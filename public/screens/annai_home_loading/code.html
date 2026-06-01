@@ -1,0 +1,269 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Annai Jewellers - Loading...</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "secondary": "#735c00",
+                  "on-tertiary-fixed": "#1c1b1b",
+                  "on-primary-container": "#fffafa",
+                  "surface-container-highest": "#e2e2e2",
+                  "surface": "#f9f9f9",
+                  "inverse-surface": "#2f3131",
+                  "tertiary": "#5c5b5b",
+                  "on-error": "#ffffff",
+                  "surface-container-high": "#e8e8e8",
+                  "surface-container": "#eeeeee",
+                  "secondary-fixed-dim": "#e9c349",
+                  "error": "#ba1a1a",
+                  "background": "#f9f9f9",
+                  "secondary-container": "#fed65b",
+                  "on-surface": "#1a1c1c",
+                  "surface-variant": "#e2e2e2",
+                  "surface-tint": "#c00014",
+                  "outline-variant": "#e7bdb8",
+                  "on-secondary-fixed-variant": "#574500",
+                  "surface-container-low": "#f3f3f3",
+                  "on-primary-fixed": "#410002",
+                  "tertiary-container": "#757474",
+                  "on-secondary": "#ffffff",
+                  "on-background": "#1a1c1c",
+                  "on-tertiary-fixed-variant": "#474746",
+                  "surface-dim": "#dadada",
+                  "inverse-on-surface": "#f1f1f1",
+                  "tertiary-fixed": "#e5e2e1",
+                  "primary-fixed": "#ffdad6",
+                  "surface-bright": "#f9f9f9",
+                  "on-error-container": "#93000a",
+                  "inverse-primary": "#ffb4ab",
+                  "primary-fixed-dim": "#ffb4ab",
+                  "on-surface-variant": "#5d3f3c",
+                  "outline": "#926f6b",
+                  "on-tertiary": "#ffffff",
+                  "secondary-fixed": "#ffe088",
+                  "tertiary-fixed-dim": "#c8c6c5",
+                  "on-secondary-fixed": "#241a00",
+                  "on-secondary-container": "#745c00",
+                  "on-tertiary-container": "#fffbfb",
+                  "on-primary": "#ffffff",
+                  "surface-container-lowest": "#ffffff",
+                  "error-container": "#ffdad6",
+                  "primary": "#ba0013",
+                  "on-primary-fixed-variant": "#93000d",
+                  "primary-container": "#e31e24"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.25rem",
+                  "lg": "0.5rem",
+                  "xl": "0.75rem",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "touch-target-min": "56px",
+                  "unit": "8px",
+                  "gutter": "16px",
+                  "stack-gap": "20px",
+                  "container-padding": "24px"
+          },
+          "fontFamily": {
+                  "body-md": ["Work Sans"],
+                  "label-sm": ["Work Sans"],
+                  "label-lg": ["Work Sans"],
+                  "headline-lg": ["Work Sans"],
+                  "headline-md": ["Work Sans"],
+                  "headline-lg-mobile": ["Work Sans"],
+                  "body-lg": ["Work Sans"]
+          },
+          "fontSize": {
+                  "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                  "label-sm": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                  "label-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                  "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                  "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                  "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                  "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .skeleton-shimmer {
+      background: linear-gradient(
+        90deg,
+        rgba(226, 226, 226, 1) 0%,
+        rgba(243, 243, 243, 1) 50%,
+        rgba(226, 226, 226, 1) 100%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite linear;
+    }
+    @keyframes shimmer {
+      from { background-position: 200% 0; }
+      to { background-position: -200% 0; }
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased">
+<!-- TopAppBar -->
+<header class="fixed top-0 z-50 w-full bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flex items-center px-gutter h-touch-target-min relative justify-center">
+<div class="flex items-center gap-4 absolute left-gutter">
+<button class="h-touch-target-min w-touch-target-min flex items-center justify-center hover:bg-surface-container rounded-full transition-all">
+
+</button>
+</div>
+<h1 class="text-headline-md font-headline-md font-bold tracking-tight text-primary dark:text-inverse-primary text-center">
+      Annai Jewellers
+    </h1>
+
+</header>
+<!-- Main Content Canvas -->
+<main class="mt-[56px] mb-[80px] p-container-padding flex flex-col gap-stack-gap max-w-[1200px] mx-auto">
+<!-- Greeting/Wallet Card Skeleton -->
+<section class="w-full bg-surface-container-low rounded-xl p-6 border border-outline-variant">
+<div class="flex flex-col gap-4">
+<div class="h-8 w-48 skeleton-shimmer rounded-lg"></div>
+<div class="flex justify-between items-end mt-2">
+<div class="flex flex-col gap-2">
+<div class="h-4 w-24 skeleton-shimmer rounded"></div>
+<div class="h-10 w-36 skeleton-shimmer rounded-lg"></div>
+</div>
+<div class="h-touch-target-min w-32 skeleton-shimmer rounded-full"></div>
+</div>
+</div>
+</section>
+<!-- Gold/Silver Rate Hero Skeleton -->
+<section class="flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<div class="h-7 w-40 skeleton-shimmer rounded"></div>
+<div class="h-5 w-20 skeleton-shimmer rounded"></div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface border border-outline-variant p-5 rounded-xl flex flex-col gap-3 shadow-[0px_4px_20px_rgba(0,0,0,0.05)]">
+<div class="flex items-center gap-2">
+<div class="h-6 w-6 skeleton-shimmer rounded-full"></div>
+<div class="h-5 w-16 skeleton-shimmer rounded"></div>
+</div>
+<div class="h-10 w-24 skeleton-shimmer rounded-lg"></div>
+<div class="h-4 w-12 skeleton-shimmer rounded mt-1"></div>
+</div>
+<div class="bg-surface border border-outline-variant p-5 rounded-xl flex flex-col gap-3">
+<div class="flex items-center gap-2">
+<div class="h-6 w-6 skeleton-shimmer rounded-full"></div>
+<div class="h-5 w-16 skeleton-shimmer rounded"></div>
+</div>
+<div class="h-10 w-24 skeleton-shimmer rounded-lg"></div>
+<div class="h-4 w-12 skeleton-shimmer rounded mt-1"></div>
+</div>
+</div>
+</section>
+<!-- Hero Carousel Skeleton -->
+<section class="relative w-full aspect-[16/9] bg-surface-container rounded-xl overflow-hidden border border-outline-variant">
+<div class="absolute inset-0 skeleton-shimmer"></div>
+<div class="absolute bottom-6 left-6 right-6 flex flex-col gap-2">
+<div class="h-8 w-2/3 skeleton-shimmer rounded-lg opacity-50"></div>
+<div class="h-4 w-1/3 skeleton-shimmer rounded opacity-50"></div>
+</div>
+</section>
+<!-- Active Schemes List Skeleton -->
+<section class="flex flex-col gap-4">
+<div class="flex justify-between items-center">
+
+<div class="h-6 w-16 skeleton-shimmer rounded"></div>
+</div>
+<div class="flex flex-col gap-4">
+<!-- Scheme Card 1 -->
+<div class="p-5 border border-outline-variant rounded-xl bg-surface flex flex-col gap-4">
+<div class="flex justify-between">
+<div class="flex flex-col gap-1">
+<div class="h-6 w-48 skeleton-shimmer rounded"></div>
+<div class="h-4 w-32 skeleton-shimmer rounded"></div>
+</div>
+<div class="h-12 w-12 skeleton-shimmer rounded-lg"></div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-label-sm">
+<div class="h-4 w-20 skeleton-shimmer rounded"></div>
+<div class="h-4 w-16 skeleton-shimmer rounded"></div>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full w-1/2 skeleton-shimmer"></div>
+</div>
+</div>
+<div class="h-touch-target-min w-full bg-surface-container-high rounded-lg skeleton-shimmer"></div>
+</div>
+<!-- Scheme Card 2 -->
+<div class="p-5 border border-outline-variant rounded-xl bg-surface flex flex-col gap-4">
+<div class="flex justify-between">
+<div class="flex flex-col gap-1">
+<div class="h-6 w-52 skeleton-shimmer rounded"></div>
+<div class="h-4 w-28 skeleton-shimmer rounded"></div>
+</div>
+<div class="h-12 w-12 skeleton-shimmer rounded-lg"></div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-label-sm">
+<div class="h-4 w-20 skeleton-shimmer rounded"></div>
+<div class="h-4 w-16 skeleton-shimmer rounded"></div>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full w-3/4 skeleton-shimmer"></div>
+</div>
+</div>
+<div class="h-touch-target-min w-full bg-surface-container-high rounded-lg skeleton-shimmer"></div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 right-0 h-[80px] bg-surface dark:bg-inverse-surface border-t border-outline-variant dark:border-outline flex justify-around items-center px-2 pb-safe z-50">
+<div class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-xl px-4 py-1.5 transition-colors">
+<span class="material-symbols-outlined">home</span>
+<span class="text-label-lg font-label-lg-mobile">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant p-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined">shopping_bag</span>
+<span class="text-label-lg font-label-lg-mobile">Shop</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant p-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined">savings</span>
+<span class="text-label-lg font-label-lg-mobile">Schemes</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant p-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined">newspaper</span>
+<span class="text-label-lg font-label-lg-mobile">News</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant p-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined">person</span>
+<span class="text-label-lg font-label-lg-mobile">Profile</span>
+</div>
+</nav>
+<script>
+    // Simple logic to simulate loading completion after a delay
+    // This is just for demonstration as requested
+    window.addEventListener('load', () => {
+      console.log('Loading state initialized...');
+    });
+  </script>
+
+
+
+
+
+
+
+
+
+
+</body></html>

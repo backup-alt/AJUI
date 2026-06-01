@@ -1,0 +1,8 @@
+{
+  "appId": "com.annaijewellers.app",
+  "appName": "Annai Jewellers",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

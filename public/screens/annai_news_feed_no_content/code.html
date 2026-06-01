@@ -1,0 +1,212 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Annai News Feed</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#1a1c1c",
+                        "inverse-surface": "#2f3131",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "tertiary": "#5c5b5b",
+                        "on-tertiary-container": "#fffbfb",
+                        "surface-container-highest": "#e2e2e2",
+                        "surface-container-low": "#f3f3f3",
+                        "outline-variant": "#e7bdb8",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#5d3f3c",
+                        "inverse-on-surface": "#f1f1f1",
+                        "surface": "#f9f9f9",
+                        "on-background": "#1a1c1c",
+                        "surface-container": "#eeeeee",
+                        "primary-container": "#e31e24",
+                        "tertiary-fixed": "#e5e2e1",
+                        "tertiary-container": "#757474",
+                        "surface-tint": "#c00014",
+                        "on-tertiary-fixed": "#1c1b1b",
+                        "primary-fixed-dim": "#ffb4ab",
+                        "secondary-fixed": "#ffe088",
+                        "background": "#f9f9f9",
+                        "secondary-container": "#fed65b",
+                        "inverse-primary": "#ffb4ab",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#745c00",
+                        "secondary-fixed-dim": "#e9c349",
+                        "outline": "#926f6b",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "on-error-container": "#93000a",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary": "#735c00",
+                        "surface-bright": "#f9f9f9",
+                        "on-secondary-fixed": "#241a00",
+                        "surface-container-high": "#e8e8e8",
+                        "surface-dim": "#dadada",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "on-primary-container": "#fffafa",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#e2e2e2",
+                        "primary": "#ba0013",
+                        "primary-fixed": "#ffdad6",
+                        "on-primary-fixed-variant": "#93000d",
+                        "on-primary-fixed": "#410002",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-fixed-variant": "#574500"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "8px",
+                        "stack-gap": "20px",
+                        "gutter": "16px",
+                        "container-padding": "24px",
+                        "touch-target-min": "56px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Work Sans"],
+                        "headline-lg-mobile": ["Work Sans"],
+                        "label-sm": ["Work Sans"],
+                        "label-lg": ["Work Sans"],
+                        "headline-lg": ["Work Sans"],
+                        "body-md": ["Work Sans"],
+                        "body-lg": ["Work Sans"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "label-sm": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "label-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Work Sans', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .empty-state-container {
+            min-height: calc(100vh - 56px);
+        }
+        .vignette-overlay {
+            background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.02) 100%);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface">
+<!-- Top AppBar - Following JSON Structure -->
+<header class="fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full px-4 h-14 bg-surface border-b border-outline-variant">
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center w-touch-target-min h-touch-target-min text-primary hover:bg-surface-container rounded-full transition-all active:scale-95">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<h1 class="text-headline-md font-headline-md text-on-surface tracking-tight"></h1><h1 class="text-label-lg font-bold text-primary dark:text-primary-container absolute left-1/2 -translate-x-1/2" style="--tw-border-spacing-y: 0; --tw-translate-x: -50%; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-pan-x: ; --tw-pan-y: ; --tw-pinch-zoom: ; --tw-scroll-snap-strictness: proximity; --tw-gradient-from-position: ; --tw-gradient-via-position: ; --tw-gradient-to-position: ; --tw-ordinal: ; --tw-slashed-zero: ; --tw-numeric-figure: ; --tw-numeric-spacing: ; --tw-numeric-fraction: ; --tw-ring-inset: ; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgb(59 130 246 / 0.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --tw-blur: ; --tw-brightness: ; --tw-contrast: ; --tw-grayscale: ; --tw-hue-rotate: ; --tw-invert: ; --tw-saturate: ; --tw-sepia: ; --tw-drop-shadow: ; --tw-backdrop-blur: ; --tw-backdrop-brightness: ; --tw-backdrop-contrast: ; --tw-backdrop-grayscale: ; --tw-backdrop-hue-rotate: ; --tw-backdrop-invert: ; --tw-backdrop-opacity: ; --tw-backdrop-saturate: ; --tw-backdrop-sepia: ; --tw-contain-size: ; --tw-contain-layout: ; --tw-contain-paint: ; --tw-contain-style: ; left: 195px; transform: translate(-50%) rotate(0deg) skewX(0deg) skewY(0deg) scaleX(1) scaleY(1); --tw-text-opacity: 1; color: rgb(186, 0, 19); animation-duration: 1.5s; animation-timing-function: ease-out; animation-iteration-count: 1; animation-direction: normal; animation-fill-mode: forwards; animation-play-state: running; animation-name: stitch-scan-flash; animation-timeline: auto; animation-range: normal; font-family: &quot;Work Sans&quot;, sans-serif; outline: none !important; box-shadow: none !important;"></h1><h1 class="text-headline-md font-headline-md font-bold tracking-tight text-primary text-center flex-1 mx-2 truncate cursor-text" spellcheck="false" data-stitch-added-classes="cursor-text" style="--tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-pan-x: ; --tw-pan-y: ; --tw-pinch-zoom: ; --tw-scroll-snap-strictness: proximity; --tw-gradient-from-position: ; --tw-gradient-via-position: ; --tw-gradient-to-position: ; --tw-ordinal: ; --tw-slashed-zero: ; --tw-numeric-figure: ; --tw-numeric-spacing: ; --tw-numeric-fraction: ; --tw-ring-inset: ; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgb(59 130 246 / 0.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --tw-blur: ; --tw-brightness: ; --tw-contrast: ; --tw-grayscale: ; --tw-hue-rotate: ; --tw-invert: ; --tw-saturate: ; --tw-sepia: ; --tw-drop-shadow: ; --tw-backdrop-blur: ; --tw-backdrop-brightness: ; --tw-backdrop-contrast: ; --tw-backdrop-grayscale: ; --tw-backdrop-hue-rotate: ; --tw-backdrop-invert: ; --tw-backdrop-opacity: ; --tw-backdrop-saturate: ; --tw-backdrop-sepia: ; --tw-contain-size: ; --tw-contain-layout: ; --tw-contain-paint: ; --tw-contain-style: ; margin: 0px 0.5rem; flex: 1 1 0%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; --tw-text-opacity: 1; color: rgb(186, 0, 19); outline: none !important; box-shadow: none !important;">Featured Jewellery</h1>
+</div>
+<div class="flex items-center">
+<button class="flex items-center justify-center w-touch-target-min h-touch-target-min text-primary hover:bg-surface-container rounded-full transition-all">
+
+</button>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="pt-14 pb-10 flex flex-col items-center justify-center empty-state-container px-gutter text-center vignette-overlay">
+<!-- Hero Empty State Section -->
+<div class="relative w-full max-w-[400px] flex flex-col items-center space-y-stack-gap">
+<!-- Elegant Iconography Block -->
+<div class="relative w-48 h-48 mb-4">
+<!-- Background decorative rings -->
+<div class="absolute inset-0 rounded-full border-2 border-outline-variant/30 animate-pulse"></div>
+<div class="absolute inset-4 rounded-full border border-primary/10"></div>
+<!-- Central Icon Component -->
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-32 h-32 bg-surface-container-low rounded-full flex items-center justify-center shadow-sm border border-outline-variant">
+<span class="material-symbols-outlined text-[64px] text-primary" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 200;">
+                            auto_stories
+                        </span>
+</div>
+</div>
+<!-- Small Floating Accents -->
+<div class="absolute top-4 right-4 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md border border-outline-variant">
+<span class="material-symbols-outlined text-[24px] text-primary" style="font-variation-settings: &quot;FILL&quot; 1;">diamond</span>
+</div>
+<div class="absolute bottom-8 left-0 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md border border-outline-variant">
+<span class="material-symbols-outlined text-[20px] text-secondary" style="font-variation-settings: &quot;FILL&quot; 1;">auto_awesome</span>
+</div>
+</div>
+<!-- Content Hierarchy -->
+<div class="space-y-4">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface tracking-tight">Stay Tuned</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-[320px] mx-auto leading-relaxed">
+                    We are curating the latest collections and heritage stories just for you. Check back soon!
+                </p>
+</div>
+<!-- Decorative Asset Section -->
+<div class="mt-12 w-full grid grid-cols-3 gap-4 opacity-40 grayscale pointer-events-none">
+<div class="aspect-square bg-surface-container-highest rounded-xl overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A macro close-up of a delicate gold filigree necklace lying on a white velvet surface. The lighting is bright and high-contrast, emphasizing the intricate traditional craftsmanship. The color palette is composed of warm gold and clean white, aligning with a premium minimalist jewelry brand aesthetic. The scene is elegant and serene." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBb1swyuS0kQzCoq1WrCIRRnqFcIvYeJKB-eBBEwVpdoDT8vyP9afCBbv_lfiglxs6ezYcQYdPUSdmDppHChtDg_DJdeCIUg80cmPpKAp4ml5dy9PZOivPcxdI3gfSvA4HU0b2fHbCuJ1-0ss090XCtzFK5AgI_sXBMy265qq5WlJxqj52qMkoyfrQMRfcjAr_TuQfkLG0zbD50fku8eJRCNcC8mIvSdt2PLDJ_mSJVVPc6YZ6my407DaFaqf6A0s3nBVayEtU8W6c">
+</div>
+<div class="aspect-square bg-surface-container-highest rounded-xl overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A collection of traditional Indian gold bangles displayed on a polished dark wood table. The lighting is soft and focused, creating a warm and trustworthy atmosphere. The overall style is corporate modern with a focus on premium heritage and reliability. Rich red and gold tones are prominent against a soft grey background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDu3qZHr7kGOgVB2o21yhm7_CY8F-k1xd3WjduV5rC389-q3LKFri6pupbm96OgeN1EFzKdDFZ2qpNaeSq5JXE7aAe0RoNArCRJsvs6EmDAsjIE44x2FmyND42ihAT1vCLQdnutetCxf2zMCrGiHXT6fZDMJsZJmWx41KhywaciwHWBQu4nVH7Zh5JvssN_jZzOWAB6EHBv1LZiAxNhpWqaHwzNNqDpFlNd0rUAOwBPQsY9z6r6iaN-GWxwYmi2qe4xBP2CzMuzQ70">
+</div>
+<div class="aspect-square bg-surface-container-highest rounded-xl overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A pair of ornate temple jewellery earrings with ruby accents resting in a premium velvet box. The composition is clean and minimalist, using heavy white space to highlight the dignity of the heritage piece. The colors are dominated by deep crimson red and lustrous gold, conveying a sense of knowledge and trust." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMAPqV0EJ-IN9qF2TZGuBgDFgHNFar8fB9ZYp6coU6Q7ExOKBPi5m7IpEUThhS8Qlpg9VKEGF_tZOXpg-kQ_-wSblWFjQANVTpXlFVdJwngM72DCwVJgqBbQFNjEXc4mWc6She9EtrCCtq0HHWI1pholeGl-3dYuGRJqoAe_G0ObzPCo1oe8p9rp7PtAIWL-TOEJ1dNSsGkkmq4r33phTZ7voi4qJMHjWYuCHJHoCkRmsC8lPJv4fscXQF-stK281R4W6keKHIkrs">
+</div>
+</div>
+<!-- Call to Action (Optional for Engagement) -->
+<div class="pt-8 w-full px-gutter">
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-label-lg text-label-lg rounded-xl flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform" onclick="window.history.back()">
+<span class="material-symbols-outlined">explore</span>
+                    Browse Store
+                </button>
+<button class="mt-4 w-full h-touch-target-min border border-outline text-primary font-label-lg text-label-lg rounded-xl flex items-center justify-center gap-2 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+                    Notify Me
+                </button>
+</div>
+</div>
+</main>
+<!-- Contextual FAB (Hidden as per feed requirements, but structurally ready if needed) -->
+<!-- Suppression applied per UX Goal: prioritized focus on "Stay Tuned" message -->
+<script>
+        // Micro-interaction for the back button
+        document.querySelector('header button:first-child').addEventListener('click', () => {
+            console.log('Navigating back...');
+        });
+
+        // Atmospheric effect: gentle floating animation for the accents
+        const accents = document.querySelectorAll('.max-w-\\[400px\\] div[class*="absolute"]:not(.inset-0)');
+        accents.forEach((accent, index) => {
+            accent.animate([
+                { transform: 'translateY(0px)' },
+                { transform: 'translateY(-10px)' },
+                { transform: 'translateY(0px)' }
+            ], {
+                duration: 3000 + (index * 500),
+                iterations: Infinity,
+                easing: 'ease-in-out'
+            });
+        });
+    </script>
+
+
+
+
+</body></html>

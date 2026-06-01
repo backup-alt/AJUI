@@ -1,0 +1,445 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Annai Jewellers - Profile</title>
+<!-- Google Fonts: Work Sans for Heritage Reliability -->
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols for High-Legibility Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .verified-badge {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+        }
+        body {
+            font-family: 'Work Sans', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-primary-container": "#fffafa",
+                "on-error": "#ffffff",
+                "surface-variant": "#e2e2e2",
+                "primary-fixed-dim": "#ffb4ab",
+                "on-tertiary-fixed-variant": "#474746",
+                "secondary-fixed-dim": "#e9c349",
+                "error": "#ba1a1a",
+                "inverse-primary": "#ffb4ab",
+                "inverse-surface": "#2f3131",
+                "surface-bright": "#f9f9f9",
+                "on-secondary-fixed": "#241a00",
+                "background": "#f9f9f9",
+                "surface-container-high": "#e8e8e8",
+                "primary": "#ba0013",
+                "on-error-container": "#93000a",
+                "on-surface": "#1a1c1c",
+                "secondary": "#735c00",
+                "on-secondary": "#ffffff",
+                "surface-tint": "#c00014",
+                "error-container": "#ffdad6",
+                "outline-variant": "#e7bdb8",
+                "surface": "#f9f9f9",
+                "tertiary": "#5c5b5b",
+                "surface-container": "#eeeeee",
+                "on-tertiary": "#ffffff",
+                "on-background": "#1a1c1c",
+                "secondary-fixed": "#ffe088",
+                "on-primary-fixed": "#410002",
+                "inverse-on-surface": "#f1f1f1",
+                "on-secondary-fixed-variant": "#574500",
+                "outline": "#926f6b",
+                "tertiary-container": "#757474",
+                "surface-container-lowest": "#ffffff",
+                "on-surface-variant": "#5d3f3c",
+                "surface-container-low": "#f3f3f3",
+                "primary-fixed": "#ffdad6",
+                "on-primary-fixed-variant": "#93000d",
+                "primary-container": "#e31e24",
+                "on-secondary-container": "#745c00",
+                "surface-container-highest": "#e2e2e2",
+                "on-primary": "#ffffff",
+                "on-tertiary-container": "#fffbfb",
+                "secondary-container": "#fed65b",
+                "tertiary-fixed": "#e5e2e1",
+                "surface-dim": "#dadada",
+                "on-tertiary-fixed": "#1c1b1b",
+                "tertiary-fixed-dim": "#c8c6c5"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+            },
+            "spacing": {
+                "stack-gap": "20px",
+                "unit": "8px",
+                "touch-target-min": "56px",
+                "container-padding": "24px",
+                "gutter": "16px"
+            },
+            "fontFamily": {
+                "headline-lg-mobile": ["Work Sans"],
+                "label-sm": ["Work Sans"],
+                "headline-md": ["Work Sans"],
+                "label-lg": ["Work Sans"],
+                "headline-lg": ["Work Sans"],
+                "body-lg": ["Work Sans"],
+                "body-md": ["Work Sans"]
+            },
+            "fontSize": {
+                "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                "label-sm": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "label-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}],
+                "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-surface text-on-surface min-h-screen pb-[80px]">
+<!-- Shared TopAppBar Component -->
+<header class="fixed top-0 left-0 right-0 h-touch-target-min z-50 bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-surface-variant flex items-center justify-between px-gutter">
+  <button aria-label="Go back" class="h-touch-target-min w-touch-target-min flex items-center justify-start text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low transition-all duration-200 active:scale-[0.90]">
+    <span class="material-symbols-outlined">arrow_back</span>
+  </button>
+  <h1 class="text-label-lg font-bold text-primary dark:text-primary-container absolute left-1/2 -translate-x-1/2"></h1><h1 class="text-headline-md font-headline-md font-bold tracking-tight text-primary text-center flex-1 mx-2 truncate" style="--tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-pan-x: ; --tw-pan-y: ; --tw-pinch-zoom: ; --tw-scroll-snap-strictness: proximity; --tw-gradient-from-position: ; --tw-gradient-via-position: ; --tw-gradient-to-position: ; --tw-ordinal: ; --tw-slashed-zero: ; --tw-numeric-figure: ; --tw-numeric-spacing: ; --tw-numeric-fraction: ; --tw-ring-inset: ; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgb(59 130 246 / 0.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --tw-blur: ; --tw-brightness: ; --tw-contrast: ; --tw-grayscale: ; --tw-hue-rotate: ; --tw-invert: ; --tw-saturate: ; --tw-sepia: ; --tw-drop-shadow: ; --tw-backdrop-blur: ; --tw-backdrop-brightness: ; --tw-backdrop-contrast: ; --tw-backdrop-grayscale: ; --tw-backdrop-hue-rotate: ; --tw-backdrop-invert: ; --tw-backdrop-opacity: ; --tw-backdrop-saturate: ; --tw-backdrop-sepia: ; --tw-contain-size: ; --tw-contain-layout: ; --tw-contain-paint: ; --tw-contain-style: ; margin: 0px 0.5rem; flex: 1 1 0%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.025em; --tw-text-opacity: 1; color: rgb(186, 0, 19); outline: none !important; box-shadow: none !important;">Profile</h1>
+  <button aria-label="Profile" class="h-10 w-10 rounded-full overflow-hidden border border-outline-variant hover:opacity-80 transition-opacity">
+    <img alt="Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK7T-isQzirgjplQZvF7JV67d7jCo2_9HSxSrcUC7CsWeNabM1AmtjlOD8PiZ0b3tss3Jrub4TuI0qWcin5jjZmh6fARo_Ol9N010_t5iyS0PbEgVdPX5dAL9IQMDIKIyDMDgNh9Bso9viPZ5Uc5vPUej-hi21IEqef1k1mbHVQ52p0iZJwCUBmKqN8yB48EpIpCJcJdm-P1n3KOl_FI-wAnigZkFw9QItXQbhIdIDRDNrwLKnE3hXSP1CAsfd0tuP0uTNNnlQ_7k">
+  </button>
+</header>
+<!-- Main Content Canvas -->
+<main class="mt-[56px] pb-44" style="padding-bottom: calc(176px + env(safe-area-inset-bottom));">
+<!-- Hero Profile Section: Visual Anchor -->
+<div class="relative bg-primary pt-12 pb-24">
+<!-- Curved background transition -->
+<div class="absolute bottom-0 left-0 right-0 h-16 bg-surface rounded-t-[40px]"></div>
+<div class="flex flex-col items-center relative z-10 px-container-padding">
+<div class="relative">
+<div class="w-[140px] h-[140px] rounded-full border-4 border-white bg-surface-container overflow-hidden shadow-lg">
+<img alt="John Doe Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK7T-isQzirgjplQZvF7JV67d7jCo2_9HSxSrcUC7CsWeNabM1AmtjlOD8PiZ0b3tss3Jrub4TuI0qWcin5jjZmh6fARo_Ol9N010_t5iyS0PbEgVdPX5dAL9IQMDIKIyDMDgNh9Bso9viPZ5Uc5vPUej-hi21IEqef1k1mbHVQ52p0iZJwCUBmKqN8yB48EpIpCJcJdm-P1n3KOl_FI-wAnigZkFw9QItXQbhIdIDRDNrwLKnE3hXSP1CAsfd0tuP0uTNNnlQ_7k">
+</div>
+<div class="absolute bottom-1 right-2 bg-white rounded-full p-1 shadow-md flex items-center justify-center">
+<span class="material-symbols-outlined verified-badge text-green-600 text-[24px]" data-icon="check_circle">check_circle</span>
+</div>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<h2 id="profileNameText" class="font-headline-md text-headline-md text-on-surface">John Doe</h2>
+<button id="editProfileButton" type="button" aria-label="Edit Profile" class="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-on-primary shadow-sm hover:opacity-90 active:scale-95 transition-all">
+<span id="editProfileIcon" class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+</div>
+<div class="mt-6 w-full max-w-sm bg-surface-container-lowest border border-outline-variant rounded-xl p-4 shadow-sm">
+<div class="space-y-3">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container text-[20px]">mail</span>
+<p id="profileEmailText" class="font-body-md text-on-surface-variant text-[16px]">johndoe124@email.com</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container text-[20px]">calendar_month</span>
+<p id="profileDobText" class="font-body-md text-on-surface-variant text-[16px]">May 25, 2026</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container text-[20px]">storefront</span>
+<p id="profileBranchText" class="font-body-md text-on-surface-variant text-[16px]">T Nagar Branch</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container text-[20px]">verified_user</span>
+<p id="profileAddressStatusText" class="font-body-md text-on-surface-variant text-[16px]">Current Address</p>
+</div>
+<div class="pt-2 border-t border-outline-variant flex items-start gap-3">
+<span class="material-symbols-outlined text-primary-container text-[20px]">location_on</span>
+<p id="profileAddressText" class="font-body-md text-on-surface-variant text-[15px] leading-5">No. 24, North Usman Road, Near Panagal Park, Chennai, Tamil Nadu 600017</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Editable Profile Form -->
+<section id="profileEditorPanel" class="hidden fixed left-0 right-0 top-0 z-[100] bg-black/40 px-container-padding pt-3 pb-3 overflow-y-auto" style="bottom: calc(92px + env(safe-area-inset-bottom));">
+<div class="min-h-full flex items-start justify-center">
+<form id="profileForm" class="w-full max-w-sm overflow-y-auto bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant p-4 space-y-4" style="max-height: calc(100dvh - 124px - env(safe-area-inset-bottom)); padding-bottom: 0;">
+<div class="sticky top-0 z-10 -mx-4 -mt-4 px-4 pt-4 pb-3 bg-surface-container-lowest border-b border-outline-variant flex items-center justify-between gap-3">
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface">Profile Details</h3>
+<p id="profileModeText" class="font-label-sm text-on-surface-variant">Update your personal and address details.</p>
+</div>
+<span id="profileSaveStatus" class="font-label-sm text-green-700 hidden">Updated</span>
+</div>
+<div class="grid grid-cols-1 gap-3">
+<label class="font-label-sm text-on-surface-variant">Full Name
+<input name="name" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface read-only:bg-surface-container-low focus:border-primary focus:ring-primary" type="text" readonly>
+</label>
+<label class="font-label-sm text-on-surface-variant">Email
+<input name="email" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface read-only:bg-surface-container-low focus:border-primary focus:ring-primary" type="email" readonly>
+</label>
+<label class="font-label-sm text-on-surface-variant">Date of Birth
+<input name="dob" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface read-only:bg-surface-container-low focus:border-primary focus:ring-primary" type="date" readonly>
+</label>
+<label class="font-label-sm text-on-surface-variant">Address Status
+<select name="addressStatus" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface disabled:bg-surface-container-low focus:border-primary focus:ring-primary" disabled>
+<option>Current</option>
+<option>Permanent</option>
+<option>Work</option>
+</select>
+</label>
+<label class="font-label-sm text-on-surface-variant">Branch
+<select name="branch" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface disabled:bg-surface-container-low focus:border-primary focus:ring-primary" disabled>
+<option>T Nagar Branch</option>
+<option>Anna Nagar Branch</option>
+<option>Tambaram Branch</option>
+<option>Coimbatore Branch</option>
+</select>
+</label>
+</div>
+<div class="rounded-xl border border-outline-variant bg-surface-container-low p-3 space-y-3">
+<h4 class="font-label-lg text-on-surface">Address Information</h4>
+<label class="font-label-sm text-on-surface-variant">Line 1
+<input name="addressLine1" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface read-only:bg-surface-container-low focus:border-primary focus:ring-primary" type="text" readonly>
+</label>
+<label class="font-label-sm text-on-surface-variant">Line 2
+<input name="addressLine2" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface read-only:bg-surface-container-low focus:border-primary focus:ring-primary" type="text" readonly>
+</label>
+<div class="grid grid-cols-2 gap-3">
+<label class="font-label-sm text-on-surface-variant">State
+<input name="state" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface read-only:bg-surface-container-low focus:border-primary focus:ring-primary" type="text" readonly>
+</label>
+<label class="font-label-sm text-on-surface-variant">City
+<input name="city" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface read-only:bg-surface-container-low focus:border-primary focus:ring-primary" type="text" readonly>
+</label>
+</div>
+<label class="font-label-sm text-on-surface-variant">PIN Code
+<input name="pinCode" data-profile-field class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-body-md text-on-surface read-only:bg-surface-container-low focus:border-primary focus:ring-primary" type="text" inputmode="numeric" readonly>
+</label>
+</div>
+<div id="profileFormActions" class="hidden sticky bottom-0 z-10 grid grid-cols-2 gap-3 bg-surface-container-lowest pt-3 pb-4 -mx-4 px-4 border-t border-outline-variant">
+<button id="cancelProfileEdit" type="button" class="h-touch-target-min rounded-lg border border-outline-variant text-on-surface font-label-lg active:scale-95 transition-all">Cancel</button>
+<button type="submit" class="h-touch-target-min rounded-lg bg-primary text-on-primary font-label-lg shadow-sm active:scale-95 transition-all">Update Profile</button>
+</div>
+</form>
+</div>
+</section>
+<!-- Navigation List: Heritage Spacing & Legibility -->
+<section class="px-container-padding mt-4 relative z-20">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
+<!-- Connect Action -->
+<button class="w-full flex items-center justify-between px-6 py-5 hover:bg-surface-container-low transition-colors duration-200 border-b border-outline-variant text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center rounded-full bg-primary-fixed text-primary">
+<span class="material-symbols-outlined" data-icon="call">call</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">Connect</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Security Action -->
+<button class="w-full flex items-center justify-between px-6 py-5 hover:bg-surface-container-low transition-colors duration-200 border-b border-outline-variant text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center rounded-full bg-secondary-container text-secondary">
+<span class="material-symbols-outlined" data-icon="security">security</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">Security</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Privacy Action -->
+<button class="w-full flex items-center justify-between px-6 py-5 hover:bg-surface-container-low transition-colors duration-200 border-b border-outline-variant text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center rounded-full bg-tertiary-fixed text-tertiary">
+<span class="material-symbols-outlined" data-icon="lock">lock</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">Privacy</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- About Action -->
+<button class="w-full flex items-center justify-between px-6 py-5 hover:bg-surface-container-low transition-colors duration-200 border-b border-outline-variant text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-highest text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="info">info</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">About</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Logout Action -->
+<button class="w-full flex items-center justify-between px-6 py-5 hover:bg-error-container transition-colors duration-200 text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center rounded-full bg-error-container text-error">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+</div>
+<span class="font-label-lg text-label-lg text-error">Logout</span>
+</div>
+<span class="material-symbols-outlined text-error" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+<!-- Heritage Tagline -->
+<div class="mt-8 mb-4 text-center">
+<p class="font-label-sm text-on-surface-variant uppercase tracking-widest opacity-60">Est. 1994 • Trusted by Families</p>
+</div>
+</section>
+</main>
+<script>
+        const defaultProfile = {
+            name: 'John Doe',
+            email: 'johndoe124@email.com',
+            dob: '2026-05-25',
+            addressStatus: 'Current',
+            branch: 'T Nagar Branch',
+            addressLine1: 'No. 24, North Usman Road',
+            addressLine2: 'Near Panagal Park',
+            state: 'Tamil Nadu',
+            city: 'Chennai',
+            pinCode: '600017'
+        };
+
+        const form = document.getElementById('profileForm');
+        const editButton = document.getElementById('editProfileButton');
+        const editorPanel = document.getElementById('profileEditorPanel');
+        const cancelButton = document.getElementById('cancelProfileEdit');
+        const formActions = document.getElementById('profileFormActions');
+        const modeText = document.getElementById('profileModeText');
+        const statusText = document.getElementById('profileSaveStatus');
+        const editIcon = document.getElementById('editProfileIcon');
+        const fields = Array.from(form.querySelectorAll('[data-profile-field]'));
+        let currentProfile = loadProfile();
+        let isEditing = false;
+
+        function loadProfile() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('annaiProfile') || '{}');
+                return { ...defaultProfile, ...saved };
+            } catch (error) {
+                return { ...defaultProfile };
+            }
+        }
+
+        function saveProfile(profile) {
+            localStorage.setItem('annaiProfile', JSON.stringify(profile));
+        }
+
+        function formatDob(value) {
+            if (!value) return '';
+            const date = new Date(`${value}T00:00:00`);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        function addressText(profile) {
+            const cityLine = [profile.city, profile.state, profile.pinCode].filter(Boolean).join(', ');
+            return [profile.addressLine1, profile.addressLine2, cityLine].filter(Boolean).join(', ');
+        }
+
+        function fillForm(profile) {
+            Object.entries(profile).forEach(([key, value]) => {
+                const field = form.elements[key];
+                if (field) field.value = value;
+            });
+        }
+
+        function renderProfile(profile) {
+            document.getElementById('profileNameText').textContent = profile.name;
+            document.getElementById('profileEmailText').textContent = profile.email;
+            document.getElementById('profileDobText').textContent = formatDob(profile.dob);
+            document.getElementById('profileBranchText').textContent = profile.branch;
+            document.getElementById('profileAddressStatusText').textContent = `${profile.addressStatus} Address`;
+            document.getElementById('profileAddressText').textContent = addressText(profile);
+            fillForm(profile);
+        }
+
+        function setEditing(editing) {
+            isEditing = editing;
+            fields.forEach(field => {
+                if (field.tagName === 'SELECT') {
+                    field.disabled = !editing;
+                } else {
+                    field.readOnly = !editing;
+                }
+            });
+            formActions.classList.toggle('hidden', !editing);
+            editorPanel.classList.toggle('hidden', !editing);
+            editIcon.textContent = editing ? 'close' : 'edit';
+            modeText.textContent = editing ? 'Update your personal and address details.' : 'Update your personal and address details.';
+            statusText.classList.add('hidden');
+            document.body.style.overflow = editing ? 'hidden' : '';
+            if (editing) window.setTimeout(() => form.elements.name.focus(), 50);
+        }
+
+        editButton.addEventListener('click', () => {
+            if (isEditing) {
+                fillForm(currentProfile);
+                setEditing(false);
+                return;
+            }
+            setEditing(true);
+        });
+
+        cancelButton.addEventListener('click', () => {
+            fillForm(currentProfile);
+            setEditing(false);
+        });
+
+        editorPanel.addEventListener('click', event => {
+            if (event.target === editorPanel) {
+                fillForm(currentProfile);
+                setEditing(false);
+            }
+        });
+
+        form.addEventListener('submit', event => {
+            event.preventDefault();
+            currentProfile = {
+                name: form.elements.name.value.trim(),
+                email: form.elements.email.value.trim(),
+                dob: form.elements.dob.value,
+                addressStatus: form.elements.addressStatus.value,
+                branch: form.elements.branch.value,
+                addressLine1: form.elements.addressLine1.value.trim(),
+                addressLine2: form.elements.addressLine2.value.trim(),
+                state: form.elements.state.value.trim(),
+                city: form.elements.city.value.trim(),
+                pinCode: form.elements.pinCode.value.trim()
+            };
+            saveProfile(currentProfile);
+            renderProfile(currentProfile);
+            setEditing(false);
+        });
+
+        renderProfile(currentProfile);
+        setEditing(false);
+
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('touchstart', function() {
+                this.classList.add('scale-[0.98]');
+            });
+            btn.addEventListener('touchend', function() {
+                this.classList.remove('scale-[0.98]');
+            });
+        });
+    </script>
+
+
+
+
+
+
+
+
+
+
+
+
+</body></html>

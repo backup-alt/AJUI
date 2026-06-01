@@ -1,0 +1,217 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Select Scheme - Annai Jewellers</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#5c5b5b",
+                        "on-background": "#1a1c1c",
+                        "secondary-fixed": "#ffe088",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#ffb4ab",
+                        "secondary-container": "#fed65b",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#745c00",
+                        "on-tertiary-container": "#fffbfb",
+                        "on-tertiary-fixed": "#1c1b1b",
+                        "surface": "#f9f9f9",
+                        "primary": "#ba0013",
+                        "primary-container": "#e31e24",
+                        "background": "#f9f9f9",
+                        "primary-fixed-dim": "#ffb4ab",
+                        "inverse-on-surface": "#f1f1f1",
+                        "on-surface": "#1a1c1c",
+                        "outline-variant": "#e7bdb8",
+                        "surface-tint": "#c00014",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "on-primary-fixed": "#410002",
+                        "on-secondary-fixed": "#241a00",
+                        "on-primary-fixed-variant": "#93000d",
+                        "secondary-fixed-dim": "#e9c349",
+                        "outline": "#926f6b",
+                        "surface-bright": "#f9f9f9",
+                        "primary-fixed": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "tertiary-container": "#757474",
+                        "surface-variant": "#e2e2e2",
+                        "surface-container-low": "#f3f3f3",
+                        "on-primary-container": "#fffafa",
+                        "on-surface-variant": "#5d3f3c",
+                        "surface-dim": "#dadada",
+                        "secondary": "#735c00",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e8e8e8",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "surface-container-highest": "#e2e2e2",
+                        "on-secondary-fixed-variant": "#574500",
+                        "tertiary-fixed": "#e5e2e1",
+                        "surface-container": "#eeeeee"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "stack-gap": "20px",
+                        "container-padding": "24px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Work Sans"],
+                        "headline-lg-mobile": ["Work Sans"],
+                        "headline-lg": ["Work Sans"],
+                        "body-md": ["Work Sans"],
+                        "label-sm": ["Work Sans"],
+                        "headline-md": ["Work Sans"],
+                        "body-lg": ["Work Sans"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-sm": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+@keyframes fade-down {
+  0% { opacity: 0; transform: translateY(-20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-150%) skewX(-15deg); }
+  100% { transform: translateX(150%) skewX(-15deg); }
+}
+
+.animate-fade-down {
+  animation: fade-down 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+.shimmer-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255, 235, 150, 0.4), transparent);
+  animation: shimmer 2.5s infinite;
+  pointer-events: none;
+}
+</style>
+</head>
+<body class="bg-background text-on-background antialiased max-w-[1200px] mx-auto min-h-screen flex flex-col overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full flex items-center px-gutter h-touch-target-min z-50 bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-surface-variant max-w-[1200px] opacity-0 animate-fade-down"><button aria-label="Go back" class="h-touch-target-min w-touch-target-min flex items-center justify-start text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low transition-all duration-200 z-10 active:scale-[0.90]"><span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span></button><div class="absolute inset-0 flex items-center justify-center pointer-events-none"><h1 class="text-headline-md font-headline-md text-primary dark:text-primary-container tracking-tight truncate px-2 pointer-events-auto">Join Scheme</h1></div><div class="ml-auto h-touch-target-min w-touch-target-min flex items-center justify-end z-10"><button aria-label="Profile" class="h-10 w-10 rounded-full overflow-hidden border border-outline-variant hover:opacity-80 transition-opacity"><img alt="Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK7T-isQzirgjplQZvF7JV67d7jCo2_9HSxSrcUC7CsWeNabM1AmtjlOD8PiZ0b3tss3Jrub4TuI0qWcin5jjZmh6fARo_Ol9N010_t5iyS0PbEgVdPX5dAL9IQMDIKIyDMDgNh9Bso9viPZ5Uc5vPUej-hi21IEqef1k1mbHVQ52p0iZJwCUBmKqN8yB48EpIpCJcJdm-P1n3KOl_FI-wAnigZkFw9QItXQbhIdIDRDNrwLKnE3hXSP1CAsfd0tuP0uTNNnlQ_7k"></button></div></header>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-[80px] pb-safe px-container-padding flex flex-col gap-stack-gap">
+<!-- Screen Intent Title (Contextual) -->
+<h2 class="text-headline-lg-mobile md:text-headline-lg font-headline-lg-mobile md:font-headline-lg text-center mt-4 opacity-0 animate-fade-down delay-100">Select Scheme</h2>
+<!-- Segmented Control for Gold/Silver -->
+<div class="bg-surface-container-low p-1 rounded-xl flex mx-auto max-w-sm w-full border border-surface-variant opacity-0 animate-fade-down delay-200">
+<button aria-pressed="true" class="flex-1 py-3 text-label-lg font-label-lg rounded-lg bg-primary-container text-on-primary-container shadow-sm shimmer-effect relative overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.95] active:brightness-95">
+                Gold
+            </button>
+<button aria-pressed="false" class="flex-1 py-3 text-label-lg font-label-lg rounded-lg text-on-surface-variant hover:bg-surface-variant relative overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.95] active:brightness-95">
+                Silver
+            </button>
+</div>
+<!-- Scheme Image Buttons List -->
+<div class="flex flex-col gap-stack-gap mt-4 pb-8">
+<!-- DigiGold Scheme -->
+<button class="w-full relative rounded-xl overflow-hidden shadow-sm group focus:outline-none focus:ring-4 focus:ring-primary/50 transition-all duration-300 active:scale-[0.98] active:brightness-95 opacity-0 animate-fade-up delay-300">
+<div class="aspect-[2/1] md:aspect-[3/1] w-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
+<img alt="DigiGold Scheme" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A macro shot of brilliant gold coins and bars stacked neatly on a dark, reflective surface. The lighting is premium, with warm spotlights enhancing the metallic luster and deep shadows creating a sense of luxury and trust. A subtle hint of red in the ambient light connects to the brand palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDoZd8SlCox7ELiLVbBg6LySPVhuxsHrwl9IY7Boa6RJ_YdBsG5abTPYsFQ4d2jevYuo5VBraNXYzDfBfoa-FxotBB1Y3jUgJT13_8fbudxku4zDMa6vrhqDZyh3eyUQ-F1x18obYFFarnGRlIv1yQED5FoptICeRcT7yo8typ1VFT0AFz0zsn9dmUbCM9dRUX4Fuqh5H9pn3wQrw6qAUWLu-9IVUFiTFf8zXQrDUmvK_HGrM4HyyLDb5y9neFa0eLV6V6_XEcFWds">
+<!-- Overlay for legibility -->
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+</div>
+<div class="absolute bottom-0 left-0 w-full p-4 text-left">
+<h3 class="text-headline-md font-headline-md text-on-primary mb-1">DigiGold</h3>
+<p class="text-label-sm font-label-sm text-on-primary/80 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="trending_up">trending_up</span> Start small, grow secure
+                    </p>
+</div>
+</button>
+<!-- Annai Savings Plan -->
+<button class="w-full relative rounded-xl overflow-hidden shadow-sm group focus:outline-none focus:ring-4 focus:ring-primary/50 transition-all duration-300 active:scale-[0.98] active:brightness-95 opacity-0 animate-fade-up delay-400">
+<div class="aspect-[2/1] md:aspect-[3/1] w-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
+<img alt="Annai Savings Plan" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A delicate, traditional Indian gold necklace draped elegantly over a soft, off-white silk fabric. The composition implies heritage and special occasions, bathed in soft, diffused daylight that highlights the intricate craftsmanship. The mood is aspirational and trustworthy, suited for a family jeweller." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGn-WT7K3KA8xdz_-uAbYA5NfcVbGtUvSk-ZzCUjrmgL1voBwfWC6YYcmgZeZLgoi4YEfQjnQyQ6Esx6Itz9kNqQ4-TGu0d0JcFyExFq53tOlznGyPryTJHZm9TG-bDydTIyG2Vhp7akpVw7BjFBnhHaSJg_76-cv5UCWMOtAWNGs7D6jFX9hrDA1LhFXk2o40wXNoR27YgcQikT7q44lu9vXnyPbAfFMYI6RQ2o3mTLHWu9IsxZ6uCB0IBOUA0u5PbA25J8trRN4">
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+</div>
+<div class="absolute bottom-0 left-0 w-full p-4 text-left">
+<h3 class="text-headline-md font-headline-md text-on-primary mb-1">Annai Savings Plan</h3>
+<p class="text-label-sm font-label-sm text-on-primary/80 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="event_note">event_note</span> 11 Month easy installments
+                    </p>
+</div>
+</button>
+<!-- Bridal Collection Scheme -->
+<button class="w-full relative rounded-xl overflow-hidden shadow-sm group focus:outline-none focus:ring-4 focus:ring-primary/50 transition-all duration-300 active:scale-[0.98] active:brightness-95 opacity-0 animate-fade-up delay-500">
+<div class="aspect-[2/1] md:aspect-[3/1] w-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
+<img alt="Bridal Collection Scheme" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A close-up of a diamond and gold engagement ring resting inside a deep red velvet box. The setting conveys romance and significant life events. The lighting is focused and cinematic, creating starburst reflections on the diamond, emphasizing a premium, heritage aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCPOKDjrmiHeQJdPOSV5_Yn8aDg6bujXy6edItzUUQQmGTIwL6BANB9NMYh4eD-XKmFJzY9uQMM4QLkA3nh0PzMpgwyYvYVxj987Ry57TLwrotf6JMa8GrMQz43Gv0JJPraI-Lru3NUpkjTjiBF8NtZuqm6c0fd7VKa6758TdhS_dqT2FFovQ4dwoQUu8vxgxhIzFcGMNOiTPn1OTqkZlVXh-DgOJrRMdmMnPACVurBPCN_1sDaKNnZcCiw-chMcGIuAUrKG_RxOc">
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+</div>
+<div class="absolute bottom-0 left-0 w-full p-4 text-left">
+<h3 class="text-headline-md font-headline-md text-on-primary mb-1">Bridal Dream Fund</h3>
+<p class="text-label-sm font-label-sm text-on-primary/80 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="favorite">favorite</span> Plan for the big day
+                    </p>
+</div>
+</button>
+</div>
+</main>
+<script>
+        // Simple toggle logic for the segmented control
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggles = document.querySelectorAll('[aria-pressed]');
+            toggles.forEach(toggle => {
+                toggle.addEventListener('click', (e) => {
+                    toggles.forEach(t => {
+                        t.setAttribute('aria-pressed', 'false');
+                        t.classList.remove('bg-primary-container', 'text-on-primary-container', 'shadow-sm', 'shimmer-effect');
+                        t.classList.add('text-on-surface-variant', 'hover:bg-surface-variant');
+                    });
+                    const target = e.currentTarget;
+                    target.setAttribute('aria-pressed', 'true');
+                    target.classList.remove('text-on-surface-variant', 'hover:bg-surface-variant');
+                    target.classList.add('bg-primary-container', 'text-on-primary-container', 'shadow-sm', 'shimmer-effect');
+                });
+            });
+        });
+    </script>
+</body></html>

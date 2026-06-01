@@ -1,0 +1,172 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Connection Interrupted - Annai Jewellers</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(0.98); }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 3s ease-in-out infinite;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-primary": "#ffb4ab",
+                        "surface-tint": "#c00014",
+                        "surface-dim": "#dadada",
+                        "on-primary-fixed-variant": "#93000d",
+                        "surface-container-highest": "#e2e2e2",
+                        "on-secondary-fixed": "#241a00",
+                        "primary-container": "#e31e24",
+                        "tertiary": "#5c5b5b",
+                        "surface-bright": "#f9f9f9",
+                        "on-surface": "#1a1c1c",
+                        "error": "#ba1a1a",
+                        "tertiary-container": "#757474",
+                        "on-primary-container": "#fffafa",
+                        "surface-variant": "#e2e2e2",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed": "#ffe088",
+                        "primary-fixed-dim": "#ffb4ab",
+                        "background": "#f9f9f9",
+                        "secondary": "#735c00",
+                        "outline-variant": "#e7bdb8",
+                        "surface-container-high": "#e8e8e8",
+                        "surface": "#f9f9f9",
+                        "on-secondary-fixed-variant": "#574500",
+                        "on-tertiary-container": "#fffbfb",
+                        "on-surface-variant": "#5d3f3c",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#ffdad6",
+                        "outline": "#926f6b",
+                        "on-secondary-container": "#745c00",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "secondary-container": "#fed65b",
+                        "primary": "#ba0013",
+                        "secondary-fixed-dim": "#e9c349",
+                        "surface-container": "#eeeeee",
+                        "tertiary-fixed": "#e5e2e1",
+                        "surface-container-low": "#f3f3f3",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "on-tertiary-fixed": "#1c1b1b",
+                        "on-primary-fixed": "#410002",
+                        "surface-container-lowest": "#ffffff",
+                        "on-background": "#1a1c1c",
+                        "inverse-on-surface": "#f1f1f1",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap": "20px",
+                        "container-padding": "24px",
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Work Sans"],
+                        "body-lg": ["Work Sans"],
+                        "label-sm": ["Work Sans"],
+                        "headline-lg-mobile": ["Work Sans"],
+                        "headline-md": ["Work Sans"],
+                        "label-lg": ["Work Sans"],
+                        "body-md": ["Work Sans"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}],
+                        "label-sm": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "label-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>@keyframes shimmer { 100% { transform: translateX(100%); } }</style></head>
+<body class="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<!-- Main Content Canvas (Error State) -->
+<main class="flex-grow flex flex-col items-center justify-center px-container-padding py-24 text-center bg-background min-h-screen">
+<div class="max-w-md w-full animate-pulse-slow">
+<!-- Stylized Connection Lost / Lotus Mark Hybrid Icon -->
+<div class="relative inline-block mb-8">
+<div class="absolute inset-0 bg-primary opacity-10 rounded-full blur-3xl scale-[2] animate-pulse"></div>
+<div class="relative flex flex-col items-center">
+<span class="material-symbols-outlined text-primary" style="font-size: 80px; font-variation-settings: &quot;wght&quot; 200;">signal_disconnected</span>
+<div class="absolute -bottom-2 -right-2 bg-background p-1 rounded-full">
+<span class="material-symbols-outlined text-error" style="font-size: 32px; font-variation-settings: &quot;FILL&quot; 1;">error</span>
+</div>
+</div>
+</div>
+<!-- Error Messaging -->
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface mb-4">
+                Connection Interrupted
+            </h2>
+<p class="font-body-md text-body-md text-tertiary mb-10 max-w-xs mx-auto">
+                We are having trouble reaching our servers. Please check your internet connection and try again.
+            </p>
+<!-- Action Button -->
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-label-lg text-label-lg rounded-lg shadow-sm active:scale-95 transition-transform duration-200 flex items-center justify-center gap-2 group relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent" id="retryButton">
+<span class="material-symbols-outlined group-hover:rotate-180 transition-transform duration-500">refresh</span>
+                RETRY
+            </button>
+<!-- Secondary Help Action -->
+
+</div>
+</main>
+<!-- BottomNavBar -->
+<script>
+        document.getElementById('retryButton').addEventListener('click', function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            // Interaction feedback
+            btn.disabled = true;
+            btn.innerHTML = `
+                <span class="material-symbols-outlined animate-spin">refresh</span>
+                RECONNECTING...
+            `;
+            
+            // Simulate a brief check
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                // Add a small toast or vibration feedback logic here if needed
+            }, 2000);
+        });
+    </script>
+
+
+</body></html>

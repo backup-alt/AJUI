@@ -1,0 +1,447 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Annai Jewellers - Shop</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Hide scrollbar for category tabs */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .animate-slide-up-fade {
+                animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            .stagger-1 { animation-delay: 0.1s; }
+            .stagger-2 { animation-delay: 0.2s; }
+            .stagger-3 { animation-delay: 0.3s; }
+            .stagger-4 { animation-delay: 0.4s; }
+            .stagger-5 { animation-delay: 0.5s; }
+            
+            @keyframes slideUpFade {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            .shimmer-effect {
+                position: relative;
+                overflow: hidden;
+            }
+            .shimmer-effect::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 50%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(233, 195, 73, 0.4), transparent);
+                animation: shimmer 2.5s infinite;
+            }
+            @keyframes shimmer {
+                100% { left: 200%; }
+            }
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#c00014",
+                        "on-tertiary-fixed": "#1c1b1b",
+                        "inverse-surface": "#2f3131",
+                        "surface-variant": "#e2e2e2",
+                        "tertiary-container": "#757474",
+                        "outline-variant": "#e7bdb8",
+                        "on-primary-fixed-variant": "#93000d",
+                        "secondary-fixed": "#ffe088",
+                        "surface-container": "#eeeeee",
+                        "outline": "#926f6b",
+                        "background": "#f9f9f9",
+                        "on-secondary-fixed": "#241a00",
+                        "on-primary-fixed": "#410002",
+                        "on-primary-container": "#fffafa",
+                        "on-error": "#ffffff",
+                        "primary-fixed": "#ffdad6",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#e9c349",
+                        "primary": "#ba0013",
+                        "surface-dim": "#dadada",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#5c5b5b",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed": "#e5e2e1",
+                        "on-primary": "#ffffff",
+                        "surface-bright": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#735c00",
+                        "primary-fixed-dim": "#ffb4ab",
+                        "on-secondary-container": "#745c00",
+                        "surface-container-highest": "#e2e2e2",
+                        "on-background": "#1a1c1c",
+                        "primary-container": "#e31e24",
+                        "inverse-primary": "#ffb4ab",
+                        "surface": "#f9f9f9",
+                        "surface-container-high": "#e8e8e8",
+                        "on-tertiary-container": "#fffbfb",
+                        "on-secondary-fixed-variant": "#574500",
+                        "on-surface-variant": "#5d3f3c",
+                        "on-surface": "#1a1c1c",
+                        "secondary-container": "#fed65b",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "surface-container-low": "#f3f3f3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "touch-target-min": "56px",
+                        "gutter": "16px",
+                        "stack-gap": "20px",
+                        "container-padding": "24px",
+                        "unit": "8px",
+                        "pb-safe": "env(safe-area-inset-bottom)"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Work Sans"],
+                        "headline-lg": ["Work Sans"],
+                        "label-lg": ["Work Sans"],
+                        "body-md": ["Work Sans"],
+                        "headline-lg-mobile": ["Work Sans"],
+                        "body-lg": ["Work Sans"],
+                        "label-sm": ["Work Sans"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "label-sm": ["14px", { "lineHeight": "20px", "fontWeight": "500" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased pb-[90px]">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 right-0 h-touch-target-min z-50 bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-surface-variant flex items-center justify-between px-gutter">
+<button aria-label="Go back" class="h-touch-target-min w-touch-target-min flex justify-start text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low transition-all duration-200 active:scale-[0.90] justify-center items-center">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-bold text-primary dark:text-primary-container text-headline-md flex-1 text-center">Shop Jewellery</h1>
+<button aria-label="Profile" class="h-10 w-10 rounded-full overflow-hidden border border-outline-variant hover:opacity-80 transition-opacity">
+<img alt="Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK7T-isQzirgjplQZvF7JV67d7jCo2_9HSxSrcUC7CsWeNabM1AmtjlOD8PiZ0b3tss3Jrub4TuI0qWcin5jjZmh6fARo_Ol9N010_t5iyS0PbEgVdPX5dAL9IQMDIKIyDMDgNh9Bso9viPZ5Uc5vPUej-hi21IEqef1k1mbHVQ52p0iZJwCUBmKqN8yB48EpIpCJcJdm-P1n3KOl_FI-wAnigZkFw9QItXQbhIdIDRDNrwLKnE3hXSP1CAsfd0tuP0uTNNnlQ_7k">
+</button>
+</header>
+<main class="max-w-7xl mx-auto px-gutter pt-[80px]">
+<!-- Category Filter -->
+<div class="flex overflow-x-auto no-scrollbar gap-4 mb-stack-gap pb-2">
+<button class="flex flex-col items-center justify-center min-w-[80px] text-primary animate-slide-up-fade stagger-1 transition-transform duration-200 active:scale-95 hover:scale-105">
+<div class="w-14 h-14 rounded-full bg-primary-container/10 flex items-center justify-center mb-1 border-2 border-primary shimmer-effect transition-all duration-300"><img alt="Gold" class="w-10 h-10 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_Uo_-SJ6eqpYkMBqkOo-ouNSMkE-OE4BOt27b5fWcKavY8ryXGu9GKYqgzElK1fV7NNGIR2qxTM26W9wFR9fYjXo7ceI9IDS1Xo_6BKkoggkkHCRSnsA278hYPGFn2XeTXcs8ZHy4HsrGKt6ftxt7MbaW1_jDJwhxjIWxDOzMkHoSRW3ZYULbpBFkk1z2YUC8PdKwf2A_jslxaZ7Kh909H825TSbCdV1Vh7agSbwaFi8bY3sx_ymS_epX6UMz6_8rkIDFhzxfJgo"></div>
+<span class="text-label-sm font-label-sm transition-colors duration-200">Gold</span>
+</button>
+<button class="flex flex-col items-center justify-center min-w-[80px] text-on-surface-variant animate-slide-up-fade stagger-2 transition-transform duration-200 active:scale-95 hover:scale-105">
+<div class="w-14 h-14 rounded-full bg-surface-container flex items-center justify-center mb-1 transition-all duration-300 hover:border-2 hover:border-secondary-fixed-dim hover:bg-secondary-fixed/10"><img alt="Silver" class="w-10 h-10 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWb9l4wrJ_uJZlupaNXbl8_KHLDj-_d3OQ_sw5iMf_4aXsuyDIsjr-hR-N98c-ozCzo7bMbpmX4px4JF2JDkR8I9dw7m1QGIlshJ4OUM6y89OV4mz8wRIJMxKeYq4DR71Z7At8xy-iAoB2Xa-3A7v_tFBXFy8BfLIRkkfR-f_NuV5whUDDWnaovZ2KnaFH6VIR_cxlrBJ-4bkGM2TMAsmvnGYr_P9pJ_jwiY9uuoAzjtK4pe1XYWcXQWFDRZx7xmoHgR9mUg_wU70"></div>
+<span class="text-label-sm font-label-sm transition-colors duration-200">Silver</span>
+</button>
+<button class="flex flex-col items-center justify-center min-w-[80px] text-on-surface-variant animate-slide-up-fade stagger-3 transition-transform duration-200 active:scale-95 hover:scale-105">
+<div class="w-14 h-14 rounded-full bg-surface-container flex items-center justify-center mb-1 transition-all duration-300 hover:border-2 hover:border-secondary-fixed-dim hover:bg-secondary-fixed/10">
+<span class="material-symbols-outlined text-3xl transition-transform duration-200 group-hover:scale-110" data-icon="diamond">diamond</span>
+</div>
+<span class="text-label-sm font-label-sm transition-colors duration-200">Diamond</span>
+</button>
+</div>
+<!-- Product Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-gutter mt-2">
+<!-- Product Card 1 -->
+<article class="bg-surface rounded-xl border border-outline-variant overflow-hidden flex flex-col transition-all duration-200 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] active:shadow-md animate-slide-up-fade stagger-2 cursor-pointer text-left">
+<div class="aspect-square bg-surface-container-lowest w-full relative overflow-hidden">
+<img alt="Antique Gold Necklace displayed on a white bust against a black background" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105" data-alt="A highly detailed close-up of an intricate antique gold necklace displayed on a pristine white jewelry bust. The background is a solid, deep matte black, providing maximum contrast. The lighting is professional studio lighting, highlighting the craftsmanship and yellow glow of the gold. The image exudes a premium, trusted heritage aesthetic suitable for a high-end jeweler." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTsiybJxjffbRzFHUEG_PR2b21VN9Ik1JTcNA5tMsP2zElVkP2Gq3Mhct4mfCFn5VaGqutkuuoK0v7OiyMCCBOUc0iS6EZ-L79x6YxfBozqxTwKJn36xfUwf9_kXhpR3X6WlzU3CwgtbZIBBG8O5aw7CABcHklA44ccL3tCGtcxf3Wn7isej0TCsCxiqhfs8M-3iIbZxczZdoZZc4aXytUktcRFOMWdp2lbjbMGVfq1hZPzb_FEc0nv7yZJIWDzhwWOeY8sDYvPqE">
+</div>
+<div class="p-4 flex flex-col flex-1">
+<h2 class="text-label-lg font-label-lg text-on-surface mb-1 line-clamp-2">Antique Gold Necklace</h2>
+<div class="flex justify-between items-end mt-auto mb-4">
+<span class="text-body-md font-body-md text-on-surface-variant">50g</span>
+<span class="text-headline-md font-headline-md text-on-surface">₹2,50,000</span>
+</div>
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-lg text-label-lg font-label-lg flex items-center justify-center transition-all duration-200 hover:bg-on-primary-fixed-variant active:scale-95 shadow-sm hover:shadow">
+                        Buy Now
+                    </button>
+</div>
+</article>
+<!-- Product Card 2 -->
+<article class="bg-surface rounded-xl border border-outline-variant overflow-hidden flex flex-col transition-all duration-200 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] active:shadow-md animate-slide-up-fade stagger-3 cursor-pointer text-left">
+<div class="aspect-square bg-surface-container-lowest w-full relative overflow-hidden">
+<img alt="Diamond Bangle Set on a dark reflective surface" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105" data-alt="Two stunning diamond and gold bangles resting interlocked on a sleek, dark reflective surface. The studio lighting catches the brilliance of the numerous small diamonds set in the yellow gold framework. The background falls off into a deep, rich black, emphasizing the luxury and sparkle of the jewelry. The composition is elegant and minimalist, aligning with a premium corporate modern style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVMLn9mbwSDXP1d3ZyvR52mh9eGgf9JDw4oXCm92_7_6B4FXY8eB0dl7jWlfxqdcHzPA9PtKoOCwHTp5HOU-gFW34atD6Oiqlx9GiKgjAcYRKv_tfUAF5f0zOAPHvTPHvBZs2Sp8I63Eq8KkyDdvUQ0z_mVxzPUP8bCPE8mkZE9nPGxnWBKihHF_7fzCQuBMZGtZa1um0qQSqqt3ZuhtJfzmHriM-vmt9YDDck1kjLejzD_tl8Rxt6j-zlJpgSjTWNm4aFM07PUXg">
+</div>
+<div class="p-4 flex flex-col flex-1">
+<h2 class="text-label-lg font-label-lg text-on-surface mb-1 line-clamp-2">Diamond Bangle Set</h2>
+<div class="flex justify-between items-end mt-auto mb-4">
+<span class="text-body-md font-body-md text-on-surface-variant">35g</span>
+<span class="text-headline-md font-headline-md text-on-surface">₹1,75,000</span>
+</div>
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-lg text-label-lg font-label-lg flex items-center justify-center transition-all duration-200 hover:bg-on-primary-fixed-variant active:scale-95 shadow-sm hover:shadow">
+                        Buy Now
+                    </button>
+</div>
+</article>
+<!-- Product Card 3 -->
+<article class="bg-surface rounded-xl border border-outline-variant overflow-hidden flex flex-col transition-all duration-200 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] active:shadow-md animate-slide-up-fade stagger-4 cursor-pointer text-left">
+<div class="aspect-square bg-surface-container-lowest w-full relative overflow-hidden">
+<img alt="Traditional Gold Jhumka earrings" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105" data-alt="A pair of ornate traditional Indian gold Jhumka earrings suspended against a pure black background. The intricate filigree work and domed shape are clearly visible under sharp, neutral white studio lighting. The gold has a warm, rich tone. The image is crisp, high-resolution, and communicates a sense of traditional reliability and premium quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDw28pm7FdTPVdw_Db6dNcchxvfW0rzAq1ttClrI8Zp_NbpYMan6uwA0nW710kJfONt3MNfTxg72e07p9eex4cmJa0s6AqO8WAOlvj4-SnPd2FyX8vuDI3YKFXd57kJLHQO524NrU9eOOZlqgloc5f04tWE4VcVKeQru3dbIjiuaE-TLYDrW59ixQTAPnAmhvKvtkZ2ZeceiRS4ljkzkDPiyDZ06v5opKtpU8Flr0PXyWk-o6tGhHKVv32EJXiqrfBEYmHlGnDyBnM">
+</div>
+<div class="p-4 flex flex-col flex-1">
+<h2 class="text-label-lg font-label-lg text-on-surface mb-1 line-clamp-2">Traditional Gold Jhumka</h2>
+<div class="flex justify-between items-end mt-auto mb-4">
+<div class="flex flex-col">
+<span class="text-body-md font-body-md text-on-surface-variant">15g</span>
+<span class="text-label-sm font-label-sm text-tertiary line-through">₹85,000</span>
+</div>
+<span class="text-headline-md font-headline-md text-on-surface">₹75,000</span>
+</div>
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-lg text-label-lg font-label-lg flex items-center justify-center transition-all duration-200 hover:bg-on-primary-fixed-variant active:scale-95 shadow-sm hover:shadow">
+                        Buy Now
+                    </button>
+</div>
+</article>
+<!-- Product Card 4 -->
+<article class="bg-surface rounded-xl border border-outline-variant overflow-hidden flex flex-col transition-all duration-200 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] active:shadow-md animate-slide-up-fade stagger-5 cursor-pointer text-left">
+<div class="aspect-square bg-surface-container-lowest w-full relative p-6 flex items-center justify-center overflow-hidden">
+<img alt="Silver Anklets laid out flat" class="w-full h-full object-contain transition-transform duration-500 hover:scale-105" data-alt="A delicate pair of polished silver anklets arranged neatly in a circular formation on a flat, dark grey surface. The lighting is soft and diffused, highlighting the metallic sheen and fine chain details of the silver without harsh glare. The aesthetic is clean, modern, and minimalist, ensuring the product is the absolute focal point against the neutral background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWbvNgZtOgTEsKI6PEhYzw3rj8dKj7hY4X0xCAxikBtSi9yJAPOnFfhyl25jrXaRCcllx1Y77W6q_ENNZDcRFxzBH5R_mcTgCF76D5n_kZB8A73prCOS1tfhoLbq9tBuelwB5L4b5--jYJJlnFzo2WoMfOp1oWUnQ62pdge5chIEoKLxvTeCC0BQwpVlDTV83YBeJd8EC6RDIAfT_SyX0UDty2vIdzzt2MLEQPEUEPptErkYXwdW6SC_Vz0ZcRj8adlRV5Aj2nBrE">
+</div>
+<div class="p-4 flex flex-col flex-1">
+<h2 class="text-label-lg font-label-lg text-on-surface mb-1 line-clamp-2">Silver Anklets</h2>
+<div class="flex justify-between items-end mt-auto mb-4">
+<span class="text-body-md font-body-md text-on-surface-variant">20g</span>
+<span class="text-headline-md font-headline-md text-on-surface">₹5,000</span>
+</div>
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-lg text-label-lg font-label-lg flex items-center justify-center transition-all duration-200 hover:bg-on-primary-fixed-variant active:scale-95 shadow-sm hover:shadow">
+                        Buy Now
+                    </button>
+</div>
+</article>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="bg-surface border-t fixed bottom-0 w-full z-50 h-[80px] md:hidden border-outline"><div class="fixed bottom-0 left-0 right-0 flex justify-between items-center h-[80px] bg-surface border-t px-1 pb-safe border-outline"><a class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-2 transition-colors duration-200 hover:text-primary active:scale-95" href="#"><span class="material-symbols-outlined text-[24px] mb-1 transition-transform duration-200 group-hover:scale-110">home</span><span class="text-label-sm">Home</span></a><div class="flex-1 flex justify-center"><a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container w-[72px] h-[56px] shadow-sm rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-md" href="#"><span class="material-symbols-outlined fill-icon text-[24px]">shopping_bag</span><span class="text-[10px] font-bold">Shop</span></a></div><a class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-2 transition-colors duration-200 hover:text-primary active:scale-95" href="#"><span class="material-symbols-outlined text-[24px] mb-1 transition-transform duration-200 group-hover:scale-110">savings</span><span class="text-label-sm">Schemes</span></a><a class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-2 transition-colors duration-200 hover:text-primary active:scale-95" href="#"><span class="material-symbols-outlined text-[24px] mb-1 transition-transform duration-200 group-hover:scale-110">newspaper</span><span class="text-label-sm">News</span></a><a class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-2 transition-colors duration-200 hover:text-primary active:scale-95" href="#"><span class="material-symbols-outlined text-[24px] mb-1 transition-transform duration-200 group-hover:scale-110">receipt_long</span><span class="text-label-sm">Payments</span></a></div></nav>
+
+
+<script>
+    const addedJewellery = [
+        {
+            name: 'Temple Gold Haram',
+            category: 'gold',
+            type: 'Necklace',
+            weight: '42g',
+            price: 'Rs. 2,18,000',
+            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDTsiybJxjffbRzFHUEG_PR2b21VN9Ik1JTcNA5tMsP2zElVkP2Gq3Mhct4mfCFn5VaGqutkuuoK0v7OiyMCCBOUc0iS6EZ-L79x6YxfBozqxTwKJn36xfUwf9_kXhpR3X6WlzU3CwgtbZIBBG8O5aw7CABcHklA44ccL3tCGtcxf3Wn7isej0TCsCxiqhfs8M-3iIbZxczZdoZZc4aXytUktcRFOMWdp2lbjbMGVfq1hZPzb_FEc0nv7yZJIWDzhwWOeY8sDYvPqE'
+        },
+        {
+            name: 'Bridal Gold Choker',
+            category: 'gold',
+            type: 'Necklace',
+            weight: '34g',
+            price: 'Rs. 1,92,000',
+            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDWBdayc7UGvjz99jfiBWZ9vBxpA5iVbS4SUct-utv8oYu5_cA5JaCfawmjZqO4R3zxmnIsTxFWdBH1WemQNTatbM-WHTzSKOVPaha5mYO30re51NeLwRqIH9iqb-yYEux0zjDiZLqTfLXQ-IRjHJC-gKGqpK60Sk1i8jppqYkgDzjMLnqGUrhbgYbvTWdRbijztIgn8BQ0Z33gYlEwB_R5MnwXKQ-paZ-saQ0zGtuOj7VQnFqv7kMec6Jt3FR6pBb9sIPJSeuOyIk'
+        },
+        {
+            name: 'Gold Kada Pair',
+            category: 'gold',
+            type: 'Bangle',
+            weight: '28g',
+            price: 'Rs. 1,46,000',
+            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDw28pm7FdTPVdw_Db6dNcchxvfW0rzAq1ttClrI8Zp_NbpYMan6uwA0nW710kJfONt3MNfTxg72e07p9eex4cmJa0s6AqO8WAOlvj4-SnPd2FyX8vuDI3YKFXd57kJLHQO524NrU9eOOZlqgloc5f04tWE4VcVKeQru3dbIjiuaE-TLYDrW59ixQTAPnAmhvKvtkZ2ZeceiRS4ljkzkDPiyDZ06v5opKtpU8Flr0PXyWk-o6tGhHKVv32EJXiqrfBEYmHlGnDyBnM'
+        },
+        {
+            name: 'Diamond Solitaire Ring',
+            category: 'diamond',
+            type: 'Ring',
+            weight: '6g',
+            price: 'Rs. 95,000',
+            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDVMLn9mbwSDXP1d3ZyvR52mh9eGgf9JDw4oXCm92_7_6B4FXY8eB0dl7jWlfxqdcHzPA9PtKoOCwHTp5HOU-gFW34atD6Oiqlx9GiKgjAcYRKv_tfUAF5f0zOAPHvTPHvBZs2Sp8I63Eq8KkyDdvUQ0z_mVxzPUP8bCPE8mkZE9nPGxnWBKihHF_7fzCQuBMZGtZa1um0qQSqqt3ZuhtJfzmHriM-vmt9YDDck1kjLejzD_tl8Rxt6j-zlJpgSjTWNm4aFM07PUXg'
+        },
+        {
+            name: 'Diamond Stud Earrings',
+            category: 'diamond',
+            type: 'Earrings',
+            weight: '8g',
+            price: 'Rs. 1,20,000',
+            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDVMLn9mbwSDXP1d3ZyvR52mh9eGgf9JDw4oXCm92_7_6B4FXY8eB0dl7jWlfxqdcHzPA9PtKoOCwHTp5HOU-gFW34atD6Oiqlx9GiKgjAcYRKv_tfUAF5f0zOAPHvTPHvBZs2Sp8I63Eq8KkyDdvUQ0z_mVxzPUP8bCPE8mkZE9nPGxnWBKihHF_7fzCQuBMZGtZa1um0qQSqqt3ZuhtJfzmHriM-vmt9YDDck1kjLejzD_tl8Rxt6j-zlJpgSjTWNm4aFM07PUXg'
+        },
+        {
+            name: 'Diamond Pendant Chain',
+            category: 'diamond',
+            type: 'Pendant',
+            weight: '10g',
+            price: 'Rs. 1,65,000',
+            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDVMLn9mbwSDXP1d3ZyvR52mh9eGgf9JDw4oXCm92_7_6B4FXY8eB0dl7jWlfxqdcHzPA9PtKoOCwHTp5HOU-gFW34atD6Oiqlx9GiKgjAcYRKv_tfUAF5f0zOAPHvTPHvBZs2Sp8I63Eq8KkyDdvUQ0z_mVxzPUP8bCPE8mkZE9nPGxnWBKihHF_7fzCQuBMZGtZa1um0qQSqqt3ZuhtJfzmHriM-vmt9YDDck1kjLejzD_tl8Rxt6j-zlJpgSjTWNm4aFM07PUXg'
+        },
+        {
+            name: 'Silver Pooja Bowl',
+            category: 'silver',
+            type: 'Silverware',
+            weight: '45g',
+            price: 'Rs. 8,500',
+            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWbvNgZtOgTEsKI6PEhYzw3rj8dKj7hY4X0xCAxikBtSi9yJAPOnFfhyl25jrXaRCcllx1Y77W6q_ENNZDcRFxzBH5R_mcTgCF76D5n_kZB8A73prCOS1tfhoLbq9tBuelwB5L4b5--jYJJlnFzo2WoMfOp1oWUnQ62pdge5chIEoKLxvTeCC0BQwpVlDTV83YBeJd8EC6RDIAfT_SyX0UDty2vIdzzt2MLEQPEUEPptErkYXwdW6SC_Vz0ZcRj8adlRV5Aj2nBrE'
+        }
+    ];
+
+    const main = document.querySelector('main');
+    const categoryBar = main.querySelector('.no-scrollbar');
+    const productGrid = main.querySelector('.grid');
+    let activeFilter = 'all';
+
+    categoryBar.insertAdjacentHTML('beforebegin', `
+        <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4 shadow-sm animate-slide-up-fade">
+            <label class="relative block">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+                <input id="jewellerySearch" class="w-full h-touch-target-min rounded-xl border border-outline-variant bg-surface pl-11 pr-4 text-body-md text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-primary" type="search" placeholder="Search jewellery items">
+            </label>
+            <div class="flex items-center justify-between mt-3">
+                <span id="shopResultCount" class="text-label-sm font-label-sm text-on-surface-variant"></span>
+                <button id="clearShopSearch" type="button" class="text-label-sm font-label-sm text-primary">Clear</button>
+            </div>
+        </section>
+    `);
+
+    categoryBar.insertAdjacentHTML('afterbegin', `
+        <button type="button" data-filter="all" class="flex flex-col items-center justify-center min-w-[80px] text-primary animate-slide-up-fade transition-transform duration-200 active:scale-95 hover:scale-105">
+            <div class="w-14 h-14 rounded-full bg-primary-container/10 flex items-center justify-center mb-1 border-2 border-primary transition-all duration-300">
+                <span class="material-symbols-outlined text-3xl">apps</span>
+            </div>
+            <span class="text-label-sm font-label-sm transition-colors duration-200">All</span>
+        </button>
+    `);
+
+    const addedMarkup = addedJewellery.map((item, index) => `
+        <article data-added="true" data-category="${item.category}" data-search="${item.name.toLowerCase()} ${item.category} ${item.type.toLowerCase()}" class="bg-surface rounded-xl border border-outline-variant overflow-hidden flex flex-col transition-all duration-200 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] active:shadow-md animate-slide-up-fade cursor-pointer text-left" style="animation-delay: ${index * 60}ms">
+            <div class="aspect-square bg-surface-container-lowest w-full relative overflow-hidden">
+                <img alt="${item.name}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105" src="${item.image}">
+            </div>
+            <div class="p-4 flex flex-col flex-1">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <h2 class="text-label-lg font-label-lg text-on-surface line-clamp-2">${item.name}</h2>
+                    <span class="text-[10px] uppercase rounded-full bg-primary-container/10 text-primary px-2 py-1">${item.category}</span>
+                </div>
+                <p class="text-label-sm font-label-sm text-on-surface-variant mb-3">${item.type}</p>
+                <div class="flex justify-between items-end mt-auto mb-4">
+                    <span class="text-body-md font-body-md text-on-surface-variant">${item.weight}</span>
+                    <span class="text-headline-md font-headline-md text-on-surface">${item.price}</span>
+                </div>
+                <button class="w-full h-touch-target-min bg-primary text-on-primary rounded-lg text-label-lg font-label-lg flex items-center justify-center transition-all duration-200 hover:bg-on-primary-fixed-variant active:scale-95 shadow-sm hover:shadow">Buy Now</button>
+            </div>
+        </article>
+    `).join('');
+
+    productGrid.insertAdjacentHTML('beforeend', addedMarkup);
+    productGrid.insertAdjacentHTML('afterend', '<div id="shopNoResults" class="hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-6 text-center text-on-surface-variant">No jewellery items match your search.</div>');
+
+    const searchInput = document.getElementById('jewellerySearch');
+    const clearSearch = document.getElementById('clearShopSearch');
+    const resultCount = document.getElementById('shopResultCount');
+    const noResults = document.getElementById('shopNoResults');
+    const filterButtons = Array.from(categoryBar.querySelectorAll('button'));
+
+    function categoryForTitle(title) {
+        const value = title.toLowerCase();
+        if (value.includes('diamond')) return 'diamond';
+        if (value.includes('silver')) return 'silver';
+        return 'gold';
+    }
+
+    function hydrateExistingCards() {
+        Array.from(productGrid.querySelectorAll('article:not([data-added])')).forEach(article => {
+            const title = article.querySelector('h2')?.textContent.trim() || '';
+            const category = categoryForTitle(title);
+            article.dataset.category = category;
+            article.dataset.search = `${title.toLowerCase()} ${category}`;
+            if (!article.querySelector('[data-category-pill]')) {
+                article.querySelector('.p-4')?.insertAdjacentHTML('afterbegin', `<span data-category-pill class="self-start mb-2 text-[10px] uppercase rounded-full bg-primary-container/10 text-primary px-2 py-1">${category}</span>`);
+            }
+        });
+    }
+
+    function setFilterButtonState() {
+        filterButtons.forEach(button => {
+            const filter = button.dataset.filter || button.textContent.trim().toLowerCase();
+            button.dataset.filter = filter;
+            const active = filter === activeFilter;
+            button.classList.toggle('text-primary', active);
+            button.classList.toggle('text-on-surface-variant', !active);
+            const iconWrap = button.querySelector('div');
+            if (iconWrap) {
+                iconWrap.classList.toggle('border-2', active);
+                iconWrap.classList.toggle('border-primary', active);
+                iconWrap.classList.toggle('bg-primary-container/10', active);
+                iconWrap.classList.toggle('bg-surface-container', !active);
+            }
+        });
+    }
+
+    function applyShopFilters() {
+        const query = searchInput.value.trim().toLowerCase();
+        let visibleCount = 0;
+        Array.from(productGrid.querySelectorAll('article')).forEach(article => {
+            const matchesCategory = activeFilter === 'all' || article.dataset.category === activeFilter;
+            const matchesSearch = !query || article.dataset.search.includes(query);
+            const visible = matchesCategory && matchesSearch;
+            article.classList.toggle('hidden', !visible);
+            if (visible) visibleCount += 1;
+        });
+        resultCount.textContent = `${visibleCount} item${visibleCount === 1 ? '' : 's'} found`;
+        noResults.classList.toggle('hidden', visibleCount !== 0);
+        setFilterButtonState();
+    }
+
+    hydrateExistingCards();
+    filterButtons.forEach(button => {
+        button.type = 'button';
+        button.dataset.filter = button.dataset.filter || button.textContent.trim().toLowerCase();
+        button.addEventListener('click', () => {
+            activeFilter = button.dataset.filter;
+            applyShopFilters();
+        });
+    });
+    searchInput.addEventListener('input', applyShopFilters);
+    clearSearch.addEventListener('click', () => {
+        searchInput.value = '';
+        activeFilter = 'all';
+        applyShopFilters();
+        searchInput.focus();
+    });
+    applyShopFilters();
+</script>
+</body></html>

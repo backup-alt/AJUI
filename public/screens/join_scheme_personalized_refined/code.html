@@ -1,0 +1,214 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Join Scheme - Annai Jewellers</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#5c5b5b",
+                        "on-background": "#1a1c1c",
+                        "secondary-fixed": "#ffe088",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#ffb4ab",
+                        "secondary-container": "#fed65b",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#745c00",
+                        "on-tertiary-container": "#fffbfb",
+                        "on-tertiary-fixed": "#1c1b1b",
+                        "surface": "#f9f9f9",
+                        "primary": "#ba0013",
+                        "primary-container": "#e31e24",
+                        "background": "#f9f9f9",
+                        "primary-fixed-dim": "#ffb4ab",
+                        "inverse-on-surface": "#f1f1f1",
+                        "on-surface": "#1a1c1c",
+                        "outline-variant": "#e7bdb8",
+                        "surface-tint": "#c00014",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "on-primary-fixed": "#410002",
+                        "on-secondary-fixed": "#241a00",
+                        "on-primary-fixed-variant": "#93000d",
+                        "secondary-fixed-dim": "#e9c349",
+                        "outline": "#926f6b",
+                        "surface-bright": "#f9f9f9",
+                        "primary-fixed": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "tertiary-container": "#757474",
+                        "surface-variant": "#e2e2e2",
+                        "surface-container-low": "#f3f3f3",
+                        "on-primary-container": "#fffafa",
+                        "on-surface-variant": "#5d3f3c",
+                        "surface-dim": "#dadada",
+                        "secondary": "#735c00",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e8e8e8",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "surface-container-highest": "#e2e2e2",
+                        "on-secondary-fixed-variant": "#574500",
+                        "tertiary-fixed": "#e5e2e1",
+                        "surface-container": "#eeeeee"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "stack-gap": "20px",
+                        "container-padding": "24px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Work Sans"],
+                        "headline-lg-mobile": ["Work Sans"],
+                        "headline-lg": ["Work Sans"],
+                        "body-md": ["Work Sans"],
+                        "label-sm": ["Work Sans"],
+                        "headline-md": ["Work Sans"],
+                        "body-lg": ["Work Sans"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-sm": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #e31e24;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #e31e24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col pt-[56px]">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-surface-variant fixed top-0 w-full z-50">
+<div class="flex justify-between items-center px-gutter h-touch-target-min w-full"><button aria-label="Go back" class="text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200 h-touch-target-min w-touch-target-min flex items-center justify-center rounded-full"><span class="material-symbols-outlined font-bold">arrow_back</span></button><h1 class="text-headline-md font-headline-md text-primary tracking-tight absolute left-1/2 -translate-x-1/2">Join Scheme</h1><div class="h-touch-target-min w-touch-target-min flex items-center justify-center"><div class="h-10 w-10 rounded-full overflow-hidden border border-outline-variant"><img alt="Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK7T-isQzirgjplQZvF7JV67d7jCo2_9HSxSrcUC7CsWeNabM1AmtjlOD8PiZ0b3tss3Jrub4TuI0qWcin5jjZmh6fARo_Ol9N010_t5iyS0PbEgVdPX5dAL9IQMDIKIyDMDgNh9Bso9viPZ5Uc5vPUej-hi21IEqef1k1mbHVQ52p0iZJwCUBmKqN8yB48EpIpCJcJdm-P1n3KOl_FI-wAnigZkFw9QItXQbhIdIDRDNrwLKnE3hXSP1CAsfd0tuP0uTNNnlQ_7k"></div></div></div>
+</header>
+<!-- Main Content -->
+<main class="flex-grow px-container-padding py-stack-gap max-w-[600px] mx-auto w-full flex flex-col gap-stack-gap pb-[100px]">
+<!-- Terms and Conditions Summary -->
+<section class="bg-surface-container-low p-4 rounded-lg border border-surface-variant min-h-[40vh] relative overflow-hidden"><div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08]"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAp9H4D88bJ4aW3cUCY8vnjCoW4_WZqEv7-OS7DMmEPsbHXPvxNTXtppdcxCqWzt93vwui_VhksyDZAoADaFl44XkcI_Wwh5Oxm2jKvQUHNlyTYuLhGx2LzmSBjOgB6kkd-7yXk8zcXDs-VEDBqoTaMj2-Ue8ZFu-A27mLCZB-4ZoShdNueT37_sZjmPnKiz0NavfWtdgSv8tM1B6mSMhsF1gAra4anotctS4YDdEr4f2j8E1Pgn0jXqCfBefqedocpevOW_IMCQ-s" class="max-w-[200px] object-contain" alt=""></div>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-1">info</span>
+<div class="flex-grow">
+<h2 class="text-label-lg font-label-lg mb-1 text-on-surface">Terms and Conditions</h2>
+<p class="text-label-sm font-label-sm text-on-surface-variant mb-2"></p><div class="max-h-[350px] overflow-y-auto pr-2 text-label-sm font-label-sm text-on-surface space-y-3 font-medium">
+<p class="">By joining this saving scheme, you agree to make consistent monthly payments. The minimum tenure for this gold saving scheme is 11 months to be eligible for the benefit of no making charges on your purchase.</p>
+<p class="">1. Payments must be made before the 10th of every month. Late payments may result in the extension of the maturity date.</p>
+<p class="">2. The gold weight will be credited based on the prevailing market rate at the time of each payment.</p>
+<p class="">3. Upon completion of the 11-month tenure, customers can purchase gold jewelry for the total accumulated value or weight.</p>
+<p class="">4. No cash refunds will be provided. The accumulated amount must be used for jewelry purchase at Annai Jewellers.</p>
+<p class="">5. In case of premature closure, the benefits of the scheme (like zero making charges) will not be applicable, and standard market rates will apply to the purchase.</p>
+<p class="">6. Government taxes, including GST, are applicable at the time of purchase as per prevailing laws.</p>
+<p class="">7. The management reserves the right to alter the terms and conditions of this scheme at its discretion.</p>
+</div><p class=""></p>
+</div>
+</div>
+</section>
+<!-- Form Fields -->
+<form class="flex flex-col gap-stack-gap">
+<!-- Name Input -->
+<div class="flex flex-col gap-2">
+<label class="text-label-lg font-label-lg text-on-surface" for="name">Full Name</label>
+<input class="w-full h-[56px] px-4 rounded border-outline bg-surface text-body-md font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" id="name" name="name" placeholder="Enter your full name" type="text">
+</div>
+<!-- Amount Input -->
+<div class="flex flex-col gap-2">
+<label class="text-label-lg font-label-lg text-on-surface" for="amount">Monthly Amount</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-body-md font-body-md">₹</span>
+<input class="w-full h-[56px] pl-8 pr-4 rounded border-outline bg-surface text-body-md font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" id="amount" min="100" name="amount" placeholder="100" step="500" type="number">
+</div>
+</div>
+<!-- Interactive Toggles -->
+<div class="flex flex-col gap-4 mt-2">
+<!-- Referral Code Toggle -->
+<div class="border border-surface-variant rounded-lg p-4 bg-surface">
+<div class="flex justify-between items-center cursor-pointer" onclick="toggleSection('referralSection', 'referralToggle')">
+<span class="text-label-lg font-label-lg text-on-surface">Have a referral code?</span>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input checked="checked" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200" id="referralToggle" name="toggle" placeholder="on" style="border-color: #e2e2e2;" type="checkbox" value="">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer transition-colors duration-200" for="referralToggle"></label>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-surface-variant" id="referralSection">
+<label class="sr-only" for="referralCode">Referral Code</label>
+<input class="w-full h-[56px] px-4 rounded border-outline bg-surface text-body-md font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" id="referralCode" placeholder="Eg. AG1412" type="text" value="AG1412">
+</div>
+</div>
+<!-- Promo Code Toggle -->
+<div class="border border-surface-variant rounded-lg p-4 bg-surface">
+<div class="flex justify-between items-center cursor-pointer" onclick="toggleSection('promoSection', 'promoToggle')">
+<span class="text-label-lg font-label-lg text-on-surface">Apply promo code?</span>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input checked="checked" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200" id="promoToggle" name="toggle" style="border-color: #e2e2e2;" type="checkbox">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer transition-colors duration-200" for="promoToggle"></label>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-surface-variant" id="promoSection">
+<label class="sr-only" for="promoCode">Promo Code</label>
+<input class="w-full h-[56px] px-4 rounded border-outline bg-surface text-body-md font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" id="promoCode" placeholder="Eg. PROMO100" type="text" value="PROMO100">
+</div>
+</div>
+</div>
+</form>
+</main>
+<!-- Fixed Bottom Action -->
+<div class="fixed bottom-0 left-0 w-full p-container-padding bg-surface border-t border-surface-variant shadow-[0px_-4px_20px_rgba(0,0,0,0.05)] z-40 flex justify-center">
+<button aria-label="Continue to Pay" class="w-full max-w-[600px] h-[56px] bg-primary-container text-on-primary-container text-label-lg font-label-lg rounded hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+            Continue to Pay
+            <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+<script>
+        function toggleSection(sectionId, toggleId) {
+            const section = document.getElementById(sectionId);
+            const toggle = document.getElementById(toggleId);
+            
+            // If clicking the container but not the checkbox directly, sync the checkbox
+            if(event.target.type !== 'checkbox') {
+                 toggle.checked = !toggle.checked;
+            }
+
+            if (toggle.checked) {
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        }
+    </script>
+
+
+
+
+
+
+</body></html>

@@ -1,0 +1,22 @@
+{
+  "name": "annai-jewellers-ionic",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "start": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.6.5",
+    "@capacitor/core": "^7.0.0",
+    "@ionic/core": "^8.0.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "vite": "^7.0.0"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "Annai Jewellers",
+  "type": "custom",
+  "integrations": {
+    "capacitor": {}
+  }
+}

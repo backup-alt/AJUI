@@ -1,0 +1,426 @@
+<!DOCTYPE html><html class="" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Plan Details</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#c00014",
+                        "on-tertiary-fixed": "#1c1b1b",
+                        "inverse-surface": "#2f3131",
+                        "surface-variant": "#e2e2e2",
+                        "tertiary-container": "#757474",
+                        "outline-variant": "#e7bdb8",
+                        "on-primary-fixed-variant": "#93000d",
+                        "secondary-fixed": "#ffe088",
+                        "surface-container": "#eeeeee",
+                        "outline": "#926f6b",
+                        "background": "#f9f9f9",
+                        "on-secondary-fixed": "#241a00",
+                        "on-primary-fixed": "#410002",
+                        "on-primary-container": "#fffafa",
+                        "on-error": "#ffffff",
+                        "primary-fixed": "#ffdad6",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#e9c349",
+                        "primary": "#ba0013",
+                        "surface-dim": "#dadada",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#5c5b5b",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed": "#e5e2e1",
+                        "on-primary": "#ffffff",
+                        "surface-bright": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#735c00",
+                        "primary-fixed-dim": "#ffb4ab",
+                        "on-secondary-container": "#745c00",
+                        "surface-container-highest": "#e2e2e2",
+                        "on-background": "#1a1c1c",
+                        "primary-container": "#e31e24",
+                        "inverse-primary": "#ffb4ab",
+                        "surface": "#f9f9f9",
+                        "surface-container-high": "#e8e8e8",
+                        "on-tertiary-container": "#fffbfb",
+                        "on-secondary-fixed-variant": "#574500",
+                        "on-surface-variant": "#5d3f3c",
+                        "on-surface": "#1a1c1c",
+                        "secondary-container": "#fed65b",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "surface-container-low": "#f3f3f3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px",
+                        "2xl": "1rem",
+                        "3xl": "1.5rem"
+                    },
+                    "spacing": {
+                        "touch-target-min": "56px",
+                        "gutter": "16px",
+                        "stack-gap": "20px",
+                        "container-padding": "24px",
+                        "unit": "8px",
+                        "safe-bottom": "env(safe-area-inset-bottom)"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Work Sans"],
+                        "headline-lg": ["Work Sans"],
+                        "label-lg": ["Work Sans"],
+                        "body-md": ["Work Sans"],
+                        "headline-lg-mobile": ["Work Sans"],
+                        "body-lg": ["Work Sans"],
+                        "label-sm": ["Work Sans"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}],
+                        "label-sm": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+                    },
+                    "keyframes": {
+                        "slide-down": {
+                            "0%": { transform: "translateY(-20px)", opacity: "0" },
+                            "100%": { transform: "translateY(0)", opacity: "1" }
+                        },
+                        "slide-up": {
+                            "0%": { transform: "translateY(20px)", opacity: "0" },
+                            "100%": { transform: "translateY(0)", opacity: "1" }
+                        },
+                        "fade-in": {
+                            "0%": { opacity: "0" },
+                            "100%": { opacity: "1" }
+                        },
+                        "progress-reveal": {
+                            "0%": { "stroke-dashoffset": "251.2" },
+                            "100%": { "stroke-dashoffset": "var(--target-offset)" }
+                        },
+                        "gradient-shift": {
+                            "0%": { "background-position": "0% 50%" },
+                            "50%": { "background-position": "100% 50%" },
+                            "100%": { "background-position": "0% 50%" }
+                        }
+                    },
+                    "animation": {
+                        "slide-down": "slide-down 0.6s ease-out forwards",
+                        "slide-up": "slide-up 0.6s ease-out forwards",
+                        "fade-in": "fade-in 0.4s ease-out forwards",
+                        "progress-reveal": "progress-reveal 1.5s cubic-bezier(0.65, 0, 0.35, 1) forwards",
+                        "premium-shimmer": "gradient-shift 10s ease-in-out infinite"
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        .bg-gradient-premium {
+            background: linear-gradient(135deg, #7A0010, #ba0013, #4A0033, #7A0010);
+            background-size: 400% 400%;
+        }
+        
+        .progress-ring__circle {
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+            --target-offset: 55.26; /* 78% of 251.2 */
+        }
+
+        .tab-active-indicator {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stagger-item {
+            opacity: 0;
+        }
+
+        .metric-card:active {
+            transform: scale(0.97);
+            transition: transform 0.1s ease;
+        }
+    </style>
+<style>
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+</style></head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen flex flex-col pb-[100px]">
+<!-- Top App Bar -->
+<header class="fixed top-0 left-0 right-0 h-touch-target-min z-50 bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-surface-variant flex items-center justify-between px-gutter">
+<button aria-label="Go back" class="h-touch-target-min w-touch-target-min flex items-center justify-start text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low transition-all duration-200 active:scale-[0.90]">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-bold text-primary dark:text-primary-container text-headline-md flex-1 text-center">Scheme Details</h1>
+<button aria-label="Profile" class="h-10 w-10 rounded-full overflow-hidden border border-outline-variant hover:opacity-80 transition-opacity">
+<img alt="Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK7T-isQzirgjplQZvF7JV67d7jCo2_9HSxSrcUC7CsWeNabM1AmtjlOD8PiZ0b3tss3Jrub4TuI0qWcin5jjZmh6fARo_Ol9N010_t5iyS0PbEgVdPX5dAL9IQMDIKIyDMDgNh9Bso9viPZ5Uc5vPUej-hi21IEqef1k1mbHVQ52p0iZJwCUBmKqN8yB48EpIpCJcJdm-P1n3KOl_FI-wAnigZkFw9QItXQbhIdIDRDNrwLKnE3hXSP1CAsfd0tuP0uTNNnlQ_7k">
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 px-gutter pt-stack-gap pb-safe-bottom w-full max-w-[1200px] mx-auto mt-[56px]">
+<!-- Hero Status Card (Entrance: Slide Down + Premium Background Animation) -->
+<div class="relative mb-stack-gap overflow-hidden"><div class="relative group">
+  <!-- Navigation Arrows -->
+  <button onclick="prevScheme()" class="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/40 text-white rounded-full p-1 ml-2 transition-all opacity-0 group-hover:opacity-100">
+    <span class="material-symbols-outlined">chevron_left</span>
+  </button>
+  <button onclick="nextScheme()" class="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/40 text-white rounded-full p-1 mr-2 transition-all opacity-0 group-hover:opacity-100">
+    <span class="material-symbols-outlined">chevron_right</span>
+  </button>
+
+  <!-- Hero Card Container -->
+  <section id="hero-card" class="animate-premium-shimmer bg-gradient-premium rounded-3xl p-6 text-on-primary shadow-lg relative overflow-hidden transition-all duration-500 min-h-[180px] antialiased">
+    <div class="flex justify-between items-start relative z-10 mb-2"><div class="flex flex-col gap-1">
+        <div class="flex items-center gap-2">
+          <span id="scheme-title" class="text-label-lg font-label-lg subpixel-antialiased">DigiGold</span>
+          <span id="scheme-badge" class="bg-[#198754] text-white text-[12px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ml-2">Active</span>
+        </div>
+      </div>
+      <div class="relative w-[110px] h-[110px] scale-110 origin-top-right">
+        <svg class="w-full h-full" viewBox="0 0 100 100" style="shape-rendering: geometricPrecision;">
+          <circle class="text-white/20 stroke-current" cx="50" cy="50" fill="transparent" r="40" stroke-width="8"></circle>
+          <circle id="progress-circle" class="stroke-current progress-ring__circle transition-all duration-1000" cx="50" cy="50" fill="transparent" r="40" stroke="#edcc61" stroke-dasharray="251.2" stroke-dashoffset="55.26" stroke-linecap="round" stroke-width="8"></circle>
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <span id="progress-text" class="text-headline-md font-bold text-white subpixel-antialiased">78%</span>
+        </div>
+      </div></div>
+    <div class="flex justify-between items-end relative z-10"><div class="">
+        <div class="flex items-center gap-3 mb-2">
+          <span id="scheme-amount" class="text-[40px] leading-none font-bold subpixel-antialiased">7,500</span>
+          <button class="text-on-primary opacity-80 hover:opacity-100 transition-opacity active:rotate-180 duration-500">
+            <span class="material-symbols-outlined">sync</span>
+          </button>
+        </div>
+        <div id="scheme-date-label" class="text-label-sm font-label-sm opacity-90 subpixel-antialiased">Close Date: 21/05/2025</div>
+      </div>
+      <button aria-label="View next scheme" class="text-white hover:opacity-80 transition-all duration-200 active:scale-90" onclick="nextScheme()">
+        <span class="material-symbols-outlined text-[32px]">chevron_right</span>
+      </button></div>
+    <div class="absolute inset-0 bg-[url('__PRESERVED_IMG_0__')] opacity-20 mix-blend-overlay z-0"></div>
+  </section>
+</div>
+
+<!-- Pagination Dots -->
+<div class="flex justify-center gap-2 mt-4">
+  <div onclick="switchScheme(0)" class="pagination-dot w-2 h-2 rounded-full bg-primary cursor-pointer transition-colors"></div>
+  <div onclick="switchScheme(1)" class="pagination-dot w-2 h-2 rounded-full bg-surface-container-highest cursor-pointer transition-colors"></div>
+</div></div>
+<!-- Bento Cards (Entrance: Slide Up + Staggered Delay) -->
+<div class="grid grid-cols-2 gap-4 mb-stack-gap">
+<!-- Saved Card -->
+<div class="metric-card animate-slide-up opacity-0 [animation-delay:200ms] bg-surface-container-lowest p-4 rounded-2xl border border-surface-variant shadow-[0_2px_8px_rgba(0,0,0,0.05)] cursor-pointer">
+<div class="text-label-sm font-label-sm text-on-surface-variant mb-1">Saved</div>
+<div class="text-body-lg font-bold text-[#198754]" id="saved-amount">₹ 7500.00</div>
+</div>
+<!-- Bonus Card -->
+<div class="metric-card animate-slide-up opacity-0 [animation-delay:300ms] bg-surface-container-lowest p-4 rounded-2xl border border-surface-variant shadow-[0_2px_8px_rgba(0,0,0,0.05)] cursor-pointer">
+<div class="text-label-sm font-label-sm text-on-surface-variant mb-1" id="bonus-label">Bnus</div>
+<div class="text-body-lg font-bold text-[#198754]" id="bonus-amount">₹ 565.86</div>
+</div>
+</div>
+<!-- Segmented Control (Tabs) -->
+<div class="bg-[#F8EAEA] p-1 rounded-xl flex mb-stack-gap border border-outline-variant/30 relative">
+<div class="tab-active-indicator absolute h-[calc(100%-8px)] top-1 left-1 w-[calc(50%-4px)] bg-surface-container-lowest rounded-lg shadow-sm" id="tab-indicator"></div>
+<button class="relative flex-1 py-3 px-4 rounded-lg text-on-surface font-label-lg text-label-lg transition-all text-center z-10" onclick="switchTab(0)">
+                Scheme Info
+            </button>
+<button class="relative flex-1 py-3 px-4 rounded-lg text-on-surface-variant font-label-lg text-label-lg transition-all text-center hover:bg-surface-container-lowest/30 z-10" onclick="switchTab(1)">
+                Transaction History
+            </button>
+</div>
+<!-- Details List (Staggered Fade-in) -->
+<section class="bg-surface-container-lowest rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-surface-variant overflow-hidden">
+<div class="flex flex-col"><div class="stagger-item animate-fade-in flex items-center justify-between p-4 border-b border-surface-variant/50">
+  <div class="flex items-center gap-3">
+    <span class="material-symbols-outlined text-primary">account_balance_wallet</span>
+    <span class="text-label-lg font-label-lg text-on-surface">Total Payments</span>
+  </div>
+  <span id="detail-payments" class="text-body-lg font-bold text-on-surface">0</span>
+</div>
+<div class="stagger-item animate-fade-in flex items-center justify-between p-4 border-b border-surface-variant/50">
+  <div class="flex items-center gap-3">
+    <span class="material-symbols-outlined text-primary">percent</span>
+    <span id="detail-interest-label-1" class="text-label-lg font-label-lg text-on-surface">Interest Cash</span>
+  </div>
+  <span id="detail-interest-val-1" class="text-body-lg font-bold text-on-surface">15%</span>
+</div>
+<div class="stagger-item animate-fade-in flex items-center justify-between p-4 border-b border-surface-variant/50">
+  <div class="flex items-center gap-3">
+    <span id="detail-interest-icon-2" class="material-symbols-outlined text-primary">stars</span>
+    <span id="detail-interest-label-2" class="text-label-lg font-label-lg text-on-surface">Interest Gold</span>
+  </div>
+  <span id="detail-interest-val-2" class="text-body-lg font-bold text-on-surface">9.23%</span>
+</div>
+<div class="stagger-item animate-fade-in flex items-center justify-between p-4">
+  <div class="flex items-center gap-3">
+    <span class="material-symbols-outlined text-primary">calendar_today</span>
+    <span class="text-label-lg font-label-lg text-on-surface">Joined Date</span>
+  </div>
+  <span id="detail-joined-date" class="text-body-lg font-bold text-on-surface">June 25, 2024</span>
+</div></div>
+</section>
+</main>
+<!-- Bottom Nav Bar -->
+<nav class="bg-surface border-t fixed bottom-0 w-full z-50 h-[80px] md:hidden border-outline">
+<div class="fixed bottom-0 left-0 right-0 flex justify-between items-center h-[80px] bg-surface border-t px-1 pb-safe border-outline">
+<a class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-2 transition-colors active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">home</span>
+<span class="text-label-sm">Home</span>
+</a>
+<a class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-2 transition-colors active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">shopping_bag</span>
+<span class="text-label-sm">Shop</span>
+</a>
+<div class="flex-1 flex justify-center">
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container w-[72px] h-[56px] shadow-sm rounded-lg active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined fill-icon text-[24px]">savings</span>
+<span class="text-[10px] font-bold">Schemes</span>
+</a>
+</div>
+<a class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-2 transition-colors active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">newspaper</span>
+<span class="text-label-sm">News</span>
+</a>
+<a class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-2 transition-colors active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">receipt_long</span>
+<span class="text-label-sm">Payments</span>
+</a>
+</div>
+</nav>
+<script>
+        function switchTab(index) {
+            const indicator = document.getElementById('tab-indicator');
+            const buttons = indicator.parentElement.querySelectorAll('button');
+            
+            // Move indicator
+            if (index === 0) {
+                indicator.style.transform = 'translateX(0)';
+                buttons[0].classList.add('text-on-surface');
+                buttons[0].classList.remove('text-on-surface-variant');
+                buttons[1].classList.remove('text-on-surface');
+                buttons[1].classList.add('text-on-surface-variant');
+            } else {
+                const offset = buttons[1].offsetLeft - buttons[0].offsetLeft;
+                indicator.style.transform = `translateX(${offset}px)`;
+                
+                buttons[1].classList.add('text-on-surface');
+                buttons[1].classList.remove('text-on-surface-variant');
+                buttons[0].classList.remove('text-on-surface');
+                buttons[0].classList.add('text-on-surface-variant');
+            }
+        }
+    </script>
+
+
+<script class="">
+  const schemes = [
+    {
+      title: 'DigiGold',
+      badge: 'Active',
+      amount: '7,500',
+      saved: '₹ 7500.00',
+      bonus: '₹ 565.86',
+      bonusLabel: 'Bnus',
+      progress: 78,
+      closeDate: '21/05/2025',
+      payments: '0',
+      intCash: '15%',
+      intSpecial: '9.23%',
+      intSpecialLabel: 'Interest Gold',
+      intSpecialIcon: 'stars',
+      joined: 'June 25, 2024',
+      bg: 'bg-gradient-premium'
+    },
+    {
+      title: 'DigiSilver',
+      badge: 'Active',
+      amount: '12,000',
+      saved: '₹ 12000.00',
+      bonus: '₹ 840.00',
+      bonusLabel: 'Bonus',
+      progress: 45,
+      closeDate: '12/10/2025',
+      payments: '5',
+      intCash: '12%',
+      intSpecial: '8.5%',
+      intSpecialLabel: 'Interest Silver',
+      intSpecialIcon: 'monetization_on',
+      joined: 'Aug 10, 2024',
+      bg: 'bg-gradient-to-br from-[#4b5563] to-[#1f2937]'
+    }
+  ];
+
+  let currentSchemeIndex = 0;
+
+  function switchScheme(index) {
+    currentSchemeIndex = index;
+    const s = schemes[index];
+    
+    // Update Card
+    document.getElementById('scheme-title').innerText = s.title;
+    document.getElementById('scheme-amount').innerText = s.amount;
+    document.getElementById('scheme-date-label').innerText = 'Close Date: ' + s.closeDate;
+    
+    // Progress Circle
+    const circle = document.getElementById('progress-circle');
+    const offset = 251.2 - (s.progress / 100 * 251.2);
+    circle.style.strokeDashoffset = offset;
+    document.getElementById('progress-text').innerText = s.progress + '%';
+
+    // Bento Cards
+    document.getElementById('saved-amount').innerText = s.saved;
+    document.getElementById('bonus-amount').innerText = s.bonus;
+    document.getElementById('bonus-label').innerText = s.bonusLabel;
+
+    // Detail List
+    document.getElementById('detail-payments').innerText = s.payments;
+    document.getElementById('detail-interest-val-1').innerText = s.intCash;
+    document.getElementById('detail-interest-label-2').innerText = s.intSpecialLabel;
+    document.getElementById('detail-interest-val-2').innerText = s.intSpecial;
+    document.getElementById('detail-interest-icon-2').innerText = s.intSpecialIcon;
+    document.getElementById('detail-joined-date').innerText = s.joined;
+
+    // Pagination Dots
+    document.querySelectorAll('.pagination-dot').forEach((dot, i) => {
+      dot.className = i === index ? 'pagination-dot w-2 h-2 rounded-full bg-primary cursor-pointer transition-colors' : 'pagination-dot w-2 h-2 rounded-full bg-surface-container-highest cursor-pointer transition-colors';
+    });
+
+    // Background Transition
+    const hero = document.getElementById('hero-card');
+    hero.className = `animate-premium-shimmer ${s.bg} rounded-3xl p-6 text-on-primary shadow-lg relative overflow-hidden transition-all duration-500 min-h-[180px]`;
+  }
+
+  function nextScheme() {
+    let next = (currentSchemeIndex + 1) % schemes.length;
+    switchScheme(next);
+  }
+
+  function prevScheme() {
+    let prev = (currentSchemeIndex - 1 + schemes.length) % schemes.length;
+    switchScheme(prev);
+  }
+</script></body></html>
