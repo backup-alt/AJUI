@@ -5827,3 +5827,84 @@ body {
 .project-workbench .operations-table {
   min-height: 320px;
 }
+
+/* Header profile refinement */
+.enterprise-header {
+  box-shadow: 0 1px 0 rgba(208, 215, 222, 0.84);
+}
+
+.enterprise-header ion-toolbar,
+.enterprise-header.client-header ion-toolbar {
+  --min-height: 64px;
+}
+
+.enterprise-toolbar {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 620px) max-content;
+  gap: 16px;
+  min-height: 64px;
+  padding: 0 34px 0 24px;
+}
+
+.toolbar-search {
+  height: 40px;
+  border-color: #cfd8e3;
+  background: #fbfcfe;
+}
+
+.toolbar-search input {
+  font-size: 13px;
+}
+
+.toolbar-actions,
+.toolbar-actions:has(ion-avatar) {
+  gap: 8px;
+}
+
+.toolbar-actions {
+  padding-right: 10px;
+}
+
+.role-pill {
+  height: 30px;
+  padding: 0 12px;
+  border-color: #d7dee8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.toolbar-actions ion-avatar,
+.enterprise-header.client-header .toolbar-actions ion-avatar {
+  width: 30px;
+  height: 30px;
+  margin: 0 0 0 2px;
+  border: 1px solid #d5dbe3;
+  border-radius: 8px;
+  background: #101828;
+  color: #ffffff;
+  box-shadow: none;
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.toolbar-actions ion-avatar span {
+  line-height: 1;
+}
+
+@media (max-width: 760px) {
+  .enterprise-toolbar {
+    grid-template-columns: 1fr auto;
+    padding: 0 18px 0 14px;
+  }
+
+  .toolbar-search {
+    display: none;
+  }
+
+  .toolbar-actions {
+    padding-right: 4px;
+  }
+}
