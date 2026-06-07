@@ -2,14 +2,140 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
-import { IonBadge, IonContent, IonProgressBar, IonSplitPane, IonText } from "@ionic/angular/standalone";
+import { IonBadge, IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { formatMoney, statusClass } from "../shared/format";
+import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
 
-type ProjectTab = "overview" | "sites" | "activity" | "settings";
+type ModuleKey = "materials" | "labour" | "expenses" | "payments" | "vendors" | "reports" | "settings";
+type FieldType = "text" | "number" | "date";
+type TableRow = Record<string, string | number>;
+type FieldSchema = {
+  key: string;
+  label: string;
+  type?: FieldType;
+};
+type SectionConfig = {
+  key: ModuleKey;
+  label: string;
+  title: string;
+  description: string;
+  columns: FieldSchema[];
+};
+
+const sectionConfigs: SectionConfig[] = [
+  {
+    key: "materials",
+    label: "Materials",
+    title: "Material Requests",
+    description: "Fixed procurement fields for requests, approvals, vendors, purchase orders, and stock visibility.",
+    columns: [
+      { key: "materialName", label: "Material Name" },
+      { key: "unit", label: "Unit" },
+      { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
+      { key: "approvedQuantity", label: "Approved Quantity", type: "number" },
+      { key: "requestDate", label: "Request Date", type: "date" },
+      { key: "vendor", label: "Vendor" },
+      { key: "poNumber", label: "PO Number" },
+      { key: "remainingStock", label: "Remaining Stock" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  {
+    key: "labour",
+    label: "Labour",
+    title: "Labour Attendance",
+    description: "Attendance and wage fields for site labour, shifts, overtime, fine, notes, and approvals.",
+    columns: [
+      { key: "labourName", label: "Labour Name" },
+      { key: "category", label: "Category" },
+      { key: "site", label: "Site" },
+      { key: "present", label: "Present" },
+      { key: "absent", label: "Absent", type: "number" },
+      { key: "shift", label: "Shift" },
+      { key: "overtime", label: "Overtime" },
+      { key: "lateFine", label: "Late Fine" },
+      { key: "weeklyPayable", label: "Weekly Payable" },
+      { key: "paymentMode", label: "Payment Mode" },
+      { key: "notes", label: "Notes" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  {
+    key: "expenses",
+    label: "Expenses",
+    title: "Site Expense Ledger",
+    description: "Supervisor cash ledger and site expense fields with bill reference and approval status.",
+    columns: [
+      { key: "expenseDate", label: "Expense Date", type: "date" },
+      { key: "description", label: "Description" },
+      { key: "amount", label: "Amount" },
+      { key: "site", label: "Site" },
+      { key: "supervisor", label: "Supervisor" },
+      { key: "cashIssued", label: "Cash Issued" },
+      { key: "runningBalance", label: "Running Balance" },
+      { key: "reference", label: "Bill / Reference" },
+      { key: "approvalStatus", label: "Approval Status" },
+    ],
+  },
+  {
+    key: "payments",
+    label: "Payments",
+    title: "Payment Ledger",
+    description: "Client collection fields for dates, modes, receipts, transaction references, and approval checks.",
+    columns: [
+      { key: "paymentDate", label: "Payment Date", type: "date" },
+      { key: "amount", label: "Amount" },
+      { key: "mode", label: "Mode" },
+      { key: "transactionReference", label: "Transaction Reference" },
+      { key: "receiptNumber", label: "Receipt Number" },
+      { key: "collectedBy", label: "Collected By" },
+      { key: "approvalStatus", label: "Approval Status" },
+    ],
+  },
+  {
+    key: "vendors",
+    label: "Vendors",
+    title: "Vendor Directory",
+    description: "Vendor master fields for material type, contact, address, GST, and purchase history.",
+    columns: [
+      { key: "vendorName", label: "Vendor Name" },
+      { key: "materialType", label: "Material Type" },
+      { key: "phoneNumber", label: "Phone Number" },
+      { key: "address", label: "Address" },
+      { key: "gstNumber", label: "GST Number" },
+      { key: "purchaseHistory", label: "Purchase History" },
+    ],
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    title: "Reports Register",
+    description: "Report fields for financial, labour, material, and project exports.",
+    columns: [
+      { key: "category", label: "Category" },
+      { key: "reportName", label: "Report Name" },
+      { key: "description", label: "Description" },
+      { key: "owner", label: "Owner" },
+      { key: "exportFormat", label: "Export Format" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    title: "Project Settings",
+    description: "Project configuration fields kept in a table so admin users can adjust operational defaults.",
+    columns: [
+      { key: "setting", label: "Setting" },
+      { key: "value", label: "Value" },
+      { key: "owner", label: "Owner" },
+      { key: "updated", label: "Updated" },
+    ],
+  },
+];
 
 @Component({
   standalone: true,
@@ -17,9 +143,8 @@ type ProjectTab = "overview" | "sites" | "activity" | "settings";
     CommonModule,
     IonBadge,
     IonContent,
-    IonProgressBar,
+    IonIcon,
     IonSplitPane,
-    IonText,
     EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
     ProjectFormDialogComponent,
@@ -29,7 +154,7 @@ type ProjectTab = "overview" | "sites" | "activity" | "settings";
       <agb-enterprise-sidebar [clientId]="clientId()" [projectId]="projectId()" active="projects" (newProject)="showProjectForm.set(true)"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        <agb-enterprise-header [showTitle]="false" role="Admin" searchPlaceholder="Search project notes..." />
+        <agb-enterprise-header [showTitle]="false" role="Admin" searchPlaceholder="Search table records..." />
 
         <ion-content class="erp-page">
           <main class="workspace-shell" *ngIf="project() as currentProject">
@@ -41,155 +166,139 @@ type ProjectTab = "overview" | "sites" | "activity" | "settings";
               <strong>{{ currentProject.name }}</strong>
             </nav>
 
-            <section class="project-hero">
-              <div class="project-hero-main">
-                <ion-text color="medium">{{ currentProject.id }}</ion-text>
+            <section class="project-compact-strip">
+              <div>
+                <span>{{ currentProject.id }}</span>
                 <h1>{{ currentProject.name }}</h1>
-                <p>{{ currentProject.client }}  -  {{ currentProject.address }}</p>
-                <div class="project-hero-meta">
-                  <span>Supervisor: {{ currentProject.supervisor }}</span>
-                  <span>Started {{ currentProject.startDate }}</span>
-                  <span>{{ currentProject.sites.length }} sites</span>
-                </div>
+                <p>{{ currentProject.client }} - {{ currentProject.address }}</p>
               </div>
+              <dl>
+                <div><dt>Value</dt><dd>{{ formatMoney(currentProject.totalValue) }}</dd></div>
+                <div><dt>Received</dt><dd>{{ formatMoney(currentProject.receivedAmount) }}</dd></div>
+                <div><dt>Pending</dt><dd>{{ formatMoney(currentProject.totalValue - currentProject.receivedAmount) }}</dd></div>
+                <div><dt>Supervisor</dt><dd>{{ currentProject.supervisor }}</dd></div>
+                <div><dt>Status</dt><dd><ion-badge class="status" [ngClass]="statusClass(currentProject.status)">{{ currentProject.status }}</ion-badge></dd></div>
+              </dl>
+            </section>
 
-              <div class="project-hero-panel">
+            <section class="operations-workbench">
+              <nav class="operations-tabs" aria-label="Project table modules">
+                <button
+                  *ngFor="let section of sections"
+                  type="button"
+                  [class.active]="activeSection() === section.key"
+                  (click)="switchSection(section.key)"
+                >
+                  {{ section.label }}
+                </button>
+              </nav>
+
+              <div class="module-toolbar table-first-toolbar">
                 <div>
-                  <span>Project Progress</span>
-                  <strong>{{ currentProject.completion }}%</strong>
+                  <h2>{{ activeConfig().title }}</h2>
+                  <p>{{ activeConfig().description }}</p>
                 </div>
-                <ion-progress-bar [value]="currentProject.completion / 100"></ion-progress-bar>
-                <ion-badge class="status" [ngClass]="statusClass(currentProject.status)">{{ currentProject.status }}</ion-badge>
+                <div class="table-actions">
+                  <label class="table-search">
+                    <ion-icon name="search-outline"></ion-icon>
+                    <input [value]="tableSearch()" (input)="tableSearch.set($any($event.target).value)" placeholder="Search rows" />
+                  </label>
+                  <button type="button" class="primary-table-action" (click)="openRecordDialog()">
+                    <ion-icon name="add-outline"></ion-icon>
+                    Add Record
+                  </button>
+                  <button type="button" (click)="openFieldDialog()">Add Field</button>
+                  <button type="button" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
+                </div>
+              </div>
+
+              <div class="table-meta-strip">
+                <span>{{ visibleRows(activeSection()).length }} rows</span>
+                <span>{{ columnsFor(activeSection()).length }} fields</span>
+                <span>Inline editable cells</span>
+              </div>
+
+              <div class="table-wrap operations-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th *ngFor="let column of columnsFor(activeSection())">{{ column.label }}</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of visibleRows(activeSection()); let rowIndex = index">
+                      <td
+                        *ngFor="let column of columnsFor(activeSection())"
+                        contenteditable="true"
+                        spellcheck="false"
+                        (blur)="updateCell(activeSection(), rowIndex, column.key, $any($event.target).textContent || '')"
+                      >
+                        {{ row[column.key] }}
+                      </td>
+                      <td class="row-actions">
+                        <button type="button" (click)="duplicateRow(activeSection(), row)">Duplicate</button>
+                        <button type="button" (click)="deleteRow(activeSection(), row)">Delete</button>
+                      </td>
+                    </tr>
+                    <tr *ngIf="visibleRows(activeSection()).length === 0">
+                      <td class="empty-row" [attr.colspan]="columnsFor(activeSection()).length + 1">No records found. Add a record to begin.</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </section>
 
-            <section class="project-tabbar" role="tablist" aria-label="Project detail navigation">
-              <button
-                *ngFor="let tab of tabs"
-                type="button"
-                role="tab"
-                [class.active]="activeTab() === tab.key"
-                [attr.aria-selected]="activeTab() === tab.key"
-                (click)="activeTab.set(tab.key)"
-              >
-                {{ tab.label }}
-              </button>
+            <section class="form-overlay" *ngIf="recordDialogOpen()">
+              <form class="erp-dialog operations-dialog" (submit)="saveRecord($event)">
+                <div class="dialog-head">
+                  <div>
+                    <span>{{ activeConfig().label }}</span>
+                    <h2>Add Record</h2>
+                  </div>
+                  <button type="button" class="icon-button" (click)="recordDialogOpen.set(false)">
+                    <ion-icon name="close-outline"></ion-icon>
+                  </button>
+                </div>
+                <div class="erp-form">
+                  <label *ngFor="let column of columnsFor(activeSection())">
+                    <span>{{ column.label }}</span>
+                    <input
+                      [type]="column.type || 'text'"
+                      [value]="draftRow()[column.key] || ''"
+                      (input)="updateDraftField(column.key, $any($event.target).value)"
+                    />
+                  </label>
+                </div>
+                <div class="dialog-actions">
+                  <button type="button" class="secondary-action" (click)="recordDialogOpen.set(false)">Cancel</button>
+                  <button type="submit" class="primary-action">Add Record</button>
+                </div>
+              </form>
             </section>
 
-            <section class="project-detail-content" [ngSwitch]="activeTab()">
-              <ng-container *ngSwitchCase="'overview'">
-                <div class="project-summary-grid">
-                  <article class="detail-card primary">
-                    <span>Project Value</span>
-                    <strong>{{ formatMoney(currentProject.totalValue) }}</strong>
-                    <p>Approved contract value for this project.</p>
-                  </article>
-                  <article class="detail-card">
-                    <span>Received</span>
-                    <strong>{{ formatMoney(currentProject.receivedAmount) }}</strong>
-                    <p>{{ receiptRatio() }}% collected from client.</p>
-                  </article>
-                  <article class="detail-card">
-                    <span>Pending</span>
-                    <strong>{{ formatMoney(pendingReceivable()) }}</strong>
-                    <p>Balance receivable against the agreed value.</p>
-                  </article>
-                  <article class="detail-card">
-                    <span>Advance</span>
-                    <strong>{{ formatMoney(currentProject.advanceAmount) }}</strong>
-                    <p>Initial amount recorded at project creation.</p>
-                  </article>
+            <section class="form-overlay" *ngIf="fieldDialogOpen()">
+              <form class="erp-dialog field-dialog" (submit)="saveField($event)">
+                <div class="dialog-head">
+                  <div>
+                    <span>{{ activeConfig().label }}</span>
+                    <h2>Add Field</h2>
+                  </div>
+                  <button type="button" class="icon-button" (click)="fieldDialogOpen.set(false)">
+                    <ion-icon name="close-outline"></ion-icon>
+                  </button>
                 </div>
-
-                <div class="project-overview-layout">
-                  <article class="project-profile-panel">
-                    <div class="panel-title-row">
-                      <h2>Project Details</h2>
-                      <ion-badge class="neutral">{{ currentProject.status }}</ion-badge>
-                    </div>
-                    <dl class="project-definition-list">
-                      <div><dt>Client</dt><dd>{{ currentProject.client }}</dd></div>
-                      <div><dt>Mobile</dt><dd>{{ currentProject.mobile }}</dd></div>
-                      <div><dt>Address</dt><dd>{{ currentProject.address }}</dd></div>
-                      <div><dt>Supervisor</dt><dd>{{ currentProject.supervisor }}</dd></div>
-                      <div><dt>Start Date</dt><dd>{{ currentProject.startDate }}</dd></div>
-                      <div><dt>Project ID</dt><dd>{{ currentProject.id }}</dd></div>
-                    </dl>
-                  </article>
-
-                  <aside class="project-side-panel">
-                    <h2>Current Focus</h2>
-                    <p>The workspace is scoped to this project only. Use the tabs above to review details without opening unrelated modules.</p>
-                    <div class="focus-list">
-                      <span *ngFor="let site of currentProject.sites">{{ site }}</span>
-                    </div>
-                  </aside>
+                <div class="erp-form">
+                  <label class="span-2">
+                    <span>Field Name</span>
+                    <input [value]="newFieldLabel()" (input)="newFieldLabel.set($any($event.target).value)" placeholder="Example: Bill Checked By" />
+                  </label>
                 </div>
-              </ng-container>
-
-              <ng-container *ngSwitchCase="'sites'">
-                <div class="site-card-grid">
-                  <article *ngFor="let site of siteCards(); let index = index" class="site-card">
-                    <div>
-                      <span>Site {{ index + 1 }}</span>
-                      <h2>{{ site.name }}</h2>
-                      <p>{{ site.phase }}</p>
-                    </div>
-                    <strong>{{ site.progress }}%</strong>
-                    <ion-progress-bar [value]="site.progress / 100"></ion-progress-bar>
-                    <div class="site-card-footer">
-                      <span>{{ site.owner }}</span>
-                      <ion-badge class="neutral">{{ site.status }}</ion-badge>
-                    </div>
-                  </article>
+                <div class="dialog-actions">
+                  <button type="button" class="secondary-action" (click)="fieldDialogOpen.set(false)">Cancel</button>
+                  <button type="submit" class="primary-action">Add Field</button>
                 </div>
-              </ng-container>
-
-              <ng-container *ngSwitchCase="'activity'">
-                <article class="activity-panel">
-                  <div class="panel-title-row">
-                    <h2>Recent Activity</h2>
-                    <span>{{ activityItems().length }} updates</span>
-                  </div>
-                  <div class="activity-list">
-                    <div *ngFor="let item of activityItems()" class="activity-item">
-                      <span class="activity-dot"></span>
-                      <div>
-                        <strong>{{ item.title }}</strong>
-                        <p>{{ item.detail }}</p>
-                        <small>{{ item.time }}</small>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              </ng-container>
-
-              <ng-container *ngSwitchCase="'settings'">
-                <article class="project-settings-panel">
-                  <div class="panel-title-row">
-                    <h2>Project Settings</h2>
-                    <button type="button" class="secondary-action">Edit</button>
-                  </div>
-                  <div class="settings-grid">
-                    <label>
-                      <span>Project Name</span>
-                      <input [value]="currentProject.name" readonly />
-                    </label>
-                    <label>
-                      <span>Assigned Supervisor</span>
-                      <input [value]="currentProject.supervisor" readonly />
-                    </label>
-                    <label>
-                      <span>Status</span>
-                      <input [value]="currentProject.status" readonly />
-                    </label>
-                    <label>
-                      <span>Default View</span>
-                      <input value="Overview" readonly />
-                    </label>
-                  </div>
-                </article>
-              </ng-container>
+              </form>
             </section>
 
             <agb-project-form-dialog
@@ -214,64 +323,116 @@ export class ProjectWorkspacePage {
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
   readonly showProjectForm = signal(false);
-  readonly activeTab = signal<ProjectTab>("overview");
-
-  readonly tabs: { key: ProjectTab; label: string }[] = [
-    { key: "overview", label: "Overview" },
-    { key: "sites", label: "Sites" },
-    { key: "activity", label: "Activity" },
-    { key: "settings", label: "Settings" },
-  ];
+  readonly sections = sectionConfigs;
+  readonly activeSection = signal<ModuleKey>(this.normalizeSection(this.route.snapshot.paramMap.get("section")));
+  readonly tableSearch = signal("");
+  readonly recordDialogOpen = signal(false);
+  readonly fieldDialogOpen = signal(false);
+  readonly newFieldLabel = signal("");
+  readonly draftRow = signal<TableRow>({});
+  readonly customColumns = signal<Record<ModuleKey, FieldSchema[]>>(this.emptyColumnMap());
+  readonly tableRows = signal<Record<ModuleKey, TableRow[]>>(this.buildInitialRows(this.route.snapshot.paramMap.get("projectId") ?? ""));
 
   readonly clientId = computed(() => this.paramMap().get("clientId") ?? "");
   readonly projectId = computed(() => this.paramMap().get("projectId") ?? "");
   readonly client = computed(() => this.data.clientById(this.clientId()));
   readonly project = computed(() => this.data.projectById(this.projectId()));
+  readonly activeConfig = computed(() => sectionConfigs.find((section) => section.key === this.activeSection()) ?? sectionConfigs[0]);
 
-  pendingReceivable() {
-    const project = this.project();
-    return project ? project.totalValue - project.receivedAmount : 0;
+  switchSection(section: ModuleKey) {
+    this.activeSection.set(section);
+    this.tableSearch.set("");
+    void this.router.navigate(["/clients", this.clientId(), "projects", this.projectId(), section]);
   }
 
-  receiptRatio() {
-    const project = this.project();
-    if (!project?.totalValue) return 0;
-    return Math.round((project.receivedAmount / project.totalValue) * 100);
+  columnsFor(section: ModuleKey): FieldSchema[] {
+    const base = sectionConfigs.find((config) => config.key === section)?.columns ?? [];
+    return [...base, ...this.customColumns()[section]];
   }
 
-  siteCards() {
-    const project = this.project();
-    if (!project) return [];
-    const phases = ["Foundation and structure", "Civil work in progress", "Finishing preparation", "Final inspection"];
-    return project.sites.map((site, index) => ({
-      name: site,
-      phase: phases[index % phases.length],
-      owner: project.supervisor,
-      progress: Math.max(18, Math.min(96, project.completion + index * 7 - 8)),
-      status: project.status === "Completed" ? "Closed" : index === 0 ? "In Progress" : "Queued",
+  visibleRows(section: ModuleKey): TableRow[] {
+    const query = this.tableSearch().trim().toLowerCase();
+    const rows = this.tableRows()[section] ?? [];
+    if (!query) return rows;
+    return rows.filter((row) => Object.values(row).some((value) => String(value).toLowerCase().includes(query)));
+  }
+
+  openRecordDialog() {
+    const row: TableRow = {};
+    for (const column of this.columnsFor(this.activeSection())) {
+      row[column.key] = "";
+    }
+    this.draftRow.set(row);
+    this.recordDialogOpen.set(true);
+  }
+
+  updateDraftField(key: string, value: string) {
+    this.draftRow.update((row) => ({ ...row, [key]: value }));
+  }
+
+  saveRecord(event: Event) {
+    event.preventDefault();
+    const section = this.activeSection();
+    const row = this.draftRow();
+    this.tableRows.update((rows) => ({ ...rows, [section]: [{ ...row }, ...rows[section]] }));
+    this.recordDialogOpen.set(false);
+  }
+
+  openFieldDialog() {
+    this.newFieldLabel.set("");
+    this.fieldDialogOpen.set(true);
+  }
+
+  saveField(event: Event) {
+    event.preventDefault();
+    const label = this.newFieldLabel().trim();
+    if (!label) return;
+    const section = this.activeSection();
+    const key = this.fieldKey(label, this.columnsFor(section));
+    const column = { key, label };
+    this.customColumns.update((columns) => ({ ...columns, [section]: [...columns[section], column] }));
+    this.tableRows.update((rows) => ({
+      ...rows,
+      [section]: rows[section].map((row) => ({ ...row, [key]: "" })),
+    }));
+    this.fieldDialogOpen.set(false);
+  }
+
+  updateCell(section: ModuleKey, visibleIndex: number, key: string, value: string) {
+    const target = this.visibleRows(section)[visibleIndex];
+    if (!target) return;
+    this.tableRows.update((rows) => ({
+      ...rows,
+      [section]: rows[section].map((row) => (row === target ? { ...row, [key]: value.trim() } : row)),
     }));
   }
 
-  activityItems() {
-    const project = this.project();
-    if (!project) return [];
-    return [
-      {
-        title: "Project workspace reviewed",
-        detail: `${project.name} was opened for project-level planning and follow-up.`,
-        time: "Today",
-      },
-      {
-        title: "Supervisor assignment confirmed",
-        detail: `${project.supervisor} is responsible for site updates and coordination.`,
-        time: "Yesterday",
-      },
-      {
-        title: "Client balance checked",
-        detail: `${this.formatMoney(this.pendingReceivable())} remains pending against the project value.`,
-        time: "This week",
-      },
-    ];
+  duplicateRow(section: ModuleKey, row: TableRow) {
+    this.tableRows.update((rows) => ({ ...rows, [section]: [{ ...row }, ...rows[section]] }));
+  }
+
+  deleteRow(section: ModuleKey, row: TableRow) {
+    this.tableRows.update((rows) => ({ ...rows, [section]: rows[section].filter((existingRow) => existingRow !== row) }));
+  }
+
+  exportExcel() {
+    const section = this.activeSection();
+    const columns = this.columnsFor(section);
+    const rows = this.visibleRows(section);
+    const html = [
+      "<table><thead><tr>",
+      ...columns.map((column) => `<th>${this.escapeHtml(column.label)}</th>`),
+      "</tr></thead><tbody>",
+      ...rows.map((row) => `<tr>${columns.map((column) => `<td>${this.escapeHtml(String(row[column.key] ?? ""))}</td>`).join("")}</tr>`),
+      "</tbody></table>",
+    ].join("");
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `annai-${this.projectId()}-${section}-${new Date().toISOString().slice(0, 10)}.xls`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   backToClients() {
@@ -287,6 +448,137 @@ export class ProjectWorkspacePage {
     if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
     const project = this.data.addProject(currentClient, value);
     this.showProjectForm.set(false);
-    setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id]));
+    setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]));
+  }
+
+  private buildInitialRows(projectId: string): Record<ModuleKey, TableRow[]> {
+    const materials = this.data.materialsForProject(projectId).map((row) => ({
+      materialName: row.name,
+      unit: row.unit,
+      requestedQuantity: formatNumber(row.requested),
+      approvedQuantity: formatNumber(row.approved),
+      requestDate: "2026-06-05",
+      vendor: row.vendor,
+      poNumber: row.poNumber,
+      remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
+      status: row.status,
+    }));
+
+    const labour = this.data.labourForProject(projectId).map((row) => ({
+      labourName: row.party,
+      category: row.category,
+      site: row.site,
+      present: `${row.presentDays} days / ${row.presentCount} staff`,
+      absent: row.absentDays,
+      shift: row.shift,
+      overtime: `${row.overtime} hrs`,
+      lateFine: formatMoney(row.lateFine),
+      weeklyPayable: formatMoney(row.dailyWage * row.presentDays * row.presentCount + row.overtime * 175 - row.lateFine),
+      paymentMode: row.paymentMode,
+      notes: row.notes,
+      status: row.status,
+    }));
+
+    let runningBalance = this.data.projectById(projectId)?.expenseBalance ?? 0;
+    const expenses = this.data.expensesForProject(projectId).map((row) => {
+      runningBalance += row.received - row.spent;
+      return {
+        expenseDate: row.date,
+        description: row.description,
+        amount: formatMoney(row.spent),
+        site: row.site,
+        supervisor: row.supervisor,
+        cashIssued: formatMoney(row.received),
+        runningBalance: formatMoney(runningBalance),
+        reference: row.reference,
+        approvalStatus: row.status,
+      };
+    });
+
+    const payments = this.data.paymentsForProject(projectId).map((row) => ({
+      paymentDate: row.date,
+      amount: formatMoney(row.amount),
+      mode: row.mode,
+      transactionReference: row.reference,
+      receiptNumber: row.receipt,
+      collectedBy: row.collectedBy,
+      approvalStatus: row.status,
+    }));
+
+    const vendors = this.data.vendors().map((vendor) => ({
+      vendorName: vendor.name,
+      materialType: vendor.materialType,
+      phoneNumber: vendor.phone,
+      address: vendor.address,
+      gstNumber: vendor.gst,
+      purchaseHistory: "View History",
+    }));
+
+    const reports = [
+      ["Financial", "Payment Collection Report", "Client receipt and pending receivable export", "Accountant", "PDF / Excel", "Ready"],
+      ["Financial", "Expense Report", "Supervisor expense and bill reference export", "Admin", "PDF / Excel", "Ready"],
+      ["Labour", "Attendance Report", "Site-wise attendance and wage export", "Project Manager", "Excel", "Ready"],
+      ["Material", "Inventory Report", "Purchased, consumed, and remaining stock export", "Project Manager", "Excel", "Ready"],
+      ["Project", "Project Summary", "Project value, progress, sites, and status export", "Admin", "PDF", "Ready"],
+    ].map(([category, reportName, description, owner, exportFormat, status]) => ({
+      category,
+      reportName,
+      description,
+      owner,
+      exportFormat,
+      status,
+    }));
+
+    const project = this.data.projectById(projectId);
+    const settings = [
+      { setting: "Project Name", value: project?.name ?? "", owner: "Admin", updated: "Today" },
+      { setting: "Assigned Supervisor", value: project?.supervisor ?? "", owner: "Admin", updated: "Today" },
+      { setting: "Status", value: project?.status ?? "", owner: "Project Manager", updated: "Today" },
+      { setting: "Default Module", value: "Materials", owner: "Admin", updated: "Today" },
+    ];
+
+    return {
+      materials,
+      labour,
+      expenses,
+      payments,
+      vendors,
+      reports,
+      settings,
+    };
+  }
+
+  private normalizeSection(value: string | null): ModuleKey {
+    return sectionConfigs.some((section) => section.key === value) ? (value as ModuleKey) : "materials";
+  }
+
+  private emptyColumnMap(): Record<ModuleKey, FieldSchema[]> {
+    return {
+      materials: [],
+      labour: [],
+      expenses: [],
+      payments: [],
+      vendors: [],
+      reports: [],
+      settings: [],
+    };
+  }
+
+  private fieldKey(label: string, existingColumns: FieldSchema[]): string {
+    const base = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    const fallback = `custom-${Date.now()}`;
+    const candidate = base || fallback;
+    const existing = new Set(existingColumns.map((column) => column.key));
+    if (!existing.has(candidate)) return candidate;
+    let index = 2;
+    while (existing.has(`${candidate}-${index}`)) index += 1;
+    return `${candidate}-${index}`;
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 }

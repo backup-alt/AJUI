@@ -61,10 +61,10 @@ export class EnterpriseSidebarComponent {
 
   get items(): SidebarItem[] {
     const clientRoute = this.clientId ? ["/clients", this.clientId] : ["/clients"];
-    const settingsRoute = this.clientId && this.projectId ? ["/clients", this.clientId, "projects", this.projectId] : clientRoute;
+    const settingsRoute = this.clientId && this.projectId ? ["/clients", this.clientId, "projects", this.projectId, "settings"] : ["/dashboard"];
 
     return [
-      { key: "dashboard", label: "Dashboard", icon: "grid-outline", route: clientRoute },
+      { key: "dashboard", label: "Dashboard", icon: "grid-outline", route: ["/dashboard"] },
       { key: "clients", label: "Clients", icon: "people-outline", route: ["/clients"] },
       { key: "projects", label: "Projects", icon: "construct-outline", route: clientRoute },
       { key: "settings", label: "Settings", icon: "settings-outline", route: settingsRoute },
