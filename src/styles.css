@@ -5638,17 +5638,19 @@ body {
 /* Logo, project module tabs, and expense split polish */
 .sidebar-logo-wrap {
   justify-content: center;
-  min-height: 132px;
-  padding: 18px 16px 16px;
+  min-height: 112px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(208, 215, 222, 0.78);
 }
 
 .sidebar-logo {
-  width: 104px;
-  height: 104px;
-  border-radius: 14px;
+  width: 88px;
+  height: 88px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
   object-fit: contain;
   background: #12131a;
-  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.14);
+  box-shadow: 0 8px 18px rgba(16, 24, 40, 0.1);
 }
 
 .sidebar-brand-copy {
