@@ -3,20 +3,15 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@a
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { IonBadge, IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
-import { ErpDataService } from "../data/erp-data.service";
+import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
 
-type ModuleKey = "materials" | "labour" | "expenses" | "payments" | "vendors" | "reports" | "settings";
-type FieldType = "text" | "number" | "date";
-type TableRow = Record<string, string | number>;
-type FieldSchema = {
-  key: string;
-  label: string;
-  type?: FieldType;
-};
+type ModuleKey = Exclude<SharedModuleKey, "clients">;
+type TableRow = SharedTableRow;
+type FieldSchema = SharedTableField;
 type SectionConfig = {
   key: ModuleKey;
   label: string;
@@ -330,7 +325,6 @@ export class ProjectWorkspacePage {
   readonly fieldDialogOpen = signal(false);
   readonly newFieldLabel = signal("");
   readonly draftRow = signal<TableRow>({});
-  readonly customColumns = signal<Record<ModuleKey, FieldSchema[]>>(this.emptyColumnMap());
   readonly tableRows = signal<Record<ModuleKey, TableRow[]>>(this.buildInitialRows(this.route.snapshot.paramMap.get("projectId") ?? ""));
 
   readonly clientId = computed(() => this.paramMap().get("clientId") ?? "");
@@ -347,12 +341,12 @@ export class ProjectWorkspacePage {
 
   columnsFor(section: ModuleKey): FieldSchema[] {
     const base = sectionConfigs.find((config) => config.key === section)?.columns ?? [];
-    return [...base, ...this.customColumns()[section]];
+    return [...base, ...this.data.customFieldsFor(section)];
   }
 
   visibleRows(section: ModuleKey): TableRow[] {
     const query = this.tableSearch().trim().toLowerCase();
-    const rows = this.tableRows()[section] ?? [];
+    const rows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (row) => this.rowBelongsToProject(row));
     if (!query) return rows;
     return rows.filter((row) => Object.values(row).some((value) => String(value).toLowerCase().includes(query)));
   }
@@ -373,8 +367,13 @@ export class ProjectWorkspacePage {
   saveRecord(event: Event) {
     event.preventDefault();
     const section = this.activeSection();
-    const row = this.draftRow();
-    this.tableRows.update((rows) => ({ ...rows, [section]: [{ ...row }, ...rows[section]] }));
+    const currentProject = this.project();
+    this.data.addCustomRow(section, {
+      ...this.draftRow(),
+      __projectId: this.projectId(),
+      client: currentProject?.client ?? "",
+      project: currentProject?.name ?? "",
+    });
     this.recordDialogOpen.set(false);
   }
 
@@ -388,31 +387,35 @@ export class ProjectWorkspacePage {
     const label = this.newFieldLabel().trim();
     if (!label) return;
     const section = this.activeSection();
-    const key = this.fieldKey(label, this.columnsFor(section));
-    const column = { key, label };
-    this.customColumns.update((columns) => ({ ...columns, [section]: [...columns[section], column] }));
-    this.tableRows.update((rows) => ({
-      ...rows,
-      [section]: rows[section].map((row) => ({ ...row, [key]: "" })),
-    }));
+    this.data.addCustomField(section, label, this.columnsFor(section));
     this.fieldDialogOpen.set(false);
   }
 
   updateCell(section: ModuleKey, visibleIndex: number, key: string, value: string) {
     const target = this.visibleRows(section)[visibleIndex];
     if (!target) return;
+    const rowId = String(target["__rowId"] || "");
+    if (rowId) this.data.updateSharedRowCell(rowId, key, value.trim());
+    if (rowId.startsWith("custom:")) return;
+
     this.tableRows.update((rows) => ({
       ...rows,
-      [section]: rows[section].map((row) => (row === target ? { ...row, [key]: value.trim() } : row)),
+      [section]: rows[section].map((row) => (String(row["__rowId"] || "") === rowId ? { ...row, [key]: value.trim() } : row)),
     }));
   }
 
   duplicateRow(section: ModuleKey, row: TableRow) {
-    this.tableRows.update((rows) => ({ ...rows, [section]: [{ ...row }, ...rows[section]] }));
+    const currentProject = this.project();
+    this.data.duplicateSharedRow(section, {
+      ...row,
+      __projectId: this.projectId(),
+      client: currentProject?.client ?? row["client"],
+      project: currentProject?.name ?? row["project"],
+    });
   }
 
   deleteRow(section: ModuleKey, row: TableRow) {
-    this.tableRows.update((rows) => ({ ...rows, [section]: rows[section].filter((existingRow) => existingRow !== row) }));
+    this.data.deleteSharedRow(String(row["__rowId"] || ""));
   }
 
   exportExcel() {
@@ -453,6 +456,8 @@ export class ProjectWorkspacePage {
 
   private buildInitialRows(projectId: string): Record<ModuleKey, TableRow[]> {
     const materials = this.data.materialsForProject(projectId).map((row) => ({
+      __rowId: `material:${row.id}`,
+      __projectId: row.projectId,
       materialName: row.name,
       unit: row.unit,
       requestedQuantity: formatNumber(row.requested),
@@ -465,6 +470,8 @@ export class ProjectWorkspacePage {
     }));
 
     const labour = this.data.labourForProject(projectId).map((row) => ({
+      __rowId: `labour:${row.id}`,
+      __projectId: row.projectId,
       labourName: row.party,
       category: row.category,
       site: row.site,
@@ -483,6 +490,8 @@ export class ProjectWorkspacePage {
     const expenses = this.data.expensesForProject(projectId).map((row) => {
       runningBalance += row.received - row.spent;
       return {
+        __rowId: `expense:${row.id}`,
+        __projectId: row.projectId,
         expenseDate: row.date,
         description: row.description,
         amount: formatMoney(row.spent),
@@ -496,6 +505,8 @@ export class ProjectWorkspacePage {
     });
 
     const payments = this.data.paymentsForProject(projectId).map((row) => ({
+      __rowId: `payment:${row.id}`,
+      __projectId: row.projectId,
       paymentDate: row.date,
       amount: formatMoney(row.amount),
       mode: row.mode,
@@ -506,6 +517,8 @@ export class ProjectWorkspacePage {
     }));
 
     const vendors = this.data.vendors().map((vendor) => ({
+      __rowId: `vendor:${vendor.id}`,
+      __projectId: projectId,
       vendorName: vendor.name,
       materialType: vendor.materialType,
       phoneNumber: vendor.phone,
@@ -520,7 +533,9 @@ export class ProjectWorkspacePage {
       ["Labour", "Attendance Report", "Site-wise attendance and wage export", "Project Manager", "Excel", "Ready"],
       ["Material", "Inventory Report", "Purchased, consumed, and remaining stock export", "Project Manager", "Excel", "Ready"],
       ["Project", "Project Summary", "Project value, progress, sites, and status export", "Admin", "PDF", "Ready"],
-    ].map(([category, reportName, description, owner, exportFormat, status]) => ({
+    ].map(([category, reportName, description, owner, exportFormat, status], index) => ({
+      __rowId: `project-report:${projectId}:${index}`,
+      __projectId: projectId,
       category,
       reportName,
       description,
@@ -531,10 +546,10 @@ export class ProjectWorkspacePage {
 
     const project = this.data.projectById(projectId);
     const settings = [
-      { setting: "Project Name", value: project?.name ?? "", owner: "Admin", updated: "Today" },
-      { setting: "Assigned Supervisor", value: project?.supervisor ?? "", owner: "Admin", updated: "Today" },
-      { setting: "Status", value: project?.status ?? "", owner: "Project Manager", updated: "Today" },
-      { setting: "Default Module", value: "Materials", owner: "Admin", updated: "Today" },
+      { __rowId: `setting:${projectId}:name`, __projectId: projectId, setting: "Project Name", value: project?.name ?? "", owner: "Admin", updated: "Today" },
+      { __rowId: `setting:${projectId}:supervisor`, __projectId: projectId, setting: "Assigned Supervisor", value: project?.supervisor ?? "", owner: "Admin", updated: "Today" },
+      { __rowId: `setting:${projectId}:status`, __projectId: projectId, setting: "Status", value: project?.status ?? "", owner: "Project Manager", updated: "Today" },
+      { __rowId: `setting:${projectId}:module`, __projectId: projectId, setting: "Default Module", value: "Materials", owner: "Admin", updated: "Today" },
     ];
 
     return {
@@ -552,30 +567,9 @@ export class ProjectWorkspacePage {
     return sectionConfigs.some((section) => section.key === value) ? (value as ModuleKey) : "materials";
   }
 
-  private emptyColumnMap(): Record<ModuleKey, FieldSchema[]> {
-    return {
-      materials: [],
-      labour: [],
-      expenses: [],
-      payments: [],
-      vendors: [],
-      reports: [],
-      settings: [],
-    };
-  }
-
-  private fieldKey(label: string, existingColumns: FieldSchema[]): string {
-    const base = label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-    const fallback = `custom-${Date.now()}`;
-    const candidate = base || fallback;
-    const existing = new Set(existingColumns.map((column) => column.key));
-    if (!existing.has(candidate)) return candidate;
-    let index = 2;
-    while (existing.has(`${candidate}-${index}`)) index += 1;
-    return `${candidate}-${index}`;
+  private rowBelongsToProject(row: TableRow): boolean {
+    const rowProjectId = row["__projectId"];
+    return rowProjectId === undefined || rowProjectId === "" || String(rowProjectId) === this.projectId();
   }
 
   private escapeHtml(value: string): string {

@@ -5308,3 +5308,329 @@ ion-menu.enterprise-sidebar::part(container) {
     width: 100%;
   }
 }
+
+/* Final dashboard precision pass */
+:root {
+  --ion-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --app-bg: #eef2f6;
+  --ui-accent: #0f766e;
+  --ui-accent-dark: #0a5d58;
+  --ui-accent-soft: #eefcf8;
+  --ui-accent-line: #9ce4d8;
+  --ui-panel: #ffffff;
+  --ui-line: #d7dee8;
+  --ui-line-strong: #b8c4d2;
+  --ui-text: #111827;
+  --ui-muted: #667085;
+}
+
+html,
+body,
+button,
+input,
+textarea,
+select {
+  font-family: var(--ion-font-family);
+}
+
+body {
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.workspace-shell {
+  padding: 16px 20px 24px;
+}
+
+.dashboard-command-center {
+  grid-template-columns: minmax(160px, 0.42fr) minmax(0, 1fr);
+  align-items: center;
+  min-height: 88px;
+  padding: 14px 16px;
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(16, 24, 40, 0.06);
+}
+
+.dashboard-command-copy > span,
+.dashboard-command-copy p {
+  display: none;
+}
+
+.dashboard-command-copy h1 {
+  margin: 0;
+  color: var(--ui-text);
+  font-size: 25px;
+  line-height: 1;
+  font-weight: 860;
+}
+
+.dashboard-kpi-board {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.dashboard-kpi-board > div {
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 1px solid #e0e6ee;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f7f9fc 100%);
+  box-shadow: none;
+}
+
+.dashboard-kpi-board span {
+  color: #667085;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.dashboard-kpi-board strong {
+  margin-top: 5px;
+  color: #101828;
+  font-size: 16px;
+  font-weight: 820;
+}
+
+.universal-workbench {
+  min-height: calc(100vh - 154px);
+  border-radius: 12px;
+  box-shadow: 0 12px 26px rgba(16, 24, 40, 0.08);
+}
+
+.universal-workbench .operations-tabs {
+  padding: 0 8px;
+}
+
+.universal-workbench .operations-tabs button {
+  margin: 0 2px;
+  border-bottom-width: 3px;
+  font-weight: 760;
+}
+
+.universal-workbench .table-first-toolbar {
+  grid-template-columns: minmax(260px, 1fr) minmax(520px, auto);
+  padding: 13px 16px;
+}
+
+.universal-workbench .table-first-toolbar h2 {
+  margin-bottom: 3px;
+  font-size: 18px;
+  font-weight: 830;
+}
+
+.universal-workbench .table-first-toolbar p {
+  font-size: 12px;
+}
+
+.table-actions button,
+.table-search,
+.universal-filter-bar select,
+.universal-filter-bar button {
+  border-radius: 9px;
+}
+
+.table-actions button {
+  font-weight: 760;
+}
+
+.table-actions button.primary-table-action {
+  background: #111827;
+  color: #ffffff;
+}
+
+.universal-filter-bar {
+  grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
+  padding: 9px 16px;
+}
+
+.universal-filter-bar label span {
+  color: #596579;
+}
+
+.table-meta-strip {
+  gap: 7px;
+  padding: 7px 16px;
+}
+
+.table-meta-strip span {
+  min-height: 22px;
+  font-size: 11px;
+}
+
+.universal-table {
+  max-height: calc(100vh - 346px);
+}
+
+.universal-table th {
+  height: 38px;
+  padding: 9px 12px;
+  background: #f3f6fa;
+  letter-spacing: 0;
+}
+
+.universal-table td {
+  height: 42px;
+  padding: 9px 12px;
+}
+
+.form-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(8px);
+}
+
+.erp-dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #d5deea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
+}
+
+.operations-dialog {
+  width: min(880px, calc(100vw - 48px));
+  max-height: min(86vh, 740px);
+}
+
+.field-dialog {
+  width: min(520px, calc(100vw - 48px));
+}
+
+.dialog-head {
+  flex: 0 0 auto;
+  padding: 20px 24px 18px;
+  border-bottom: 1px solid #e3e8ef;
+}
+
+.dialog-head span {
+  color: var(--ui-accent-dark);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.dialog-head h2 {
+  margin-top: 5px;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border-color: #d7dee8;
+  border-radius: 10px;
+}
+
+.erp-dialog > .erp-form {
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 14px 18px;
+  overflow: auto;
+  padding: 20px 24px 22px;
+}
+
+.erp-form label {
+  gap: 7px;
+  align-content: start;
+}
+
+.erp-form label > span {
+  color: #344054;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.erp-form input,
+.erp-form textarea {
+  min-height: 42px;
+  border-color: #d4dce7;
+  border-radius: 9px;
+  color: #111827;
+  font-size: 13px;
+}
+
+.erp-form input:focus,
+.erp-form textarea:focus {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.13);
+}
+
+.erp-dialog > .dialog-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0;
+  padding: 14px 24px 18px;
+  border-top: 1px solid #e3e8ef;
+  background: #fbfcfe;
+}
+
+.erp-form .dialog-actions {
+  padding: 4px 0 0;
+  border: 0;
+  background: transparent;
+}
+
+.primary-action,
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.secondary-action {
+  background: #ffffff;
+}
+
+@media (max-width: 1180px) {
+  .dashboard-command-center,
+  .universal-workbench .table-first-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-kpi-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .form-overlay {
+    padding: 12px;
+  }
+
+  .operations-dialog,
+  .field-dialog {
+    width: min(100%, calc(100vw - 24px));
+  }
+
+  .erp-dialog > .erp-form {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .erp-dialog > .dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding: 12px 16px 16px;
+  }
+
+  .dashboard-kpi-board {
+    grid-template-columns: 1fr;
+  }
+}

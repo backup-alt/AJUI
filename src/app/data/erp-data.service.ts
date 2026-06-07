@@ -34,6 +34,11 @@ export type Vendor = {
   gst: string;
 };
 
+export type SharedModuleKey = "materials" | "clients" | "labour" | "expenses" | "payments" | "vendors" | "reports" | "settings";
+export type SharedFieldType = "text" | "number" | "date";
+export type SharedTableField = { key: string; label: string; type?: SharedFieldType };
+export type SharedTableRow = Record<string, string | number | undefined>;
+
 @Injectable({ providedIn: "root" })
 export class ErpDataService {
   readonly clients = signal<Client[]>(
@@ -158,6 +163,14 @@ export class ErpDataService {
   ]);
 
   readonly activeClients = computed(() => this.clients().filter((client) => client.status === "Active").length);
+  readonly customTableFields = signal<Record<SharedModuleKey, SharedTableField[]>>(
+    this.readState<Record<SharedModuleKey, SharedTableField[]>>("customTableFields", this.emptySharedFieldMap()),
+  );
+  readonly customTableRows = signal<Record<SharedModuleKey, SharedTableRow[]>>(
+    this.readState<Record<SharedModuleKey, SharedTableRow[]>>("customTableRows", this.emptySharedRowMap()),
+  );
+  readonly tableCellEdits = signal<Record<string, SharedTableRow>>(this.readState<Record<string, SharedTableRow>>("tableCellEdits", {}));
+  readonly hiddenTableRows = signal<string[]>(this.readState<string[]>("hiddenTableRows", []));
 
   constructor() {
     effect(() => this.writeState("clients", this.clients()));
@@ -167,6 +180,10 @@ export class ErpDataService {
     effect(() => this.writeState("expenses", this.expenses()));
     effect(() => this.writeState("payments", this.payments()));
     effect(() => this.writeState("vendors", this.vendors()));
+    effect(() => this.writeState("customTableFields", this.customTableFields()));
+    effect(() => this.writeState("customTableRows", this.customTableRows()));
+    effect(() => this.writeState("tableCellEdits", this.tableCellEdits()));
+    effect(() => this.writeState("hiddenTableRows", this.hiddenTableRows()));
   }
 
   addClient(input: { name: string; mobile: string; address: string; supervisor: string }): Client {
@@ -294,6 +311,87 @@ export class ErpDataService {
     return this.payments().filter((row) => row.projectId === projectId);
   }
 
+  customFieldsFor(module: SharedModuleKey): SharedTableField[] {
+    return this.customTableFields()[module] ?? [];
+  }
+
+  addCustomField(module: SharedModuleKey, label: string, existingColumns: SharedTableField[] = []): SharedTableField {
+    const field: SharedTableField = {
+      key: this.fieldKey(label, [...existingColumns, ...this.customFieldsFor(module)]),
+      label,
+    };
+
+    this.customTableFields.update((fields) => ({
+      ...fields,
+      [module]: [...(fields[module] ?? []), field],
+    }));
+    return field;
+  }
+
+  tableRowsFor(module: SharedModuleKey, baseRows: SharedTableRow[] = [], predicate?: (row: SharedTableRow) => boolean): SharedTableRow[] {
+    const edits = this.tableCellEdits();
+    const hidden = new Set(this.hiddenTableRows());
+    return [...baseRows, ...(this.customTableRows()[module] ?? [])]
+      .filter((row) => !hidden.has(String(row["__rowId"] || "")))
+      .map((row) => {
+        const rowId = String(row["__rowId"] || "");
+        return rowId && edits[rowId] ? { ...row, ...edits[rowId] } : row;
+      })
+      .filter((row) => (predicate ? predicate(row) : true));
+  }
+
+  addCustomRow(module: SharedModuleKey, row: SharedTableRow): SharedTableRow {
+    const nextRow: SharedTableRow = {
+      ...row,
+      __rowId: `custom:${module}:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    };
+    this.customTableRows.update((rows) => ({
+      ...rows,
+      [module]: [nextRow, ...(rows[module] ?? [])],
+    }));
+    return nextRow;
+  }
+
+  updateSharedRowCell(rowId: string, key: string, value: string | number) {
+    if (!rowId) return;
+
+    this.customTableRows.update((rows) => {
+      let changed = false;
+      const nextRows = Object.fromEntries(
+        Object.entries(rows).map(([module, moduleRows]) => [
+          module,
+          moduleRows.map((row) => {
+            if (String(row["__rowId"] || "") !== rowId) return row;
+            changed = true;
+            return { ...row, [key]: value };
+          }),
+        ]),
+      ) as Record<SharedModuleKey, SharedTableRow[]>;
+      return changed ? nextRows : rows;
+    });
+
+    this.tableCellEdits.update((edits) => ({
+      ...edits,
+      [rowId]: { ...(edits[rowId] ?? {}), [key]: value },
+    }));
+  }
+
+  duplicateSharedRow(module: SharedModuleKey, row: SharedTableRow): SharedTableRow {
+    const { __rowId: _rowId, ...copy } = row;
+    return this.addCustomRow(module, copy);
+  }
+
+  deleteSharedRow(rowId: string) {
+    if (!rowId) return;
+    this.customTableRows.update((rows) => {
+      const nextRows = Object.fromEntries(
+        Object.entries(rows).map(([module, moduleRows]) => [module, moduleRows.filter((row) => String(row["__rowId"] || "") !== rowId)]),
+      ) as Record<SharedModuleKey, SharedTableRow[]>;
+      return nextRows;
+    });
+    this.hiddenTableRows.update((rowIds) => (rowIds.includes(rowId) ? rowIds : [...rowIds, rowId]));
+  }
+
   clientSummary(client: Client) {
     const clientProjects = this.projectsForClient(client);
     const totalValue = clientProjects.reduce((sum, project) => sum + project.totalValue, 0);
@@ -352,5 +450,26 @@ export class ErpDataService {
 
   private storageKey(key: string): string {
     return `agb-erp:${key}`;
+  }
+
+  private emptySharedFieldMap(): Record<SharedModuleKey, SharedTableField[]> {
+    return { materials: [], clients: [], labour: [], expenses: [], payments: [], vendors: [], reports: [], settings: [] };
+  }
+
+  private emptySharedRowMap(): Record<SharedModuleKey, SharedTableRow[]> {
+    return { materials: [], clients: [], labour: [], expenses: [], payments: [], vendors: [], reports: [], settings: [] };
+  }
+
+  private fieldKey(label: string, existingColumns: SharedTableField[]): string {
+    const base = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    const candidate = base || `custom-${Date.now()}`;
+    const existing = new Set(existingColumns.map((column) => column.key));
+    if (!existing.has(candidate)) return candidate;
+    let index = 2;
+    while (existing.has(`${candidate}-${index}`)) index += 1;
+    return `${candidate}-${index}`;
   }
 }

@@ -2,15 +2,14 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
-import { ErpDataService } from "../data/erp-data.service";
+import { ErpDataService, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 
 type DashboardModule = "materials" | "clients" | "labour" | "expenses" | "payments" | "vendors" | "reports";
-type FieldType = "text" | "number" | "date";
-type TableRow = Record<string, string | number | undefined>;
-type FieldSchema = { key: string; label: string; type?: FieldType };
+type TableRow = SharedTableRow;
+type FieldSchema = SharedTableField;
 type FilterSchema = { key: string; label: string };
 type ModuleConfig = {
   key: DashboardModule;
@@ -202,9 +201,7 @@ const dashboardModules: ModuleConfig[] = [
           <main class="workspace-shell">
             <section class="dashboard-command-strip dashboard-command-center">
               <div class="dashboard-command-copy">
-                <span>Company Command Center</span>
-                <h1>Primary Dashboard</h1>
-                <p>Universal records for clients, material, labour, expenses, payments, vendors, and reports.</p>
+                <h1>Dashboard</h1>
               </div>
               <div class="dashboard-kpi-strip dashboard-kpi-board">
                 <div><span>Project Value</span><strong>{{ formatMoney(totalProjectValue()) }}</strong></div>
@@ -301,7 +298,7 @@ const dashboardModules: ModuleConfig[] = [
                 <div class="dialog-head">
                   <div>
                     <span>{{ activeConfig().label }}</span>
-                    <h2>Add Universal Record</h2>
+                    <h2>Add Record</h2>
                   </div>
                   <button type="button" class="icon-button" (click)="recordDialogOpen.set(false)">
                     <ion-icon name="close-outline"></ion-icon>
@@ -363,10 +360,6 @@ export class UniversalDashboardPage {
   readonly fieldDialogOpen = signal(false);
   readonly draftRow = signal<TableRow>({});
   readonly newFieldLabel = signal("");
-  readonly customColumns = signal<Record<DashboardModule, FieldSchema[]>>(this.emptyColumnMap());
-  readonly customRows = signal<Record<DashboardModule, TableRow[]>>(this.emptyRowMap());
-  readonly rowEdits = signal<Record<string, TableRow>>({});
-  readonly hiddenRowIds = signal<string[]>([]);
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
 
   totalProjectValue() {
@@ -389,7 +382,7 @@ export class UniversalDashboardPage {
 
   columnsForActive(): FieldSchema[] {
     const base = this.activeConfig().columns;
-    return [...base, ...this.customColumns()[this.activeModule()]];
+    return [...base, ...this.data.customFieldsFor(this.activeModule())];
   }
 
   visibleRows(): TableRow[] {
@@ -457,10 +450,7 @@ export class UniversalDashboardPage {
       const status = this.normalizeClientStatus(String(row["status"] || ""));
       if (status !== "Active") this.data.updateClient(client.id, { status });
     } else {
-      this.customRows.update((rows) => ({
-        ...rows,
-        [module]: [{ ...row, __rowId: `custom:${module}:${Date.now()}` }, ...rows[module]],
-      }));
+      this.data.addCustomRow(module, row);
     }
     this.recordDialogOpen.set(false);
   }
@@ -475,8 +465,7 @@ export class UniversalDashboardPage {
     const label = this.newFieldLabel().trim();
     if (!label) return;
     const module = this.activeModule();
-    const key = this.fieldKey(label, this.columnsForActive());
-    this.customColumns.update((columns) => ({ ...columns, [module]: [...columns[module], { key, label }] }));
+    this.data.addCustomField(module, label, this.columnsForActive());
     this.fieldDialogOpen.set(false);
   }
 
@@ -492,10 +481,7 @@ export class UniversalDashboardPage {
 
     const rowId = String(target["__rowId"] || "");
     if (!rowId) return;
-    this.rowEdits.update((edits) => ({
-      ...edits,
-      [rowId]: { ...(edits[rowId] ?? {}), [key]: trimmedValue },
-    }));
+    this.data.updateSharedRowCell(rowId, key, trimmedValue);
   }
 
   duplicateRow(row: TableRow) {
@@ -511,10 +497,7 @@ export class UniversalDashboardPage {
       return;
     }
 
-    this.customRows.update((rows) => ({
-      ...rows,
-      [module]: [{ ...row, __rowId: `custom:${module}:${Date.now()}` }, ...rows[module]],
-    }));
+    this.data.duplicateSharedRow(module, row);
   }
 
   deleteRow(row: TableRow) {
@@ -524,9 +507,7 @@ export class UniversalDashboardPage {
       this.data.deleteClient(String(row["clientId"] || ""));
       return;
     }
-    if (rowId) {
-      this.hiddenRowIds.update((rowIds) => [...rowIds, rowId]);
-    }
+    this.data.deleteSharedRow(rowId);
   }
 
   exportExcel() {
@@ -559,6 +540,7 @@ export class UniversalDashboardPage {
 
     const materials = this.data.materials().map((row) => ({
       __rowId: `material:${row.id}`,
+      __projectId: row.projectId,
       client: clientName(row.projectId),
       project: projectName(row.projectId),
       site: row.site,
@@ -592,6 +574,7 @@ export class UniversalDashboardPage {
 
     const labour = this.data.labour().map((row) => ({
       __rowId: `labour:${row.id}`,
+      __projectId: row.projectId,
       client: clientName(row.projectId),
       project: projectName(row.projectId),
       site: row.site,
@@ -609,6 +592,7 @@ export class UniversalDashboardPage {
 
     const expenses = this.data.expenses().map((row) => ({
       __rowId: `expense:${row.id}`,
+      __projectId: row.projectId,
       client: clientName(row.projectId),
       project: projectName(row.projectId),
       site: row.site,
@@ -623,6 +607,7 @@ export class UniversalDashboardPage {
 
     const payments = this.data.payments().map((row) => ({
       __rowId: `payment:${row.id}`,
+      __projectId: row.projectId,
       client: clientName(row.projectId),
       project: projectName(row.projectId),
       paymentDate: row.date,
@@ -666,14 +651,7 @@ export class UniversalDashboardPage {
   }
 
   private rowsFor(module: DashboardModule): TableRow[] {
-    const edits = this.rowEdits();
-    const hidden = new Set(this.hiddenRowIds());
-    return [...this.buildRows()[module], ...this.customRows()[module]]
-      .filter((row) => !hidden.has(String(row["__rowId"] || "")))
-      .map((row) => {
-        const rowId = String(row["__rowId"] || "");
-        return rowId && edits[rowId] ? { ...row, ...edits[rowId] } : row;
-      });
+    return this.data.tableRowsFor(module, this.buildRows()[module]);
   }
 
   private updateClientCell(row: TableRow, key: string, value: string) {
@@ -692,24 +670,6 @@ export class UniversalDashboardPage {
     if (normalized === "completed") return "Completed";
     if (normalized === "on hold" || normalized === "hold") return "On Hold";
     return "Active";
-  }
-
-  private emptyColumnMap(): Record<DashboardModule, FieldSchema[]> {
-    return { materials: [], clients: [], labour: [], expenses: [], payments: [], vendors: [], reports: [] };
-  }
-
-  private emptyRowMap(): Record<DashboardModule, TableRow[]> {
-    return { materials: [], clients: [], labour: [], expenses: [], payments: [], vendors: [], reports: [] };
-  }
-
-  private fieldKey(label: string, existingColumns: FieldSchema[]): string {
-    const base = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const candidate = base || `custom-${Date.now()}`;
-    const existing = new Set(existingColumns.map((column) => column.key));
-    if (!existing.has(candidate)) return candidate;
-    let index = 2;
-    while (existing.has(`${candidate}-${index}`)) index += 1;
-    return `${candidate}-${index}`;
   }
 
   private escapeHtml(value: string): string {
