@@ -7826,3 +7826,548 @@ body {
     display: none;
   }
 }
+
+/* Final enterprise polish: dark mode, table dividers, visible logout, and empty states */
+:root {
+  color-scheme: light;
+}
+
+.enterprise-toolbar {
+  grid-template-columns: minmax(180px, 1fr) minmax(360px, 680px) minmax(180px, 1fr) !important;
+  align-items: center !important;
+  min-height: 70px;
+}
+
+.toolbar-context {
+  min-width: 0;
+}
+
+.toolbar-search {
+  width: min(680px, 100%) !important;
+  height: 46px !important;
+  justify-self: center !important;
+  margin: 0 !important;
+}
+
+.toolbar-search input {
+  height: 100% !important;
+}
+
+.toolbar-right {
+  min-width: 0;
+  padding-right: 14px;
+}
+
+.enterprise-header.modal-blurred {
+  filter: blur(12px) saturate(0.55) !important;
+  opacity: 0.2 !important;
+  transform: scale(0.995);
+  pointer-events: none;
+}
+
+.enterprise-header.modal-blurred ion-toolbar {
+  --background: rgba(245, 248, 252, 0.42) !important;
+}
+
+.form-overlay {
+  z-index: 10000;
+  background: rgba(12, 20, 34, 0.46);
+  backdrop-filter: blur(10px);
+}
+
+.sidebar-user-panel {
+  grid-template-columns: 40px minmax(0, 1fr) auto !important;
+  gap: 10px !important;
+  padding: 12px !important;
+}
+
+.sidebar-logout {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  width: auto !important;
+  min-width: 88px;
+  height: 36px !important;
+  padding: 0 12px !important;
+  border: 1px solid #cbd7e8 !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: #002263 !important;
+  font-size: 12px !important;
+  font-weight: 820 !important;
+  letter-spacing: 0 !important;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.sidebar-logout span {
+  display: inline-block;
+}
+
+.sidebar-logout ion-icon {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 16px !important;
+}
+
+.sidebar-logout:hover {
+  border-color: #002263 !important;
+  background: #eef4ff !important;
+}
+
+.table-wrap.operations-table,
+.operations-table {
+  border: 1px solid #cfd9e8 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05) !important;
+  overflow: auto !important;
+}
+
+.operations-table table {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.operations-table th,
+.operations-table td {
+  border-right: 1px solid #dce4ef !important;
+  border-bottom: 1px solid #dce4ef !important;
+  background-clip: padding-box;
+}
+
+.operations-table th:last-child,
+.operations-table td:last-child {
+  border-right: 0 !important;
+}
+
+.operations-table tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.operations-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f4f7fb !important;
+  color: #12213a !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+}
+
+.operations-table td {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 13px !important;
+  line-height: 1.42 !important;
+}
+
+.operations-table tbody tr:nth-child(even) td:not(.empty-row) {
+  background: #fbfdff !important;
+}
+
+.operations-table tbody tr:hover td:not(.empty-row) {
+  background: #f6f9ff !important;
+}
+
+.operations-table td[contenteditable="true"] {
+  outline: 0;
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+
+.operations-table td[contenteditable="true"]:focus {
+  background: #ffffff !important;
+  box-shadow: inset 0 0 0 2px rgba(0, 34, 99, 0.22) !important;
+}
+
+.operations-table td.empty-row {
+  height: clamp(260px, 42vh, 430px) !important;
+  border-right: 0 !important;
+  background:
+    radial-gradient(circle at center, rgba(0, 34, 99, 0.06), transparent 42%),
+    #ffffff !important;
+  text-align: center;
+}
+
+.empty-record-state.icon-only,
+.project-empty-state.icon-only {
+  display: grid !important;
+  place-items: center !important;
+  min-height: clamp(220px, 34vh, 360px) !important;
+  padding: 28px !important;
+}
+
+.empty-record-state.icon-only strong,
+.empty-record-state.icon-only span:last-child,
+.project-empty-state.icon-only h2,
+.project-empty-state.icon-only p {
+  display: none !important;
+}
+
+.empty-box-icon {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 92px !important;
+  height: 92px !important;
+  border: 1px solid #cbd7e8 !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  color: #002263 !important;
+  box-shadow: 0 18px 42px rgba(0, 34, 99, 0.12) !important;
+}
+
+.empty-box-icon.large {
+  width: 108px !important;
+  height: 108px !important;
+}
+
+.empty-box-icon svg,
+.empty-box-icon.large svg {
+  width: 58px !important;
+  height: 58px !important;
+}
+
+.empty-box-icon.large svg {
+  width: 68px !important;
+  height: 68px !important;
+}
+
+.empty-box-icon svg path {
+  fill: #ffffff !important;
+  stroke: #002263 !important;
+  stroke-width: 6px !important;
+  stroke-linejoin: round !important;
+  vector-effect: non-scaling-stroke;
+}
+
+.universal-filter-bar select,
+.erp-form select,
+.settings-card select,
+.status-edit-shell select {
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5 10 12l4.5-4.5' fill='none' stroke='%23002263' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 14px center !important;
+  background-size: 16px 16px !important;
+  padding-right: 38px !important;
+}
+
+.universal-filter-bar label {
+  min-width: 0;
+}
+
+.universal-filter-bar select {
+  min-height: 46px;
+}
+
+.table-actions button,
+.primary-table-action,
+.universal-filter-bar button {
+  white-space: nowrap;
+}
+
+.dark-mode {
+  color-scheme: dark;
+}
+
+.dark-mode body,
+.dark-mode ion-app {
+  background: #08111f !important;
+  color: #e8eef8 !important;
+}
+
+.dark-mode .ion-page {
+  background: #08111f !important;
+}
+
+.dark-mode ion-content.erp-page,
+.dark-mode .erp-page {
+  --background: linear-gradient(180deg, #0c1728 0%, #08111f 100%) !important;
+  color: #e8eef8 !important;
+}
+
+.dark-mode .enterprise-header ion-toolbar,
+.dark-mode .enterprise-header.client-header ion-toolbar {
+  --background: rgba(11, 19, 33, 0.98) !important;
+  --border-color: #21314d !important;
+  color: #eef5ff !important;
+  box-shadow: 0 1px 0 rgba(126, 160, 214, 0.12) !important;
+}
+
+.dark-mode .enterprise-header.modal-blurred ion-toolbar {
+  --background: rgba(8, 14, 25, 0.45) !important;
+}
+
+.dark-mode .toolbar-context strong,
+.dark-mode .dashboard-command-copy h1,
+.dark-mode .client-workspace-header h1,
+.dark-mode .project-compact-strip h1,
+.dark-mode .module-toolbar h2,
+.dark-mode .settings-hero h1,
+.dark-mode .settings-card h2,
+.dark-mode .client-card h3,
+.dark-mode .project-select-card h3,
+.dark-mode .project-select-card-head strong,
+.dark-mode .sidebar-user-copy strong {
+  color: #f7faff !important;
+}
+
+.dark-mode .toolbar-context span,
+.dark-mode .toolbar-meta span,
+.dark-mode .dashboard-command-copy p,
+.dark-mode .client-workspace-header p,
+.dark-mode .project-compact-strip p,
+.dark-mode .module-toolbar p,
+.dark-mode .workspace-breadcrumb span,
+.dark-mode .settings-hero p,
+.dark-mode .settings-card p,
+.dark-mode .sidebar-user-copy span,
+.dark-mode .client-card p,
+.dark-mode .project-select-card p,
+.dark-mode .project-select-meta span,
+.dark-mode .project-select-footer span {
+  color: #9fb0c9 !important;
+}
+
+.dark-mode .toolbar-search,
+.dark-mode .toolbar-meta,
+.dark-mode .dark-mode-toggle,
+.dark-mode .dashboard-command-strip,
+.dark-mode .dashboard-kpi-strip > div,
+.dark-mode .client-workspace-header,
+.dark-mode .client-header-metrics > div,
+.dark-mode .project-compact-strip,
+.dark-mode .project-compact-strip dl > div,
+.dark-mode .operations-workbench,
+.dark-mode .project-management-panel,
+.dark-mode .client-card,
+.dark-mode .project-select-card,
+.dark-mode .project-select-ledger > div,
+.dark-mode .settings-hero,
+.dark-mode .settings-card,
+.dark-mode .sidebar-user-panel {
+  border-color: #253856 !important;
+  background: #101b2e !important;
+  color: #e8eef8 !important;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28) !important;
+}
+
+.dark-mode .enterprise-sidebar ion-content,
+.dark-mode .sidebar-logo-wrap,
+.dark-mode .sidebar-section-head,
+.dark-mode .sidebar-project-list,
+.dark-mode .site-workbench,
+.dark-mode .operations-tabs,
+.dark-mode .module-toolbar,
+.dark-mode .table-first-toolbar,
+.dark-mode .table-meta-strip,
+.dark-mode .universal-filter-bar,
+.dark-mode .settings-toggle {
+  border-color: #253856 !important;
+  background: #0d1728 !important;
+  color: #e8eef8 !important;
+}
+
+.dark-mode .sidebar-nav ion-item {
+  --background: transparent !important;
+  --color: #c8d3e3 !important;
+}
+
+.dark-mode .sidebar-nav ion-item.selected {
+  --background: #142444 !important;
+  --color: #ffffff !important;
+  box-shadow: inset 3px 0 0 #7ea0d6;
+}
+
+.dark-mode .sidebar-project-row {
+  border-color: #253856 !important;
+  background: #101b2e !important;
+}
+
+.dark-mode .sidebar-project-row.active {
+  border-color: #7ea0d6 !important;
+  box-shadow: inset 3px 0 0 #7ea0d6;
+}
+
+.dark-mode .sidebar-project-row a,
+.dark-mode .sidebar-section-head span {
+  color: #e8eef8 !important;
+}
+
+.dark-mode .sidebar-project-row small {
+  color: #9fb0c9 !important;
+}
+
+.dark-mode .sidebar-logout {
+  border-color: #354966 !important;
+  background: #17243a !important;
+  color: #dce8ff !important;
+}
+
+.dark-mode .sidebar-logout:hover {
+  border-color: #7ea0d6 !important;
+  background: #1b3154 !important;
+}
+
+.dark-mode .toolbar-search input,
+.dark-mode .table-search input,
+.dark-mode .erp-form input,
+.dark-mode .erp-form textarea,
+.dark-mode .erp-form select,
+.dark-mode .settings-card input,
+.dark-mode .settings-card select,
+.dark-mode .universal-filter-bar select,
+.dark-mode .status-edit-shell select {
+  border-color: #304565 !important;
+  background-color: #0d1728 !important;
+  color: #eef5ff !important;
+}
+
+.dark-mode .toolbar-search input::placeholder,
+.dark-mode .table-search input::placeholder,
+.dark-mode .erp-form input::placeholder {
+  color: #7f91ad !important;
+}
+
+.dark-mode .universal-filter-bar select,
+.dark-mode .erp-form select,
+.dark-mode .settings-card select,
+.dark-mode .status-edit-shell select {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5 10 12l4.5-4.5' fill='none' stroke='%239fb8ff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+
+.dark-mode .operations-table,
+.dark-mode .table-wrap.operations-table {
+  border-color: #263b5f !important;
+  background: #0d1728 !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32) !important;
+}
+
+.dark-mode .operations-table th {
+  border-color: #263b5f !important;
+  background: #14223a !important;
+  color: #dce8ff !important;
+}
+
+.dark-mode .operations-table td {
+  border-color: #263b5f !important;
+  background: #0f1b2f !important;
+  color: #e8eef8 !important;
+}
+
+.dark-mode .operations-table tbody tr:nth-child(even) td:not(.empty-row) {
+  background: #111f36 !important;
+}
+
+.dark-mode .operations-table tbody tr:hover td:not(.empty-row) {
+  background: #172846 !important;
+}
+
+.dark-mode .operations-table td[contenteditable="true"]:focus {
+  background: #0d1728 !important;
+  box-shadow: inset 0 0 0 2px rgba(126, 160, 214, 0.5) !important;
+}
+
+.dark-mode .operations-table td.empty-row {
+  background:
+    radial-gradient(circle at center, rgba(126, 160, 214, 0.12), transparent 42%),
+    #0f1b2f !important;
+}
+
+.dark-mode .empty-box-icon {
+  border-color: #354966 !important;
+  background: #ffffff !important;
+  color: #002263 !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.34) !important;
+}
+
+.dark-mode .empty-box-icon svg path {
+  fill: #ffffff !important;
+  stroke: #002263 !important;
+}
+
+.dark-mode .table-actions button,
+.dark-mode .universal-filter-bar button,
+.dark-mode .project-tool-action,
+.dark-mode .site-add-chip,
+.dark-mode .site-chip-strip button,
+.dark-mode .row-actions button {
+  border-color: #304565 !important;
+  background: #101b2e !important;
+  color: #dce8ff !important;
+}
+
+.dark-mode .primary-table-action,
+.dark-mode .project-tool-action.primary {
+  border-color: #244a92 !important;
+  background: linear-gradient(180deg, #0b3b8c 0%, #002263 100%) !important;
+  color: #ffffff !important;
+}
+
+.dark-mode .erp-dialog,
+.dark-mode .field-dialog,
+.dark-mode .operations-dialog {
+  border-color: #253856 !important;
+  background: #101b2e !important;
+  color: #e8eef8 !important;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.42) !important;
+}
+
+.dark-mode .dialog-head,
+.dark-mode .dialog-actions {
+  border-color: #253856 !important;
+  background: #0d1728 !important;
+}
+
+.dark-mode .dialog-head h2,
+.dark-mode .erp-form label span {
+  color: #f7faff !important;
+}
+
+.dark-mode .status-edit-shell.active,
+.dark-mode ion-badge.status.active {
+  background: rgba(34, 197, 94, 0.16) !important;
+  color: #86efac !important;
+}
+
+.dark-mode .status-edit-shell.warning,
+.dark-mode ion-badge.status.warning {
+  background: rgba(245, 158, 11, 0.18) !important;
+  color: #facc15 !important;
+}
+
+.dark-mode .status-edit-shell.danger,
+.dark-mode ion-badge.status.danger {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #fca5a5 !important;
+}
+
+@media (max-width: 1180px) {
+  .enterprise-toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 620px) auto !important;
+  }
+
+  .toolbar-right {
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .enterprise-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    min-height: auto;
+  }
+
+  .toolbar-search {
+    grid-column: 1 / -1;
+    width: 100% !important;
+  }
+
+  .toolbar-right {
+    justify-self: end;
+  }
+}

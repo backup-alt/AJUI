@@ -88,6 +88,7 @@ type SidebarItem = {
             </div>
             <button type="button" class="sidebar-logout" aria-label="Logout" (click)="logout()">
               <ion-icon name="log-out-outline"></ion-icon>
+              <span>Logout</span>
             </button>
           </div>
         </div>

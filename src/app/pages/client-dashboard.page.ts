@@ -19,7 +19,7 @@ import { formatMoney, statusClass } from "../shared/format";
         <agb-enterprise-header
           title="Clients"
           eyebrow="Client Registry"
-          metaLabel="Client workspace"
+          metaLabel=""
           [blurred]="showClientForm()"
           [showTitle]="false"
           searchPlaceholder="Search clients, projects, receipts..."

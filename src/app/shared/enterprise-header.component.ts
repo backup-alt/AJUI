@@ -45,7 +45,7 @@ import {
                 <path d="m19.07 4.93-1.41 1.41" />
               </svg>
             </button>
-            <div class="toolbar-meta">
+            <div class="toolbar-meta" *ngIf="metaLabel">
               <span>{{ metaLabel }}</span>
             </div>
           </div>
