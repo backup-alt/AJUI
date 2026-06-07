@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject } from "@angular/core";
-import { RouterLink } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenu } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
 import type { Project } from "../../data/dashboardData";
@@ -86,7 +86,7 @@ type SidebarItem = {
               <strong>{{ userName }}</strong>
               <span>{{ role }}</span>
             </div>
-            <button type="button" class="sidebar-logout" aria-label="Logout">
+            <button type="button" class="sidebar-logout" aria-label="Logout" (click)="logout()">
               <ion-icon name="log-out-outline"></ion-icon>
             </button>
           </div>
@@ -98,6 +98,7 @@ type SidebarItem = {
 })
 export class EnterpriseSidebarComponent {
   private readonly data = inject(ErpDataService);
+  private readonly router = inject(Router);
 
   @Input() active = "dashboard";
   @Input() clientId: string | null = null;
@@ -120,5 +121,14 @@ export class EnterpriseSidebarComponent {
       { key: "clients", label: "Clients", icon: "people-outline", route: ["/clients"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
     ];
+  }
+
+  logout() {
+    try {
+      localStorage.setItem("agb-erp:session", "logged-out");
+    } catch {
+      // The static demo has no auth backend; this marks the local UI session only.
+    }
+    void this.router.navigate(["/login"]);
   }
 }

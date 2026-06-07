@@ -11,6 +11,10 @@ export const routes: Routes = [
     loadComponent: () => import("./pages/universal-dashboard.page").then((m) => m.UniversalDashboardPage),
   },
   {
+    path: "login",
+    loadComponent: () => import("./pages/login.page").then((m) => m.LoginPage),
+  },
+  {
     path: "clients",
     loadComponent: () => import("./pages/client-dashboard.page").then((m) => m.ClientDashboardPage),
   },

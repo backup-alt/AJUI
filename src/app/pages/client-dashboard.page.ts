@@ -16,7 +16,14 @@ import { formatMoney, statusClass } from "../shared/format";
       <agb-enterprise-sidebar active="clients"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        <agb-enterprise-header title="Clients" eyebrow="Client Registry" metaLabel="Client workspace" [showTitle]="false" searchPlaceholder="Search clients, projects, receipts..." />
+        <agb-enterprise-header
+          title="Clients"
+          eyebrow="Client Registry"
+          metaLabel="Client workspace"
+          [blurred]="showClientForm()"
+          [showTitle]="false"
+          searchPlaceholder="Search clients, projects, receipts..."
+        />
 
         <ion-content class="erp-page">
           <main class="client-landing">

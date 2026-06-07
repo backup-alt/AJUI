@@ -145,7 +145,15 @@ const sectionConfigs: SectionConfig[] = [
       ></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        <agb-enterprise-header title="Project Workspace" eyebrow="Project Operations" metaLabel="Site records" [showTitle]="false" role="Admin" searchPlaceholder="Search table records..." />
+        <agb-enterprise-header
+          title="Project Workspace"
+          eyebrow="Project Operations"
+          metaLabel="Site records"
+          [blurred]="recordDialogOpen() || fieldDialogOpen() || showProjectForm()"
+          [showTitle]="false"
+          role="Admin"
+          searchPlaceholder="Search table records..."
+        />
 
         <ion-content class="erp-page">
           <main class="workspace-shell" *ngIf="project() as currentProject">
@@ -237,13 +245,6 @@ const sectionConfigs: SectionConfig[] = [
                     </form>
                   </div>
                 </div>
-                <label class="labour-site-filter" *ngIf="activeSection() === 'labour'">
-                  <span>Labour site filter</span>
-                  <select [value]="activeSiteFilter()" (change)="selectSite($any($event.target).value)">
-                    <option value="All">All Sites</option>
-                    <option *ngFor="let site of projectSites()" [value]="site">{{ site }}</option>
-                  </select>
-                </label>
               </div>
 
               <div class="module-toolbar table-first-toolbar">
@@ -297,11 +298,15 @@ const sectionConfigs: SectionConfig[] = [
                       <td class="empty-row" [attr.colspan]="columnsFor(activeSection()).length + 1">
                         <div class="empty-record-state" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
-                            <svg viewBox="0 0 64 64">
-                              <rect x="14" y="18" width="36" height="34" rx="7" />
-                              <path d="M22 18v-4h20v4" />
-                              <path d="M14 31h14l4 6 4-6h14" />
-                              <path d="M24 44h16" />
+                            <svg viewBox="0 0 96 96">
+                              <path class="box-fill" d="M17 36 48 18l31 18-31 18-31-18Z" />
+                              <path class="box-fill" d="M17 36v34l31 18V54L17 36Z" />
+                              <path class="box-fill" d="M79 36v34L48 88V54l31-18Z" />
+                              <path d="M17 36 48 18l31 18-31 18-31-18Z" />
+                              <path d="M17 36v34l31 18 31-18V36" />
+                              <path d="M48 54v34" />
+                              <path d="m30 26 31 18" />
+                              <path d="m66 28-31 18" />
                             </svg>
                           </span>
                           <strong>No records</strong>
