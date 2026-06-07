@@ -68,10 +68,29 @@ import { formatMoney, statusClass } from "../shared/format";
                   <h2>Project Management</h2>
                   <p>Select a project to open its details, site status, activity, and settings.</p>
                 </div>
-                <div class="table-actions">
-                  <button type="button" class="primary-table-action" (click)="openCreateProject()"><ion-icon name="add-outline"></ion-icon>New Project</button>
-                  <button type="button" (click)="editingClient.set(true)"><ion-icon name="create-outline"></ion-icon>Edit Client</button>
-                  <button type="button"><ion-icon name="download-outline"></ion-icon>Export</button>
+                <div class="project-toolbar-icons" aria-label="Project actions">
+                  <button type="button" class="project-tool-action primary" aria-label="Create new project" title="Create new project" (click)="openCreateProject()">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M4 5.5h10" />
+                      <path d="M4 11.5h7" />
+                      <path d="M4 17.5h6" />
+                      <path d="M17 10v8" />
+                      <path d="M13 14h8" />
+                    </svg>
+                  </button>
+                  <button type="button" class="project-tool-action" aria-label="Edit client" title="Edit client" (click)="editingClient.set(true)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
+                      <path d="m14.8 7.2 3 3" />
+                    </svg>
+                  </button>
+                  <button type="button" class="project-tool-action" aria-label="Export projects" title="Export projects">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M12 3v11" />
+                      <path d="m8 10 4 4 4-4" />
+                      <path d="M5 20h14" />
+                    </svg>
+                  </button>
                 </div>
               </div>
 
@@ -79,10 +98,20 @@ import { formatMoney, statusClass } from "../shared/format";
                 <article *ngFor="let project of projects()" class="project-select-card" role="button" tabindex="0" (click)="openProject(project)" (keydown.enter)="openProject(project)">
                   <div class="project-hover-actions" aria-label="Project actions">
                     <button type="button" aria-label="Edit project" (click)="openEditProject(project, $event)">
-                      <ion-icon name="create-outline"></ion-icon>
+                      <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                        <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
+                        <path d="m14.8 7.2 3 3" />
+                      </svg>
                     </button>
                     <button type="button" aria-label="Delete project" (click)="deleteProject(project, $event)">
-                      <ion-icon name="trash-outline"></ion-icon>
+                      <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                        <path d="M5 7h14" />
+                        <path d="M9 7V5h6v2" />
+                        <path d="M8 10v8" />
+                        <path d="M12 10v8" />
+                        <path d="M16 10v8" />
+                        <path d="M7 7l1 14h8l1-14" />
+                      </svg>
                     </button>
                   </div>
                   <div class="project-select-card-head">
@@ -186,6 +215,7 @@ export class ClientWorkspacePage {
       supervisor: project.supervisor,
       totalValue: project.totalValue,
       advanceAmount: project.advanceAmount,
+      status: project.status,
     };
   }
 

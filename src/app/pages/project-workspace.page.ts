@@ -2,8 +2,8 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
-import { IonBadge, IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
-import type { Project } from "../../data/dashboardData";
+import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
+import type { Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
@@ -138,7 +138,6 @@ const sectionConfigs: SectionConfig[] = [
   standalone: true,
   imports: [
     CommonModule,
-    IonBadge,
     IonContent,
     IonIcon,
     IonSplitPane,
@@ -181,7 +180,19 @@ const sectionConfigs: SectionConfig[] = [
                 <div><dt>Received</dt><dd>{{ formatMoney(currentProject.receivedAmount) }}</dd></div>
                 <div><dt>Pending</dt><dd>{{ formatMoney(currentProject.totalValue - currentProject.receivedAmount) }}</dd></div>
                 <div><dt>Supervisor</dt><dd>{{ currentProject.supervisor }}</dd></div>
-                <div><dt>Status</dt><dd><ion-badge class="status" [ngClass]="statusClass(currentProject.status)">{{ currentProject.status }}</ion-badge></dd></div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    <label class="status-edit-shell" [ngClass]="statusClass(currentProject.status)">
+                      <span class="sr-only">Project status</span>
+                      <select [value]="currentProject.status" (change)="updateProjectStatus($any($event.target).value)">
+                        <option value="Active">Active</option>
+                        <option value="On Hold">On Hold</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </label>
+                  </dd>
+                </div>
               </dl>
             </section>
 
@@ -212,7 +223,10 @@ const sectionConfigs: SectionConfig[] = [
                       {{ site }}
                     </button>
                     <button *ngIf="!siteDraftOpen()" type="button" class="site-add-chip" aria-label="Add site" (click)="openSiteDraft()">
-                      <ion-icon name="add-outline"></ion-icon>
+                      <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                        <path d="M12 5v14" />
+                        <path d="M5 12h14" />
+                      </svg>
                     </button>
                     <form *ngIf="siteDraftOpen()" class="site-add-form" (submit)="saveSite($event)">
                       <input
@@ -220,8 +234,18 @@ const sectionConfigs: SectionConfig[] = [
                         (input)="siteDraftName.set($any($event.target).value)"
                         placeholder="New site"
                       />
-                      <button type="submit"><ion-icon name="checkmark-outline"></ion-icon></button>
-                      <button type="button" (click)="siteDraftOpen.set(false)"><ion-icon name="close-outline"></ion-icon></button>
+                      <button type="submit" class="site-confirm" aria-label="Add site">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                          <path d="m5 12 4 4L19 6" />
+                        </svg>
+                        <span>Add</span>
+                      </button>
+                      <button type="button" class="site-cancel" aria-label="Cancel site" (click)="siteDraftOpen.set(false)">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                          <path d="M6 6l12 12" />
+                          <path d="M18 6 6 18" />
+                        </svg>
+                      </button>
                     </form>
                   </div>
                 </div>
@@ -284,7 +308,15 @@ const sectionConfigs: SectionConfig[] = [
                     <tr *ngIf="visibleRows(activeSection()).length === 0">
                       <td class="empty-row" [attr.colspan]="columnsFor(activeSection()).length + 1">
                         <button type="button" class="empty-add-record" (click)="openRecordDialog()">
-                          <ion-icon name="add-outline"></ion-icon>
+                          <span class="empty-add-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" class="svg-icon">
+                              <path d="M4 6h10" />
+                              <path d="M4 12h8" />
+                              <path d="M4 18h7" />
+                              <path d="M17 11v8" />
+                              <path d="M13 15h8" />
+                            </svg>
+                          </span>
                           <span>Add first record</span>
                         </button>
                       </td>
@@ -544,6 +576,7 @@ export class ProjectWorkspacePage {
       supervisor: project.supervisor,
       totalValue: project.totalValue,
       advanceAmount: project.advanceAmount,
+      status: project.status,
     };
   }
 
@@ -563,6 +596,11 @@ export class ProjectWorkspacePage {
     const project = this.data.addProject(currentClient, value);
     this.showProjectForm.set(false);
     setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]));
+  }
+
+  updateProjectStatus(value: string) {
+    if (!this.isProjectStatus(value)) return;
+    this.data.updateProject(this.projectId(), { status: value });
   }
 
   deleteProject(project: Project) {
@@ -699,6 +737,10 @@ export class ProjectWorkspacePage {
   private rowBelongsToProject(row: TableRow): boolean {
     const rowProjectId = row["__projectId"];
     return rowProjectId === undefined || rowProjectId === "" || String(rowProjectId) === this.projectId();
+  }
+
+  private isProjectStatus(value: string): value is ProjectStatus {
+    return value === "Active" || value === "On Hold" || value === "Completed";
   }
 
   private escapeHtml(value: string): string {

@@ -309,7 +309,15 @@ const dashboardModules: ModuleConfig[] = [
                     <tr *ngIf="visibleRows().length === 0">
                       <td class="empty-row" [attr.colspan]="columnsForActive().length + 1">
                         <button type="button" class="empty-add-record" (click)="openRecordDialog()">
-                          <ion-icon name="add-outline"></ion-icon>
+                          <span class="empty-add-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" class="svg-icon">
+                              <path d="M4 6h10" />
+                              <path d="M4 12h8" />
+                              <path d="M4 18h7" />
+                              <path d="M17 11v8" />
+                              <path d="M13 15h8" />
+                            </svg>
+                          </span>
                           <span>Add first record</span>
                         </button>
                       </td>

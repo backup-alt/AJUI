@@ -1,12 +1,14 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from "@angular/core";
 import { IonIcon } from "@ionic/angular/standalone";
+import type { ProjectStatus } from "../../data/dashboardData";
 
 export type ProjectFormValue = {
   name: string;
   sites: string[];
   startDate: string;
   supervisor: string;
+  status: ProjectStatus;
   totalValue: number;
   advanceAmount: number;
 };
@@ -41,6 +43,14 @@ export type ProjectFormValue = {
           <label>
             <span>Supervisor</span>
             <input name="supervisor" required [value]="initialValue?.supervisor || defaultSupervisor" placeholder="Supervisor name" />
+          </label>
+          <label>
+            <span>Status</span>
+            <select name="status" [value]="initialValue?.status || 'Active'">
+              <option value="Active">Active</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Completed">Completed</option>
+            </select>
           </label>
           <label class="span-2">
             <span>Sites / Areas</span>
@@ -89,9 +99,14 @@ export class ProjectFormDialogComponent {
       name: String(formData.get("name") ?? "").trim(),
       startDate: String(formData.get("startDate") ?? "").trim(),
       supervisor: String(formData.get("supervisor") ?? "").trim(),
+      status: this.projectStatusFor(String(formData.get("status") ?? "Active")),
       sites,
       totalValue: Number(formData.get("totalValue") ?? 0),
       advanceAmount: Number(formData.get("advanceAmount") ?? 0),
     });
+  }
+
+  private projectStatusFor(value: string): ProjectStatus {
+    return value === "On Hold" || value === "Completed" ? value : "Active";
   }
 }

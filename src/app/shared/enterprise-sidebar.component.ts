@@ -42,8 +42,14 @@ type SidebarItem = {
           <section class="sidebar-project-list" *ngIf="clientId">
             <div class="sidebar-section-head">
               <span>Projects</span>
-              <button type="button" aria-label="Create new project" (click)="newProject.emit()">
-                <ion-icon name="add-outline"></ion-icon>
+              <button type="button" class="project-create-icon" aria-label="Create new project" (click)="newProject.emit()">
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                  <path d="M4 5.5h9.5" />
+                  <path d="M4 11.5h7" />
+                  <path d="M4 17.5h5.5" />
+                  <path d="M16.5 10v7" />
+                  <path d="M13 13.5h7" />
+                </svg>
               </button>
             </div>
             <div *ngFor="let project of clientProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
@@ -53,10 +59,20 @@ type SidebarItem = {
               </a>
               <div class="sidebar-project-actions">
                 <button type="button" aria-label="Edit project" (click)="editProject.emit(project)">
-                  <ion-icon name="create-outline"></ion-icon>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                    <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
+                    <path d="m14.8 7.2 3 3" />
+                  </svg>
                 </button>
                 <button type="button" aria-label="Delete project" (click)="deleteProject.emit(project)">
-                  <ion-icon name="trash-outline"></ion-icon>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                    <path d="M5 7h14" />
+                    <path d="M9 7V5h6v2" />
+                    <path d="M8 10v8" />
+                    <path d="M12 10v8" />
+                    <path d="M16 10v8" />
+                    <path d="M7 7l1 14h8l1-14" />
+                  </svg>
                 </button>
               </div>
             </div>

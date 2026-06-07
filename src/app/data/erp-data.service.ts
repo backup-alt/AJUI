@@ -10,6 +10,7 @@ import {
   type MaterialRow,
   type PaymentRow,
   type Project,
+  type ProjectStatus,
 } from "../../data/dashboardData";
 
 export type ClientStatus = "Active" | "On Hold" | "Completed";
@@ -257,7 +258,15 @@ export class ErpDataService {
 
   addProject(
     client: Client,
-    input: { name: string; sites: string[]; startDate: string; supervisor: string; totalValue: number; advanceAmount: number },
+    input: {
+      name: string;
+      sites: string[];
+      startDate: string;
+      supervisor: string;
+      status?: ProjectStatus;
+      totalValue: number;
+      advanceAmount: number;
+    },
   ): Project {
     const numericIds = this.projects()
       .map((project) => Number(project.id.replace(/\D/g, "")))
@@ -271,7 +280,7 @@ export class ErpDataService {
       address: client.address,
       supervisor: input.supervisor,
       sites: input.sites.length ? input.sites : ["Main Site"],
-      status: "Active",
+      status: input.status ?? "Active",
       startDate: input.startDate,
       totalValue: input.totalValue,
       advanceAmount: input.advanceAmount,
@@ -314,7 +323,7 @@ export class ErpDataService {
 
   updateProject(
     projectId: string,
-    patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "totalValue" | "advanceAmount">>,
+    patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "status" | "totalValue" | "advanceAmount">>,
   ): Project | undefined {
     let updatedProject: Project | undefined;
 
