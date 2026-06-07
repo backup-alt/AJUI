@@ -1,30 +1,30 @@
 {
-  "name": "annai-refined",
+  "name": "annai-builders-dashboard",
+  "version": "0.1.0",
   "private": true,
-  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc && vite build",
-    "preview": "vite preview --host 127.0.0.1",
-    "cap": "cap",
-    "sync:android": "cap sync android"
+    "dev": "ng serve --host 127.0.0.1",
+    "build": "ng build",
+    "preview": "ng serve --host 127.0.0.1 --configuration production",
+    "serve:dist": "node scripts/serve-dist.cjs"
   },
   "dependencies": {
-    "@capacitor/core": "^7.4.0",
-    "@ionic/react": "^8.0.0",
+    "@angular/animations": "^20.0.0",
+    "@angular/common": "^20.0.0",
+    "@angular/compiler": "^20.0.0",
+    "@angular/core": "^20.0.0",
+    "@angular/forms": "^20.0.0",
+    "@angular/platform-browser": "^20.0.0",
+    "@angular/router": "^20.0.0",
+    "@ionic/angular": "^8.4.0",
     "ionicons": "^7.4.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "rxjs": "^7.8.1",
+    "zone.js": "^0.15.0"
   },
   "devDependencies": {
-    "@capacitor/android": "^7.4.0",
-    "@capacitor/cli": "^7.4.0",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "qrcode": "^1.5.4",
-    "typescript": "^5.6.2",
-    "vite": "^7.0.0"
+    "@angular-devkit/build-angular": "^20.0.0",
+    "@angular/cli": "^20.0.0",
+    "typescript": "~5.8.0"
   }
 }
