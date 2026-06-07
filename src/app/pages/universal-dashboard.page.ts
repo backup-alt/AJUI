@@ -307,7 +307,12 @@ const dashboardModules: ModuleConfig[] = [
                       </td>
                     </tr>
                     <tr *ngIf="visibleRows().length === 0">
-                      <td class="empty-row" [attr.colspan]="columnsForActive().length + 1">No records match the current filters.</td>
+                      <td class="empty-row" [attr.colspan]="columnsForActive().length + 1">
+                        <button type="button" class="empty-add-record" (click)="openRecordDialog()">
+                          <ion-icon name="add-outline"></ion-icon>
+                          <span>Add first record</span>
+                        </button>
+                      </td>
                     </tr>
                   </tbody>
                 </table>

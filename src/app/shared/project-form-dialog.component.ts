@@ -20,9 +20,9 @@ export type ProjectFormValue = {
       <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="project-form-title">
         <div class="dialog-head">
           <div>
-            <span>Project Setup</span>
-            <h2 id="project-form-title">Create New Project</h2>
-            <p>{{ clientName }} project records will open with site-wise material, labour, expense, and payment ledgers.</p>
+            <span>{{ eyebrow }}</span>
+            <h2 id="project-form-title">{{ title }}</h2>
+            <p>{{ description || clientName + ' project records will open with site-wise material, labour, expense, and payment ledgers.' }}</p>
           </div>
           <button type="button" class="icon-button" aria-label="Close project form" (click)="cancel.emit()">
             <ion-icon name="close-outline"></ion-icon>
@@ -32,32 +32,32 @@ export type ProjectFormValue = {
         <form class="erp-form" (submit)="submit($event)">
           <label class="span-2">
             <span>Project Name</span>
-            <input name="name" required placeholder="Example: Green Nest Villas Phase 2" />
+            <input name="name" required [value]="initialValue?.name || ''" placeholder="Example: Green Nest Villas Phase 2" />
           </label>
           <label>
             <span>Start Date</span>
-            <input name="startDate" type="date" required value="2026-06-07" />
+            <input name="startDate" type="date" required [value]="initialValue?.startDate || '2026-06-07'" />
           </label>
           <label>
             <span>Supervisor</span>
-            <input name="supervisor" required [value]="defaultSupervisor" placeholder="Supervisor name" />
+            <input name="supervisor" required [value]="initialValue?.supervisor || defaultSupervisor" placeholder="Supervisor name" />
           </label>
           <label class="span-2">
             <span>Sites / Areas</span>
-            <input name="sites" required placeholder="Area 1, Area 2, Terrace" />
+            <input name="sites" required [value]="initialValue?.sites?.join(', ') || ''" placeholder="Area 1, Area 2, Terrace" />
           </label>
           <label>
             <span>Total Project Value</span>
-            <input name="totalValue" required type="number" min="0" step="1000" placeholder="8200000" />
+            <input name="totalValue" required type="number" min="0" step="1000" [value]="initialValue?.totalValue || ''" placeholder="8200000" />
           </label>
           <label>
             <span>Advance Amount</span>
-            <input name="advanceAmount" required type="number" min="0" step="1000" placeholder="1000000" />
+            <input name="advanceAmount" required type="number" min="0" step="1000" [value]="initialValue?.advanceAmount || ''" placeholder="1000000" />
           </label>
 
           <div class="dialog-actions span-2">
             <button type="button" class="secondary-action" (click)="cancel.emit()">Cancel</button>
-            <button type="submit" class="primary-action">Create Project</button>
+            <button type="submit" class="primary-action">{{ submitLabel }}</button>
           </div>
         </form>
       </section>
@@ -66,6 +66,11 @@ export type ProjectFormValue = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectFormDialogComponent {
+  @Input() eyebrow = "Project Setup";
+  @Input() title = "Create New Project";
+  @Input() description = "";
+  @Input() submitLabel = "Create Project";
+  @Input() initialValue: ProjectFormValue | null = null;
   @Input() clientName = "Selected client";
   @Input() defaultSupervisor = "";
   @Output() cancel = new EventEmitter<void>();

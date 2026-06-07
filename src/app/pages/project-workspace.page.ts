@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@a
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { IonBadge, IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
+import type { Project } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
@@ -147,7 +148,14 @@ const sectionConfigs: SectionConfig[] = [
   ],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
-      <agb-enterprise-sidebar [clientId]="clientId()" [projectId]="projectId()" active="projects" (newProject)="showProjectForm.set(true)"></agb-enterprise-sidebar>
+      <agb-enterprise-sidebar
+        [clientId]="clientId()"
+        [projectId]="projectId()"
+        active="projects"
+        (newProject)="openCreateProject()"
+        (editProject)="openEditProject($event)"
+        (deleteProject)="deleteProject($event)"
+      ></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
         <agb-enterprise-header [showTitle]="false" role="Admin" searchPlaceholder="Search table records..." />
@@ -217,12 +225,6 @@ const sectionConfigs: SectionConfig[] = [
                     </form>
                   </div>
                 </div>
-                <div class="site-module-row">
-                  <span>Site table</span>
-                  <button type="button" [class.active]="activeSection() === 'materials'" (click)="switchSection('materials')">Materials</button>
-                  <button type="button" [class.active]="activeSection() === 'labour'" (click)="switchSection('labour')">Labour</button>
-                  <button type="button" [class.active]="activeSection() === 'expenses'" (click)="switchSection('expenses')">Expenses</button>
-                </div>
                 <label class="labour-site-filter" *ngIf="activeSection() === 'labour'">
                   <span>Labour site filter</span>
                   <select [value]="activeSiteFilter()" (change)="selectSite($any($event.target).value)">
@@ -280,7 +282,12 @@ const sectionConfigs: SectionConfig[] = [
                       </td>
                     </tr>
                     <tr *ngIf="visibleRows(activeSection()).length === 0">
-                      <td class="empty-row" [attr.colspan]="columnsFor(activeSection()).length + 1">No records found. Add a record to begin.</td>
+                      <td class="empty-row" [attr.colspan]="columnsFor(activeSection()).length + 1">
+                        <button type="button" class="empty-add-record" (click)="openRecordDialog()">
+                          <ion-icon name="add-outline"></ion-icon>
+                          <span>Add first record</span>
+                        </button>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -343,8 +350,12 @@ const sectionConfigs: SectionConfig[] = [
               *ngIf="showProjectForm() && client() as currentClient"
               [clientName]="currentClient.name"
               [defaultSupervisor]="currentClient.supervisor"
+              [initialValue]="editingProjectValue()"
+              [eyebrow]="editingProject() ? 'Project Edit' : 'Project Setup'"
+              [title]="editingProject() ? 'Edit Project' : 'Create New Project'"
+              [submitLabel]="editingProject() ? 'Save Project' : 'Create Project'"
               (cancel)="showProjectForm.set(false)"
-              (create)="createProject($event)"
+              (create)="saveProject($event)"
             ></agb-project-form-dialog>
           </main>
         </ion-content>
@@ -361,6 +372,7 @@ export class ProjectWorkspacePage {
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
   readonly showProjectForm = signal(false);
+  readonly editingProject = signal<Project | null>(null);
   readonly sections = sectionConfigs;
   readonly activeSection = signal<ModuleKey>(this.normalizeSection(this.route.snapshot.paramMap.get("section")));
   readonly tableSearch = signal("");
@@ -512,12 +524,55 @@ export class ProjectWorkspacePage {
     void this.router.navigate(["/clients", this.clientId()]);
   }
 
-  createProject(value: ProjectFormValue) {
+  openCreateProject() {
+    this.editingProject.set(null);
+    this.showProjectForm.set(true);
+  }
+
+  openEditProject(project: Project) {
+    this.editingProject.set(project);
+    this.showProjectForm.set(true);
+  }
+
+  editingProjectValue(): ProjectFormValue | null {
+    const project = this.editingProject();
+    if (!project) return null;
+    return {
+      name: project.name,
+      sites: project.sites,
+      startDate: project.startDate,
+      supervisor: project.supervisor,
+      totalValue: project.totalValue,
+      advanceAmount: project.advanceAmount,
+    };
+  }
+
+  saveProject(value: ProjectFormValue) {
     const currentClient = this.client();
     if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
+    const editing = this.editingProject();
+    if (editing) {
+      const updated = this.data.updateProject(editing.id, value);
+      this.editingProject.set(null);
+      this.showProjectForm.set(false);
+      if (updated && editing.id === this.projectId()) {
+        void this.router.navigate(["/clients", currentClient.id, "projects", updated.id, this.activeSection()]);
+      }
+      return;
+    }
     const project = this.data.addProject(currentClient, value);
     this.showProjectForm.set(false);
     setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]));
+  }
+
+  deleteProject(project: Project) {
+    const confirmed = window.confirm(`Delete ${project.name}? This removes the project from this client.`);
+    if (!confirmed) return;
+    const deletingCurrent = project.id === this.projectId();
+    this.data.deleteProject(project.id);
+    if (deletingCurrent) {
+      void this.router.navigate(["/clients", this.clientId()]);
+    }
   }
 
   private buildInitialRows(projectId: string): Record<ModuleKey, TableRow[]> {

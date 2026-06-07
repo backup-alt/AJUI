@@ -2,7 +2,6 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, Input } from "@angular/core";
 import {
   IonHeader,
-  IonIcon,
   IonTitle,
   IonToolbar,
 } from "@ionic/angular/standalone";
@@ -10,7 +9,7 @@ import {
 @Component({
   selector: "agb-enterprise-header",
   standalone: true,
-  imports: [CommonModule, IonHeader, IonIcon, IonTitle, IonToolbar],
+  imports: [CommonModule, IonHeader, IonTitle, IonToolbar],
   template: `
     <ion-header class="enterprise-header" [class.client-header]="dark">
       <ion-toolbar>
@@ -23,7 +22,6 @@ import {
           </div>
 
           <div class="toolbar-search">
-            <ion-icon name="search-outline"></ion-icon>
             <input [placeholder]="searchPlaceholder" />
           </div>
         </div>

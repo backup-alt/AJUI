@@ -46,14 +46,20 @@ type SidebarItem = {
                 <ion-icon name="add-outline"></ion-icon>
               </button>
             </div>
-            <a
-              *ngFor="let project of clientProjects"
-              [routerLink]="['/clients', clientId, 'projects', project.id, 'materials']"
-              [class.active]="project.id === projectId"
-            >
-              <span>{{ project.name }}</span>
-              <small>{{ project.id }}</small>
-            </a>
+            <div *ngFor="let project of clientProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
+              <a [routerLink]="['/clients', clientId, 'projects', project.id, 'materials']">
+                <span>{{ project.name }}</span>
+                <small>{{ project.id }}</small>
+              </a>
+              <div class="sidebar-project-actions">
+                <button type="button" aria-label="Edit project" (click)="editProject.emit(project)">
+                  <ion-icon name="create-outline"></ion-icon>
+                </button>
+                <button type="button" aria-label="Delete project" (click)="deleteProject.emit(project)">
+                  <ion-icon name="trash-outline"></ion-icon>
+                </button>
+              </div>
+            </div>
           </section>
 
           <div class="sidebar-user-panel">
@@ -83,6 +89,8 @@ export class EnterpriseSidebarComponent {
   @Input() userName = "Karthik";
   @Input() role = "Admin";
   @Output() newProject = new EventEmitter<void>();
+  @Output() editProject = new EventEmitter<Project>();
+  @Output() deleteProject = new EventEmitter<Project>();
 
   readonly logoPath = "assets/logo.png";
 

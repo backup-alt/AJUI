@@ -6244,3 +6244,222 @@ body {
     min-width: 0;
   }
 }
+
+/* Neutral enterprise finish and record actions */
+:root {
+  --ui-accent: #334155;
+  --ui-accent-dark: #111827;
+  --ui-accent-soft: #f1f5f9;
+  --ui-accent-line: #cbd5e1;
+  --gold: var(--ui-accent);
+  --gold-dark: var(--ui-accent-dark);
+  --ui-gold: var(--ui-accent);
+  --ui-gold-dark: var(--ui-accent-dark);
+}
+
+.toolbar-search {
+  padding: 0 16px;
+}
+
+.enterprise-header .toolbar-search ion-icon,
+.site-module-row {
+  display: none;
+}
+
+.toolbar-search:focus-within,
+.universal-filter-bar select:focus,
+.erp-form input:focus,
+.erp-form textarea:focus {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(51, 65, 85, 0.12);
+}
+
+.universal-workbench .operations-tabs button.active small,
+.project-workbench .operations-tabs button.active small,
+.site-workbench button.active {
+  border-color: var(--ui-accent-line);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-dark);
+}
+
+.empty-row {
+  height: 150px;
+  text-align: center;
+  background: #ffffff;
+}
+
+.empty-add-record {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #d7dee8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #101828;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+.empty-add-record ion-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.empty-add-record:hover {
+  border-color: #b8c4d2;
+  background: #f8fafc;
+}
+
+.project-management-panel {
+  overflow: hidden;
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.project-management-panel > .module-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  border-bottom: 1px solid var(--ui-line);
+  background: #ffffff;
+}
+
+.project-management-panel .project-select-grid {
+  max-height: min(56vh, 620px);
+  overflow: auto;
+  padding: 16px;
+}
+
+.project-select-card {
+  position: relative;
+}
+
+.project-hover-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.project-select-card:hover .project-hover-actions,
+.project-select-card:focus-within .project-hover-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.project-hover-actions button,
+.sidebar-project-actions button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d7dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475467;
+  cursor: pointer;
+}
+
+.project-hover-actions button:hover,
+.sidebar-project-actions button:hover {
+  border-color: #b8c4d2;
+  background: #f8fafc;
+  color: #101828;
+}
+
+.project-hover-actions ion-icon,
+.sidebar-project-actions ion-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.project-select-card-head {
+  padding-right: 74px;
+}
+
+.sidebar-project-list {
+  max-height: min(42vh, 430px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.sidebar-section-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+}
+
+.sidebar-project-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+}
+
+.sidebar-project-row:hover,
+.sidebar-project-row.active {
+  border-color: #d7dee8;
+  background: #ffffff;
+}
+
+.sidebar-project-row.active {
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+}
+
+.sidebar-project-row > a {
+  min-width: 0;
+}
+
+.sidebar-project-list a:hover,
+.sidebar-project-list a.active,
+.sidebar-project-row.active a {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar-project-actions {
+  display: inline-flex;
+  gap: 4px;
+  padding-right: 6px;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.sidebar-project-row:hover .sidebar-project-actions,
+.sidebar-project-row:focus-within .sidebar-project-actions {
+  opacity: 1;
+}
+
+.sidebar-project-actions button {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+@media (max-width: 760px) {
+  .project-management-panel .project-select-grid {
+    max-height: none;
+    padding: 12px;
+  }
+
+  .project-hover-actions {
+    opacity: 1;
+    transform: none;
+  }
+}

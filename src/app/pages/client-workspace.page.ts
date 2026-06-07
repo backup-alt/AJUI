@@ -11,6 +11,7 @@ import {
 } from "@ionic/angular/standalone";
 import { type Project } from "../../data/dashboardData";
 import { ErpDataService } from "../data/erp-data.service";
+import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
@@ -28,11 +29,18 @@ import { formatMoney, statusClass } from "../shared/format";
     IonText,
     EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
+    ClientFormDialogComponent,
     ProjectFormDialogComponent,
   ],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
-      <agb-enterprise-sidebar [clientId]="clientId()" active="projects" (newProject)="showProjectForm.set(true)"></agb-enterprise-sidebar>
+      <agb-enterprise-sidebar
+        [clientId]="clientId()"
+        active="projects"
+        (newProject)="openCreateProject()"
+        (editProject)="openEditProject($event)"
+        (deleteProject)="deleteProject($event)"
+      ></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
         <agb-enterprise-header [showTitle]="false" role="Admin" />
@@ -54,22 +62,29 @@ import { formatMoney, statusClass } from "../shared/format";
               </div>
             </section>
 
-            <section class="module-panel">
+            <section class="module-panel project-management-panel">
               <div class="module-toolbar">
                 <div>
                   <h2>Project Management</h2>
                   <p>Select a project to open its details, site status, activity, and settings.</p>
                 </div>
                 <div class="table-actions">
-                  <button type="button" class="primary-table-action" (click)="showProjectForm.set(true)"><ion-icon name="add-outline"></ion-icon>New Project</button>
-                  <button type="button"><ion-icon name="search-outline"></ion-icon>Search</button>
-                  <button type="button"><ion-icon name="funnel-outline"></ion-icon>Filters</button>
+                  <button type="button" class="primary-table-action" (click)="openCreateProject()"><ion-icon name="add-outline"></ion-icon>New Project</button>
+                  <button type="button" (click)="editingClient.set(true)"><ion-icon name="create-outline"></ion-icon>Edit Client</button>
                   <button type="button"><ion-icon name="download-outline"></ion-icon>Export</button>
                 </div>
               </div>
 
               <div class="project-select-grid">
                 <article *ngFor="let project of projects()" class="project-select-card" role="button" tabindex="0" (click)="openProject(project)" (keydown.enter)="openProject(project)">
+                  <div class="project-hover-actions" aria-label="Project actions">
+                    <button type="button" aria-label="Edit project" (click)="openEditProject(project, $event)">
+                      <ion-icon name="create-outline"></ion-icon>
+                    </button>
+                    <button type="button" aria-label="Delete project" (click)="deleteProject(project, $event)">
+                      <ion-icon name="trash-outline"></ion-icon>
+                    </button>
+                  </div>
                   <div class="project-select-card-head">
                     <div>
                       <ion-badge class="status" [ngClass]="statusClass(project.status)">{{ project.status }}</ion-badge>
@@ -101,9 +116,24 @@ import { formatMoney, statusClass } from "../shared/format";
               *ngIf="showProjectForm()"
               [clientName]="currentClient.name"
               [defaultSupervisor]="currentClient.supervisor"
+              [initialValue]="editingProjectValue()"
+              [eyebrow]="editingProject() ? 'Project Edit' : 'Project Setup'"
+              [title]="editingProject() ? 'Edit Project' : 'Create New Project'"
+              [submitLabel]="editingProject() ? 'Save Project' : 'Create Project'"
               (cancel)="showProjectForm.set(false)"
-              (create)="createProject($event)"
+              (create)="saveProject($event)"
             ></agb-project-form-dialog>
+
+            <agb-client-form-dialog
+              *ngIf="editingClient()"
+              eyebrow="Client Edit"
+              title="Edit Client"
+              description="Update client contact, address, and assigned supervisor information."
+              submitLabel="Save Client"
+              [initialValue]="clientEditValue()"
+              (cancel)="editingClient.set(false)"
+              (create)="saveClient($event)"
+            ></agb-client-form-dialog>
           </main>
         </ion-content>
       </div>
@@ -117,6 +147,8 @@ export class ClientWorkspacePage {
   readonly router = inject(Router);
   readonly clientId = signal(this.route.snapshot.paramMap.get("clientId") ?? "");
   readonly showProjectForm = signal(false);
+  readonly editingProject = signal<Project | null>(null);
+  readonly editingClient = signal(false);
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
 
@@ -133,11 +165,67 @@ export class ClientWorkspacePage {
     void this.router.navigate(["/clients", this.clientId(), "projects", project.id]);
   }
 
-  createProject(value: ProjectFormValue) {
+  openCreateProject() {
+    this.editingProject.set(null);
+    this.showProjectForm.set(true);
+  }
+
+  openEditProject(project: Project, event?: Event) {
+    event?.stopPropagation();
+    this.editingProject.set(project);
+    this.showProjectForm.set(true);
+  }
+
+  editingProjectValue(): ProjectFormValue | null {
+    const project = this.editingProject();
+    if (!project) return null;
+    return {
+      name: project.name,
+      sites: project.sites,
+      startDate: project.startDate,
+      supervisor: project.supervisor,
+      totalValue: project.totalValue,
+      advanceAmount: project.advanceAmount,
+    };
+  }
+
+  saveProject(value: ProjectFormValue) {
     const currentClient = this.client();
     if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
+    const editing = this.editingProject();
+    if (editing) {
+      this.data.updateProject(editing.id, value);
+      this.editingProject.set(null);
+      this.showProjectForm.set(false);
+      return;
+    }
     const project = this.data.addProject(currentClient, value);
     this.showProjectForm.set(false);
     setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id]));
+  }
+
+  deleteProject(project: Project, event?: Event) {
+    event?.stopPropagation();
+    const confirmed = window.confirm(`Delete ${project.name}? This removes the project from this client.`);
+    if (!confirmed) return;
+    this.data.deleteProject(project.id);
+  }
+
+  clientEditValue(): ClientFormValue | null {
+    const currentClient = this.client();
+    if (!currentClient) return null;
+    return {
+      name: currentClient.name,
+      mobile: currentClient.mobile,
+      address: currentClient.address,
+      supervisor: currentClient.supervisor,
+    };
+  }
+
+  saveClient(value: ClientFormValue) {
+    const currentClient = this.client();
+    if (!currentClient || !value.name || !value.mobile || !value.address || !value.supervisor) return;
+    this.data.updateClient(currentClient.id, value);
+    this.editingClient.set(false);
   }
 }

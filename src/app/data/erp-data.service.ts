@@ -312,6 +312,42 @@ export class ErpDataService {
     return updatedProject;
   }
 
+  updateProject(
+    projectId: string,
+    patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "totalValue" | "advanceAmount">>,
+  ): Project | undefined {
+    let updatedProject: Project | undefined;
+
+    this.projects.update((projectRows) =>
+      projectRows.map((project) => {
+        if (project.id !== projectId) return project;
+        const receivedDelta =
+          patch.advanceAmount !== undefined && project.receivedAmount === project.advanceAmount
+            ? patch.advanceAmount - project.advanceAmount
+            : 0;
+        updatedProject = {
+          ...project,
+          ...patch,
+          sites: patch.sites?.length ? patch.sites : project.sites,
+          receivedAmount: project.receivedAmount + receivedDelta,
+        };
+        return updatedProject;
+      }),
+    );
+
+    return updatedProject;
+  }
+
+  deleteProject(projectId: string) {
+    this.projects.update((projectRows) => projectRows.filter((project) => project.id !== projectId));
+    this.clients.update((clientRows) =>
+      clientRows.map((client) => ({
+        ...client,
+        projectIds: client.projectIds.filter((id) => id !== projectId),
+      })),
+    );
+  }
+
   clientById(clientId: string | null): Client | undefined {
     return this.clients().find((client) => client.id === clientId);
   }
