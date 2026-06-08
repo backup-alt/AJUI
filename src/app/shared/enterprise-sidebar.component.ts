@@ -79,12 +79,14 @@ type SidebarItem = {
           </section>
 
           <div class="sidebar-user-panel">
-            <div class="sidebar-user-avatar" aria-hidden="true">
-              <ion-icon name="person-outline"></ion-icon>
-            </div>
-            <div class="sidebar-user-copy">
-              <strong>{{ userName }}</strong>
-              <span>{{ role }}</span>
+            <div class="sidebar-profile-row">
+              <div class="sidebar-user-avatar" aria-hidden="true">
+                <ion-icon name="person-outline"></ion-icon>
+              </div>
+              <div class="sidebar-user-copy">
+                <strong>{{ userName }}</strong>
+                <span>{{ role }}</span>
+              </div>
             </div>
             <button type="button" class="sidebar-logout" aria-label="Logout" (click)="logout()">
               <ion-icon name="log-out-outline"></ion-icon>

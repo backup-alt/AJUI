@@ -7,7 +7,6 @@ import {
   IonIcon,
   IonProgressBar,
   IonSplitPane,
-  IonText,
 } from "@ionic/angular/standalone";
 import { type Project } from "../../data/dashboardData";
 import { ErpDataService } from "../data/erp-data.service";
@@ -26,7 +25,6 @@ import { formatMoney, statusClass } from "../shared/format";
     IonIcon,
     IonProgressBar,
     IonSplitPane,
-    IonText,
     EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
     ClientFormDialogComponent,
@@ -45,8 +43,8 @@ import { formatMoney, statusClass } from "../shared/format";
       <div class="ion-page" id="main-content">
         <agb-enterprise-header
           title="Client Projects"
-          eyebrow="Project fallback"
-          metaLabel="No-project state"
+          eyebrow="Projects"
+          metaLabel=""
           [blurred]="showProjectForm() || editingClient()"
           [showTitle]="false"
           role="Admin"
@@ -54,21 +52,6 @@ import { formatMoney, statusClass } from "../shared/format";
 
         <ion-content class="erp-page">
           <main class="workspace-shell client-project-shell" *ngIf="client() as currentClient">
-            <section class="client-workspace-header">
-              <div>
-                <ion-text color="medium">{{ currentClient.id }}</ion-text>
-                <h1>{{ currentClient.name }}</h1>
-                <p>{{ currentClient.address }}  -  {{ currentClient.mobile }}</p>
-              </div>
-              <div class="client-header-metrics">
-                <div><span>Project Value</span><strong>{{ formatMoney(summary().totalValue) }}</strong></div>
-                <div><span>Received</span><strong>{{ formatMoney(summary().received) }}</strong></div>
-                <div><span>Pending</span><strong class="warning">{{ formatMoney(summary().pending) }}</strong></div>
-                <div><span>Supervisor</span><strong>{{ currentClient.supervisor }}</strong></div>
-                <ion-badge class="status" [ngClass]="statusClass(currentClient.status)">{{ currentClient.status }}</ion-badge>
-              </div>
-            </section>
-
             <section class="module-panel project-management-panel">
               <div class="module-toolbar">
                 <div>
@@ -150,8 +133,12 @@ import { formatMoney, statusClass } from "../shared/format";
               <ng-template #noProjects>
                 <div class="project-empty-state icon-only" aria-label="No records found">
                   <span class="empty-box-icon large" aria-hidden="true">
-                    <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
-                      <path d="M186.268,9.011H38.929c0,0-3.04,0-6.799,0c-3.753,0-8.577,4.536-10.764,10.128L3.009,65.958 c-2.187,5.591-3.47,14.974-2.856,20.951l12.287,119.774c0.609,5.978,5.983,10.818,11.988,10.818h177.672 c6.005,0,11.379-4.846,11.988-10.818l12.287-119.774c0.609-5.978-0.87-15.273-3.312-20.755l-21.414-47.238 C199.158,13.444,192.272,9.011,186.268,9.011z M148.162,148.615H78.362c-6.005,0-10.878-4.873-10.878-10.878v-24.476 c0-6.005,4.873-10.878,10.878-10.878h69.799c6.005,0,10.878,4.873,10.878,10.878v24.476 C159.04,143.742,154.166,148.615,148.162,148.615z M28.834,68.514l6.88-20.201c1.936-5.684,8.376-10.296,14.386-10.296h122.896 c6.005,0,12.863,4.444,15.311,9.932l9.361,20.935c2.448,5.488-0.435,9.932-6.445,9.932H36.209 C30.199,78.816,26.898,74.204,28.834,68.514z" />
+                    <svg viewBox="0 0 96 96" aria-hidden="true">
+                      <path class="empty-box-fill" d="M22 50 30 28h36l8 22v22a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7V50Z" />
+                      <path class="empty-box-line" d="M30 28h36l8 22H60l-5 8H41l-5-8H22l8-22Z" />
+                      <path class="empty-box-line" d="M22 50v22a7 7 0 0 0 7 7h38a7 7 0 0 0 7-7V50" />
+                      <path class="empty-box-line" d="M36 40h24" />
+                      <path class="empty-box-line" d="M40 68h16" />
                     </svg>
                   </span>
                 </div>
@@ -200,12 +187,6 @@ export class ClientWorkspacePage {
 
   readonly client = computed(() => this.data.clientById(this.clientId()));
   readonly projects = computed(() => this.data.projectsForClient(this.client()));
-  readonly summary = computed(() => {
-    const currentClient = this.client();
-    return currentClient
-      ? this.data.clientSummary(currentClient)
-      : { totalValue: 0, received: 0, pending: 0, materialCost: 0, labourCost: 0, siteExpense: 0, activeSites: 0, activeLabour: 0 };
-  });
 
   constructor() {
     effect(() => {
