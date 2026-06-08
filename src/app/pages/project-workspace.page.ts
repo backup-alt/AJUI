@@ -292,7 +292,7 @@ const sectionConfigs: SectionConfig[] = [
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="tableSearch()" (input)="tableSearch.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
-                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="activeSection() === 'expenses' ? openRecordDialog() : addInlineRow()">
+                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="addInlineRow()">
                     <ion-icon name="add-outline"></ion-icon>
                     Add Row
                   </button>
@@ -557,7 +557,7 @@ const sectionConfigs: SectionConfig[] = [
                     <input
                       list="project-labour-type-options"
                       [value]="labourTypeName()"
-                      (input)="labourTypeName.set($any($event.target).value)"
+                      (input)="updateLabourTypeName($any($event.target).value)"
                       placeholder="Type or choose labor type"
                     />
                     <datalist id="project-labour-type-options">
@@ -569,7 +569,7 @@ const sectionConfigs: SectionConfig[] = [
                         type="button"
                         [class.selected]="labourTypeName().toLowerCase() === option.toLowerCase()"
                         (mousedown)="$event.preventDefault()"
-                        (click)="labourTypeName.set(option)"
+                        (click)="selectLabourTypeSuggestion(option)"
                       >
                         {{ option }}
                       </button>
@@ -883,6 +883,17 @@ export class ProjectWorkspacePage {
     this.labourTypeRowId.set("");
   }
 
+  updateLabourTypeName(value: string) {
+    this.labourTypeName.set(value);
+    const match = this.labourTypeDialogOptions().find((option) => option.toLowerCase() === value.trim().toLowerCase());
+    if (match) this.applyLabourTypeSuggestion(match);
+  }
+
+  selectLabourTypeSuggestion(option: string) {
+    this.labourTypeName.set(option);
+    this.applyLabourTypeSuggestion(option);
+  }
+
   saveLabourType(event: Event) {
     event.preventDefault();
     const rowId = this.labourTypeRowId();
@@ -904,9 +915,19 @@ export class ProjectWorkspacePage {
   }
 
   labourTypeDialogOptions(): string[] {
-    const rowId = this.labourTypeRowId();
-    const row = this.visibleRows("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
+    const row = this.labourTypeDialogRow();
     return row ? this.labourTypeOptionsForRow(row) : [];
+  }
+
+  private applyLabourTypeSuggestion(labourType: string) {
+    const row = this.labourTypeDialogRow();
+    const wage = row ? this.suggestedDailyWageForLabourType(row, labourType) : 0;
+    this.labourTypeDailyWage.set(wage ? String(wage) : "");
+  }
+
+  private labourTypeDialogRow(): TableRow | undefined {
+    const rowId = this.labourTypeRowId();
+    return this.visibleRows("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
   }
 
   removeLabourType(row: TableRow, labourType: string) {
@@ -1305,7 +1326,7 @@ export class ProjectWorkspacePage {
     return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
       const transactionType = String(row["transactionType"] || row["expenseScope"] || "Site Expense");
       const groupKey = this.expenseGroupKey(row);
-      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row, this.activeSiteFilter() !== "All");
+      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
       const balance = previousBalance + this.expenseSignedAmount(row, transactionType);
       balances.set(groupKey, balance);
       return {
@@ -1489,13 +1510,7 @@ export class ProjectWorkspacePage {
 
   expenseOpeningBalanceLabel(): string {
     if (this.activeSiteFilter() === "All") {
-      const rows = this.visibleRows("expenses");
-      if (rows.length) {
-        const openings = new Map<string, number>();
-        for (const row of rows) openings.set(this.expenseGroupKey(row), this.expenseOpeningBalanceFor(row, false));
-        return formatMoney([...openings.values()].reduce((sum, amount) => sum + amount, 0));
-      }
-      return formatMoney(0);
+      return formatMoney(this.expenseLedgerSites().reduce((sum, site) => sum + this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }), 0));
     }
     return formatMoney(this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
   }
@@ -1504,6 +1519,11 @@ export class ProjectWorkspacePage {
     const rows = this.visibleRows("expenses");
     if (!rows.length) return this.expenseOpeningBalanceLabel();
     const latestByGroup = new Map<string, number>();
+    if (this.activeSiteFilter() === "All") {
+      for (const site of this.expenseLedgerSites()) {
+        latestByGroup.set(this.expenseGroupKey({ projectId: this.projectId(), site }), this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }));
+      }
+    }
     for (const row of rows) latestByGroup.set(this.expenseGroupKey(row), this.moneyNumber(row["runningBalance"]));
     if (this.activeSiteFilter() !== "All") {
       return formatMoney([...latestByGroup.values()].at(-1) ?? this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
@@ -1517,7 +1537,7 @@ export class ProjectWorkspacePage {
     const openingByGroup = new Map<string, number>();
     const cashAdded = rows.reduce((sum, row) => {
       const key = this.expenseGroupKey(row);
-      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row, this.activeSiteFilter() !== "All"));
+      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row));
       const amount = this.expenseSignedAmount(row);
       return amount > 0 ? sum + amount : sum;
     }, 0);
@@ -1550,7 +1570,7 @@ export class ProjectWorkspacePage {
     if (savedOpening !== undefined) return savedOpening;
     const explicitOpening = this.explicitExpenseOpeningForGroup(projectId, site);
     if (explicitOpening) return explicitOpening;
-    if (!allowProjectFallback) return 0;
+    if (!allowProjectFallback || !this.isPrimaryExpenseSite(projectId, site)) return 0;
     const project = this.data.projectById(projectId);
     return project?.expenseBalance ?? 0;
   }
@@ -1573,6 +1593,27 @@ export class ProjectWorkspacePage {
       return rowProjectId === projectId && rowSite === normalizedSite && this.moneyNumber(row["openingBalance"]);
     });
     return match ? this.moneyNumber(match["openingBalance"]) : 0;
+  }
+
+  private expenseLedgerSites(): string[] {
+    const sites = new Set<string>();
+    for (const site of this.projectSites()) {
+      const cleanSite = site.trim();
+      if (cleanSite) sites.add(cleanSite);
+    }
+    const rows = this.data.tableRowsFor("expenses", this.tableRows().expenses, (row) => this.rowBelongsToProject(row));
+    for (const row of rows) {
+      const cleanSite = String(row["site"] || "").trim();
+      if (cleanSite) sites.add(cleanSite);
+    }
+    return [...sites];
+  }
+
+  private isPrimaryExpenseSite(projectId: string, site: string): boolean {
+    const project = this.data.projectById(projectId);
+    const normalizedSite = site.trim().toLowerCase();
+    const primarySite = String(project?.sites[0] || "").trim().toLowerCase();
+    return !normalizedSite || normalizedSite === "project" || (!!primarySite && normalizedSite === primarySite);
   }
 
   private expenseEditableSite(): string {
@@ -1670,14 +1711,20 @@ export class ProjectWorkspacePage {
   }
 
   private dailyWageForLabourType(row: TableRow, labourType: string, typeCount: number): number {
+    const suggestedWage = this.suggestedDailyWageForLabourType(row, labourType);
+    if (suggestedWage) return suggestedWage;
+    const rowWage = this.moneyNumber(row["dailyWage"]);
+    if (rowWage) return rowWage;
+    return typeCount === 1 ? this.moneyNumber(row["weeklyPayable"]) : 0;
+  }
+
+  private suggestedDailyWageForLabourType(row: TableRow, labourType: string): number {
     const label = `${this.titleCase(labourType)} Daily Wage`.toLowerCase();
     const generatedKey = label.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const field = this.data.customFieldsFor("labour").find((candidate) => candidate.label.toLowerCase() === label);
     const wage = this.moneyNumber(row[field?.key ?? generatedKey]) || this.moneyNumber(row[generatedKey]);
     if (wage) return wage;
-    const rowWage = this.moneyNumber(row["dailyWage"]);
-    if (rowWage) return rowWage;
-    return this.historicalDailyWageForLabourType(row, labourType) || (typeCount === 1 ? this.moneyNumber(row["weeklyPayable"]) : 0);
+    return this.historicalDailyWageForLabourType(row, labourType);
   }
 
   private historicalDailyWageForLabourType(row: TableRow, labourType: string): number {
@@ -1694,7 +1741,8 @@ export class ProjectWorkspacePage {
         .map((part) => this.parseLabourTypeEntrySafe(part))
         .some((entry) => entry?.type.toLowerCase() === normalizedType);
       if (!hasType) continue;
-      const wage = this.moneyNumber(candidate[wageField?.key ?? ""]) || this.moneyNumber(candidate["dailyWage"]);
+      const generatedKey = `${this.titleCase(labourType)} Daily Wage`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const wage = this.moneyNumber(candidate[wageField?.key ?? generatedKey]) || this.moneyNumber(candidate[generatedKey]) || this.moneyNumber(candidate["dailyWage"]);
       if (wage) return wage;
     }
     return 0;
@@ -1745,7 +1793,7 @@ export class ProjectWorkspacePage {
     const closingByGroup = new Map<string, number>();
     const spent = rows.reduce((sum, row) => {
       const key = this.expenseGroupKey(row);
-      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row, this.activeSiteFilter() !== "All"));
+      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row));
       closingByGroup.set(key, this.moneyNumber(row["runningBalance"]));
       const amount = this.expenseSignedAmount(row);
       return amount < 0 ? sum + Math.abs(amount) : sum;

@@ -611,7 +611,7 @@ const dashboardModules: ModuleConfig[] = [
                     <input
                       list="universal-labour-type-options"
                       [value]="labourTypeName()"
-                      (input)="labourTypeName.set($any($event.target).value)"
+                      (input)="updateLabourTypeName($any($event.target).value)"
                       placeholder="Type or choose labor type"
                     />
                     <datalist id="universal-labour-type-options">
@@ -623,7 +623,7 @@ const dashboardModules: ModuleConfig[] = [
                         type="button"
                         [class.selected]="labourTypeName().toLowerCase() === option.toLowerCase()"
                         (mousedown)="$event.preventDefault()"
-                        (click)="labourTypeName.set(option)"
+                        (click)="selectLabourTypeSuggestion(option)"
                       >
                         {{ option }}
                       </button>
@@ -946,6 +946,17 @@ export class UniversalDashboardPage {
     this.labourTypeRowId.set("");
   }
 
+  updateLabourTypeName(value: string) {
+    this.labourTypeName.set(value);
+    const match = this.labourTypeDialogOptions().find((option) => option.toLowerCase() === value.trim().toLowerCase());
+    if (match) this.applyLabourTypeSuggestion(match);
+  }
+
+  selectLabourTypeSuggestion(option: string) {
+    this.labourTypeName.set(option);
+    this.applyLabourTypeSuggestion(option);
+  }
+
   saveLabourType(event: Event) {
     event.preventDefault();
     const rowId = this.labourTypeRowId();
@@ -967,9 +978,19 @@ export class UniversalDashboardPage {
   }
 
   labourTypeDialogOptions(): string[] {
-    const rowId = this.labourTypeRowId();
-    const row = this.rowsFor("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
+    const row = this.labourTypeDialogRow();
     return row ? this.labourTypeOptionsForRow(row) : [];
+  }
+
+  private applyLabourTypeSuggestion(labourType: string) {
+    const row = this.labourTypeDialogRow();
+    const wage = row ? this.suggestedDailyWageForLabourType(row, labourType) : 0;
+    this.labourTypeDailyWage.set(wage ? String(wage) : "");
+  }
+
+  private labourTypeDialogRow(): TableRow | undefined {
+    const rowId = this.labourTypeRowId();
+    return this.rowsFor("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
   }
 
   removeLabourType(row: TableRow, labourType: string) {
@@ -1388,8 +1409,7 @@ export class UniversalDashboardPage {
     return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
       const transactionType = String(row["transactionType"] || "Site Expense");
       const groupKey = this.expenseGroupKey(row);
-      const allowProjectFallback = Boolean(this.selectedFilters()["project"] && this.selectedFilters()["site"]);
-      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row, allowProjectFallback);
+      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
       const balance = previousBalance + this.expenseSignedAmount(row, transactionType);
       balances.set(groupKey, balance);
       return {
@@ -1597,10 +1617,10 @@ export class UniversalDashboardPage {
     if (savedOpening !== undefined) return savedOpening;
     const explicitOpening = this.explicitExpenseOpeningForGroup(explicitProjectId, String(row["project"] || ""), String(row["site"] || ""));
     if (explicitOpening) return explicitOpening;
-    if (!allowProjectFallback) return 0;
     const project =
       this.data.projectById(explicitProjectId) ??
       this.data.projects().find((projectRow) => projectRow.name === row["project"] || projectRow.id === row["project"]);
+    if (!allowProjectFallback || !this.isPrimaryExpenseSite(project, site)) return 0;
     return project?.expenseBalance ?? 0;
   }
 
@@ -1624,6 +1644,12 @@ export class UniversalDashboardPage {
       return sameProject && rowSite === normalizedSite && this.moneyNumber(row["openingBalance"]);
     });
     return match ? this.moneyNumber(match["openingBalance"]) : 0;
+  }
+
+  private isPrimaryExpenseSite(project: { sites: string[] } | undefined, site: string): boolean {
+    const normalizedSite = site.trim().toLowerCase();
+    const primarySite = String(project?.sites[0] || "").trim().toLowerCase();
+    return !normalizedSite || normalizedSite === "project" || (!!primarySite && normalizedSite === primarySite);
   }
 
   private reportColumns(module: DashboardModule): FieldSchema[] {
@@ -1712,14 +1738,20 @@ export class UniversalDashboardPage {
   }
 
   private dailyWageForLabourType(row: TableRow, labourType: string, typeCount: number): number {
+    const suggestedWage = this.suggestedDailyWageForLabourType(row, labourType);
+    if (suggestedWage) return suggestedWage;
+    const rowWage = this.moneyNumber(row["dailyWage"]);
+    if (rowWage) return rowWage;
+    return typeCount === 1 ? this.moneyNumber(row["weeklyPayable"]) : 0;
+  }
+
+  private suggestedDailyWageForLabourType(row: TableRow, labourType: string): number {
     const label = `${this.titleCase(labourType)} Daily Wage`.toLowerCase();
     const generatedKey = label.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const field = this.data.customFieldsFor("labour").find((candidate) => candidate.label.toLowerCase() === label);
     const wage = this.moneyNumber(row[field?.key ?? generatedKey]) || this.moneyNumber(row[generatedKey]);
     if (wage) return wage;
-    const rowWage = this.moneyNumber(row["dailyWage"]);
-    if (rowWage) return rowWage;
-    return this.historicalDailyWageForLabourType(row, labourType) || (typeCount === 1 ? this.moneyNumber(row["weeklyPayable"]) : 0);
+    return this.historicalDailyWageForLabourType(row, labourType);
   }
 
   private historicalDailyWageForLabourType(row: TableRow, labourType: string): number {
@@ -1735,7 +1767,8 @@ export class UniversalDashboardPage {
         .map((part) => this.parseLabourTypeEntrySafe(part))
         .some((entry) => entry?.type.toLowerCase() === normalizedType);
       if (!hasType) continue;
-      const wage = this.moneyNumber(candidate[wageField?.key ?? ""]) || this.moneyNumber(candidate["dailyWage"]);
+      const generatedKey = `${this.titleCase(labourType)} Daily Wage`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const wage = this.moneyNumber(candidate[wageField?.key ?? generatedKey]) || this.moneyNumber(candidate[generatedKey]) || this.moneyNumber(candidate["dailyWage"]);
       if (wage) return wage;
     }
     return 0;
