@@ -1233,6 +1233,7 @@ export class UniversalDashboardPage {
 
   selectOptions(module: DashboardModule, key: string): string[] {
     if (key === "site" || key === "assignedSite") return this.siteOptionsForModule(module);
+    if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
     if (key === "project") return this.projectNameOptions();
     if (key === "projectId") return this.projectIdOptions();
     if (key === "client" || key === "clientName") return this.clientNameOptions();
@@ -1254,12 +1255,12 @@ export class UniversalDashboardPage {
       ];
     }
     if (module === "labour" && key === "attendance") return ["Present", "Absent"];
-    if (key === "approvalStatus") return ["Approve", "Decline"];
+    if (key === "approvalStatus") return ["Pending", "Approved", "Declined"];
     if (key === "status") {
       if (module === "clients") return ["Active", "On Hold", "Completed"];
       if (module === "supervisors") return ["Active", "On Leave", "Inactive"];
       if (module === "reports") return ["Ready", "Scheduled", "Archived"];
-      return ["Approve", "Decline"];
+      return ["Pending", "Approved", "Declined"];
     }
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
@@ -1274,7 +1275,7 @@ export class UniversalDashboardPage {
   selectOptionIcon(option: string): "approve" | "decline" | "" {
     const normalized = option.toLowerCase();
     if (normalized === "approve" || normalized === "approved" || normalized === "active" || normalized === "ready") return "approve";
-    if (normalized === "decline" || normalized === "rejected" || normalized === "inactive") return "decline";
+    if (normalized === "decline" || normalized === "declined" || normalized === "rejected" || normalized === "inactive") return "decline";
     return "";
   }
 
@@ -1393,15 +1394,31 @@ export class UniversalDashboardPage {
   }
 
   private withComputedRows(module: DashboardModule, rows: TableRow[]): TableRow[] {
-    if (module === "expenses") return this.withExpenseBalances(rows);
-    if (module === "labour") return rows.map((row) => this.withLabourPayable(row));
+    const normalizedRows = rows.map((row) => this.withNormalizedApprovalStatus(row));
+    if (module === "expenses") return this.withExpenseBalances(normalizedRows);
+    if (module === "labour") return normalizedRows.map((row) => this.withLabourPayable(row));
     if (module === "subcontractors") {
-      return rows.map((row) => ({
+      return normalizedRows.map((row) => ({
         ...row,
         balance: formatMoney(this.moneyNumber(row["contractValue"]) - this.moneyNumber(row["advancePaid"])),
       }));
     }
-    return rows;
+    return normalizedRows;
+  }
+
+  private withNormalizedApprovalStatus(row: TableRow): TableRow {
+    return {
+      ...row,
+      ...(row["status"] ? { status: this.normalizeApprovalStatus(row["status"]) } : {}),
+      ...(row["approvalStatus"] ? { approvalStatus: this.normalizeApprovalStatus(row["approvalStatus"]) } : {}),
+    };
+  }
+
+  private normalizeApprovalStatus(value: unknown): string {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "approve" || normalized === "approved") return "Approved";
+    if (normalized === "decline" || normalized === "declined" || normalized === "rejected") return "Declined";
+    return String(value || "");
   }
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
@@ -1504,6 +1521,14 @@ export class UniversalDashboardPage {
     const rows = this.data.materials().filter((row) => row.vendor.toLowerCase() === vendorName.toLowerCase());
     const purchased = rows.reduce((sum, row) => sum + row.purchased, 0);
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
+  }
+
+  private vendorNameOptions(): string[] {
+    return this.sortedUnique([
+      ...this.data.vendors().map((vendor) => vendor.name),
+      ...this.data.materials().map((material) => material.vendor),
+      ...this.rowsFor("materials").map((row) => String(row["vendor"] || "")),
+    ]);
   }
 
   private labourTypesFromRow(row: { category: string; notes: string; presentCount: number; dailyWage?: number }): string {
