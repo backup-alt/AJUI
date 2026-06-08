@@ -90,12 +90,13 @@ const dashboardModules: ModuleConfig[] = [
       { key: "client", label: "Client" },
       { key: "project", label: "Project" },
       { key: "site", label: "Site" },
+      { key: "attendanceDate", label: "Date" },
       { key: "labourName", label: "Labour Name" },
       { key: "category", label: "Category" },
-      { key: "present", label: "Present" },
-      { key: "absent", label: "Absent" },
+      { key: "attendance", label: "Attendance" },
       { key: "shift", label: "Shift" },
       { key: "overtime", label: "Overtime" },
+      { key: "dailyPay", label: "Daily Labour Pay" },
       { key: "lateFine", label: "Late Fine" },
       { key: "weeklyPayable", label: "Weekly Payable" },
       { key: "paymentMode", label: "Payment Mode" },
@@ -104,8 +105,7 @@ const dashboardModules: ModuleConfig[] = [
     filters: [
       { key: "site", label: "Site" },
       { key: "category", label: "Category" },
-      { key: "present", label: "Present" },
-      { key: "absent", label: "Absent" },
+      { key: "attendance", label: "Attendance" },
       { key: "status", label: "Status" },
     ],
   },
@@ -119,10 +119,12 @@ const dashboardModules: ModuleConfig[] = [
       { key: "project", label: "Project" },
       { key: "site", label: "Site" },
       { key: "expenseDate", label: "Expense Date" },
+      { key: "transactionType", label: "Transaction Type" },
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
+      { key: "openingBalance", label: "Opening Balance" },
+      { key: "runningBalance", label: "Balance" },
       { key: "supervisor", label: "Supervisor" },
-      { key: "cashIssued", label: "Cash Issued" },
       { key: "reference", label: "Bill / Reference" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
@@ -284,7 +286,7 @@ const dashboardModules: ModuleConfig[] = [
         <agb-enterprise-header
           title="Dashboard"
           eyebrow="Universal Records"
-          metaLabel="Company-wide view"
+          metaLabel=""
           [blurred]="recordDialogOpen() || fieldDialogOpen()"
           [showTitle]="false"
           role="Admin"
@@ -328,11 +330,12 @@ const dashboardModules: ModuleConfig[] = [
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="searchText()" (input)="searchText.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
-                  <button type="button" class="primary-table-action" (click)="openRecordDialog()">
+                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="addInlineRow()">
                     <ion-icon name="add-outline"></ion-icon>
-                    Add Record
+                    Add Row
                   </button>
                   <button type="button" (click)="openFieldDialog()">Add Field</button>
+                  <button type="button" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
                   <button type="button" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
                 </div>
               </div>
@@ -367,12 +370,27 @@ const dashboardModules: ModuleConfig[] = [
                     <tr *ngFor="let row of visibleRows(); let rowIndex = index">
                       <td
                         *ngFor="let column of columnsForActive()"
-                        [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
+                        [class.select-cell]="selectOptions(activeModule(), column.key).length > 0"
                         spellcheck="false"
-                        (blur)="!isReadonlyColumn(column.key) && updateCell(rowIndex, column.key, $any($event.target).textContent || '')"
                       >
-                        {{ row[column.key] }}
+                        <select
+                          *ngIf="selectOptions(activeModule(), column.key).length > 0; else editableDashboardCell"
+                          [value]="row[column.key] || ''"
+                          (change)="updateCell(rowIndex, column.key, $any($event.target).value)"
+                        >
+                          <option *ngFor="let option of selectOptions(activeModule(), column.key)" [value]="option">{{ option }}</option>
+                        </select>
+                        <ng-template #editableDashboardCell>
+                          <span
+                            class="editable-cell"
+                            [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
+                            spellcheck="false"
+                            (blur)="!isReadonlyColumn(column.key) && updateCell(rowIndex, column.key, $any($event.target).textContent || '')"
+                          >
+                            {{ row[column.key] }}
+                          </span>
+                        </ng-template>
                       </td>
                       <td class="row-actions">
                         <button type="button" (click)="deleteRow(row)">Delete</button>
@@ -382,12 +400,10 @@ const dashboardModules: ModuleConfig[] = [
                       <td class="empty-row" [attr.colspan]="columnsForActive().length + 1">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
-                            <svg viewBox="0 0 96 96" aria-hidden="true">
-                              <path class="empty-box-fill" d="M22 50 30 28h36l8 22v22a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7V50Z" />
-                              <path class="empty-box-line" d="M30 28h36l8 22H60l-5 8H41l-5-8H22l8-22Z" />
-                              <path class="empty-box-line" d="M22 50v22a7 7 0 0 0 7 7h38a7 7 0 0 0 7-7V50" />
-                              <path class="empty-box-line" d="M36 40h24" />
-                              <path class="empty-box-line" d="M40 68h16" />
+                            <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
+                              <path class="empty-box-fill" d="M186.268 9.011H38.929c-6.005 0-13.189 4.536-16.116 10.128L3.009 65.958C.822 71.549-.461 80.932.153 86.909l12.287 119.774c.609 5.978 5.983 10.818 11.988 10.818h177.672c6.005 0 11.379-4.846 11.988-10.818l12.287-119.774c.609-5.978-.87-15.273-3.312-20.755l-21.414-47.238c-2.491-5.472-8.377-9.905-14.381-9.905Z" />
+                              <path class="empty-box-line" d="M28.834 68.514l6.88-20.201c1.936-5.684 8.376-10.296 14.386-10.296h122.896c6.005 0 12.863 4.444 15.311 9.932l9.361 20.935c2.448 5.488-.435 9.932-6.445 9.932H36.209c-6.01 0-9.311-4.612-7.375-10.302Z" />
+                              <path class="empty-box-line" d="M78.362 102.383h69.799c6.005 0 10.878 4.873 10.878 10.878v24.476c0 6.005-4.873 10.878-10.878 10.878H78.362c-6.005 0-10.878-4.873-10.878-10.878v-24.476c0-6.005 4.873-10.878 10.878-10.878Z" />
                             </svg>
                           </span>
                         </div>
@@ -493,16 +509,17 @@ export class UniversalDashboardPage {
   visibleRows(): TableRow[] {
     const query = this.searchText().trim().toLowerCase();
     const filters = this.selectedFilters();
-    return this.rowsFor(this.activeModule()).filter((row) => {
+    const rows = this.rowsFor(this.activeModule()).filter((row) => {
       const matchesSearch = !query || Object.values(row).some((value) => String(value).toLowerCase().includes(query));
       const matchesFilters = Object.entries(filters).every(([key, value]) => !value || String(row[key]) === value);
       return matchesSearch && matchesFilters;
     });
+    return this.withComputedRows(this.activeModule(), rows);
   }
 
   filterValues(key: string): string[] {
     const values = new Set<string>();
-    for (const row of this.rowsFor(this.activeModule())) {
+    for (const row of this.withComputedRows(this.activeModule(), this.rowsFor(this.activeModule()))) {
       const value = row[key];
       if (value !== undefined && value !== "") values.add(String(value));
     }
@@ -518,7 +535,15 @@ export class UniversalDashboardPage {
   }
 
   isReadonlyColumn(key: string): boolean {
-    return key === "clientId" || key === "vendorId" || key === "supervisorId" || key === "subcontractId";
+    return (
+      key === "clientId" ||
+      key === "vendorId" ||
+      key === "supervisorId" ||
+      key === "subcontractId" ||
+      key === "runningBalance" ||
+      key === "weeklyPayable" ||
+      key === "balance"
+    );
   }
 
   setFilter(key: string, value: string) {
@@ -535,6 +560,15 @@ export class UniversalDashboardPage {
     for (const column of this.columnsForActive()) row[column.key] = "";
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
+  }
+
+  addInlineRow() {
+    const module = this.activeModule();
+    if (module === "clients") {
+      this.data.addClient({ name: "New Client", mobile: "", address: "", supervisor: "Unassigned" });
+      return;
+    }
+    this.data.addCustomRow(module, this.defaultRowFor(module));
   }
 
   updateDraftField(key: string, value: string) {
@@ -575,6 +609,7 @@ export class UniversalDashboardPage {
   }
 
   updateCell(visibleIndex: number, key: string, value: string) {
+    if (this.isReadonlyColumn(key)) return;
     const target = this.visibleRows()[visibleIndex];
     if (!target) return;
     const module = this.activeModule();
@@ -616,6 +651,20 @@ export class UniversalDashboardPage {
     anchor.download = `annai-${this.activeModule()}-${new Date().toISOString().slice(0, 10)}.xls`;
     anchor.click();
     URL.revokeObjectURL(url);
+  }
+
+  exportPdf() {
+    const module = this.activeModule();
+    const columns = this.reportColumns(module);
+    const rows = this.reportRows(module, this.visibleRows());
+    const summary = module === "labour" ? this.labourSummaryHtml(rows) : module === "expenses" ? this.expenseSummaryHtml(rows) : "";
+    this.openPrintableReport({
+      title: module === "labour" ? "Labour Attendance Report" : module === "expenses" ? "Expense Ledger Report" : this.activeConfig().title,
+      subtitle: "Annai Golden Builders - Universal Dashboard",
+      columns,
+      rows,
+      summary,
+    });
   }
 
   openClients() {
@@ -667,14 +716,16 @@ export class UniversalDashboardPage {
       client: clientName(row.projectId),
       project: projectName(row.projectId),
       site: row.site,
+      attendanceDate: "2026-06-05",
       labourName: row.party,
       category: row.category,
-      present: `${row.presentDays} days / ${row.presentCount} staff`,
-      absent: row.absentDays,
+      attendance: "Present",
       shift: row.shift,
       overtime: `${row.overtime} hrs`,
+      dailyPay: formatMoney(row.dailyWage),
       lateFine: formatMoney(row.lateFine),
       weeklyPayable: formatMoney(row.dailyWage * row.presentDays * row.presentCount + row.overtime * 175 - row.lateFine),
+      presentUnits: row.presentDays * row.presentCount,
       paymentMode: row.paymentMode,
       status: row.status,
     }));
@@ -686,8 +737,11 @@ export class UniversalDashboardPage {
       project: projectName(row.projectId),
       site: row.site,
       expenseDate: row.date,
+      transactionType: row.type,
       description: row.description,
       amount: formatMoney(row.spent),
+      openingBalance: row.received ? formatMoney(row.received) : "",
+      runningBalance: formatMoney(0),
       supervisor: row.supervisor,
       cashIssued: formatMoney(row.received),
       reference: row.reference,
@@ -791,6 +845,291 @@ export class UniversalDashboardPage {
 
   private rowsFor(module: DashboardModule): TableRow[] {
     return this.data.tableRowsFor(module, this.buildRows()[module]);
+  }
+
+  selectOptions(module: DashboardModule, key: string): string[] {
+    if (module === "expenses" && key === "transactionType") {
+      return [
+        "Site Expense",
+        "Opening Balance",
+        "Cash Issued to Supervisor",
+        "Payment Received from Annai Golden Builders Pvt Ltd",
+        "Adjustment",
+      ];
+    }
+    if (module === "labour" && key === "attendance") return ["Present", "Absent"];
+    if (key === "approvalStatus" || key === "status") return ["Pending", "Approved", "Rejected"];
+    if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
+    if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
+    return [];
+  }
+
+  private defaultRowFor(module: DashboardModule): TableRow {
+    const today = new Date().toISOString().slice(0, 10);
+    const defaults: Record<DashboardModule, TableRow> = {
+      materials: {
+        client: "",
+        project: "",
+        site: "",
+        materialName: "",
+        unit: "",
+        requestedQuantity: "",
+        approvedQuantity: "",
+        vendor: "",
+        poNumber: "",
+        remainingStock: "",
+        status: "Pending",
+      },
+      clients: {},
+      labour: {
+        client: "",
+        project: "",
+        site: "",
+        attendanceDate: today,
+        labourName: "",
+        category: "",
+        attendance: "Present",
+        shift: "Day",
+        overtime: "0",
+        dailyPay: "0",
+        lateFine: "0",
+        weeklyPayable: formatMoney(0),
+        presentUnits: 1,
+        paymentMode: "Cash",
+        status: "Pending",
+      },
+      expenses: {
+        client: "",
+        project: "",
+        site: "",
+        expenseDate: today,
+        transactionType: "Site Expense",
+        description: "",
+        amount: "0",
+        openingBalance: "",
+        runningBalance: formatMoney(0),
+        supervisor: "",
+        reference: "",
+        approvalStatus: "Pending",
+      },
+      generalExpenses: {
+        expenseDate: today,
+        department: "Head Office",
+        description: "",
+        category: "Office Expense",
+        amount: "0",
+        paidBy: "",
+        reference: "",
+        approvalStatus: "Pending",
+      },
+      payments: {
+        client: "",
+        project: "",
+        paymentDate: today,
+        amount: "0",
+        mode: "Cash",
+        transactionReference: "",
+        receiptNumber: "",
+        collectedBy: "",
+        approvalStatus: "Pending",
+      },
+      vendors: {
+        vendorName: "",
+        materialType: "",
+        phoneNumber: "",
+        address: "",
+        gstNumber: "",
+        purchaseHistory: "",
+      },
+      supervisors: {
+        supervisorName: "",
+        phoneNumber: "",
+        role: "",
+        assignedProject: "",
+        assignedSite: "",
+        cashLimit: "0",
+        activeAdvances: "0",
+        approvalAuthority: "",
+        status: "Active",
+      },
+      subcontractors: {
+        client: "",
+        project: "",
+        site: "",
+        subcontractorName: "",
+        workPackage: "",
+        contractValue: "0",
+        advancePaid: "0",
+        balance: formatMoney(0),
+        startDate: today,
+        dueDate: today,
+        supervisor: "",
+        approvalStatus: "Pending",
+        paymentStatus: "Not Started",
+      },
+      reports: {
+        category: "",
+        reportName: "",
+        scope: "",
+        owner: "",
+        exportFormat: "PDF / Excel",
+        status: "Ready",
+      },
+    };
+    return defaults[module];
+  }
+
+  private withComputedRows(module: DashboardModule, rows: TableRow[]): TableRow[] {
+    if (module === "expenses") return this.withExpenseBalances(rows);
+    if (module === "labour") return rows.map((row) => this.withLabourPayable(row));
+    if (module === "subcontractors") {
+      return rows.map((row) => ({
+        ...row,
+        balance: formatMoney(this.moneyNumber(row["contractValue"]) - this.moneyNumber(row["advancePaid"])),
+      }));
+    }
+    return rows;
+  }
+
+  private withExpenseBalances(rows: TableRow[]): TableRow[] {
+    let balance = 0;
+    return rows.map((row) => {
+      const transactionType = String(row["transactionType"] || "Site Expense");
+      const openingBalance = this.moneyNumber(row["openingBalance"] ?? row["cashIssued"]);
+      const amount = this.moneyNumber(row["amount"]);
+      if (openingBalance) balance += openingBalance;
+      if (amount) balance += this.isExpenseCredit(transactionType) ? amount : -amount;
+      return {
+        ...row,
+        transactionType,
+        openingBalance: openingBalance ? formatMoney(openingBalance) : row["openingBalance"] ?? "",
+        runningBalance: formatMoney(balance),
+      };
+    });
+  }
+
+  private withLabourPayable(row: TableRow): TableRow {
+    const attendance = String(row["attendance"] || "Present");
+    const presentUnits = attendance.toLowerCase() === "absent" ? 0 : this.moneyNumber(row["presentUnits"] || 1) || 1;
+    const dailyPay = this.moneyNumber(row["dailyPay"]);
+    const overtime = this.moneyNumber(row["overtime"]);
+    const lateFine = this.moneyNumber(row["lateFine"]);
+    return {
+      ...row,
+      attendance,
+      weeklyPayable: formatMoney(dailyPay * presentUnits + overtime * 175 - lateFine),
+    };
+  }
+
+  private isExpenseCredit(transactionType: string): boolean {
+    const normalized = transactionType.toLowerCase();
+    return normalized.includes("payment") || normalized.includes("received") || normalized.includes("cash issued") || normalized.includes("opening");
+  }
+
+  private reportColumns(module: DashboardModule): FieldSchema[] {
+    if (module === "expenses") {
+      return [
+        { key: "expenseDate", label: "Date" },
+        { key: "transactionType", label: "Transaction Type" },
+        { key: "description", label: "Description" },
+        { key: "amount", label: "Amount" },
+        { key: "runningBalance", label: "Balance" },
+      ];
+    }
+    if (module === "labour") {
+      return [
+        { key: "attendanceDate", label: "Date" },
+        { key: "labourName", label: "Staff Name" },
+        { key: "attendance", label: "Attendance" },
+        { key: "shift", label: "Shift" },
+        { key: "overtimeLate", label: "Overtime / Late" },
+        { key: "weeklyPayable", label: "Payable" },
+      ];
+    }
+    return this.columnsForActive();
+  }
+
+  private reportRows(module: DashboardModule, rows: TableRow[]): TableRow[] {
+    if (module !== "labour") return rows;
+    return rows.map((row) => ({
+      ...row,
+      overtimeLate: `${row["overtime"] || "0"} overtime / ${row["lateFine"] || "0"} late fine`,
+    }));
+  }
+
+  private labourSummaryHtml(rows: TableRow[]): string {
+    const summary = new Map<string, { present: number; absent: number; payable: number }>();
+    for (const row of rows) {
+      const name = String(row["labourName"] || "Unnamed");
+      const current = summary.get(name) ?? { present: 0, absent: 0, payable: 0 };
+      if (String(row["attendance"] || "").toLowerCase() === "absent") current.absent += 1;
+      else current.present += 1;
+      current.payable += this.moneyNumber(row["weeklyPayable"]);
+      summary.set(name, current);
+    }
+    if (!summary.size) return "";
+    return `<section class="summary"><h2>Labour Summary</h2>${[...summary.entries()]
+      .map(
+        ([name, value]) =>
+          `<div><strong>${this.escapeHtml(name)}</strong><span>Present: ${value.present}</span><span>Absent: ${value.absent}</span><span>${this.escapeHtml(formatMoney(value.payable))}</span></div>`,
+      )
+      .join("")}</section>`;
+  }
+
+  private expenseSummaryHtml(rows: TableRow[]): string {
+    const spent = rows.reduce((sum, row) => sum + (this.isExpenseCredit(String(row["transactionType"] || "")) ? 0 : this.moneyNumber(row["amount"])), 0);
+    const received = rows.reduce((sum, row) => sum + this.moneyNumber(row["openingBalance"]) + (this.isExpenseCredit(String(row["transactionType"] || "")) ? this.moneyNumber(row["amount"]) : 0), 0);
+    const closing = rows.length ? String(rows[rows.length - 1]["runningBalance"] || formatMoney(0)) : formatMoney(0);
+    return `<section class="summary"><h2>Expense Summary</h2><div><strong>Opening / Received</strong><span>${this.escapeHtml(formatMoney(received))}</span></div><div><strong>Expenses</strong><span>${this.escapeHtml(formatMoney(spent))}</span></div><div><strong>Closing Balance</strong><span>${this.escapeHtml(closing)}</span></div></section>`;
+  }
+
+  private openPrintableReport(config: { title: string; subtitle: string; columns: FieldSchema[]; rows: TableRow[]; summary: string }) {
+    const reportWindow = window.open("", "_blank");
+    if (!reportWindow) return;
+    const tableRows = config.rows
+      .map((row) => `<tr>${config.columns.map((column) => `<td>${this.escapeHtml(String(row[column.key] ?? ""))}</td>`).join("")}</tr>`)
+      .join("");
+    reportWindow.document.write(`<!doctype html>
+<html>
+<head>
+  <title>${this.escapeHtml(config.title)}</title>
+  <style>
+    body { margin: 32px; color: #111827; font-family: Inter, Arial, sans-serif; }
+    header { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 18px; border-bottom: 2px solid #002263; }
+    h1 { margin: 0 0 6px; font-size: 24px; }
+    p { margin: 0; color: #526070; font-size: 13px; }
+    table { width: 100%; margin-top: 22px; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 9px 10px; border: 1px solid #cfd8e6; text-align: left; vertical-align: top; }
+    th { background: #eef4ff; color: #002263; font-weight: 800; }
+    .summary { display: grid; gap: 8px; margin-top: 18px; padding: 14px; border: 1px solid #cfd8e6; background: #f8fafc; }
+    .summary h2 { margin: 0 0 4px; font-size: 16px; }
+    .summary div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e4e9f1; padding-bottom: 6px; }
+    .summary div:last-child { border-bottom: 0; padding-bottom: 0; }
+    footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 48px; font-size: 12px; }
+    footer div { padding-top: 34px; border-top: 1px solid #94a3b8; text-align: center; color: #526070; }
+    @media print { body { margin: 18mm; } button { display: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>${this.escapeHtml(config.title)}</h1><p>${this.escapeHtml(config.subtitle)}</p></div>
+    <p>Generated ${new Date().toLocaleDateString()}</p>
+  </header>
+  <table>
+    <thead><tr>${config.columns.map((column) => `<th>${this.escapeHtml(column.label)}</th>`).join("")}</tr></thead>
+    <tbody>${tableRows || `<tr><td colspan="${config.columns.length}">No records</td></tr>`}</tbody>
+  </table>
+  ${config.summary}
+  <footer><div>Prepared By</div><div>Verified By</div><div>Approved / Stamp</div></footer>
+  <script>window.addEventListener('load', () => setTimeout(() => window.print(), 150));</script>
+</body>
+</html>`);
+    reportWindow.document.close();
+  }
+
+  private moneyNumber(value: unknown): number {
+    const parsed = Number(String(value ?? "").replace(/,/g, "").replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   private updateClientCell(row: TableRow, key: string, value: string) {

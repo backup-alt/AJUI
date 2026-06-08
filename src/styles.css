@@ -8752,3 +8752,82 @@ body {
 .dark-mode .operations-tabs::-webkit-scrollbar-thumb {
   background: #3a5278;
 }
+
+/* Ledger and attendance workflow refinements */
+.add-row-action ion-icon {
+  width: 17px !important;
+  height: 17px !important;
+}
+
+.operations-table .editable-cell {
+  display: block;
+  min-height: 22px;
+  min-width: 72px;
+  outline: 0;
+  white-space: pre-wrap;
+}
+
+.operations-table .editable-cell[contenteditable="true"] {
+  cursor: text;
+}
+
+.operations-table .editable-cell[contenteditable="true"]:focus {
+  border-radius: 5px;
+  background: #ffffff !important;
+  box-shadow: inset 0 0 0 2px rgba(0, 34, 99, 0.22) !important;
+}
+
+.operations-table td.select-cell {
+  padding: 6px 8px !important;
+}
+
+.operations-table td.select-cell select {
+  width: 100%;
+  min-width: 132px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5 10 12l4.5-4.5' fill='none' stroke='%23002263' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center / 14px 14px,
+    #f8fafc;
+  color: #0f172a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  outline: 0;
+  padding: 0 30px 0 9px;
+  appearance: none;
+}
+
+.operations-table td.select-cell select:focus {
+  border-color: #8fa6d2;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.12);
+}
+
+.operations-table tbody tr:last-child td:not(.empty-row) {
+  border-bottom: 1px solid #dce4ef !important;
+}
+
+.operations-table td.readonly-cell .editable-cell {
+  color: #526070;
+  font-weight: 760;
+}
+
+.dark-mode .operations-table .editable-cell[contenteditable="true"]:focus {
+  background: #0d1728 !important;
+  box-shadow: inset 0 0 0 2px rgba(155, 188, 255, 0.54) !important;
+}
+
+.dark-mode .operations-table td.select-cell select {
+  border-color: transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5 10 12l4.5-4.5' fill='none' stroke='%239fb8ff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center / 14px 14px,
+    #101c30 !important;
+  color: #edf4ff;
+}
+
+.dark-mode .operations-table td.select-cell select:focus {
+  border-color: #9bbcff;
+  box-shadow: 0 0 0 3px rgba(155, 188, 255, 0.18);
+}
