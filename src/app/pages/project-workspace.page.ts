@@ -44,7 +44,7 @@ const sectionConfigs: SectionConfig[] = [
     key: "labour",
     label: "Labour",
     title: "Labour Attendance",
-    description: "Staff attendance with site, date, staff name, labour types, shift count, overtime, fine, and daily pay.",
+    description: "Staff attendance with site, date, staff name, labour types, staff count, shift count, overtime, and fine.",
     columns: [
       { key: "client", label: "Client" },
       { key: "clientId", label: "Client ID" },
@@ -57,7 +57,6 @@ const sectionConfigs: SectionConfig[] = [
       { key: "attendance", label: "Attendance" },
       { key: "shift", label: "Shift", type: "number" },
       { key: "overtime", label: "Overtime" },
-      { key: "dailyPay", label: "Daily Labour Pay" },
       { key: "lateFine", label: "Late Fine" },
       { key: "paymentMode", label: "Payment Mode" },
       { key: "notes", label: "Notes" },
@@ -333,7 +332,7 @@ const sectionConfigs: SectionConfig[] = [
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let row of visibleRows(activeSection()); let rowIndex = index">
+                    <tr *ngFor="let row of visibleRows(activeSection())">
                       <td
                         *ngFor="let column of columnsFor(activeSection())"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
@@ -346,7 +345,7 @@ const sectionConfigs: SectionConfig[] = [
                               class="editable-cell"
                               contenteditable="true"
                               spellcheck="false"
-                              (blur)="updateCell(activeSection(), rowIndex, column.key, $any($event.target).textContent || '')"
+                              (blur)="updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
                             >
                               {{ row[column.key] }}
                             </span>
@@ -370,7 +369,7 @@ const sectionConfigs: SectionConfig[] = [
                                 *ngFor="let option of selectOptions(activeSection(), column.key)"
                                 type="button"
                                 [class.selected]="option === row[column.key]"
-                                (click)="selectCellOption(activeSection(), rowIndex, column.key, option)"
+                                (click)="selectCellOptionForRow(activeSection(), row, column.key, option)"
                               >
                                 {{ option }}
                               </button>
@@ -379,7 +378,7 @@ const sectionConfigs: SectionConfig[] = [
                                 <input
                                   [value]="selectCustomValue()"
                                   (input)="selectCustomValue.set($any($event.target).value)"
-                                  (keydown.enter)="saveCustomSelectOption(activeSection(), rowIndex, column.key, $event)"
+                                  (keydown.enter)="saveCustomSelectOptionForRow(activeSection(), row, column.key, $event)"
                                   placeholder="Type value"
                                 />
                               </label>
@@ -387,7 +386,7 @@ const sectionConfigs: SectionConfig[] = [
                                 *ngIf="allowsCustomOption(activeSection(), column.key)"
                                 type="button"
                                 class="custom-select-save"
-                                (click)="saveCustomSelectOption(activeSection(), rowIndex, column.key)"
+                                (click)="saveCustomSelectOptionForRow(activeSection(), row, column.key)"
                               >
                                 Use custom value
                               </button>
@@ -398,7 +397,7 @@ const sectionConfigs: SectionConfig[] = [
                               class="editable-cell"
                               [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
                               spellcheck="false"
-                              (blur)="!isReadonlyColumn(column.key) && updateCell(activeSection(), rowIndex, column.key, $any($event.target).textContent || '')"
+                              (blur)="!isReadonlyColumn(column.key) && updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
                             >
                               {{ row[column.key] }}
                             </span>
@@ -733,7 +732,12 @@ export class ProjectWorkspacePage {
     if (this.isReadonlyColumn(key)) return;
     const target = this.visibleRows(section)[visibleIndex];
     if (!target) return;
-    const rowId = String(target["__rowId"] || "");
+    this.updateRowCell(section, target, key, value);
+  }
+
+  updateRowCell(section: ModuleKey, row: TableRow, key: string, value: string) {
+    if (this.isReadonlyColumn(key)) return;
+    const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
     const cleanValue = value.trim();
     this.data.updateSharedRowCell(rowId, key, cleanValue);
@@ -764,6 +768,12 @@ export class ProjectWorkspacePage {
     this.selectCustomValue.set("");
   }
 
+  selectCellOptionForRow(section: ModuleKey, row: TableRow, key: string, value: string) {
+    this.updateRowCell(section, row, key, value);
+    this.openSelectKey.set("");
+    this.selectCustomValue.set("");
+  }
+
   saveCustomSelectOption(section: ModuleKey, visibleIndex: number, key: string, event?: Event) {
     event?.preventDefault();
     const value = this.selectCustomValue().trim();
@@ -771,8 +781,15 @@ export class ProjectWorkspacePage {
     this.selectCellOption(section, visibleIndex, key, value);
   }
 
+  saveCustomSelectOptionForRow(section: ModuleKey, row: TableRow, key: string, event?: Event) {
+    event?.preventDefault();
+    const value = this.selectCustomValue().trim();
+    if (!value) return;
+    this.selectCellOptionForRow(section, row, key, value);
+  }
+
   allowsCustomOption(section: ModuleKey, key: string): boolean {
-    return (section === "expenses" && key === "transactionType") || (section === "labour" && key === "staffName");
+    return this.selectOptions(section, key).length > 0;
   }
 
   openLabourTypeDialog(row: TableRow) {
@@ -938,7 +955,6 @@ export class ProjectWorkspacePage {
       attendance: "Present",
       shift: this.normalizeShift(row.shift),
       overtime: `${row.overtime} hrs`,
-      dailyPay: formatMoney(row.dailyWage),
       lateFine: formatMoney(row.lateFine),
       presentUnits: row.presentDays * row.presentCount,
       paymentMode: row.paymentMode,
@@ -1105,7 +1121,6 @@ export class ProjectWorkspacePage {
         attendance: "Present",
         shift: "1",
         overtime: "0",
-        dailyPay: "0",
         lateFine: "0",
         presentUnits: 1,
         paymentMode: "Cash",
@@ -1393,7 +1408,6 @@ export class ProjectWorkspacePage {
         { key: "attendance", label: "Attendance" },
         { key: "shift", label: "Shift" },
         { key: "overtimeLate", label: "Overtime / Late" },
-        { key: "dailyPay", label: "Daily Labour Pay" },
       ];
     }
     return this.columnsFor(section);
@@ -1408,25 +1422,22 @@ export class ProjectWorkspacePage {
   }
 
   private labourSummaryHtml(rows: TableRow[]): string {
-    const summary = new Map<string, { present: number; absent: number; payable: number }>();
+    const summary = new Map<string, { present: number; absent: number; staff: number }>();
     for (const row of rows) {
       const name = String(row["staffName"] || row["labourName"] || "Unnamed");
-      const current = summary.get(name) ?? { present: 0, absent: 0, payable: 0 };
-      if (String(row["attendance"] || "").toLowerCase() === "absent") current.absent += 1;
+      const current = summary.get(name) ?? { present: 0, absent: 0, staff: 0 };
+      const isAbsent = String(row["attendance"] || "").toLowerCase() === "absent";
+      if (isAbsent) current.absent += 1;
       else current.present += 1;
       const staffCount = this.moneyNumber(row["staffCount"]) || this.staffCountFromLabourTypes(String(row["labourTypes"] || ""));
-      const shift = this.moneyNumber(row["shift"]) || 1;
-      const dailyPay = this.moneyNumber(row["dailyPay"]);
-      const overtime = this.moneyNumber(row["overtime"]);
-      const lateFine = this.moneyNumber(row["lateFine"]);
-      current.payable += String(row["attendance"] || "").toLowerCase() === "absent" ? 0 : dailyPay * staffCount * shift + overtime * 175 - lateFine;
+      if (!isAbsent) current.staff += staffCount;
       summary.set(name, current);
     }
     if (!summary.size) return "";
     return `<section class="summary"><h2>Labour Summary</h2>${[...summary.entries()]
       .map(
         ([name, value]) =>
-          `<div><strong>${this.escapeHtml(name)}</strong><span>Present: ${value.present}</span><span>Absent: ${value.absent}</span><span>${this.escapeHtml(formatMoney(value.payable))}</span></div>`,
+          `<div><strong>${this.escapeHtml(name)}</strong><span>Present: ${value.present}</span><span>Absent: ${value.absent}</span><span>Staff: ${value.staff}</span></div>`,
       )
       .join("")}</section>`;
   }

@@ -8781,7 +8781,8 @@ body {
   padding: 6px 8px !important;
 }
 
-.operations-table td.select-cell select {
+.operations-table td.select-cell select,
+.operations-table td.select-cell .table-combo-input {
   width: 100%;
   min-width: 132px;
   height: 34px;
@@ -8799,7 +8800,12 @@ body {
   appearance: none;
 }
 
-.operations-table td.select-cell select:focus {
+.operations-table td.select-cell .table-combo-input::placeholder {
+  color: #738197;
+}
+
+.operations-table td.select-cell select:focus,
+.operations-table td.select-cell .table-combo-input:focus {
   border-color: #8fa6d2;
   background-color: #ffffff;
   box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.12);
@@ -8860,7 +8866,8 @@ body {
   box-shadow: inset 0 0 0 2px rgba(155, 188, 255, 0.54) !important;
 }
 
-.dark-mode .operations-table td.select-cell select {
+.dark-mode .operations-table td.select-cell select,
+.dark-mode .operations-table td.select-cell .table-combo-input {
   border-color: transparent;
   background:
     url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5 10 12l4.5-4.5' fill='none' stroke='%239fb8ff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center / 14px 14px,
@@ -8868,7 +8875,12 @@ body {
   color: #edf4ff;
 }
 
-.dark-mode .operations-table td.select-cell select:focus {
+.dark-mode .operations-table td.select-cell .table-combo-input::placeholder {
+  color: #9fb0ca;
+}
+
+.dark-mode .operations-table td.select-cell select:focus,
+.dark-mode .operations-table td.select-cell .table-combo-input:focus {
   border-color: #9bbcff;
   box-shadow: 0 0 0 3px rgba(155, 188, 255, 0.18);
 }

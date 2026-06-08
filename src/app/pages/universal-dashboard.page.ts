@@ -85,7 +85,7 @@ const dashboardModules: ModuleConfig[] = [
     key: "labour",
     label: "Labour",
     title: "All Labour Attendance",
-    description: "Every staff attendance row across sites with labour types, staff count, shift, overtime, fine, and daily pay.",
+    description: "Every staff attendance row across sites with labour types, staff count, shift, overtime, and fine.",
     columns: [
       { key: "client", label: "Client" },
       { key: "clientId", label: "Client ID" },
@@ -98,7 +98,6 @@ const dashboardModules: ModuleConfig[] = [
       { key: "attendance", label: "Attendance" },
       { key: "shift", label: "Shift" },
       { key: "overtime", label: "Overtime" },
-      { key: "dailyPay", label: "Daily Labour Pay" },
       { key: "lateFine", label: "Late Fine" },
       { key: "paymentMode", label: "Payment Mode" },
       { key: "status", label: "Status" },
@@ -367,26 +366,31 @@ const dashboardModules: ModuleConfig[] = [
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let row of visibleRows(); let rowIndex = index">
+                    <tr *ngFor="let row of visibleRows()">
                       <td
                         *ngFor="let column of columnsForActive()"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
                         [class.select-cell]="selectOptions(activeModule(), column.key).length > 0"
                         spellcheck="false"
                       >
-                        <select
-                          *ngIf="selectOptions(activeModule(), column.key).length > 0; else editableDashboardCell"
-                          [value]="row[column.key] || ''"
-                          (change)="updateCell(rowIndex, column.key, $any($event.target).value)"
-                        >
-                          <option *ngFor="let option of selectOptions(activeModule(), column.key)" [value]="option">{{ option }}</option>
-                        </select>
+                        <ng-container *ngIf="selectOptions(activeModule(), column.key).length > 0; else editableDashboardCell">
+                          <input
+                            class="table-combo-input"
+                            [attr.list]="'dashboard-cell-' + activeModule() + '-' + column.key"
+                            [value]="row[column.key] || ''"
+                            (input)="updateRowCell(row, column.key, $any($event.target).value)"
+                            (blur)="updateRowCell(row, column.key, $any($event.target).value)"
+                          />
+                          <datalist [id]="'dashboard-cell-' + activeModule() + '-' + column.key">
+                            <option *ngFor="let option of selectOptions(activeModule(), column.key)" [value]="option"></option>
+                          </datalist>
+                        </ng-container>
                         <ng-template #editableDashboardCell>
                           <span
                             class="editable-cell"
                             [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
                             spellcheck="false"
-                            (blur)="!isReadonlyColumn(column.key) && updateCell(rowIndex, column.key, $any($event.target).textContent || '')"
+                            (blur)="!isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
                           >
                             {{ row[column.key] }}
                           </span>
@@ -436,13 +440,16 @@ const dashboardModules: ModuleConfig[] = [
                 <div class="erp-form">
                   <label *ngFor="let column of columnsForActive()">
                     <span>{{ column.label }}</span>
-                    <select
+                    <input
                       *ngIf="selectOptions(activeModule(), column.key).length > 0; else dashboardDraftInput"
+                      [attr.list]="'dashboard-draft-' + activeModule() + '-' + column.key"
+                      [type]="column.type || 'text'"
                       [value]="draftRow()[column.key] || ''"
-                      (change)="updateDraftField(column.key, $any($event.target).value)"
-                    >
-                      <option *ngFor="let option of selectOptions(activeModule(), column.key)" [value]="option">{{ option }}</option>
-                    </select>
+                      (input)="updateDraftField(column.key, $any($event.target).value)"
+                    />
+                    <datalist [id]="'dashboard-draft-' + activeModule() + '-' + column.key">
+                      <option *ngFor="let option of selectOptions(activeModule(), column.key)" [value]="option"></option>
+                    </datalist>
                     <ng-template #dashboardDraftInput>
                       <input [type]="column.type || 'text'" [value]="draftRow()[column.key] || ''" (input)="updateDraftField(column.key, $any($event.target).value)" />
                     </ng-template>
@@ -634,16 +641,22 @@ export class UniversalDashboardPage {
     if (this.isReadonlyColumn(key)) return;
     const target = this.visibleRows()[visibleIndex];
     if (!target) return;
+    this.updateRowCell(target, key, value);
+  }
+
+  updateRowCell(row: TableRow, key: string, value: string) {
+    if (this.isReadonlyColumn(key)) return;
     const module = this.activeModule();
     const trimmedValue = value.trim();
 
     if (module === "clients") {
-      this.updateClientCell(target, key, trimmedValue);
+      this.updateClientCell(row, key, trimmedValue);
     }
 
-    const rowId = String(target["__rowId"] || "");
+    const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
     this.data.updateSharedRowCell(rowId, key, trimmedValue);
+    if (module === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", trimmedValue);
   }
 
   deleteRow(row: TableRow) {
@@ -747,7 +760,6 @@ export class UniversalDashboardPage {
       attendance: "Present",
       shift: this.normalizeShift(row.shift),
       overtime: `${row.overtime} hrs`,
-      dailyPay: formatMoney(row.dailyWage),
       lateFine: formatMoney(row.lateFine),
       presentUnits: row.presentDays * row.presentCount,
       paymentMode: row.paymentMode,
@@ -923,7 +935,6 @@ export class UniversalDashboardPage {
         attendance: "Present",
         shift: "1",
         overtime: "0",
-        dailyPay: "0",
         lateFine: "0",
         presentUnits: 1,
         paymentMode: "Cash",
@@ -1176,7 +1187,6 @@ export class UniversalDashboardPage {
         { key: "attendance", label: "Attendance" },
         { key: "shift", label: "Shift" },
         { key: "overtimeLate", label: "Overtime / Late" },
-        { key: "dailyPay", label: "Daily Labour Pay" },
       ];
     }
     return this.columnsForActive();
@@ -1191,25 +1201,22 @@ export class UniversalDashboardPage {
   }
 
   private labourSummaryHtml(rows: TableRow[]): string {
-    const summary = new Map<string, { present: number; absent: number; payable: number }>();
+    const summary = new Map<string, { present: number; absent: number; staff: number }>();
     for (const row of rows) {
       const name = String(row["staffName"] || row["labourName"] || "Unnamed");
-      const current = summary.get(name) ?? { present: 0, absent: 0, payable: 0 };
-      if (String(row["attendance"] || "").toLowerCase() === "absent") current.absent += 1;
+      const current = summary.get(name) ?? { present: 0, absent: 0, staff: 0 };
+      const isAbsent = String(row["attendance"] || "").toLowerCase() === "absent";
+      if (isAbsent) current.absent += 1;
       else current.present += 1;
       const staffCount = this.moneyNumber(row["staffCount"]) || this.staffCountFromLabourTypes(String(row["labourTypes"] || ""));
-      const shift = this.moneyNumber(row["shift"]) || 1;
-      const dailyPay = this.moneyNumber(row["dailyPay"]);
-      const overtime = this.moneyNumber(row["overtime"]);
-      const lateFine = this.moneyNumber(row["lateFine"]);
-      current.payable += String(row["attendance"] || "").toLowerCase() === "absent" ? 0 : dailyPay * staffCount * shift + overtime * 175 - lateFine;
+      if (!isAbsent) current.staff += staffCount;
       summary.set(name, current);
     }
     if (!summary.size) return "";
     return `<section class="summary"><h2>Labour Summary</h2>${[...summary.entries()]
       .map(
         ([name, value]) =>
-          `<div><strong>${this.escapeHtml(name)}</strong><span>Present: ${value.present}</span><span>Absent: ${value.absent}</span><span>${this.escapeHtml(formatMoney(value.payable))}</span></div>`,
+          `<div><strong>${this.escapeHtml(name)}</strong><span>Present: ${value.present}</span><span>Absent: ${value.absent}</span><span>Staff: ${value.staff}</span></div>`,
       )
       .join("")}</section>`;
   }
