@@ -8885,6 +8885,285 @@ body {
   color: #fda4af !important;
 }
 
+.site-chip-unit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.site-chip-unit > button:first-child {
+  padding-right: 34px !important;
+}
+
+.site-delete-chip {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  display: inline-grid !important;
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  padding: 0 !important;
+  transform: translateY(-50%);
+  place-items: center;
+  border-radius: 6px !important;
+  opacity: 0;
+  color: #64748b !important;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.site-chip-unit:hover .site-delete-chip,
+.site-chip-unit:focus-within .site-delete-chip {
+  opacity: 1;
+}
+
+.site-delete-chip svg {
+  width: 13px !important;
+  height: 13px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2.4px !important;
+  stroke-linecap: round !important;
+}
+
+.site-delete-chip:hover {
+  background: #fff1f2 !important;
+  color: #be123c !important;
+}
+
+.site-delete-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0 !important;
+}
+
+.expense-opening-editor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #dce4ef;
+  background: #fbfdff;
+}
+
+.expense-opening-editor label,
+.expense-opening-modal label {
+  display: grid;
+  gap: 6px;
+  min-width: 260px;
+}
+
+.expense-opening-editor span,
+.expense-opening-modal span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.expense-opening-editor input,
+.expense-opening-modal input {
+  height: 38px;
+  border: 1px solid #cbd7e8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 800;
+  outline: 0;
+  padding: 0 12px;
+}
+
+.expense-opening-editor input:focus,
+.expense-opening-modal input:focus {
+  border-color: #8fa6d2;
+  box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.12);
+}
+
+.expense-opening-editor strong {
+  display: block;
+  margin-top: 3px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.expense-opening-modal {
+  padding: 16px 22px 0;
+}
+
+.erp-select-menu {
+  position: relative;
+  min-width: 180px;
+}
+
+.erp-select-trigger {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-height: 34px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  padding: 0 10px !important;
+  font-size: 13px !important;
+  font-weight: 760 !important;
+}
+
+.erp-select-trigger svg {
+  width: 15px !important;
+  height: 15px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2px !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  flex: 0 0 auto;
+}
+
+.erp-select-menu.open .erp-select-trigger {
+  border-color: #8fa6d2 !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.1);
+}
+
+.erp-select-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 4px;
+  width: max(100%, 280px);
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid #cbd7e8;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 6px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+}
+
+.erp-select-panel > button {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #172033;
+  padding: 0 10px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.erp-select-panel > button:hover,
+.erp-select-panel > button.selected {
+  background: #eef4ff;
+  color: #002263;
+}
+
+.custom-select-entry {
+  display: grid;
+  gap: 5px;
+  padding: 8px 6px 4px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.custom-select-entry span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.custom-select-entry input {
+  height: 34px;
+  border: 1px solid #cbd7e8;
+  border-radius: 7px;
+  color: #0f172a;
+  outline: 0;
+  padding: 0 9px;
+}
+
+.custom-select-save {
+  border: 1px solid #cbd7e8 !important;
+  background: #ffffff !important;
+  text-align: center !important;
+}
+
+.labour-types-cell {
+  display: grid;
+  gap: 7px;
+  min-width: 240px;
+}
+
+.labour-types-cell button {
+  justify-self: start;
+  min-height: 28px;
+  border: 1px solid #cbd7e8;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #002263;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.dark-mode .site-delete-chip:hover {
+  background: rgba(190, 18, 60, 0.22) !important;
+  color: #fda4af !important;
+}
+
+.dark-mode .expense-opening-editor {
+  border-color: #2a4268 !important;
+  background: #101c30 !important;
+}
+
+.dark-mode .expense-opening-editor span,
+.dark-mode .expense-opening-modal span,
+.dark-mode .custom-select-entry span {
+  color: #aab9d0 !important;
+}
+
+.dark-mode .expense-opening-editor input,
+.dark-mode .expense-opening-modal input,
+.dark-mode .erp-select-trigger,
+.dark-mode .custom-select-entry input,
+.dark-mode .labour-types-cell button {
+  border-color: #385175 !important;
+  background: #101c30 !important;
+  color: #edf4ff !important;
+}
+
+.dark-mode .expense-opening-editor strong {
+  color: #f8fbff !important;
+}
+
+.dark-mode .erp-select-menu.open .erp-select-trigger {
+  border-color: #9bbcff !important;
+  background: #13233b !important;
+  box-shadow: 0 0 0 3px rgba(155, 188, 255, 0.18);
+}
+
+.dark-mode .erp-select-panel {
+  border-color: #385175 !important;
+  background: #0f1b2f !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .erp-select-panel > button {
+  color: #edf4ff !important;
+}
+
+.dark-mode .erp-select-panel > button:hover,
+.dark-mode .erp-select-panel > button.selected {
+  background: #17345d !important;
+  color: #ffffff !important;
+}
+
 .expense-ledger-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr));

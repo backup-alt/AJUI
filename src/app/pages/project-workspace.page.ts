@@ -44,7 +44,7 @@ const sectionConfigs: SectionConfig[] = [
     key: "labour",
     label: "Labour",
     title: "Labour Attendance",
-    description: "Staff attendance, category, crew count, shift, fine, and weekly pay fields for site labour.",
+    description: "Staff attendance with site, date, staff name, labour types, shift count, overtime, fine, and daily pay.",
     columns: [
       { key: "client", label: "Client" },
       { key: "clientId", label: "Client ID" },
@@ -52,17 +52,13 @@ const sectionConfigs: SectionConfig[] = [
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date", type: "date" },
       { key: "staffName", label: "Staff Name" },
-      { key: "category", label: "Category" },
-      { key: "masonCount", label: "Mason", type: "number" },
-      { key: "helperCount", label: "Helper", type: "number" },
+      { key: "labourTypes", label: "Labour Types" },
       { key: "staffCount", label: "Staff Count", type: "number" },
       { key: "attendance", label: "Attendance" },
-      { key: "shift", label: "Shift" },
+      { key: "shift", label: "Shift", type: "number" },
       { key: "overtime", label: "Overtime" },
       { key: "dailyPay", label: "Daily Labour Pay" },
-      { key: "weeklyDays", label: "Week Days", type: "number" },
       { key: "lateFine", label: "Late Fine" },
-      { key: "weeklyPay", label: "Weekly Pay" },
       { key: "paymentMode", label: "Payment Mode" },
       { key: "notes", label: "Notes" },
       { key: "status", label: "Status" },
@@ -176,7 +172,7 @@ const sectionConfigs: SectionConfig[] = [
           title="Project Workspace"
           eyebrow="Project Operations"
           metaLabel="Site records"
-          [blurred]="recordDialogOpen() || fieldDialogOpen() || showProjectForm()"
+          [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || showProjectForm()"
           [showTitle]="false"
           role="Admin"
           searchPlaceholder="Search table records..."
@@ -237,14 +233,27 @@ const sectionConfigs: SectionConfig[] = [
                   <span>Site</span>
                   <div class="site-chip-strip">
                     <button type="button" [class.active]="activeSiteFilter() === 'All'" (click)="selectSite('All')">All Sites</button>
-                    <button
-                      *ngFor="let site of projectSites()"
-                      type="button"
-                      [class.active]="activeSiteFilter() === site"
-                      (click)="selectSite(site)"
-                    >
-                      {{ site }}
-                    </button>
+                    <span class="site-chip-unit" *ngFor="let site of projectSites()">
+                      <button
+                        type="button"
+                        [class.active]="activeSiteFilter() === site"
+                        (click)="selectSite(site)"
+                      >
+                        {{ site }}
+                      </button>
+                      <button
+                        type="button"
+                        class="site-delete-chip"
+                        [disabled]="projectSites().length <= 1"
+                        [attr.aria-label]="'Delete site ' + site"
+                        (click)="deleteSite(site, $event)"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                          <path d="M6 6l12 12" />
+                          <path d="M18 6 6 18" />
+                        </svg>
+                      </button>
+                    </span>
                     <button *ngIf="!siteDraftOpen()" type="button" class="site-add-chip" aria-label="Add site" (click)="openSiteDraft()">
                       <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                         <path d="M12 5v14" />
@@ -284,7 +293,7 @@ const sectionConfigs: SectionConfig[] = [
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="tableSearch()" (input)="tableSearch.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
-                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="addInlineRow()">
+                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="activeSection() === 'expenses' ? openRecordDialog() : addInlineRow()">
                     <ion-icon name="add-outline"></ion-icon>
                     Add Row
                   </button>
@@ -300,22 +309,18 @@ const sectionConfigs: SectionConfig[] = [
                 <span>Inline editable cells</span>
               </div>
 
-              <div class="expense-ledger-summary" *ngIf="activeSection() === 'expenses'">
-                <div>
-                  <span>Ledger Scope</span>
-                  <strong>{{ expenseLedgerScope() }}</strong>
-                </div>
-                <div>
+              <div class="expense-opening-editor" *ngIf="activeSection() === 'expenses'">
+                <label>
                   <span>Opening Balance</span>
-                  <strong>{{ expenseOpeningBalanceLabel() }}</strong>
-                </div>
+                  <input
+                    inputmode="decimal"
+                    [value]="expenseOpeningBalanceInput()"
+                    (input)="updateExpenseOpeningBalance($any($event.target).value)"
+                  />
+                </label>
                 <div>
-                  <span>Current Balance</span>
-                  <strong>{{ expenseCurrentBalanceLabel() }}</strong>
-                </div>
-                <div>
-                  <span>Entry Rule</span>
-                  <strong>Use + for cash added, - for purchases</strong>
+                  <span>{{ expenseOpeningSiteLabel() }}</span>
+                  <strong>Current balance {{ expenseCurrentBalanceLabel() }}</strong>
                 </div>
               </div>
 
@@ -333,23 +338,71 @@ const sectionConfigs: SectionConfig[] = [
                         *ngFor="let column of columnsFor(activeSection())"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
                         [class.select-cell]="selectOptions(activeSection(), column.key).length > 0"
+                        [class.labour-types-cell-host]="activeSection() === 'labour' && column.key === 'labourTypes'"
                       >
-                        <select
-                          *ngIf="selectOptions(activeSection(), column.key).length > 0; else editableProjectCell"
-                          [value]="row[column.key] || ''"
-                          (change)="updateCell(activeSection(), rowIndex, column.key, $any($event.target).value)"
-                        >
-                          <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option">{{ option }}</option>
-                        </select>
-                        <ng-template #editableProjectCell>
-                          <span
-                            class="editable-cell"
-                            [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
-                            spellcheck="false"
-                            (blur)="!isReadonlyColumn(column.key) && updateCell(activeSection(), rowIndex, column.key, $any($event.target).textContent || '')"
+                        <ng-container *ngIf="activeSection() === 'labour' && column.key === 'labourTypes'; else standardProjectCell">
+                          <div class="labour-types-cell">
+                            <span
+                              class="editable-cell"
+                              contenteditable="true"
+                              spellcheck="false"
+                              (blur)="updateCell(activeSection(), rowIndex, column.key, $any($event.target).textContent || '')"
+                            >
+                              {{ row[column.key] }}
+                            </span>
+                            <button type="button" (click)="openLabourTypeDialog(row)">Add labor type</button>
+                          </div>
+                        </ng-container>
+                        <ng-template #standardProjectCell>
+                          <div
+                            *ngIf="selectOptions(activeSection(), column.key).length > 0; else editableProjectCell"
+                            class="erp-select-menu"
+                            [class.open]="isSelectMenuOpen(row, column.key)"
                           >
-                            {{ row[column.key] }}
-                          </span>
+                            <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
+                              <span>{{ row[column.key] || 'Select' }}</span>
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                <path d="M5.5 7.5 10 12l4.5-4.5" />
+                              </svg>
+                            </button>
+                            <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
+                              <button
+                                *ngFor="let option of selectOptions(activeSection(), column.key)"
+                                type="button"
+                                [class.selected]="option === row[column.key]"
+                                (click)="selectCellOption(activeSection(), rowIndex, column.key, option)"
+                              >
+                                {{ option }}
+                              </button>
+                              <label class="custom-select-entry" *ngIf="allowsCustomOption(activeSection(), column.key)">
+                                <span>Custom</span>
+                                <input
+                                  [value]="selectCustomValue()"
+                                  (input)="selectCustomValue.set($any($event.target).value)"
+                                  (keydown.enter)="saveCustomSelectOption(activeSection(), rowIndex, column.key, $event)"
+                                  placeholder="Type value"
+                                />
+                              </label>
+                              <button
+                                *ngIf="allowsCustomOption(activeSection(), column.key)"
+                                type="button"
+                                class="custom-select-save"
+                                (click)="saveCustomSelectOption(activeSection(), rowIndex, column.key)"
+                              >
+                                Use custom value
+                              </button>
+                            </div>
+                          </div>
+                          <ng-template #editableProjectCell>
+                            <span
+                              class="editable-cell"
+                              [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
+                              spellcheck="false"
+                              (blur)="!isReadonlyColumn(column.key) && updateCell(activeSection(), rowIndex, column.key, $any($event.target).textContent || '')"
+                            >
+                              {{ row[column.key] }}
+                            </span>
+                          </ng-template>
                         </ng-template>
                       </td>
                       <td class="row-actions">
@@ -393,16 +446,38 @@ const sectionConfigs: SectionConfig[] = [
                     <ion-icon name="close-outline"></ion-icon>
                   </button>
                 </div>
+                <div class="expense-opening-modal" *ngIf="activeSection() === 'expenses'">
+                  <label>
+                    <span>Opening Balance for {{ expenseDraftSiteLabel() }}</span>
+                    <input
+                      inputmode="decimal"
+                      [value]="expenseDraftOpeningBalanceInput()"
+                      (input)="updateExpenseDraftOpeningBalance($any($event.target).value)"
+                    />
+                  </label>
+                </div>
                 <div class="erp-form">
                   <label *ngFor="let column of columnsFor(activeSection())">
                     <span>{{ column.label }}</span>
-                    <select
-                      *ngIf="selectOptions(activeSection(), column.key).length > 0; else projectDraftInput"
+                    <input
+                      *ngIf="selectOptions(activeSection(), column.key).length > 0 && allowsCustomOption(activeSection(), column.key); else projectDraftSelect"
+                      [attr.list]="'project-draft-' + activeSection() + '-' + column.key"
+                      [type]="column.type || 'text'"
                       [value]="draftRow()[column.key] || ''"
-                      (change)="updateDraftField(column.key, $any($event.target).value)"
-                    >
-                      <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option">{{ option }}</option>
-                    </select>
+                      (input)="updateDraftField(column.key, $any($event.target).value)"
+                    />
+                    <datalist [id]="'project-draft-' + activeSection() + '-' + column.key">
+                      <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option"></option>
+                    </datalist>
+                    <ng-template #projectDraftSelect>
+                      <select
+                        *ngIf="selectOptions(activeSection(), column.key).length > 0; else projectDraftInput"
+                        [value]="draftRow()[column.key] || ''"
+                        (change)="updateDraftField(column.key, $any($event.target).value)"
+                      >
+                        <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option">{{ option }}</option>
+                      </select>
+                    </ng-template>
                     <ng-template #projectDraftInput>
                       <input
                         [type]="column.type || 'text'"
@@ -439,6 +514,52 @@ const sectionConfigs: SectionConfig[] = [
                 <div class="dialog-actions">
                   <button type="button" class="secondary-action" (click)="fieldDialogOpen.set(false)">Cancel</button>
                   <button type="submit" class="primary-action">Add Field</button>
+                </div>
+              </form>
+            </section>
+
+            <section class="form-overlay" *ngIf="labourTypeDialogOpen()">
+              <form class="erp-dialog labour-type-dialog" (submit)="saveLabourType($event)">
+                <div class="dialog-head">
+                  <div>
+                    <span>Labour</span>
+                    <h2>Add Labor Type</h2>
+                  </div>
+                  <button type="button" class="icon-button" (click)="closeLabourTypeDialog()">
+                    <ion-icon name="close-outline"></ion-icon>
+                  </button>
+                </div>
+                <div class="erp-form">
+                  <label>
+                    <span>Labor Type</span>
+                    <input
+                      list="project-labour-type-options"
+                      [value]="labourTypeName()"
+                      (input)="labourTypeName.set($any($event.target).value)"
+                      placeholder="Mason, Helper, Electrician"
+                    />
+                    <datalist id="project-labour-type-options">
+                      <option value="Mason"></option>
+                      <option value="Helper"></option>
+                      <option value="Electrician"></option>
+                      <option value="Plumber"></option>
+                      <option value="Mechanic"></option>
+                      <option value="Civil"></option>
+                    </datalist>
+                  </label>
+                  <label>
+                    <span>Staff Count</span>
+                    <input
+                      type="number"
+                      min="0"
+                      [value]="labourTypeCount()"
+                      (input)="labourTypeCount.set($any($event.target).value)"
+                    />
+                  </label>
+                </div>
+                <div class="dialog-actions">
+                  <button type="button" class="secondary-action" (click)="closeLabourTypeDialog()">Cancel</button>
+                  <button type="submit" class="primary-action">Add Labor Type</button>
                 </div>
               </form>
             </section>
@@ -480,6 +601,12 @@ export class ProjectWorkspacePage {
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
   readonly siteDraftName = signal("");
+  readonly openSelectKey = signal("");
+  readonly selectCustomValue = signal("");
+  readonly labourTypeDialogOpen = signal(false);
+  readonly labourTypeRowId = signal("");
+  readonly labourTypeName = signal("Mason");
+  readonly labourTypeCount = signal("1");
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
 
   readonly clientId = computed(() => this.paramMap().get("clientId") ?? "");
@@ -582,6 +709,12 @@ export class ProjectWorkspacePage {
     this.siteDraftOpen.set(false);
   }
 
+  deleteSite(site: string, event: Event) {
+    event.stopPropagation();
+    const updatedProject = this.data.removeSiteFromProject(this.projectId(), site);
+    if (updatedProject && this.activeSite() === site) this.activeSite.set("All");
+  }
+
   openFieldDialog() {
     this.newFieldLabel.set("");
     this.fieldDialogOpen.set(true);
@@ -601,11 +734,70 @@ export class ProjectWorkspacePage {
     const target = this.visibleRows(section)[visibleIndex];
     if (!target) return;
     const rowId = String(target["__rowId"] || "");
-    if (rowId) this.data.updateSharedRowCell(rowId, key, value.trim());
+    if (!rowId) return;
+    const cleanValue = value.trim();
+    this.data.updateSharedRowCell(rowId, key, cleanValue);
+    if (section === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", cleanValue);
   }
 
   deleteRow(row: TableRow) {
     this.data.deleteSharedRow(String(row["__rowId"] || ""));
+  }
+
+  selectCellKey(row: TableRow, key: string): string {
+    return `${row["__rowId"] || "row"}:${key}`;
+  }
+
+  isSelectMenuOpen(row: TableRow, key: string): boolean {
+    return this.openSelectKey() === this.selectCellKey(row, key);
+  }
+
+  toggleSelectMenu(row: TableRow, key: string) {
+    const nextKey = this.selectCellKey(row, key);
+    this.openSelectKey.set(this.openSelectKey() === nextKey ? "" : nextKey);
+    this.selectCustomValue.set("");
+  }
+
+  selectCellOption(section: ModuleKey, visibleIndex: number, key: string, value: string) {
+    this.updateCell(section, visibleIndex, key, value);
+    this.openSelectKey.set("");
+    this.selectCustomValue.set("");
+  }
+
+  saveCustomSelectOption(section: ModuleKey, visibleIndex: number, key: string, event?: Event) {
+    event?.preventDefault();
+    const value = this.selectCustomValue().trim();
+    if (!value) return;
+    this.selectCellOption(section, visibleIndex, key, value);
+  }
+
+  allowsCustomOption(section: ModuleKey, key: string): boolean {
+    return (section === "expenses" && key === "transactionType") || (section === "labour" && key === "staffName");
+  }
+
+  openLabourTypeDialog(row: TableRow) {
+    this.labourTypeRowId.set(String(row["__rowId"] || ""));
+    this.labourTypeName.set("Mason");
+    this.labourTypeCount.set("1");
+    this.labourTypeDialogOpen.set(true);
+  }
+
+  closeLabourTypeDialog() {
+    this.labourTypeDialogOpen.set(false);
+    this.labourTypeRowId.set("");
+  }
+
+  saveLabourType(event: Event) {
+    event.preventDefault();
+    const rowId = this.labourTypeRowId();
+    const type = this.labourTypeName().trim();
+    const count = Math.max(0, Math.round(this.moneyNumber(this.labourTypeCount())));
+    if (!rowId || !type || !count) return;
+    const row = this.visibleRows("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
+    const nextTypes = this.mergeLabourType(String(row?.["labourTypes"] || ""), type, count);
+    this.data.updateSharedRowCell(rowId, "labourTypes", nextTypes);
+    this.data.updateSharedRowCell(rowId, "notes", nextTypes);
+    this.closeLabourTypeDialog();
   }
 
   exportExcel() {
@@ -740,18 +932,14 @@ export class ProjectWorkspacePage {
       clientId: currentClient?.id ?? this.clientId(),
       attendanceDate: "2026-06-05",
       staffName: row.party,
-      category: row.category,
       site: row.site,
-      masonCount: this.countFromNotes(row.notes, "Mason") || (row.category === "Mason" ? row.presentCount : 0),
-      helperCount: this.countFromNotes(row.notes, "Helper"),
+      labourTypes: this.labourTypesFromRow(row),
       staffCount: row.presentCount,
       attendance: "Present",
-      shift: row.shift,
+      shift: this.normalizeShift(row.shift),
       overtime: `${row.overtime} hrs`,
       dailyPay: formatMoney(row.dailyWage),
-      weeklyDays: row.presentDays,
       lateFine: formatMoney(row.lateFine),
-      weeklyPay: formatMoney(row.dailyWage * row.presentDays * row.presentCount + row.overtime * 175 - row.lateFine),
       presentUnits: row.presentDays * row.presentCount,
       paymentMode: row.paymentMode,
       notes: row.notes,
@@ -881,7 +1069,7 @@ export class ProjectWorkspacePage {
       ];
     }
     if (section === "labour" && key === "attendance") return ["Present", "Absent"];
-    if (section === "labour" && key === "category") return ["Mason", "Plumber", "Civil", "Electrician"];
+    if (section === "labour" && key === "shift") return ["1", "2", "3"];
     if (key === "approvalStatus" || key === "status") return ["Pending", "Approved", "Rejected"];
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
@@ -912,20 +1100,16 @@ export class ProjectWorkspacePage {
         site,
         attendanceDate: today,
         staffName: this.staffNameOptionsForProject()[0] ?? "",
-        category: "Mason",
-        masonCount: "1",
-        helperCount: "0",
+        labourTypes: "Mason: 1",
         staffCount: "1",
         attendance: "Present",
-        shift: "Day",
+        shift: "1",
         overtime: "0",
         dailyPay: "0",
-        weeklyDays: "1",
         lateFine: "0",
-        weeklyPay: formatMoney(0),
         presentUnits: 1,
         paymentMode: "Cash",
-        notes: "",
+        notes: "Mason: 1",
         status: "Pending",
       },
       expenses: {
@@ -1011,20 +1195,17 @@ export class ProjectWorkspacePage {
 
   private withLabourPayable(row: TableRow): TableRow {
     const attendance = String(row["attendance"] || "Present");
-    const masonCount = this.moneyNumber(row["masonCount"]);
-    const helperCount = this.moneyNumber(row["helperCount"]);
+    const labourTypes = String(row["labourTypes"] || row["notes"] || "").trim();
     const enteredStaffCount = this.moneyNumber(row["staffCount"]);
-    const staffCount = masonCount + helperCount || enteredStaffCount || this.moneyNumber(row["presentUnits"]) || 1;
-    const weeklyDays = attendance.toLowerCase() === "absent" ? 0 : this.moneyNumber(row["weeklyDays"] || 1) || 1;
-    const dailyPay = this.moneyNumber(row["dailyPay"]);
-    const overtime = this.moneyNumber(row["overtime"]);
-    const lateFine = this.moneyNumber(row["lateFine"]);
+    const staffCount = this.staffCountFromLabourTypes(labourTypes) || enteredStaffCount || this.moneyNumber(row["presentUnits"]) || 1;
     return {
       ...row,
       staffName: row["staffName"] || row["labourName"] || "",
+      labourTypes,
       attendance,
+      shift: this.normalizeShift(row["shift"]),
       staffCount,
-      weeklyPay: formatMoney(dailyPay * staffCount * weeklyDays + overtime * 175 - lateFine),
+      notes: labourTypes || row["notes"] || "",
     };
   }
 
@@ -1058,9 +1239,68 @@ export class ProjectWorkspacePage {
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
   }
 
-  expenseLedgerScope(): string {
+  private labourTypesFromRow(row: { category: string; notes: string; presentCount: number }): string {
+    const notes = row.notes.trim();
+    if (this.staffCountFromLabourTypes(notes)) return notes;
+    return `${row.category}: ${row.presentCount}`;
+  }
+
+  private normalizeShift(value: unknown): string {
+    const text = String(value ?? "").trim();
+    if (!text) return "1";
+    if (text.toLowerCase().includes("night")) return "2";
+    if (text.toLowerCase().includes("day")) return "1";
+    const shift = this.moneyNumber(text);
+    return shift ? String(shift) : "1";
+  }
+
+  private staffCountFromLabourTypes(value: string): number {
+    return value
+      .split(/[,;\n]+/)
+      .map((part) => {
+        const match = part.trim().match(/(?:^|[:x-])\s*(\d+(?:\.\d+)?)\s*$/i) ?? part.trim().match(/(\d+(?:\.\d+)?)/);
+        return match ? Number(match[1]) : 0;
+      })
+      .filter((count) => Number.isFinite(count))
+      .reduce((sum, count) => sum + count, 0);
+  }
+
+  private mergeLabourType(currentValue: string, labourType: string, count: number): string {
+    const entries = new Map<string, number>();
+    for (const part of currentValue.split(/[,;\n]+/)) {
+      const [rawType, rawCount] = part.split(/[:x-]/);
+      const type = rawType?.trim();
+      const parsedCount = this.moneyNumber(rawCount);
+      if (type && parsedCount) entries.set(type, parsedCount);
+    }
+    const existingKey = [...entries.keys()].find((key) => key.toLowerCase() === labourType.toLowerCase());
+    entries.set(existingKey ?? labourType, count);
+    return [...entries.entries()].map(([type, value]) => `${type}: ${value}`).join(", ");
+  }
+
+  expenseOpeningSiteLabel(): string {
     const site = this.activeSiteFilter();
-    return site === "All" ? "Grouped by Project + Site" : `${this.projectId()} / ${site}`;
+    return site === "All" ? "Select a site to edit its opening balance" : `${site} opening balance`;
+  }
+
+  expenseOpeningBalanceInput(): string {
+    return String(this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.expenseEditableSite() }));
+  }
+
+  updateExpenseOpeningBalance(value: string) {
+    this.data.setExpenseOpeningBalance(this.projectId(), this.expenseEditableSite(), this.moneyNumber(value));
+  }
+
+  expenseDraftSiteLabel(): string {
+    return this.expenseDraftSite();
+  }
+
+  expenseDraftOpeningBalanceInput(): string {
+    return String(this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.expenseDraftSite() }));
+  }
+
+  updateExpenseDraftOpeningBalance(value: string) {
+    this.data.setExpenseOpeningBalance(this.projectId(), this.expenseDraftSite(), this.moneyNumber(value));
   }
 
   expenseOpeningBalanceLabel(): string {
@@ -1095,7 +1335,10 @@ export class ProjectWorkspacePage {
 
   private expenseOpeningBalanceFor(row: TableRow): number {
     const projectId = String(row["projectId"] || row["__projectId"] || this.projectId());
-    const explicitOpening = this.explicitExpenseOpeningForGroup(projectId, String(row["site"] || this.activeSiteFilter() || ""));
+    const site = String(row["site"] || this.expenseEditableSite());
+    const savedOpening = this.data.expenseOpeningBalanceFor(projectId, site);
+    if (savedOpening !== undefined) return savedOpening;
+    const explicitOpening = this.explicitExpenseOpeningForGroup(projectId, site);
     if (explicitOpening) return explicitOpening;
     const project = this.data.projectById(projectId);
     return project?.expenseBalance ?? 0;
@@ -1121,6 +1364,16 @@ export class ProjectWorkspacePage {
     return match ? this.moneyNumber(match["openingBalance"]) || this.moneyNumber(match["cashIssued"]) : 0;
   }
 
+  private expenseEditableSite(): string {
+    const site = this.activeSiteFilter();
+    return site === "All" ? this.projectSites()[0] ?? "Project" : site;
+  }
+
+  private expenseDraftSite(): string {
+    const site = String(this.draftRow()["site"] || this.expenseEditableSite()).trim();
+    return site || this.expenseEditableSite();
+  }
+
   private reportColumns(section: ModuleKey): FieldSchema[] {
     if (section === "expenses") {
       return [
@@ -1135,10 +1388,12 @@ export class ProjectWorkspacePage {
       return [
         { key: "attendanceDate", label: "Date" },
         { key: "staffName", label: "Staff Name" },
+        { key: "labourTypes", label: "Labour Types" },
+        { key: "staffCount", label: "Staff Count" },
         { key: "attendance", label: "Attendance" },
         { key: "shift", label: "Shift" },
         { key: "overtimeLate", label: "Overtime / Late" },
-        { key: "weeklyPay", label: "Weekly Pay" },
+        { key: "dailyPay", label: "Daily Labour Pay" },
       ];
     }
     return this.columnsFor(section);
@@ -1159,7 +1414,12 @@ export class ProjectWorkspacePage {
       const current = summary.get(name) ?? { present: 0, absent: 0, payable: 0 };
       if (String(row["attendance"] || "").toLowerCase() === "absent") current.absent += 1;
       else current.present += 1;
-      current.payable += this.moneyNumber(row["weeklyPay"] ?? row["weeklyPayable"]);
+      const staffCount = this.moneyNumber(row["staffCount"]) || this.staffCountFromLabourTypes(String(row["labourTypes"] || ""));
+      const shift = this.moneyNumber(row["shift"]) || 1;
+      const dailyPay = this.moneyNumber(row["dailyPay"]);
+      const overtime = this.moneyNumber(row["overtime"]);
+      const lateFine = this.moneyNumber(row["lateFine"]);
+      current.payable += String(row["attendance"] || "").toLowerCase() === "absent" ? 0 : dailyPay * staffCount * shift + overtime * 175 - lateFine;
       summary.set(name, current);
     }
     if (!summary.size) return "";

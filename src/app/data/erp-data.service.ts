@@ -298,6 +298,7 @@ export class ErpDataService {
   );
   readonly tableCellEdits = signal<Record<string, SharedTableRow>>(this.readState<Record<string, SharedTableRow>>("tableCellEdits", {}));
   readonly hiddenTableRows = signal<string[]>(this.readState<string[]>("hiddenTableRows", []));
+  readonly expenseOpeningBalances = signal<Record<string, number>>(this.readState<Record<string, number>>("expenseOpeningBalances", {}));
 
   constructor() {
     this.ensureMeenakshiSampleProject();
@@ -314,6 +315,7 @@ export class ErpDataService {
     effect(() => this.writeState("customTableRows", this.customTableRows()));
     effect(() => this.writeState("tableCellEdits", this.tableCellEdits()));
     effect(() => this.writeState("hiddenTableRows", this.hiddenTableRows()));
+    effect(() => this.writeState("expenseOpeningBalances", this.expenseOpeningBalances()));
   }
 
   private ensureMeenakshiSampleProject() {
@@ -669,6 +671,42 @@ export class ErpDataService {
     return updatedProject;
   }
 
+  removeSiteFromProject(projectId: string, siteName: string): Project | undefined {
+    const cleanName = siteName.trim();
+    if (!cleanName) return undefined;
+    let updatedProject: Project | undefined;
+
+    this.projects.update((projectRows) =>
+      projectRows.map((project) => {
+        if (project.id !== projectId || project.sites.length <= 1) return project;
+        const nextSites = project.sites.filter((site) => site.toLowerCase() !== cleanName.toLowerCase());
+        if (nextSites.length === project.sites.length || !nextSites.length) return project;
+        updatedProject = { ...project, sites: nextSites };
+        return updatedProject;
+      }),
+    );
+
+    if (updatedProject) {
+      const key = this.expenseOpeningBalanceKey(projectId, cleanName);
+      this.expenseOpeningBalances.update((balances) => {
+        const { [key]: _removed, ...nextBalances } = balances;
+        return nextBalances;
+      });
+    }
+
+    return updatedProject;
+  }
+
+  expenseOpeningBalanceFor(projectId: string, siteName: string): number | undefined {
+    const key = this.expenseOpeningBalanceKey(projectId, siteName);
+    return this.expenseOpeningBalances()[key];
+  }
+
+  setExpenseOpeningBalance(projectId: string, siteName: string, amount: number) {
+    const key = this.expenseOpeningBalanceKey(projectId, siteName);
+    this.expenseOpeningBalances.update((balances) => ({ ...balances, [key]: amount }));
+  }
+
   updateProject(
     projectId: string,
     patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "status" | "totalValue" | "advanceAmount">>,
@@ -872,6 +910,10 @@ export class ErpDataService {
 
   private storageKey(key: string): string {
     return `agb-erp:${key}`;
+  }
+
+  private expenseOpeningBalanceKey(projectId: string, siteName: string): string {
+    return `${projectId}::${siteName.trim().toLowerCase() || "project"}`;
   }
 
   private emptySharedFieldMap(): Record<SharedModuleKey, SharedTableField[]> {

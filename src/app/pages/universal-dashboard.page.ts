@@ -85,7 +85,7 @@ const dashboardModules: ModuleConfig[] = [
     key: "labour",
     label: "Labour",
     title: "All Labour Attendance",
-    description: "Every staff attendance row across sites, with category, crew count, shift, fine, and weekly pay fields.",
+    description: "Every staff attendance row across sites with labour types, staff count, shift, overtime, fine, and daily pay.",
     columns: [
       { key: "client", label: "Client" },
       { key: "clientId", label: "Client ID" },
@@ -93,23 +93,18 @@ const dashboardModules: ModuleConfig[] = [
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date" },
       { key: "staffName", label: "Staff Name" },
-      { key: "category", label: "Category" },
-      { key: "masonCount", label: "Mason" },
-      { key: "helperCount", label: "Helper" },
+      { key: "labourTypes", label: "Labour Types" },
       { key: "staffCount", label: "Staff Count" },
       { key: "attendance", label: "Attendance" },
       { key: "shift", label: "Shift" },
       { key: "overtime", label: "Overtime" },
       { key: "dailyPay", label: "Daily Labour Pay" },
-      { key: "weeklyDays", label: "Week Days" },
       { key: "lateFine", label: "Late Fine" },
-      { key: "weeklyPay", label: "Weekly Pay" },
       { key: "paymentMode", label: "Payment Mode" },
       { key: "status", label: "Status" },
     ],
     filters: [
       { key: "site", label: "Site" },
-      { key: "category", label: "Category" },
       { key: "attendance", label: "Attendance" },
       { key: "status", label: "Status" },
     ],
@@ -747,17 +742,13 @@ export class UniversalDashboardPage {
       site: row.site,
       attendanceDate: "2026-06-05",
       staffName: row.party,
-      category: row.category,
-      masonCount: this.countFromNotes(row.notes, "Mason") || (row.category === "Mason" ? row.presentCount : 0),
-      helperCount: this.countFromNotes(row.notes, "Helper"),
+      labourTypes: this.labourTypesFromRow(row),
       staffCount: row.presentCount,
       attendance: "Present",
-      shift: row.shift,
+      shift: this.normalizeShift(row.shift),
       overtime: `${row.overtime} hrs`,
       dailyPay: formatMoney(row.dailyWage),
-      weeklyDays: row.presentDays,
       lateFine: formatMoney(row.lateFine),
-      weeklyPay: formatMoney(row.dailyWage * row.presentDays * row.presentCount + row.overtime * 175 - row.lateFine),
       presentUnits: row.presentDays * row.presentCount,
       paymentMode: row.paymentMode,
       status: row.status,
@@ -896,7 +887,7 @@ export class UniversalDashboardPage {
       ];
     }
     if (module === "labour" && key === "attendance") return ["Present", "Absent"];
-    if (module === "labour" && key === "category") return ["Mason", "Plumber", "Civil", "Electrician"];
+    if (module === "labour" && key === "shift") return ["1", "2", "3"];
     if (key === "approvalStatus" || key === "status") return ["Pending", "Approved", "Rejected"];
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
@@ -927,17 +918,13 @@ export class UniversalDashboardPage {
         site: "",
         attendanceDate: today,
         staffName: this.staffNameOptions()[0] ?? "",
-        category: "Mason",
-        masonCount: "1",
-        helperCount: "0",
+        labourTypes: "Mason: 1",
         staffCount: "1",
         attendance: "Present",
-        shift: "Day",
+        shift: "1",
         overtime: "0",
         dailyPay: "0",
-        weeklyDays: "1",
         lateFine: "0",
-        weeklyPay: formatMoney(0),
         presentUnits: 1,
         paymentMode: "Cash",
         status: "Pending",
@@ -1052,20 +1039,16 @@ export class UniversalDashboardPage {
 
   private withLabourPayable(row: TableRow): TableRow {
     const attendance = String(row["attendance"] || "Present");
-    const masonCount = this.moneyNumber(row["masonCount"]);
-    const helperCount = this.moneyNumber(row["helperCount"]);
+    const labourTypes = String(row["labourTypes"] || row["notes"] || "").trim();
     const enteredStaffCount = this.moneyNumber(row["staffCount"]);
-    const staffCount = masonCount + helperCount || enteredStaffCount || this.moneyNumber(row["presentUnits"]) || 1;
-    const weeklyDays = attendance.toLowerCase() === "absent" ? 0 : this.moneyNumber(row["weeklyDays"] || 1) || 1;
-    const dailyPay = this.moneyNumber(row["dailyPay"]);
-    const overtime = this.moneyNumber(row["overtime"]);
-    const lateFine = this.moneyNumber(row["lateFine"]);
+    const staffCount = this.staffCountFromLabourTypes(labourTypes) || enteredStaffCount || this.moneyNumber(row["presentUnits"]) || 1;
     return {
       ...row,
       staffName: row["staffName"] || row["labourName"] || "",
+      labourTypes,
       attendance,
+      shift: this.normalizeShift(row["shift"]),
       staffCount,
-      weeklyPay: formatMoney(dailyPay * staffCount * weeklyDays + overtime * 175 - lateFine),
     };
   }
 
@@ -1107,6 +1090,32 @@ export class UniversalDashboardPage {
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
   }
 
+  private labourTypesFromRow(row: { category: string; notes: string; presentCount: number }): string {
+    const notes = row.notes.trim();
+    if (this.staffCountFromLabourTypes(notes)) return notes;
+    return `${row.category}: ${row.presentCount}`;
+  }
+
+  private normalizeShift(value: unknown): string {
+    const text = String(value ?? "").trim();
+    if (!text) return "1";
+    if (text.toLowerCase().includes("night")) return "2";
+    if (text.toLowerCase().includes("day")) return "1";
+    const shift = this.moneyNumber(text);
+    return shift ? String(shift) : "1";
+  }
+
+  private staffCountFromLabourTypes(value: string): number {
+    return value
+      .split(/[,;\n]+/)
+      .map((part) => {
+        const match = part.trim().match(/(?:^|[:x-])\s*(\d+(?:\.\d+)?)\s*$/i) ?? part.trim().match(/(\d+(?:\.\d+)?)/);
+        return match ? Number(match[1]) : 0;
+      })
+      .filter((count) => Number.isFinite(count))
+      .reduce((sum, count) => sum + count, 0);
+  }
+
   private expenseGroupKey(row: TableRow): string {
     const projectId = String(row["projectId"] || row["__projectId"] || row["project"] || "project");
     const site = String(row["site"] || "Project").trim().toLowerCase();
@@ -1115,6 +1124,9 @@ export class UniversalDashboardPage {
 
   private expenseOpeningBalanceFor(row: TableRow): number {
     const explicitProjectId = String(row["projectId"] || row["__projectId"] || "");
+    const site = String(row["site"] || "Project");
+    const savedOpening = explicitProjectId ? this.data.expenseOpeningBalanceFor(explicitProjectId, site) : undefined;
+    if (savedOpening !== undefined) return savedOpening;
     const explicitOpening = this.explicitExpenseOpeningForGroup(explicitProjectId, String(row["project"] || ""), String(row["site"] || ""));
     if (explicitOpening) return explicitOpening;
     const project =
@@ -1159,10 +1171,12 @@ export class UniversalDashboardPage {
       return [
         { key: "attendanceDate", label: "Date" },
         { key: "staffName", label: "Staff Name" },
+        { key: "labourTypes", label: "Labour Types" },
+        { key: "staffCount", label: "Staff Count" },
         { key: "attendance", label: "Attendance" },
         { key: "shift", label: "Shift" },
         { key: "overtimeLate", label: "Overtime / Late" },
-        { key: "weeklyPay", label: "Weekly Pay" },
+        { key: "dailyPay", label: "Daily Labour Pay" },
       ];
     }
     return this.columnsForActive();
@@ -1183,7 +1197,12 @@ export class UniversalDashboardPage {
       const current = summary.get(name) ?? { present: 0, absent: 0, payable: 0 };
       if (String(row["attendance"] || "").toLowerCase() === "absent") current.absent += 1;
       else current.present += 1;
-      current.payable += this.moneyNumber(row["weeklyPay"] ?? row["weeklyPayable"]);
+      const staffCount = this.moneyNumber(row["staffCount"]) || this.staffCountFromLabourTypes(String(row["labourTypes"] || ""));
+      const shift = this.moneyNumber(row["shift"]) || 1;
+      const dailyPay = this.moneyNumber(row["dailyPay"]);
+      const overtime = this.moneyNumber(row["overtime"]);
+      const lateFine = this.moneyNumber(row["lateFine"]);
+      current.payable += String(row["attendance"] || "").toLowerCase() === "absent" ? 0 : dailyPay * staffCount * shift + overtime * 175 - lateFine;
       summary.set(name, current);
     }
     if (!summary.size) return "";
