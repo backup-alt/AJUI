@@ -8873,3 +8873,69 @@ body {
   background: rgba(190, 18, 60, 0.18) !important;
   color: #fda4af !important;
 }
+
+.expense-ledger-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #dce4ef;
+  background: linear-gradient(180deg, #fbfdff 0%, #f6f9ff 100%);
+}
+
+.expense-ledger-summary > div {
+  min-width: 0;
+  border: 1px solid #d4deeb;
+  border-radius: 9px;
+  background: #ffffff;
+  padding: 10px 12px;
+}
+
+.expense-ledger-summary span {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.expense-ledger-summary strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 850;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dark-mode .expense-ledger-summary {
+  border-color: #2a4268 !important;
+  background: #0e1a2d !important;
+}
+
+.dark-mode .expense-ledger-summary > div {
+  border-color: #385175 !important;
+  background: #13233b !important;
+}
+
+.dark-mode .expense-ledger-summary span {
+  color: #aab9d0 !important;
+}
+
+.dark-mode .expense-ledger-summary strong {
+  color: #f8fbff !important;
+}
+
+@media (max-width: 1100px) {
+  .expense-ledger-summary {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .expense-ledger-summary {
+    grid-template-columns: 1fr;
+    padding: 10px 12px;
+  }
+}

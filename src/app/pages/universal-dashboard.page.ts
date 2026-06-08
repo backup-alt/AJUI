@@ -127,7 +127,6 @@ const dashboardModules: ModuleConfig[] = [
       { key: "transactionType", label: "Transaction Type" },
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
-      { key: "openingBalance", label: "Opening Balance" },
       { key: "runningBalance", label: "Balance" },
       { key: "supervisor", label: "Supervisor" },
       { key: "reference", label: "Bill / Reference" },
@@ -361,6 +360,7 @@ const dashboardModules: ModuleConfig[] = [
                 <span>{{ columnsForActive().length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
                 <span *ngIf="activeModule() === 'clients'">Customer records synced</span>
+                <span *ngIf="activeModule() === 'expenses'">Balances grouped by Project + Site</span>
               </div>
 
               <div class="table-wrap operations-table universal-table">
@@ -752,10 +752,9 @@ export class UniversalDashboardPage {
       project: projectName(row.projectId),
       site: row.site,
       expenseDate: row.date,
-      transactionType: row.type,
+      transactionType: "Site Expense (-)",
       description: row.description,
-      amount: formatMoney(row.spent),
-      openingBalance: row.received ? formatMoney(row.received) : "",
+      amount: formatMoney(-row.spent),
       runningBalance: formatMoney(0),
       supervisor: row.supervisor,
       cashIssued: formatMoney(row.received),
@@ -865,10 +864,14 @@ export class UniversalDashboardPage {
   selectOptions(module: DashboardModule, key: string): string[] {
     if (module === "expenses" && key === "transactionType") {
       return [
-        "Site Expense",
-        "Opening Balance",
-        "Cash Issued to Supervisor",
-        "Payment Received from Annai Golden Builders Pvt Ltd",
+        "Site Expense (-)",
+        "Material Purchase (-)",
+        "Supervisor Expense (-)",
+        "Cash Added (+)",
+        "Cash Issued to Supervisor (+)",
+        "Payment Received (+)",
+        "Payment Received from Annai Golden Builders Pvt Ltd (+)",
+        "Refund / Return (+)",
         "Adjustment",
       ];
     }
@@ -924,10 +927,9 @@ export class UniversalDashboardPage {
         project: "",
         site: "",
         expenseDate: today,
-        transactionType: "Site Expense",
+        transactionType: "Site Expense (-)",
         description: "",
         amount: "0",
-        openingBalance: "",
         runningBalance: formatMoney(0),
         supervisor: "",
         reference: "",
@@ -1013,17 +1015,16 @@ export class UniversalDashboardPage {
   }
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
-    let balance = 0;
+    const balances = new Map<string, number>();
     return rows.map((row) => {
       const transactionType = String(row["transactionType"] || "Site Expense");
-      const openingBalance = this.moneyNumber(row["openingBalance"] ?? row["cashIssued"]);
-      const amount = this.moneyNumber(row["amount"]);
-      if (openingBalance) balance += openingBalance;
-      if (amount) balance += this.isExpenseCredit(transactionType) ? amount : -amount;
+      const groupKey = this.expenseGroupKey(row);
+      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
+      const balance = previousBalance + this.expenseSignedAmount(row, transactionType);
+      balances.set(groupKey, balance);
       return {
         ...row,
         transactionType,
-        openingBalance: openingBalance ? formatMoney(openingBalance) : row["openingBalance"] ?? "",
         runningBalance: formatMoney(balance),
       };
     });
@@ -1050,7 +1051,52 @@ export class UniversalDashboardPage {
 
   private isExpenseCredit(transactionType: string): boolean {
     const normalized = transactionType.toLowerCase();
-    return normalized.includes("payment") || normalized.includes("received") || normalized.includes("cash issued") || normalized.includes("opening");
+    return (
+      normalized.includes("payment") ||
+      normalized.includes("received") ||
+      normalized.includes("cash issued") ||
+      normalized.includes("cash added") ||
+      normalized.includes("refund") ||
+      normalized.includes("credit")
+    );
+  }
+
+  private expenseGroupKey(row: TableRow): string {
+    const projectId = String(row["projectId"] || row["__projectId"] || row["project"] || "project");
+    const site = String(row["site"] || "Project").trim().toLowerCase();
+    return `${projectId}::${site}`;
+  }
+
+  private expenseOpeningBalanceFor(row: TableRow): number {
+    const explicitProjectId = String(row["projectId"] || row["__projectId"] || "");
+    const explicitOpening = this.explicitExpenseOpeningForGroup(explicitProjectId, String(row["project"] || ""), String(row["site"] || ""));
+    if (explicitOpening) return explicitOpening;
+    const project =
+      this.data.projectById(explicitProjectId) ??
+      this.data.projects().find((projectRow) => projectRow.name === row["project"] || projectRow.id === row["project"]);
+    return project?.expenseBalance ?? 0;
+  }
+
+  private expenseSignedAmount(row: TableRow, transactionType = String(row["transactionType"] || "")): number {
+    const amountText = String(row["amount"] ?? "").trim();
+    const amount = this.moneyNumber(amountText);
+    if (!amount) return 0;
+    if (amountText.startsWith("+") || amountText.startsWith("-")) return amount;
+    return this.isExpenseCredit(transactionType) ? Math.abs(amount) : -Math.abs(amount);
+  }
+
+  private explicitExpenseOpeningForGroup(projectId: string, projectName: string, site: string): number {
+    const normalizedSite = site.trim().toLowerCase();
+    if (!normalizedSite) return 0;
+    const rows = this.rowsFor("expenses");
+    const match = rows.find((row) => {
+      const rowProjectId = String(row["projectId"] || row["__projectId"] || "");
+      const rowProjectName = String(row["project"] || "");
+      const rowSite = String(row["site"] || "").trim().toLowerCase();
+      const sameProject = projectId ? rowProjectId === projectId : rowProjectName === projectName;
+      return sameProject && rowSite === normalizedSite && (this.moneyNumber(row["openingBalance"]) || this.moneyNumber(row["cashIssued"]));
+    });
+    return match ? this.moneyNumber(match["openingBalance"]) || this.moneyNumber(match["cashIssued"]) : 0;
   }
 
   private reportColumns(module: DashboardModule): FieldSchema[] {
@@ -1104,9 +1150,20 @@ export class UniversalDashboardPage {
   }
 
   private expenseSummaryHtml(rows: TableRow[]): string {
-    const spent = rows.reduce((sum, row) => sum + (this.isExpenseCredit(String(row["transactionType"] || "")) ? 0 : this.moneyNumber(row["amount"])), 0);
-    const received = rows.reduce((sum, row) => sum + this.moneyNumber(row["openingBalance"]) + (this.isExpenseCredit(String(row["transactionType"] || "")) ? this.moneyNumber(row["amount"]) : 0), 0);
-    const closing = rows.length ? String(rows[rows.length - 1]["runningBalance"] || formatMoney(0)) : formatMoney(0);
+    const openingByGroup = new Map<string, number>();
+    const closingByGroup = new Map<string, number>();
+    const spent = rows.reduce((sum, row) => {
+      const key = this.expenseGroupKey(row);
+      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row));
+      closingByGroup.set(key, this.moneyNumber(row["runningBalance"]));
+      const amount = this.expenseSignedAmount(row);
+      return amount < 0 ? sum + Math.abs(amount) : sum;
+    }, 0);
+    const received = rows.reduce((sum, row) => {
+      const amount = this.expenseSignedAmount(row);
+      return amount > 0 ? sum + amount : sum;
+    }, [...openingByGroup.values()].reduce((sum, amount) => sum + amount, 0));
+    const closing = formatMoney([...closingByGroup.values()].reduce((sum, amount) => sum + amount, 0));
     return `<section class="summary"><h2>Expense Summary</h2><div><strong>Opening / Received</strong><span>${this.escapeHtml(formatMoney(received))}</span></div><div><strong>Expenses</strong><span>${this.escapeHtml(formatMoney(spent))}</span></div><div><strong>Closing Balance</strong><span>${this.escapeHtml(closing)}</span></div></section>`;
   }
 

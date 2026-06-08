@@ -78,7 +78,6 @@ const sectionConfigs: SectionConfig[] = [
       { key: "transactionType", label: "Transaction Type" },
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
-      { key: "openingBalance", label: "Opening Balance" },
       { key: "runningBalance", label: "Balance" },
       { key: "site", label: "Site" },
       { key: "supervisor", label: "Supervisor" },
@@ -299,6 +298,25 @@ const sectionConfigs: SectionConfig[] = [
                 <span>{{ visibleRows(activeSection()).length }} rows</span>
                 <span>{{ columnsFor(activeSection()).length }} fields</span>
                 <span>Inline editable cells</span>
+              </div>
+
+              <div class="expense-ledger-summary" *ngIf="activeSection() === 'expenses'">
+                <div>
+                  <span>Ledger Scope</span>
+                  <strong>{{ expenseLedgerScope() }}</strong>
+                </div>
+                <div>
+                  <span>Opening Balance</span>
+                  <strong>{{ expenseOpeningBalanceLabel() }}</strong>
+                </div>
+                <div>
+                  <span>Current Balance</span>
+                  <strong>{{ expenseCurrentBalanceLabel() }}</strong>
+                </div>
+                <div>
+                  <span>Entry Rule</span>
+                  <strong>Use + for cash added, - for purchases</strong>
+                </div>
               </div>
 
               <div class="table-wrap operations-table">
@@ -724,27 +742,22 @@ export class ProjectWorkspacePage {
       status: row.status,
     }));
 
-    let runningBalance = this.data.projectById(projectId)?.expenseBalance ?? 0;
-    const expenses = this.data.expensesForProject(projectId).filter((row) => row.type === "Site Expense").map((row) => {
-      runningBalance += row.received - row.spent;
-      return {
+    const expenses = this.data.expensesForProject(projectId).filter((row) => row.type === "Site Expense").map((row) => ({
         __rowId: `expense:${row.id}`,
         __projectId: row.projectId,
         projectId: row.projectId,
         expenseScope: row.type,
         expenseDate: row.date,
-        transactionType: row.type,
+        transactionType: "Site Expense (-)",
         description: row.description,
-        amount: formatMoney(row.spent),
-        openingBalance: row.received ? formatMoney(row.received) : "",
-        runningBalance: formatMoney(runningBalance),
+        amount: formatMoney(-row.spent),
+        runningBalance: formatMoney(0),
         site: row.site,
         supervisor: row.supervisor,
         cashIssued: formatMoney(row.received),
         reference: row.reference,
         approvalStatus: row.status,
-      };
-    });
+      }));
 
     const payments = this.data.paymentsForProject(projectId).map((row) => ({
       __rowId: `payment:${row.id}`,
@@ -838,10 +851,14 @@ export class ProjectWorkspacePage {
   selectOptions(section: ModuleKey, key: string): string[] {
     if (section === "expenses" && key === "transactionType") {
       return [
-        "Site Expense",
-        "Opening Balance",
-        "Cash Issued to Supervisor",
-        "Payment Received from Annai Golden Builders Pvt Ltd",
+        "Site Expense (-)",
+        "Material Purchase (-)",
+        "Supervisor Expense (-)",
+        "Cash Added (+)",
+        "Cash Issued to Supervisor (+)",
+        "Payment Received (+)",
+        "Payment Received from Annai Golden Builders Pvt Ltd (+)",
+        "Refund / Return (+)",
         "Adjustment",
       ];
     }
@@ -895,10 +912,9 @@ export class ProjectWorkspacePage {
       },
       expenses: {
         expenseDate: today,
-        transactionType: "Site Expense",
+        transactionType: "Site Expense (-)",
         description: "",
         amount: "0",
-        openingBalance: "",
         runningBalance: formatMoney(0),
         site,
         supervisor: currentProject?.supervisor ?? "",
@@ -960,17 +976,16 @@ export class ProjectWorkspacePage {
   }
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
-    let balance = 0;
+    const balances = new Map<string, number>();
     return rows.map((row) => {
       const transactionType = String(row["transactionType"] || row["expenseScope"] || "Site Expense");
-      const openingBalance = this.moneyNumber(row["openingBalance"] ?? row["cashIssued"]);
-      const amount = this.moneyNumber(row["amount"]);
-      if (openingBalance) balance += openingBalance;
-      if (amount) balance += this.isExpenseCredit(transactionType) ? amount : -amount;
+      const groupKey = this.expenseGroupKey(row);
+      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
+      const balance = previousBalance + this.expenseSignedAmount(row, transactionType);
+      balances.set(groupKey, balance);
       return {
         ...row,
         transactionType,
-        openingBalance: openingBalance ? formatMoney(openingBalance) : row["openingBalance"] ?? "",
         runningBalance: formatMoney(balance),
       };
     });
@@ -997,7 +1012,77 @@ export class ProjectWorkspacePage {
 
   private isExpenseCredit(transactionType: string): boolean {
     const normalized = transactionType.toLowerCase();
-    return normalized.includes("payment") || normalized.includes("received") || normalized.includes("cash issued") || normalized.includes("opening");
+    return (
+      normalized.includes("payment") ||
+      normalized.includes("received") ||
+      normalized.includes("cash issued") ||
+      normalized.includes("cash added") ||
+      normalized.includes("refund") ||
+      normalized.includes("credit")
+    );
+  }
+
+  expenseLedgerScope(): string {
+    const site = this.activeSiteFilter();
+    return site === "All" ? "Grouped by Project + Site" : `${this.projectId()} / ${site}`;
+  }
+
+  expenseOpeningBalanceLabel(): string {
+    if (this.activeSiteFilter() === "All") {
+      const rows = this.visibleRows("expenses");
+      if (rows.length) {
+        const openings = new Map<string, number>();
+        for (const row of rows) openings.set(this.expenseGroupKey(row), this.expenseOpeningBalanceFor(row));
+        return formatMoney([...openings.values()].reduce((sum, amount) => sum + amount, 0));
+      }
+    }
+    return formatMoney(this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
+  }
+
+  expenseCurrentBalanceLabel(): string {
+    const rows = this.visibleRows("expenses");
+    if (!rows.length) return this.expenseOpeningBalanceLabel();
+    const latestByGroup = new Map<string, number>();
+    for (const row of rows) latestByGroup.set(this.expenseGroupKey(row), this.moneyNumber(row["runningBalance"]));
+    if (this.activeSiteFilter() !== "All") {
+      return formatMoney([...latestByGroup.values()].at(-1) ?? this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
+    }
+    const total = [...latestByGroup.values()].reduce((sum, balance) => sum + balance, 0);
+    return formatMoney(total);
+  }
+
+  private expenseGroupKey(row: TableRow): string {
+    const projectId = String(row["projectId"] || row["__projectId"] || this.projectId() || "project");
+    const site = String(row["site"] || "Project").trim().toLowerCase();
+    return `${projectId}::${site}`;
+  }
+
+  private expenseOpeningBalanceFor(row: TableRow): number {
+    const projectId = String(row["projectId"] || row["__projectId"] || this.projectId());
+    const explicitOpening = this.explicitExpenseOpeningForGroup(projectId, String(row["site"] || this.activeSiteFilter() || ""));
+    if (explicitOpening) return explicitOpening;
+    const project = this.data.projectById(projectId);
+    return project?.expenseBalance ?? 0;
+  }
+
+  private expenseSignedAmount(row: TableRow, transactionType = String(row["transactionType"] || "")): number {
+    const amountText = String(row["amount"] ?? "").trim();
+    const amount = this.moneyNumber(amountText);
+    if (!amount) return 0;
+    if (amountText.startsWith("+") || amountText.startsWith("-")) return amount;
+    return this.isExpenseCredit(transactionType) ? Math.abs(amount) : -Math.abs(amount);
+  }
+
+  private explicitExpenseOpeningForGroup(projectId: string, site: string): number {
+    const normalizedSite = site.trim().toLowerCase();
+    if (!normalizedSite || normalizedSite === "all") return 0;
+    const rows = this.data.tableRowsFor("expenses", this.tableRows().expenses, (row) => this.rowBelongsToProject(row));
+    const match = rows.find((row) => {
+      const rowProjectId = String(row["projectId"] || row["__projectId"] || this.projectId());
+      const rowSite = String(row["site"] || "").trim().toLowerCase();
+      return rowProjectId === projectId && rowSite === normalizedSite && (this.moneyNumber(row["openingBalance"]) || this.moneyNumber(row["cashIssued"]));
+    });
+    return match ? this.moneyNumber(match["openingBalance"]) || this.moneyNumber(match["cashIssued"]) : 0;
   }
 
   private reportColumns(section: ModuleKey): FieldSchema[] {
@@ -1051,9 +1136,20 @@ export class ProjectWorkspacePage {
   }
 
   private expenseSummaryHtml(rows: TableRow[]): string {
-    const spent = rows.reduce((sum, row) => sum + (this.isExpenseCredit(String(row["transactionType"] || "")) ? 0 : this.moneyNumber(row["amount"])), 0);
-    const received = rows.reduce((sum, row) => sum + this.moneyNumber(row["openingBalance"]) + (this.isExpenseCredit(String(row["transactionType"] || "")) ? this.moneyNumber(row["amount"]) : 0), 0);
-    const closing = rows.length ? String(rows[rows.length - 1]["runningBalance"] || formatMoney(0)) : formatMoney(0);
+    const openingByGroup = new Map<string, number>();
+    const closingByGroup = new Map<string, number>();
+    const spent = rows.reduce((sum, row) => {
+      const key = this.expenseGroupKey(row);
+      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row));
+      closingByGroup.set(key, this.moneyNumber(row["runningBalance"]));
+      const amount = this.expenseSignedAmount(row);
+      return amount < 0 ? sum + Math.abs(amount) : sum;
+    }, 0);
+    const received = rows.reduce((sum, row) => {
+      const amount = this.expenseSignedAmount(row);
+      return amount > 0 ? sum + amount : sum;
+    }, [...openingByGroup.values()].reduce((sum, amount) => sum + amount, 0));
+    const closing = formatMoney([...closingByGroup.values()].reduce((sum, amount) => sum + amount, 0));
     return `<section class="summary"><h2>Expense Summary</h2><div><strong>Opening / Received</strong><span>${this.escapeHtml(formatMoney(received))}</span></div><div><strong>Expenses</strong><span>${this.escapeHtml(formatMoney(spent))}</span></div><div><strong>Closing Balance</strong><span>${this.escapeHtml(closing)}</span></div></section>`;
   }
 
