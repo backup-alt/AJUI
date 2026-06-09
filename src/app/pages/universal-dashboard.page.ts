@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { ErpDataService, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
@@ -737,10 +737,8 @@ export class UniversalDashboardPage {
     this.activeModule.set(module);
     this.searchText.set("");
     this.selectedFilters.set({});
-    this.openSelectKey.set("");
-    this.openFilterKey.set("");
-    this.selectedRowKey.set("");
-    this.editingRowKey.set("");
+    this.closeDropdowns();
+    this.clearRowSelection();
   }
 
   rowKey(row: TableRow): string {
@@ -769,6 +767,31 @@ export class UniversalDashboardPage {
     const key = this.rowKey(row);
     this.selectedRowKey.set(key);
     this.editingRowKey.set(key);
+  }
+
+  @HostListener("document:pointerdown", ["$event"])
+  closeTransientTableUi(event: PointerEvent) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    if (!target.closest(".selectable-data-row, .row-hover-toolbar")) {
+      this.clearRowSelection();
+    }
+
+    if (!target.closest(".erp-select-menu, .filter-select-shell, .custom-select-entry")) {
+      this.closeDropdowns();
+    }
+  }
+
+  private clearRowSelection() {
+    this.selectedRowKey.set("");
+    this.editingRowKey.set("");
+  }
+
+  private closeDropdowns() {
+    this.openSelectKey.set("");
+    this.openFilterKey.set("");
+    this.selectCustomValue.set("");
   }
 
   columnsForActive(): FieldSchema[] {
@@ -894,10 +917,8 @@ export class UniversalDashboardPage {
   clearFilters() {
     this.selectedFilters.set({});
     this.searchText.set("");
-    this.openSelectKey.set("");
-    this.openFilterKey.set("");
-    this.selectedRowKey.set("");
-    this.editingRowKey.set("");
+    this.closeDropdowns();
+    this.clearRowSelection();
   }
 
   openRecordDialog() {

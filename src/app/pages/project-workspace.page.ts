@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
@@ -718,9 +718,8 @@ export class ProjectWorkspacePage {
   switchSection(section: ModuleKey) {
     this.activeSection.set(section);
     this.tableSearch.set("");
-    this.openSelectKey.set("");
-    this.selectedRowKey.set("");
-    this.editingRowKey.set("");
+    this.closeDropdowns();
+    this.clearRowSelection();
     void this.router.navigate(["/clients", this.clientId(), "projects", this.projectId(), section]);
   }
 
@@ -750,6 +749,30 @@ export class ProjectWorkspacePage {
     const key = this.rowKey(row);
     this.selectedRowKey.set(key);
     this.editingRowKey.set(key);
+  }
+
+  @HostListener("document:pointerdown", ["$event"])
+  closeTransientTableUi(event: PointerEvent) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    if (!target.closest(".selectable-data-row, .row-hover-toolbar")) {
+      this.clearRowSelection();
+    }
+
+    if (!target.closest(".erp-select-menu, .custom-select-entry")) {
+      this.closeDropdowns();
+    }
+  }
+
+  private clearRowSelection() {
+    this.selectedRowKey.set("");
+    this.editingRowKey.set("");
+  }
+
+  private closeDropdowns() {
+    this.openSelectKey.set("");
+    this.selectCustomValue.set("");
   }
 
   columnsFor(section: ModuleKey): FieldSchema[] {
@@ -850,9 +873,8 @@ export class ProjectWorkspacePage {
     this.activeSite.set(site);
     this.expenseOpeningEdit.set(false);
     this.tableSearch.set("");
-    this.openSelectKey.set("");
-    this.selectedRowKey.set("");
-    this.editingRowKey.set("");
+    this.closeDropdowns();
+    this.clearRowSelection();
   }
 
   openSiteDraft() {
