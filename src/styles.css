@@ -10805,3 +10805,119 @@ th:hover .column-insert-action,
 .dark-mode .sidebar-user-copy span {
   color: #b8c6da !important;
 }
+
+/* Read-only table rows with contextual row actions. */
+.operations-table tbody tr.selectable-data-row {
+  cursor: pointer;
+}
+
+.operations-table tbody tr.selectable-data-row td:first-child {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.operations-table tbody tr.selectable-data-row:hover td:not(.empty-row),
+.operations-table tbody tr.selectable-data-row.row-selected td:not(.empty-row) {
+  background: #f4f7fb !important;
+}
+
+.operations-table tbody tr.selectable-data-row.row-editing td:not(.empty-row) {
+  background: #eef4ff !important;
+}
+
+.operations-table .editable-cell.cell-readonly {
+  cursor: default !important;
+  user-select: text;
+}
+
+.row-hover-toolbar {
+  position: absolute;
+  top: -18px;
+  left: 12px;
+  z-index: 22;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid #c9d5e7;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.selectable-data-row:hover .row-hover-toolbar,
+.selectable-data-row.row-selected .row-hover-toolbar,
+.selectable-data-row.row-editing .row-hover-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.row-hover-toolbar .icon-row-action {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #002263;
+  cursor: pointer;
+}
+
+.row-hover-toolbar .icon-row-action:hover {
+  border-color: #aebfda;
+  background: #eef4ff;
+}
+
+.row-hover-toolbar .icon-row-action.danger {
+  color: #b42318;
+}
+
+.row-hover-toolbar .icon-row-action.danger:hover {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.row-hover-toolbar .icon-row-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dark-mode .operations-table tbody tr.selectable-data-row:hover td:not(.empty-row),
+.dark-mode .operations-table tbody tr.selectable-data-row.row-selected td:not(.empty-row) {
+  background: #172846 !important;
+}
+
+.dark-mode .operations-table tbody tr.selectable-data-row.row-editing td:not(.empty-row) {
+  background: #1d3358 !important;
+}
+
+.dark-mode .row-hover-toolbar {
+  border-color: #3a5278;
+  background: #0f1b2f;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.34);
+}
+
+.dark-mode .row-hover-toolbar .icon-row-action {
+  background: #13233b;
+  color: #dce8ff;
+}
+
+.dark-mode .row-hover-toolbar .icon-row-action:hover {
+  border-color: #7ea0d6;
+  background: #172f55;
+}
+
+.dark-mode .row-hover-toolbar .icon-row-action.danger {
+  color: #fda4af;
+}
