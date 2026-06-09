@@ -309,7 +309,7 @@ const dashboardModules: ModuleConfig[] = [
             <section class="operations-workbench universal-workbench">
               <nav class="operations-tabs" aria-label="Universal dashboard modules">
                 <button
-                  *ngFor="let module of modules; trackBy: trackByModule"
+                  *ngFor="let module of modules"
                   type="button"
                   [class.active]="activeModule() === module.key"
                   (click)="switchModule(module.key)"
@@ -340,7 +340,7 @@ const dashboardModules: ModuleConfig[] = [
               </div>
 
               <div class="universal-filter-bar">
-                <label *ngFor="let filter of activeConfig().filters; trackBy: trackByFilter" class="filter-select-shell">
+                <label *ngFor="let filter of activeConfig().filters" class="filter-select-shell">
                   <span>{{ filter.label }}</span>
                   <div class="erp-select-menu filter-select-menu" [class.open]="isFilterMenuOpen(filter.key)">
                     <button type="button" class="erp-select-trigger" (click)="toggleFilterMenu(filter.key)">
@@ -352,7 +352,7 @@ const dashboardModules: ModuleConfig[] = [
                     <div class="erp-select-panel" *ngIf="isFilterMenuOpen(filter.key)">
                       <button type="button" [class.selected]="!selectedFilters()[filter.key]" (click)="setFilter(filter.key, '')">All</button>
                       <button
-                        *ngFor="let value of filterValues(filter.key); trackBy: trackByValue"
+                        *ngFor="let value of filterValues(filter.key)"
                         type="button"
                         [class.selected]="selectedFilters()[filter.key] === value"
                         (click)="setFilter(filter.key, value)"
@@ -373,8 +373,8 @@ const dashboardModules: ModuleConfig[] = [
               </div>
 
               <div class="table-meta-strip">
-                <span>{{ activeRows().length }} rows</span>
-                <span>{{ activeColumns().length }} fields</span>
+                <span>{{ visibleRows().length }} rows</span>
+                <span>{{ columnsForActive().length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
                 <span *ngIf="activeModule() === 'clients'">Customer records synced</span>
                 <span *ngIf="activeModule() === 'expenses'">Balances grouped by Project + Site</span>
@@ -387,7 +387,7 @@ const dashboardModules: ModuleConfig[] = [
                 <table>
                   <thead>
                     <tr>
-                      <th *ngFor="let column of activeColumns(); trackBy: trackByColumn">
+                      <th *ngFor="let column of columnsForActive()">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
                           <button
@@ -410,56 +410,25 @@ const dashboardModules: ModuleConfig[] = [
                           </button>
                         </span>
                       </th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr
-                      *ngFor="let row of activeRows(); trackBy: trackByRow"
-                      (click)="selectRow(row)"
-                      [class.selected-row]="isRowSelected(row)"
-                      [class.editing-row]="isRowEditing(row)"
-                    >
+                    <tr *ngFor="let row of visibleRows()">
                       <td
-                        *ngFor="let column of activeColumns(); let first = first; trackBy: trackByColumn"
+                        *ngFor="let column of columnsForActive()"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
-                        [class.select-cell]="isRowEditing(row) && activeSelectOptions(column.key).length > 0"
+                        [class.select-cell]="selectOptions(activeModule(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeModule() === 'labour' && column.key === 'labourTypes'"
                         spellcheck="false"
                       >
-                        <div class="row-inline-actions" *ngIf="first && isRowSelected(row)" (click)="$event.stopPropagation()">
-                          <button type="button" class="context-row-action" [class.active]="isRowEditing(row)" (click)="editSelectedRow()">
-                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                              <path d="M12.8 4.6 15.4 7.2" />
-                              <path d="M5 15h2.8l7-7a1.8 1.8 0 0 0-2.6-2.6l-7 7V15Z" />
-                            </svg>
-                            Edit
-                          </button>
-                          <button *ngIf="activeModule() === 'reports'" type="button" class="context-row-action" (click)="downloadReportRow(row)">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M12 4v10" />
-                              <path d="m8 10 4 4 4-4" />
-                              <path d="M5 20h14" />
-                            </svg>
-                            PDF
-                          </button>
-                          <button type="button" class="context-row-action danger" (click)="deleteSelectedRow()">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M4 7h16" />
-                              <path d="M10 11v6" />
-                              <path d="M14 11v6" />
-                              <path d="M6 7l1 14h10l1-14" />
-                              <path d="M9 7V4h6v3" />
-                            </svg>
-                            Delete
-                          </button>
-                        </div>
                         <ng-container *ngIf="activeModule() === 'labour' && column.key === 'labourTypes'; else standardDashboardCell">
                           <div class="labour-types-cell">
                             <div class="labour-type-chip-row" *ngIf="labourTypeCards(row).length; else emptyUniversalLabourTypes">
-                              <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row); trackBy: trackByLabourType">
+                              <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row)">
                                 <span>{{ type.type }}</span>
                                 <strong>{{ type.count }}</strong>
-                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type)">
+                                <button type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type)">
                                   <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                     <path d="m5.5 5.5 9 9" />
                                     <path d="m14.5 5.5-9 9" />
@@ -470,7 +439,7 @@ const dashboardModules: ModuleConfig[] = [
                             <ng-template #emptyUniversalLabourTypes>
                               <span class="labour-type-empty">No labor types</span>
                             </ng-template>
-                            <button *ngIf="isRowEditing(row)" type="button" class="labour-type-add" (click)="openLabourTypeDialog(row)">
+                            <button type="button" class="labour-type-add" (click)="openLabourTypeDialog(row)">
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                 <path d="M10 4v12" />
                                 <path d="M4 10h12" />
@@ -480,70 +449,90 @@ const dashboardModules: ModuleConfig[] = [
                           </div>
                         </ng-container>
                         <ng-template #standardDashboardCell>
-                          <ng-container *ngIf="isRowEditing(row); else readonlyDashboardCell">
-                            <div
-                              *ngIf="activeSelectOptions(column.key).length > 0; else editableDashboardCell"
-                              class="erp-select-menu"
-                              [class.open]="isSelectMenuOpen(row, column.key)"
-                            >
-                              <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
-                                <span>{{ row[column.key] || 'Select' }}</span>
-                                <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                  <path d="M5.5 7.5 10 12l4.5-4.5" />
-                                </svg>
-                              </button>
-                              <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
-                                <button
-                                  *ngFor="let option of activeSelectOptions(column.key); trackBy: trackByValue"
-                                  type="button"
-                                  [class.selected]="option === row[column.key]"
-                                  (click)="selectCellOptionForRow(row, column.key, option)"
-                                >
-                                  <span
-                                    class="select-option-icon"
-                                    *ngIf="selectOptionIcon(option) as icon"
-                                    [class.approve]="icon === 'approve'"
-                                    [class.decline]="icon === 'decline'"
-                                  >
-                                    <svg *ngIf="icon === 'approve'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-                                    </svg>
-                                    <svg *ngIf="icon === 'decline'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                      <path d="m5.5 5.5 9 9" />
-                                      <path d="m14.5 5.5-9 9" />
-                                    </svg>
-                                  </span>
-                                  {{ option }}
-                                </button>
-                                <label class="custom-select-entry" *ngIf="allowsCustomOption(activeModule(), column.key)">
-                                  <span>Custom</span>
-                                  <input
-                                    #dashboardCustomValue
-                                    (keydown.enter)="saveCustomSelectOptionForRow(row, column.key, dashboardCustomValue.value, $event)"
-                                    placeholder="Type value and press Enter"
-                                  />
-                                </label>
-                              </div>
-                            </div>
-                            <ng-template #editableDashboardCell>
-                              <span
-                                class="editable-cell"
-                                [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
-                                spellcheck="false"
-                                (blur)="!isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
+                          <div
+                            *ngIf="selectOptions(activeModule(), column.key).length > 0; else editableDashboardCell"
+                            class="erp-select-menu"
+                            [class.open]="isSelectMenuOpen(row, column.key)"
+                          >
+                            <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
+                              <span>{{ row[column.key] || 'Select' }}</span>
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                <path d="M5.5 7.5 10 12l4.5-4.5" />
+                              </svg>
+                            </button>
+                            <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
+                              <button
+                                *ngFor="let option of selectOptions(activeModule(), column.key)"
+                                type="button"
+                                [class.selected]="option === row[column.key]"
+                                (click)="selectCellOptionForRow(row, column.key, option)"
                               >
-                                {{ row[column.key] }}
-                              </span>
-                            </ng-template>
-                          </ng-container>
-                          <ng-template #readonlyDashboardCell>
-                            <span class="cell-value">{{ cellDisplay(row, column.key) }}</span>
+                                <span
+                                  class="select-option-icon"
+                                  *ngIf="selectOptionIcon(option) as icon"
+                                  [class.approve]="icon === 'approve'"
+                                  [class.decline]="icon === 'decline'"
+                                >
+                                  <svg *ngIf="icon === 'approve'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                    <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                                  </svg>
+                                  <svg *ngIf="icon === 'decline'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                    <path d="m5.5 5.5 9 9" />
+                                    <path d="m14.5 5.5-9 9" />
+                                  </svg>
+                                </span>
+                                {{ option }}
+                              </button>
+                              <label class="custom-select-entry" *ngIf="allowsCustomOption(activeModule(), column.key)">
+                                <span>Custom</span>
+                                <input
+                                  #dashboardCustomValue
+                                  (keydown.enter)="saveCustomSelectOptionForRow(row, column.key, dashboardCustomValue.value, $event)"
+                                  placeholder="Type value and press Enter"
+                                />
+                              </label>
+                            </div>
+                          </div>
+                          <ng-template #editableDashboardCell>
+                            <span
+                              class="editable-cell"
+                              [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
+                              spellcheck="false"
+                              (blur)="!isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
+                            >
+                              {{ row[column.key] }}
+                            </span>
                           </ng-template>
                         </ng-template>
                       </td>
+                      <td class="row-actions">
+                        <button
+                          *ngIf="activeModule() === 'reports'"
+                          type="button"
+                          class="icon-row-action"
+                          aria-label="Download report"
+                          title="Download report"
+                          (click)="downloadReportRow(row)"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                            <path d="M12 4v10" />
+                            <path d="m8 10 4 4 4-4" />
+                            <path d="M5 20h14" />
+                          </svg>
+                        </button>
+                        <button type="button" class="icon-row-action danger" aria-label="Delete row" title="Delete row" (click)="deleteRow(row)">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                            <path d="M4 7h16" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                            <path d="M6 7l1 14h10l1-14" />
+                            <path d="M9 7V4h6v3" />
+                          </svg>
+                        </button>
+                      </td>
                     </tr>
-                    <tr *ngIf="activeRows().length === 0">
-                      <td class="empty-row" [attr.colspan]="activeColumns().length">
+                    <tr *ngIf="visibleRows().length === 0">
+                      <td class="empty-row" [attr.colspan]="columnsForActive().length + 1">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -716,22 +705,7 @@ export class UniversalDashboardPage {
   readonly labourTypeName = signal("Mason");
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
-  readonly selectedRowId = signal("");
-  readonly editingRowId = signal("");
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
-  readonly activeColumns = computed(() => this.computeColumnsForActive());
-  readonly activeRows = computed(() => this.computeVisibleRows());
-  readonly activeSelectOptionMap = computed(() => {
-    const module = this.activeModule();
-    return Object.fromEntries(this.activeColumns().map((column) => [column.key, this.selectOptions(module, column.key)])) as Record<string, string[]>;
-  });
-  readonly activeFilterValueMap = computed(
-    () => Object.fromEntries(this.activeConfig().filters.map((filter) => [filter.key, this.computeFilterValues(filter.key)])) as Record<string, string[]>,
-  );
-  readonly moduleRowCounts = computed(
-    () => Object.fromEntries(this.modules.map((module) => [module.key, this.rowsFor(module.key).length])) as Record<DashboardModule, number>,
-  );
-  readonly pendingApprovalTotal = computed(() => this.pendingApprovalRows().length);
 
   activeProjectsCount() {
     return this.data.projects().filter((project) => project.status === "Active").length;
@@ -742,7 +716,7 @@ export class UniversalDashboardPage {
   }
 
   pendingApprovalCount() {
-    return this.pendingApprovalTotal();
+    return this.pendingApprovalRows().length;
   }
 
   switchModule(module: DashboardModule) {
@@ -751,33 +725,14 @@ export class UniversalDashboardPage {
     this.selectedFilters.set({});
     this.openSelectKey.set("");
     this.openFilterKey.set("");
-    this.selectedRowId.set("");
-    this.editingRowId.set("");
   }
 
   columnsForActive(): FieldSchema[] {
-    return this.activeColumns();
-  }
-
-  private computeColumnsForActive(): FieldSchema[] {
     const base = this.activeConfig().columns;
-    const custom = this.data.customFieldsFor(this.activeModule()).filter((field) => field.label?.trim() && field.key?.trim());
+    const custom = this.data.customFieldsFor(this.activeModule());
     const hidden = new Set(this.data.hiddenFieldsFor(this.activeModule()));
     const columns = this.activeModule() === "labour" ? this.withLabourWageColumns(base, custom) : this.data.composeTableColumns(base, custom);
-    const visible = this.normalizeColumns(columns.filter((column) => !hidden.has(column.key)));
-    const visibleBaseCount = base.filter((column) => column.label?.trim() && column.key?.trim() && !hidden.has(column.key)).length;
-    return visible.length && visibleBaseCount ? visible : this.normalizeColumns(columns);
-  }
-
-  private normalizeColumns(columns: FieldSchema[]): FieldSchema[] {
-    const seen = new Set<string>();
-    return columns.filter((column) => {
-      const key = column.key?.trim();
-      const label = column.label?.trim();
-      if (!key || !label || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    return columns.filter((column) => !hidden.has(column.key));
   }
 
   hiddenFieldCount(module: DashboardModule): number {
@@ -805,10 +760,6 @@ export class UniversalDashboardPage {
   }
 
   visibleRows(): TableRow[] {
-    return this.activeRows();
-  }
-
-  private computeVisibleRows(): TableRow[] {
     const query = this.searchText().trim().toLowerCase();
     const filters = this.selectedFilters();
     const rows = this.rowsFor(this.activeModule()).filter((row) => {
@@ -820,10 +771,6 @@ export class UniversalDashboardPage {
   }
 
   filterValues(key: string): string[] {
-    return this.activeFilterValueMap()[key] ?? [];
-  }
-
-  private computeFilterValues(key: string): string[] {
     const values = new Set<string>();
     for (const option of this.selectOptions(this.activeModule(), key)) {
       if (option) values.add(option);
@@ -833,10 +780,6 @@ export class UniversalDashboardPage {
       if (value !== undefined && value !== "") values.add(String(value));
     }
     return [...values].sort((a, b) => a.localeCompare(b));
-  }
-
-  activeSelectOptions(key: string): string[] {
-    return this.activeSelectOptionMap()[key] ?? [];
   }
 
   isFilterMenuOpen(key: string): boolean {
@@ -859,78 +802,12 @@ export class UniversalDashboardPage {
 
   expenseFilterCurrentLabel(): string {
     const rows = this.visibleRows().filter((entry) => entry["project"] === this.selectedFilters()["project"] && entry["site"] === this.selectedFilters()["site"]);
-    const latest = rows.reduce<TableRow | undefined>((current, row) => {
-      if (!current) return row;
-      return this.expenseRowSortValue(row) > this.expenseRowSortValue(current) ? row : current;
-    }, undefined);
+    const latest = rows.at(-1);
     return latest ? String(latest["runningBalance"] || formatMoney(0)) : formatMoney(0);
   }
 
   rowCountFor(module: DashboardModule): number {
-    return this.moduleRowCounts()[module] ?? 0;
-  }
-
-  trackByModule(_: number, module: ModuleConfig): DashboardModule {
-    return module.key;
-  }
-
-  trackByFilter(_: number, filter: FilterSchema): string {
-    return filter.key;
-  }
-
-  trackByColumn(index: number, column: FieldSchema): string {
-    return `${column.key}:${index}`;
-  }
-
-  trackByRow(_: number, row: TableRow): string {
-    return this.rowKey(row);
-  }
-
-  trackByValue(_: number, value: string): string {
-    return value;
-  }
-
-  trackByLabourType(_: number, type: { type: string }): string {
-    return type.type;
-  }
-
-  private rowKey(row: TableRow): string {
-    return String(row["__rowId"] || row["clientId"] || row["vendorId"] || row["supervisorId"] || row["subcontractId"] || row["reportName"] || JSON.stringify(row));
-  }
-
-  cellDisplay(row: TableRow, key: string): string {
-    const value = row[key];
-    if (value === undefined || value === null || value === "") return "-";
-    return String(value);
-  }
-
-  selectRow(row: TableRow) {
-    const rowId = this.rowKey(row);
-    this.selectedRowId.set(rowId);
-    if (this.editingRowId() && this.editingRowId() !== rowId) this.editingRowId.set("");
-  }
-
-  isRowSelected(row: TableRow): boolean {
-    return this.selectedRowId() === this.rowKey(row);
-  }
-
-  isRowEditing(row: TableRow): boolean {
-    return this.editingRowId() === this.rowKey(row);
-  }
-
-  editSelectedRow() {
-    const selected = this.selectedRowId();
-    if (!selected) return;
-    this.editingRowId.set(this.editingRowId() === selected ? "" : selected);
-  }
-
-  deleteSelectedRow() {
-    const selected = this.selectedRowId();
-    const row = this.visibleRows().find((entry) => this.rowKey(entry) === selected);
-    if (!row) return;
-    this.deleteRow(row);
-    this.selectedRowId.set("");
-    this.editingRowId.set("");
+    return this.rowsFor(module).length;
   }
 
   pendingApprovalRows(): TableRow[] {
@@ -993,10 +870,7 @@ export class UniversalDashboardPage {
       this.data.addClient({ name: "New Client", mobile: "", address: "", supervisor: "Unassigned" });
       return;
     }
-    const row = this.data.addCustomRow(module, this.defaultRowFor(module));
-    const rowId = this.rowKey(row);
-    this.selectedRowId.set(rowId);
-    this.editingRowId.set(rowId);
+    this.data.addCustomRow(module, this.defaultRowFor(module));
   }
 
   updateDraftField(key: string, value: string) {
@@ -1172,13 +1046,9 @@ export class UniversalDashboardPage {
     const rowId = String(row["__rowId"] || "");
     if (module === "clients") {
       this.data.deleteClient(String(row["clientId"] || ""));
-      this.selectedRowId.set("");
-      this.editingRowId.set("");
       return;
     }
     this.data.deleteSharedRow(rowId);
-    if (this.selectedRowId() === this.rowKey(row)) this.selectedRowId.set("");
-    if (this.editingRowId() === this.rowKey(row)) this.editingRowId.set("");
   }
 
   exportExcel() {
@@ -1229,209 +1099,181 @@ export class UniversalDashboardPage {
     void this.router.navigate(["/clients"]);
   }
 
-  private buildRowsFor(module: DashboardModule): TableRow[] {
-    const projects = this.data.projects();
-    const clients = this.data.clients();
-    const projectById = (projectId: string) => projects.find((project) => project.id === projectId);
+  private buildRows(): Record<DashboardModule, TableRow[]> {
+    const projectById = (projectId: string) => this.data.projectById(projectId);
     const projectName = (projectId: string) => projectById(projectId)?.name ?? projectId;
     const clientName = (projectId: string) => projectById(projectId)?.client ?? "";
-    const clientId = (projectId: string) => clients.find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
+    const clientId = (projectId: string) => this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
 
-    if (module === "materials") {
-      return this.data.materials().map((row) => ({
-        __rowId: `material:${row.id}`,
-        __projectId: row.projectId,
-        client: clientName(row.projectId),
-        project: projectName(row.projectId),
-        site: row.site,
-        materialName: row.name,
-        unit: row.unit,
-        requestedQuantity: formatNumber(row.requested),
-        approvedQuantity: formatNumber(row.approved),
-        vendor: row.vendor,
-        poNumber: row.poNumber,
-        remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
-        status: row.status,
-      }));
-    }
+    const materials = this.data.materials().map((row) => ({
+      __rowId: `material:${row.id}`,
+      __projectId: row.projectId,
+      client: clientName(row.projectId),
+      project: projectName(row.projectId),
+      site: row.site,
+      materialName: row.name,
+      unit: row.unit,
+      requestedQuantity: formatNumber(row.requested),
+      approvedQuantity: formatNumber(row.approved),
+      vendor: row.vendor,
+      poNumber: row.poNumber,
+      remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
+      status: row.status,
+    }));
 
-    if (module === "clients") {
-      return clients.map((client) => {
-        const summary = this.data.clientSummary(client);
-        return {
-          __rowId: `client:${client.id}`,
-          clientId: client.id,
-          clientName: client.name,
-          mobile: client.mobile,
-          address: client.address,
-          projectCount: summary.projectCount,
-          activeSites: summary.activeSites,
-          totalProjectValue: formatMoney(summary.totalValue),
-          amountReceived: formatMoney(summary.received),
-          pendingBalance: formatMoney(summary.pending),
-          supervisor: client.supervisor,
-          status: client.status,
-        };
-      });
-    }
+    const clients = this.data.clients().map((client) => {
+      const summary = this.data.clientSummary(client);
+      return {
+        __rowId: `client:${client.id}`,
+        clientId: client.id,
+        clientName: client.name,
+        mobile: client.mobile,
+        address: client.address,
+        projectCount: summary.projectCount,
+        activeSites: summary.activeSites,
+        totalProjectValue: formatMoney(summary.totalValue),
+        amountReceived: formatMoney(summary.received),
+        pendingBalance: formatMoney(summary.pending),
+        supervisor: client.supervisor,
+        status: client.status,
+      };
+    });
 
-    if (module === "labour") {
-      return this.data.labour().map((row) => ({
-        __rowId: `labour:${row.id}`,
-        __projectId: row.projectId,
-        client: clientName(row.projectId),
-        clientId: clientId(row.projectId),
-        projectId: row.projectId,
-        project: projectName(row.projectId),
-        site: row.site,
-        attendanceDate: "2026-06-05",
-        staffName: row.party,
-        dailyWage: row.dailyWage,
-        labourTypes: this.labourTypesFromRow(row),
-        staffCount: row.presentCount,
-        attendance: "Present",
-        shift: this.normalizeShift(row.shift),
-        overtime: `${row.overtime} hrs`,
-        lateFine: formatMoney(row.lateFine),
-        presentUnits: row.presentDays * row.presentCount,
-        paymentMode: row.paymentMode,
-        status: row.status,
-      }));
-    }
+    const labour = this.data.labour().map((row) => ({
+      __rowId: `labour:${row.id}`,
+      __projectId: row.projectId,
+      client: clientName(row.projectId),
+      clientId: clientId(row.projectId),
+      projectId: row.projectId,
+      project: projectName(row.projectId),
+      site: row.site,
+      attendanceDate: "2026-06-05",
+      staffName: row.party,
+      dailyWage: row.dailyWage,
+      labourTypes: this.labourTypesFromRow(row),
+      staffCount: row.presentCount,
+      attendance: "Present",
+      shift: this.normalizeShift(row.shift),
+      overtime: `${row.overtime} hrs`,
+      lateFine: formatMoney(row.lateFine),
+      presentUnits: row.presentDays * row.presentCount,
+      paymentMode: row.paymentMode,
+      status: row.status,
+    }));
 
-    if (module === "expenses") {
-      return this.data
-        .expenses()
-        .filter((row) => row.type === "Site Expense")
-        .map((row) => ({
-          __rowId: `expense:${row.id}`,
-          __projectId: row.projectId,
-          client: clientName(row.projectId),
-          project: projectName(row.projectId),
-          site: row.site,
-          expenseDate: row.date,
-          transactionType: "Site Expense",
-          description: row.description,
-          amount: formatMoney(-row.spent),
-          runningBalance: formatMoney(0),
-          supervisor: row.supervisor,
-          cashIssued: formatMoney(row.received),
-          reference: row.reference,
-          approvalStatus: row.status,
-        }));
-    }
+    const expenses = this.data.expenses().filter((row) => row.type === "Site Expense").map((row) => ({
+      __rowId: `expense:${row.id}`,
+      __projectId: row.projectId,
+      client: clientName(row.projectId),
+      project: projectName(row.projectId),
+      site: row.site,
+      expenseDate: row.date,
+      transactionType: "Site Expense",
+      description: row.description,
+      amount: formatMoney(-row.spent),
+      runningBalance: formatMoney(0),
+      supervisor: row.supervisor,
+      cashIssued: formatMoney(row.received),
+      reference: row.reference,
+      approvalStatus: row.status,
+    }));
 
-    if (module === "generalExpenses") {
-      return this.data
-        .expenses()
-        .filter((row) => row.type === "General Expense")
-        .map((row) => ({
-          __rowId: `general-expense:${row.id}`,
-          __projectId: "",
-          expenseDate: row.date,
-          department: "Head Office",
-          description: row.description,
-          category: "Office Expense",
-          amount: formatMoney(row.spent),
-          paidBy: row.supervisor,
-          reference: row.reference,
-          approvalStatus: row.status,
-        }));
-    }
+    const generalExpenses = this.data.expenses().filter((row) => row.type === "General Expense").map((row) => ({
+      __rowId: `general-expense:${row.id}`,
+      __projectId: "",
+      expenseDate: row.date,
+      department: "Head Office",
+      description: row.description,
+      category: "Office Expense",
+      amount: formatMoney(row.spent),
+      paidBy: row.supervisor,
+      reference: row.reference,
+      approvalStatus: row.status,
+    }));
 
-    if (module === "payments") {
-      return this.data.payments().map((row) => ({
-        __rowId: `payment:${row.id}`,
-        __projectId: row.projectId,
-        client: clientName(row.projectId),
-        project: projectName(row.projectId),
-        paymentDate: row.date,
-        amount: formatMoney(row.amount),
-        mode: row.mode,
-        transactionReference: row.reference,
-        receiptNumber: row.receipt,
-        collectedBy: row.collectedBy,
-        approvalStatus: row.status,
-      }));
-    }
+    const payments = this.data.payments().map((row) => ({
+      __rowId: `payment:${row.id}`,
+      __projectId: row.projectId,
+      client: clientName(row.projectId),
+      project: projectName(row.projectId),
+      paymentDate: row.date,
+      amount: formatMoney(row.amount),
+      mode: row.mode,
+      transactionReference: row.reference,
+      receiptNumber: row.receipt,
+      collectedBy: row.collectedBy,
+      approvalStatus: row.status,
+    }));
 
-    if (module === "vendors") {
-      return this.data.vendors().map((vendor) => ({
-        __rowId: `vendor:${vendor.id}`,
-        vendorId: vendor.id,
-        vendorName: vendor.name,
-        materialType: vendor.materialType,
-        materialsBought: this.materialPurchaseSummaryForVendor(vendor.name),
-        phoneNumber: vendor.phone,
-        address: vendor.address,
-        gstNumber: vendor.gst,
-      }));
-    }
+    const vendors = this.data.vendors().map((vendor) => ({
+      __rowId: `vendor:${vendor.id}`,
+      vendorId: vendor.id,
+      vendorName: vendor.name,
+      materialType: vendor.materialType,
+      materialsBought: this.materialPurchaseSummaryForVendor(vendor.name),
+      phoneNumber: vendor.phone,
+      address: vendor.address,
+      gstNumber: vendor.gst,
+    }));
 
-    if (module === "supervisors") {
-      return this.data.supervisors().map((supervisor) => ({
-        __rowId: `supervisor:${supervisor.id}`,
-        supervisorId: supervisor.id,
-        supervisorName: supervisor.name,
-        phoneNumber: supervisor.phone,
-        role: supervisor.role,
-        assignedProject: supervisor.assignedProject,
-        assignedSite: supervisor.assignedSite,
-        cashLimit: formatMoney(supervisor.cashLimit),
-        activeAdvances: formatMoney(supervisor.activeAdvances),
-        approvalAuthority: supervisor.approvalAuthority,
-        status: supervisor.status,
-      }));
-    }
+    const supervisors = this.data.supervisors().map((supervisor) => ({
+      __rowId: `supervisor:${supervisor.id}`,
+      supervisorId: supervisor.id,
+      supervisorName: supervisor.name,
+      phoneNumber: supervisor.phone,
+      role: supervisor.role,
+      assignedProject: supervisor.assignedProject,
+      assignedSite: supervisor.assignedSite,
+      cashLimit: formatMoney(supervisor.cashLimit),
+      activeAdvances: formatMoney(supervisor.activeAdvances),
+      approvalAuthority: supervisor.approvalAuthority,
+      status: supervisor.status,
+    }));
 
-    if (module === "subcontractors") {
-      return this.data.subcontractors().map((subcontractor) => {
-        const project = projectById(subcontractor.projectId);
-        return {
-          __rowId: `subcontractor:${subcontractor.id}`,
-          __projectId: subcontractor.projectId,
-          subcontractId: subcontractor.id,
-          client: project?.client ?? "",
-          project: project?.name ?? subcontractor.projectId,
-          site: subcontractor.site,
-          subcontractorName: subcontractor.name,
-          workPackage: subcontractor.workPackage,
-          contractValue: formatMoney(subcontractor.contractValue),
-          advancePaid: formatMoney(subcontractor.advancePaid),
-          balance: formatMoney(subcontractor.contractValue - subcontractor.advancePaid),
-          startDate: subcontractor.startDate,
-          dueDate: subcontractor.dueDate,
-          supervisor: subcontractor.supervisor,
-          approvalStatus: subcontractor.approvalStatus,
-          paymentStatus: subcontractor.paymentStatus,
-        };
-      });
-    }
+    const subcontractors = this.data.subcontractors().map((subcontractor) => {
+      const project = projectById(subcontractor.projectId);
+      return {
+        __rowId: `subcontractor:${subcontractor.id}`,
+        __projectId: subcontractor.projectId,
+        subcontractId: subcontractor.id,
+        client: project?.client ?? "",
+        project: project?.name ?? subcontractor.projectId,
+        site: subcontractor.site,
+        subcontractorName: subcontractor.name,
+        workPackage: subcontractor.workPackage,
+        contractValue: formatMoney(subcontractor.contractValue),
+        advancePaid: formatMoney(subcontractor.advancePaid),
+        balance: formatMoney(subcontractor.contractValue - subcontractor.advancePaid),
+        startDate: subcontractor.startDate,
+        dueDate: subcontractor.dueDate,
+        supervisor: subcontractor.supervisor,
+        approvalStatus: subcontractor.approvalStatus,
+        paymentStatus: subcontractor.paymentStatus,
+      };
+    });
 
-    if (module === "reports") {
-      return [
-        ["Financial", "Payment Collection Report", "All projects", "Accountant", "Excel"],
-        ["Financial", "Expense Report", "All sites", "Admin", "Excel"],
-        ["Labour", "Attendance Report", "All labour", "Project Manager", "Excel"],
-        ["Material", "Inventory Report", "All materials", "Project Manager", "Excel"],
-        ["Vendor", "Vendor Purchase Report", "All vendors", "Admin", "Excel"],
-        ["Subcontract", "Subcontractor Ledger", "All subcontractors", "Project Manager", "Excel"],
-        ["Project", "Project Summary", "All clients", "Admin", "Excel"],
-      ].map(([category, reportName, scope, owner, exportFormat], index) => ({
-        __rowId: `report:${index}`,
-        category,
-        reportName,
-        scope,
-        owner,
-        exportFormat,
-      }));
-    }
+    const reports = [
+      ["Financial", "Payment Collection Report", "All projects", "Accountant", "Excel"],
+      ["Financial", "Expense Report", "All sites", "Admin", "Excel"],
+      ["Labour", "Attendance Report", "All labour", "Project Manager", "Excel"],
+      ["Material", "Inventory Report", "All materials", "Project Manager", "Excel"],
+      ["Vendor", "Vendor Purchase Report", "All vendors", "Admin", "Excel"],
+      ["Subcontract", "Subcontractor Ledger", "All subcontractors", "Project Manager", "Excel"],
+      ["Project", "Project Summary", "All clients", "Admin", "Excel"],
+    ].map(([category, reportName, scope, owner, exportFormat], index) => ({
+      __rowId: `report:${index}`,
+      category,
+      reportName,
+      scope,
+      owner,
+      exportFormat,
+    }));
 
-    return [];
+    return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, reports };
   }
 
   private rowsFor(module: DashboardModule): TableRow[] {
-    return this.data.tableRowsFor(module, this.buildRowsFor(module));
+    return this.data.tableRowsFor(module, this.buildRows()[module]);
   }
 
   selectOptions(module: DashboardModule, key: string): string[] {
@@ -1625,7 +1467,7 @@ export class UniversalDashboardPage {
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
-    const balancedRows = [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
+    return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
       const transactionType = String(row["transactionType"] || "Site Expense");
       const groupKey = this.expenseGroupKey(row);
       const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
@@ -1637,7 +1479,6 @@ export class UniversalDashboardPage {
         runningBalance: formatMoney(balance),
       };
     });
-    return balancedRows.sort((first, second) => this.expenseDisplaySortValue(second).localeCompare(this.expenseDisplaySortValue(first)));
   }
 
   private withLabourPayable(row: TableRow): TableRow {
@@ -1836,17 +1677,6 @@ export class UniversalDashboardPage {
   private expenseRowSortValue(row: TableRow): string {
     const date = String(row["expenseDate"] || row["date"] || "");
     return `${this.expenseGroupKey(row)}::${date}::${row["__rowId"] || ""}`;
-  }
-
-  private expenseDisplaySortValue(row: TableRow): string {
-    const customOrder = this.customRowOrder(row);
-    const date = String(row["expenseDate"] || row["date"] || "");
-    return `${customOrder ? "1" : "0"}::${customOrder || date}::${row["__rowId"] || ""}`;
-  }
-
-  private customRowOrder(row: TableRow): number {
-    const match = String(row["__rowId"] || "").match(/^custom:[^:]+:(\d+)/);
-    return match ? Number(match[1]) : 0;
   }
 
   private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true): number {

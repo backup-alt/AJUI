@@ -229,7 +229,7 @@ const sectionConfigs: SectionConfig[] = [
             <section class="operations-workbench universal-workbench project-workbench">
               <nav class="operations-tabs" aria-label="Project table modules">
                 <button
-                  *ngFor="let section of sections; trackBy: trackBySection"
+                  *ngFor="let section of sections"
                   type="button"
                   [class.active]="activeSection() === section.key"
                   (click)="switchSection(section.key)"
@@ -315,9 +315,9 @@ const sectionConfigs: SectionConfig[] = [
               </div>
 
               <div class="table-meta-strip">
-                <span>{{ activeRows().length }} rows</span>
-                <span>{{ activeColumns().length }} fields</span>
-                <span>{{ editingRowId() ? 'Editing selected row' : 'Select a row to edit' }}</span>
+                <span>{{ visibleRows(activeSection()).length }} rows</span>
+                <span>{{ columnsFor(activeSection()).length }} fields</span>
+                <span>Inline editable cells</span>
                 <button type="button" class="meta-reset-action" *ngIf="hiddenFieldCount(activeSection())" (click)="resetFields(activeSection())">
                   Reset fields
                 </button>
@@ -334,7 +334,7 @@ const sectionConfigs: SectionConfig[] = [
                 <table>
                   <thead>
                     <tr>
-                      <th *ngFor="let column of activeColumns(); trackBy: trackByColumn">
+                      <th *ngFor="let column of columnsFor(activeSection())">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
                           <button
@@ -357,55 +357,24 @@ const sectionConfigs: SectionConfig[] = [
                           </button>
                         </span>
                       </th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr
-                      *ngFor="let row of activeRows(); trackBy: trackByRow"
-                      (click)="selectRow(row)"
-                      [class.selected-row]="isRowSelected(row)"
-                      [class.editing-row]="isRowEditing(row)"
-                    >
+                    <tr *ngFor="let row of visibleRows(activeSection())">
                       <td
-                        *ngFor="let column of activeColumns(); let first = first; trackBy: trackByColumn"
+                        *ngFor="let column of columnsFor(activeSection())"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
-                        [class.select-cell]="isRowEditing(row) && activeSelectOptions(column.key).length > 0"
+                        [class.select-cell]="selectOptions(activeSection(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeSection() === 'labour' && column.key === 'labourTypes'"
                       >
-                        <div class="row-inline-actions" *ngIf="first && isRowSelected(row)" (click)="$event.stopPropagation()">
-                          <button type="button" class="context-row-action" [class.active]="isRowEditing(row)" (click)="editSelectedRow()">
-                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                              <path d="M12.8 4.6 15.4 7.2" />
-                              <path d="M5 15h2.8l7-7a1.8 1.8 0 0 0-2.6-2.6l-7 7V15Z" />
-                            </svg>
-                            Edit
-                          </button>
-                          <button *ngIf="activeSection() === 'reports'" type="button" class="context-row-action" (click)="downloadReportRow(row)">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M12 4v10" />
-                              <path d="m8 10 4 4 4-4" />
-                              <path d="M5 20h14" />
-                            </svg>
-                            PDF
-                          </button>
-                          <button type="button" class="context-row-action danger" (click)="deleteSelectedRow()">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M4 7h16" />
-                              <path d="M10 11v6" />
-                              <path d="M14 11v6" />
-                              <path d="M6 7l1 14h10l1-14" />
-                              <path d="M9 7V4h6v3" />
-                            </svg>
-                            Delete
-                          </button>
-                        </div>
                         <ng-container *ngIf="activeSection() === 'labour' && column.key === 'labourTypes'; else standardProjectCell">
                           <div class="labour-types-cell">
                             <div class="labour-type-chip-row" *ngIf="labourTypeCards(row).length; else emptyLabourTypes">
-                              <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row); trackBy: trackByLabourType">
+                              <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row)">
                                 <span>{{ type.type }}</span>
                                 <strong>{{ type.count }}</strong>
-                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type)">
+                                <button type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type)">
                                   <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                     <path d="m5.5 5.5 9 9" />
                                     <path d="m14.5 5.5-9 9" />
@@ -416,7 +385,7 @@ const sectionConfigs: SectionConfig[] = [
                             <ng-template #emptyLabourTypes>
                               <span class="labour-type-empty">No labor types</span>
                             </ng-template>
-                            <button *ngIf="isRowEditing(row)" type="button" class="labour-type-add" (click)="openLabourTypeDialog(row)">
+                            <button type="button" class="labour-type-add" (click)="openLabourTypeDialog(row)">
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                 <path d="M10 4v12" />
                                 <path d="M4 10h12" />
@@ -426,70 +395,90 @@ const sectionConfigs: SectionConfig[] = [
                           </div>
                         </ng-container>
                         <ng-template #standardProjectCell>
-                          <ng-container *ngIf="isRowEditing(row); else readonlyProjectCell">
-                            <div
-                              *ngIf="activeSelectOptions(column.key).length > 0; else editableProjectCell"
-                              class="erp-select-menu"
-                              [class.open]="isSelectMenuOpen(row, column.key)"
-                            >
-                              <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
-                                <span>{{ row[column.key] || 'Select' }}</span>
-                                <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                  <path d="M5.5 7.5 10 12l4.5-4.5" />
-                                </svg>
-                              </button>
-                              <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
-                                <button
-                                  *ngFor="let option of activeSelectOptions(column.key); trackBy: trackByValue"
-                                  type="button"
-                                  [class.selected]="option === row[column.key]"
-                                  (click)="selectCellOptionForRow(activeSection(), row, column.key, option)"
-                                >
-                                  <span
-                                    class="select-option-icon"
-                                    *ngIf="selectOptionIcon(option) as icon"
-                                    [class.approve]="icon === 'approve'"
-                                    [class.decline]="icon === 'decline'"
-                                  >
-                                    <svg *ngIf="icon === 'approve'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-                                    </svg>
-                                    <svg *ngIf="icon === 'decline'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                      <path d="m5.5 5.5 9 9" />
-                                      <path d="m14.5 5.5-9 9" />
-                                    </svg>
-                                  </span>
-                                  {{ option }}
-                                </button>
-                                <label class="custom-select-entry" *ngIf="allowsCustomOption(activeSection(), column.key)">
-                                  <span>Custom</span>
-                                  <input
-                                    #projectCustomValue
-                                    (keydown.enter)="saveCustomSelectOptionForRow(activeSection(), row, column.key, projectCustomValue.value, $event)"
-                                    placeholder="Type value and press Enter"
-                                  />
-                                </label>
-                              </div>
-                            </div>
-                            <ng-template #editableProjectCell>
-                              <span
-                                class="editable-cell"
-                                [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
-                                spellcheck="false"
-                                (blur)="!isReadonlyColumn(column.key) && updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
+                          <div
+                            *ngIf="selectOptions(activeSection(), column.key).length > 0; else editableProjectCell"
+                            class="erp-select-menu"
+                            [class.open]="isSelectMenuOpen(row, column.key)"
+                          >
+                            <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
+                              <span>{{ row[column.key] || 'Select' }}</span>
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                <path d="M5.5 7.5 10 12l4.5-4.5" />
+                              </svg>
+                            </button>
+                            <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
+                              <button
+                                *ngFor="let option of selectOptions(activeSection(), column.key)"
+                                type="button"
+                                [class.selected]="option === row[column.key]"
+                                (click)="selectCellOptionForRow(activeSection(), row, column.key, option)"
                               >
-                                {{ row[column.key] }}
-                              </span>
-                            </ng-template>
-                          </ng-container>
-                          <ng-template #readonlyProjectCell>
-                            <span class="cell-value">{{ cellDisplay(row, column.key) }}</span>
+                                <span
+                                  class="select-option-icon"
+                                  *ngIf="selectOptionIcon(option) as icon"
+                                  [class.approve]="icon === 'approve'"
+                                  [class.decline]="icon === 'decline'"
+                                >
+                                  <svg *ngIf="icon === 'approve'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                    <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                                  </svg>
+                                  <svg *ngIf="icon === 'decline'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                    <path d="m5.5 5.5 9 9" />
+                                    <path d="m14.5 5.5-9 9" />
+                                  </svg>
+                                </span>
+                                {{ option }}
+                              </button>
+                              <label class="custom-select-entry" *ngIf="allowsCustomOption(activeSection(), column.key)">
+                                <span>Custom</span>
+                                <input
+                                  #projectCustomValue
+                                  (keydown.enter)="saveCustomSelectOptionForRow(activeSection(), row, column.key, projectCustomValue.value, $event)"
+                                  placeholder="Type value and press Enter"
+                                />
+                              </label>
+                            </div>
+                          </div>
+                          <ng-template #editableProjectCell>
+                            <span
+                              class="editable-cell"
+                              [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
+                              spellcheck="false"
+                              (blur)="!isReadonlyColumn(column.key) && updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
+                            >
+                              {{ row[column.key] }}
+                            </span>
                           </ng-template>
                         </ng-template>
                       </td>
+                      <td class="row-actions">
+                        <button
+                          *ngIf="activeSection() === 'reports'"
+                          type="button"
+                          class="icon-row-action"
+                          aria-label="Download report"
+                          title="Download report"
+                          (click)="downloadReportRow(row)"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                            <path d="M12 4v10" />
+                            <path d="m8 10 4 4 4-4" />
+                            <path d="M5 20h14" />
+                          </svg>
+                        </button>
+                        <button type="button" class="icon-row-action danger" aria-label="Delete row" title="Delete row" (click)="deleteRow(row)">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                            <path d="M4 7h16" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                            <path d="M6 7l1 14h10l1-14" />
+                            <path d="M9 7V4h6v3" />
+                          </svg>
+                        </button>
+                      </td>
                     </tr>
-                    <tr *ngIf="activeRows().length === 0">
-                      <td class="empty-row" [attr.colspan]="activeColumns().length">
+                    <tr *ngIf="visibleRows(activeSection()).length === 0">
+                      <td class="empty-row" [attr.colspan]="columnsFor(activeSection()).length + 1">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -693,8 +682,6 @@ export class ProjectWorkspacePage {
   readonly siteDraftName = signal("");
   readonly openSelectKey = signal("");
   readonly selectCustomValue = signal("");
-  readonly selectedRowId = signal("");
-  readonly editingRowId = signal("");
   readonly labourTypeDialogOpen = signal(false);
   readonly labourTypeRowId = signal("");
   readonly labourTypeName = signal("Mason");
@@ -713,50 +700,19 @@ export class ProjectWorkspacePage {
     return site === "All" || this.projectSites().includes(site) ? site : "All";
   });
   readonly activeConfig = computed(() => sectionConfigs.find((section) => section.key === this.activeSection()) ?? sectionConfigs[0]);
-  readonly activeColumns = computed(() => this.computeColumnsFor(this.activeSection()));
-  readonly activeRows = computed(() => this.computeVisibleRowsFor(this.activeSection()));
-  readonly activeSelectOptionMap = computed(() => {
-    const section = this.activeSection();
-    return Object.fromEntries(this.activeColumns().map((column) => [column.key, this.selectOptions(section, column.key)])) as Record<string, string[]>;
-  });
 
   switchSection(section: ModuleKey) {
     this.activeSection.set(section);
     this.tableSearch.set("");
-    this.openSelectKey.set("");
-    this.selectedRowId.set("");
-    this.editingRowId.set("");
     void this.router.navigate(["/clients", this.clientId(), "projects", this.projectId(), section]);
   }
 
   columnsFor(section: ModuleKey): FieldSchema[] {
-    if (section === this.activeSection()) return this.activeColumns();
-    return this.computeColumnsFor(section);
-  }
-
-  private computeColumnsFor(section: ModuleKey): FieldSchema[] {
     const base = sectionConfigs.find((config) => config.key === section)?.columns ?? [];
-    const custom = this.data.customFieldsFor(section).filter((field) => field.label?.trim() && field.key?.trim());
+    const custom = this.data.customFieldsFor(section);
     const hidden = new Set(this.data.hiddenFieldsFor(section));
     const columns = section === "labour" ? this.withLabourWageColumns(base, custom) : this.data.composeTableColumns(base, custom);
-    const visible = this.normalizeColumns(columns.filter((column) => !hidden.has(column.key)));
-    const visibleBaseCount = base.filter((column) => column.label?.trim() && column.key?.trim() && !hidden.has(column.key)).length;
-    return visible.length && visibleBaseCount ? visible : this.normalizeColumns(columns);
-  }
-
-  private normalizeColumns(columns: FieldSchema[]): FieldSchema[] {
-    const seen = new Set<string>();
-    return columns.filter((column) => {
-      const key = column.key?.trim();
-      const label = column.label?.trim();
-      if (!key || !label || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
-
-  activeSelectOptions(key: string): string[] {
-    return this.activeSelectOptionMap()[key] ?? [];
+    return columns.filter((column) => !hidden.has(column.key));
   }
 
   hiddenFieldCount(section: ModuleKey): number {
@@ -784,11 +740,6 @@ export class ProjectWorkspacePage {
   }
 
   visibleRows(section: ModuleKey): TableRow[] {
-    if (section === this.activeSection()) return this.activeRows();
-    return this.computeVisibleRowsFor(section);
-  }
-
-  private computeVisibleRowsFor(section: ModuleKey): TableRow[] {
     const query = this.tableSearch().trim().toLowerCase();
     let rows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (row) => this.rowBelongsToProject(row));
     const site = this.activeSiteFilter();
@@ -799,69 +750,10 @@ export class ProjectWorkspacePage {
     return this.withComputedRows(section, rows);
   }
 
-  trackBySection(_: number, section: SectionConfig): ModuleKey {
-    return section.key;
-  }
-
-  trackByColumn(index: number, column: FieldSchema): string {
-    return `${column.key}:${index}`;
-  }
-
-  trackByRow(_: number, row: TableRow): string {
-    return this.rowKey(row);
-  }
-
-  trackByValue(_: number, value: string): string {
-    return value;
-  }
-
-  trackByLabourType(_: number, type: { type: string }): string {
-    return type.type;
-  }
-
-  private rowKey(row: TableRow): string {
-    return String(row["__rowId"] || row["vendorId"] || row["subcontractId"] || row["reportName"] || JSON.stringify(row));
-  }
-
-  cellDisplay(row: TableRow, key: string): string {
-    const value = row[key];
-    if (value === undefined || value === null || value === "") return "-";
-    return String(value);
-  }
-
-  selectRow(row: TableRow) {
-    const rowId = this.rowKey(row);
-    this.selectedRowId.set(rowId);
-    if (this.editingRowId() && this.editingRowId() !== rowId) this.editingRowId.set("");
-  }
-
-  isRowSelected(row: TableRow): boolean {
-    return this.selectedRowId() === this.rowKey(row);
-  }
-
-  isRowEditing(row: TableRow): boolean {
-    return this.editingRowId() === this.rowKey(row);
-  }
-
-  editSelectedRow() {
-    const selected = this.selectedRowId();
-    if (!selected) return;
-    this.editingRowId.set(this.editingRowId() === selected ? "" : selected);
-  }
-
-  deleteSelectedRow() {
-    const selected = this.selectedRowId();
-    const row = this.visibleRows(this.activeSection()).find((entry) => this.rowKey(entry) === selected);
-    if (!row) return;
-    this.deleteRow(row);
-    this.selectedRowId.set("");
-    this.editingRowId.set("");
-  }
-
   addInlineRow() {
     const section = this.activeSection();
     const currentProject = this.project();
-    const row = this.data.addCustomRow(section, {
+    this.data.addCustomRow(section, {
       ...this.defaultRowFor(section),
       __projectId: this.projectId(),
       projectId: this.projectId(),
@@ -869,9 +761,6 @@ export class ProjectWorkspacePage {
       project: currentProject?.name ?? "",
       expenseScope: section === "expenses" ? "Site" : undefined,
     });
-    const rowId = this.rowKey(row);
-    this.selectedRowId.set(rowId);
-    this.editingRowId.set(rowId);
   }
 
   openRecordDialog() {
@@ -976,8 +865,6 @@ export class ProjectWorkspacePage {
 
   deleteRow(row: TableRow) {
     this.data.deleteSharedRow(String(row["__rowId"] || ""));
-    if (this.selectedRowId() === this.rowKey(row)) this.selectedRowId.set("");
-    if (this.editingRowId() === this.rowKey(row)) this.editingRowId.set("");
   }
 
   selectCellKey(row: TableRow, key: string): string {
@@ -1519,7 +1406,7 @@ export class ProjectWorkspacePage {
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
-    const balancedRows = [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
+    return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
       const transactionType = String(row["transactionType"] || row["expenseScope"] || "Site Expense");
       const groupKey = this.expenseGroupKey(row);
       const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
@@ -1531,7 +1418,6 @@ export class ProjectWorkspacePage {
         runningBalance: formatMoney(balance),
       };
     });
-    return balancedRows.sort((first, second) => this.expenseDisplaySortValue(second).localeCompare(this.expenseDisplaySortValue(first)));
   }
 
   private withLabourPayable(row: TableRow): TableRow {
@@ -1725,25 +1611,17 @@ export class ProjectWorkspacePage {
   expenseCurrentBalanceLabel(): string {
     const rows = this.visibleRows("expenses");
     if (!rows.length) return this.expenseOpeningBalanceLabel();
-    const latestByGroup = new Map<string, { order: string; balance: number }>();
+    const latestByGroup = new Map<string, number>();
     if (this.activeSiteFilter() === "All") {
       for (const site of this.expenseLedgerSites()) {
-        latestByGroup.set(this.expenseGroupKey({ projectId: this.projectId(), site }), {
-          order: "",
-          balance: this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }),
-        });
+        latestByGroup.set(this.expenseGroupKey({ projectId: this.projectId(), site }), this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }));
       }
     }
-    for (const row of rows) {
-      const key = this.expenseGroupKey(row);
-      const order = this.expenseRowSortValue(row);
-      const previous = latestByGroup.get(key);
-      if (!previous || order >= previous.order) latestByGroup.set(key, { order, balance: this.moneyNumber(row["runningBalance"]) });
-    }
+    for (const row of rows) latestByGroup.set(this.expenseGroupKey(row), this.moneyNumber(row["runningBalance"]));
     if (this.activeSiteFilter() !== "All") {
-      return formatMoney([...latestByGroup.values()].at(-1)?.balance ?? this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
+      return formatMoney([...latestByGroup.values()].at(-1) ?? this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
     }
-    const total = [...latestByGroup.values()].reduce((sum, entry) => sum + entry.balance, 0);
+    const total = [...latestByGroup.values()].reduce((sum, balance) => sum + balance, 0);
     return formatMoney(total);
   }
 
@@ -1776,17 +1654,6 @@ export class ProjectWorkspacePage {
   private expenseRowSortValue(row: TableRow): string {
     const date = String(row["expenseDate"] || row["date"] || "");
     return `${this.expenseGroupKey(row)}::${date}::${row["__rowId"] || ""}`;
-  }
-
-  private expenseDisplaySortValue(row: TableRow): string {
-    const customOrder = this.customRowOrder(row);
-    const date = String(row["expenseDate"] || row["date"] || "");
-    return `${customOrder ? "1" : "0"}::${customOrder || date}::${row["__rowId"] || ""}`;
-  }
-
-  private customRowOrder(row: TableRow): number {
-    const match = String(row["__rowId"] || "").match(/^custom:[^:]+:(\d+)/);
-    return match ? Number(match[1]) : 0;
   }
 
   private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true): number {

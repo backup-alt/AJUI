@@ -22,17 +22,7 @@ type SidebarItem = {
       <ion-content>
         <div class="sidebar-shell">
           <div class="sidebar-logo-wrap">
-            <img
-              *ngIf="!logoLoadFailed; else logoFallback"
-              class="sidebar-logo"
-              [src]="logoPath"
-              alt="Annai Golden Builders"
-              draggable="false"
-              (error)="logoLoadFailed = true"
-            />
-            <ng-template #logoFallback>
-              <div class="sidebar-logo-fallback" aria-label="Annai Golden Builders">AG</div>
-            </ng-template>
+            <img class="sidebar-logo" [src]="logoPath" alt="Annai Golden Builders" />
           </div>
 
           <ion-list lines="none" class="sidebar-nav">
@@ -126,8 +116,7 @@ export class EnterpriseSidebarComponent {
   @Output() editProject = new EventEmitter<Project>();
   @Output() deleteProject = new EventEmitter<Project>();
 
-  readonly logoPath = "./assets/logo.png";
-  logoLoadFailed = false;
+  readonly logoPath = "assets/logo.png";
 
   get clientProjects(): Project[] {
     return this.data.projectsForClient(this.data.clientById(this.clientId));
