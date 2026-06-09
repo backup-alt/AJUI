@@ -10617,3 +10617,19 @@ body.dark-mode {
 .dark-mode .empty-box-line {
   fill: #002263 !important;
 }
+
+/* Universal dashboard: do not freeze the Client ID / first column horizontally. */
+.universal-table td:first-child {
+  position: static !important;
+  left: auto !important;
+  z-index: auto !important;
+  box-shadow: none !important;
+}
+
+.universal-table th:first-child {
+  position: sticky !important;
+  top: 0 !important;
+  left: auto !important;
+  z-index: 2 !important;
+  box-shadow: none !important;
+}
