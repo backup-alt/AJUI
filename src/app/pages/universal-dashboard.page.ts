@@ -373,8 +373,8 @@ const dashboardModules: ModuleConfig[] = [
               </div>
 
               <div class="table-meta-strip">
-                <span>{{ visibleRows().length }} rows</span>
-                <span>{{ columnsForActive().length }} fields</span>
+                <span>{{ activeRows().length }} rows</span>
+                <span>{{ activeColumns().length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
                 <span *ngIf="activeModule() === 'clients'">Customer records synced</span>
                 <span *ngIf="activeModule() === 'expenses'">Balances grouped by Project + Site</span>
@@ -383,32 +383,11 @@ const dashboardModules: ModuleConfig[] = [
                 </button>
               </div>
 
-              <div class="selected-row-actions" *ngIf="selectedRowId() && activeModule() !== 'reports'">
-                <span>{{ editingRowId() ? 'Editing selected row' : '1 row selected' }}</span>
-                <button type="button" class="context-row-action" (click)="editSelectedRow()">
-                  <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                    <path d="M12.8 4.6 15.4 7.2" />
-                    <path d="M5 15h2.8l7-7a1.8 1.8 0 0 0-2.6-2.6l-7 7V15Z" />
-                  </svg>
-                  {{ editingRowId() ? 'Done' : 'Edit row' }}
-                </button>
-                <button type="button" class="context-row-action danger" (click)="deleteSelectedRow()">
-                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                    <path d="M4 7h16" />
-                    <path d="M10 11v6" />
-                    <path d="M14 11v6" />
-                    <path d="M6 7l1 14h10l1-14" />
-                    <path d="M9 7V4h6v3" />
-                  </svg>
-                  Delete row
-                </button>
-              </div>
-
               <div class="table-wrap operations-table universal-table">
                 <table>
                   <thead>
                     <tr>
-                      <th *ngFor="let column of columnsForActive(); trackBy: trackByColumn">
+                      <th *ngFor="let column of activeColumns(); trackBy: trackByColumn">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
                           <button
@@ -436,18 +415,37 @@ const dashboardModules: ModuleConfig[] = [
                   </thead>
                   <tbody>
                     <tr
-                      *ngFor="let row of visibleRows(); trackBy: trackByRow"
+                      *ngFor="let row of activeRows(); trackBy: trackByRow"
                       (click)="selectRow(row)"
                       [class.selected-row]="isRowSelected(row)"
                       [class.editing-row]="isRowEditing(row)"
                     >
                       <td
-                        *ngFor="let column of columnsForActive(); trackBy: trackByColumn"
+                        *ngFor="let column of activeColumns(); let first = first; trackBy: trackByColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
                         [class.select-cell]="isRowEditing(row) && activeSelectOptions(column.key).length > 0"
                         [class.labour-types-cell-host]="activeModule() === 'labour' && column.key === 'labourTypes'"
                         spellcheck="false"
                       >
+                        <div class="row-inline-actions" *ngIf="first && isRowSelected(row) && activeModule() !== 'reports'" (click)="$event.stopPropagation()">
+                          <button type="button" class="context-row-action" [class.active]="isRowEditing(row)" (click)="editSelectedRow()">
+                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                              <path d="M12.8 4.6 15.4 7.2" />
+                              <path d="M5 15h2.8l7-7a1.8 1.8 0 0 0-2.6-2.6l-7 7V15Z" />
+                            </svg>
+                            Edit
+                          </button>
+                          <button type="button" class="context-row-action danger" (click)="deleteSelectedRow()">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                              <path d="M4 7h16" />
+                              <path d="M10 11v6" />
+                              <path d="M14 11v6" />
+                              <path d="M6 7l1 14h10l1-14" />
+                              <path d="M9 7V4h6v3" />
+                            </svg>
+                            Delete
+                          </button>
+                        </div>
                         <ng-container *ngIf="activeModule() === 'labour' && column.key === 'labourTypes'; else standardDashboardCell">
                           <div class="labour-types-cell">
                             <div class="labour-type-chip-row" *ngIf="labourTypeCards(row).length; else emptyUniversalLabourTypes">
@@ -561,8 +559,8 @@ const dashboardModules: ModuleConfig[] = [
                         </button>
                       </td>
                     </tr>
-                    <tr *ngIf="visibleRows().length === 0">
-                      <td class="empty-row" [attr.colspan]="columnsForActive().length + (activeModule() === 'reports' ? 1 : 0)">
+                    <tr *ngIf="activeRows().length === 0">
+                      <td class="empty-row" [attr.colspan]="activeColumns().length + (activeModule() === 'reports' ? 1 : 0)">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
