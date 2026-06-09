@@ -9036,6 +9036,83 @@ body {
   background: rgba(190, 18, 60, 0.18) !important;
 }
 
+/* Defensive table visibility and row-selection stability */
+.operations-tabs button span,
+.operations-tabs button small,
+.filter-select-shell > span,
+.erp-select-trigger span,
+.column-head-inner > span,
+.operations-table th,
+.operations-table td,
+.operations-table .cell-value {
+  visibility: visible !important;
+  opacity: 1 !important;
+  text-indent: 0 !important;
+}
+
+.operations-tabs button span {
+  display: inline-flex !important;
+  color: inherit !important;
+  font-size: 13px !important;
+  font-weight: 820 !important;
+  line-height: 1 !important;
+}
+
+.operations-tabs button small {
+  color: #002263 !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.operations-table thead,
+.operations-table tbody,
+.operations-table tr {
+  visibility: visible !important;
+}
+
+.operations-table tbody tr {
+  display: table-row !important;
+  min-height: 42px;
+}
+
+.operations-table th {
+  color: #1d2939 !important;
+}
+
+.operations-table td,
+.operations-table .cell-value {
+  color: #101828 !important;
+}
+
+.operations-table tbody tr.selected-row td:first-child:not(.empty-row) {
+  padding-left: 218px !important;
+}
+
+.row-inline-actions {
+  min-width: max-content;
+}
+
+.dark-mode .operations-tabs button span,
+.dark-mode .operations-tabs button small,
+.dark-mode .filter-select-shell > span,
+.dark-mode .erp-select-trigger span,
+.dark-mode .column-head-inner > span,
+.dark-mode .operations-table th,
+.dark-mode .operations-table td,
+.dark-mode .operations-table .cell-value {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.dark-mode .operations-table th {
+  color: #eaf2ff !important;
+}
+
+.dark-mode .operations-table td,
+.dark-mode .operations-table .cell-value {
+  color: #edf4ff !important;
+}
+
 .dark-mode .operations-table td.select-cell select,
 .dark-mode .operations-table td.select-cell .table-combo-input {
   border-color: transparent;

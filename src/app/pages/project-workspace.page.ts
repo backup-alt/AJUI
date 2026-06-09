@@ -357,7 +357,6 @@ const sectionConfigs: SectionConfig[] = [
                           </button>
                         </span>
                       </th>
-                      <th *ngIf="activeSection() === 'reports'">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -373,13 +372,21 @@ const sectionConfigs: SectionConfig[] = [
                         [class.select-cell]="isRowEditing(row) && activeSelectOptions(column.key).length > 0"
                         [class.labour-types-cell-host]="activeSection() === 'labour' && column.key === 'labourTypes'"
                       >
-                        <div class="row-inline-actions" *ngIf="first && isRowSelected(row) && activeSection() !== 'reports'" (click)="$event.stopPropagation()">
+                        <div class="row-inline-actions" *ngIf="first && isRowSelected(row)" (click)="$event.stopPropagation()">
                           <button type="button" class="context-row-action" [class.active]="isRowEditing(row)" (click)="editSelectedRow()">
                             <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                               <path d="M12.8 4.6 15.4 7.2" />
                               <path d="M5 15h2.8l7-7a1.8 1.8 0 0 0-2.6-2.6l-7 7V15Z" />
                             </svg>
                             Edit
+                          </button>
+                          <button *ngIf="activeSection() === 'reports'" type="button" class="context-row-action" (click)="downloadReportRow(row)">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                              <path d="M12 4v10" />
+                              <path d="m8 10 4 4 4-4" />
+                              <path d="M5 20h14" />
+                            </svg>
+                            PDF
                           </button>
                           <button type="button" class="context-row-action danger" (click)="deleteSelectedRow()">
                             <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
@@ -480,33 +487,9 @@ const sectionConfigs: SectionConfig[] = [
                           </ng-template>
                         </ng-template>
                       </td>
-                      <td class="row-actions" *ngIf="activeSection() === 'reports'">
-                        <button
-                          type="button"
-                          class="icon-row-action"
-                          aria-label="Download report"
-                          title="Download report"
-                          (click)="downloadReportRow(row)"
-                        >
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                            <path d="M12 4v10" />
-                            <path d="m8 10 4 4 4-4" />
-                            <path d="M5 20h14" />
-                          </svg>
-                        </button>
-                        <button type="button" class="icon-row-action danger" aria-label="Delete row" title="Delete row" (click)="deleteRow(row)">
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                            <path d="M4 7h16" />
-                            <path d="M10 11v6" />
-                            <path d="M14 11v6" />
-                            <path d="M6 7l1 14h10l1-14" />
-                            <path d="M9 7V4h6v3" />
-                          </svg>
-                        </button>
-                      </td>
                     </tr>
                     <tr *ngIf="activeRows().length === 0">
-                      <td class="empty-row" [attr.colspan]="activeColumns().length + (activeSection() === 'reports' ? 1 : 0)">
+                      <td class="empty-row" [attr.colspan]="activeColumns().length">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -753,10 +736,12 @@ export class ProjectWorkspacePage {
 
   private computeColumnsFor(section: ModuleKey): FieldSchema[] {
     const base = sectionConfigs.find((config) => config.key === section)?.columns ?? [];
-    const custom = this.data.customFieldsFor(section);
+    const custom = this.data.customFieldsFor(section).filter((field) => field.label?.trim() && field.key?.trim());
     const hidden = new Set(this.data.hiddenFieldsFor(section));
     const columns = section === "labour" ? this.withLabourWageColumns(base, custom) : this.data.composeTableColumns(base, custom);
-    return columns.filter((column) => !hidden.has(column.key));
+    const visible = columns.filter((column) => column.label?.trim() && column.key?.trim() && !hidden.has(column.key));
+    const visibleBaseCount = base.filter((column) => column.label?.trim() && column.key?.trim() && !hidden.has(column.key)).length;
+    return visible.length && visibleBaseCount ? visible : this.data.composeTableColumns(base, custom);
   }
 
   activeSelectOptions(key: string): string[] {
