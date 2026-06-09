@@ -10739,3 +10739,69 @@ th:hover .column-insert-action,
   color: #f8fbff;
   box-shadow: 0 0 0 3px rgba(155, 188, 255, 0.16);
 }
+
+/* Dashboard render recovery: keep table text visible even after stale UI state. */
+.universal-workbench .operations-tabs button > span,
+.project-workbench .operations-tabs button > span,
+.filter-select-shell > span,
+.erp-select-trigger > span,
+.operations-table th .column-head-inner > span,
+.operations-table td .editable-cell,
+.operations-table td,
+.sidebar-nav ion-label,
+.sidebar-user-copy strong,
+.sidebar-user-copy span {
+  visibility: visible !important;
+  opacity: 1 !important;
+  text-indent: 0 !important;
+  letter-spacing: 0 !important;
+  font-size: inherit !important;
+}
+
+.universal-workbench .operations-tabs button > span,
+.project-workbench .operations-tabs button > span,
+.filter-select-shell > span,
+.erp-select-trigger > span {
+  color: #344054 !important;
+}
+
+.universal-workbench .operations-tabs button.active > span,
+.project-workbench .operations-tabs button.active > span {
+  color: #002263 !important;
+}
+
+.operations-table th .column-head-inner > span {
+  display: inline-block !important;
+  min-width: 0 !important;
+  color: #24324a !important;
+  font-weight: 920 !important;
+}
+
+.operations-table td .editable-cell {
+  color: #152033 !important;
+  font-weight: 720 !important;
+}
+
+.sidebar-nav ion-label,
+.sidebar-user-copy strong {
+  color: #344054 !important;
+}
+
+.sidebar-user-copy span {
+  color: #667085 !important;
+}
+
+.dark-mode .universal-workbench .operations-tabs button > span,
+.dark-mode .project-workbench .operations-tabs button > span,
+.dark-mode .filter-select-shell > span,
+.dark-mode .erp-select-trigger > span,
+.dark-mode .operations-table th .column-head-inner > span,
+.dark-mode .operations-table td .editable-cell,
+.dark-mode .sidebar-nav ion-label,
+.dark-mode .sidebar-user-copy strong {
+  color: #f8fbff !important;
+}
+
+.dark-mode .sidebar-user-copy span {
+  color: #b8c6da !important;
+}

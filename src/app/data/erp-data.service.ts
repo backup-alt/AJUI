@@ -81,6 +81,8 @@ export type SharedTableRow = Record<string, string | number | undefined>;
 
 @Injectable({ providedIn: "root" })
 export class ErpDataService {
+  private readonly recoveredTablePresentationState = this.recoverTablePresentationState();
+
   readonly clients = signal<Client[]>(
     this.readState<Client[]>("clients", [
     {
@@ -1161,6 +1163,36 @@ export class ErpDataService {
 
   private storageKey(key: string): string {
     return `agb-erp:${key}`;
+  }
+
+  private recoverTablePresentationState(): boolean {
+    if (typeof localStorage === "undefined") return true;
+
+    const recoveryKey = this.storageKey("dashboardPresentationRecoveryV1");
+    if (localStorage.getItem(recoveryKey) === "complete") return true;
+
+    try {
+      localStorage.removeItem(this.storageKey("hiddenTableFields"));
+      const customFieldsKey = this.storageKey("customTableFields");
+      const storedFields = localStorage.getItem(customFieldsKey);
+      if (storedFields) {
+        const parsed = JSON.parse(storedFields) as Record<string, SharedTableField[]>;
+        const sanitized = Object.fromEntries(
+          Object.entries(parsed).map(([module, fields]) => [
+            module,
+            Array.isArray(fields)
+              ? fields.filter((field) => typeof field?.label === "string" && field.label.trim() && typeof field?.key === "string" && field.key.trim())
+              : [],
+          ]),
+        );
+        localStorage.setItem(customFieldsKey, JSON.stringify(sanitized));
+      }
+      localStorage.setItem(recoveryKey, "complete");
+    } catch {
+      // The recovery only protects the static demo presentation state.
+    }
+
+    return true;
   }
 
   private expenseOpeningBalanceKey(projectId: string, siteName: string): string {
