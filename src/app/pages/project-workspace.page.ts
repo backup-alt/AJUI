@@ -483,7 +483,7 @@ const sectionConfigs: SectionConfig[] = [
                             </ng-template>
                           </ng-container>
                           <ng-template #readonlyProjectCell>
-                            <span class="cell-value">{{ row[column.key] }}</span>
+                            <span class="cell-value">{{ cellDisplay(row, column.key) }}</span>
                           </ng-template>
                         </ng-template>
                       </td>
@@ -739,9 +739,20 @@ export class ProjectWorkspacePage {
     const custom = this.data.customFieldsFor(section).filter((field) => field.label?.trim() && field.key?.trim());
     const hidden = new Set(this.data.hiddenFieldsFor(section));
     const columns = section === "labour" ? this.withLabourWageColumns(base, custom) : this.data.composeTableColumns(base, custom);
-    const visible = columns.filter((column) => column.label?.trim() && column.key?.trim() && !hidden.has(column.key));
+    const visible = this.normalizeColumns(columns.filter((column) => !hidden.has(column.key)));
     const visibleBaseCount = base.filter((column) => column.label?.trim() && column.key?.trim() && !hidden.has(column.key)).length;
-    return visible.length && visibleBaseCount ? visible : this.data.composeTableColumns(base, custom);
+    return visible.length && visibleBaseCount ? visible : this.normalizeColumns(columns);
+  }
+
+  private normalizeColumns(columns: FieldSchema[]): FieldSchema[] {
+    const seen = new Set<string>();
+    return columns.filter((column) => {
+      const key = column.key?.trim();
+      const label = column.label?.trim();
+      if (!key || !label || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   activeSelectOptions(key: string): string[] {
@@ -792,8 +803,8 @@ export class ProjectWorkspacePage {
     return section.key;
   }
 
-  trackByColumn(_: number, column: FieldSchema): string {
-    return column.key;
+  trackByColumn(index: number, column: FieldSchema): string {
+    return `${column.key}:${index}`;
   }
 
   trackByRow(_: number, row: TableRow): string {
@@ -810,6 +821,12 @@ export class ProjectWorkspacePage {
 
   private rowKey(row: TableRow): string {
     return String(row["__rowId"] || row["vendorId"] || row["subcontractId"] || row["reportName"] || JSON.stringify(row));
+  }
+
+  cellDisplay(row: TableRow, key: string): string {
+    const value = row[key];
+    if (value === undefined || value === null || value === "") return "-";
+    return String(value);
   }
 
   selectRow(row: TableRow) {
