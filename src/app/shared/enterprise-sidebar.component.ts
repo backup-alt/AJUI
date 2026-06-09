@@ -81,7 +81,7 @@ type SidebarItem = {
           <div class="sidebar-user-panel">
             <div class="sidebar-profile-row">
               <div class="sidebar-user-avatar" aria-hidden="true">
-                <ion-icon name="person-outline"></ion-icon>
+                {{ userInitial }}
               </div>
               <div class="sidebar-user-copy">
                 <strong>{{ userName }}</strong>
@@ -89,7 +89,6 @@ type SidebarItem = {
               </div>
             </div>
             <button type="button" class="sidebar-logout" aria-label="Logout" (click)="logout()">
-              <span class="sidebar-logout-avatar" aria-hidden="true">AG</span>
               <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                 <path d="M10 6H6.5A2.5 2.5 0 0 0 4 8.5v7A2.5 2.5 0 0 0 6.5 18H10" />
                 <path d="M14 8l4 4-4 4" />
@@ -130,6 +129,10 @@ export class EnterpriseSidebarComponent {
       { key: "approvals", label: "Pending Approvals", icon: "checkmark-done-outline", route: ["/approvals"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
     ];
+  }
+
+  get userInitial(): string {
+    return (this.userName || "A").trim().charAt(0).toUpperCase() || "A";
   }
 
   logout() {

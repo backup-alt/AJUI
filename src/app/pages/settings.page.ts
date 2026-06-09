@@ -32,26 +32,6 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
             <section class="settings-grid">
               <article class="settings-card">
                 <div>
-                  <span>Company</span>
-                  <h2>Business Profile</h2>
-                  <p>Used in project records, exports, and receipts.</p>
-                </div>
-                <label>
-                  <span>Company Name</span>
-                  <input value="Annai Golden Builders" />
-                </label>
-                <label>
-                  <span>Primary Location</span>
-                  <input value="Chennai, Tamil Nadu" />
-                </label>
-                <label>
-                  <span>Default Supervisor</span>
-                  <input value="R. Karthik" />
-                </label>
-              </article>
-
-              <article class="settings-card">
-                <div>
                   <span>Projects</span>
                   <h2>Project Defaults</h2>
                   <p>Applied when a client is created or a new project is opened.</p>
@@ -112,30 +92,36 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 
               <article class="settings-card">
                 <div>
-                  <span>Approvals</span>
-                  <h2>Workflow Rules</h2>
-                  <p>Keep financial and site records controlled before export.</p>
+                  <span>Review</span>
+                  <h2>Approval Controls</h2>
+                  <p>Keep pending work visible without adding extra navigation steps.</p>
                 </div>
-                <div class="settings-toggle">
+                <div class="settings-check-row">
                   <div>
-                    <strong>Require expense approval</strong>
-                    <span>Site and general expenses need admin review.</span>
+                    <strong>Expense review queue</strong>
+                    <span>Site and general expenses appear in Pending Approvals.</span>
                   </div>
-                  <input type="checkbox" checked />
+                  <span class="settings-check-mark" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
+                  </span>
                 </div>
-                <div class="settings-toggle">
+                <div class="settings-check-row">
                   <div>
                     <strong>Payment verification</strong>
                     <span>Collections require accountant confirmation.</span>
                   </div>
-                  <input type="checkbox" checked />
+                  <span class="settings-check-mark" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
+                  </span>
                 </div>
-                <div class="settings-toggle">
+                <div class="settings-check-row">
                   <div>
-                    <strong>Material purchase tracking</strong>
-                    <span>Track vendors, PO numbers, and remaining stock.</span>
+                    <strong>Material quantity approval</strong>
+                    <span>Project managers enter approved quantity before approval.</span>
                   </div>
-                  <input type="checkbox" checked />
+                  <span class="settings-check-mark" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
+                  </span>
                 </div>
               </article>
 
@@ -162,6 +148,26 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                     <span>Append project IDs to exported records.</span>
                   </div>
                   <input type="checkbox" checked />
+                </div>
+              </article>
+
+              <article class="settings-card">
+                <div>
+                  <span>Appearance</span>
+                  <h2>Workspace Theme</h2>
+                  <p>Use a calm professional palette in light mode and a purpose-built navy dark mode.</p>
+                </div>
+                <div class="settings-mode-row">
+                  <button type="button" class="active">Light</button>
+                  <button type="button">Dark</button>
+                  <button type="button">System</button>
+                </div>
+                <div class="settings-theme-chip">
+                  <span aria-hidden="true"></span>
+                  <div>
+                    <strong>Primary accent</strong>
+                    <small>#002263</small>
+                  </div>
                 </div>
               </article>
             </section>

@@ -266,12 +266,10 @@ const dashboardModules: ModuleConfig[] = [
       { key: "scope", label: "Scope" },
       { key: "owner", label: "Owner" },
       { key: "exportFormat", label: "Export Format" },
-      { key: "status", label: "Status" },
     ],
     filters: [
       { key: "category", label: "Category" },
       { key: "owner", label: "Owner" },
-      { key: "status", label: "Status" },
     ],
   },
 ];
@@ -496,6 +494,20 @@ const dashboardModules: ModuleConfig[] = [
                         </ng-template>
                       </td>
                       <td class="row-actions">
+                        <button
+                          *ngIf="activeModule() === 'reports'"
+                          type="button"
+                          class="icon-row-action"
+                          aria-label="Download report"
+                          title="Download report"
+                          (click)="downloadReportRow(row)"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                            <path d="M12 4v10" />
+                            <path d="m8 10 4 4 4-4" />
+                            <path d="M5 20h14" />
+                          </svg>
+                        </button>
                         <button type="button" class="icon-row-action danger" aria-label="Delete row" title="Delete row" (click)="deleteRow(row)">
                           <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                             <path d="M4 7h16" />
@@ -1049,6 +1061,17 @@ export class UniversalDashboardPage {
     });
   }
 
+  downloadReportRow(row: TableRow) {
+    const columns = this.columnsForModule("reports");
+    this.openPrintableReport({
+      title: String(row["reportName"] || "Dashboard Report"),
+      subtitle: `Annai Golden Builders - ${String(row["scope"] || "Universal Dashboard")}`,
+      columns,
+      rows: [row],
+      summary: `<section class="summary"><h2>Report Details</h2><div><strong>Owner</strong><span>${this.escapeHtml(String(row["owner"] || "-"))}</span></div><div><strong>Format</strong><span>${this.escapeHtml(String(row["exportFormat"] || "PDF / Excel"))}</span></div></section>`,
+    });
+  }
+
   openClients() {
     void this.router.navigate(["/clients"]);
   }
@@ -1207,21 +1230,20 @@ export class UniversalDashboardPage {
     });
 
     const reports = [
-      ["Financial", "Payment Collection Report", "All projects", "Accountant", "Excel", "Ready"],
-      ["Financial", "Expense Report", "All sites", "Admin", "Excel", "Ready"],
-      ["Labour", "Attendance Report", "All labour", "Project Manager", "Excel", "Ready"],
-      ["Material", "Inventory Report", "All materials", "Project Manager", "Excel", "Ready"],
-      ["Vendor", "Vendor Purchase Report", "All vendors", "Admin", "Excel", "Ready"],
-      ["Subcontract", "Subcontractor Ledger", "All subcontractors", "Project Manager", "Excel", "Ready"],
-      ["Project", "Project Summary", "All clients", "Admin", "Excel", "Ready"],
-    ].map(([category, reportName, scope, owner, exportFormat, status], index) => ({
+      ["Financial", "Payment Collection Report", "All projects", "Accountant", "Excel"],
+      ["Financial", "Expense Report", "All sites", "Admin", "Excel"],
+      ["Labour", "Attendance Report", "All labour", "Project Manager", "Excel"],
+      ["Material", "Inventory Report", "All materials", "Project Manager", "Excel"],
+      ["Vendor", "Vendor Purchase Report", "All vendors", "Admin", "Excel"],
+      ["Subcontract", "Subcontractor Ledger", "All subcontractors", "Project Manager", "Excel"],
+      ["Project", "Project Summary", "All clients", "Admin", "Excel"],
+    ].map(([category, reportName, scope, owner, exportFormat], index) => ({
       __rowId: `report:${index}`,
       category,
       reportName,
       scope,
       owner,
       exportFormat,
-      status,
     }));
 
     return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, reports };
@@ -1387,7 +1409,6 @@ export class UniversalDashboardPage {
         scope: "",
         owner: "",
         exportFormat: "PDF / Excel",
-        status: "Ready",
       },
     };
     return defaults[module];
@@ -1862,6 +1883,7 @@ export class UniversalDashboardPage {
   private openPrintableReport(config: { title: string; subtitle: string; columns: FieldSchema[]; rows: TableRow[]; summary: string }) {
     const reportWindow = window.open("", "_blank");
     if (!reportWindow) return;
+    const generatedAt = new Date().toLocaleString();
     const tableRows = config.rows
       .map((row) => `<tr>${config.columns.map((column) => `<td>${this.escapeHtml(String(row[column.key] ?? ""))}</td>`).join("")}</tr>`)
       .join("");
@@ -1870,35 +1892,43 @@ export class UniversalDashboardPage {
 <head>
   <title>${this.escapeHtml(config.title)}</title>
   <style>
-    body { margin: 32px; color: #111827; font-family: Inter, Arial, sans-serif; }
-    header { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 18px; border-bottom: 2px solid #002263; }
-    h1 { margin: 0 0 6px; font-size: 24px; }
+    * { box-sizing: border-box; }
+    body { margin: 30px; color: #111827; background: #f5f7fb; font-family: Inter, Arial, sans-serif; }
+    .sheet { max-width: 1180px; margin: 0 auto; padding: 28px; border: 1px solid #cbd6e6; border-radius: 14px; background: #ffffff; }
+    header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; padding-bottom: 20px; border-bottom: 3px solid #002263; }
+    .brand { color: #002263; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 8px 0 6px; color: #0f172a; font-size: 25px; line-height: 1.12; }
     p { margin: 0; color: #526070; font-size: 13px; }
-    table { width: 100%; margin-top: 22px; border-collapse: collapse; font-size: 12px; }
-    th, td { padding: 9px 10px; border: 1px solid #cfd8e6; text-align: left; vertical-align: top; }
-    th { background: #eef4ff; color: #002263; font-weight: 800; }
-    .summary { display: grid; gap: 8px; margin-top: 18px; padding: 14px; border: 1px solid #cfd8e6; background: #f8fafc; }
-    .summary h2 { margin: 0 0 4px; font-size: 16px; }
+    .meta { display: grid; gap: 6px; min-width: 190px; padding: 12px; border: 1px solid #d6e0ee; border-radius: 10px; background: #f8fbff; color: #334155; font-size: 12px; }
+    table { width: 100%; margin-top: 22px; border-collapse: collapse; background: #fff; font-size: 12px; }
+    th, td { padding: 10px 11px; border: 1px solid #cfd8e6; text-align: left; vertical-align: top; }
+    th { background: #eef4ff; color: #002263; font-weight: 900; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; }
+    td { color: #1f2937; font-weight: 650; }
+    tr:nth-child(even) td { background: #fbfcff; }
+    .summary { display: grid; gap: 8px; margin-top: 18px; padding: 14px; border: 1px solid #cfd8e6; border-radius: 10px; background: #f8fafc; }
+    .summary h2 { margin: 0 0 4px; color: #0f172a; font-size: 16px; }
     .summary div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e4e9f1; padding-bottom: 6px; }
     .summary div:last-child { border-bottom: 0; padding-bottom: 0; }
-    footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 48px; font-size: 12px; }
-    footer div { padding-top: 34px; border-top: 1px solid #94a3b8; text-align: center; color: #526070; }
-    .print-action { margin-top: 18px; border: 0; border-radius: 8px; background: #002263; color: #fff; padding: 10px 14px; font-weight: 800; }
-    @media print { body { margin: 18mm; } button { display: none; } }
+    footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 50px; color: #526070; font-size: 12px; }
+    footer div { padding-top: 38px; border-top: 1px solid #94a3b8; text-align: center; }
+    .print-action { margin-top: 18px; border: 0; border-radius: 8px; background: #002263; color: #fff; padding: 11px 16px; font-weight: 900; cursor: pointer; }
+    @media print { body { margin: 0; background: #fff; } .sheet { max-width: none; border: 0; border-radius: 0; padding: 0; } button { display: none; } }
   </style>
 </head>
 <body>
-  <header>
-    <div><h1>${this.escapeHtml(config.title)}</h1><p>${this.escapeHtml(config.subtitle)}</p></div>
-    <p>Generated ${new Date().toLocaleDateString()}</p>
-  </header>
-  <table>
-    <thead><tr>${config.columns.map((column) => `<th>${this.escapeHtml(column.label)}</th>`).join("")}</tr></thead>
-    <tbody>${tableRows || `<tr><td colspan="${config.columns.length}">No records</td></tr>`}</tbody>
-  </table>
-  ${config.summary}
-  <button class="print-action" onclick="window.print()">Print / Save PDF</button>
-  <footer><div>Prepared By</div><div>Verified By</div><div>Approved / Stamp</div></footer>
+  <main class="sheet">
+    <header>
+      <div><div class="brand">Annai Golden Builders</div><h1>${this.escapeHtml(config.title)}</h1><p>${this.escapeHtml(config.subtitle)}</p></div>
+      <div class="meta"><strong>Generated</strong><span>${this.escapeHtml(generatedAt)}</span><span>Prepared for review and approval</span></div>
+    </header>
+    <table>
+      <thead><tr>${config.columns.map((column) => `<th>${this.escapeHtml(column.label)}</th>`).join("")}</tr></thead>
+      <tbody>${tableRows || `<tr><td colspan="${config.columns.length}">No records available</td></tr>`}</tbody>
+    </table>
+    ${config.summary}
+    <button class="print-action" onclick="window.print()">Print / Save PDF</button>
+    <footer><div>Prepared By</div><div>Verified By</div><div>Approved / Stamp</div></footer>
+  </main>
 </body>
 </html>`);
     reportWindow.document.close();
