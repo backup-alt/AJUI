@@ -8767,6 +8767,90 @@ body {
   white-space: pre-wrap;
 }
 
+.operations-table .cell-value {
+  display: block;
+  min-height: 22px;
+  min-width: 72px;
+  color: #0f172a;
+  font-weight: 650;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.operations-table tbody tr {
+  cursor: pointer;
+}
+
+.operations-table tbody tr.selected-row td:not(.empty-row) {
+  background: #f1f6ff !important;
+  box-shadow: inset 3px 0 0 #002263;
+}
+
+.operations-table tbody tr.editing-row td:not(.empty-row) {
+  background: #ffffff !important;
+}
+
+.selected-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 8px 16px;
+  border-top: 1px solid #dbe3ef;
+  background: #f8fbff;
+}
+
+.selected-row-actions > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #cad7ea;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.context-row-action {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border: 1px solid #c9d7eb !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #002263 !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.context-row-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.context-row-action:hover {
+  border-color: #002263 !important;
+  background: #eef4ff !important;
+}
+
+.context-row-action.danger {
+  color: #b42318 !important;
+}
+
+.context-row-action.danger:hover {
+  border-color: #fda29b !important;
+  background: #fff1f0 !important;
+}
+
 .operations-table .editable-cell[contenteditable="true"] {
   cursor: text;
 }
@@ -8864,6 +8948,50 @@ body {
 .dark-mode .operations-table .editable-cell[contenteditable="true"]:focus {
   background: #0d1728 !important;
   box-shadow: inset 0 0 0 2px rgba(155, 188, 255, 0.54) !important;
+}
+
+.dark-mode .operations-table .cell-value {
+  color: #edf4ff;
+}
+
+.dark-mode .operations-table tbody tr.selected-row td:not(.empty-row) {
+  background: #182b4a !important;
+  box-shadow: inset 3px 0 0 #9bbcff;
+}
+
+.dark-mode .operations-table tbody tr.editing-row td:not(.empty-row) {
+  background: #111f36 !important;
+}
+
+.dark-mode .selected-row-actions {
+  border-color: #2a4268;
+  background: #0f1b2e;
+}
+
+.dark-mode .selected-row-actions > span {
+  border-color: #385175;
+  background: #172946;
+  color: #eaf2ff;
+}
+
+.dark-mode .context-row-action {
+  border-color: #385175 !important;
+  background: #101c30 !important;
+  color: #dce8ff !important;
+}
+
+.dark-mode .context-row-action:hover {
+  border-color: #9bbcff !important;
+  background: #172946 !important;
+}
+
+.dark-mode .context-row-action.danger {
+  color: #fda4af !important;
+}
+
+.dark-mode .context-row-action.danger:hover {
+  border-color: #fda4af !important;
+  background: rgba(190, 18, 60, 0.18) !important;
 }
 
 .dark-mode .operations-table td.select-cell select,

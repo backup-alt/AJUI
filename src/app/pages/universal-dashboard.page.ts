@@ -309,7 +309,7 @@ const dashboardModules: ModuleConfig[] = [
             <section class="operations-workbench universal-workbench">
               <nav class="operations-tabs" aria-label="Universal dashboard modules">
                 <button
-                  *ngFor="let module of modules"
+                  *ngFor="let module of modules; trackBy: trackByModule"
                   type="button"
                   [class.active]="activeModule() === module.key"
                   (click)="switchModule(module.key)"
@@ -340,7 +340,7 @@ const dashboardModules: ModuleConfig[] = [
               </div>
 
               <div class="universal-filter-bar">
-                <label *ngFor="let filter of activeConfig().filters" class="filter-select-shell">
+                <label *ngFor="let filter of activeConfig().filters; trackBy: trackByFilter" class="filter-select-shell">
                   <span>{{ filter.label }}</span>
                   <div class="erp-select-menu filter-select-menu" [class.open]="isFilterMenuOpen(filter.key)">
                     <button type="button" class="erp-select-trigger" (click)="toggleFilterMenu(filter.key)">
@@ -352,7 +352,7 @@ const dashboardModules: ModuleConfig[] = [
                     <div class="erp-select-panel" *ngIf="isFilterMenuOpen(filter.key)">
                       <button type="button" [class.selected]="!selectedFilters()[filter.key]" (click)="setFilter(filter.key, '')">All</button>
                       <button
-                        *ngFor="let value of filterValues(filter.key)"
+                        *ngFor="let value of filterValues(filter.key); trackBy: trackByValue"
                         type="button"
                         [class.selected]="selectedFilters()[filter.key] === value"
                         (click)="setFilter(filter.key, value)"
@@ -383,11 +383,32 @@ const dashboardModules: ModuleConfig[] = [
                 </button>
               </div>
 
+              <div class="selected-row-actions" *ngIf="selectedRowId() && activeModule() !== 'reports'">
+                <span>{{ editingRowId() ? 'Editing selected row' : '1 row selected' }}</span>
+                <button type="button" class="context-row-action" (click)="editSelectedRow()">
+                  <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                    <path d="M12.8 4.6 15.4 7.2" />
+                    <path d="M5 15h2.8l7-7a1.8 1.8 0 0 0-2.6-2.6l-7 7V15Z" />
+                  </svg>
+                  {{ editingRowId() ? 'Done' : 'Edit row' }}
+                </button>
+                <button type="button" class="context-row-action danger" (click)="deleteSelectedRow()">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                    <path d="M4 7h16" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                    <path d="M6 7l1 14h10l1-14" />
+                    <path d="M9 7V4h6v3" />
+                  </svg>
+                  Delete row
+                </button>
+              </div>
+
               <div class="table-wrap operations-table universal-table">
                 <table>
                   <thead>
                     <tr>
-                      <th *ngFor="let column of columnsForActive()">
+                      <th *ngFor="let column of columnsForActive(); trackBy: trackByColumn">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
                           <button
@@ -410,25 +431,30 @@ const dashboardModules: ModuleConfig[] = [
                           </button>
                         </span>
                       </th>
-                      <th>Actions</th>
+                      <th *ngIf="activeModule() === 'reports'">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let row of visibleRows()">
+                    <tr
+                      *ngFor="let row of visibleRows(); trackBy: trackByRow"
+                      (click)="selectRow(row)"
+                      [class.selected-row]="isRowSelected(row)"
+                      [class.editing-row]="isRowEditing(row)"
+                    >
                       <td
-                        *ngFor="let column of columnsForActive()"
+                        *ngFor="let column of columnsForActive(); trackBy: trackByColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
-                        [class.select-cell]="selectOptions(activeModule(), column.key).length > 0"
+                        [class.select-cell]="isRowEditing(row) && activeSelectOptions(column.key).length > 0"
                         [class.labour-types-cell-host]="activeModule() === 'labour' && column.key === 'labourTypes'"
                         spellcheck="false"
                       >
                         <ng-container *ngIf="activeModule() === 'labour' && column.key === 'labourTypes'; else standardDashboardCell">
                           <div class="labour-types-cell">
                             <div class="labour-type-chip-row" *ngIf="labourTypeCards(row).length; else emptyUniversalLabourTypes">
-                              <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row)">
+                              <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row); trackBy: trackByLabourType">
                                 <span>{{ type.type }}</span>
                                 <strong>{{ type.count }}</strong>
-                                <button type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type)">
+                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type)">
                                   <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                     <path d="m5.5 5.5 9 9" />
                                     <path d="m14.5 5.5-9 9" />
@@ -439,7 +465,7 @@ const dashboardModules: ModuleConfig[] = [
                             <ng-template #emptyUniversalLabourTypes>
                               <span class="labour-type-empty">No labor types</span>
                             </ng-template>
-                            <button type="button" class="labour-type-add" (click)="openLabourTypeDialog(row)">
+                            <button *ngIf="isRowEditing(row)" type="button" class="labour-type-add" (click)="openLabourTypeDialog(row)">
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                 <path d="M10 4v12" />
                                 <path d="M4 10h12" />
@@ -449,65 +475,69 @@ const dashboardModules: ModuleConfig[] = [
                           </div>
                         </ng-container>
                         <ng-template #standardDashboardCell>
-                          <div
-                            *ngIf="selectOptions(activeModule(), column.key).length > 0; else editableDashboardCell"
-                            class="erp-select-menu"
-                            [class.open]="isSelectMenuOpen(row, column.key)"
-                          >
-                            <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
-                              <span>{{ row[column.key] || 'Select' }}</span>
-                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                <path d="M5.5 7.5 10 12l4.5-4.5" />
-                              </svg>
-                            </button>
-                            <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
-                              <button
-                                *ngFor="let option of selectOptions(activeModule(), column.key)"
-                                type="button"
-                                [class.selected]="option === row[column.key]"
-                                (click)="selectCellOptionForRow(row, column.key, option)"
-                              >
-                                <span
-                                  class="select-option-icon"
-                                  *ngIf="selectOptionIcon(option) as icon"
-                                  [class.approve]="icon === 'approve'"
-                                  [class.decline]="icon === 'decline'"
-                                >
-                                  <svg *ngIf="icon === 'approve'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                    <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-                                  </svg>
-                                  <svg *ngIf="icon === 'decline'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                    <path d="m5.5 5.5 9 9" />
-                                    <path d="m14.5 5.5-9 9" />
-                                  </svg>
-                                </span>
-                                {{ option }}
-                              </button>
-                              <label class="custom-select-entry" *ngIf="allowsCustomOption(activeModule(), column.key)">
-                                <span>Custom</span>
-                                <input
-                                  #dashboardCustomValue
-                                  (keydown.enter)="saveCustomSelectOptionForRow(row, column.key, dashboardCustomValue.value, $event)"
-                                  placeholder="Type value and press Enter"
-                                />
-                              </label>
-                            </div>
-                          </div>
-                          <ng-template #editableDashboardCell>
-                            <span
-                              class="editable-cell"
-                              [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
-                              spellcheck="false"
-                              (blur)="!isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
+                          <ng-container *ngIf="isRowEditing(row); else readonlyDashboardCell">
+                            <div
+                              *ngIf="activeSelectOptions(column.key).length > 0; else editableDashboardCell"
+                              class="erp-select-menu"
+                              [class.open]="isSelectMenuOpen(row, column.key)"
                             >
-                              {{ row[column.key] }}
-                            </span>
+                              <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
+                                <span>{{ row[column.key] || 'Select' }}</span>
+                                <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                  <path d="M5.5 7.5 10 12l4.5-4.5" />
+                                </svg>
+                              </button>
+                              <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
+                                <button
+                                  *ngFor="let option of activeSelectOptions(column.key); trackBy: trackByValue"
+                                  type="button"
+                                  [class.selected]="option === row[column.key]"
+                                  (click)="selectCellOptionForRow(row, column.key, option)"
+                                >
+                                  <span
+                                    class="select-option-icon"
+                                    *ngIf="selectOptionIcon(option) as icon"
+                                    [class.approve]="icon === 'approve'"
+                                    [class.decline]="icon === 'decline'"
+                                  >
+                                    <svg *ngIf="icon === 'approve'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                                    </svg>
+                                    <svg *ngIf="icon === 'decline'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                      <path d="m5.5 5.5 9 9" />
+                                      <path d="m14.5 5.5-9 9" />
+                                    </svg>
+                                  </span>
+                                  {{ option }}
+                                </button>
+                                <label class="custom-select-entry" *ngIf="allowsCustomOption(activeModule(), column.key)">
+                                  <span>Custom</span>
+                                  <input
+                                    #dashboardCustomValue
+                                    (keydown.enter)="saveCustomSelectOptionForRow(row, column.key, dashboardCustomValue.value, $event)"
+                                    placeholder="Type value and press Enter"
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                            <ng-template #editableDashboardCell>
+                              <span
+                                class="editable-cell"
+                                [attr.contenteditable]="isReadonlyColumn(column.key) ? null : 'true'"
+                                spellcheck="false"
+                                (blur)="!isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
+                              >
+                                {{ row[column.key] }}
+                              </span>
+                            </ng-template>
+                          </ng-container>
+                          <ng-template #readonlyDashboardCell>
+                            <span class="cell-value">{{ row[column.key] }}</span>
                           </ng-template>
                         </ng-template>
                       </td>
-                      <td class="row-actions">
+                      <td class="row-actions" *ngIf="activeModule() === 'reports'">
                         <button
-                          *ngIf="activeModule() === 'reports'"
                           type="button"
                           class="icon-row-action"
                           aria-label="Download report"
@@ -532,7 +562,7 @@ const dashboardModules: ModuleConfig[] = [
                       </td>
                     </tr>
                     <tr *ngIf="visibleRows().length === 0">
-                      <td class="empty-row" [attr.colspan]="columnsForActive().length + 1">
+                      <td class="empty-row" [attr.colspan]="columnsForActive().length + (activeModule() === 'reports' ? 1 : 0)">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -705,11 +735,22 @@ export class UniversalDashboardPage {
   readonly labourTypeName = signal("Mason");
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
+  readonly selectedRowId = signal("");
+  readonly editingRowId = signal("");
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
+  readonly activeColumns = computed(() => this.computeColumnsForActive());
   readonly activeRows = computed(() => this.computeVisibleRows());
+  readonly activeSelectOptionMap = computed(() => {
+    const module = this.activeModule();
+    return Object.fromEntries(this.activeColumns().map((column) => [column.key, this.selectOptions(module, column.key)])) as Record<string, string[]>;
+  });
+  readonly activeFilterValueMap = computed(
+    () => Object.fromEntries(this.activeConfig().filters.map((filter) => [filter.key, this.computeFilterValues(filter.key)])) as Record<string, string[]>,
+  );
   readonly moduleRowCounts = computed(
     () => Object.fromEntries(this.modules.map((module) => [module.key, this.rowsFor(module.key).length])) as Record<DashboardModule, number>,
   );
+  readonly pendingApprovalTotal = computed(() => this.pendingApprovalRows().length);
 
   activeProjectsCount() {
     return this.data.projects().filter((project) => project.status === "Active").length;
@@ -720,7 +761,7 @@ export class UniversalDashboardPage {
   }
 
   pendingApprovalCount() {
-    return this.pendingApprovalRows().length;
+    return this.pendingApprovalTotal();
   }
 
   switchModule(module: DashboardModule) {
@@ -729,9 +770,15 @@ export class UniversalDashboardPage {
     this.selectedFilters.set({});
     this.openSelectKey.set("");
     this.openFilterKey.set("");
+    this.selectedRowId.set("");
+    this.editingRowId.set("");
   }
 
   columnsForActive(): FieldSchema[] {
+    return this.activeColumns();
+  }
+
+  private computeColumnsForActive(): FieldSchema[] {
     const base = this.activeConfig().columns;
     const custom = this.data.customFieldsFor(this.activeModule());
     const hidden = new Set(this.data.hiddenFieldsFor(this.activeModule()));
@@ -779,6 +826,10 @@ export class UniversalDashboardPage {
   }
 
   filterValues(key: string): string[] {
+    return this.activeFilterValueMap()[key] ?? [];
+  }
+
+  private computeFilterValues(key: string): string[] {
     const values = new Set<string>();
     for (const option of this.selectOptions(this.activeModule(), key)) {
       if (option) values.add(option);
@@ -788,6 +839,10 @@ export class UniversalDashboardPage {
       if (value !== undefined && value !== "") values.add(String(value));
     }
     return [...values].sort((a, b) => a.localeCompare(b));
+  }
+
+  activeSelectOptions(key: string): string[] {
+    return this.activeSelectOptionMap()[key] ?? [];
   }
 
   isFilterMenuOpen(key: string): boolean {
@@ -819,6 +874,63 @@ export class UniversalDashboardPage {
 
   rowCountFor(module: DashboardModule): number {
     return this.moduleRowCounts()[module] ?? 0;
+  }
+
+  trackByModule(_: number, module: ModuleConfig): DashboardModule {
+    return module.key;
+  }
+
+  trackByFilter(_: number, filter: FilterSchema): string {
+    return filter.key;
+  }
+
+  trackByColumn(_: number, column: FieldSchema): string {
+    return column.key;
+  }
+
+  trackByRow(_: number, row: TableRow): string {
+    return this.rowKey(row);
+  }
+
+  trackByValue(_: number, value: string): string {
+    return value;
+  }
+
+  trackByLabourType(_: number, type: { type: string }): string {
+    return type.type;
+  }
+
+  private rowKey(row: TableRow): string {
+    return String(row["__rowId"] || row["clientId"] || row["vendorId"] || row["supervisorId"] || row["subcontractId"] || row["reportName"] || JSON.stringify(row));
+  }
+
+  selectRow(row: TableRow) {
+    const rowId = this.rowKey(row);
+    this.selectedRowId.set(rowId);
+    if (this.editingRowId() && this.editingRowId() !== rowId) this.editingRowId.set("");
+  }
+
+  isRowSelected(row: TableRow): boolean {
+    return this.selectedRowId() === this.rowKey(row);
+  }
+
+  isRowEditing(row: TableRow): boolean {
+    return this.editingRowId() === this.rowKey(row);
+  }
+
+  editSelectedRow() {
+    const selected = this.selectedRowId();
+    if (!selected) return;
+    this.editingRowId.set(this.editingRowId() === selected ? "" : selected);
+  }
+
+  deleteSelectedRow() {
+    const selected = this.selectedRowId();
+    const row = this.visibleRows().find((entry) => this.rowKey(entry) === selected);
+    if (!row) return;
+    this.deleteRow(row);
+    this.selectedRowId.set("");
+    this.editingRowId.set("");
   }
 
   pendingApprovalRows(): TableRow[] {
@@ -881,7 +993,10 @@ export class UniversalDashboardPage {
       this.data.addClient({ name: "New Client", mobile: "", address: "", supervisor: "Unassigned" });
       return;
     }
-    this.data.addCustomRow(module, this.defaultRowFor(module));
+    const row = this.data.addCustomRow(module, this.defaultRowFor(module));
+    const rowId = this.rowKey(row);
+    this.selectedRowId.set(rowId);
+    this.editingRowId.set(rowId);
   }
 
   updateDraftField(key: string, value: string) {
@@ -1057,9 +1172,13 @@ export class UniversalDashboardPage {
     const rowId = String(row["__rowId"] || "");
     if (module === "clients") {
       this.data.deleteClient(String(row["clientId"] || ""));
+      this.selectedRowId.set("");
+      this.editingRowId.set("");
       return;
     }
     this.data.deleteSharedRow(rowId);
+    if (this.selectedRowId() === this.rowKey(row)) this.selectedRowId.set("");
+    if (this.editingRowId() === this.rowKey(row)) this.editingRowId.set("");
   }
 
   exportExcel() {
