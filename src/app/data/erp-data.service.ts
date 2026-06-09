@@ -76,7 +76,7 @@ export type SharedModuleKey =
   | "reports"
   | "settings";
 export type SharedFieldType = "text" | "number" | "date";
-export type SharedTableField = { key: string; label: string; type?: SharedFieldType };
+export type SharedTableField = { key: string; label: string; type?: SharedFieldType; afterKey?: string };
 export type SharedTableRow = Record<string, string | number | undefined>;
 
 @Injectable({ providedIn: "root" })
@@ -305,6 +305,7 @@ export class ErpDataService {
 
   constructor() {
     this.ensureMeenakshiSampleProject();
+    this.ensureLargeDemoDataset();
     effect(() => this.writeState("clients", this.clients()));
     effect(() => this.writeState("projects", this.projects()));
     effect(() => this.writeState("materials", this.materials()));
@@ -534,8 +535,193 @@ export class ErpDataService {
     }
   }
 
+  private ensureLargeDemoDataset() {
+    const seedKey = "demoDatasetSeededV3";
+    if (this.readState<boolean>(seedKey, false)) return;
+
+    const demoClients: Client[] = [
+      {
+        id: "CL-1010",
+        initials: "UB",
+        name: "Unibuilders",
+        mobile: "+91 99401 77880",
+        address: "No. 18, Industrial Estate Road, Ambattur, Chennai",
+        status: "Active",
+        projectIds: [],
+        supervisor: "R. Karthik",
+      },
+    ];
+
+    this.clients.update((rows) => {
+      const existingIds = new Set(rows.map((row) => row.id));
+      return [...demoClients.filter((client) => !existingIds.has(client.id)), ...rows];
+    });
+
+    const projectNamePool = ["Foundation Block", "Tower Extension", "Interior Fit-Out"];
+    const sitePool = [
+      ["North Wing", "South Wing", "Stock Yard"],
+      ["Level 1", "Level 2", "Terrace"],
+      ["Main Site", "Finishing", "MEP"],
+    ];
+    const supervisors = ["R. Karthik", "S. Prabhu", "M. Saravanan"];
+    const allClients = this.clients();
+    const nextProjects = [...this.projects()];
+    const projectsByClient = new Map<string, string[]>();
+
+    allClients.forEach((client, clientIndex) => {
+      const validIds = client.projectIds.filter((projectId) => nextProjects.some((project) => project.id === projectId && project.client === client.name));
+      const createdIds = [...validIds];
+
+      for (let slot = createdIds.length; slot < 3; slot += 1) {
+        const projectId = `AB-${2100 + clientIndex * 10 + slot + 1}`;
+        if (nextProjects.some((project) => project.id === projectId)) {
+          createdIds.push(projectId);
+          continue;
+        }
+
+        const totalValue = 5200000 + clientIndex * 475000 + slot * 625000;
+        const receivedAmount = 1350000 + clientIndex * 140000 + slot * 225000;
+        const sites = sitePool[slot % sitePool.length];
+        nextProjects.unshift({
+          id: projectId,
+          name: `${client.name} ${projectNamePool[slot % projectNamePool.length]}`,
+          client: client.name,
+          mobile: client.mobile,
+          address: client.address,
+          supervisor: supervisors[(clientIndex + slot) % supervisors.length],
+          sites,
+          status: slot === 2 && clientIndex % 3 === 0 ? "On Hold" : "Active",
+          startDate: `2026-0${4 + (slot % 3)}-${String(10 + ((clientIndex + slot) % 17)).padStart(2, "0")}`,
+          totalValue,
+          advanceAmount: Math.round(totalValue * 0.14),
+          receivedAmount,
+          materialSpend: 620000 + clientIndex * 55000 + slot * 70000,
+          labourPayable: 185000 + clientIndex * 18000 + slot * 23000,
+          expenseBalance: 18000 + clientIndex * 1800 + slot * 2500,
+          completion: Math.min(82, 24 + clientIndex * 5 + slot * 8),
+        });
+        createdIds.push(projectId);
+        this.setExpenseOpeningBalance(projectId, sites[0] ?? "Main Site", 20000 + clientIndex * 1500 + slot * 2500);
+      }
+
+      projectsByClient.set(client.id, [...new Set(createdIds)]);
+    });
+
+    this.projects.set(nextProjects);
+    this.clients.update((rows) =>
+      rows.map((client) => {
+        const projectIds = projectsByClient.get(client.id);
+        return projectIds ? { ...client, projectIds } : client;
+      }),
+    );
+
+    const seededProjects = this.projects();
+    const materialNames = [
+      ["Cement", "Bag", "KMS Agencies"],
+      ["Bricks", "Nos", "Sri Devi Traders"],
+      ["Steel Rod", "Kg", "Amman Steel"],
+      ["M-Sand", "Load", "Thirumalai Blue Metals"],
+      ["Blue Metal", "Load", "Thirumalai Blue Metals"],
+      ["PVC Pipe", "Piece", "Ganesh Plumbing"],
+      ["Electrical Wire", "Bundle", "Sri Balaji Electricals"],
+      ["Paint Primer", "Tin", "Sri Devi Traders"],
+    ];
+
+    if (!this.materials().some((row) => row.id.startsWith("DEMO-MAT-"))) {
+      this.materials.update((rows) => [
+        ...Array.from({ length: 50 }, (_, index): MaterialRow => {
+          const project = seededProjects[index % seededProjects.length];
+          const item = materialNames[index % materialNames.length];
+          const requested = 80 + index * 13;
+          const approved = Math.max(20, requested - (index % 7) * 5);
+          const purchased = Math.max(0, approved - (index % 5) * 3);
+          const consumed = Math.max(0, purchased - (index % 6) * 2);
+          return {
+            id: `DEMO-MAT-${String(index + 1).padStart(3, "0")}`,
+            projectId: project.id,
+            site: project.sites[index % project.sites.length],
+            name: item[0],
+            unit: item[1],
+            requested,
+            approved,
+            purchased,
+            consumed,
+            vendor: item[2],
+            poNumber: `PO-${3000 + index}`,
+            status: index % 5 === 0 ? "Pending" : "Approved",
+          };
+        }),
+        ...rows,
+      ]);
+    }
+
+    const labourParties = ["Velu Mason Party", "Babu Labour Team", "Ravi Electrical Crew", "Ganesh Plumbing", "Selvam Civil Works"];
+    const labourTypes = ["Mason", "Helper", "Electrician", "Plumber", "Civil"];
+    if (!this.labour().some((row) => row.id.startsWith("DEMO-LAB-"))) {
+      this.labour.update((rows) => [
+        ...Array.from({ length: 50 }, (_, index): LabourRow => {
+          const project = seededProjects[index % seededProjects.length];
+          const primary = labourTypes[index % labourTypes.length];
+          const helpers = 1 + (index % 4);
+          const primaryCount = 2 + (index % 6);
+          return {
+            id: `DEMO-LAB-${String(index + 1).padStart(3, "0")}`,
+            projectId: project.id,
+            site: project.sites[(index + 1) % project.sites.length],
+            party: labourParties[index % labourParties.length],
+            category: primary,
+            dailyWage: 850 + (index % 6) * 75,
+            presentDays: 1,
+            absentDays: index % 9 === 0 ? 1 : 0,
+            presentCount: primaryCount + helpers,
+            overtime: index % 4,
+            lateFine: index % 6 === 0 ? 100 : 0,
+            shift: String(1 + (index % 2)),
+            notes: `${primary} - ${primaryCount}, Helper - ${helpers}`,
+            paymentMode: index % 3 === 0 ? "Cash" : "NEFT",
+            status: index % 4 === 0 ? "Pending" : "Approved",
+          };
+        }),
+        ...rows,
+      ]);
+    }
+
+    const expenseDescriptions = ["Petrol and water cans", "Brush and hammer set", "Safety gloves", "Site transport", "Office print and courier", "Temporary lighting", "Tea and labour refreshments"];
+    if (!this.expenses().some((row) => row.id.startsWith("DEMO-EXP-"))) {
+      this.expenses.update((rows) => [
+        ...Array.from({ length: 50 }, (_, index): ExpenseRow => {
+          const project = seededProjects[index % seededProjects.length];
+          const received = index % 10 === 0 ? 15000 + index * 120 : 0;
+          const spent = 180 + (index % 11) * 265;
+          return {
+            id: `DEMO-EXP-${String(index + 1).padStart(3, "0")}`,
+            projectId: project.id,
+            site: project.sites[(index + 2) % project.sites.length],
+            supervisor: project.supervisor,
+            date: `2026-06-${String(1 + (index % 26)).padStart(2, "0")}`,
+            description: expenseDescriptions[index % expenseDescriptions.length],
+            type: index % 8 === 0 ? "General Expense" : "Site Expense",
+            received,
+            spent,
+            reference: `EXP-${4200 + index}`,
+            status: index % 6 === 0 ? "Pending" : "Approved",
+          };
+        }),
+        ...rows,
+      ]);
+    }
+
+    this.writeState(seedKey, true);
+  }
+
   addClient(input: { name: string; mobile: string; address: string; supervisor: string }): Client {
-    const nextNumber = 1001 + this.clients().length;
+    const nextNumber =
+      Math.max(
+        1000,
+        ...this.clients()
+          .map((client) => Number(client.id.replace(/\D/g, "")))
+          .filter((value) => Number.isFinite(value)),
+      ) + 1;
     const initials = input.name
       .split(/\s+/)
       .filter(Boolean)
@@ -591,7 +777,16 @@ export class ErpDataService {
   }
 
   deleteClient(clientId: string) {
+    const projectIds = this.clients().find((client) => client.id === clientId)?.projectIds ?? [];
     this.clients.update((clients) => clients.filter((client) => client.id !== clientId));
+    if (!projectIds.length) return;
+    const projectIdSet = new Set(projectIds);
+    this.projects.update((rows) => rows.filter((row) => !projectIdSet.has(row.id)));
+    this.materials.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
+    this.labour.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
+    this.expenses.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
+    this.payments.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
+    this.subcontractors.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
   }
 
   createDefaultProject(client: Client): Project {
@@ -620,6 +815,7 @@ export class ErpDataService {
       status?: ProjectStatus;
       totalValue: number;
       advanceAmount: number;
+      receivedAmount?: number;
       openingBalance?: number;
     },
   ): Project {
@@ -639,7 +835,7 @@ export class ErpDataService {
       startDate: input.startDate,
       totalValue: input.totalValue,
       advanceAmount: input.advanceAmount,
-      receivedAmount: input.advanceAmount,
+      receivedAmount: input.receivedAmount ?? input.advanceAmount,
       materialSpend: 0,
       labourPayable: 0,
       expenseBalance: input.openingBalance ?? 0,
@@ -715,7 +911,7 @@ export class ErpDataService {
 
   updateProject(
     projectId: string,
-    patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "status" | "totalValue" | "advanceAmount" | "expenseBalance">>,
+    patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "status" | "totalValue" | "advanceAmount" | "receivedAmount" | "expenseBalance">>,
   ): Project | undefined {
     let updatedProject: Project | undefined;
 
@@ -730,7 +926,7 @@ export class ErpDataService {
           ...project,
           ...patch,
           sites: patch.sites?.length ? patch.sites : project.sites,
-          receivedAmount: project.receivedAmount + receivedDelta,
+          receivedAmount: patch.receivedAmount !== undefined ? Math.max(0, patch.receivedAmount) : project.receivedAmount + receivedDelta,
         };
         return updatedProject;
       }),
@@ -813,6 +1009,39 @@ export class ErpDataService {
       [module]: [...(fields[module] ?? []), field],
     }));
     return field;
+  }
+
+  addCustomFieldAfter(module: SharedModuleKey, label: string, afterKey: string | null, existingColumns: SharedTableField[] = []): SharedTableField {
+    const field = this.addCustomField(module, label, existingColumns);
+    if (!afterKey) return field;
+    this.customTableFields.update((fields) => ({
+      ...fields,
+      [module]: (fields[module] ?? []).map((customField) => (customField.key === field.key ? { ...customField, afterKey } : customField)),
+    }));
+    return { ...field, afterKey };
+  }
+
+  composeTableColumns(base: SharedTableField[], custom: SharedTableField[]): SharedTableField[] {
+    const output = [...base];
+    const pending = [...custom];
+
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let index = pending.length - 1; index >= 0; index -= 1) {
+        const field = pending[index];
+        if (!field.afterKey) continue;
+        const insertIndex = output.findIndex((column) => column.key === field.afterKey);
+        if (insertIndex < 0) continue;
+        const siblingCount = output.slice(insertIndex + 1).findIndex((column) => column.afterKey !== field.afterKey);
+        const offset = siblingCount < 0 ? output.length - insertIndex - 1 : siblingCount;
+        output.splice(insertIndex + 1 + offset, 0, field);
+        pending.splice(index, 1);
+        changed = true;
+      }
+    }
+
+    return [...output, ...pending];
   }
 
   tableRowsFor(module: SharedModuleKey, baseRows: SharedTableRow[] = [], predicate?: (row: SharedTableRow) => boolean): SharedTableRow[] {

@@ -390,6 +390,18 @@ const dashboardModules: ModuleConfig[] = [
                       <th *ngFor="let column of columnsForActive()">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
+                          <button
+                            type="button"
+                            class="column-insert-action"
+                            aria-label="Add column after this column"
+                            title="Add column after {{ column.label }}"
+                            (click)="openFieldDialog(column.key, $event)"
+                          >
+                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                              <path d="M10 4v12" />
+                              <path d="M4 10h12" />
+                            </svg>
+                          </button>
                           <button type="button" class="column-hide-action" aria-label="Hide column" title="Hide column" (click)="hideField(activeModule(), column.key, $event)">
                             <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                               <path d="m5.5 5.5 9 9" />
@@ -588,6 +600,7 @@ const dashboardModules: ModuleConfig[] = [
                   <div>
                     <span>{{ activeConfig().label }}</span>
                     <h2>Add Field</h2>
+                    <p *ngIf="newFieldAfterLabel()">Inserted after {{ newFieldAfterLabel() }}.</p>
                   </div>
                   <button type="button" class="icon-button" (click)="fieldDialogOpen.set(false)">
                     <ion-icon name="close-outline"></ion-icon>
@@ -683,6 +696,7 @@ export class UniversalDashboardPage {
   readonly fieldDialogOpen = signal(false);
   readonly draftRow = signal<TableRow>({});
   readonly newFieldLabel = signal("");
+  readonly newFieldAfterKey = signal<string | null>(null);
   readonly openSelectKey = signal("");
   readonly openFilterKey = signal("");
   readonly selectCustomValue = signal("");
@@ -717,7 +731,7 @@ export class UniversalDashboardPage {
     const base = this.activeConfig().columns;
     const custom = this.data.customFieldsFor(this.activeModule());
     const hidden = new Set(this.data.hiddenFieldsFor(this.activeModule()));
-    const columns = this.activeModule() === "labour" ? this.withLabourWageColumns(base, custom) : [...base, ...custom];
+    const columns = this.activeModule() === "labour" ? this.withLabourWageColumns(base, custom) : this.data.composeTableColumns(base, custom);
     return columns.filter((column) => !hidden.has(column.key));
   }
 
@@ -735,10 +749,10 @@ export class UniversalDashboardPage {
   }
 
   private withLabourWageColumns(base: FieldSchema[], custom: FieldSchema[]): FieldSchema[] {
-    const wageFields = custom.filter((field) => this.isLabourWageField(field));
-    const otherFields = custom.filter((field) => !this.isLabourWageField(field));
+    const wageFields = custom.filter((field) => this.isLabourWageField(field) && !field.afterKey);
+    const otherFields = custom.filter((field) => !this.isLabourWageField(field) || field.afterKey);
     const orderedBase = base.flatMap((field) => (field.key === "staffCount" ? [...wageFields, field] : [field]));
-    return [...orderedBase, ...otherFields];
+    return this.data.composeTableColumns(orderedBase, otherFields);
   }
 
   private isLabourWageField(field: FieldSchema): boolean {
@@ -882,8 +896,10 @@ export class UniversalDashboardPage {
     this.recordDialogOpen.set(false);
   }
 
-  openFieldDialog() {
+  openFieldDialog(afterKey?: string, event?: Event) {
+    event?.stopPropagation();
     this.newFieldLabel.set("");
+    this.newFieldAfterKey.set(afterKey ?? null);
     this.fieldDialogOpen.set(true);
   }
 
@@ -892,8 +908,15 @@ export class UniversalDashboardPage {
     const label = this.newFieldLabel().trim();
     if (!label) return;
     const module = this.activeModule();
-    this.data.addCustomField(module, label, this.columnsForActive());
+    this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
+    this.newFieldAfterKey.set(null);
     this.fieldDialogOpen.set(false);
+  }
+
+  newFieldAfterLabel(): string {
+    const afterKey = this.newFieldAfterKey();
+    if (!afterKey) return "";
+    return this.columnsForActive().find((column) => column.key === afterKey)?.label ?? "";
   }
 
   updateCell(visibleIndex: number, key: string, value: string) {
@@ -1634,7 +1657,7 @@ export class UniversalDashboardPage {
 
   private columnsForModule(module: DashboardModule): FieldSchema[] {
     const base = dashboardModules.find((config) => config.key === module)?.columns ?? [];
-    return [...base, ...this.data.customFieldsFor(module)];
+    return this.data.composeTableColumns(base, this.data.customFieldsFor(module));
   }
 
   private titleCase(value: string): string {

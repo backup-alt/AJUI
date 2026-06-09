@@ -194,7 +194,20 @@ const sectionConfigs: SectionConfig[] = [
               </div>
               <dl>
                 <div><dt>Value</dt><dd>{{ formatMoney(currentProject.totalValue) }}</dd></div>
-                <div><dt>Received</dt><dd>{{ formatMoney(currentProject.receivedAmount) }}</dd></div>
+                <div>
+                  <dt>Received</dt>
+                  <dd>
+                    <input
+                      class="project-metric-input"
+                      type="number"
+                      min="0"
+                      step="1000"
+                      [value]="currentProject.receivedAmount"
+                      (change)="updateProjectReceived($any($event.target).value)"
+                      aria-label="Project received amount"
+                    />
+                  </dd>
+                </div>
                 <div><dt>Pending</dt><dd>{{ formatMoney(currentProject.totalValue - currentProject.receivedAmount) }}</dd></div>
                 <div><dt>Supervisor</dt><dd>{{ currentProject.supervisor }}</dd></div>
                 <div>
@@ -324,6 +337,18 @@ const sectionConfigs: SectionConfig[] = [
                       <th *ngFor="let column of columnsFor(activeSection())">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
+                          <button
+                            type="button"
+                            class="column-insert-action"
+                            aria-label="Add column after this column"
+                            title="Add column after {{ column.label }}"
+                            (click)="openFieldDialog(column.key, $event)"
+                          >
+                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                              <path d="M10 4v12" />
+                              <path d="M4 10h12" />
+                            </svg>
+                          </button>
                           <button type="button" class="column-hide-action" aria-label="Hide column" title="Hide column" (click)="hideField(activeSection(), column.key, $event)">
                             <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                               <path d="m5.5 5.5 9 9" />
@@ -535,6 +560,7 @@ const sectionConfigs: SectionConfig[] = [
                   <div>
                     <span>{{ activeConfig().label }}</span>
                     <h2>Add Field</h2>
+                    <p *ngIf="newFieldAfterLabel()">Inserted after {{ newFieldAfterLabel() }}.</p>
                   </div>
                   <button type="button" class="icon-button" (click)="fieldDialogOpen.set(false)">
                     <ion-icon name="close-outline"></ion-icon>
@@ -649,6 +675,7 @@ export class ProjectWorkspacePage {
   readonly recordDialogOpen = signal(false);
   readonly fieldDialogOpen = signal(false);
   readonly newFieldLabel = signal("");
+  readonly newFieldAfterKey = signal<string | null>(null);
   readonly draftRow = signal<TableRow>({});
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
@@ -684,7 +711,7 @@ export class ProjectWorkspacePage {
     const base = sectionConfigs.find((config) => config.key === section)?.columns ?? [];
     const custom = this.data.customFieldsFor(section);
     const hidden = new Set(this.data.hiddenFieldsFor(section));
-    const columns = section === "labour" ? this.withLabourWageColumns(base, custom) : [...base, ...custom];
+    const columns = section === "labour" ? this.withLabourWageColumns(base, custom) : this.data.composeTableColumns(base, custom);
     return columns.filter((column) => !hidden.has(column.key));
   }
 
@@ -702,10 +729,10 @@ export class ProjectWorkspacePage {
   }
 
   private withLabourWageColumns(base: FieldSchema[], custom: FieldSchema[]): FieldSchema[] {
-    const wageFields = custom.filter((field) => this.isLabourWageField(field));
-    const otherFields = custom.filter((field) => !this.isLabourWageField(field));
+    const wageFields = custom.filter((field) => this.isLabourWageField(field) && !field.afterKey);
+    const otherFields = custom.filter((field) => !this.isLabourWageField(field) || field.afterKey);
     const orderedBase = base.flatMap((field) => (field.key === "staffCount" ? [...wageFields, field] : [field]));
-    return [...orderedBase, ...otherFields];
+    return this.data.composeTableColumns(orderedBase, otherFields);
   }
 
   private isLabourWageField(field: FieldSchema): boolean {
@@ -797,8 +824,10 @@ export class ProjectWorkspacePage {
     if (updatedProject && this.activeSite() === site) this.activeSite.set("All");
   }
 
-  openFieldDialog() {
+  openFieldDialog(afterKey?: string, event?: Event) {
+    event?.stopPropagation();
     this.newFieldLabel.set("");
+    this.newFieldAfterKey.set(afterKey ?? null);
     this.fieldDialogOpen.set(true);
   }
 
@@ -807,8 +836,15 @@ export class ProjectWorkspacePage {
     const label = this.newFieldLabel().trim();
     if (!label) return;
     const section = this.activeSection();
-    this.data.addCustomField(section, label, this.columnsFor(section));
+    this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
+    this.newFieldAfterKey.set(null);
     this.fieldDialogOpen.set(false);
+  }
+
+  newFieldAfterLabel(): string {
+    const afterKey = this.newFieldAfterKey();
+    if (!afterKey) return "";
+    return this.columnsFor(this.activeSection()).find((column) => column.key === afterKey)?.label ?? "";
   }
 
   updateCell(section: ModuleKey, visibleIndex: number, key: string, value: string) {
@@ -1031,6 +1067,7 @@ export class ProjectWorkspacePage {
       supervisor: project.supervisor,
       totalValue: project.totalValue,
       advanceAmount: project.advanceAmount,
+      receivedAmount: project.receivedAmount,
       openingBalance: project.expenseBalance,
       status: project.status,
     };
@@ -1059,6 +1096,12 @@ export class ProjectWorkspacePage {
   updateProjectStatus(value: string) {
     if (!this.isProjectStatus(value)) return;
     this.data.updateProject(this.projectId(), { status: value });
+  }
+
+  updateProjectReceived(value: string) {
+    const amount = Number(String(value).replace(/[^\d.-]/g, ""));
+    if (!Number.isFinite(amount)) return;
+    this.data.updateProject(this.projectId(), { receivedAmount: amount });
   }
 
   deleteProject(project: Project) {
