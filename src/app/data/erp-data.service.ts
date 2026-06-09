@@ -1047,7 +1047,7 @@ export class ErpDataService {
   tableRowsFor(module: SharedModuleKey, baseRows: SharedTableRow[] = [], predicate?: (row: SharedTableRow) => boolean): SharedTableRow[] {
     const edits = this.tableCellEdits();
     const hidden = new Set(this.hiddenTableRows());
-    return [...baseRows, ...(this.customTableRows()[module] ?? [])]
+    return [...(this.customTableRows()[module] ?? []), ...baseRows]
       .filter((row) => !hidden.has(String(row["__rowId"] || "")))
       .map((row) => {
         const rowId = String(row["__rowId"] || "");

@@ -1406,7 +1406,7 @@ export class ProjectWorkspacePage {
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
-    return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
+    const balancedRows = [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
       const transactionType = String(row["transactionType"] || row["expenseScope"] || "Site Expense");
       const groupKey = this.expenseGroupKey(row);
       const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
@@ -1418,6 +1418,7 @@ export class ProjectWorkspacePage {
         runningBalance: formatMoney(balance),
       };
     });
+    return balancedRows.sort((first, second) => this.expenseDisplaySortValue(second).localeCompare(this.expenseDisplaySortValue(first)));
   }
 
   private withLabourPayable(row: TableRow): TableRow {
@@ -1611,17 +1612,25 @@ export class ProjectWorkspacePage {
   expenseCurrentBalanceLabel(): string {
     const rows = this.visibleRows("expenses");
     if (!rows.length) return this.expenseOpeningBalanceLabel();
-    const latestByGroup = new Map<string, number>();
+    const latestByGroup = new Map<string, { order: string; balance: number }>();
     if (this.activeSiteFilter() === "All") {
       for (const site of this.expenseLedgerSites()) {
-        latestByGroup.set(this.expenseGroupKey({ projectId: this.projectId(), site }), this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }));
+        latestByGroup.set(this.expenseGroupKey({ projectId: this.projectId(), site }), {
+          order: "",
+          balance: this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }),
+        });
       }
     }
-    for (const row of rows) latestByGroup.set(this.expenseGroupKey(row), this.moneyNumber(row["runningBalance"]));
-    if (this.activeSiteFilter() !== "All") {
-      return formatMoney([...latestByGroup.values()].at(-1) ?? this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
+    for (const row of rows) {
+      const key = this.expenseGroupKey(row);
+      const order = this.expenseRowSortValue(row);
+      const previous = latestByGroup.get(key);
+      if (!previous || order >= previous.order) latestByGroup.set(key, { order, balance: this.moneyNumber(row["runningBalance"]) });
     }
-    const total = [...latestByGroup.values()].reduce((sum, balance) => sum + balance, 0);
+    if (this.activeSiteFilter() !== "All") {
+      return formatMoney([...latestByGroup.values()].at(-1)?.balance ?? this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
+    }
+    const total = [...latestByGroup.values()].reduce((sum, entry) => sum + entry.balance, 0);
     return formatMoney(total);
   }
 
@@ -1654,6 +1663,17 @@ export class ProjectWorkspacePage {
   private expenseRowSortValue(row: TableRow): string {
     const date = String(row["expenseDate"] || row["date"] || "");
     return `${this.expenseGroupKey(row)}::${date}::${row["__rowId"] || ""}`;
+  }
+
+  private expenseDisplaySortValue(row: TableRow): string {
+    const customOrder = this.customRowOrder(row);
+    const date = String(row["expenseDate"] || row["date"] || "");
+    return `${customOrder ? "1" : "0"}::${customOrder || date}::${row["__rowId"] || ""}`;
+  }
+
+  private customRowOrder(row: TableRow): number {
+    const match = String(row["__rowId"] || "").match(/^custom:[^:]+:(\d+)/);
+    return match ? Number(match[1]) : 0;
   }
 
   private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true): number {

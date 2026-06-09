@@ -706,6 +706,10 @@ export class UniversalDashboardPage {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
+  readonly activeRows = computed(() => this.computeVisibleRows());
+  readonly moduleRowCounts = computed(
+    () => Object.fromEntries(this.modules.map((module) => [module.key, this.rowsFor(module.key).length])) as Record<DashboardModule, number>,
+  );
 
   activeProjectsCount() {
     return this.data.projects().filter((project) => project.status === "Active").length;
@@ -760,6 +764,10 @@ export class UniversalDashboardPage {
   }
 
   visibleRows(): TableRow[] {
+    return this.activeRows();
+  }
+
+  private computeVisibleRows(): TableRow[] {
     const query = this.searchText().trim().toLowerCase();
     const filters = this.selectedFilters();
     const rows = this.rowsFor(this.activeModule()).filter((row) => {
@@ -802,12 +810,15 @@ export class UniversalDashboardPage {
 
   expenseFilterCurrentLabel(): string {
     const rows = this.visibleRows().filter((entry) => entry["project"] === this.selectedFilters()["project"] && entry["site"] === this.selectedFilters()["site"]);
-    const latest = rows.at(-1);
+    const latest = rows.reduce<TableRow | undefined>((current, row) => {
+      if (!current) return row;
+      return this.expenseRowSortValue(row) > this.expenseRowSortValue(current) ? row : current;
+    }, undefined);
     return latest ? String(latest["runningBalance"] || formatMoney(0)) : formatMoney(0);
   }
 
   rowCountFor(module: DashboardModule): number {
-    return this.rowsFor(module).length;
+    return this.moduleRowCounts()[module] ?? 0;
   }
 
   pendingApprovalRows(): TableRow[] {
@@ -1099,181 +1110,209 @@ export class UniversalDashboardPage {
     void this.router.navigate(["/clients"]);
   }
 
-  private buildRows(): Record<DashboardModule, TableRow[]> {
-    const projectById = (projectId: string) => this.data.projectById(projectId);
+  private buildRowsFor(module: DashboardModule): TableRow[] {
+    const projects = this.data.projects();
+    const clients = this.data.clients();
+    const projectById = (projectId: string) => projects.find((project) => project.id === projectId);
     const projectName = (projectId: string) => projectById(projectId)?.name ?? projectId;
     const clientName = (projectId: string) => projectById(projectId)?.client ?? "";
-    const clientId = (projectId: string) => this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
+    const clientId = (projectId: string) => clients.find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
 
-    const materials = this.data.materials().map((row) => ({
-      __rowId: `material:${row.id}`,
-      __projectId: row.projectId,
-      client: clientName(row.projectId),
-      project: projectName(row.projectId),
-      site: row.site,
-      materialName: row.name,
-      unit: row.unit,
-      requestedQuantity: formatNumber(row.requested),
-      approvedQuantity: formatNumber(row.approved),
-      vendor: row.vendor,
-      poNumber: row.poNumber,
-      remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
-      status: row.status,
-    }));
+    if (module === "materials") {
+      return this.data.materials().map((row) => ({
+        __rowId: `material:${row.id}`,
+        __projectId: row.projectId,
+        client: clientName(row.projectId),
+        project: projectName(row.projectId),
+        site: row.site,
+        materialName: row.name,
+        unit: row.unit,
+        requestedQuantity: formatNumber(row.requested),
+        approvedQuantity: formatNumber(row.approved),
+        vendor: row.vendor,
+        poNumber: row.poNumber,
+        remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
+        status: row.status,
+      }));
+    }
 
-    const clients = this.data.clients().map((client) => {
-      const summary = this.data.clientSummary(client);
-      return {
-        __rowId: `client:${client.id}`,
-        clientId: client.id,
-        clientName: client.name,
-        mobile: client.mobile,
-        address: client.address,
-        projectCount: summary.projectCount,
-        activeSites: summary.activeSites,
-        totalProjectValue: formatMoney(summary.totalValue),
-        amountReceived: formatMoney(summary.received),
-        pendingBalance: formatMoney(summary.pending),
-        supervisor: client.supervisor,
-        status: client.status,
-      };
-    });
+    if (module === "clients") {
+      return clients.map((client) => {
+        const summary = this.data.clientSummary(client);
+        return {
+          __rowId: `client:${client.id}`,
+          clientId: client.id,
+          clientName: client.name,
+          mobile: client.mobile,
+          address: client.address,
+          projectCount: summary.projectCount,
+          activeSites: summary.activeSites,
+          totalProjectValue: formatMoney(summary.totalValue),
+          amountReceived: formatMoney(summary.received),
+          pendingBalance: formatMoney(summary.pending),
+          supervisor: client.supervisor,
+          status: client.status,
+        };
+      });
+    }
 
-    const labour = this.data.labour().map((row) => ({
-      __rowId: `labour:${row.id}`,
-      __projectId: row.projectId,
-      client: clientName(row.projectId),
-      clientId: clientId(row.projectId),
-      projectId: row.projectId,
-      project: projectName(row.projectId),
-      site: row.site,
-      attendanceDate: "2026-06-05",
-      staffName: row.party,
-      dailyWage: row.dailyWage,
-      labourTypes: this.labourTypesFromRow(row),
-      staffCount: row.presentCount,
-      attendance: "Present",
-      shift: this.normalizeShift(row.shift),
-      overtime: `${row.overtime} hrs`,
-      lateFine: formatMoney(row.lateFine),
-      presentUnits: row.presentDays * row.presentCount,
-      paymentMode: row.paymentMode,
-      status: row.status,
-    }));
+    if (module === "labour") {
+      return this.data.labour().map((row) => ({
+        __rowId: `labour:${row.id}`,
+        __projectId: row.projectId,
+        client: clientName(row.projectId),
+        clientId: clientId(row.projectId),
+        projectId: row.projectId,
+        project: projectName(row.projectId),
+        site: row.site,
+        attendanceDate: "2026-06-05",
+        staffName: row.party,
+        dailyWage: row.dailyWage,
+        labourTypes: this.labourTypesFromRow(row),
+        staffCount: row.presentCount,
+        attendance: "Present",
+        shift: this.normalizeShift(row.shift),
+        overtime: `${row.overtime} hrs`,
+        lateFine: formatMoney(row.lateFine),
+        presentUnits: row.presentDays * row.presentCount,
+        paymentMode: row.paymentMode,
+        status: row.status,
+      }));
+    }
 
-    const expenses = this.data.expenses().filter((row) => row.type === "Site Expense").map((row) => ({
-      __rowId: `expense:${row.id}`,
-      __projectId: row.projectId,
-      client: clientName(row.projectId),
-      project: projectName(row.projectId),
-      site: row.site,
-      expenseDate: row.date,
-      transactionType: "Site Expense",
-      description: row.description,
-      amount: formatMoney(-row.spent),
-      runningBalance: formatMoney(0),
-      supervisor: row.supervisor,
-      cashIssued: formatMoney(row.received),
-      reference: row.reference,
-      approvalStatus: row.status,
-    }));
+    if (module === "expenses") {
+      return this.data
+        .expenses()
+        .filter((row) => row.type === "Site Expense")
+        .map((row) => ({
+          __rowId: `expense:${row.id}`,
+          __projectId: row.projectId,
+          client: clientName(row.projectId),
+          project: projectName(row.projectId),
+          site: row.site,
+          expenseDate: row.date,
+          transactionType: "Site Expense",
+          description: row.description,
+          amount: formatMoney(-row.spent),
+          runningBalance: formatMoney(0),
+          supervisor: row.supervisor,
+          cashIssued: formatMoney(row.received),
+          reference: row.reference,
+          approvalStatus: row.status,
+        }));
+    }
 
-    const generalExpenses = this.data.expenses().filter((row) => row.type === "General Expense").map((row) => ({
-      __rowId: `general-expense:${row.id}`,
-      __projectId: "",
-      expenseDate: row.date,
-      department: "Head Office",
-      description: row.description,
-      category: "Office Expense",
-      amount: formatMoney(row.spent),
-      paidBy: row.supervisor,
-      reference: row.reference,
-      approvalStatus: row.status,
-    }));
+    if (module === "generalExpenses") {
+      return this.data
+        .expenses()
+        .filter((row) => row.type === "General Expense")
+        .map((row) => ({
+          __rowId: `general-expense:${row.id}`,
+          __projectId: "",
+          expenseDate: row.date,
+          department: "Head Office",
+          description: row.description,
+          category: "Office Expense",
+          amount: formatMoney(row.spent),
+          paidBy: row.supervisor,
+          reference: row.reference,
+          approvalStatus: row.status,
+        }));
+    }
 
-    const payments = this.data.payments().map((row) => ({
-      __rowId: `payment:${row.id}`,
-      __projectId: row.projectId,
-      client: clientName(row.projectId),
-      project: projectName(row.projectId),
-      paymentDate: row.date,
-      amount: formatMoney(row.amount),
-      mode: row.mode,
-      transactionReference: row.reference,
-      receiptNumber: row.receipt,
-      collectedBy: row.collectedBy,
-      approvalStatus: row.status,
-    }));
+    if (module === "payments") {
+      return this.data.payments().map((row) => ({
+        __rowId: `payment:${row.id}`,
+        __projectId: row.projectId,
+        client: clientName(row.projectId),
+        project: projectName(row.projectId),
+        paymentDate: row.date,
+        amount: formatMoney(row.amount),
+        mode: row.mode,
+        transactionReference: row.reference,
+        receiptNumber: row.receipt,
+        collectedBy: row.collectedBy,
+        approvalStatus: row.status,
+      }));
+    }
 
-    const vendors = this.data.vendors().map((vendor) => ({
-      __rowId: `vendor:${vendor.id}`,
-      vendorId: vendor.id,
-      vendorName: vendor.name,
-      materialType: vendor.materialType,
-      materialsBought: this.materialPurchaseSummaryForVendor(vendor.name),
-      phoneNumber: vendor.phone,
-      address: vendor.address,
-      gstNumber: vendor.gst,
-    }));
+    if (module === "vendors") {
+      return this.data.vendors().map((vendor) => ({
+        __rowId: `vendor:${vendor.id}`,
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        materialType: vendor.materialType,
+        materialsBought: this.materialPurchaseSummaryForVendor(vendor.name),
+        phoneNumber: vendor.phone,
+        address: vendor.address,
+        gstNumber: vendor.gst,
+      }));
+    }
 
-    const supervisors = this.data.supervisors().map((supervisor) => ({
-      __rowId: `supervisor:${supervisor.id}`,
-      supervisorId: supervisor.id,
-      supervisorName: supervisor.name,
-      phoneNumber: supervisor.phone,
-      role: supervisor.role,
-      assignedProject: supervisor.assignedProject,
-      assignedSite: supervisor.assignedSite,
-      cashLimit: formatMoney(supervisor.cashLimit),
-      activeAdvances: formatMoney(supervisor.activeAdvances),
-      approvalAuthority: supervisor.approvalAuthority,
-      status: supervisor.status,
-    }));
+    if (module === "supervisors") {
+      return this.data.supervisors().map((supervisor) => ({
+        __rowId: `supervisor:${supervisor.id}`,
+        supervisorId: supervisor.id,
+        supervisorName: supervisor.name,
+        phoneNumber: supervisor.phone,
+        role: supervisor.role,
+        assignedProject: supervisor.assignedProject,
+        assignedSite: supervisor.assignedSite,
+        cashLimit: formatMoney(supervisor.cashLimit),
+        activeAdvances: formatMoney(supervisor.activeAdvances),
+        approvalAuthority: supervisor.approvalAuthority,
+        status: supervisor.status,
+      }));
+    }
 
-    const subcontractors = this.data.subcontractors().map((subcontractor) => {
-      const project = projectById(subcontractor.projectId);
-      return {
-        __rowId: `subcontractor:${subcontractor.id}`,
-        __projectId: subcontractor.projectId,
-        subcontractId: subcontractor.id,
-        client: project?.client ?? "",
-        project: project?.name ?? subcontractor.projectId,
-        site: subcontractor.site,
-        subcontractorName: subcontractor.name,
-        workPackage: subcontractor.workPackage,
-        contractValue: formatMoney(subcontractor.contractValue),
-        advancePaid: formatMoney(subcontractor.advancePaid),
-        balance: formatMoney(subcontractor.contractValue - subcontractor.advancePaid),
-        startDate: subcontractor.startDate,
-        dueDate: subcontractor.dueDate,
-        supervisor: subcontractor.supervisor,
-        approvalStatus: subcontractor.approvalStatus,
-        paymentStatus: subcontractor.paymentStatus,
-      };
-    });
+    if (module === "subcontractors") {
+      return this.data.subcontractors().map((subcontractor) => {
+        const project = projectById(subcontractor.projectId);
+        return {
+          __rowId: `subcontractor:${subcontractor.id}`,
+          __projectId: subcontractor.projectId,
+          subcontractId: subcontractor.id,
+          client: project?.client ?? "",
+          project: project?.name ?? subcontractor.projectId,
+          site: subcontractor.site,
+          subcontractorName: subcontractor.name,
+          workPackage: subcontractor.workPackage,
+          contractValue: formatMoney(subcontractor.contractValue),
+          advancePaid: formatMoney(subcontractor.advancePaid),
+          balance: formatMoney(subcontractor.contractValue - subcontractor.advancePaid),
+          startDate: subcontractor.startDate,
+          dueDate: subcontractor.dueDate,
+          supervisor: subcontractor.supervisor,
+          approvalStatus: subcontractor.approvalStatus,
+          paymentStatus: subcontractor.paymentStatus,
+        };
+      });
+    }
 
-    const reports = [
-      ["Financial", "Payment Collection Report", "All projects", "Accountant", "Excel"],
-      ["Financial", "Expense Report", "All sites", "Admin", "Excel"],
-      ["Labour", "Attendance Report", "All labour", "Project Manager", "Excel"],
-      ["Material", "Inventory Report", "All materials", "Project Manager", "Excel"],
-      ["Vendor", "Vendor Purchase Report", "All vendors", "Admin", "Excel"],
-      ["Subcontract", "Subcontractor Ledger", "All subcontractors", "Project Manager", "Excel"],
-      ["Project", "Project Summary", "All clients", "Admin", "Excel"],
-    ].map(([category, reportName, scope, owner, exportFormat], index) => ({
-      __rowId: `report:${index}`,
-      category,
-      reportName,
-      scope,
-      owner,
-      exportFormat,
-    }));
+    if (module === "reports") {
+      return [
+        ["Financial", "Payment Collection Report", "All projects", "Accountant", "Excel"],
+        ["Financial", "Expense Report", "All sites", "Admin", "Excel"],
+        ["Labour", "Attendance Report", "All labour", "Project Manager", "Excel"],
+        ["Material", "Inventory Report", "All materials", "Project Manager", "Excel"],
+        ["Vendor", "Vendor Purchase Report", "All vendors", "Admin", "Excel"],
+        ["Subcontract", "Subcontractor Ledger", "All subcontractors", "Project Manager", "Excel"],
+        ["Project", "Project Summary", "All clients", "Admin", "Excel"],
+      ].map(([category, reportName, scope, owner, exportFormat], index) => ({
+        __rowId: `report:${index}`,
+        category,
+        reportName,
+        scope,
+        owner,
+        exportFormat,
+      }));
+    }
 
-    return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, reports };
+    return [];
   }
 
   private rowsFor(module: DashboardModule): TableRow[] {
-    return this.data.tableRowsFor(module, this.buildRows()[module]);
+    return this.data.tableRowsFor(module, this.buildRowsFor(module));
   }
 
   selectOptions(module: DashboardModule, key: string): string[] {
@@ -1467,7 +1506,7 @@ export class UniversalDashboardPage {
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
-    return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
+    const balancedRows = [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
       const transactionType = String(row["transactionType"] || "Site Expense");
       const groupKey = this.expenseGroupKey(row);
       const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
@@ -1479,6 +1518,7 @@ export class UniversalDashboardPage {
         runningBalance: formatMoney(balance),
       };
     });
+    return balancedRows.sort((first, second) => this.expenseDisplaySortValue(second).localeCompare(this.expenseDisplaySortValue(first)));
   }
 
   private withLabourPayable(row: TableRow): TableRow {
@@ -1677,6 +1717,17 @@ export class UniversalDashboardPage {
   private expenseRowSortValue(row: TableRow): string {
     const date = String(row["expenseDate"] || row["date"] || "");
     return `${this.expenseGroupKey(row)}::${date}::${row["__rowId"] || ""}`;
+  }
+
+  private expenseDisplaySortValue(row: TableRow): string {
+    const customOrder = this.customRowOrder(row);
+    const date = String(row["expenseDate"] || row["date"] || "");
+    return `${customOrder ? "1" : "0"}::${customOrder || date}::${row["__rowId"] || ""}`;
+  }
+
+  private customRowOrder(row: TableRow): number {
+    const match = String(row["__rowId"] || "").match(/^custom:[^:]+:(\d+)/);
+    return match ? Number(match[1]) : 0;
   }
 
   private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true): number {
