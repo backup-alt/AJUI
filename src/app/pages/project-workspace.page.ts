@@ -768,6 +768,7 @@ export class ProjectWorkspacePage {
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
   readonly paramMap = toSignal(this.route.paramMap, { initialValue: this.route.snapshot.paramMap });
+  readonly queryParamMap = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
   readonly showProjectForm = signal(false);
@@ -818,6 +819,13 @@ export class ProjectWorkspacePage {
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.data.touchProject(projectId);
+    });
+    effect(() => {
+      if (this.queryParamMap().get("editProject") !== "1") return;
+      const project = this.project();
+      if (!project || this.showProjectForm()) return;
+      this.editingProject.set(project);
+      this.showProjectForm.set(true);
     });
   }
 

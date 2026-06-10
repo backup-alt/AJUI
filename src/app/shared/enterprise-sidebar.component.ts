@@ -78,13 +78,13 @@ type SidebarItem = {
                   </small>
                 </a>
                 <div class="sidebar-project-actions">
-                  <button type="button" aria-label="Edit project" (click)="editProject.emit(project)">
+                  <button type="button" aria-label="Edit project" (click)="requestEditProject(project, $event)">
                     <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                       <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
                       <path d="m14.8 7.2 3 3" />
                     </svg>
                   </button>
-                  <button type="button" aria-label="Delete project" (click)="deleteProject.emit(project)">
+                  <button type="button" aria-label="Delete project" (click)="requestDeleteProject(project, $event)">
                     <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                       <path d="M5 7h14" />
                       <path d="M9 7V5h6v2" />
@@ -171,6 +171,32 @@ export class EnterpriseSidebarComponent {
     return this.data.projectLastWorkedLabel(project.id);
   }
 
+  requestEditProject(project: Project, event: Event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.hasOutputObservers(this.editProject)) {
+      this.editProject.emit(project);
+      return;
+    }
+    const clientId = this.projectClientId(project);
+    if (!clientId) return;
+    void this.router.navigate(["/clients", clientId, "projects", project.id, "materials"], { queryParams: { editProject: "1" } });
+  }
+
+  requestDeleteProject(project: Project, event: Event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.hasOutputObservers(this.deleteProject)) {
+      this.deleteProject.emit(project);
+      return;
+    }
+    const confirmed = window.confirm(`Delete ${project.name}? This removes the project and its linked records.`);
+    if (!confirmed) return;
+    const deletingCurrent = project.id === this.projectId;
+    this.data.deleteProject(project.id);
+    if (deletingCurrent) void this.router.navigate(["/projects"]);
+  }
+
   get items(): SidebarItem[] {
     return [
       { key: "dashboard", label: "Dashboard", icon: "grid-outline", route: ["/dashboard"] },
@@ -192,5 +218,10 @@ export class EnterpriseSidebarComponent {
       // The static demo has no auth backend; this marks the local UI session only.
     }
     void this.router.navigate(["/login"]);
+  }
+
+  private hasOutputObservers<T>(emitter: EventEmitter<T>): boolean {
+    const inspectedEmitter = emitter as EventEmitter<T> & { observed?: boolean; observers?: unknown[] };
+    return Boolean(inspectedEmitter.observed || inspectedEmitter.observers?.length);
   }
 }
