@@ -279,9 +279,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
   { key: "materialName", label: "Material Name" },
   { key: "unit", label: "Unit" },
   { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
-  { key: "approvedQuantity", label: "Approved Quantity", type: "number" },
+  { key: "vendor", label: "Vendor Name" },
   { key: "requestDate", label: "Request Date", type: "date" },
-  { key: "vendor", label: "Vendor" },
   { key: "poNumber", label: "PO Number" },
   { key: "remainingStock", label: "Remaining Stock" },
 ];
@@ -633,7 +632,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
                 <div class="erp-form">
                   <label *ngFor="let column of recordFormColumns()">
-                    <span>{{ column.label }}</span>
+                    <span>{{ formColumnLabel(column) }}</span>
                     <input
                       *ngIf="selectOptions(activeModule(), column.key).length > 0 && allowsCustomOption(activeModule(), column.key); else dashboardDraftSelect"
                       [attr.list]="'dashboard-draft-' + activeModule() + '-' + column.key"
@@ -1235,10 +1234,8 @@ export class UniversalDashboardPage {
           next["materialName"] = next["materialName"] || next["description"] || "Site material purchase";
           next["unit"] = unit;
           next["requestedQuantity"] = requestedQuantity;
-          next["approvedQuantity"] = next["approvedQuantity"] || requestedQuantity;
           next["remainingStock"] = next["remainingStock"] || `${requestedQuantity} ${unit}`.trim();
         }
-        if (key === "requestedQuantity" && !next["approvedQuantity"]) next["approvedQuantity"] = value;
         if ((key === "requestedQuantity" || key === "unit") && this.normalizeYesNo(next["siteMaterial"]) === "Yes") {
           next["remainingStock"] = `${next["requestedQuantity"] || "1"} ${next["unit"] || "Item"}`.trim();
         }
@@ -1251,6 +1248,10 @@ export class UniversalDashboardPage {
     if (this.activeModule() !== "expenses") return false;
     const row = this.draftRow();
     return this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Purchase" && this.normalizeYesNo(row["siteMaterial"]) === "Yes";
+  }
+
+  formColumnLabel(column: FieldSchema): string {
+    return this.activeModule() === "expenses" && column.key === "amount" ? "Total Amount" : column.label;
   }
 
   saveRecord(event: Event) {
@@ -1312,7 +1313,7 @@ export class UniversalDashboardPage {
       materialName: row["materialName"] || row["description"] || "Site material purchase",
       unit,
       requestedQuantity,
-      approvedQuantity: row["approvedQuantity"] || requestedQuantity,
+      approvedQuantity: row["approvedQuantity"] || "",
       requestDate: row["requestDate"] || row["expenseDate"] || new Date().toISOString().slice(0, 10),
       vendor: row["vendor"] || "",
       poNumber: row["reference"] || "",

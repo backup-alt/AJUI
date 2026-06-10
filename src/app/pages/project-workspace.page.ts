@@ -148,9 +148,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
   { key: "materialName", label: "Material Name" },
   { key: "unit", label: "Unit" },
   { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
-  { key: "approvedQuantity", label: "Approved Quantity", type: "number" },
+  { key: "vendor", label: "Vendor Name" },
   { key: "requestDate", label: "Request Date", type: "date" },
-  { key: "vendor", label: "Vendor" },
   { key: "poNumber", label: "PO Number" },
   { key: "remainingStock", label: "Remaining Stock" },
 ];
@@ -587,7 +586,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
                 <div class="erp-form">
                   <label *ngFor="let column of recordFormColumns()">
-                    <span>{{ column.label }}</span>
+                    <span>{{ formColumnLabel(column) }}</span>
                     <input
                       *ngIf="selectOptions(activeSection(), column.key).length > 0 && allowsCustomOption(activeSection(), column.key); else projectDraftSelect"
                       [attr.list]="'project-draft-' + activeSection() + '-' + column.key"
@@ -1110,14 +1109,10 @@ export class ProjectWorkspacePage {
         nextRow["materialName"] ||= nextRow["description"] || "";
         nextRow["unit"] ||= "Item";
         nextRow["requestedQuantity"] ||= "1";
-        nextRow["approvedQuantity"] ||= nextRow["requestedQuantity"] || "1";
-        nextRow["remainingStock"] ||= `${nextRow["approvedQuantity"] || "1"} ${nextRow["unit"] || "Item"}`;
-      }
-      if (this.activeSection() === "expenses" && key === "requestedQuantity" && !nextRow["approvedQuantity"]) {
-        nextRow["approvedQuantity"] = value;
+        nextRow["remainingStock"] ||= `${nextRow["requestedQuantity"] || "1"} ${nextRow["unit"] || "Item"}`;
       }
       if (this.activeSection() === "expenses" && (key === "requestedQuantity" || key === "approvedQuantity" || key === "unit")) {
-        const quantity = nextRow["approvedQuantity"] || nextRow["requestedQuantity"] || "0";
+        const quantity = nextRow["requestedQuantity"] || "0";
         const unit = nextRow["unit"] || "Item";
         nextRow["remainingStock"] = `${quantity} ${unit}`;
       }
@@ -1129,6 +1124,10 @@ export class ProjectWorkspacePage {
     if (this.activeSection() !== "expenses") return false;
     const row = this.draftRow();
     return this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Purchase" && this.normalizeYesNo(row["siteMaterial"]) === "Yes";
+  }
+
+  formColumnLabel(column: FieldSchema): string {
+    return this.activeSection() === "expenses" && column.key === "amount" ? "Total Amount" : column.label;
   }
 
   saveRecord(event: Event) {
@@ -1172,11 +1171,11 @@ export class ProjectWorkspacePage {
       materialName: row["materialName"] || row["description"] || "Site material purchase",
       unit: row["unit"] || "Item",
       requestedQuantity: row["requestedQuantity"] || "1",
-      approvedQuantity: row["approvedQuantity"] || row["requestedQuantity"] || "1",
+      approvedQuantity: row["approvedQuantity"] || "",
       requestDate: row["requestDate"] || row["expenseDate"] || new Date().toISOString().slice(0, 10),
       vendor: row["vendor"] || "",
       poNumber: row["poNumber"] || row["reference"] || "",
-      remainingStock: row["remainingStock"] || `${row["approvedQuantity"] || row["requestedQuantity"] || "1"} ${row["unit"] || "Item"}`,
+      remainingStock: row["remainingStock"] || `${row["requestedQuantity"] || "1"} ${row["unit"] || "Item"}`,
       status: row["approvalStatus"] || "Pending",
       sourceExpenseRowId,
     });
