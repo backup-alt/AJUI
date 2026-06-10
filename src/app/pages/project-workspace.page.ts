@@ -567,16 +567,6 @@ const sectionConfigs: SectionConfig[] = [
                     <ion-icon name="close-outline"></ion-icon>
                   </button>
                 </div>
-                <div class="expense-opening-modal" *ngIf="activeSection() === 'expenses'">
-                  <label>
-                    <span>Opening Balance for {{ expenseDraftSiteLabel() }}</span>
-                    <input
-                      inputmode="decimal"
-                      [value]="expenseDraftOpeningBalanceInput()"
-                      (input)="updateExpenseDraftOpeningBalance($any($event.target).value)"
-                    />
-                  </label>
-                </div>
                 <div class="erp-form">
                   <label *ngFor="let column of recordFormColumns()">
                     <span>{{ column.label }}</span>
@@ -1044,7 +1034,11 @@ export class ProjectWorkspacePage {
   }
 
   recordFormColumns(): FieldSchema[] {
-    return this.columnsFor(this.activeSection()).filter((column) => !this.isReadonlyColumn(column.key));
+    const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
+    return this.columnsFor(this.activeSection()).filter((column) => {
+      if (this.activeSection() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
+      return !this.isReadonlyColumn(column.key);
+    });
   }
 
   updateDraftField(key: string, value: string) {
@@ -1057,7 +1051,7 @@ export class ProjectWorkspacePage {
     const currentProject = this.project();
     const selectedSite = this.activeSiteFilter();
     const savedRow = this.data.addCustomRow(section, {
-      ...this.draftRow(),
+      ...(section === "expenses" ? this.normalizedExpenseInputRow(this.draftRow()) : this.draftRow()),
       ...(this.isSiteAware(section) && selectedSite !== "All" ? { site: this.draftRow()["site"] || selectedSite } : {}),
       __projectId: this.projectId(),
       projectId: this.projectId(),
@@ -1179,6 +1173,10 @@ export class ProjectWorkspacePage {
     const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
     const cleanValue = value.trim();
+    if (section === "expenses" && key === "amount") {
+      this.data.updateSharedRowCell(rowId, key, this.positiveExpenseAmountValue(cleanValue));
+      return;
+    }
     this.data.updateSharedRowCell(rowId, key, cleanValue);
     if (section === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", cleanValue);
     if (section === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: cleanValue });
@@ -1234,7 +1232,7 @@ export class ProjectWorkspacePage {
   }
 
   allowsCustomOption(section: ModuleKey, key: string): boolean {
-    if (key === "site" || key === "approvalStatus" || key === "status" || key === "paymentStatus" || key === "attendance") return false;
+    if (key === "site" || key === "siteMaterial" || key === "transactionType" || key === "approvalStatus" || key === "status" || key === "paymentStatus" || key === "attendance") return false;
     return this.selectOptions(section, key).length > 0;
   }
 
@@ -1626,17 +1624,7 @@ export class ProjectWorkspacePage {
     if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
     if (section === "labour" && key === "staffName") return this.staffNameOptionsForProject();
     if (section === "expenses" && key === "transactionType") {
-      return [
-        "Site Expense",
-        "Material Purchase",
-        "Supervisor Expense",
-        "Cash Added",
-        "Cash Issued to Supervisor",
-        "Payment Received",
-        "Payment Received from Annai Golden Builders Pvt Ltd",
-        "Refund / Return",
-        "Adjustment",
-      ];
+      return ["Purchase", "Cash Added"];
     }
     if (section === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (section === "labour" && key === "attendance") return ["Present", "Absent"];
@@ -1683,7 +1671,7 @@ export class ProjectWorkspacePage {
       },
       expenses: {
         expenseDate: today,
-        transactionType: "Site Expense",
+        transactionType: "Purchase",
         description: "",
         amount: "0",
         siteMaterial: "No",
@@ -1765,14 +1753,15 @@ export class ProjectWorkspacePage {
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
     return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
-      const transactionType = String(row["transactionType"] || row["expenseScope"] || "Site Expense");
+      const transactionType = this.normalizedExpenseTransactionType(String(row["transactionType"] || row["expenseScope"] || "Purchase"));
       const groupKey = this.expenseGroupKey(row);
       const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
-      const balance = previousBalance + this.expenseSignedAmount(row, transactionType);
+      const balance = Math.max(0, previousBalance + this.expenseSignedAmount(row, transactionType));
       balances.set(groupKey, balance);
       return {
         ...row,
         transactionType,
+        amount: this.expenseAmountDisplay(row),
         runningBalance: formatMoney(balance),
       };
     });
@@ -2029,11 +2018,35 @@ export class ProjectWorkspacePage {
   }
 
   private expenseSignedAmount(row: TableRow, transactionType = String(row["transactionType"] || "")): number {
-    const amountText = String(row["amount"] ?? "").trim();
-    const amount = this.moneyNumber(amountText);
+    const amount = Math.abs(this.moneyNumber(row["amount"]));
     if (!amount) return 0;
-    if (amountText.startsWith("+") || amountText.startsWith("-")) return amount;
-    return this.isExpenseCredit(transactionType) ? Math.abs(amount) : -Math.abs(amount);
+    return this.isExpenseCredit(transactionType) ? amount : -amount;
+  }
+
+  private normalizedExpenseInputRow(row: TableRow): TableRow {
+    return {
+      ...row,
+      transactionType: this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase")),
+      amount: this.positiveExpenseAmountValue(row["amount"]),
+      siteMaterial: this.normalizeYesNo(row["siteMaterial"]),
+      approvalStatus: row["approvalStatus"] || "Pending",
+    };
+  }
+
+  private normalizedExpenseTransactionType(value: string): string {
+    return this.isExpenseCredit(value) ? "Cash Added" : "Purchase";
+  }
+
+  private positiveExpenseAmountValue(value: unknown): string {
+    return String(Math.abs(this.moneyNumber(value)));
+  }
+
+  private expenseAmountDisplay(row: TableRow): string {
+    return formatMoney(Math.abs(this.moneyNumber(row["amount"])));
+  }
+
+  private normalizeYesNo(value: unknown): string {
+    return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
   }
 
   private explicitExpenseOpeningForGroup(projectId: string, site: string): number {

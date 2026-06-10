@@ -1140,7 +1140,11 @@ export class UniversalDashboardPage {
   }
 
   recordFormColumns(): FieldSchema[] {
-    return this.columnsForActive().filter((column) => !this.isReadonlyColumn(column.key));
+    const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
+    return this.columnsForActive().filter((column) => {
+      if (this.activeModule() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
+      return !this.isReadonlyColumn(column.key);
+    });
   }
 
   addInlineRow(event?: MouseEvent) {
@@ -1181,7 +1185,7 @@ export class UniversalDashboardPage {
       const status = this.normalizeClientStatus(String(row["status"] || ""));
       if (status !== "Active") this.data.updateClient(client.id, { status });
     } else {
-      const savedRow = this.data.addCustomRow(module, this.withGeneratedReferences(row));
+      const savedRow = this.data.addCustomRow(module, this.withGeneratedReferences(module === "expenses" ? this.normalizedExpenseInputRow(row) : row));
       if (module === "expenses") this.createMaterialFromSiteExpense(savedRow);
     }
     this.recordDialogOpen.set(false);
@@ -1285,6 +1289,10 @@ export class UniversalDashboardPage {
 
     const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
+    if (module === "expenses" && key === "amount") {
+      this.data.updateSharedRowCell(rowId, key, this.positiveExpenseAmountValue(trimmedValue));
+      return;
+    }
     this.data.updateSharedRowCell(rowId, key, trimmedValue);
     if (module === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", trimmedValue);
     if (module === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: trimmedValue });
@@ -1646,17 +1654,7 @@ export class UniversalDashboardPage {
     if (key === "supervisor" || key === "supervisorName" || key === "collectedBy" || key === "paidBy") return this.supervisorNameOptions();
     if (module === "labour" && key === "staffName") return this.staffNameOptions();
     if (module === "expenses" && key === "transactionType") {
-      return [
-        "Site Expense",
-        "Material Purchase",
-        "Supervisor Expense",
-        "Cash Added",
-        "Cash Issued to Supervisor",
-        "Payment Received",
-        "Payment Received from Annai Golden Builders Pvt Ltd",
-        "Refund / Return",
-        "Adjustment",
-      ];
+      return ["Purchase", "Cash Added"];
     }
     if (module === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (module === "labour" && key === "attendance") return ["Present", "Absent"];
@@ -1673,7 +1671,7 @@ export class UniversalDashboardPage {
   }
 
   allowsCustomOption(module: DashboardModule, key: string): boolean {
-    if (key === "site" || key === "approvalStatus" || key === "status" || key === "paymentStatus" || key === "attendance") return false;
+    if (key === "site" || key === "siteMaterial" || key === "transactionType" || key === "approvalStatus" || key === "status" || key === "paymentStatus" || key === "attendance") return false;
     return this.selectOptions(module, key).length > 0;
   }
 
@@ -1723,7 +1721,7 @@ export class UniversalDashboardPage {
         project: "",
         site: "",
         expenseDate: today,
-        transactionType: "Site Expense",
+        transactionType: "Purchase",
         description: "",
         amount: "0",
         siteMaterial: "No",
@@ -1829,14 +1827,15 @@ export class UniversalDashboardPage {
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
     return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
-      const transactionType = String(row["transactionType"] || "Site Expense");
+      const transactionType = this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase"));
       const groupKey = this.expenseGroupKey(row);
       const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
-      const balance = previousBalance + this.expenseSignedAmount(row, transactionType);
+      const balance = Math.max(0, previousBalance + this.expenseSignedAmount(row, transactionType));
       balances.set(groupKey, balance);
       return {
         ...row,
         transactionType,
+        amount: this.expenseAmountDisplay(row),
         runningBalance: formatMoney(balance),
       };
     });
@@ -2054,11 +2053,35 @@ export class UniversalDashboardPage {
   }
 
   private expenseSignedAmount(row: TableRow, transactionType = String(row["transactionType"] || "")): number {
-    const amountText = String(row["amount"] ?? "").trim();
-    const amount = this.moneyNumber(amountText);
+    const amount = Math.abs(this.moneyNumber(row["amount"]));
     if (!amount) return 0;
-    if (amountText.startsWith("+") || amountText.startsWith("-")) return amount;
-    return this.isExpenseCredit(transactionType) ? Math.abs(amount) : -Math.abs(amount);
+    return this.isExpenseCredit(transactionType) ? amount : -amount;
+  }
+
+  private normalizedExpenseInputRow(row: TableRow): TableRow {
+    return {
+      ...row,
+      transactionType: this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase")),
+      amount: this.positiveExpenseAmountValue(row["amount"]),
+      siteMaterial: this.normalizeYesNo(row["siteMaterial"]),
+      approvalStatus: row["approvalStatus"] || "Pending",
+    };
+  }
+
+  private normalizedExpenseTransactionType(value: string): string {
+    return this.isExpenseCredit(value) ? "Cash Added" : "Purchase";
+  }
+
+  private positiveExpenseAmountValue(value: unknown): string {
+    return String(Math.abs(this.moneyNumber(value)));
+  }
+
+  private expenseAmountDisplay(row: TableRow): string {
+    return formatMoney(Math.abs(this.moneyNumber(row["amount"])));
+  }
+
+  private normalizeYesNo(value: unknown): string {
+    return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
   }
 
   private explicitExpenseOpeningForGroup(projectId: string, projectName: string, site: string): number {
