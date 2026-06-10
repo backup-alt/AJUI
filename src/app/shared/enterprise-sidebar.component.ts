@@ -96,14 +96,14 @@ type SidebarItem = {
                   </button>
                 </div>
               </div>
-              <a class="sidebar-view-all-projects" [routerLink]="['/projects']">
-                <span>View all projects</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                  <path d="M5 12h14" />
-                  <path d="m13 6 6 6-6 6" />
-                </svg>
-              </a>
             </div>
+            <a class="sidebar-view-all-projects" [routerLink]="['/projects']">
+              <span>View all projects</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                <path d="M5 12h14" />
+                <path d="m13 6 6 6-6 6" />
+              </svg>
+            </a>
           </section>
 
           <div class="sidebar-user-panel">

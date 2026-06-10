@@ -11184,16 +11184,21 @@ th:hover .column-insert-action,
 /* Fixed project navigator and all-projects directory. */
 .sidebar-project-list {
   display: grid !important;
-  grid-template-rows: auto auto minmax(0, 1fr) !important;
+  grid-template-rows: auto auto minmax(0, 1fr) auto !important;
   max-height: min(42vh, 430px) !important;
   overflow: hidden !important;
   padding-right: 0 !important;
 }
 
 .sidebar-project-list .sidebar-section-head {
+  grid-row: 1;
   position: static !important;
   z-index: auto !important;
   flex: 0 0 auto;
+}
+
+.sidebar-project-list .sidebar-project-filters {
+  grid-row: 2;
 }
 
 .sidebar-project-scroll {
@@ -11218,9 +11223,11 @@ th:hover .column-insert-action,
 }
 
 .sidebar-view-all-projects {
+  grid-row: 4;
   display: flex !important;
   align-items: center;
   justify-content: space-between;
+  flex: 0 0 auto;
   min-height: 38px;
   margin-top: 4px;
   border: 1px solid #d7e0ee !important;
