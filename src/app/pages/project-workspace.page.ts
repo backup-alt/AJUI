@@ -429,7 +429,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       [class.in-range]="day.inRange"
                       [class.disabled]="day.disabled"
                       [disabled]="day.disabled"
-                      (click)="selectCalendarDate(day.key)"
+                      (pointerdown)="selectCalendarDate(day.key, $event)"
                     >
                       {{ day.label }}
                     </button>
@@ -1463,15 +1463,24 @@ export class ProjectWorkspacePage {
     return days;
   }
 
-  selectCalendarDate(key: string) {
+  selectCalendarDate(key: string, event?: Event) {
+    event?.preventDefault();
+    event?.stopPropagation();
     if (key > this.localDateKey(new Date())) return;
     const range = this.dateRange();
-    if (this.datePickerTarget() === "start" || !range.start || (range.start && range.end)) {
-      this.dateRange.set({ start: key, end: "" });
+    if (this.datePickerTarget() === "start") {
+      this.dateRange.set({ start: key, end: range.end && key <= range.end ? range.end : "" });
       this.datePickerTarget.set("end");
       return;
     }
-    if (key < range.start) this.dateRange.set({ start: key, end: "" });
+
+    if (!range.start) {
+      this.dateRange.set({ start: key, end: key });
+      this.datePickerTarget.set("start");
+      return;
+    }
+
+    if (key < range.start) this.dateRange.set({ start: key, end: range.start });
     else this.dateRange.set({ ...range, end: key });
     this.datePickerTarget.set("start");
   }
