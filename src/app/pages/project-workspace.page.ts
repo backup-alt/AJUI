@@ -788,7 +788,10 @@ export class ProjectWorkspacePage {
       this.openSelectKey.set("");
     }
     this.selectedRowKey.set(key);
-    this.selectedRowKeys.set([key]);
+    this.selectedRowKeys.update((keys) => {
+      if (!keys.length) return [key];
+      return keys.includes(key) ? keys : [...keys, key];
+    });
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -893,7 +896,7 @@ export class ProjectWorkspacePage {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    if (!target.closest(".selectable-data-row, .row-hover-toolbar")) {
+    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions")) {
       this.clearRowSelection();
     }
 
@@ -1950,6 +1953,8 @@ export class ProjectWorkspacePage {
     if (savedOpening !== undefined) return savedOpening;
     const explicitOpening = this.explicitExpenseOpeningForGroup(projectId, site);
     if (explicitOpening) return explicitOpening;
+    const issuedOpening = this.expenseCashIssuedOpeningForGroup(projectId, site);
+    if (issuedOpening) return issuedOpening;
     if (!allowProjectFallback || !this.isPrimaryExpenseSite(projectId, site)) return 0;
     const project = this.data.projectById(projectId);
     return project?.expenseBalance ?? 0;
@@ -1973,6 +1978,21 @@ export class ProjectWorkspacePage {
       return rowProjectId === projectId && rowSite === normalizedSite && this.moneyNumber(row["openingBalance"]);
     });
     return match ? this.moneyNumber(match["openingBalance"]) : 0;
+  }
+
+  private expenseCashIssuedOpeningForGroup(projectId: string, site: string): number {
+    const normalizedSite = site.trim().toLowerCase();
+    if (!normalizedSite || normalizedSite === "all") return 0;
+    const rows = this.data
+      .tableRowsFor("expenses", this.tableRows().expenses, (row) => this.rowBelongsToProject(row))
+      .filter((row) => {
+        const rowProjectId = String(row["projectId"] || row["__projectId"] || this.projectId());
+        const rowSite = String(row["site"] || "").trim().toLowerCase();
+        return rowProjectId === projectId && rowSite === normalizedSite;
+      })
+      .sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second)));
+    const openingRow = rows.find((row) => this.moneyNumber(row["cashIssued"]) || this.moneyNumber(row["received"]));
+    return openingRow ? this.moneyNumber(openingRow["cashIssued"]) || this.moneyNumber(openingRow["received"]) : 0;
   }
 
   private expenseLedgerSites(): string[] {

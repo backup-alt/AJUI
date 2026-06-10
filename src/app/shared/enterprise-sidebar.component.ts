@@ -39,7 +39,7 @@ type SidebarItem = {
             </ion-item>
           </ion-list>
 
-          <section class="sidebar-project-list" *ngIf="sidebarProjects.length">
+          <section class="sidebar-project-list" *ngIf="clientId && sidebarProjects.length">
             <div class="sidebar-section-head">
               <span>Projects</span>
               <button *ngIf="clientId" type="button" class="project-create-icon" aria-label="Create new project" (click)="newProject.emit()">
@@ -135,7 +135,7 @@ export class EnterpriseSidebarComponent {
   }
 
   get sidebarProjects(): Project[] {
-    return this.clientId ? this.clientProjects : this.data.projects();
+    return this.clientProjects;
   }
 
   get filteredSidebarProjects(): Project[] {

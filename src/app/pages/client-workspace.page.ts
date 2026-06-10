@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import {
   IonBadge,
@@ -187,15 +187,6 @@ export class ClientWorkspacePage {
 
   readonly client = computed(() => this.data.clientById(this.clientId()));
   readonly projects = computed(() => this.data.projectsForClient(this.client()));
-
-  constructor() {
-    effect(() => {
-      const project = this.projects()[0];
-      if (project) {
-        void this.router.navigate(["/clients", this.clientId(), "projects", project.id, "materials"], { replaceUrl: true });
-      }
-    });
-  }
 
   openProject(project: Project) {
     void this.router.navigate(["/clients", this.clientId(), "projects", project.id]);

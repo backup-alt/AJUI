@@ -810,7 +810,10 @@ export class UniversalDashboardPage {
       this.openSelectKey.set("");
     }
     this.selectedRowKey.set(key);
-    this.selectedRowKeys.set([key]);
+    this.selectedRowKeys.update((keys) => {
+      if (!keys.length) return [key];
+      return keys.includes(key) ? keys : [...keys, key];
+    });
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -918,7 +921,7 @@ export class UniversalDashboardPage {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    if (!target.closest(".selectable-data-row, .row-hover-toolbar")) {
+    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions")) {
       this.clearRowSelection();
     }
 
@@ -1970,13 +1973,16 @@ export class UniversalDashboardPage {
   private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true): number {
     const explicitProjectId = String(row["projectId"] || row["__projectId"] || "");
     const site = String(row["site"] || "Project");
-    const savedOpening = explicitProjectId ? this.data.expenseOpeningBalanceFor(explicitProjectId, site) : undefined;
-    if (savedOpening !== undefined) return savedOpening;
-    const explicitOpening = this.explicitExpenseOpeningForGroup(explicitProjectId, String(row["project"] || ""), String(row["site"] || ""));
-    if (explicitOpening) return explicitOpening;
     const project =
       this.data.projectById(explicitProjectId) ??
       this.data.projects().find((projectRow) => projectRow.name === row["project"] || projectRow.id === row["project"]);
+    const projectId = explicitProjectId || project?.id || "";
+    const savedOpening = projectId ? this.data.expenseOpeningBalanceFor(projectId, site) : undefined;
+    if (savedOpening !== undefined) return savedOpening;
+    const explicitOpening = this.explicitExpenseOpeningForGroup(projectId, String(row["project"] || ""), String(row["site"] || ""));
+    if (explicitOpening) return explicitOpening;
+    const issuedOpening = this.expenseCashIssuedOpeningForGroup(projectId, String(row["project"] || ""), String(row["site"] || ""));
+    if (issuedOpening) return issuedOpening;
     if (!allowProjectFallback || !this.isPrimaryExpenseSite(project, site)) return 0;
     return project?.expenseBalance ?? 0;
   }
@@ -2001,6 +2007,22 @@ export class UniversalDashboardPage {
       return sameProject && rowSite === normalizedSite && this.moneyNumber(row["openingBalance"]);
     });
     return match ? this.moneyNumber(match["openingBalance"]) : 0;
+  }
+
+  private expenseCashIssuedOpeningForGroup(projectId: string, projectName: string, site: string): number {
+    const normalizedSite = site.trim().toLowerCase();
+    if (!normalizedSite || normalizedSite === "all") return 0;
+    const rows = this.rowsFor("expenses")
+      .filter((row) => {
+        const rowProjectId = String(row["projectId"] || row["__projectId"] || "");
+        const rowProjectName = String(row["project"] || "");
+        const rowSite = String(row["site"] || "").trim().toLowerCase();
+        const sameProject = projectId ? rowProjectId === projectId : rowProjectName === projectName;
+        return sameProject && rowSite === normalizedSite;
+      })
+      .sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second)));
+    const openingRow = rows.find((row) => this.moneyNumber(row["cashIssued"]) || this.moneyNumber(row["received"]));
+    return openingRow ? this.moneyNumber(openingRow["cashIssued"]) || this.moneyNumber(openingRow["received"]) : 0;
   }
 
   private isPrimaryExpenseSite(project: { sites: string[] } | undefined, site: string): boolean {
