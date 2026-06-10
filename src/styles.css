@@ -11143,3 +11143,270 @@ th:hover .column-insert-action,
 .dark-mode .sidebar-project-list a small em .svg-icon {
   color: #9bbcff;
 }
+
+/* Fixed project navigator and all-projects directory. */
+.sidebar-project-list {
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
+  max-height: min(42vh, 430px) !important;
+  overflow: hidden !important;
+  padding-right: 0 !important;
+}
+
+.sidebar-project-list .sidebar-section-head {
+  position: static !important;
+  z-index: auto !important;
+  flex: 0 0 auto;
+}
+
+.sidebar-project-scroll {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+}
+
+.sidebar-project-list a small {
+  display: grid !important;
+  grid-template-columns: auto minmax(78px, 1fr);
+  align-items: center;
+  column-gap: 12px;
+}
+
+.sidebar-project-list a small em {
+  justify-self: start;
+}
+
+.sidebar-view-all-projects {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  margin-top: 4px;
+  border: 1px solid #d7e0ee !important;
+  background: #f7faff !important;
+  color: var(--ui-royal) !important;
+  font-size: 12px;
+  font-weight: 860;
+}
+
+.sidebar-view-all-projects .svg-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.projects-directory-shell {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px 24px;
+}
+
+.projects-directory-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  align-items: end;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
+}
+
+.projects-directory-head span {
+  color: var(--ui-royal);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.projects-directory-head h1 {
+  margin: 5px 0 4px;
+  color: #101828;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.projects-directory-head p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.projects-directory-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid #cad6e6;
+  border-radius: 9px;
+  background: #f8fbff;
+}
+
+.projects-directory-search ion-icon {
+  width: 17px;
+  height: 17px;
+  color: #667085;
+}
+
+.projects-directory-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+}
+
+.projects-directory-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 14px;
+}
+
+.projects-directory-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #d7e0ee;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.05);
+}
+
+.projects-directory-title,
+.projects-directory-footer,
+.projects-directory-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.projects-directory-title h2 {
+  margin: 8px 0 4px;
+  color: #101828;
+  font-size: 18px;
+}
+
+.projects-directory-title p,
+.projects-directory-footer span,
+.projects-directory-meta {
+  color: #667085;
+  font-size: 12px;
+}
+
+.projects-directory-title > strong {
+  color: var(--ui-royal);
+  font-size: 13px;
+}
+
+.projects-directory-meta {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.projects-directory-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.projects-directory-meta ion-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--ui-royal);
+}
+
+.projects-directory-ledger {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.projects-directory-ledger > div {
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid #d7e0ee;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.projects-directory-ledger span {
+  display: block;
+  margin-bottom: 6px;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 820;
+}
+
+.projects-directory-ledger strong {
+  color: #101828;
+  font-size: 13px;
+}
+
+.projects-directory-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ui-royal);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 860;
+  cursor: pointer;
+}
+
+.projects-directory-footer ion-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.dark-mode .sidebar-view-all-projects,
+.dark-mode .projects-directory-head,
+.dark-mode .projects-directory-card {
+  border-color: #2a4268 !important;
+  background: #0e1a2d !important;
+}
+
+.dark-mode .projects-directory-head h1,
+.dark-mode .projects-directory-title h2,
+.dark-mode .projects-directory-ledger strong {
+  color: #f8fbff !important;
+}
+
+.dark-mode .projects-directory-head p,
+.dark-mode .projects-directory-title p,
+.dark-mode .projects-directory-footer span,
+.dark-mode .projects-directory-meta {
+  color: #aebbd0 !important;
+}
+
+.dark-mode .projects-directory-search,
+.dark-mode .projects-directory-ledger > div {
+  border-color: #2a4268 !important;
+  background: #101f36 !important;
+}
+
+.dark-mode .projects-directory-search input {
+  color: #f8fbff !important;
+}
+
+@media (max-width: 900px) {
+  .projects-directory-head,
+  .projects-directory-list {
+    grid-template-columns: 1fr;
+  }
+
+  .projects-directory-ledger {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

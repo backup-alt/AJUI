@@ -19,6 +19,10 @@ export const routes: Routes = [
     loadComponent: () => import("./pages/client-dashboard.page").then((m) => m.ClientDashboardPage),
   },
   {
+    path: "projects",
+    loadComponent: () => import("./pages/projects-directory.page").then((m) => m.ProjectsDirectoryPage),
+  },
+  {
     path: "approvals",
     loadComponent: () => import("./pages/pending-approvals.page").then((m) => m.PendingApprovalsPage),
   },

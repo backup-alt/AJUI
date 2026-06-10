@@ -52,7 +52,7 @@ type SidebarItem = {
                 </svg>
               </button>
             </div>
-            <div class="sidebar-project-filters" aria-label="Project status filters">
+            <div class="sidebar-project-filters" aria-label="Project status filters" *ngIf="!clientId">
               <button
                 *ngFor="let status of projectStatusFilters"
                 type="button"
@@ -62,38 +62,47 @@ type SidebarItem = {
                 {{ status === 'On Hold' ? 'On-Hold' : status }}
               </button>
             </div>
-            <div *ngFor="let project of filteredSidebarProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
-              <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']">
-                <span>{{ project.name }}</span>
-                <small>
-                  <strong>{{ project.id }}</strong>
-                  <em>
+            <div class="sidebar-project-scroll">
+              <div *ngFor="let project of filteredSidebarProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
+                <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']">
+                  <span>{{ project.name }}</span>
+                  <small>
+                    <strong>{{ project.id }}</strong>
+                    <em>
+                      <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                        <path d="M12 7v5l3 2" />
+                        <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                      {{ projectActivityLabel(project) }}
+                    </em>
+                  </small>
+                </a>
+                <div class="sidebar-project-actions">
+                  <button type="button" aria-label="Edit project" (click)="editProject.emit(project)">
                     <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M12 7v5l3 2" />
-                      <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
+                      <path d="m14.8 7.2 3 3" />
                     </svg>
-                    {{ projectActivityLabel(project) }}
-                  </em>
-                </small>
-              </a>
-              <div class="sidebar-project-actions">
-                <button type="button" aria-label="Edit project" (click)="editProject.emit(project)">
-                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                    <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
-                    <path d="m14.8 7.2 3 3" />
-                  </svg>
-                </button>
-                <button type="button" aria-label="Delete project" (click)="deleteProject.emit(project)">
-                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                    <path d="M5 7h14" />
-                    <path d="M9 7V5h6v2" />
-                    <path d="M8 10v8" />
-                    <path d="M12 10v8" />
-                    <path d="M16 10v8" />
-                    <path d="M7 7l1 14h8l1-14" />
-                  </svg>
-                </button>
+                  </button>
+                  <button type="button" aria-label="Delete project" (click)="deleteProject.emit(project)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M5 7h14" />
+                      <path d="M9 7V5h6v2" />
+                      <path d="M8 10v8" />
+                      <path d="M12 10v8" />
+                      <path d="M16 10v8" />
+                      <path d="M7 7l1 14h8l1-14" />
+                    </svg>
+                  </button>
+                </div>
               </div>
+              <a class="sidebar-view-all-projects" routerLink="/projects">
+                <span>View all projects</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                  <path d="M5 12h14" />
+                  <path d="m13 6 6 6-6 6" />
+                </svg>
+              </a>
             </div>
           </section>
 
@@ -149,6 +158,7 @@ export class EnterpriseSidebarComponent {
   }
 
   get filteredSidebarProjects(): Project[] {
+    if (this.clientId) return this.sidebarProjects;
     const status = this.projectStatusFilter();
     return this.sidebarProjects.filter((project) => project.status === status);
   }
