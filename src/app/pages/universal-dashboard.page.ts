@@ -275,6 +275,17 @@ const dashboardModules: ModuleConfig[] = [
   },
 ];
 
+const siteMaterialDetailFields: FieldSchema[] = [
+  { key: "materialName", label: "Material Name" },
+  { key: "unit", label: "Unit" },
+  { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
+  { key: "approvedQuantity", label: "Approved Quantity", type: "number" },
+  { key: "requestDate", label: "Request Date", type: "date" },
+  { key: "vendor", label: "Vendor" },
+  { key: "poNumber", label: "PO Number" },
+  { key: "remainingStock", label: "Remaining Stock" },
+];
+
 @Component({
   standalone: true,
   imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
@@ -646,6 +657,37 @@ const dashboardModules: ModuleConfig[] = [
                       <input [type]="column.type || 'text'" [value]="draftRow()[column.key] || ''" (input)="updateDraftField(column.key, $any($event.target).value)" />
                     </ng-template>
                   </label>
+                  <ng-container *ngIf="showSiteMaterialDetails()">
+                    <div class="material-detail-heading span-2">
+                      <strong>Material details</strong>
+                      <span>These fields create the linked Material Requests row for this site purchase.</span>
+                    </div>
+                    <label *ngFor="let field of siteMaterialDetailFields">
+                      <span>{{ field.label }}</span>
+                      <input
+                        *ngIf="selectOptions('materials', field.key).length > 0 && allowsCustomOption('materials', field.key); else dashboardMaterialSelect"
+                        [attr.list]="'dashboard-site-material-' + field.key"
+                        [type]="field.type || 'text'"
+                        [value]="draftRow()[field.key] || ''"
+                        (input)="updateDraftField(field.key, $any($event.target).value)"
+                      />
+                      <datalist [id]="'dashboard-site-material-' + field.key">
+                        <option *ngFor="let option of selectOptions('materials', field.key)" [value]="option"></option>
+                      </datalist>
+                      <ng-template #dashboardMaterialSelect>
+                        <select
+                          *ngIf="selectOptions('materials', field.key).length > 0; else dashboardMaterialInput"
+                          [value]="draftRow()[field.key] || ''"
+                          (change)="updateDraftField(field.key, $any($event.target).value)"
+                        >
+                          <option *ngFor="let option of selectOptions('materials', field.key)" [value]="option">{{ option }}</option>
+                        </select>
+                      </ng-template>
+                      <ng-template #dashboardMaterialInput>
+                        <input [type]="field.type || 'text'" [value]="draftRow()[field.key] || ''" (input)="updateDraftField(field.key, $any($event.target).value)" />
+                      </ng-template>
+                    </label>
+                  </ng-container>
                 </div>
                 <div class="dialog-actions">
                   <button type="button" class="secondary-action" (click)="recordDialogOpen.set(false)">Cancel</button>
@@ -770,6 +812,7 @@ export class UniversalDashboardPage {
   readonly labourTypeName = signal("Mason");
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
+  readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
   readonly dashboardRows = computed(() => this.buildRows());
   readonly tableState = computed(() => ({
@@ -1066,12 +1109,12 @@ export class UniversalDashboardPage {
   }
 
   expenseFilterOpeningLabel(): string {
-    const row = this.visibleRows().find((entry) => this.activeModule() === "expenses" && entry["project"] === this.selectedFilters()["project"] && entry["site"] === this.selectedFilters()["site"]);
-    return row ? formatMoney(this.expenseOpeningBalanceFor(row)) : formatMoney(0);
+    const row = this.expenseChronologicalRows(this.visibleRows()).find((entry) => this.activeModule() === "expenses" && entry["project"] === this.selectedFilters()["project"] && entry["site"] === this.selectedFilters()["site"]);
+    return row ? formatMoney(this.expenseOpeningBalanceFor(row, true, true)) : formatMoney(0);
   }
 
   expenseFilterCurrentLabel(): string {
-    const rows = this.visibleRows().filter((entry) => entry["project"] === this.selectedFilters()["project"] && entry["site"] === this.selectedFilters()["site"]);
+    const rows = this.expenseChronologicalRows(this.visibleRows()).filter((entry) => entry["project"] === this.selectedFilters()["project"] && entry["site"] === this.selectedFilters()["site"]);
     const latest = rows.at(-1);
     return latest ? String(latest["runningBalance"] || formatMoney(0)) : formatMoney(0);
   }
@@ -1131,6 +1174,7 @@ export class UniversalDashboardPage {
 
   openRecordDialog() {
     const row: TableRow = { ...this.defaultRowFor(this.activeModule()) };
+    this.draftRow.set(row);
     for (const column of this.recordFormColumns()) {
       const options = this.selectOptions(this.activeModule(), column.key);
       row[column.key] = row[column.key] || options[0] || "";
@@ -1143,6 +1187,13 @@ export class UniversalDashboardPage {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
     return this.columnsForActive().filter((column) => {
       if (this.activeModule() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
+      if (
+        this.activeModule() === "expenses" &&
+        column.key === "siteMaterial" &&
+        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Purchase")) !== "Purchase"
+      ) {
+        return false;
+      }
       return !this.isReadonlyColumn(column.key);
     });
   }
@@ -1168,7 +1219,38 @@ export class UniversalDashboardPage {
   }
 
   updateDraftField(key: string, value: string) {
-    this.draftRow.update((row) => ({ ...row, [key]: value }));
+    this.draftRow.update((row) => {
+      const next = { ...row, [key]: value };
+      if (this.activeModule() === "expenses") {
+        const transactionType = this.normalizedExpenseTransactionType(String(key === "transactionType" ? value : next["transactionType"] || "Purchase"));
+        next["transactionType"] = transactionType;
+        if (transactionType !== "Purchase") {
+          next["siteMaterial"] = "No";
+          for (const field of siteMaterialDetailFields) delete next[field.key];
+        }
+        if ((key === "siteMaterial" || next["siteMaterial"] === "Yes") && transactionType === "Purchase" && this.normalizeYesNo(next["siteMaterial"]) === "Yes") {
+          const requestedQuantity = String(next["requestedQuantity"] || "1");
+          const unit = String(next["unit"] || "Item");
+          next["requestDate"] = next["requestDate"] || next["expenseDate"] || new Date().toISOString().slice(0, 10);
+          next["materialName"] = next["materialName"] || next["description"] || "Site material purchase";
+          next["unit"] = unit;
+          next["requestedQuantity"] = requestedQuantity;
+          next["approvedQuantity"] = next["approvedQuantity"] || requestedQuantity;
+          next["remainingStock"] = next["remainingStock"] || `${requestedQuantity} ${unit}`.trim();
+        }
+        if (key === "requestedQuantity" && !next["approvedQuantity"]) next["approvedQuantity"] = value;
+        if ((key === "requestedQuantity" || key === "unit") && this.normalizeYesNo(next["siteMaterial"]) === "Yes") {
+          next["remainingStock"] = `${next["requestedQuantity"] || "1"} ${next["unit"] || "Item"}`.trim();
+        }
+      }
+      return next;
+    });
+  }
+
+  showSiteMaterialDetails(): boolean {
+    if (this.activeModule() !== "expenses") return false;
+    const row = this.draftRow();
+    return this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Purchase" && this.normalizeYesNo(row["siteMaterial"]) === "Yes";
   }
 
   saveRecord(event: Event) {
@@ -1185,7 +1267,9 @@ export class UniversalDashboardPage {
       const status = this.normalizeClientStatus(String(row["status"] || ""));
       if (status !== "Active") this.data.updateClient(client.id, { status });
     } else {
-      const savedRow = this.data.addCustomRow(module, this.withGeneratedReferences(module === "expenses" ? this.normalizedExpenseInputRow(row) : row));
+      const preparedRow = this.withGeneratedReferences(module === "expenses" ? this.normalizedExpenseInputRow(row) : row);
+      if (module === "expenses") this.ensureExpenseOpeningForInput(preparedRow);
+      const savedRow = this.data.addCustomRow(module, preparedRow);
       if (module === "expenses") this.createMaterialFromSiteExpense(savedRow);
     }
     this.recordDialogOpen.set(false);
@@ -1216,6 +1300,8 @@ export class UniversalDashboardPage {
     const existing = this.rowsFor("materials").some((entry) => String(entry["sourceExpenseRowId"] || "") === sourceExpenseRowId);
     if (existing) return;
     const client = this.data.clients().find((entry) => entry.projectIds.includes(project.id) || entry.name === project.client);
+    const requestedQuantity = String(row["requestedQuantity"] || "1");
+    const unit = String(row["unit"] || "Item");
     this.data.addCustomRow("materials", {
       __projectId: project.id,
       projectId: project.id,
@@ -1223,14 +1309,14 @@ export class UniversalDashboardPage {
       client: project.client,
       project: project.name,
       site: row["site"] || project.sites[0] || "",
-      materialName: row["description"] || "Site material purchase",
-      unit: "Item",
-      requestedQuantity: "1",
-      approvedQuantity: "1",
-      requestDate: row["expenseDate"] || new Date().toISOString().slice(0, 10),
+      materialName: row["materialName"] || row["description"] || "Site material purchase",
+      unit,
+      requestedQuantity,
+      approvedQuantity: row["approvedQuantity"] || requestedQuantity,
+      requestDate: row["requestDate"] || row["expenseDate"] || new Date().toISOString().slice(0, 10),
       vendor: row["vendor"] || "",
       poNumber: row["reference"] || "",
-      remainingStock: "1 Item",
+      remainingStock: row["remainingStock"] || `${requestedQuantity} ${unit}`.trim(),
       status: row["approvalStatus"] || "Pending",
       sourceExpenseRowId,
     });
@@ -1440,8 +1526,9 @@ export class UniversalDashboardPage {
   exportPdf() {
     const module = this.activeModule();
     const columns = this.reportColumns(module);
-    const rows = this.reportRows(module, this.visibleRows());
-    const summary = module === "labour" ? this.labourSummaryHtml(rows) : module === "expenses" ? this.expenseSummaryHtml(rows) : "";
+    const sourceRows = this.visibleRows();
+    const rows = this.reportRows(module, sourceRows);
+    const summary = module === "labour" ? this.labourSummaryHtml(rows) : module === "expenses" ? this.expenseSummaryHtml(sourceRows) : "";
     this.openPrintableReport({
       title: module === "labour" ? "Labour Attendance Report" : module === "expenses" ? "Expense Ledger Report" : this.activeConfig().title,
       subtitle: "Annai Golden Builders - Universal Dashboard",
@@ -1653,6 +1740,8 @@ export class UniversalDashboardPage {
     if (key === "address") return this.clientAddressOptions();
     if (key === "supervisor" || key === "supervisorName" || key === "collectedBy" || key === "paidBy") return this.supervisorNameOptions();
     if (module === "labour" && key === "staffName") return this.staffNameOptions();
+    if (module === "materials" && key === "materialName") return this.materialNameOptions();
+    if (module === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
     if (module === "expenses" && key === "transactionType") {
       return ["Purchase", "Cash Added"];
     }
@@ -1826,10 +1915,10 @@ export class UniversalDashboardPage {
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
-    return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
+    const computedRows = this.expenseChronologicalRows(rows).map((row) => {
       const transactionType = this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase"));
       const groupKey = this.expenseGroupKey(row);
-      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
+      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row, true, true);
       const balance = Math.max(0, previousBalance + this.expenseSignedAmount(row, transactionType));
       balances.set(groupKey, balance);
       return {
@@ -1839,6 +1928,7 @@ export class UniversalDashboardPage {
         runningBalance: formatMoney(balance),
       };
     });
+    return this.expenseDisplayRows(computedRows);
   }
 
   private withLabourPayable(row: TableRow): TableRow {
@@ -1928,6 +2018,13 @@ export class UniversalDashboardPage {
       ...this.data.vendors().map((vendor) => vendor.name),
       ...this.data.materials().map((material) => material.vendor),
       ...this.rowsFor("materials").map((row) => String(row["vendor"] || "")),
+    ]);
+  }
+
+  private materialNameOptions(): string[] {
+    return this.sortedUnique([
+      ...this.data.materials().map((material) => material.name),
+      ...this.rowsFor("materials").map((row) => String(row["materialName"] || row["name"] || "")),
     ]);
   }
 
@@ -2035,7 +2132,15 @@ export class UniversalDashboardPage {
     return `${this.expenseGroupKey(row)}::${date}::${row["__rowId"] || ""}`;
   }
 
-  private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true): number {
+  private expenseChronologicalRows(rows: TableRow[]): TableRow[] {
+    return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second)));
+  }
+
+  private expenseDisplayRows(rows: TableRow[]): TableRow[] {
+    return [...rows].sort((first, second) => this.expenseRowSortValue(second).localeCompare(this.expenseRowSortValue(first)));
+  }
+
+  private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true, allowAnySiteFallback = false): number {
     const explicitProjectId = String(row["projectId"] || row["__projectId"] || "");
     const site = String(row["site"] || "Project");
     const project =
@@ -2048,7 +2153,7 @@ export class UniversalDashboardPage {
     if (explicitOpening) return explicitOpening;
     const issuedOpening = this.expenseCashIssuedOpeningForGroup(projectId, String(row["project"] || ""), String(row["site"] || ""));
     if (issuedOpening) return issuedOpening;
-    if (!allowProjectFallback || !this.isPrimaryExpenseSite(project, site)) return 0;
+    if (!allowProjectFallback || (!allowAnySiteFallback && !this.isPrimaryExpenseSite(project, site))) return 0;
     return project?.expenseBalance ?? 0;
   }
 
@@ -2059,11 +2164,12 @@ export class UniversalDashboardPage {
   }
 
   private normalizedExpenseInputRow(row: TableRow): TableRow {
+    const transactionType = this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase"));
     return {
       ...row,
-      transactionType: this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase")),
+      transactionType,
       amount: this.positiveExpenseAmountValue(row["amount"]),
-      siteMaterial: this.normalizeYesNo(row["siteMaterial"]),
+      siteMaterial: transactionType === "Purchase" ? this.normalizeYesNo(row["siteMaterial"]) : "No",
       approvalStatus: row["approvalStatus"] || "Pending",
     };
   }
@@ -2082,6 +2188,15 @@ export class UniversalDashboardPage {
 
   private normalizeYesNo(value: unknown): string {
     return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
+  }
+
+  private ensureExpenseOpeningForInput(row: TableRow) {
+    const project =
+      this.data.projectById(String(row["projectId"] || row["__projectId"] || "")) ??
+      this.data.projects().find((projectRow) => projectRow.name === row["project"] || projectRow.id === row["project"]);
+    const site = String(row["site"] || project?.sites[0] || "").trim();
+    if (!project?.id || !site || this.data.expenseOpeningBalanceFor(project.id, site) !== undefined) return;
+    this.data.setExpenseOpeningBalance(project.id, site, project.expenseBalance ?? 0);
   }
 
   private explicitExpenseOpeningForGroup(projectId: string, projectName: string, site: string): number {
@@ -2149,6 +2264,26 @@ export class UniversalDashboardPage {
   }
 
   private reportRows(module: DashboardModule, rows: TableRow[]): TableRow[] {
+    if (module === "expenses") {
+      const chronologicalRows = this.expenseChronologicalRows(rows);
+      const openingRows: TableRow[] = [];
+      const seenGroups = new Set<string>();
+      for (const row of chronologicalRows) {
+        const key = this.expenseGroupKey(row);
+        if (seenGroups.has(key)) continue;
+        seenGroups.add(key);
+        const opening = this.expenseOpeningBalanceFor(row, true, true);
+        openingRows.push({
+          ...row,
+          expenseDate: String(row["expenseDate"] || row["date"] || ""),
+          transactionType: "Opening Balance",
+          description: `Opening balance - ${row["site"] || "Project"}`,
+          amount: formatMoney(opening),
+          runningBalance: formatMoney(opening),
+        });
+      }
+      return [...openingRows, ...chronologicalRows];
+    }
     if (module !== "labour") return rows;
     return rows.map((row) => {
       const weeklyPay = this.labourWeeklyPayForRow(row);
@@ -2283,18 +2418,19 @@ export class UniversalDashboardPage {
   }
 
   private expenseSummaryHtml(rows: TableRow[]): string {
+    const ledgerRows = this.expenseChronologicalRows(rows);
     const openingByGroup = new Map<string, number>();
     const closingByGroup = new Map<string, number>();
-    const spent = rows.reduce((sum, row) => {
+    const spent = ledgerRows.reduce((sum, row) => {
       const key = this.expenseGroupKey(row);
       if (!openingByGroup.has(key)) {
-        openingByGroup.set(key, this.expenseOpeningBalanceFor(row, Boolean(this.selectedFilters()["project"] && this.selectedFilters()["site"])));
+        openingByGroup.set(key, this.expenseOpeningBalanceFor(row, true, true));
       }
       closingByGroup.set(key, this.moneyNumber(row["runningBalance"]));
       const amount = this.expenseSignedAmount(row);
       return amount < 0 ? sum + Math.abs(amount) : sum;
     }, 0);
-    const received = rows.reduce((sum, row) => {
+    const received = ledgerRows.reduce((sum, row) => {
       const amount = this.expenseSignedAmount(row);
       return amount > 0 ? sum + amount : sum;
     }, [...openingByGroup.values()].reduce((sum, amount) => sum + amount, 0));

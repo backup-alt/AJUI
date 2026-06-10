@@ -2845,6 +2845,43 @@ ion-badge.neutral {
   grid-column: span 2;
 }
 
+.material-detail-heading {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid #d6e0ee;
+  border-radius: 8px;
+  background: #f7faff;
+}
+
+.material-detail-heading strong {
+  color: #002263;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.material-detail-heading span {
+  color: #526070;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+body.dark-mode .material-detail-heading {
+  border-color: rgba(123, 157, 214, 0.36);
+  background: rgba(21, 39, 74, 0.78);
+}
+
+body.dark-mode .material-detail-heading strong {
+  color: #d8e6ff;
+}
+
+body.dark-mode .material-detail-heading span {
+  color: #a9b9d3;
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

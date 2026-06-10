@@ -144,6 +144,17 @@ const sectionConfigs: SectionConfig[] = [
   },
 ];
 
+const siteMaterialDetailFields: FieldSchema[] = [
+  { key: "materialName", label: "Material Name" },
+  { key: "unit", label: "Unit" },
+  { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
+  { key: "approvedQuantity", label: "Approved Quantity", type: "number" },
+  { key: "requestDate", label: "Request Date", type: "date" },
+  { key: "vendor", label: "Vendor" },
+  { key: "poNumber", label: "PO Number" },
+  { key: "remainingStock", label: "Remaining Stock" },
+];
+
 @Component({
   standalone: true,
   imports: [
@@ -604,6 +615,41 @@ const sectionConfigs: SectionConfig[] = [
                       />
                     </ng-template>
                   </label>
+                  <ng-container *ngIf="showSiteMaterialDetails()">
+                    <div class="material-detail-heading span-2">
+                      <strong>Material details</strong>
+                      <span>These fields create the linked Material Requests row for this site purchase.</span>
+                    </div>
+                    <label *ngFor="let field of siteMaterialDetailFields">
+                      <span>{{ field.label }}</span>
+                      <input
+                        *ngIf="selectOptions('materials', field.key).length > 0 && allowsCustomOption('materials', field.key); else projectMaterialSelect"
+                        [attr.list]="'project-site-material-' + field.key"
+                        [type]="field.type || 'text'"
+                        [value]="draftRow()[field.key] || ''"
+                        (input)="updateDraftField(field.key, $any($event.target).value)"
+                      />
+                      <datalist [id]="'project-site-material-' + field.key">
+                        <option *ngFor="let option of selectOptions('materials', field.key)" [value]="option"></option>
+                      </datalist>
+                      <ng-template #projectMaterialSelect>
+                        <select
+                          *ngIf="selectOptions('materials', field.key).length > 0; else projectMaterialInput"
+                          [value]="draftRow()[field.key] || ''"
+                          (change)="updateDraftField(field.key, $any($event.target).value)"
+                        >
+                          <option *ngFor="let option of selectOptions('materials', field.key)" [value]="option">{{ option }}</option>
+                        </select>
+                      </ng-template>
+                      <ng-template #projectMaterialInput>
+                        <input
+                          [type]="field.type || 'text'"
+                          [value]="draftRow()[field.key] || ''"
+                          (input)="updateDraftField(field.key, $any($event.target).value)"
+                        />
+                      </ng-template>
+                    </label>
+                  </ng-container>
                 </div>
                 <div class="dialog-actions">
                   <button type="button" class="secondary-action" (click)="recordDialogOpen.set(false)">Cancel</button>
@@ -751,6 +797,7 @@ export class ProjectWorkspacePage {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly expenseOpeningEdit = signal(false);
+  readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
   readonly tableState = computed(() => ({
     rows: this.visibleRows(this.activeSection()),
@@ -1032,6 +1079,7 @@ export class ProjectWorkspacePage {
 
   openRecordDialog() {
     const row: TableRow = { ...this.defaultRowFor(this.activeSection()) };
+    this.draftRow.set(row);
     for (const column of this.recordFormColumns()) {
       const options = this.selectOptions(this.activeSection(), column.key);
       row[column.key] = column.key === "site" && this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : row[column.key] || options[0] || "";
@@ -1044,7 +1092,7 @@ export class ProjectWorkspacePage {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
     return this.columnsFor(this.activeSection()).filter((column) => {
       if (this.activeSection() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
-      if (this.activeSection() === "expenses" && column.key === "siteMaterial" && this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "")) !== "Purchase") {
+      if (this.activeSection() === "expenses" && column.key === "siteMaterial" && this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Purchase")) !== "Purchase") {
         return false;
       }
       return !this.isReadonlyColumn(column.key);
@@ -1057,8 +1105,30 @@ export class ProjectWorkspacePage {
       if (this.activeSection() === "expenses" && key === "transactionType" && this.normalizedExpenseTransactionType(value) !== "Purchase") {
         nextRow["siteMaterial"] = "No";
       }
+      if (this.activeSection() === "expenses" && key === "siteMaterial" && this.normalizeYesNo(value) === "Yes") {
+        nextRow["requestDate"] ||= nextRow["expenseDate"] || new Date().toISOString().slice(0, 10);
+        nextRow["materialName"] ||= nextRow["description"] || "";
+        nextRow["unit"] ||= "Item";
+        nextRow["requestedQuantity"] ||= "1";
+        nextRow["approvedQuantity"] ||= nextRow["requestedQuantity"] || "1";
+        nextRow["remainingStock"] ||= `${nextRow["approvedQuantity"] || "1"} ${nextRow["unit"] || "Item"}`;
+      }
+      if (this.activeSection() === "expenses" && key === "requestedQuantity" && !nextRow["approvedQuantity"]) {
+        nextRow["approvedQuantity"] = value;
+      }
+      if (this.activeSection() === "expenses" && (key === "requestedQuantity" || key === "approvedQuantity" || key === "unit")) {
+        const quantity = nextRow["approvedQuantity"] || nextRow["requestedQuantity"] || "0";
+        const unit = nextRow["unit"] || "Item";
+        nextRow["remainingStock"] = `${quantity} ${unit}`;
+      }
       return nextRow;
     });
+  }
+
+  showSiteMaterialDetails(): boolean {
+    if (this.activeSection() !== "expenses") return false;
+    const row = this.draftRow();
+    return this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Purchase" && this.normalizeYesNo(row["siteMaterial"]) === "Yes";
   }
 
   saveRecord(event: Event) {
@@ -1099,14 +1169,14 @@ export class ProjectWorkspacePage {
       client: currentProject?.client ?? "",
       project: currentProject?.name ?? "",
       site: row["site"] || this.expenseEditableSite(),
-      materialName: row["description"] || "Site material purchase",
-      unit: "Item",
-      requestedQuantity: "1",
-      approvedQuantity: "1",
-      requestDate: row["expenseDate"] || new Date().toISOString().slice(0, 10),
+      materialName: row["materialName"] || row["description"] || "Site material purchase",
+      unit: row["unit"] || "Item",
+      requestedQuantity: row["requestedQuantity"] || "1",
+      approvedQuantity: row["approvedQuantity"] || row["requestedQuantity"] || "1",
+      requestDate: row["requestDate"] || row["expenseDate"] || new Date().toISOString().slice(0, 10),
       vendor: row["vendor"] || "",
-      poNumber: row["reference"] || "",
-      remainingStock: "1 Item",
+      poNumber: row["poNumber"] || row["reference"] || "",
+      remainingStock: row["remainingStock"] || `${row["approvedQuantity"] || row["requestedQuantity"] || "1"} ${row["unit"] || "Item"}`,
       status: row["approvalStatus"] || "Pending",
       sourceExpenseRowId,
     });
@@ -1361,9 +1431,10 @@ export class ProjectWorkspacePage {
   exportPdf() {
     const section = this.activeSection();
     const columns = this.reportColumns(section);
-    const rows = this.reportRows(section, this.visibleRows(section));
+    const sourceRows = this.visibleRows(section);
+    const rows = this.reportRows(section, sourceRows);
     const currentProject = this.project();
-    const summary = section === "labour" ? this.labourSummaryHtml(rows) : section === "expenses" ? this.expenseSummaryHtml(rows) : "";
+    const summary = section === "labour" ? this.labourSummaryHtml(rows) : section === "expenses" ? this.expenseSummaryHtml(sourceRows) : "";
     this.openPrintableReport({
       title: section === "labour" ? "Labour Attendance Report" : section === "expenses" ? "Expense Ledger Report" : this.activeConfig().title,
       subtitle: `${currentProject?.name ?? this.projectId()} - ${this.activeSiteFilter() === "All" ? "All Sites" : this.activeSiteFilter()}`,
@@ -1643,6 +1714,8 @@ export class ProjectWorkspacePage {
   selectOptions(section: ModuleKey, key: string): string[] {
     if (key === "site") return this.projectSites();
     if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
+    if (section === "materials" && key === "materialName") return this.materialNameOptions();
+    if (section === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
     if (section === "labour" && key === "staffName") return this.staffNameOptionsForProject();
     if (section === "expenses" && key === "transactionType") {
       return ["Purchase", "Cash Added"];
@@ -1773,10 +1846,10 @@ export class ProjectWorkspacePage {
 
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
-    return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second))).map((row) => {
+    const computedRows = this.expenseChronologicalRows(rows).map((row) => {
       const transactionType = this.normalizedExpenseTransactionType(String(row["transactionType"] || row["expenseScope"] || "Purchase"));
       const groupKey = this.expenseGroupKey(row);
-      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row);
+      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row, true, true);
       const balance = Math.max(0, previousBalance + this.expenseSignedAmount(row, transactionType));
       balances.set(groupKey, balance);
       return {
@@ -1786,6 +1859,7 @@ export class ProjectWorkspacePage {
         runningBalance: formatMoney(balance),
       };
     });
+    return this.expenseDisplayRows(computedRows);
   }
 
   private withLabourPayable(row: TableRow): TableRow {
@@ -1840,6 +1914,15 @@ export class ProjectWorkspacePage {
         ...this.data.vendors().map((vendor) => vendor.name),
         ...this.data.materials().map((material) => material.vendor),
         ...this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row)).map((row) => String(row["vendor"] || "")),
+      ].map((value) => value.trim()).filter(Boolean)),
+    ].sort((first, second) => first.localeCompare(second));
+  }
+
+  private materialNameOptions(): string[] {
+    return [
+      ...new Set([
+        ...this.data.materials().map((material) => material.name),
+        ...this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row)).map((row) => String(row["materialName"] || row["name"] || "")),
       ].map((value) => value.trim()).filter(Boolean)),
     ].sort((first, second) => first.localeCompare(second));
   }
@@ -1970,14 +2053,24 @@ export class ProjectWorkspacePage {
   }
 
   expenseOpeningBalanceLabel(): string {
+    const rows = this.expenseChronologicalRows(this.visibleRows("expenses"));
     if (this.activeSiteFilter() === "All") {
-      return formatMoney(this.expenseLedgerSites().reduce((sum, site) => sum + this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }), 0));
+      if (!rows.length) {
+        return formatMoney(this.expenseLedgerSites().reduce((sum, site) => sum + this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }), 0));
+      }
+      const openingByGroup = new Map<string, number>();
+      for (const row of rows) {
+        const key = this.expenseGroupKey(row);
+        if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row, true, true));
+      }
+      return formatMoney([...openingByGroup.values()].reduce((sum, amount) => sum + amount, 0));
     }
-    return formatMoney(this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
+    const row = rows.find((entry) => String(entry["site"] || "").toLowerCase() === this.activeSiteFilter().toLowerCase());
+    return formatMoney(row ? this.expenseOpeningBalanceFor(row, true, true) : this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
   }
 
   expenseCurrentBalanceLabel(): string {
-    const rows = this.visibleRows("expenses");
+    const rows = this.expenseChronologicalRows(this.visibleRows("expenses"));
     if (!rows.length) return this.expenseOpeningBalanceLabel();
     const latestByGroup = new Map<string, number>();
     if (this.activeSiteFilter() === "All") {
@@ -1998,7 +2091,7 @@ export class ProjectWorkspacePage {
     const openingByGroup = new Map<string, number>();
     const cashAdded = rows.reduce((sum, row) => {
       const key = this.expenseGroupKey(row);
-      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row));
+      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row, true, true));
       const amount = this.expenseSignedAmount(row);
       return amount > 0 ? sum + amount : sum;
     }, 0);
@@ -2024,7 +2117,15 @@ export class ProjectWorkspacePage {
     return `${this.expenseGroupKey(row)}::${date}::${row["__rowId"] || ""}`;
   }
 
-  private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true): number {
+  private expenseChronologicalRows(rows: TableRow[]): TableRow[] {
+    return [...rows].sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second)));
+  }
+
+  private expenseDisplayRows(rows: TableRow[]): TableRow[] {
+    return [...rows].sort((first, second) => this.expenseRowSortValue(second).localeCompare(this.expenseRowSortValue(first)));
+  }
+
+  private expenseOpeningBalanceFor(row: TableRow, allowProjectFallback = true, allowAnySiteFallback = false): number {
     const projectId = String(row["projectId"] || row["__projectId"] || this.projectId());
     const site = String(row["site"] || this.expenseEditableSite());
     const savedOpening = this.data.expenseOpeningBalanceFor(projectId, site);
@@ -2033,7 +2134,7 @@ export class ProjectWorkspacePage {
     if (explicitOpening) return explicitOpening;
     const issuedOpening = this.expenseCashIssuedOpeningForGroup(projectId, site);
     if (issuedOpening) return issuedOpening;
-    if (!allowProjectFallback || !this.isPrimaryExpenseSite(projectId, site)) return 0;
+    if (!allowProjectFallback || (!allowAnySiteFallback && !this.isPrimaryExpenseSite(projectId, site))) return 0;
     const project = this.data.projectById(projectId);
     return project?.expenseBalance ?? 0;
   }
@@ -2166,6 +2267,26 @@ export class ProjectWorkspacePage {
   }
 
   private reportRows(section: ModuleKey, rows: TableRow[]): TableRow[] {
+    if (section === "expenses") {
+      const chronologicalRows = this.expenseChronologicalRows(rows);
+      const openingRows: TableRow[] = [];
+      const seenGroups = new Set<string>();
+      for (const row of chronologicalRows) {
+        const key = this.expenseGroupKey(row);
+        if (seenGroups.has(key)) continue;
+        seenGroups.add(key);
+        const opening = this.expenseOpeningBalanceFor(row, true, true);
+        openingRows.push({
+          ...row,
+          expenseDate: String(row["expenseDate"] || row["date"] || ""),
+          transactionType: "Opening Balance",
+          description: `Opening balance - ${row["site"] || "Project"}`,
+          amount: formatMoney(opening),
+          runningBalance: formatMoney(opening),
+        });
+      }
+      return [...openingRows, ...chronologicalRows];
+    }
     if (section !== "labour") return rows;
     return rows.map((row) => {
       const weeklyPay = this.labourWeeklyPayForRow(row);
@@ -2300,16 +2421,17 @@ export class ProjectWorkspacePage {
   }
 
   private expenseSummaryHtml(rows: TableRow[]): string {
+    const ledgerRows = this.expenseChronologicalRows(rows);
     const openingByGroup = new Map<string, number>();
     const closingByGroup = new Map<string, number>();
-    const spent = rows.reduce((sum, row) => {
+    const spent = ledgerRows.reduce((sum, row) => {
       const key = this.expenseGroupKey(row);
-      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row));
+      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row, true, true));
       closingByGroup.set(key, this.moneyNumber(row["runningBalance"]));
       const amount = this.expenseSignedAmount(row);
       return amount < 0 ? sum + Math.abs(amount) : sum;
     }, 0);
-    const received = rows.reduce((sum, row) => {
+    const received = ledgerRows.reduce((sum, row) => {
       const amount = this.expenseSignedAmount(row);
       return amount > 0 ? sum + amount : sum;
     }, [...openingByGroup.values()].reduce((sum, amount) => sum + amount, 0));
