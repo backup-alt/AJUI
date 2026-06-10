@@ -78,8 +78,18 @@ export type SharedModuleKey =
 export type SharedFieldType = "text" | "number" | "date";
 export type SharedTableField = { key: string; label: string; type?: SharedFieldType; afterKey?: string };
 export type SharedTableRow = Record<string, string | number | undefined>;
+export const managedRoleNames = ["Project Manager", "Accountant", "Supervisor"] as const;
+export type ManagedRole = (typeof managedRoleNames)[number];
+export type RolePermissionLevel = "hidden" | "read" | "write" | "edit";
+export type RoleOption = {
+  id: string;
+  role: ManagedRole;
+  label: string;
+};
 export type ErpSettings = {
   singleApprovalForSiteExpenseMaterials: boolean;
+  roleOptions: RoleOption[];
+  rolePermissions: Record<ManagedRole, Record<string, RolePermissionLevel>>;
 };
 
 @Injectable({ providedIn: "root" })
@@ -309,9 +319,7 @@ export class ErpDataService {
   readonly expenseOpeningBalances = signal<Record<string, number>>(this.readState<Record<string, number>>("expenseOpeningBalances", {}));
   readonly projectActivity = signal<Record<string, number>>(this.readState<Record<string, number>>("projectActivity", {}));
   readonly settings = signal<ErpSettings>(
-    this.readState<ErpSettings>("settings", {
-      singleApprovalForSiteExpenseMaterials: false,
-    }),
+    this.normalizeSettings(this.readState<Partial<ErpSettings>>("settings", this.defaultSettings())),
   );
 
   constructor() {
@@ -930,6 +938,45 @@ export class ErpDataService {
     this.settings.update((settings) => ({ ...settings, ...patch }));
   }
 
+  roleOptionsFor(role: ManagedRole): RoleOption[] {
+    return this.settings().roleOptions.filter((option) => option.role === role);
+  }
+
+  addRoleOption(role: ManagedRole, label: string): RoleOption | undefined {
+    const cleanLabel = label.trim();
+    if (!cleanLabel) return undefined;
+    const existing = this.roleOptionsFor(role).some((option) => option.label.toLowerCase() === cleanLabel.toLowerCase());
+    if (existing) return undefined;
+    const option: RoleOption = {
+      id: `role-option:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      role,
+      label: cleanLabel,
+    };
+    this.settings.update((settings) => ({ ...settings, roleOptions: [...settings.roleOptions, option] }));
+    return option;
+  }
+
+  deleteRoleOption(optionId: string) {
+    this.settings.update((settings) => ({ ...settings, roleOptions: settings.roleOptions.filter((option) => option.id !== optionId) }));
+  }
+
+  rolePermission(role: ManagedRole, fieldId: string): RolePermissionLevel {
+    return this.settings().rolePermissions[role]?.[fieldId] ?? this.defaultRolePermission(role, fieldId);
+  }
+
+  setRolePermission(role: ManagedRole, fieldId: string, level: RolePermissionLevel) {
+    this.settings.update((settings) => ({
+      ...settings,
+      rolePermissions: {
+        ...settings.rolePermissions,
+        [role]: {
+          ...(settings.rolePermissions[role] ?? {}),
+          [fieldId]: level,
+        },
+      },
+    }));
+  }
+
   updateProject(
     projectId: string,
     patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "status" | "totalValue" | "advanceAmount" | "receivedAmount" | "expenseBalance">>,
@@ -1257,6 +1304,57 @@ export class ErpDataService {
   private moneyNumber(value: unknown): number {
     const parsed = Number(String(value ?? "").replace(/[^\d.-]/g, ""));
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private defaultSettings(): ErpSettings {
+    return {
+      singleApprovalForSiteExpenseMaterials: false,
+      roleOptions: [
+        { id: "role-option:pm-site", role: "Project Manager", label: "Site approvals" },
+        { id: "role-option:pm-procurement", role: "Project Manager", label: "Procurement review" },
+        { id: "role-option:accountant-ledger", role: "Accountant", label: "Ledger posting" },
+        { id: "role-option:accountant-payments", role: "Accountant", label: "Payment verification" },
+        { id: "role-option:supervisor-field", role: "Supervisor", label: "Field entry" },
+        { id: "role-option:supervisor-attendance", role: "Supervisor", label: "Attendance capture" },
+      ],
+      rolePermissions: {
+        "Project Manager": {},
+        Accountant: {},
+        Supervisor: {},
+      },
+    };
+  }
+
+  private normalizeSettings(settings: Partial<ErpSettings> | undefined): ErpSettings {
+    const defaults = this.defaultSettings();
+    const incomingPermissions = (settings?.rolePermissions ?? {}) as Partial<Record<ManagedRole, Record<string, RolePermissionLevel>>>;
+    const rolePermissions = Object.fromEntries(
+      managedRoleNames.map((role) => [role, { ...(defaults.rolePermissions[role] ?? {}), ...(incomingPermissions[role] ?? {}) }]),
+    ) as Record<ManagedRole, Record<string, RolePermissionLevel>>;
+
+    return {
+      ...defaults,
+      ...(settings ?? {}),
+      roleOptions: settings?.roleOptions?.length ? settings.roleOptions : defaults.roleOptions,
+      rolePermissions,
+    };
+  }
+
+  private defaultRolePermission(role: ManagedRole, fieldId: string): RolePermissionLevel {
+    if (fieldId.startsWith("settings.")) return "hidden";
+    if (role === "Project Manager") {
+      if (fieldId.startsWith("clients.")) return "read";
+      if (fieldId.startsWith("payments.")) return "read";
+      return "edit";
+    }
+    if (role === "Accountant") {
+      if (fieldId.startsWith("expenses.") || fieldId.startsWith("generalExpenses.") || fieldId.startsWith("payments.") || fieldId.startsWith("reports.")) {
+        return "edit";
+      }
+      return "read";
+    }
+    if (fieldId.startsWith("materials.") || fieldId.startsWith("labour.") || fieldId.startsWith("expenses.")) return "write";
+    return "read";
   }
 
   private initialsFor(name: string): string {
