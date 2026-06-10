@@ -419,16 +419,47 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <button type="button" class="filter-clear-button" *ngIf="selectedFilterCount()" (click)="clearFilters()">Clear filters</button>
               </div>
 
-              <section class="date-filter-panel" *ngIf="dateFilterOpen() && dateFilterEnabled()">
-                <label>
-                  <span>From</span>
-                  <input type="date" [value]="dateRange().start" (change)="setDateRange('start', $any($event.target).value)" />
-                </label>
-                <label>
-                  <span>To</span>
-                  <input type="date" [value]="dateRange().end" (change)="setDateRange('end', $any($event.target).value)" />
-                </label>
-                <strong *ngIf="dateRangeLabel()">{{ dateRangeLabel() }}</strong>
+              <section class="date-filter-panel blue-date-panel" *ngIf="dateFilterOpen() && dateFilterEnabled()">
+                <div class="date-range-picker-fields">
+                  <button type="button" [class.active]="datePickerTarget() === 'start'" (click)="datePickerTarget.set('start')">
+                    <span>From</span>
+                    <strong>{{ dateDisplay(dateRange().start) }}</strong>
+                  </button>
+                  <button type="button" [class.active]="datePickerTarget() === 'end'" (click)="datePickerTarget.set('end')">
+                    <span>To</span>
+                    <strong>{{ dateDisplay(dateRange().end) }}</strong>
+                  </button>
+                </div>
+                <div class="blue-calendar-card">
+                  <div class="blue-calendar-head">
+                    <strong>{{ calendarTitle() }}</strong>
+                    <div>
+                      <button type="button" aria-label="Previous month" (click)="shiftCalendarMonth(-1)">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon"><path d="m15 18-6-6 6-6" /></svg>
+                      </button>
+                      <button type="button" aria-label="Next month" (click)="shiftCalendarMonth(1)">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon"><path d="m9 18 6-6-6-6" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="blue-calendar-grid weekdays">
+                    <span *ngFor="let weekday of calendarWeekdays">{{ weekday }}</span>
+                  </div>
+                  <div class="blue-calendar-grid">
+                    <button
+                      type="button"
+                      *ngFor="let day of calendarDays()"
+                      [class.muted]="!day.inMonth"
+                      [class.today]="day.today"
+                      [class.selected]="day.selected"
+                      [class.in-range]="day.inRange"
+                      (click)="selectCalendarDate(day.key)"
+                    >
+                      {{ day.label }}
+                    </button>
+                  </div>
+                </div>
+                <strong class="date-filter-summary">{{ dateRangeLabel() || 'Choose a start and end date' }}</strong>
                 <button type="button" class="filter-clear-button" (click)="clearDateFilter()">Clear date</button>
                 <button type="button" class="primary-mini-action" (click)="dateFilterOpen.set(false)">Apply</button>
               </section>
@@ -917,6 +948,9 @@ export class UniversalDashboardPage {
   readonly activeFilterValueKey = signal("");
   readonly dateFilterOpen = signal(false);
   readonly dateRange = signal({ start: "", end: "" });
+  readonly datePickerTarget = signal<"start" | "end">("start");
+  readonly calendarCursor = signal(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`);
+  readonly calendarWeekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   readonly recordDialogOpen = signal(false);
   readonly fieldDialogOpen = signal(false);
   readonly draftRow = signal<TableRow>({});
@@ -1444,7 +1478,11 @@ export class UniversalDashboardPage {
   }
 
   toggleDateFilter() {
-    this.dateFilterOpen.update((open) => !open);
+    this.dateFilterOpen.update((open) => {
+      const next = !open;
+      if (next) this.syncCalendarCursor();
+      return next;
+    });
     this.filterBuilderOpen.set(false);
     this.activeFilterValueKey.set("");
   }
@@ -1455,6 +1493,8 @@ export class UniversalDashboardPage {
 
   clearDateFilter() {
     this.dateRange.set({ start: "", end: "" });
+    this.datePickerTarget.set("start");
+    this.syncCalendarCursor();
   }
 
   hasDateFilter(): boolean {
@@ -1468,6 +1508,68 @@ export class UniversalDashboardPage {
     const start = range.start || "Start";
     const end = range.end || "Today";
     return `${start} 12:00 AM - ${end} 11:59 PM`;
+  }
+
+  dateDisplay(value: string): string {
+    if (!value) return "dd/mm/yyyy";
+    const [year, month, day] = value.split("-");
+    return `${day}/${month}/${year}`;
+  }
+
+  calendarTitle(): string {
+    const [year, month] = this.calendarCursor().split("-").map(Number);
+    return new Date(year, month - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+  }
+
+  calendarDays(): Array<{ key: string; label: number; inMonth: boolean; today: boolean; selected: boolean; inRange: boolean }> {
+    const [year, month] = this.calendarCursor().split("-").map(Number);
+    const monthIndex = month - 1;
+    const firstDay = new Date(year, monthIndex, 1);
+    const mondayOffset = (firstDay.getDay() + 6) % 7;
+    const range = this.dateRange();
+    const today = this.localDateKey(new Date());
+    const days = [];
+    for (let index = 0; index < 42; index += 1) {
+      const date = new Date(year, monthIndex, index - mondayOffset + 1);
+      const key = this.localDateKey(date);
+      const hasRange = Boolean(range.start && range.end);
+      days.push({
+        key,
+        label: date.getDate(),
+        inMonth: date.getMonth() === monthIndex,
+        today: key === today,
+        selected: key === range.start || key === range.end,
+        inRange: hasRange && key > range.start && key < range.end,
+      });
+    }
+    return days;
+  }
+
+  selectCalendarDate(key: string) {
+    const range = this.dateRange();
+    if (this.datePickerTarget() === "start" || !range.start || (range.start && range.end)) {
+      this.dateRange.set({ start: key, end: "" });
+      this.datePickerTarget.set("end");
+      return;
+    }
+    if (key < range.start) this.dateRange.set({ start: key, end: "" });
+    else this.dateRange.set({ ...range, end: key });
+    this.datePickerTarget.set("start");
+  }
+
+  shiftCalendarMonth(direction: number) {
+    const [year, month] = this.calendarCursor().split("-").map(Number);
+    const date = new Date(year, month - 1 + direction, 1);
+    this.calendarCursor.set(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+  }
+
+  private syncCalendarCursor() {
+    const key = this.dateRange().start || this.dateRange().end || this.localDateKey(new Date());
+    this.calendarCursor.set(key.slice(0, 7));
+  }
+
+  private localDateKey(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
   dateFilterEnabled(): boolean {
