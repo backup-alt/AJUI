@@ -1031,6 +1031,19 @@ export class ErpDataService {
     return this.payments().filter((row) => row.projectId === projectId);
   }
 
+  projectReceivedAmount(projectOrId: Project | string | undefined): number {
+    const project = typeof projectOrId === "string" ? this.projectById(projectOrId) : projectOrId;
+    if (!project) return 0;
+    const historicalReceived = Math.max(0, project.receivedAmount - this.seedPaymentTotalForProject(project.id));
+    return Math.max(0, historicalReceived + this.paymentLedgerTotalForProject(project));
+  }
+
+  projectPendingAmount(projectOrId: Project | string | undefined): number {
+    const project = typeof projectOrId === "string" ? this.projectById(projectOrId) : projectOrId;
+    if (!project) return 0;
+    return Math.max(0, project.totalValue - this.projectReceivedAmount(project));
+  }
+
   subcontractorsForProject(projectId: string): Subcontractor[] {
     return this.subcontractors().filter((row) => row.projectId === projectId);
   }
@@ -1187,7 +1200,8 @@ export class ErpDataService {
   clientSummary(client: Client) {
     const clientProjects = this.projectsForClient(client);
     const totalValue = clientProjects.reduce((sum, project) => sum + project.totalValue, 0);
-    const received = clientProjects.reduce((sum, project) => sum + project.receivedAmount, 0);
+    const received = clientProjects.reduce((sum, project) => sum + this.projectReceivedAmount(project), 0);
+    const pending = clientProjects.reduce((sum, project) => sum + this.projectPendingAmount(project), 0);
     const sites = clientProjects.reduce((sum, project) => sum + project.sites.length, 0);
     const materialCost = clientProjects.reduce((sum, project) => sum + project.materialSpend, 0);
     const labourCost = clientProjects.reduce((sum, project) => sum + project.labourPayable, 0);
@@ -1198,7 +1212,7 @@ export class ErpDataService {
       activeSites: sites,
       totalValue,
       received,
-      pending: totalValue - received,
+      pending,
       materialCost,
       labourCost,
       siteExpense,
@@ -1206,6 +1220,50 @@ export class ErpDataService {
         .filter((row) => clientProjects.some((project) => project.id === row.projectId))
         .reduce((sum, row) => sum + row.presentCount, 0),
     };
+  }
+
+  private paymentLedgerTotalForProject(project: Project): number {
+    return this.paymentLedgerRowsForProject(project).reduce((sum, row) => sum + this.paymentAmountForLedgerRow(row), 0);
+  }
+
+  private paymentLedgerRowsForProject(project: Project): SharedTableRow[] {
+    const baseRows = this.payments().map((row) => ({
+      __rowId: `payment:${row.id}`,
+      __projectId: row.projectId,
+      projectId: row.projectId,
+      paymentDate: row.date,
+      amount: row.amount,
+      mode: row.mode,
+      transactionReference: row.reference,
+      receiptNumber: row.receipt,
+      collectedBy: row.collectedBy,
+      approvalStatus: row.status,
+    }));
+    return this.tableRowsFor("payments", baseRows, (row) => this.paymentRowBelongsToProject(row, project));
+  }
+
+  private paymentRowBelongsToProject(row: SharedTableRow, project: Project): boolean {
+    const rowProjectId = String(row["projectId"] || row["__projectId"] || "").trim();
+    if (rowProjectId) return rowProjectId === project.id;
+    const rowProject = String(row["project"] || "").trim();
+    return rowProject === project.id || rowProject.toLowerCase() === project.name.toLowerCase();
+  }
+
+  private paymentAmountForLedgerRow(row: SharedTableRow): number {
+    const status = String(row["approvalStatus"] || row["status"] || "").trim().toLowerCase();
+    if (status === "declined" || status === "rejected") return 0;
+    return Math.max(0, this.moneyNumber(row["amount"]));
+  }
+
+  private seedPaymentTotalForProject(projectId: string): number {
+    return this.payments()
+      .filter((row) => row.projectId === projectId && row.status !== "Rejected")
+      .reduce((sum, row) => sum + Math.max(0, row.amount), 0);
+  }
+
+  private moneyNumber(value: unknown): number {
+    const parsed = Number(String(value ?? "").replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   private initialsFor(name: string): string {

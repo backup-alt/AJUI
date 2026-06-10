@@ -119,8 +119,8 @@ import { formatMoney, statusClass } from "../shared/format";
                   </div>
                   <div class="project-select-ledger">
                     <div><span>Project Value</span><strong>{{ formatMoney(project.totalValue) }}</strong></div>
-                    <div><span>Received</span><strong>{{ formatMoney(project.receivedAmount) }}</strong></div>
-                    <div><span>Balance</span><strong>{{ formatMoney(project.totalValue - project.receivedAmount) }}</strong></div>
+                    <div><span>Received</span><strong>{{ formatMoney(projectReceivedAmount(project)) }}</strong></div>
+                    <div><span>Balance</span><strong>{{ formatMoney(projectPendingAmount(project)) }}</strong></div>
                     <div><span>Supervisor</span><strong>{{ project.supervisor }}</strong></div>
                   </div>
                   <ion-progress-bar [value]="project.completion / 100"></ion-progress-bar>
@@ -236,6 +236,14 @@ export class ClientWorkspacePage implements OnInit {
       openingBalance: project.expenseBalance,
       status: project.status,
     };
+  }
+
+  projectReceivedAmount(project: Project): number {
+    return this.data.projectReceivedAmount(project);
+  }
+
+  projectPendingAmount(project: Project): number {
+    return this.data.projectPendingAmount(project);
   }
 
   saveProject(value: ProjectFormValue) {

@@ -228,13 +228,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       type="number"
                       min="0"
                       step="1"
-                      [value]="currentProject.receivedAmount"
-                      (change)="updateProjectReceived($any($event.target).value)"
-                      aria-label="Project received amount"
+                      [value]="projectReceivedAmount(currentProject)"
+                      readonly
+                      aria-label="Project received amount from payment ledger"
                     />
                   </dd>
                 </div>
-                <div><dt>Pending</dt><dd>{{ formatMoney(currentProject.totalValue - currentProject.receivedAmount) }}</dd></div>
+                <div><dt>Pending</dt><dd>{{ formatMoney(projectPendingAmount(currentProject)) }}</dd></div>
                 <div><dt>Supervisor</dt><dd>{{ currentProject.supervisor }}</dd></div>
                 <div>
                   <dt>Status</dt>
@@ -2034,6 +2034,14 @@ export class ProjectWorkspacePage {
     const amount = Number(String(value).replace(/[^\d.-]/g, ""));
     if (!Number.isFinite(amount)) return;
     this.data.updateProject(this.projectId(), { receivedAmount: amount });
+  }
+
+  projectReceivedAmount(project: Project): number {
+    return this.data.projectReceivedAmount(project);
+  }
+
+  projectPendingAmount(project: Project): number {
+    return this.data.projectPendingAmount(project);
   }
 
   updateProjectEstimatedValue(value: string) {

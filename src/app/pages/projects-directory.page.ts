@@ -57,8 +57,8 @@ import { formatMoney, statusClass } from "../shared/format";
 
                 <div class="projects-directory-ledger">
                   <div><span>Estimated Value</span><strong>{{ formatMoney(project.totalValue) }}</strong></div>
-                  <div><span>Received</span><strong>{{ formatMoney(project.receivedAmount) }}</strong></div>
-                  <div><span>Pending</span><strong>{{ formatMoney(project.totalValue - project.receivedAmount) }}</strong></div>
+                  <div><span>Received</span><strong>{{ formatMoney(projectReceivedAmount(project)) }}</strong></div>
+                  <div><span>Pending</span><strong>{{ formatMoney(projectPendingAmount(project)) }}</strong></div>
                   <div><span>Supervisor</span><strong>{{ project.supervisor }}</strong></div>
                 </div>
 
@@ -96,6 +96,14 @@ export class ProjectsDirectoryPage {
 
   trackProject(_: number, project: Project): string {
     return project.id;
+  }
+
+  projectReceivedAmount(project: Project): number {
+    return this.data.projectReceivedAmount(project);
+  }
+
+  projectPendingAmount(project: Project): number {
+    return this.data.projectPendingAmount(project);
   }
 
   openProject(project: Project) {
