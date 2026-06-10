@@ -78,6 +78,9 @@ export type SharedModuleKey =
 export type SharedFieldType = "text" | "number" | "date";
 export type SharedTableField = { key: string; label: string; type?: SharedFieldType; afterKey?: string };
 export type SharedTableRow = Record<string, string | number | undefined>;
+export type ErpSettings = {
+  singleApprovalForSiteExpenseMaterials: boolean;
+};
 
 @Injectable({ providedIn: "root" })
 export class ErpDataService {
@@ -305,6 +308,11 @@ export class ErpDataService {
   );
   readonly expenseOpeningBalances = signal<Record<string, number>>(this.readState<Record<string, number>>("expenseOpeningBalances", {}));
   readonly projectActivity = signal<Record<string, number>>(this.readState<Record<string, number>>("projectActivity", {}));
+  readonly settings = signal<ErpSettings>(
+    this.readState<ErpSettings>("settings", {
+      singleApprovalForSiteExpenseMaterials: false,
+    }),
+  );
 
   constructor() {
     this.ensureMeenakshiSampleProject();
@@ -325,6 +333,7 @@ export class ErpDataService {
     effect(() => this.writeState("hiddenTableFields", this.hiddenTableFields()));
     effect(() => this.writeState("expenseOpeningBalances", this.expenseOpeningBalances()));
     effect(() => this.writeState("projectActivity", this.projectActivity()));
+    effect(() => this.writeState("settings", this.settings()));
   }
 
   private ensureMeenakshiSampleProject() {
@@ -915,6 +924,10 @@ export class ErpDataService {
     const key = this.expenseOpeningBalanceKey(projectId, siteName);
     this.expenseOpeningBalances.update((balances) => ({ ...balances, [key]: amount }));
     this.touchProject(projectId);
+  }
+
+  updateSettings(patch: Partial<ErpSettings>) {
+    this.settings.update((settings) => ({ ...settings, ...patch }));
   }
 
   updateProject(

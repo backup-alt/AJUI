@@ -123,6 +123,17 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                     <svg viewBox="0 0 20 20" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
                   </span>
                 </div>
+                <label class="settings-toggle">
+                  <div>
+                    <strong>Single approve for Site Expense and Materials</strong>
+                    <span>When a site expense creates a material row, approving either linked item clears the pair.</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    [checked]="data.settings().singleApprovalForSiteExpenseMaterials"
+                    (change)="updateSingleApproval($any($event.target).checked)"
+                  />
+                </label>
               </article>
 
               <article class="settings-card">
@@ -179,7 +190,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsPage {
-  private readonly data = inject(ErpDataService);
+  readonly data = inject(ErpDataService);
 
   readonly profileSites = signal(this.allKnownSites());
   readonly siteDraft = signal("");
@@ -198,5 +209,9 @@ export class SettingsPage {
 
   removeProfileSite(site: string) {
     this.profileSites.update((sites) => sites.filter((value) => value !== site));
+  }
+
+  updateSingleApproval(enabled: boolean) {
+    this.data.updateSettings({ singleApprovalForSiteExpenseMaterials: enabled });
   }
 }

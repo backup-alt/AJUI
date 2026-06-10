@@ -458,7 +458,14 @@ const sectionConfigs: SectionConfig[] = [
                               <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row)">
                                 <span>{{ type.type }}</span>
                                 <strong>{{ type.count }}</strong>
-                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type, $event)">
+                                <button
+                                  *ngIf="isRowEditing(row)"
+                                  type="button"
+                                  aria-label="Remove labor type"
+                                  title="Remove labor type"
+                                  (pointerdown)="$event.stopPropagation()"
+                                  (click)="removeLabourType(row, type.type, $event)"
+                                >
                                   <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                     <path d="m5.5 5.5 9 9" />
                                     <path d="m14.5 5.5-9 9" />
@@ -1037,12 +1044,21 @@ export class ProjectWorkspacePage {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
     return this.columnsFor(this.activeSection()).filter((column) => {
       if (this.activeSection() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
+      if (this.activeSection() === "expenses" && column.key === "siteMaterial" && this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "")) !== "Purchase") {
+        return false;
+      }
       return !this.isReadonlyColumn(column.key);
     });
   }
 
   updateDraftField(key: string, value: string) {
-    this.draftRow.update((row) => ({ ...row, [key]: value }));
+    this.draftRow.update((row) => {
+      const nextRow = { ...row, [key]: value };
+      if (this.activeSection() === "expenses" && key === "transactionType" && this.normalizedExpenseTransactionType(value) !== "Purchase") {
+        nextRow["siteMaterial"] = "No";
+      }
+      return nextRow;
+    });
   }
 
   saveRecord(event: Event) {
@@ -1050,8 +1066,10 @@ export class ProjectWorkspacePage {
     const section = this.activeSection();
     const currentProject = this.project();
     const selectedSite = this.activeSiteFilter();
+    const draft = section === "expenses" ? this.normalizedExpenseInputRow(this.draftRow()) : this.draftRow();
+    if (section === "expenses") this.ensureExpenseOpeningForInput(draft);
     const savedRow = this.data.addCustomRow(section, {
-      ...(section === "expenses" ? this.normalizedExpenseInputRow(this.draftRow()) : this.draftRow()),
+      ...draft,
       ...(this.isSiteAware(section) && selectedSite !== "All" ? { site: this.draftRow()["site"] || selectedSite } : {}),
       __projectId: this.projectId(),
       projectId: this.projectId(),
@@ -1304,6 +1322,7 @@ export class ProjectWorkspacePage {
   }
 
   removeLabourType(row: TableRow, labourType: string, event?: Event) {
+    event?.preventDefault();
     event?.stopPropagation();
     const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
@@ -1315,6 +1334,8 @@ export class ProjectWorkspacePage {
     this.data.updateSharedRowCell(rowId, "staffCount", nextStaffCount);
     const wageField = this.data.customFieldsFor("labour").find((field) => field.label.toLowerCase() === `${this.titleCase(labourType)} daily wage`.toLowerCase());
     if (wageField) this.data.updateSharedRowCell(rowId, wageField.key, "");
+    const generatedKey = `${this.titleCase(labourType)} Daily Wage`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    this.data.updateSharedRowCell(rowId, generatedKey, "");
   }
 
   exportExcel() {
@@ -2024,11 +2045,12 @@ export class ProjectWorkspacePage {
   }
 
   private normalizedExpenseInputRow(row: TableRow): TableRow {
+    const transactionType = this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase"));
     return {
       ...row,
-      transactionType: this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase")),
+      transactionType,
       amount: this.positiveExpenseAmountValue(row["amount"]),
-      siteMaterial: this.normalizeYesNo(row["siteMaterial"]),
+      siteMaterial: transactionType === "Purchase" ? this.normalizeYesNo(row["siteMaterial"]) : "No",
       approvalStatus: row["approvalStatus"] || "Pending",
     };
   }
@@ -2047,6 +2069,14 @@ export class ProjectWorkspacePage {
 
   private normalizeYesNo(value: unknown): string {
     return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
+  }
+
+  private ensureExpenseOpeningForInput(row: TableRow) {
+    const projectId = this.projectId();
+    const site = String(row["site"] || this.expenseEditableSite()).trim();
+    if (!projectId || !site || this.data.expenseOpeningBalanceFor(projectId, site) !== undefined) return;
+    const projectOpening = this.project()?.expenseBalance ?? 0;
+    this.data.setExpenseOpeningBalance(projectId, site, projectOpening);
   }
 
   private explicitExpenseOpeningForGroup(projectId: string, site: string): number {

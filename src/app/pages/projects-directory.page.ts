@@ -13,12 +13,12 @@ import { formatMoney, statusClass } from "../shared/format";
   imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
-      <agb-enterprise-sidebar active="clients"></agb-enterprise-sidebar>
+      <agb-enterprise-sidebar active="projects"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
         <agb-enterprise-header
-          title="Projects"
-          eyebrow="Project Directory"
+          title="Project list"
+          eyebrow="Projects"
           metaLabel=""
           [showTitle]="false"
           searchPlaceholder="Search clients, projects, vendors..."
@@ -28,7 +28,7 @@ import { formatMoney, statusClass } from "../shared/format";
           <main class="projects-directory-shell">
             <section class="projects-directory-head">
               <div>
-                <span>Project Directory</span>
+                <span>Project list</span>
                 <h1>All Projects</h1>
                 <p>Sorted by the most recently worked-on project.</p>
               </div>

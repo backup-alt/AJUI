@@ -96,7 +96,7 @@ type SidebarItem = {
                   </button>
                 </div>
               </div>
-              <a class="sidebar-view-all-projects" routerLink="/projects">
+              <a class="sidebar-view-all-projects" [routerLink]="['/projects']">
                 <span>View all projects</span>
                 <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                   <path d="M5 12h14" />
@@ -175,6 +175,7 @@ export class EnterpriseSidebarComponent {
     return [
       { key: "dashboard", label: "Dashboard", icon: "grid-outline", route: ["/dashboard"] },
       { key: "clients", label: "Clients", icon: "people-outline", route: ["/clients"] },
+      { key: "projects", label: "Project list", icon: "folder-open-outline", route: ["/projects"] },
       { key: "approvals", label: "Pending Approvals", icon: "checkmark-done-outline", route: ["/approvals"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
     ];

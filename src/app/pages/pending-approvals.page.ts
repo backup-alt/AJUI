@@ -17,6 +17,7 @@ type ApprovalBaseRow = {
   project: string;
   site: string;
   status: string;
+  sourceExpenseRowId?: string;
 };
 
 type MaterialApprovalRow = ApprovalBaseRow & {
@@ -428,7 +429,9 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 export class PendingApprovalsPage {
   private readonly data = inject(ErpDataService);
 
-  readonly materialApprovals = computed(() => this.materialRows().filter((row) => this.isPending(row.status)));
+  readonly materialApprovals = computed(() =>
+    this.materialRows().filter((row) => this.isPending(row.status) && !(this.data.settings().singleApprovalForSiteExpenseMaterials && row.sourceExpenseRowId)),
+  );
   readonly labourApprovals = computed(() => this.labourRows().filter((row) => this.isPending(row.status)));
   readonly siteExpenseApprovals = computed(() => this.siteExpenseRows().filter((row) => this.isPending(row.status)));
   readonly generalExpenseApprovals = computed(() => this.generalExpenseRows().filter((row) => this.isPending(row.status)));
@@ -460,11 +463,29 @@ export class PendingApprovalsPage {
   }
 
   approve(row: ApprovalBaseRow) {
-    this.data.updateSharedRowCell(row.rowId, row.field, "Approved");
+    this.applyApproval(row, "Approved");
   }
 
   decline(row: ApprovalBaseRow) {
-    this.data.updateSharedRowCell(row.rowId, row.field, "Declined");
+    this.applyApproval(row, "Declined");
+  }
+
+  private applyApproval(row: ApprovalBaseRow, status: "Approved" | "Declined") {
+    this.data.updateSharedRowCell(row.rowId, row.field, status);
+    if (!this.data.settings().singleApprovalForSiteExpenseMaterials) return;
+
+    if (row.module === "materials" && row.sourceExpenseRowId) {
+      this.data.updateSharedRowCell(row.sourceExpenseRowId, "approvalStatus", status);
+      return;
+    }
+
+    if (row.module === "expenses") {
+      const linkedMaterial = this.data
+        .tableRowsFor("materials", [])
+        .find((material) => String(material["sourceExpenseRowId"] || "") === row.rowId);
+      const linkedMaterialId = String(linkedMaterial?.["__rowId"] || "");
+      if (linkedMaterialId) this.data.updateSharedRowCell(linkedMaterialId, "status", status);
+    }
   }
 
   private allPendingRows(): ApprovalBaseRow[] {
@@ -509,6 +530,7 @@ export class PendingApprovalsPage {
         project: String(row["project"] || project?.name || row["projectId"] || row["__projectId"] || ""),
         site: String(row["site"] || ""),
         status: this.normalizeApprovalStatus(row["status"]),
+        sourceExpenseRowId: String(row["sourceExpenseRowId"] || ""),
         materialName: String(row["materialName"] || row["name"] || "Material"),
         unit: String(row["unit"] || ""),
         requestedQuantity: String(row["requestedQuantity"] || ""),

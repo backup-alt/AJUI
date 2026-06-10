@@ -11160,6 +11160,7 @@ th:hover .column-insert-action,
 }
 
 .sidebar-project-scroll {
+  grid-row: 3;
   display: grid;
   gap: 6px;
   min-height: 0;
