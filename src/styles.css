@@ -10403,6 +10403,23 @@ th:hover .column-hide-action,
   align-items: center;
 }
 
+.approvals-table th:last-child,
+.approvals-table td.approval-actions {
+  position: sticky !important;
+  right: 0;
+  z-index: 6;
+  min-width: 190px;
+  border-left: 3px solid #0b1937 !important;
+  border-right: 0 !important;
+  background: #ffffff !important;
+  box-shadow: -12px 0 20px rgba(15, 23, 42, 0.08);
+}
+
+.approvals-table th:last-child {
+  z-index: 8;
+  background: #eef3fb !important;
+}
+
 .approval-actions button {
   display: inline-flex;
   align-items: center;
@@ -10603,6 +10620,17 @@ body.dark-mode {
   border-color: #fb7185 !important;
   background: rgba(225, 29, 72, 0.2) !important;
   color: #fecdd3 !important;
+}
+
+.dark-mode .approvals-table th:last-child,
+.dark-mode .approvals-table td.approval-actions {
+  border-left-color: #9bbcff !important;
+  background: #101c30 !important;
+  box-shadow: -12px 0 22px rgba(0, 0, 0, 0.36);
+}
+
+.dark-mode .approvals-table th:last-child {
+  background: #13233b !important;
 }
 
 .dark-mode .empty-box-icon {

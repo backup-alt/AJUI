@@ -330,7 +330,7 @@ const dashboardModules: ModuleConfig[] = [
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="searchText()" (input)="searchText.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
-                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="addInlineRow($event)">
+                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="openRecordDialog()">
                     <ion-icon name="add-outline"></ion-icon>
                     Add Row
                   </button>
@@ -582,7 +582,7 @@ const dashboardModules: ModuleConfig[] = [
                   </button>
                 </div>
                 <div class="erp-form">
-                  <label *ngFor="let column of columnsForActive()">
+                  <label *ngFor="let column of recordFormColumns()">
                     <span>{{ column.label }}</span>
                     <input
                       *ngIf="selectOptions(activeModule(), column.key).length > 0 && allowsCustomOption(activeModule(), column.key); else dashboardDraftSelect"
@@ -939,6 +939,11 @@ export class UniversalDashboardPage {
       key === "vendorId" ||
       key === "supervisorId" ||
       key === "subcontractId" ||
+      key === "projectCount" ||
+      key === "activeSites" ||
+      key === "totalValue" ||
+      key === "amountReceived" ||
+      key === "pendingBalance" ||
       key === "runningBalance" ||
       key === "weeklyPayable" ||
       key === "weeklyPay" ||
@@ -960,13 +965,17 @@ export class UniversalDashboardPage {
   }
 
   openRecordDialog() {
-    const row: TableRow = {};
-    for (const column of this.columnsForActive()) {
+    const row: TableRow = { ...this.defaultRowFor(this.activeModule()) };
+    for (const column of this.recordFormColumns()) {
       const options = this.selectOptions(this.activeModule(), column.key);
-      row[column.key] = options[0] ?? "";
+      row[column.key] = row[column.key] || options[0] || "";
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
+  }
+
+  recordFormColumns(): FieldSchema[] {
+    return this.columnsForActive().filter((column) => !this.isReadonlyColumn(column.key));
   }
 
   addInlineRow(event?: MouseEvent) {
@@ -1003,9 +1012,22 @@ export class UniversalDashboardPage {
       const status = this.normalizeClientStatus(String(row["status"] || ""));
       if (status !== "Active") this.data.updateClient(client.id, { status });
     } else {
-      this.data.addCustomRow(module, row);
+      this.data.addCustomRow(module, this.withGeneratedReferences(row));
     }
     this.recordDialogOpen.set(false);
+  }
+
+  private withGeneratedReferences(row: TableRow): TableRow {
+    const projectId = String(row["projectId"] || row["__projectId"] || "").trim();
+    const project = projectId ? this.data.projectById(projectId) : undefined;
+    const client = project
+      ? this.data.clients().find((entry) => entry.projectIds.includes(project.id) || entry.name === project.client)
+      : this.data.clients().find((entry) => entry.name === row["client"] || entry.name === row["clientName"]);
+    return {
+      ...row,
+      ...(project ? { projectId: project.id, project: project.name, __projectId: project.id, client: project.client } : {}),
+      ...(client ? { clientId: client.id } : {}),
+    };
   }
 
   openFieldDialog(afterKey?: string, event?: Event) {

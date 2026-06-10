@@ -215,7 +215,7 @@ const sectionConfigs: SectionConfig[] = [
                   <dd>
                     <label class="status-edit-shell" [ngClass]="statusClass(currentProject.status)">
                       <span class="sr-only">Project status</span>
-                      <select [value]="currentProject.status" (change)="updateProjectStatus($any($event.target).value)">
+                      <select [value]="currentProject.status" (change)="updateProjectStatus($any($event.target).value, $event)">
                         <option value="Active">Active</option>
                         <option value="On Hold">On Hold</option>
                         <option value="Completed">Completed</option>
@@ -304,7 +304,7 @@ const sectionConfigs: SectionConfig[] = [
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="tableSearch()" (input)="tableSearch.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
-                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="addInlineRow($event)">
+                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="openRecordDialog()">
                     <ion-icon name="add-outline"></ion-icon>
                     Add Row
                   </button>
@@ -537,7 +537,7 @@ const sectionConfigs: SectionConfig[] = [
                   </label>
                 </div>
                 <div class="erp-form">
-                  <label *ngFor="let column of columnsFor(activeSection())">
+                  <label *ngFor="let column of recordFormColumns()">
                     <span>{{ column.label }}</span>
                     <input
                       *ngIf="selectOptions(activeSection(), column.key).length > 0 && allowsCustomOption(activeSection(), column.key); else projectDraftSelect"
@@ -868,13 +868,17 @@ export class ProjectWorkspacePage {
   }
 
   openRecordDialog() {
-    const row: TableRow = {};
-    for (const column of this.columnsFor(this.activeSection())) {
+    const row: TableRow = { ...this.defaultRowFor(this.activeSection()) };
+    for (const column of this.recordFormColumns()) {
       const options = this.selectOptions(this.activeSection(), column.key);
-      row[column.key] = column.key === "site" && this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : options[0] ?? "";
+      row[column.key] = column.key === "site" && this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : row[column.key] || options[0] || "";
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
+  }
+
+  recordFormColumns(): FieldSchema[] {
+    return this.columnsFor(this.activeSection()).filter((column) => !this.isReadonlyColumn(column.key));
   }
 
   updateDraftField(key: string, value: string) {
@@ -891,6 +895,7 @@ export class ProjectWorkspacePage {
       ...(this.isSiteAware(section) && selectedSite !== "All" ? { site: this.draftRow()["site"] || selectedSite } : {}),
       __projectId: this.projectId(),
       projectId: this.projectId(),
+      clientId: this.clientId(),
       client: currentProject?.client ?? "",
       project: currentProject?.name ?? "",
       expenseScope: section === "expenses" ? "Site" : undefined,
@@ -1202,8 +1207,15 @@ export class ProjectWorkspacePage {
     setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]));
   }
 
-  updateProjectStatus(value: string) {
+  updateProjectStatus(value: string, event?: Event) {
     if (!this.isProjectStatus(value)) return;
+    const currentProject = this.project();
+    if (!currentProject || currentProject.status === value) return;
+    if ((value === "Completed" || value === "On Hold") && !window.confirm(`Mark ${currentProject.name} as ${value}?`)) {
+      const select = event?.target instanceof HTMLSelectElement ? event.target : null;
+      if (select) select.value = currentProject.status;
+      return;
+    }
     this.data.updateProject(this.projectId(), { status: value });
   }
 
@@ -1371,7 +1383,7 @@ export class ProjectWorkspacePage {
   }
 
   isReadonlyColumn(key: string): boolean {
-    return key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance";
+    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance";
   }
 
   selectOptions(section: ModuleKey, key: string): string[] {
