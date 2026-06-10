@@ -59,20 +59,20 @@ export type ProjectFormValue = {
             <input name="sites" required [value]="initialValue?.sites?.join(', ') || ''" placeholder="Area 1, Area 2, Terrace" />
           </label>
           <label>
-            <span>Total Project Value</span>
-            <input name="totalValue" required type="number" min="0" step="1000" [value]="initialValue?.totalValue || ''" placeholder="8200000" />
+            <span>Estimated Project Value</span>
+            <input name="totalValue" required type="number" min="0" step="1" [value]="initialValue?.totalValue || ''" placeholder="8200000" />
           </label>
           <label>
             <span>Advance Amount</span>
-            <input name="advanceAmount" required type="number" min="0" step="1000" [value]="initialValue?.advanceAmount || ''" placeholder="1000000" />
+            <input name="advanceAmount" required type="number" min="0" step="1" [value]="initialValue?.advanceAmount || ''" placeholder="1000000" />
           </label>
           <label>
             <span>Received Amount</span>
-            <input name="receivedAmount" type="number" min="0" step="1000" [value]="initialValue?.receivedAmount || initialValue?.advanceAmount || ''" placeholder="2200000" />
+            <input name="receivedAmount" type="number" min="0" step="1" [value]="initialValue?.receivedAmount || initialValue?.advanceAmount || ''" placeholder="2200000" />
           </label>
           <label>
             <span>Opening Expense Balance</span>
-            <input name="openingBalance" type="number" min="0" step="1000" [value]="initialValue?.openingBalance || ''" placeholder="25000" />
+            <input name="openingBalance" type="number" min="0" step="1" [value]="initialValue?.openingBalance || ''" placeholder="25000" />
           </label>
 
           <div class="dialog-actions span-2">

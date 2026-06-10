@@ -124,6 +124,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "transactionType", label: "Transaction Type" },
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
+      { key: "siteMaterial", label: "Site Material" },
       { key: "runningBalance", label: "Balance" },
       { key: "supervisor", label: "Supervisor" },
       { key: "reference", label: "Bill / Reference" },
@@ -330,9 +331,25 @@ const dashboardModules: ModuleConfig[] = [
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="searchText()" (input)="searchText.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
-                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="openRecordDialog()">
-                    <ion-icon name="add-outline"></ion-icon>
-                    Add Row
+                  <button
+                    type="button"
+                    class="primary-table-action add-row-action"
+                    [title]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
+                    [attr.aria-label]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
+                    (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
+                  >
+                    <ion-icon [name]="selectedRowCount() ? 'create-outline' : 'add-outline'"></ion-icon>
+                    {{ selectedRowCount() ? 'Edit Row' : 'Add Row' }}
+                  </button>
+                  <button
+                    *ngIf="selectedRowCount()"
+                    type="button"
+                    class="danger-table-action"
+                    [attr.aria-label]="selectedRowCount() === 1 ? 'Delete selected row' : 'Delete selected rows'"
+                    (click)="deleteSelectedRows()"
+                  >
+                    <ion-icon name="trash-outline"></ion-icon>
+                    {{ selectedRowCount() === 1 ? 'Delete Row' : 'Delete Rows' }}
                   </button>
                   <button type="button" (click)="openFieldDialog()">Add Field</button>
                   <button type="button" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
@@ -389,6 +406,14 @@ const dashboardModules: ModuleConfig[] = [
                 <table>
                   <thead>
                     <tr>
+                      <th *ngIf="hasSelectedRows()" class="row-check-column">
+                        <input
+                          type="checkbox"
+                          [checked]="allVisibleRowsSelected()"
+                          aria-label="Select all visible rows"
+                          (click)="toggleVisibleRowsSelection($event)"
+                        />
+                      </th>
                       <th *ngFor="let column of tableState.columns; trackBy: trackColumn">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
@@ -422,6 +447,14 @@ const dashboardModules: ModuleConfig[] = [
                       [class.row-editing]="isRowEditing(row)"
                       (click)="selectRow(row, $event)"
                     >
+                      <td *ngIf="hasSelectedRows()" class="row-check-column">
+                        <input
+                          type="checkbox"
+                          [checked]="isRowChecked(row)"
+                          aria-label="Select row"
+                          (click)="toggleRowSelection(row, $event)"
+                        />
+                      </td>
                       <td
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
@@ -430,7 +463,7 @@ const dashboardModules: ModuleConfig[] = [
                         spellcheck="false"
                       >
                         <div
-                          *ngIf="first"
+                          *ngIf="first && selectedRowKey() === rowKey(row)"
                           class="row-hover-toolbar"
                           [style.left.px]="rowToolbarPosition().x"
                           [style.top.px]="rowToolbarPosition().y"
@@ -472,7 +505,7 @@ const dashboardModules: ModuleConfig[] = [
                               <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row)">
                                 <span>{{ type.type }}</span>
                                 <strong>{{ type.count }}</strong>
-                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type)">
+                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type, $event)">
                                   <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                     <path d="m5.5 5.5 9 9" />
                                     <path d="m14.5 5.5-9 9" />
@@ -552,7 +585,7 @@ const dashboardModules: ModuleConfig[] = [
                       </td>
                     </tr>
                     <tr *ngIf="tableState.rows.length === 0">
-                      <td class="empty-row" [attr.colspan]="tableState.columns.length">
+                      <td class="empty-row" [attr.colspan]="tableState.columns.length + (hasSelectedRows() ? 1 : 0)">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -712,6 +745,7 @@ export class UniversalDashboardPage {
   readonly statusClass = statusClass;
   readonly activeModule = signal<DashboardModule>("clients");
   readonly selectedRowKey = signal("");
+  readonly selectedRowKeys = signal<string[]>([]);
   readonly editingRowKey = signal("");
   readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly searchText = signal("");
@@ -776,6 +810,7 @@ export class UniversalDashboardPage {
       this.openSelectKey.set("");
     }
     this.selectedRowKey.set(key);
+    this.selectedRowKeys.set([key]);
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -793,17 +828,88 @@ export class UniversalDashboardPage {
   }
 
   isRowSelected(row: TableRow): boolean {
-    return this.selectedRowKey() === this.rowKey(row);
+    const key = this.rowKey(row);
+    return this.selectedRowKey() === key || this.selectedRowKeys().includes(key);
   }
 
   isRowEditing(row: TableRow): boolean {
     return this.editingRowKey() === this.rowKey(row);
   }
 
+  selectedRowCount(): number {
+    return this.selectedRowKeys().length;
+  }
+
+  hasSelectedRows(): boolean {
+    return this.selectedRowCount() > 0;
+  }
+
+  isRowChecked(row: TableRow): boolean {
+    return this.selectedRowKeys().includes(this.rowKey(row));
+  }
+
+  toggleRowSelection(row: TableRow, event?: Event) {
+    event?.stopPropagation();
+    const key = this.rowKey(row);
+    this.selectedRowKeys.update((keys) => (keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]));
+    const nextKeys = this.selectedRowKeys();
+    this.selectedRowKey.set(nextKeys.includes(key) ? key : nextKeys.at(-1) ?? "");
+    this.editingRowKey.set("");
+    this.openSelectKey.set("");
+  }
+
+  allVisibleRowsSelected(): boolean {
+    const rows = this.visibleRows();
+    if (!rows.length) return false;
+    const selected = new Set(this.selectedRowKeys());
+    return rows.every((row) => selected.has(this.rowKey(row)));
+  }
+
+  toggleVisibleRowsSelection(event?: Event) {
+    event?.stopPropagation();
+    const rows = this.visibleRows();
+    if (this.allVisibleRowsSelected()) {
+      this.clearRowSelection();
+      return;
+    }
+    const keys = rows.map((row) => this.rowKey(row));
+    this.selectedRowKeys.set(keys);
+    this.selectedRowKey.set(keys.at(-1) ?? "");
+    this.editingRowKey.set("");
+    this.openSelectKey.set("");
+  }
+
+  private selectedRows(): TableRow[] {
+    const selected = new Set(this.selectedRowKeys());
+    return this.visibleRows().filter((row) => selected.has(this.rowKey(row)));
+  }
+
+  editSelectedRows() {
+    const row = this.selectedRows()[0];
+    if (!row) {
+      this.openRecordDialog();
+      return;
+    }
+    this.startRowEdit(row);
+  }
+
+  deleteSelectedRows() {
+    const rows = this.selectedRows();
+    if (!rows.length) return;
+    const label = rows.length === 1 ? "this row" : `${rows.length} rows`;
+    if (!window.confirm(`Delete ${label}?`)) return;
+    for (const row of rows) {
+      if (this.activeModule() === "clients") this.data.deleteClient(String(row["clientId"] || ""));
+      else this.data.deleteSharedRow(String(row["__rowId"] || ""));
+    }
+    this.clearRowSelection();
+  }
+
   startRowEdit(row: TableRow, event?: Event) {
     event?.stopPropagation();
     const key = this.rowKey(row);
     this.selectedRowKey.set(key);
+    this.selectedRowKeys.set([key]);
     this.editingRowKey.set(key);
   }
 
@@ -823,6 +929,7 @@ export class UniversalDashboardPage {
 
   private clearRowSelection() {
     this.selectedRowKey.set("");
+    this.selectedRowKeys.set([]);
     this.editingRowKey.set("");
   }
 
@@ -846,6 +953,8 @@ export class UniversalDashboardPage {
 
   hideField(module: DashboardModule, key: string, event?: Event) {
     event?.stopPropagation();
+    const label = this.columnsForActive().find((column) => column.key === key)?.label ?? key;
+    if (!window.confirm(`Delete the "${label}" column from this table view?`)) return;
     this.data.hideTableField(module, key);
   }
 
@@ -1012,7 +1121,8 @@ export class UniversalDashboardPage {
       const status = this.normalizeClientStatus(String(row["status"] || ""));
       if (status !== "Active") this.data.updateClient(client.id, { status });
     } else {
-      this.data.addCustomRow(module, this.withGeneratedReferences(row));
+      const savedRow = this.data.addCustomRow(module, this.withGeneratedReferences(row));
+      if (module === "expenses") this.createMaterialFromSiteExpense(savedRow);
     }
     this.recordDialogOpen.set(false);
   }
@@ -1028,6 +1138,38 @@ export class UniversalDashboardPage {
       ...(project ? { projectId: project.id, project: project.name, __projectId: project.id, client: project.client } : {}),
       ...(client ? { clientId: client.id } : {}),
     };
+  }
+
+  private createMaterialFromSiteExpense(row: TableRow) {
+    const isSiteMaterial = String(row["siteMaterial"] || "").trim().toLowerCase() === "yes";
+    if (!isSiteMaterial) return;
+    const sourceExpenseRowId = String(row["__rowId"] || "");
+    if (!sourceExpenseRowId) return;
+    const project =
+      this.data.projectById(String(row["projectId"] || row["__projectId"] || "")) ??
+      this.data.projects().find((projectRow) => projectRow.name === row["project"] || projectRow.id === row["project"]);
+    if (!project) return;
+    const existing = this.rowsFor("materials").some((entry) => String(entry["sourceExpenseRowId"] || "") === sourceExpenseRowId);
+    if (existing) return;
+    const client = this.data.clients().find((entry) => entry.projectIds.includes(project.id) || entry.name === project.client);
+    this.data.addCustomRow("materials", {
+      __projectId: project.id,
+      projectId: project.id,
+      clientId: client?.id ?? "",
+      client: project.client,
+      project: project.name,
+      site: row["site"] || project.sites[0] || "",
+      materialName: row["description"] || "Site material purchase",
+      unit: "Item",
+      requestedQuantity: "1",
+      approvedQuantity: "1",
+      requestDate: row["expenseDate"] || new Date().toISOString().slice(0, 10),
+      vendor: row["vendor"] || "",
+      poNumber: row["reference"] || "",
+      remainingStock: "1 Item",
+      status: row["approvalStatus"] || "Pending",
+      sourceExpenseRowId,
+    });
   }
 
   openFieldDialog(afterKey?: string, event?: Event) {
@@ -1073,6 +1215,7 @@ export class UniversalDashboardPage {
     if (!rowId) return;
     this.data.updateSharedRowCell(rowId, key, trimmedValue);
     if (module === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", trimmedValue);
+    if (module === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: trimmedValue });
   }
 
   selectCellKey(row: TableRow, key: string): string {
@@ -1162,7 +1305,8 @@ export class UniversalDashboardPage {
     return this.rowsFor("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
   }
 
-  removeLabourType(row: TableRow, labourType: string) {
+  removeLabourType(row: TableRow, labourType: string, event?: Event) {
+    event?.stopPropagation();
     const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
     const remaining = this.labourTypeEntriesForRow(row).filter((entry) => entry.type.toLowerCase() !== labourType.toLowerCase());
@@ -1181,11 +1325,13 @@ export class UniversalDashboardPage {
     const rowId = String(row["__rowId"] || "");
     if (module === "clients") {
       this.data.deleteClient(String(row["clientId"] || ""));
+      this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
       if (this.selectedRowKey() === key) this.selectedRowKey.set("");
       if (this.editingRowKey() === key) this.editingRowKey.set("");
       return;
     }
     this.data.deleteSharedRow(rowId);
+    this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
     if (this.selectedRowKey() === key) this.selectedRowKey.set("");
     if (this.editingRowKey() === key) this.editingRowKey.set("");
   }
@@ -1310,6 +1456,7 @@ export class UniversalDashboardPage {
       transactionType: "Site Expense",
       description: row.description,
       amount: formatMoney(-row.spent),
+      siteMaterial: "No",
       runningBalance: formatMoney(0),
       supervisor: row.supervisor,
       cashIssued: formatMoney(row.received),
@@ -1438,6 +1585,7 @@ export class UniversalDashboardPage {
         "Adjustment",
       ];
     }
+    if (module === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (module === "labour" && key === "attendance") return ["Present", "Absent"];
     if (key === "approvalStatus") return ["Pending", "Approved", "Declined"];
     if (key === "status") {
@@ -1505,6 +1653,7 @@ export class UniversalDashboardPage {
         transactionType: "Site Expense",
         description: "",
         amount: "0",
+        siteMaterial: "No",
         runningBalance: formatMoney(0),
         supervisor: "",
         reference: "",

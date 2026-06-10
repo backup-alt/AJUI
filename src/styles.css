@@ -4599,7 +4599,7 @@ ion-progress-bar,
 
 .project-compact-strip dl {
   display: grid;
-  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  grid-template-columns: repeat(6, minmax(110px, 1fr));
   gap: 8px;
   margin: 0;
 }
@@ -10947,4 +10947,108 @@ th:hover .column-insert-action,
 
 .dark-mode .row-hover-toolbar .icon-row-action.danger {
   color: #fda4af;
+}
+
+/* Project navigation and row selection refinements. */
+.sidebar-project-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin: 2px 0 6px;
+  padding: 3px;
+  border: 1px solid var(--ui-line);
+  border-radius: 9px;
+  background: #eef3fa;
+}
+
+.sidebar-project-filters button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #526070;
+  font-size: 10px;
+  font-weight: 840;
+  cursor: pointer;
+}
+
+.sidebar-project-filters button.active {
+  background: #ffffff;
+  color: var(--ui-royal);
+  box-shadow: 0 1px 4px rgba(16, 24, 40, 0.12);
+}
+
+.table-first-toolbar .table-actions {
+  justify-content: flex-start !important;
+}
+
+.table-first-toolbar .table-search {
+  width: min(30vw, 360px) !important;
+  margin-right: 4px;
+}
+
+.table-actions button.danger-table-action {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #b42318;
+}
+
+.table-actions button.danger-table-action:hover {
+  border-color: #fda4af;
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.operations-table .row-check-column,
+.universal-table .row-check-column {
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  padding: 0 !important;
+  text-align: center;
+  vertical-align: middle;
+  background: #f2f6fb !important;
+}
+
+.operations-table .row-check-column input,
+.universal-table .row-check-column input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ui-royal);
+  cursor: pointer;
+}
+
+.operations-table tbody tr.selectable-data-row.row-selected .row-check-column,
+.universal-table tbody tr.selectable-data-row.row-selected .row-check-column {
+  background: #e7eefc !important;
+}
+
+.dark-mode .sidebar-project-filters {
+  border-color: #2f4568;
+  background: #0d1728;
+}
+
+.dark-mode .sidebar-project-filters button {
+  color: #9fb0ca;
+}
+
+.dark-mode .sidebar-project-filters button.active {
+  background: #172846;
+  color: #f8fbff;
+}
+
+.dark-mode .table-actions button.danger-table-action {
+  border-color: rgba(253, 164, 175, 0.45);
+  background: rgba(190, 18, 60, 0.16);
+  color: #fda4af;
+}
+
+.dark-mode .operations-table .row-check-column,
+.dark-mode .universal-table .row-check-column {
+  background: #13233b !important;
+}
+
+.dark-mode .operations-table tbody tr.selectable-data-row.row-selected .row-check-column,
+.dark-mode .universal-table tbody tr.selectable-data-row.row-selected .row-check-column {
+  background: #1d3358 !important;
 }

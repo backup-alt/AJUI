@@ -1,9 +1,9 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject, signal } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenu } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
-import type { Project } from "../../data/dashboardData";
+import type { Project, ProjectStatus } from "../../data/dashboardData";
 
 type SidebarItem = {
   key: string;
@@ -39,10 +39,10 @@ type SidebarItem = {
             </ion-item>
           </ion-list>
 
-          <section class="sidebar-project-list" *ngIf="clientId">
+          <section class="sidebar-project-list" *ngIf="sidebarProjects.length">
             <div class="sidebar-section-head">
               <span>Projects</span>
-              <button type="button" class="project-create-icon" aria-label="Create new project" (click)="newProject.emit()">
+              <button *ngIf="clientId" type="button" class="project-create-icon" aria-label="Create new project" (click)="newProject.emit()">
                 <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                   <path d="M4 5.5h9.5" />
                   <path d="M4 11.5h7" />
@@ -52,8 +52,18 @@ type SidebarItem = {
                 </svg>
               </button>
             </div>
-            <div *ngFor="let project of clientProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
-              <a [routerLink]="['/clients', clientId, 'projects', project.id, 'materials']">
+            <div class="sidebar-project-filters" aria-label="Project status filters">
+              <button
+                *ngFor="let status of projectStatusFilters"
+                type="button"
+                [class.active]="projectStatusFilter() === status"
+                (click)="projectStatusFilter.set(status)"
+              >
+                {{ status === 'On Hold' ? 'On-Hold' : status }}
+              </button>
+            </div>
+            <div *ngFor="let project of filteredSidebarProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
+              <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']">
                 <span>{{ project.name }}</span>
                 <small>{{ project.id }}</small>
               </a>
@@ -117,9 +127,24 @@ export class EnterpriseSidebarComponent {
   @Output() deleteProject = new EventEmitter<Project>();
 
   readonly logoPath = "assets/logo.png";
+  readonly projectStatusFilters: ProjectStatus[] = ["Active", "On Hold", "Completed"];
+  readonly projectStatusFilter = signal<ProjectStatus>("Active");
 
   get clientProjects(): Project[] {
     return this.data.projectsForClient(this.data.clientById(this.clientId));
+  }
+
+  get sidebarProjects(): Project[] {
+    return this.clientId ? this.clientProjects : this.data.projects();
+  }
+
+  get filteredSidebarProjects(): Project[] {
+    const status = this.projectStatusFilter();
+    return this.sidebarProjects.filter((project) => project.status === status);
+  }
+
+  projectClientId(project: Project): string {
+    return this.data.clients().find((client) => client.projectIds.includes(project.id) || client.name === project.client)?.id ?? this.clientId ?? "";
   }
 
   get items(): SidebarItem[] {

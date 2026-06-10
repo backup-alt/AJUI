@@ -73,6 +73,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "transactionType", label: "Transaction Type" },
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
+      { key: "siteMaterial", label: "Site Material" },
       { key: "runningBalance", label: "Balance" },
       { key: "site", label: "Site" },
       { key: "supervisor", label: "Supervisor" },
@@ -193,7 +194,21 @@ const sectionConfigs: SectionConfig[] = [
                 <p>{{ currentProject.client }} - {{ currentProject.address }}</p>
               </div>
               <dl>
-                <div><dt>Value</dt><dd>{{ formatMoney(currentProject.totalValue) }}</dd></div>
+                <div>
+                  <dt>Estimated Value</dt>
+                  <dd>
+                    <input
+                      class="project-metric-input"
+                      type="number"
+                      min="0"
+                      step="1"
+                      [value]="currentProject.totalValue"
+                      (change)="updateProjectEstimatedValue($any($event.target).value)"
+                      aria-label="Project estimated value"
+                    />
+                  </dd>
+                </div>
+                <div><dt>Total Expense</dt><dd>{{ totalProjectExpenseLabel() }}</dd></div>
                 <div>
                   <dt>Received</dt>
                   <dd>
@@ -201,7 +216,7 @@ const sectionConfigs: SectionConfig[] = [
                       class="project-metric-input"
                       type="number"
                       min="0"
-                      step="1000"
+                      step="1"
                       [value]="currentProject.receivedAmount"
                       (change)="updateProjectReceived($any($event.target).value)"
                       aria-label="Project received amount"
@@ -252,18 +267,6 @@ const sectionConfigs: SectionConfig[] = [
                       >
                         {{ site }}
                       </button>
-                      <button
-                        type="button"
-                        class="site-delete-chip"
-                        [disabled]="projectSites().length <= 1"
-                        [attr.aria-label]="'Delete site ' + site"
-                        (click)="deleteSite(site, $event)"
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                          <path d="M6 6l12 12" />
-                          <path d="M18 6 6 18" />
-                        </svg>
-                      </button>
                     </span>
                     <button *ngIf="!siteDraftOpen()" type="button" class="site-add-chip" aria-label="Add site" (click)="openSiteDraft()">
                       <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
@@ -304,9 +307,25 @@ const sectionConfigs: SectionConfig[] = [
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="tableSearch()" (input)="tableSearch.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
-                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="openRecordDialog()">
-                    <ion-icon name="add-outline"></ion-icon>
-                    Add Row
+                  <button
+                    type="button"
+                    class="primary-table-action add-row-action"
+                    [title]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
+                    [attr.aria-label]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
+                    (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
+                  >
+                    <ion-icon [name]="selectedRowCount() ? 'create-outline' : 'add-outline'"></ion-icon>
+                    {{ selectedRowCount() ? 'Edit Row' : 'Add Row' }}
+                  </button>
+                  <button
+                    *ngIf="selectedRowCount()"
+                    type="button"
+                    class="danger-table-action"
+                    [attr.aria-label]="selectedRowCount() === 1 ? 'Delete selected row' : 'Delete selected rows'"
+                    (click)="deleteSelectedRows()"
+                  >
+                    <ion-icon name="trash-outline"></ion-icon>
+                    {{ selectedRowCount() === 1 ? 'Delete Row' : 'Delete Rows' }}
                   </button>
                   <button type="button" (click)="openFieldDialog()">Add Field</button>
                   <button type="button" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
@@ -335,6 +354,14 @@ const sectionConfigs: SectionConfig[] = [
                 <table>
                   <thead>
                     <tr>
+                      <th *ngIf="hasSelectedRows()" class="row-check-column">
+                        <input
+                          type="checkbox"
+                          [checked]="allVisibleRowsSelected()"
+                          aria-label="Select all visible rows"
+                          (click)="toggleVisibleRowsSelection($event)"
+                        />
+                      </th>
                       <th *ngFor="let column of tableState.columns; trackBy: trackColumn">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
@@ -368,6 +395,14 @@ const sectionConfigs: SectionConfig[] = [
                       [class.row-editing]="isRowEditing(row)"
                       (click)="selectRow(row, $event)"
                     >
+                      <td *ngIf="hasSelectedRows()" class="row-check-column">
+                        <input
+                          type="checkbox"
+                          [checked]="isRowChecked(row)"
+                          aria-label="Select row"
+                          (click)="toggleRowSelection(row, $event)"
+                        />
+                      </td>
                       <td
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
@@ -375,7 +410,7 @@ const sectionConfigs: SectionConfig[] = [
                         [class.labour-types-cell-host]="activeSection() === 'labour' && column.key === 'labourTypes'"
                       >
                         <div
-                          *ngIf="first"
+                          *ngIf="first && selectedRowKey() === rowKey(row)"
                           class="row-hover-toolbar"
                           [style.left.px]="rowToolbarPosition().x"
                           [style.top.px]="rowToolbarPosition().y"
@@ -417,7 +452,7 @@ const sectionConfigs: SectionConfig[] = [
                               <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row)">
                                 <span>{{ type.type }}</span>
                                 <strong>{{ type.count }}</strong>
-                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type)">
+                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type, $event)">
                                   <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                     <path d="m5.5 5.5 9 9" />
                                     <path d="m14.5 5.5-9 9" />
@@ -497,7 +532,7 @@ const sectionConfigs: SectionConfig[] = [
                       </td>
                     </tr>
                     <tr *ngIf="tableState.rows.length === 0">
-                      <td class="empty-row" [attr.colspan]="tableState.columns.length">
+                      <td class="empty-row" [attr.colspan]="tableState.columns.length + (hasSelectedRows() ? 1 : 0)">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -692,6 +727,7 @@ export class ProjectWorkspacePage {
   readonly sections = sectionConfigs;
   readonly activeSection = signal<ModuleKey>(this.normalizeSection(this.route.snapshot.paramMap.get("section")));
   readonly selectedRowKey = signal("");
+  readonly selectedRowKeys = signal<string[]>([]);
   readonly editingRowKey = signal("");
   readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly tableSearch = signal("");
@@ -752,6 +788,7 @@ export class ProjectWorkspacePage {
       this.openSelectKey.set("");
     }
     this.selectedRowKey.set(key);
+    this.selectedRowKeys.set([key]);
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -769,17 +806,85 @@ export class ProjectWorkspacePage {
   }
 
   isRowSelected(row: TableRow): boolean {
-    return this.selectedRowKey() === this.rowKey(row);
+    const key = this.rowKey(row);
+    return this.selectedRowKey() === key || this.selectedRowKeys().includes(key);
   }
 
   isRowEditing(row: TableRow): boolean {
     return this.editingRowKey() === this.rowKey(row);
   }
 
+  selectedRowCount(): number {
+    return this.selectedRowKeys().length;
+  }
+
+  hasSelectedRows(): boolean {
+    return this.selectedRowCount() > 0;
+  }
+
+  isRowChecked(row: TableRow): boolean {
+    return this.selectedRowKeys().includes(this.rowKey(row));
+  }
+
+  toggleRowSelection(row: TableRow, event?: Event) {
+    event?.stopPropagation();
+    const key = this.rowKey(row);
+    this.selectedRowKeys.update((keys) => (keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]));
+    const nextKeys = this.selectedRowKeys();
+    this.selectedRowKey.set(nextKeys.includes(key) ? key : nextKeys.at(-1) ?? "");
+    this.editingRowKey.set("");
+    this.openSelectKey.set("");
+  }
+
+  allVisibleRowsSelected(): boolean {
+    const rows = this.visibleRows(this.activeSection());
+    if (!rows.length) return false;
+    const selected = new Set(this.selectedRowKeys());
+    return rows.every((row) => selected.has(this.rowKey(row)));
+  }
+
+  toggleVisibleRowsSelection(event?: Event) {
+    event?.stopPropagation();
+    const rows = this.visibleRows(this.activeSection());
+    if (this.allVisibleRowsSelected()) {
+      this.clearRowSelection();
+      return;
+    }
+    const keys = rows.map((row) => this.rowKey(row));
+    this.selectedRowKeys.set(keys);
+    this.selectedRowKey.set(keys.at(-1) ?? "");
+    this.editingRowKey.set("");
+    this.openSelectKey.set("");
+  }
+
+  private selectedRows(): TableRow[] {
+    const selected = new Set(this.selectedRowKeys());
+    return this.visibleRows(this.activeSection()).filter((row) => selected.has(this.rowKey(row)));
+  }
+
+  editSelectedRows() {
+    const row = this.selectedRows()[0];
+    if (!row) {
+      this.openRecordDialog();
+      return;
+    }
+    this.startRowEdit(row);
+  }
+
+  deleteSelectedRows() {
+    const rows = this.selectedRows();
+    if (!rows.length) return;
+    const label = rows.length === 1 ? "this row" : `${rows.length} rows`;
+    if (!window.confirm(`Delete ${label}?`)) return;
+    for (const row of rows) this.data.deleteSharedRow(String(row["__rowId"] || ""));
+    this.clearRowSelection();
+  }
+
   startRowEdit(row: TableRow, event?: Event) {
     event?.stopPropagation();
     const key = this.rowKey(row);
     this.selectedRowKey.set(key);
+    this.selectedRowKeys.set([key]);
     this.editingRowKey.set(key);
   }
 
@@ -799,6 +904,7 @@ export class ProjectWorkspacePage {
 
   private clearRowSelection() {
     this.selectedRowKey.set("");
+    this.selectedRowKeys.set([]);
     this.editingRowKey.set("");
   }
 
@@ -821,6 +927,8 @@ export class ProjectWorkspacePage {
 
   hideField(section: ModuleKey, key: string, event?: Event) {
     event?.stopPropagation();
+    const label = this.columnsFor(section).find((column) => column.key === key)?.label ?? key;
+    if (!window.confirm(`Delete the "${label}" column from this table view?`)) return;
     this.data.hideTableField(section, key);
   }
 
@@ -890,7 +998,7 @@ export class ProjectWorkspacePage {
     const section = this.activeSection();
     const currentProject = this.project();
     const selectedSite = this.activeSiteFilter();
-    this.data.addCustomRow(section, {
+    const savedRow = this.data.addCustomRow(section, {
       ...this.draftRow(),
       ...(this.isSiteAware(section) && selectedSite !== "All" ? { site: this.draftRow()["site"] || selectedSite } : {}),
       __projectId: this.projectId(),
@@ -900,7 +1008,38 @@ export class ProjectWorkspacePage {
       project: currentProject?.name ?? "",
       expenseScope: section === "expenses" ? "Site" : undefined,
     });
+    if (section === "expenses") this.createMaterialFromSiteExpense(savedRow);
     this.recordDialogOpen.set(false);
+  }
+
+  private createMaterialFromSiteExpense(row: TableRow) {
+    const isSiteMaterial = String(row["siteMaterial"] || "").trim().toLowerCase() === "yes";
+    if (!isSiteMaterial) return;
+    const sourceExpenseRowId = String(row["__rowId"] || "");
+    if (!sourceExpenseRowId) return;
+    const existing = this.data
+      .tableRowsFor("materials", this.tableRows().materials, (entry) => this.rowBelongsToProject(entry))
+      .some((entry) => String(entry["sourceExpenseRowId"] || "") === sourceExpenseRowId);
+    if (existing) return;
+    const currentProject = this.project();
+    this.data.addCustomRow("materials", {
+      __projectId: this.projectId(),
+      projectId: this.projectId(),
+      clientId: this.clientId(),
+      client: currentProject?.client ?? "",
+      project: currentProject?.name ?? "",
+      site: row["site"] || this.expenseEditableSite(),
+      materialName: row["description"] || "Site material purchase",
+      unit: "Item",
+      requestedQuantity: "1",
+      approvedQuantity: "1",
+      requestDate: row["expenseDate"] || new Date().toISOString().slice(0, 10),
+      vendor: row["vendor"] || "",
+      poNumber: row["reference"] || "",
+      remainingStock: "1 Item",
+      status: row["approvalStatus"] || "Pending",
+      sourceExpenseRowId,
+    });
   }
 
   isSiteAware(section: ModuleKey): boolean {
@@ -972,11 +1111,13 @@ export class ProjectWorkspacePage {
     const cleanValue = value.trim();
     this.data.updateSharedRowCell(rowId, key, cleanValue);
     if (section === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", cleanValue);
+    if (section === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: cleanValue });
   }
 
   deleteRow(row: TableRow) {
     const key = this.rowKey(row);
     this.data.deleteSharedRow(String(row["__rowId"] || ""));
+    this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
     if (this.selectedRowKey() === key) this.selectedRowKey.set("");
     if (this.editingRowKey() === key) this.editingRowKey.set("");
   }
@@ -1093,7 +1234,8 @@ export class ProjectWorkspacePage {
     return this.visibleRows("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
   }
 
-  removeLabourType(row: TableRow, labourType: string) {
+  removeLabourType(row: TableRow, labourType: string, event?: Event) {
+    event?.stopPropagation();
     const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
     const remaining = this.labourTypeEntriesForRow(row).filter((entry) => entry.type.toLowerCase() !== labourType.toLowerCase());
@@ -1225,6 +1367,27 @@ export class ProjectWorkspacePage {
     this.data.updateProject(this.projectId(), { receivedAmount: amount });
   }
 
+  updateProjectEstimatedValue(value: string) {
+    const amount = Number(String(value).replace(/[^\d.-]/g, ""));
+    if (!Number.isFinite(amount)) return;
+    this.data.updateProject(this.projectId(), { totalValue: amount });
+  }
+
+  totalProjectExpenseLabel(): string {
+    return formatMoney(this.totalProjectExpenseValue());
+  }
+
+  private totalProjectExpenseValue(): number {
+    const expenseRows = this.data.tableRowsFor("expenses", this.tableRows().expenses, (row) => this.rowBelongsToProject(row));
+    const expenseTotal = expenseRows.reduce((sum, row) => {
+      const amount = this.expenseSignedAmount(row);
+      return amount < 0 ? sum + Math.abs(amount) : sum;
+    }, 0);
+    const labourRows = this.data.tableRowsFor("labour", this.tableRows().labour, (row) => this.rowBelongsToProject(row));
+    const labourTotal = labourRows.reduce((sum, row) => sum + this.labourWeeklyPayForRow(this.withLabourPayable(row)).total, 0);
+    return expenseTotal + labourTotal;
+  }
+
   deleteProject(project: Project) {
     const confirmed = window.confirm(`Delete ${project.name}? This removes the project from this client.`);
     if (!confirmed) return;
@@ -1290,6 +1453,7 @@ export class ProjectWorkspacePage {
         transactionType: "Site Expense",
         description: row.description,
         amount: formatMoney(-row.spent),
+        siteMaterial: "No",
         runningBalance: formatMoney(0),
         site: row.site,
         supervisor: row.supervisor,
@@ -1403,6 +1567,7 @@ export class ProjectWorkspacePage {
         "Adjustment",
       ];
     }
+    if (section === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (section === "labour" && key === "attendance") return ["Present", "Absent"];
     if (key === "approvalStatus" || key === "status") return ["Pending", "Approved", "Declined"];
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
@@ -1450,6 +1615,7 @@ export class ProjectWorkspacePage {
         transactionType: "Site Expense",
         description: "",
         amount: "0",
+        siteMaterial: "No",
         runningBalance: formatMoney(0),
         site,
         supervisor: currentProject?.supervisor ?? "",
