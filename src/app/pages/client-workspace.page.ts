@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import {
   IonBadge,
@@ -175,7 +175,7 @@ import { formatMoney, statusClass } from "../shared/format";
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ClientWorkspacePage {
+export class ClientWorkspacePage implements OnInit {
   readonly data = inject(ErpDataService);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
@@ -188,6 +188,14 @@ export class ClientWorkspacePage {
 
   readonly client = computed(() => this.data.clientById(this.clientId()));
   readonly projects = computed(() => this.data.projectsForClient(this.client()));
+
+  ngOnInit() {
+    const currentClient = this.client();
+    if (!currentClient) return;
+    const project = this.data.firstProjectForClient(currentClient) ?? this.data.createDefaultProject(currentClient);
+    this.data.touchProject(project.id);
+    void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"], { replaceUrl: true });
+  }
 
   openProject(project: Project) {
     this.data.touchProject(project.id);

@@ -39,7 +39,7 @@ type SidebarItem = {
             </ion-item>
           </ion-list>
 
-          <section class="sidebar-project-list" *ngIf="clientId && sidebarProjects.length">
+          <section class="sidebar-project-list" *ngIf="sidebarProjects.length">
             <div class="sidebar-section-head">
               <span>Projects</span>
               <button *ngIf="clientId" type="button" class="project-create-icon" aria-label="Create new project" (click)="newProject.emit()">
@@ -65,7 +65,16 @@ type SidebarItem = {
             <div *ngFor="let project of filteredSidebarProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
               <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']">
                 <span>{{ project.name }}</span>
-                <small>{{ project.id }}</small>
+                <small>
+                  <strong>{{ project.id }}</strong>
+                  <em>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M12 7v5l3 2" />
+                      <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    {{ projectActivityLabel(project) }}
+                  </em>
+                </small>
               </a>
               <div class="sidebar-project-actions">
                 <button type="button" aria-label="Edit project" (click)="editProject.emit(project)">
@@ -135,7 +144,8 @@ export class EnterpriseSidebarComponent {
   }
 
   get sidebarProjects(): Project[] {
-    return this.clientProjects;
+    if (this.clientId) return this.clientProjects;
+    return this.data.sortProjectsByLastWorked(this.data.projects());
   }
 
   get filteredSidebarProjects(): Project[] {
@@ -145,6 +155,10 @@ export class EnterpriseSidebarComponent {
 
   projectClientId(project: Project): string {
     return this.data.clients().find((client) => client.projectIds.includes(project.id) || client.name === project.client)?.id ?? this.clientId ?? "";
+  }
+
+  projectActivityLabel(project: Project): string {
+    return this.data.projectLastWorkedLabel(project.id);
   }
 
   get items(): SidebarItem[] {

@@ -11103,3 +11103,43 @@ th:hover .column-insert-action,
 .dark-mode .project-activity-chip ion-icon {
   color: #8eb4ff;
 }
+
+.sidebar-project-list a small {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sidebar-project-list a small strong {
+  font: inherit;
+  color: inherit;
+}
+
+.sidebar-project-list a small em {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+  color: #6b7890;
+  font-style: normal;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-project-list a small em .svg-icon {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  color: var(--ui-royal);
+}
+
+.dark-mode .sidebar-project-list a small em {
+  color: #aebbd0 !important;
+}
+
+.dark-mode .sidebar-project-list a small em .svg-icon {
+  color: #9bbcff;
+}

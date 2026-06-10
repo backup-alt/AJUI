@@ -324,7 +324,13 @@ const sectionConfigs: SectionConfig[] = [
                     [attr.aria-label]="selectedRowCount() === 1 ? 'Delete selected row' : 'Delete selected rows'"
                     (click)="deleteSelectedRows()"
                   >
-                    <ion-icon name="trash-outline"></ion-icon>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M4 7h16" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M6 7l1 14h10l1-14" />
+                      <path d="M9 7V4h6v3" />
+                    </svg>
                     {{ selectedRowCount() === 1 ? 'Delete Row' : 'Delete Rows' }}
                   </button>
                   <button type="button" (click)="openFieldDialog()">Add Field</button>
@@ -406,7 +412,7 @@ const sectionConfigs: SectionConfig[] = [
                       <td
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
-                        [class.select-cell]="isRowEditing(row) && selectOptions(activeSection(), column.key).length > 0"
+                        [class.select-cell]="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeSection(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeSection() === 'labour' && column.key === 'labourTypes'"
                       >
                         <div
@@ -474,7 +480,7 @@ const sectionConfigs: SectionConfig[] = [
                         </ng-container>
                         <ng-template #standardProjectCell>
                           <div
-                            *ngIf="isRowEditing(row) && selectOptions(activeSection(), column.key).length > 0; else editableProjectCell"
+                            *ngIf="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeSection(), column.key).length > 0; else editableProjectCell"
                             class="erp-select-menu"
                             [class.open]="isSelectMenuOpen(row, column.key)"
                           >
@@ -729,6 +735,7 @@ export class ProjectWorkspacePage {
   readonly selectedRowKey = signal("");
   readonly selectedRowKeys = signal<string[]>([]);
   readonly editingRowKey = signal("");
+  readonly editingRowKeys = signal<string[]>([]);
   readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly tableSearch = signal("");
   readonly recordDialogOpen = signal(false);
@@ -819,13 +826,16 @@ export class ProjectWorkspacePage {
     const key = this.rowKey(row);
     if (this.selectedRowKey() !== key) {
       this.editingRowKey.set("");
+      this.editingRowKeys.set([]);
       this.openSelectKey.set("");
     }
     this.selectedRowKey.set(key);
-    this.selectedRowKeys.update((keys) => {
-      if (!keys.length) return [key];
-      return keys.includes(key) ? keys : [...keys, key];
-    });
+    if (event?.ctrlKey || event?.metaKey || event?.shiftKey) {
+      this.selectedRowKeys.update((keys) => (keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]));
+      if (!this.selectedRowKeys().length) this.selectedRowKey.set("");
+      return;
+    }
+    this.selectedRowKeys.set([key]);
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -848,7 +858,8 @@ export class ProjectWorkspacePage {
   }
 
   isRowEditing(row: TableRow): boolean {
-    return this.editingRowKey() === this.rowKey(row);
+    const key = this.rowKey(row);
+    return this.editingRowKey() === key || this.editingRowKeys().includes(key);
   }
 
   selectedRowCount(): number {
@@ -870,6 +881,7 @@ export class ProjectWorkspacePage {
     const nextKeys = this.selectedRowKeys();
     this.selectedRowKey.set(nextKeys.includes(key) ? key : nextKeys.at(-1) ?? "");
     this.editingRowKey.set("");
+    this.editingRowKeys.set([]);
     this.openSelectKey.set("");
   }
 
@@ -891,6 +903,7 @@ export class ProjectWorkspacePage {
     this.selectedRowKeys.set(keys);
     this.selectedRowKey.set(keys.at(-1) ?? "");
     this.editingRowKey.set("");
+    this.editingRowKeys.set([]);
     this.openSelectKey.set("");
   }
 
@@ -900,12 +913,16 @@ export class ProjectWorkspacePage {
   }
 
   editSelectedRows() {
-    const row = this.selectedRows()[0];
-    if (!row) {
+    const rows = this.selectedRows();
+    if (!rows.length) {
       this.openRecordDialog();
       return;
     }
-    this.startRowEdit(row);
+    const keys = rows.map((row) => this.rowKey(row));
+    this.selectedRowKeys.set(keys);
+    this.selectedRowKey.set(keys[0] ?? "");
+    this.editingRowKey.set(keys[0] ?? "");
+    this.editingRowKeys.set(keys);
   }
 
   deleteSelectedRows() {
@@ -923,6 +940,7 @@ export class ProjectWorkspacePage {
     this.selectedRowKey.set(key);
     this.selectedRowKeys.set([key]);
     this.editingRowKey.set(key);
+    this.editingRowKeys.set([key]);
   }
 
   @HostListener("document:pointerdown", ["$event"])
@@ -943,6 +961,7 @@ export class ProjectWorkspacePage {
     this.selectedRowKey.set("");
     this.selectedRowKeys.set([]);
     this.editingRowKey.set("");
+    this.editingRowKeys.set([]);
   }
 
   private closeDropdowns() {
@@ -1009,7 +1028,9 @@ export class ProjectWorkspacePage {
     });
     const key = `${section}:${row["__rowId"]}`;
     this.selectedRowKey.set(key);
+    this.selectedRowKeys.set([key]);
     this.editingRowKey.set(key);
+    this.editingRowKeys.set([key]);
   }
 
   openRecordDialog() {
@@ -1169,6 +1190,7 @@ export class ProjectWorkspacePage {
     this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
     if (this.selectedRowKey() === key) this.selectedRowKey.set("");
     if (this.editingRowKey() === key) this.editingRowKey.set("");
+    this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
   }
 
   selectCellKey(row: TableRow, key: string): string {

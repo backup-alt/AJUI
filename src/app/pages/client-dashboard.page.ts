@@ -107,7 +107,9 @@ export class ClientDashboardPage {
   readonly statusClass = statusClass;
 
   openClient(client: Client) {
-    void this.router.navigate(["/clients", client.id]);
+    const project = this.data.firstProjectForClient(client) ?? this.data.createDefaultProject(client);
+    this.data.touchProject(project.id);
+    void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]);
   }
 
   createClient(value: ClientFormValue) {

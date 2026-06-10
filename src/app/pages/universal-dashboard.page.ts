@@ -348,7 +348,13 @@ const dashboardModules: ModuleConfig[] = [
                     [attr.aria-label]="selectedRowCount() === 1 ? 'Delete selected row' : 'Delete selected rows'"
                     (click)="deleteSelectedRows()"
                   >
-                    <ion-icon name="trash-outline"></ion-icon>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M4 7h16" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M6 7l1 14h10l1-14" />
+                      <path d="M9 7V4h6v3" />
+                    </svg>
                     {{ selectedRowCount() === 1 ? 'Delete Row' : 'Delete Rows' }}
                   </button>
                   <button type="button" (click)="openFieldDialog()">Add Field</button>
@@ -458,7 +464,7 @@ const dashboardModules: ModuleConfig[] = [
                       <td
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
-                        [class.select-cell]="isRowEditing(row) && selectOptions(activeModule(), column.key).length > 0"
+                        [class.select-cell]="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeModule(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeModule() === 'labour' && column.key === 'labourTypes'"
                         spellcheck="false"
                       >
@@ -527,7 +533,7 @@ const dashboardModules: ModuleConfig[] = [
                         </ng-container>
                         <ng-template #standardDashboardCell>
                           <div
-                            *ngIf="isRowEditing(row) && selectOptions(activeModule(), column.key).length > 0; else editableDashboardCell"
+                            *ngIf="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeModule(), column.key).length > 0; else editableDashboardCell"
                             class="erp-select-menu"
                             [class.open]="isSelectMenuOpen(row, column.key)"
                           >
@@ -747,6 +753,7 @@ export class UniversalDashboardPage {
   readonly selectedRowKey = signal("");
   readonly selectedRowKeys = signal<string[]>([]);
   readonly editingRowKey = signal("");
+  readonly editingRowKeys = signal<string[]>([]);
   readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly searchText = signal("");
   readonly selectedFilters = signal<Record<string, string>>({});
@@ -841,13 +848,16 @@ export class UniversalDashboardPage {
     const key = this.rowKey(row);
     if (this.selectedRowKey() !== key) {
       this.editingRowKey.set("");
+      this.editingRowKeys.set([]);
       this.openSelectKey.set("");
     }
     this.selectedRowKey.set(key);
-    this.selectedRowKeys.update((keys) => {
-      if (!keys.length) return [key];
-      return keys.includes(key) ? keys : [...keys, key];
-    });
+    if (event?.ctrlKey || event?.metaKey || event?.shiftKey) {
+      this.selectedRowKeys.update((keys) => (keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]));
+      if (!this.selectedRowKeys().length) this.selectedRowKey.set("");
+      return;
+    }
+    this.selectedRowKeys.set([key]);
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -870,7 +880,8 @@ export class UniversalDashboardPage {
   }
 
   isRowEditing(row: TableRow): boolean {
-    return this.editingRowKey() === this.rowKey(row);
+    const key = this.rowKey(row);
+    return this.editingRowKey() === key || this.editingRowKeys().includes(key);
   }
 
   selectedRowCount(): number {
@@ -892,6 +903,7 @@ export class UniversalDashboardPage {
     const nextKeys = this.selectedRowKeys();
     this.selectedRowKey.set(nextKeys.includes(key) ? key : nextKeys.at(-1) ?? "");
     this.editingRowKey.set("");
+    this.editingRowKeys.set([]);
     this.openSelectKey.set("");
   }
 
@@ -913,6 +925,7 @@ export class UniversalDashboardPage {
     this.selectedRowKeys.set(keys);
     this.selectedRowKey.set(keys.at(-1) ?? "");
     this.editingRowKey.set("");
+    this.editingRowKeys.set([]);
     this.openSelectKey.set("");
   }
 
@@ -922,12 +935,16 @@ export class UniversalDashboardPage {
   }
 
   editSelectedRows() {
-    const row = this.selectedRows()[0];
-    if (!row) {
+    const rows = this.selectedRows();
+    if (!rows.length) {
       this.openRecordDialog();
       return;
     }
-    this.startRowEdit(row);
+    const keys = rows.map((row) => this.rowKey(row));
+    this.selectedRowKeys.set(keys);
+    this.selectedRowKey.set(keys[0] ?? "");
+    this.editingRowKey.set(keys[0] ?? "");
+    this.editingRowKeys.set(keys);
   }
 
   deleteSelectedRows() {
@@ -948,6 +965,7 @@ export class UniversalDashboardPage {
     this.selectedRowKey.set(key);
     this.selectedRowKeys.set([key]);
     this.editingRowKey.set(key);
+    this.editingRowKeys.set([key]);
   }
 
   @HostListener("document:pointerdown", ["$event"])
@@ -968,6 +986,7 @@ export class UniversalDashboardPage {
     this.selectedRowKey.set("");
     this.selectedRowKeys.set([]);
     this.editingRowKey.set("");
+    this.editingRowKeys.set([]);
   }
 
   private closeDropdowns() {
@@ -1131,13 +1150,17 @@ export class UniversalDashboardPage {
       const client = this.data.addClient({ name: "New Client", mobile: "", address: "", supervisor: "Unassigned" });
       const key = `${module}:client:${client.id}`;
       this.selectedRowKey.set(key);
+      this.selectedRowKeys.set([key]);
       this.editingRowKey.set(key);
+      this.editingRowKeys.set([key]);
       return;
     }
     const row = this.data.addCustomRow(module, this.defaultRowFor(module));
     const key = `${module}:${row["__rowId"]}`;
     this.selectedRowKey.set(key);
+    this.selectedRowKeys.set([key]);
     this.editingRowKey.set(key);
+    this.editingRowKeys.set([key]);
   }
 
   updateDraftField(key: string, value: string) {
@@ -1377,12 +1400,14 @@ export class UniversalDashboardPage {
       this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
       if (this.selectedRowKey() === key) this.selectedRowKey.set("");
       if (this.editingRowKey() === key) this.editingRowKey.set("");
+      this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
       return;
     }
     this.data.deleteSharedRow(rowId);
     this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
     if (this.selectedRowKey() === key) this.selectedRowKey.set("");
     if (this.editingRowKey() === key) this.editingRowKey.set("");
+    this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
   }
 
   exportExcel() {
@@ -1617,7 +1642,6 @@ export class UniversalDashboardPage {
     if (key === "project") return this.projectNameOptions();
     if (key === "projectId") return this.projectIdOptions();
     if (key === "client" || key === "clientName") return this.clientNameOptions();
-    if (key === "clientId") return this.clientIdOptions();
     if (key === "address") return this.clientAddressOptions();
     if (key === "supervisor" || key === "supervisorName" || key === "collectedBy" || key === "paidBy") return this.supervisorNameOptions();
     if (module === "labour" && key === "staffName") return this.staffNameOptions();
@@ -1866,10 +1890,6 @@ export class UniversalDashboardPage {
 
   private clientNameOptions(): string[] {
     return this.sortedUnique(this.data.clients().map((client) => client.name));
-  }
-
-  private clientIdOptions(): string[] {
-    return this.sortedUnique(this.data.clients().map((client) => client.id));
   }
 
   private clientAddressOptions(): string[] {
