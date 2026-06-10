@@ -1034,8 +1034,7 @@ export class ErpDataService {
   projectReceivedAmount(projectOrId: Project | string | undefined): number {
     const project = typeof projectOrId === "string" ? this.projectById(projectOrId) : projectOrId;
     if (!project) return 0;
-    const historicalReceived = Math.max(0, project.receivedAmount - this.seedPaymentTotalForProject(project.id));
-    return Math.max(0, historicalReceived + this.paymentLedgerTotalForProject(project));
+    return this.paymentLedgerTotalForProject(project);
   }
 
   projectPendingAmount(projectOrId: Project | string | undefined): number {
@@ -1253,12 +1252,6 @@ export class ErpDataService {
     const status = String(row["approvalStatus"] || row["status"] || "").trim().toLowerCase();
     if (status === "declined" || status === "rejected") return 0;
     return Math.max(0, this.moneyNumber(row["amount"]));
-  }
-
-  private seedPaymentTotalForProject(projectId: string): number {
-    return this.payments()
-      .filter((row) => row.projectId === projectId && row.status !== "Rejected")
-      .reduce((sum, row) => sum + Math.max(0, row.amount), 0);
   }
 
   private moneyNumber(value: unknown): number {
