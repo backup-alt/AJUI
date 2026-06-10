@@ -429,9 +429,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 export class PendingApprovalsPage {
   private readonly data = inject(ErpDataService);
 
-  readonly materialApprovals = computed(() =>
-    this.materialRows().filter((row) => this.isPending(row.status) && !(this.data.settings().singleApprovalForSiteExpenseMaterials && row.sourceExpenseRowId)),
-  );
+  readonly materialApprovals = computed(() => this.materialRows().filter((row) => this.isPending(row.status)));
   readonly labourApprovals = computed(() => this.labourRows().filter((row) => this.isPending(row.status)));
   readonly siteExpenseApprovals = computed(() => this.siteExpenseRows().filter((row) => this.isPending(row.status)));
   readonly generalExpenseApprovals = computed(() => this.generalExpenseRows().filter((row) => this.isPending(row.status)));
@@ -480,11 +478,13 @@ export class PendingApprovalsPage {
     }
 
     if (row.module === "expenses") {
-      const linkedMaterial = this.data
+      this.data
         .tableRowsFor("materials", [])
-        .find((material) => String(material["sourceExpenseRowId"] || "") === row.rowId);
-      const linkedMaterialId = String(linkedMaterial?.["__rowId"] || "");
-      if (linkedMaterialId) this.data.updateSharedRowCell(linkedMaterialId, "status", status);
+        .filter((material) => String(material["sourceExpenseRowId"] || "") === row.rowId)
+        .forEach((material) => {
+          const linkedMaterialId = String(material["__rowId"] || "");
+          if (linkedMaterialId) this.data.updateSharedRowCell(linkedMaterialId, "status", status);
+        });
     }
   }
 
