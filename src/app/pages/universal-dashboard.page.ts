@@ -301,6 +301,7 @@ const dashboardModules: ModuleConfig[] = [
               <div class="dashboard-kpi-strip dashboard-kpi-board">
                 <div><span>Active Projects</span><strong>{{ activeProjectsCount() }}</strong></div>
                 <div><span>Projects On Hold</span><strong>{{ projectsOnHoldCount() }}</strong></div>
+                <div><span>Completed Projects</span><strong>{{ completedProjectsCount() }}</strong></div>
                 <div><span>Pending Approval</span><strong>{{ pendingApprovalCount() }}</strong></div>
                 <div><span>Active Clients</span><strong>{{ data.activeClients() }}</strong></div>
               </div>
@@ -329,7 +330,7 @@ const dashboardModules: ModuleConfig[] = [
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="searchText()" (input)="searchText.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
-                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="addInlineRow()">
+                  <button type="button" class="primary-table-action add-row-action" title="Add row" aria-label="Add row" (click)="addInlineRow($event)">
                     <ion-icon name="add-outline"></ion-icon>
                     Add Row
                   </button>
@@ -419,7 +420,7 @@ const dashboardModules: ModuleConfig[] = [
                       class="selectable-data-row"
                       [class.row-selected]="isRowSelected(row)"
                       [class.row-editing]="isRowEditing(row)"
-                      (click)="selectRow(row)"
+                      (click)="selectRow(row, $event)"
                     >
                       <td
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
@@ -428,7 +429,13 @@ const dashboardModules: ModuleConfig[] = [
                         [class.labour-types-cell-host]="activeModule() === 'labour' && column.key === 'labourTypes'"
                         spellcheck="false"
                       >
-                        <div *ngIf="first" class="row-hover-toolbar" (click)="$event.stopPropagation()">
+                        <div
+                          *ngIf="first"
+                          class="row-hover-toolbar"
+                          [style.left.px]="rowToolbarPosition().x"
+                          [style.top.px]="rowToolbarPosition().y"
+                          (click)="$event.stopPropagation()"
+                        >
                           <button type="button" class="icon-row-action" aria-label="Edit row" title="Edit row" (click)="startRowEdit(row, $event)">
                             <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                               <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20Z" />
@@ -706,6 +713,7 @@ export class UniversalDashboardPage {
   readonly activeModule = signal<DashboardModule>("clients");
   readonly selectedRowKey = signal("");
   readonly editingRowKey = signal("");
+  readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly searchText = signal("");
   readonly selectedFilters = signal<Record<string, string>>({});
   readonly recordDialogOpen = signal(false);
@@ -736,6 +744,10 @@ export class UniversalDashboardPage {
     return this.data.projects().filter((project) => project.status === "On Hold").length;
   }
 
+  completedProjectsCount() {
+    return this.data.projects().filter((project) => project.status === "Completed").length;
+  }
+
   pendingApprovalCount() {
     return this.pendingApprovalRows().length;
   }
@@ -756,13 +768,28 @@ export class UniversalDashboardPage {
 
   trackColumn = (_index: number, column: FieldSchema): string => column.key;
 
-  selectRow(row: TableRow) {
+  selectRow(row: TableRow, event?: MouseEvent) {
+    this.positionRowToolbar(event);
     const key = this.rowKey(row);
     if (this.selectedRowKey() !== key) {
       this.editingRowKey.set("");
       this.openSelectKey.set("");
     }
     this.selectedRowKey.set(key);
+  }
+
+  private positionRowToolbar(event?: MouseEvent) {
+    const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
+    const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
+    const toolbarWidth = 126;
+    const toolbarHeight = 44;
+    const margin = 12;
+    const rawX = event ? event.clientX + 12 : viewportWidth - toolbarWidth - 32;
+    const rawY = event ? event.clientY - toolbarHeight - 10 : 132;
+    this.rowToolbarPosition.set({
+      x: Math.min(Math.max(rawX, margin), viewportWidth - toolbarWidth - margin),
+      y: Math.min(Math.max(rawY, margin), viewportHeight - toolbarHeight - margin),
+    });
   }
 
   isRowSelected(row: TableRow): boolean {
@@ -942,7 +969,8 @@ export class UniversalDashboardPage {
     this.recordDialogOpen.set(true);
   }
 
-  addInlineRow() {
+  addInlineRow(event?: MouseEvent) {
+    this.positionRowToolbar(event);
     const module = this.activeModule();
     if (module === "clients") {
       const client = this.data.addClient({ name: "New Client", mobile: "", address: "", supervisor: "Unassigned" });
