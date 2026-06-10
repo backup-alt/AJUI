@@ -154,7 +154,7 @@ import { formatMoney, statusClass } from "../shared/format";
               [eyebrow]="editingProject() ? 'Project Edit' : 'Project Setup'"
               [title]="editingProject() ? 'Edit Project' : 'Create New Project'"
               [submitLabel]="editingProject() ? 'Save Project' : 'Create Project'"
-              (cancel)="showProjectForm.set(false)"
+              (cancel)="closeProjectForm()"
               (create)="saveProject($event)"
             ></agb-project-form-dialog>
 
@@ -215,6 +215,11 @@ export class ClientWorkspacePage implements OnInit {
     event?.stopPropagation();
     this.editingProject.set(project);
     this.showProjectForm.set(true);
+  }
+
+  closeProjectForm() {
+    this.showProjectForm.set(false);
+    this.editingProject.set(null);
   }
 
   editingProjectValue(): ProjectFormValue | null {

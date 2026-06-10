@@ -753,7 +753,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
               [eyebrow]="editingProject() ? 'Project Edit' : 'Project Setup'"
               [title]="editingProject() ? 'Edit Project' : 'Create New Project'"
               [submitLabel]="editingProject() ? 'Save Project' : 'Create Project'"
-              (cancel)="showProjectForm.set(false)"
+              (cancel)="closeProjectForm()"
               (create)="saveProject($event)"
             ></agb-project-form-dialog>
           </main>
@@ -797,6 +797,7 @@ export class ProjectWorkspacePage {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly expenseOpeningEdit = signal(false);
+  readonly handledEditProjectQuery = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
   readonly tableState = computed(() => ({
@@ -824,6 +825,8 @@ export class ProjectWorkspacePage {
       if (this.queryParamMap().get("editProject") !== "1") return;
       const project = this.project();
       if (!project || this.showProjectForm()) return;
+      if (this.handledEditProjectQuery() === project.id) return;
+      this.handledEditProjectQuery.set(project.id);
       this.editingProject.set(project);
       this.showProjectForm.set(true);
     });
@@ -1479,6 +1482,19 @@ export class ProjectWorkspacePage {
   openEditProject(project: Project) {
     this.editingProject.set(project);
     this.showProjectForm.set(true);
+  }
+
+  closeProjectForm() {
+    this.showProjectForm.set(false);
+    this.editingProject.set(null);
+    if (this.queryParamMap().get("editProject") === "1") {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { editProject: null },
+        queryParamsHandling: "merge",
+        replaceUrl: true,
+      });
+    }
   }
 
   editingProjectValue(): ProjectFormValue | null {
