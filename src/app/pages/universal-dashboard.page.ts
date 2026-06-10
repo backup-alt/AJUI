@@ -690,7 +690,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
                 <div class="filter-dialog-body" *ngIf="filterBuilderStep() === 'values'">
                   <div class="filter-value-grid filter-dialog-value-grid">
-                    <label class="filter-combo-field" *ngFor="let column of selectedFilterColumns()">
+                    <label class="filter-combo-field" *ngFor="let column of selectedFilterColumns()" [class.menu-open]="activeFilterValueKey() === column.key">
                       <span>{{ column.label }}</span>
                       <div class="filter-combo-control">
                         <input
@@ -711,7 +711,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         <button
                           type="button"
                           *ngFor="let value of filterSuggestions(column.key)"
-                          [class.selected]="selectedFilters()[column.key] === value"
+                          [class.selected]="(selectedFilters()[column.key] || 'All') === value"
                           (mousedown)="$event.preventDefault()"
                           (click)="chooseFilterSuggestion(column.key, value)"
                         >
@@ -1426,6 +1426,11 @@ export class UniversalDashboardPage {
   }
 
   chooseFilterSuggestion(key: string, value: string) {
+    if (value === "All") {
+      this.setFilter(key, "");
+      this.activeFilterValueKey.set("");
+      return;
+    }
     this.setFilter(key, value);
     this.activeFilterValueKey.set("");
   }
@@ -1434,7 +1439,8 @@ export class UniversalDashboardPage {
     const query = String(this.selectedFilters()[key] || "").trim().toLowerCase();
     const values = this.filterValues(key);
     const matches = query ? values.filter((value) => value.toLowerCase().includes(query)) : values;
-    return matches.slice(0, 14);
+    const options = query && !"all".includes(query) ? matches : ["All", ...matches];
+    return [...new Set(options)].slice(0, 14);
   }
 
   toggleDateFilter() {
