@@ -372,9 +372,10 @@ const dashboardModules: ModuleConfig[] = [
                 <div><span>Current Balance</span><strong>{{ expenseFilterCurrentLabel() }}</strong></div>
               </div>
 
+              <ng-container *ngIf="tableState() as tableState">
               <div class="table-meta-strip">
-                <span>{{ visibleRows().length }} rows</span>
-                <span>{{ columnsForActive().length }} fields</span>
+                <span>{{ tableState.rows.length }} rows</span>
+                <span>{{ tableState.columns.length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
                 <span *ngIf="activeModule() === 'clients'">Customer records synced</span>
                 <span *ngIf="activeModule() === 'expenses'">Balances grouped by Project + Site</span>
@@ -387,7 +388,7 @@ const dashboardModules: ModuleConfig[] = [
                 <table>
                   <thead>
                     <tr>
-                      <th *ngFor="let column of columnsForActive()">
+                      <th *ngFor="let column of tableState.columns; trackBy: trackColumn">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
                           <button
@@ -414,14 +415,14 @@ const dashboardModules: ModuleConfig[] = [
                   </thead>
                   <tbody>
                     <tr
-                      *ngFor="let row of visibleRows()"
+                      *ngFor="let row of tableState.rows; trackBy: trackRow"
                       class="selectable-data-row"
                       [class.row-selected]="isRowSelected(row)"
                       [class.row-editing]="isRowEditing(row)"
                       (click)="selectRow(row)"
                     >
                       <td
-                        *ngFor="let column of columnsForActive(); let first = first"
+                        *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
                         [class.select-cell]="isRowEditing(row) && selectOptions(activeModule(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeModule() === 'labour' && column.key === 'labourTypes'"
@@ -543,8 +544,8 @@ const dashboardModules: ModuleConfig[] = [
                         </ng-template>
                       </td>
                     </tr>
-                    <tr *ngIf="visibleRows().length === 0">
-                      <td class="empty-row" [attr.colspan]="columnsForActive().length">
+                    <tr *ngIf="tableState.rows.length === 0">
+                      <td class="empty-row" [attr.colspan]="tableState.columns.length">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -559,6 +560,7 @@ const dashboardModules: ModuleConfig[] = [
                   </tbody>
                 </table>
               </div>
+              </ng-container>
             </section>
 
             <section class="form-overlay" *ngIf="recordDialogOpen()">
@@ -720,6 +722,11 @@ export class UniversalDashboardPage {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
+  readonly dashboardRows = computed(() => this.buildRows());
+  readonly tableState = computed(() => ({
+    rows: this.visibleRows(),
+    columns: this.columnsForActive(),
+  }));
 
   activeProjectsCount() {
     return this.data.projects().filter((project) => project.status === "Active").length;
@@ -744,6 +751,10 @@ export class UniversalDashboardPage {
   rowKey(row: TableRow): string {
     return `${this.activeModule()}:${row["__rowId"] || row["clientId"] || row["vendorId"] || row["reportName"] || ""}`;
   }
+
+  trackRow = (_index: number, row: TableRow): string => this.rowKey(row);
+
+  trackColumn = (_index: number, column: FieldSchema): string => column.key;
 
   selectRow(row: TableRow) {
     const key = this.rowKey(row);
@@ -1351,7 +1362,7 @@ export class UniversalDashboardPage {
   }
 
   private rowsFor(module: DashboardModule): TableRow[] {
-    return this.data.tableRowsFor(module, this.buildRows()[module]);
+    return this.data.tableRowsFor(module, this.dashboardRows()[module]);
   }
 
   selectOptions(module: DashboardModule, key: string): string[] {

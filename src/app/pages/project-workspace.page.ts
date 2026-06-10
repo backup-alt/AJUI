@@ -314,9 +314,10 @@ const sectionConfigs: SectionConfig[] = [
                 </div>
               </div>
 
+              <ng-container *ngIf="tableState() as tableState">
               <div class="table-meta-strip">
-                <span>{{ visibleRows(activeSection()).length }} rows</span>
-                <span>{{ columnsFor(activeSection()).length }} fields</span>
+                <span>{{ tableState.rows.length }} rows</span>
+                <span>{{ tableState.columns.length }} fields</span>
                 <span>Rows edit after selection</span>
                 <button type="button" class="meta-reset-action" *ngIf="hiddenFieldCount(activeSection())" (click)="resetFields(activeSection())">
                   Reset fields
@@ -334,7 +335,7 @@ const sectionConfigs: SectionConfig[] = [
                 <table>
                   <thead>
                     <tr>
-                      <th *ngFor="let column of columnsFor(activeSection())">
+                      <th *ngFor="let column of tableState.columns; trackBy: trackColumn">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
                           <button
@@ -361,14 +362,14 @@ const sectionConfigs: SectionConfig[] = [
                   </thead>
                   <tbody>
                     <tr
-                      *ngFor="let row of visibleRows(activeSection())"
+                      *ngFor="let row of tableState.rows; trackBy: trackRow"
                       class="selectable-data-row"
                       [class.row-selected]="isRowSelected(row)"
                       [class.row-editing]="isRowEditing(row)"
                       (click)="selectRow(row)"
                     >
                       <td
-                        *ngFor="let column of columnsFor(activeSection()); let first = first"
+                        *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
                         [class.select-cell]="isRowEditing(row) && selectOptions(activeSection(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeSection() === 'labour' && column.key === 'labourTypes'"
@@ -489,8 +490,8 @@ const sectionConfigs: SectionConfig[] = [
                         </ng-template>
                       </td>
                     </tr>
-                    <tr *ngIf="visibleRows(activeSection()).length === 0">
-                      <td class="empty-row" [attr.colspan]="columnsFor(activeSection()).length">
+                    <tr *ngIf="tableState.rows.length === 0">
+                      <td class="empty-row" [attr.colspan]="tableState.columns.length">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -505,6 +506,7 @@ const sectionConfigs: SectionConfig[] = [
                   </tbody>
                 </table>
               </div>
+              </ng-container>
             </section>
 
             <section class="form-overlay" *ngIf="recordDialogOpen()">
@@ -703,6 +705,10 @@ export class ProjectWorkspacePage {
   readonly labourTypeDailyWage = signal("");
   readonly expenseOpeningEdit = signal(false);
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
+  readonly tableState = computed(() => ({
+    rows: this.visibleRows(this.activeSection()),
+    columns: this.columnsFor(this.activeSection()),
+  }));
 
   readonly clientId = computed(() => this.paramMap().get("clientId") ?? "");
   readonly projectId = computed(() => this.paramMap().get("projectId") ?? "");
@@ -726,6 +732,10 @@ export class ProjectWorkspacePage {
   rowKey(row: TableRow): string {
     return `${this.activeSection()}:${row["__rowId"] || row["projectId"] || row["reportName"] || ""}`;
   }
+
+  trackRow = (_index: number, row: TableRow): string => this.rowKey(row);
+
+  trackColumn = (_index: number, column: FieldSchema): string => column.key;
 
   selectRow(row: TableRow) {
     const key = this.rowKey(row);

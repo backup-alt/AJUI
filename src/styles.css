@@ -10849,7 +10849,6 @@ th:hover .column-insert-action,
   transition: opacity 140ms ease, transform 140ms ease;
 }
 
-.selectable-data-row:hover .row-hover-toolbar,
 .selectable-data-row.row-selected .row-hover-toolbar,
 .selectable-data-row.row-editing .row-hover-toolbar {
   opacity: 1;
