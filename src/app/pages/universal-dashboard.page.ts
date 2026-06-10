@@ -305,8 +305,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
         />
 
         <ion-content class="erp-page">
-          <main class="workspace-shell">
-            <section class="dashboard-command-strip dashboard-command-center">
+          <main class="workspace-shell" [class.table-view-expanded]="tableViewExpanded()">
+            <section class="dashboard-command-strip dashboard-command-center" *ngIf="!tableViewExpanded()">
               <div class="dashboard-command-copy">
                 <h1>Dashboard</h1>
               </div>
@@ -319,8 +319,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
               </div>
             </section>
 
-            <section class="operations-workbench universal-workbench">
-              <nav class="operations-tabs" aria-label="Universal dashboard modules">
+            <section class="operations-workbench universal-workbench" [class.table-expanded]="tableViewExpanded()">
+              <nav class="operations-tabs" aria-label="Universal dashboard modules" *ngIf="!tableViewExpanded()">
                 <button
                   *ngFor="let module of modules"
                   type="button"
@@ -332,7 +332,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </button>
               </nav>
 
-              <div class="site-workbench universal-site-workbench" *ngIf="isUniversalSiteAware(activeModule())">
+              <div class="site-workbench universal-site-workbench" *ngIf="!tableViewExpanded() && isUniversalSiteAware(activeModule())">
                 <div class="site-switch-row">
                   <span>Site</span>
                   <div class="site-chip-strip">
@@ -355,13 +355,14 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <p>{{ activeConfig().description }}</p>
                 </div>
                 <div class="table-actions">
-                  <label class="table-search">
+                  <label class="table-search" *ngIf="!tableViewExpanded()">
                     <ion-icon name="search-outline"></ion-icon>
                     <input [value]="searchText()" (input)="searchText.set($any($event.target).value)" placeholder="Search rows" />
                   </label>
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
+                    *ngIf="!tableViewExpanded()"
                     [title]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
                     [attr.aria-label]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
@@ -370,7 +371,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     {{ selectedRowCount() ? 'Edit Row' : 'Add Row' }}
                   </button>
                   <button
-                    *ngIf="selectedRowCount()"
+                    *ngIf="!tableViewExpanded() && selectedRowCount()"
                     type="button"
                     class="danger-table-action"
                     [attr.aria-label]="selectedRowCount() === 1 ? 'Delete selected row' : 'Delete selected rows'"
@@ -385,13 +386,27 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     </svg>
                     {{ selectedRowCount() === 1 ? 'Delete Row' : 'Delete Rows' }}
                   </button>
-                  <button type="button" (click)="openFieldDialog()">Add Field</button>
-                  <button type="button" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
-                  <button type="button" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
+                  <button type="button" *ngIf="!tableViewExpanded()" (click)="openFieldDialog()">Add Field</button>
+                  <button type="button" *ngIf="!tableViewExpanded()" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
+                  <button type="button" *ngIf="!tableViewExpanded()" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
+                  <button type="button" class="view-table-action" *ngIf="!tableViewExpanded()" (click)="openTableView()">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M4 5h16v14H4z" />
+                      <path d="M4 10h16" />
+                      <path d="M10 10v9" />
+                    </svg>
+                    View Table
+                  </button>
+                  <button type="button" class="view-table-action minimize" *ngIf="tableViewExpanded()" (click)="closeTableView()">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M5 12h14" />
+                    </svg>
+                    Minimize
+                  </button>
                 </div>
               </div>
 
-              <div class="universal-filter-bar compact-filter-bar">
+              <div class="universal-filter-bar compact-filter-bar" *ngIf="!tableViewExpanded()">
                 <button type="button" class="filter-command-button" [class.active]="filterBuilderOpen()" (click)="toggleFilterBuilder()">
                   <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                     <path d="M4 6h16" />
@@ -419,7 +434,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <button type="button" class="filter-clear-button" *ngIf="selectedFilterCount()" (click)="clearFilters()">Clear filters</button>
               </div>
 
-              <section class="date-filter-panel blue-date-panel" *ngIf="dateFilterOpen() && dateFilterEnabled()">
+              <section class="date-filter-panel blue-date-panel" *ngIf="!tableViewExpanded() && dateFilterOpen() && dateFilterEnabled()">
                 <div class="date-range-picker-fields">
                   <button type="button" [class.active]="datePickerTarget() === 'start'" (click)="datePickerTarget.set('start')">
                     <span>From</span>
@@ -453,6 +468,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       [class.today]="day.today"
                       [class.selected]="day.selected"
                       [class.in-range]="day.inRange"
+                      [class.disabled]="day.disabled"
+                      [disabled]="day.disabled"
                       (click)="selectCalendarDate(day.key)"
                     >
                       {{ day.label }}
@@ -464,11 +481,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <button type="button" class="primary-mini-action" (click)="dateFilterOpen.set(false)">Apply</button>
               </section>
 
-              <div class="active-filter-strip" *ngIf="activeFilterSummary().length">
+              <div class="active-filter-strip" *ngIf="!tableViewExpanded() && activeFilterSummary().length">
                 <span *ngFor="let item of activeFilterSummary()">{{ item }}</span>
               </div>
 
-              <div class="expense-ledger-summary universal-expense-summary" *ngIf="activeModule() === 'expenses' && expenseFilterBalanceVisible()">
+              <div class="expense-ledger-summary universal-expense-summary" *ngIf="!tableViewExpanded() && activeModule() === 'expenses' && expenseFilterBalanceVisible()">
                 <div><span>Project</span><strong>{{ selectedFilters()['project'] }}</strong></div>
                 <div><span>Site</span><strong>{{ activeExpenseSiteFilter() }}</strong></div>
                 <div><span>Opening Balance</span><strong>{{ expenseFilterOpeningLabel() }}</strong></div>
@@ -476,7 +493,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
               </div>
 
               <ng-container *ngIf="tableState() as tableState">
-              <div class="table-meta-strip">
+              <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
                 <span>{{ tableState.rows.length }} rows</span>
                 <span>{{ tableState.columns.length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
@@ -951,6 +968,7 @@ export class UniversalDashboardPage {
   readonly datePickerTarget = signal<"start" | "end">("start");
   readonly calendarCursor = signal(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`);
   readonly calendarWeekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+  readonly tableViewExpanded = signal(false);
   readonly recordDialogOpen = signal(false);
   readonly fieldDialogOpen = signal(false);
   readonly draftRow = signal<TableRow>({});
@@ -1521,7 +1539,7 @@ export class UniversalDashboardPage {
     return new Date(year, month - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
   }
 
-  calendarDays(): Array<{ key: string; label: number; inMonth: boolean; today: boolean; selected: boolean; inRange: boolean }> {
+  calendarDays(): Array<{ key: string; label: number; inMonth: boolean; today: boolean; selected: boolean; inRange: boolean; disabled: boolean }> {
     const [year, month] = this.calendarCursor().split("-").map(Number);
     const monthIndex = month - 1;
     const firstDay = new Date(year, monthIndex, 1);
@@ -1540,12 +1558,14 @@ export class UniversalDashboardPage {
         today: key === today,
         selected: key === range.start || key === range.end,
         inRange: hasRange && key > range.start && key < range.end,
+        disabled: key > today,
       });
     }
     return days;
   }
 
   selectCalendarDate(key: string) {
+    if (key > this.localDateKey(new Date())) return;
     const range = this.dateRange();
     if (this.datePickerTarget() === "start" || !range.start || (range.start && range.end)) {
       this.dateRange.set({ start: key, end: "" });
@@ -1570,6 +1590,18 @@ export class UniversalDashboardPage {
 
   private localDateKey(date: Date): string {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  openTableView() {
+    this.tableViewExpanded.set(true);
+    this.filterBuilderOpen.set(false);
+    this.dateFilterOpen.set(false);
+    this.activeFilterValueKey.set("");
+    this.clearRowSelection();
+  }
+
+  closeTableView() {
+    this.tableViewExpanded.set(false);
   }
 
   dateFilterEnabled(): boolean {
