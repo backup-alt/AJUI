@@ -795,7 +795,41 @@ export class UniversalDashboardPage {
   }
 
   rowKey(row: TableRow): string {
-    return `${this.activeModule()}:${row["__rowId"] || row["clientId"] || row["vendorId"] || row["reportName"] || ""}`;
+    return `${this.activeModule()}:${this.rowIdentity(row)}`;
+  }
+
+  private rowIdentity(row: TableRow): string {
+    const explicitId = String(row["__rowId"] || "").trim();
+    if (explicitId) return explicitId;
+
+    const values = [
+      row["clientId"],
+      row["projectId"],
+      row["__projectId"],
+      row["vendorId"],
+      row["supervisorId"],
+      row["subcontractId"],
+      row["project"],
+      row["site"],
+      row["materialName"],
+      row["staffName"],
+      row["labourTypes"],
+      row["expenseDate"],
+      row["paymentDate"],
+      row["requestDate"],
+      row["vendorName"],
+      row["supervisorName"],
+      row["subcontractorName"],
+      row["reportName"],
+      row["description"],
+      row["amount"],
+      row["phoneNumber"],
+      row["gstNumber"],
+    ]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean);
+
+    return values.length ? values.join("|") : JSON.stringify(row);
   }
 
   trackRow = (_index: number, row: TableRow): string => this.rowKey(row);
@@ -1186,10 +1220,22 @@ export class UniversalDashboardPage {
     event.preventDefault();
     const label = this.newFieldLabel().trim();
     if (!label) return;
+    if (this.isGeneratedClientIdField(label)) {
+      window.alert("Client ID is generated automatically and cannot be created manually.");
+      return;
+    }
     const module = this.activeModule();
     this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
     this.newFieldAfterKey.set(null);
     this.fieldDialogOpen.set(false);
+  }
+
+  private isGeneratedClientIdField(label: string): boolean {
+    const normalized = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    return normalized === "client-id";
   }
 
   newFieldAfterLabel(): string {

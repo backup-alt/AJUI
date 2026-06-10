@@ -11052,3 +11052,54 @@ th:hover .column-insert-action,
 .dark-mode .universal-table tbody tr.selectable-data-row.row-selected .row-check-column {
   background: #1d3358 !important;
 }
+
+@media (min-width: 1181px) {
+  .client-project-shell {
+    height: calc(100vh - 70px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .client-project-shell .project-management-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .client-project-shell .project-management-panel > .module-toolbar {
+    position: sticky !important;
+    top: 0;
+    z-index: 5;
+    flex: 0 0 auto;
+  }
+
+  .client-project-shell .project-select-grid {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+  }
+}
+
+.project-activity-chip {
+  color: #42526a;
+  font-weight: 820;
+  white-space: nowrap;
+}
+
+.project-activity-chip ion-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--ui-royal);
+}
+
+.dark-mode .project-activity-chip {
+  color: #c8d6ec !important;
+}
+
+.dark-mode .project-activity-chip ion-icon {
+  color: #8eb4ff;
+}

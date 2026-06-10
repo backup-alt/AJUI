@@ -304,6 +304,7 @@ export class ErpDataService {
     this.readState<Record<SharedModuleKey, string[]>>("hiddenTableFields", this.emptyHiddenFieldMap()),
   );
   readonly expenseOpeningBalances = signal<Record<string, number>>(this.readState<Record<string, number>>("expenseOpeningBalances", {}));
+  readonly projectActivity = signal<Record<string, number>>(this.readState<Record<string, number>>("projectActivity", {}));
 
   constructor() {
     this.ensureMeenakshiSampleProject();
@@ -323,6 +324,7 @@ export class ErpDataService {
     effect(() => this.writeState("hiddenTableRows", this.hiddenTableRows()));
     effect(() => this.writeState("hiddenTableFields", this.hiddenTableFields()));
     effect(() => this.writeState("expenseOpeningBalances", this.expenseOpeningBalances()));
+    effect(() => this.writeState("projectActivity", this.projectActivity()));
   }
 
   private ensureMeenakshiSampleProject() {
@@ -851,6 +853,7 @@ export class ErpDataService {
         existingClient.id === client.id ? { ...existingClient, projectIds: [project.id, ...existingClient.projectIds] } : existingClient,
       ),
     );
+    this.touchProject(project.id);
     return project;
   }
 
@@ -872,6 +875,7 @@ export class ErpDataService {
       }),
     );
 
+    if (updatedProject) this.touchProject(projectId);
     return updatedProject;
   }
 
@@ -898,6 +902,7 @@ export class ErpDataService {
       });
     }
 
+    if (updatedProject) this.touchProject(projectId);
     return updatedProject;
   }
 
@@ -909,6 +914,7 @@ export class ErpDataService {
   setExpenseOpeningBalance(projectId: string, siteName: string, amount: number) {
     const key = this.expenseOpeningBalanceKey(projectId, siteName);
     this.expenseOpeningBalances.update((balances) => ({ ...balances, [key]: amount }));
+    this.touchProject(projectId);
   }
 
   updateProject(
@@ -934,11 +940,16 @@ export class ErpDataService {
       }),
     );
 
+    if (updatedProject) this.touchProject(projectId);
     return updatedProject;
   }
 
   deleteProject(projectId: string) {
     this.projects.update((projectRows) => projectRows.filter((project) => project.id !== projectId));
+    this.projectActivity.update((activity) => {
+      const { [projectId]: _removed, ...nextActivity } = activity;
+      return nextActivity;
+    });
     this.clients.update((clientRows) =>
       clientRows.map((client) => ({
         ...client,
@@ -957,7 +968,38 @@ export class ErpDataService {
 
   projectsForClient(client: Client | undefined): Project[] {
     if (!client) return [];
-    return this.projects().filter((project) => client.projectIds.includes(project.id));
+    return this.sortProjectsByLastWorked(this.projects().filter((project) => client.projectIds.includes(project.id)));
+  }
+
+  touchProject(projectId: string) {
+    if (!projectId) return;
+    this.projectActivity.update((activity) => ({ ...activity, [projectId]: Date.now() }));
+  }
+
+  projectLastWorkedAt(projectId: string): number {
+    return this.projectActivity()[projectId] ?? 0;
+  }
+
+  projectLastWorkedLabel(projectId: string): string {
+    const timestamp = this.projectLastWorkedAt(projectId);
+    if (!timestamp) return "Not worked yet";
+    const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+    if (minutes < 1) return "Just now";
+    if (minutes === 1) return "1 min ago";
+    if (minutes < 60) return `${minutes} mins ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours === 1) return "1 hr ago";
+    if (hours < 24) return `${hours} hrs ago`;
+    const days = Math.floor(hours / 24);
+    return days === 1 ? "1 day ago" : `${days} days ago`;
+  }
+
+  sortProjectsByLastWorked(projectRows: Project[]): Project[] {
+    return [...projectRows].sort((first, second) => {
+      const activityDelta = this.projectLastWorkedAt(second.id) - this.projectLastWorkedAt(first.id);
+      if (activityDelta) return activityDelta;
+      return second.startDate.localeCompare(first.startDate);
+    });
   }
 
   materialsForProject(projectId: string): MaterialRow[] {
@@ -1067,11 +1109,14 @@ export class ErpDataService {
       ...rows,
       [module]: [nextRow, ...(rows[module] ?? [])],
     }));
+    const projectId = this.projectIdFromSharedRow(nextRow);
+    if (projectId) this.touchProject(projectId);
     return nextRow;
   }
 
   updateSharedRowCell(rowId: string, key: string, value: string | number) {
     if (!rowId) return;
+    const projectId = key === "projectId" ? String(value || "") : this.projectIdFromSharedRowId(rowId);
 
     this.customTableRows.update((rows) => {
       let changed = false;
@@ -1092,10 +1137,12 @@ export class ErpDataService {
       ...edits,
       [rowId]: { ...(edits[rowId] ?? {}), [key]: value },
     }));
+    if (projectId) this.touchProject(projectId);
   }
 
   deleteSharedRow(rowId: string) {
     if (!rowId) return;
+    const projectId = this.projectIdFromSharedRowId(rowId);
     this.customTableRows.update((rows) => {
       const nextRows = Object.fromEntries(
         Object.entries(rows).map(([module, moduleRows]) => [module, moduleRows.filter((row) => String(row["__rowId"] || "") !== rowId)]),
@@ -1103,6 +1150,25 @@ export class ErpDataService {
       return nextRows;
     });
     this.hiddenTableRows.update((rowIds) => (rowIds.includes(rowId) ? rowIds : [...rowIds, rowId]));
+    if (projectId) this.touchProject(projectId);
+  }
+
+  private projectIdFromSharedRow(row: SharedTableRow | undefined): string {
+    return String(row?.["projectId"] || row?.["__projectId"] || "").trim();
+  }
+
+  private projectIdFromSharedRowId(rowId: string): string {
+    const customRows = Object.values(this.customTableRows()).flat();
+    const baseRows: SharedTableRow[] = [
+      ...this.materials(),
+      ...this.labour(),
+      ...this.expenses(),
+      ...this.payments(),
+      ...this.subcontractors(),
+    ];
+    const match = [...customRows, ...baseRows].find((row) => String(row["__rowId"] || "") === rowId);
+    const edits = this.tableCellEdits()[rowId] ?? {};
+    return String(edits["projectId"] || edits["__projectId"] || this.projectIdFromSharedRow(match)).trim();
   }
 
   clientSummary(client: Client) {

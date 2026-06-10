@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
@@ -764,6 +764,13 @@ export class ProjectWorkspacePage {
   });
   readonly activeConfig = computed(() => sectionConfigs.find((section) => section.key === this.activeSection()) ?? sectionConfigs[0]);
 
+  constructor() {
+    effect(() => {
+      const projectId = this.projectId();
+      if (projectId) this.data.touchProject(projectId);
+    });
+  }
+
   switchSection(section: ModuleKey) {
     this.activeSection.set(section);
     this.tableSearch.set("");
@@ -773,7 +780,34 @@ export class ProjectWorkspacePage {
   }
 
   rowKey(row: TableRow): string {
-    return `${this.activeSection()}:${row["__rowId"] || row["projectId"] || row["reportName"] || ""}`;
+    return `${this.activeSection()}:${this.rowIdentity(row)}`;
+  }
+
+  private rowIdentity(row: TableRow): string {
+    const explicitId = String(row["__rowId"] || "").trim();
+    if (explicitId) return explicitId;
+
+    const values = [
+      row["clientId"],
+      row["projectId"],
+      row["__projectId"],
+      row["site"],
+      row["materialName"],
+      row["staffName"],
+      row["labourTypes"],
+      row["expenseDate"],
+      row["paymentDate"],
+      row["requestDate"],
+      row["vendorName"],
+      row["subcontractorName"],
+      row["reportName"],
+      row["description"],
+      row["amount"],
+    ]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean);
+
+    return values.length ? values.join("|") : JSON.stringify(row);
   }
 
   trackRow = (_index: number, row: TableRow): string => this.rowKey(row);
@@ -1088,10 +1122,22 @@ export class ProjectWorkspacePage {
     event.preventDefault();
     const label = this.newFieldLabel().trim();
     if (!label) return;
+    if (this.isGeneratedClientIdField(label)) {
+      window.alert("Client ID is generated automatically and cannot be created manually.");
+      return;
+    }
     const section = this.activeSection();
     this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
     this.newFieldAfterKey.set(null);
     this.fieldDialogOpen.set(false);
+  }
+
+  private isGeneratedClientIdField(label: string): boolean {
+    const normalized = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    return normalized === "client-id";
   }
 
   newFieldAfterLabel(): string {

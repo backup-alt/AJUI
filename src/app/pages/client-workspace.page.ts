@@ -114,6 +114,7 @@ import { formatMoney, statusClass } from "../shared/format";
                   </div>
                   <div class="project-select-meta">
                     <span><ion-icon name="calendar-outline"></ion-icon>Started {{ project.startDate }}</span>
+                    <span class="project-activity-chip"><ion-icon name="time-outline"></ion-icon>{{ lastWorkedLabel(project) }}</span>
                     <span>{{ project.sites.length }} sites / areas</span>
                   </div>
                   <div class="project-select-ledger">
@@ -189,7 +190,12 @@ export class ClientWorkspacePage {
   readonly projects = computed(() => this.data.projectsForClient(this.client()));
 
   openProject(project: Project) {
+    this.data.touchProject(project.id);
     void this.router.navigate(["/clients", this.clientId(), "projects", project.id]);
+  }
+
+  lastWorkedLabel(project: Project): string {
+    return this.data.projectLastWorkedLabel(project.id);
   }
 
   openCreateProject() {
