@@ -21,6 +21,7 @@ type DashboardModule =
 type TableRow = SharedTableRow;
 type FieldSchema = SharedTableField;
 type FilterSchema = { key: string; label: string };
+type FilterBuilderStep = "fields" | "values";
 type ModuleConfig = {
   key: DashboardModule;
   label: string;
@@ -331,6 +332,23 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </button>
               </nav>
 
+              <div class="site-workbench universal-site-workbench" *ngIf="isUniversalSiteAware(activeModule())">
+                <div class="site-switch-row">
+                  <span>Site</span>
+                  <div class="site-chip-strip">
+                    <button type="button" [class.active]="activeSiteFilter() === 'All'" (click)="selectUniversalSite('All')">All Sites</button>
+                    <button
+                      *ngFor="let site of universalSiteOptions()"
+                      type="button"
+                      [class.active]="activeSiteFilter() === site"
+                      (click)="selectUniversalSite(site)"
+                    >
+                      {{ site }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="module-toolbar table-first-toolbar">
                 <div>
                   <h2>{{ activeConfig().title }}</h2>
@@ -373,35 +391,95 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
               </div>
 
-              <div class="universal-filter-bar">
-                <label *ngFor="let filter of activeConfig().filters" class="filter-select-shell">
-                  <span>{{ filter.label }}</span>
-                  <div class="erp-select-menu filter-select-menu" [class.open]="isFilterMenuOpen(filter.key)">
-                    <button type="button" class="erp-select-trigger" (click)="toggleFilterMenu(filter.key)">
-                      <span>{{ selectedFilters()[filter.key] || 'All' }}</span>
-                      <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                        <path d="M5.5 7.5 10 12l4.5-4.5" />
-                      </svg>
-                    </button>
-                    <div class="erp-select-panel" *ngIf="isFilterMenuOpen(filter.key)">
-                      <button type="button" [class.selected]="!selectedFilters()[filter.key]" (click)="setFilter(filter.key, '')">All</button>
-                      <button
-                        *ngFor="let value of filterValues(filter.key)"
-                        type="button"
-                        [class.selected]="selectedFilters()[filter.key] === value"
-                        (click)="setFilter(filter.key, value)"
-                      >
-                        {{ value }}
-                      </button>
-                    </div>
+              <div class="universal-filter-bar compact-filter-bar">
+                <button type="button" class="filter-command-button" [class.active]="filterBuilderOpen()" (click)="toggleFilterBuilder()">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                    <path d="M4 6h16" />
+                    <path d="M7 12h10" />
+                    <path d="M10 18h4" />
+                  </svg>
+                  Filter By
+                  <span *ngIf="activeFieldFilterCount()">{{ activeFieldFilterCount() }}</span>
+                </button>
+                <button
+                  *ngIf="dateFilterEnabled()"
+                  type="button"
+                  class="filter-command-button"
+                  [class.active]="dateFilterOpen() || hasDateFilter()"
+                  (click)="toggleDateFilter()"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                    <path d="M7 3v4" />
+                    <path d="M17 3v4" />
+                    <path d="M4 9h16" />
+                    <path d="M5 5h14v16H5z" />
+                  </svg>
+                  {{ dateRangeLabel() || 'Filter by date' }}
+                </button>
+                <button type="button" class="filter-clear-button" *ngIf="selectedFilterCount()" (click)="clearFilters()">Clear filters</button>
+              </div>
+
+              <section class="table-filter-builder" *ngIf="filterBuilderOpen()">
+                <div class="filter-builder-head">
+                  <div>
+                    <strong>{{ filterBuilderStep() === 'fields' ? 'Choose filter fields' : 'Enter filter values' }}</strong>
+                    <span>{{ filterBuilderStep() === 'fields' ? 'Select any fields, including custom columns.' : 'Use dropdown suggestions or type a custom value.' }}</span>
                   </div>
+                  <div>
+                    <button type="button" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderStep.set('fields')">Back</button>
+                    <button type="button" class="primary-mini-action" *ngIf="filterBuilderStep() === 'fields'" (click)="goToFilterValues()">Next</button>
+                    <button type="button" class="primary-mini-action" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderOpen.set(false)">Apply</button>
+                  </div>
+                </div>
+                <div class="filter-field-grid" *ngIf="filterBuilderStep() === 'fields'">
+                  <button
+                    type="button"
+                    *ngFor="let column of filterableColumns()"
+                    [class.selected]="isFilterFieldSelected(column.key)"
+                    (click)="toggleFilterField(column.key)"
+                  >
+                    <span>{{ column.label }}</span>
+                    <small>{{ column.key }}</small>
+                  </button>
+                </div>
+                <div class="filter-value-grid" *ngIf="filterBuilderStep() === 'values'">
+                  <label *ngFor="let column of selectedFilterColumns()">
+                    <span>{{ column.label }}</span>
+                    <input
+                      [attr.list]="'dashboard-filter-' + activeModule() + '-' + column.key"
+                      [value]="selectedFilters()[column.key] || ''"
+                      (input)="setFilter(column.key, $any($event.target).value)"
+                      placeholder="All"
+                    />
+                    <datalist [id]="'dashboard-filter-' + activeModule() + '-' + column.key">
+                      <option *ngFor="let value of filterValues(column.key)" [value]="value"></option>
+                    </datalist>
+                  </label>
+                  <button type="button" class="filter-clear-button" (click)="clearFieldFilters()">Clear field filters</button>
+                </div>
+              </section>
+
+              <section class="date-filter-panel" *ngIf="dateFilterOpen() && dateFilterEnabled()">
+                <label>
+                  <span>From</span>
+                  <input type="date" [value]="dateRange().start" (change)="setDateRange('start', $any($event.target).value)" />
                 </label>
-                <button type="button" (click)="clearFilters()">Clear filters</button>
+                <label>
+                  <span>To</span>
+                  <input type="date" [value]="dateRange().end" (change)="setDateRange('end', $any($event.target).value)" />
+                </label>
+                <strong *ngIf="dateRangeLabel()">{{ dateRangeLabel() }}</strong>
+                <button type="button" class="filter-clear-button" (click)="clearDateFilter()">Clear date</button>
+                <button type="button" class="primary-mini-action" (click)="dateFilterOpen.set(false)">Apply</button>
+              </section>
+
+              <div class="active-filter-strip" *ngIf="activeFilterSummary().length">
+                <span *ngFor="let item of activeFilterSummary()">{{ item }}</span>
               </div>
 
               <div class="expense-ledger-summary universal-expense-summary" *ngIf="activeModule() === 'expenses' && expenseFilterBalanceVisible()">
                 <div><span>Project</span><strong>{{ selectedFilters()['project'] }}</strong></div>
-                <div><span>Site</span><strong>{{ selectedFilters()['site'] }}</strong></div>
+                <div><span>Site</span><strong>{{ activeExpenseSiteFilter() }}</strong></div>
                 <div><span>Opening Balance</span><strong>{{ expenseFilterOpeningLabel() }}</strong></div>
                 <div><span>Current Balance</span><strong>{{ expenseFilterCurrentLabel() }}</strong></div>
               </div>
@@ -797,7 +875,13 @@ export class UniversalDashboardPage {
   readonly editingRowKeys = signal<string[]>([]);
   readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly searchText = signal("");
+  readonly activeSite = signal("All");
   readonly selectedFilters = signal<Record<string, string>>({});
+  readonly selectedFilterFields = signal<string[]>([]);
+  readonly filterBuilderOpen = signal(false);
+  readonly filterBuilderStep = signal<FilterBuilderStep>("fields");
+  readonly dateFilterOpen = signal(false);
+  readonly dateRange = signal({ start: "", end: "" });
   readonly recordDialogOpen = signal(false);
   readonly fieldDialogOpen = signal(false);
   readonly draftRow = signal<TableRow>({});
@@ -838,7 +922,7 @@ export class UniversalDashboardPage {
   switchModule(module: DashboardModule) {
     this.activeModule.set(module);
     this.searchText.set("");
-    this.selectedFilters.set({});
+    this.resetFilterState();
     this.closeDropdowns();
     this.clearRowSelection();
   }
@@ -1015,11 +1099,11 @@ export class UniversalDashboardPage {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions")) {
+    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions, .universal-filter-bar, .table-filter-builder, .date-filter-panel, .site-workbench")) {
       this.clearRowSelection();
     }
 
-    if (!target.closest(".erp-select-menu, .filter-select-shell, .custom-select-entry")) {
+    if (!target.closest(".erp-select-menu, .filter-select-shell, .custom-select-entry, .table-filter-builder, .date-filter-panel")) {
       this.closeDropdowns();
     }
   }
@@ -1074,12 +1158,26 @@ export class UniversalDashboardPage {
   visibleRows(): TableRow[] {
     const query = this.searchText().trim().toLowerCase();
     const filters = this.selectedFilters();
-    const rows = this.rowsFor(this.activeModule()).filter((row) => {
+    const module = this.activeModule();
+    const activeSite = this.activeSiteFilter();
+    const dateKey = this.dateFilterKey(module);
+    const range = this.dateRange();
+    const rows = this.withComputedRows(module, this.rowsFor(module)).filter((row) => {
+      const matchesSite =
+        !this.isUniversalSiteAware(module) ||
+        activeSite === "All" ||
+        String(row[this.siteFieldForModule(module)] || "").toLowerCase() === activeSite.toLowerCase();
       const matchesSearch = !query || Object.values(row).some((value) => String(value).toLowerCase().includes(query));
-      const matchesFilters = Object.entries(filters).every(([key, value]) => !value || String(row[key]) === value);
-      return matchesSearch && matchesFilters;
+      const matchesFilters = Object.entries(filters).every(
+        ([key, value]) => !value || String(row[key] ?? "").toLowerCase().includes(value.trim().toLowerCase()),
+      );
+      const matchesDate =
+        !dateKey ||
+        (!range.start && !range.end) ||
+        this.dateInRange(this.normalizedDateValue(row[dateKey]), range.start, range.end);
+      return matchesSite && matchesSearch && matchesFilters && matchesDate;
     });
-    return this.withComputedRows(this.activeModule(), rows);
+    return rows;
   }
 
   filterValues(key: string): string[] {
@@ -1094,6 +1192,36 @@ export class UniversalDashboardPage {
     return [...values].sort((a, b) => a.localeCompare(b));
   }
 
+  isUniversalSiteAware(module: DashboardModule): boolean {
+    return module === "materials" || module === "labour" || module === "expenses" || module === "supervisors" || module === "subcontractors";
+  }
+
+  siteFieldForModule(module: DashboardModule): string {
+    return module === "supervisors" ? "assignedSite" : "site";
+  }
+
+  universalSiteOptions(): string[] {
+    const sites = new Set<string>();
+    for (const project of this.data.projects()) project.sites.forEach((site) => site && sites.add(site));
+    const siteKey = this.siteFieldForModule(this.activeModule());
+    for (const row of this.rowsFor(this.activeModule())) {
+      const site = String(row[siteKey] || "").trim();
+      if (site) sites.add(site);
+    }
+    return [...sites].sort((first, second) => first.localeCompare(second));
+  }
+
+  activeSiteFilter(): string {
+    const site = this.activeSite();
+    return site === "All" || this.universalSiteOptions().includes(site) ? site : "All";
+  }
+
+  selectUniversalSite(site: string) {
+    this.activeSite.set(site);
+    this.closeDropdowns();
+    this.clearRowSelection();
+  }
+
   isFilterMenuOpen(key: string): boolean {
     return this.openFilterKey() === key;
   }
@@ -1104,16 +1232,22 @@ export class UniversalDashboardPage {
 
   expenseFilterBalanceVisible(): boolean {
     const filters = this.selectedFilters();
-    return Boolean(filters["project"] && filters["site"]);
+    return Boolean(filters["project"] && this.activeExpenseSiteFilter() !== "All");
+  }
+
+  activeExpenseSiteFilter(): string {
+    return this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : this.selectedFilters()["site"] || "All";
   }
 
   expenseFilterOpeningLabel(): string {
-    const row = this.expenseChronologicalRows(this.visibleRows()).find((entry) => this.activeModule() === "expenses" && entry["project"] === this.selectedFilters()["project"] && entry["site"] === this.selectedFilters()["site"]);
+    const site = this.activeExpenseSiteFilter();
+    const row = this.expenseChronologicalRows(this.visibleRows()).find((entry) => this.activeModule() === "expenses" && entry["project"] === this.selectedFilters()["project"] && entry["site"] === site);
     return row ? formatMoney(this.expenseOpeningBalanceFor(row, true, true)) : formatMoney(0);
   }
 
   expenseFilterCurrentLabel(): string {
-    const rows = this.expenseChronologicalRows(this.visibleRows()).filter((entry) => entry["project"] === this.selectedFilters()["project"] && entry["site"] === this.selectedFilters()["site"]);
+    const site = this.activeExpenseSiteFilter();
+    const rows = this.expenseChronologicalRows(this.visibleRows()).filter((entry) => entry["project"] === this.selectedFilters()["project"] && entry["site"] === site);
     const latest = rows.at(-1);
     return latest ? String(latest["runningBalance"] || formatMoney(0)) : formatMoney(0);
   }
@@ -1137,7 +1271,11 @@ export class UniversalDashboardPage {
   }
 
   selectedFilterCount(): number {
-    return Object.values(this.selectedFilters()).filter(Boolean).length;
+    return this.activeFieldFilterCount() + (this.hasDateFilter() ? 1 : 0) + (this.isUniversalSiteAware(this.activeModule()) && this.activeSiteFilter() !== "All" ? 1 : 0);
+  }
+
+  activeFieldFilterCount(): number {
+    return Object.values(this.selectedFilters()).filter((value) => value.trim()).length;
   }
 
   isReadonlyColumn(key: string): boolean {
@@ -1160,15 +1298,140 @@ export class UniversalDashboardPage {
   }
 
   setFilter(key: string, value: string) {
-    this.selectedFilters.update((filters) => ({ ...filters, [key]: value }));
-    this.openFilterKey.set("");
+    const cleanValue = value.trim();
+    this.selectedFilters.update((filters) => {
+      const next = { ...filters };
+      if (cleanValue) next[key] = cleanValue;
+      else delete next[key];
+      return next;
+    });
   }
 
   clearFilters() {
-    this.selectedFilters.set({});
+    this.resetFilterState();
     this.searchText.set("");
     this.closeDropdowns();
     this.clearRowSelection();
+  }
+
+  private resetFilterState() {
+    this.selectedFilters.set({});
+    this.selectedFilterFields.set([]);
+    this.filterBuilderOpen.set(false);
+    this.filterBuilderStep.set("fields");
+    this.dateFilterOpen.set(false);
+    this.dateRange.set({ start: "", end: "" });
+    this.activeSite.set("All");
+  }
+
+  toggleFilterBuilder() {
+    this.filterBuilderOpen.update((open) => !open);
+    this.dateFilterOpen.set(false);
+    if (!this.selectedFilterFields().length) this.filterBuilderStep.set("fields");
+  }
+
+  filterableColumns(): FieldSchema[] {
+    return this.columnsForActive();
+  }
+
+  isFilterFieldSelected(key: string): boolean {
+    return this.selectedFilterFields().includes(key);
+  }
+
+  toggleFilterField(key: string) {
+    this.selectedFilterFields.update((fields) => {
+      if (fields.includes(key)) {
+        this.selectedFilters.update((filters) => {
+          const next = { ...filters };
+          delete next[key];
+          return next;
+        });
+        return fields.filter((field) => field !== key);
+      }
+      return [...fields, key];
+    });
+  }
+
+  selectedFilterColumns(): FieldSchema[] {
+    const selected = new Set(this.selectedFilterFields());
+    return this.filterableColumns().filter((column) => selected.has(column.key));
+  }
+
+  goToFilterValues() {
+    if (!this.selectedFilterFields().length) return;
+    this.filterBuilderStep.set("values");
+  }
+
+  clearFieldFilters() {
+    this.selectedFilters.set({});
+  }
+
+  toggleDateFilter() {
+    this.dateFilterOpen.update((open) => !open);
+    this.filterBuilderOpen.set(false);
+  }
+
+  setDateRange(key: "start" | "end", value: string) {
+    this.dateRange.update((range) => ({ ...range, [key]: value }));
+  }
+
+  clearDateFilter() {
+    this.dateRange.set({ start: "", end: "" });
+  }
+
+  hasDateFilter(): boolean {
+    const range = this.dateRange();
+    return Boolean(range.start || range.end);
+  }
+
+  dateRangeLabel(): string {
+    const range = this.dateRange();
+    if (!range.start && !range.end) return "";
+    const start = range.start || "Start";
+    const end = range.end || "Today";
+    return `${start} 12:00 AM - ${end} 11:59 PM`;
+  }
+
+  dateFilterEnabled(): boolean {
+    return Boolean(this.dateFilterKey(this.activeModule()));
+  }
+
+  activeFilterSummary(): string[] {
+    const summary: string[] = [];
+    if (this.isUniversalSiteAware(this.activeModule()) && this.activeSiteFilter() !== "All") summary.push(`Site: ${this.activeSiteFilter()}`);
+    for (const column of this.selectedFilterColumns()) {
+      const value = this.selectedFilters()[column.key];
+      if (value) summary.push(`${column.label}: ${value}`);
+    }
+    if (this.dateRangeLabel()) summary.push(`Date: ${this.dateRangeLabel()}`);
+    return summary;
+  }
+
+  private dateFilterKey(module: DashboardModule): string {
+    if (module === "materials") return "requestDate";
+    if (module === "labour") return "attendanceDate";
+    if (module === "expenses" || module === "generalExpenses") return "expenseDate";
+    if (module === "payments") return "paymentDate";
+    return "";
+  }
+
+  private normalizedDateValue(value: unknown): string {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+    const dayFirstMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+    if (dayFirstMatch) return `${dayFirstMatch[3]}-${dayFirstMatch[2].padStart(2, "0")}-${dayFirstMatch[1].padStart(2, "0")}`;
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  private dateInRange(value: string, start: string, end: string): boolean {
+    if (!value) return false;
+    if (start && value < start) return false;
+    if (end && value > end) return false;
+    return true;
   }
 
   openRecordDialog() {

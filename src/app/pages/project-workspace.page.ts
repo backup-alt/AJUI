@@ -13,6 +13,7 @@ import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/pro
 type ModuleKey = Exclude<SharedModuleKey, "clients" | "generalExpenses" | "settings" | "supervisors">;
 type TableRow = SharedTableRow;
 type FieldSchema = SharedTableField;
+type FilterBuilderStep = "fields" | "values";
 type SectionConfig = {
   key: ModuleKey;
   label: string;
@@ -349,10 +350,97 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
               </div>
 
+              <div class="universal-filter-bar compact-filter-bar project-filter-bar">
+                <button type="button" class="filter-command-button" [class.active]="filterBuilderOpen()" (click)="toggleFilterBuilder()">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                    <path d="M4 6h16" />
+                    <path d="M7 12h10" />
+                    <path d="M10 18h4" />
+                  </svg>
+                  Filter By
+                  <span *ngIf="activeFieldFilterCount()">{{ activeFieldFilterCount() }}</span>
+                </button>
+                <button
+                  *ngIf="dateFilterEnabled()"
+                  type="button"
+                  class="filter-command-button"
+                  [class.active]="dateFilterOpen() || hasDateFilter()"
+                  (click)="toggleDateFilter()"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                    <path d="M7 3v4" />
+                    <path d="M17 3v4" />
+                    <path d="M4 9h16" />
+                    <path d="M5 5h14v16H5z" />
+                  </svg>
+                  {{ dateRangeLabel() || 'Filter by date' }}
+                </button>
+                <button type="button" class="filter-clear-button" *ngIf="selectedFilterCount()" (click)="clearFilters()">Clear filters</button>
+              </div>
+
+              <section class="table-filter-builder" *ngIf="filterBuilderOpen()">
+                <div class="filter-builder-head">
+                  <div>
+                    <strong>{{ filterBuilderStep() === 'fields' ? 'Choose filter fields' : 'Enter filter values' }}</strong>
+                    <span>{{ filterBuilderStep() === 'fields' ? 'Select any fields, including custom columns.' : 'Use dropdown suggestions or type a custom value.' }}</span>
+                  </div>
+                  <div>
+                    <button type="button" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderStep.set('fields')">Back</button>
+                    <button type="button" class="primary-mini-action" *ngIf="filterBuilderStep() === 'fields'" (click)="goToFilterValues()">Next</button>
+                    <button type="button" class="primary-mini-action" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderOpen.set(false)">Apply</button>
+                  </div>
+                </div>
+                <div class="filter-field-grid" *ngIf="filterBuilderStep() === 'fields'">
+                  <button
+                    type="button"
+                    *ngFor="let column of filterableColumns()"
+                    [class.selected]="isFilterFieldSelected(column.key)"
+                    (click)="toggleFilterField(column.key)"
+                  >
+                    <span>{{ column.label }}</span>
+                    <small>{{ column.key }}</small>
+                  </button>
+                </div>
+                <div class="filter-value-grid" *ngIf="filterBuilderStep() === 'values'">
+                  <label *ngFor="let column of selectedFilterColumns()">
+                    <span>{{ column.label }}</span>
+                    <input
+                      [attr.list]="'project-filter-' + activeSection() + '-' + column.key"
+                      [value]="selectedFilters()[column.key] || ''"
+                      (input)="setFilter(column.key, $any($event.target).value)"
+                      placeholder="All"
+                    />
+                    <datalist [id]="'project-filter-' + activeSection() + '-' + column.key">
+                      <option *ngFor="let value of filterValues(column.key)" [value]="value"></option>
+                    </datalist>
+                  </label>
+                  <button type="button" class="filter-clear-button" (click)="clearFieldFilters()">Clear field filters</button>
+                </div>
+              </section>
+
+              <section class="date-filter-panel" *ngIf="dateFilterOpen() && dateFilterEnabled()">
+                <label>
+                  <span>From</span>
+                  <input type="date" [value]="dateRange().start" (change)="setDateRange('start', $any($event.target).value)" />
+                </label>
+                <label>
+                  <span>To</span>
+                  <input type="date" [value]="dateRange().end" (change)="setDateRange('end', $any($event.target).value)" />
+                </label>
+                <strong *ngIf="dateRangeLabel()">{{ dateRangeLabel() }}</strong>
+                <button type="button" class="filter-clear-button" (click)="clearDateFilter()">Clear date</button>
+                <button type="button" class="primary-mini-action" (click)="dateFilterOpen.set(false)">Apply</button>
+              </section>
+
+              <div class="active-filter-strip" *ngIf="activeFilterSummary().length">
+                <span *ngFor="let item of activeFilterSummary()">{{ item }}</span>
+              </div>
+
               <ng-container *ngIf="tableState() as tableState">
               <div class="table-meta-strip">
                 <span>{{ tableState.rows.length }} rows</span>
                 <span>{{ tableState.columns.length }} fields</span>
+                <span>{{ selectedFilterCount() }} active filters</span>
                 <span>Rows edit after selection</span>
                 <button type="button" class="meta-reset-action" *ngIf="hiddenFieldCount(activeSection())" (click)="resetFields(activeSection())">
                   Reset fields
@@ -781,6 +869,12 @@ export class ProjectWorkspacePage {
   readonly editingRowKeys = signal<string[]>([]);
   readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly tableSearch = signal("");
+  readonly selectedFilters = signal<Record<string, string>>({});
+  readonly selectedFilterFields = signal<string[]>([]);
+  readonly filterBuilderOpen = signal(false);
+  readonly filterBuilderStep = signal<FilterBuilderStep>("fields");
+  readonly dateFilterOpen = signal(false);
+  readonly dateRange = signal({ start: "", end: "" });
   readonly recordDialogOpen = signal(false);
   readonly fieldDialogOpen = signal(false);
   readonly newFieldLabel = signal("");
@@ -835,6 +929,7 @@ export class ProjectWorkspacePage {
   switchSection(section: ModuleKey) {
     this.activeSection.set(section);
     this.tableSearch.set("");
+    this.resetFilterState();
     this.closeDropdowns();
     this.clearRowSelection();
     void this.router.navigate(["/clients", this.clientId(), "projects", this.projectId(), section]);
@@ -1002,11 +1097,11 @@ export class ProjectWorkspacePage {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions")) {
+    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions, .universal-filter-bar, .table-filter-builder, .date-filter-panel, .site-workbench")) {
       this.clearRowSelection();
     }
 
-    if (!target.closest(".erp-select-menu, .custom-select-entry")) {
+    if (!target.closest(".erp-select-menu, .custom-select-entry, .table-filter-builder, .date-filter-panel")) {
       this.closeDropdowns();
     }
   }
@@ -1064,8 +1159,177 @@ export class ProjectWorkspacePage {
     if (this.isSiteAware(section) && site !== "All") {
       rows = rows.filter((row) => String(row["site"] ?? "").toLowerCase() === site.toLowerCase());
     }
+    rows = this.withComputedRows(section, rows);
+    const filters = this.selectedFilters();
+    const dateKey = this.dateFilterKey(section);
+    const range = this.dateRange();
     if (query) rows = rows.filter((row) => Object.values(row).some((value) => String(value).toLowerCase().includes(query)));
-    return this.withComputedRows(section, rows);
+    rows = rows.filter((row) => {
+      const matchesFilters = Object.entries(filters).every(
+        ([key, value]) => !value || String(row[key] ?? "").toLowerCase().includes(value.trim().toLowerCase()),
+      );
+      const matchesDate =
+        !dateKey ||
+        (!range.start && !range.end) ||
+        this.dateInRange(this.normalizedDateValue(row[dateKey]), range.start, range.end);
+      return matchesFilters && matchesDate;
+    });
+    return rows;
+  }
+
+  selectedFilterCount(): number {
+    return this.activeFieldFilterCount() + (this.hasDateFilter() ? 1 : 0);
+  }
+
+  activeFieldFilterCount(): number {
+    return Object.values(this.selectedFilters()).filter((value) => value.trim()).length;
+  }
+
+  setFilter(key: string, value: string) {
+    const cleanValue = value.trim();
+    this.selectedFilters.update((filters) => {
+      const next = { ...filters };
+      if (cleanValue) next[key] = cleanValue;
+      else delete next[key];
+      return next;
+    });
+  }
+
+  clearFilters() {
+    this.resetFilterState();
+    this.tableSearch.set("");
+    this.closeDropdowns();
+    this.clearRowSelection();
+  }
+
+  private resetFilterState() {
+    this.selectedFilters.set({});
+    this.selectedFilterFields.set([]);
+    this.filterBuilderOpen.set(false);
+    this.filterBuilderStep.set("fields");
+    this.dateFilterOpen.set(false);
+    this.dateRange.set({ start: "", end: "" });
+  }
+
+  toggleFilterBuilder() {
+    this.filterBuilderOpen.update((open) => !open);
+    this.dateFilterOpen.set(false);
+    if (!this.selectedFilterFields().length) this.filterBuilderStep.set("fields");
+  }
+
+  filterableColumns(): FieldSchema[] {
+    return this.columnsFor(this.activeSection());
+  }
+
+  isFilterFieldSelected(key: string): boolean {
+    return this.selectedFilterFields().includes(key);
+  }
+
+  toggleFilterField(key: string) {
+    this.selectedFilterFields.update((fields) => {
+      if (fields.includes(key)) {
+        this.selectedFilters.update((filters) => {
+          const next = { ...filters };
+          delete next[key];
+          return next;
+        });
+        return fields.filter((field) => field !== key);
+      }
+      return [...fields, key];
+    });
+  }
+
+  selectedFilterColumns(): FieldSchema[] {
+    const selected = new Set(this.selectedFilterFields());
+    return this.filterableColumns().filter((column) => selected.has(column.key));
+  }
+
+  goToFilterValues() {
+    if (!this.selectedFilterFields().length) return;
+    this.filterBuilderStep.set("values");
+  }
+
+  clearFieldFilters() {
+    this.selectedFilters.set({});
+  }
+
+  filterValues(key: string): string[] {
+    const values = new Set<string>();
+    for (const option of this.selectOptions(this.activeSection(), key)) {
+      if (option) values.add(option);
+    }
+    for (const row of this.withComputedRows(this.activeSection(), this.data.tableRowsFor(this.activeSection(), this.tableRows()[this.activeSection()] ?? [], (entry) => this.rowBelongsToProject(entry)))) {
+      const value = row[key];
+      if (value !== undefined && value !== "") values.add(String(value));
+    }
+    return [...values].sort((a, b) => a.localeCompare(b));
+  }
+
+  toggleDateFilter() {
+    this.dateFilterOpen.update((open) => !open);
+    this.filterBuilderOpen.set(false);
+  }
+
+  setDateRange(key: "start" | "end", value: string) {
+    this.dateRange.update((range) => ({ ...range, [key]: value }));
+  }
+
+  clearDateFilter() {
+    this.dateRange.set({ start: "", end: "" });
+  }
+
+  hasDateFilter(): boolean {
+    const range = this.dateRange();
+    return Boolean(range.start || range.end);
+  }
+
+  dateRangeLabel(): string {
+    const range = this.dateRange();
+    if (!range.start && !range.end) return "";
+    const start = range.start || "Start";
+    const end = range.end || "Today";
+    return `${start} 12:00 AM - ${end} 11:59 PM`;
+  }
+
+  dateFilterEnabled(): boolean {
+    return Boolean(this.dateFilterKey(this.activeSection()));
+  }
+
+  activeFilterSummary(): string[] {
+    const summary: string[] = [];
+    for (const column of this.selectedFilterColumns()) {
+      const value = this.selectedFilters()[column.key];
+      if (value) summary.push(`${column.label}: ${value}`);
+    }
+    if (this.dateRangeLabel()) summary.push(`Date: ${this.dateRangeLabel()}`);
+    return summary;
+  }
+
+  private dateFilterKey(section: ModuleKey): string {
+    if (section === "materials") return "requestDate";
+    if (section === "labour") return "attendanceDate";
+    if (section === "expenses") return "expenseDate";
+    if (section === "payments") return "paymentDate";
+    return "";
+  }
+
+  private normalizedDateValue(value: unknown): string {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+    const dayFirstMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+    if (dayFirstMatch) return `${dayFirstMatch[3]}-${dayFirstMatch[2].padStart(2, "0")}-${dayFirstMatch[1].padStart(2, "0")}`;
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  private dateInRange(value: string, start: string, end: string): boolean {
+    if (!value) return false;
+    if (start && value < start) return false;
+    if (end && value > end) return false;
+    return true;
   }
 
   addInlineRow(event?: MouseEvent) {
