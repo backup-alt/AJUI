@@ -182,7 +182,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
           title="Project Workspace"
           eyebrow="Project Operations"
           metaLabel="Site records"
-          [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || showProjectForm()"
+          [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm()"
           [showTitle]="false"
           role="Admin"
           searchPlaceholder="Search table records..."
@@ -377,46 +377,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </button>
                 <button type="button" class="filter-clear-button" *ngIf="selectedFilterCount()" (click)="clearFilters()">Clear filters</button>
               </div>
-
-              <section class="table-filter-builder" *ngIf="filterBuilderOpen()">
-                <div class="filter-builder-head">
-                  <div>
-                    <strong>{{ filterBuilderStep() === 'fields' ? 'Choose filter fields' : 'Enter filter values' }}</strong>
-                    <span>{{ filterBuilderStep() === 'fields' ? 'Select any fields, including custom columns.' : 'Use dropdown suggestions or type a custom value.' }}</span>
-                  </div>
-                  <div>
-                    <button type="button" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderStep.set('fields')">Back</button>
-                    <button type="button" class="primary-mini-action" *ngIf="filterBuilderStep() === 'fields'" (click)="goToFilterValues()">Next</button>
-                    <button type="button" class="primary-mini-action" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderOpen.set(false)">Apply</button>
-                  </div>
-                </div>
-                <div class="filter-field-grid" *ngIf="filterBuilderStep() === 'fields'">
-                  <button
-                    type="button"
-                    *ngFor="let column of filterableColumns()"
-                    [class.selected]="isFilterFieldSelected(column.key)"
-                    (click)="toggleFilterField(column.key)"
-                  >
-                    <span>{{ column.label }}</span>
-                    <small>{{ column.key }}</small>
-                  </button>
-                </div>
-                <div class="filter-value-grid" *ngIf="filterBuilderStep() === 'values'">
-                  <label *ngFor="let column of selectedFilterColumns()">
-                    <span>{{ column.label }}</span>
-                    <input
-                      [attr.list]="'project-filter-' + activeSection() + '-' + column.key"
-                      [value]="selectedFilters()[column.key] || ''"
-                      (input)="setFilter(column.key, $any($event.target).value)"
-                      placeholder="All"
-                    />
-                    <datalist [id]="'project-filter-' + activeSection() + '-' + column.key">
-                      <option *ngFor="let value of filterValues(column.key)" [value]="value"></option>
-                    </datalist>
-                  </label>
-                  <button type="button" class="filter-clear-button" (click)="clearFieldFilters()">Clear field filters</button>
-                </div>
-              </section>
 
               <section class="date-filter-panel" *ngIf="dateFilterOpen() && dateFilterEnabled()">
                 <label>
@@ -661,6 +621,80 @@ const siteMaterialDetailFields: FieldSchema[] = [
               </ng-container>
             </section>
 
+            <section class="form-overlay" *ngIf="filterBuilderOpen()">
+              <form class="erp-dialog operations-dialog filter-dialog" (submit)="submitFilterBuilder($event)">
+                <div class="dialog-head">
+                  <div>
+                    <span>{{ activeConfig().label }}</span>
+                    <h2>{{ filterBuilderStep() === 'fields' ? 'Filter By Fields' : 'Filter Values' }}</h2>
+                    <p>
+                      {{
+                        filterBuilderStep() === 'fields'
+                          ? 'Choose any project table fields to filter. Custom fields are included.'
+                          : 'Enter one or more values. Pick a suggestion or type your own.'
+                      }}
+                    </p>
+                  </div>
+                  <button type="button" class="icon-button" (click)="closeFilterBuilder()">
+                    <ion-icon name="close-outline"></ion-icon>
+                  </button>
+                </div>
+                <div class="filter-dialog-body" *ngIf="filterBuilderStep() === 'fields'">
+                  <div class="filter-field-grid filter-dialog-field-grid">
+                    <button
+                      type="button"
+                      *ngFor="let column of filterableColumns()"
+                      [class.selected]="isFilterFieldSelected(column.key)"
+                      (click)="toggleFilterField(column.key)"
+                    >
+                      <span>{{ column.label }}</span>
+                      <small>{{ column.key }}</small>
+                    </button>
+                  </div>
+                </div>
+                <div class="filter-dialog-body" *ngIf="filterBuilderStep() === 'values'">
+                  <div class="filter-value-grid filter-dialog-value-grid">
+                    <label class="filter-combo-field" *ngFor="let column of selectedFilterColumns()">
+                      <span>{{ column.label }}</span>
+                      <div class="filter-combo-control">
+                        <input
+                          autocomplete="off"
+                          [value]="selectedFilters()[column.key] || ''"
+                          (focus)="openFilterValueMenu(column.key)"
+                          (input)="setFilter(column.key, $any($event.target).value); openFilterValueMenu(column.key)"
+                          (keydown.escape)="activeFilterValueKey.set('')"
+                          placeholder="All"
+                        />
+                        <button type="button" aria-label="Show filter suggestions" (click)="toggleFilterValueMenu(column.key)">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div class="filter-suggestion-menu" *ngIf="activeFilterValueKey() === column.key && filterSuggestions(column.key).length">
+                        <button
+                          type="button"
+                          *ngFor="let value of filterSuggestions(column.key)"
+                          [class.selected]="selectedFilters()[column.key] === value"
+                          (mousedown)="$event.preventDefault()"
+                          (click)="chooseFilterSuggestion(column.key, value)"
+                        >
+                          {{ value }}
+                        </button>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <div class="dialog-actions">
+                  <button type="button" class="secondary-action" (click)="closeFilterBuilder()">Cancel</button>
+                  <button type="button" class="secondary-action" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderStep.set('fields')">Back</button>
+                  <button type="submit" class="primary-action" [disabled]="filterBuilderStep() === 'fields' && !selectedFilterFields().length">
+                    {{ filterBuilderStep() === 'fields' ? 'Next' : 'Apply Filter' }}
+                  </button>
+                </div>
+              </form>
+            </section>
+
             <section class="form-overlay" *ngIf="recordDialogOpen()">
               <form class="erp-dialog operations-dialog" (submit)="saveRecord($event)">
                 <div class="dialog-head">
@@ -873,6 +907,7 @@ export class ProjectWorkspacePage {
   readonly selectedFilterFields = signal<string[]>([]);
   readonly filterBuilderOpen = signal(false);
   readonly filterBuilderStep = signal<FilterBuilderStep>("fields");
+  readonly activeFilterValueKey = signal("");
   readonly dateFilterOpen = signal(false);
   readonly dateRange = signal({ start: "", end: "" });
   readonly recordDialogOpen = signal(false);
@@ -1097,11 +1132,11 @@ export class ProjectWorkspacePage {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions, .universal-filter-bar, .table-filter-builder, .date-filter-panel, .site-workbench")) {
+    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions, .universal-filter-bar, .filter-dialog, .date-filter-panel, .site-workbench")) {
       this.clearRowSelection();
     }
 
-    if (!target.closest(".erp-select-menu, .custom-select-entry, .table-filter-builder, .date-filter-panel")) {
+    if (!target.closest(".erp-select-menu, .custom-select-entry, .filter-combo-field, .date-filter-panel")) {
       this.closeDropdowns();
     }
   }
@@ -1115,6 +1150,7 @@ export class ProjectWorkspacePage {
 
   private closeDropdowns() {
     this.openSelectKey.set("");
+    this.activeFilterValueKey.set("");
     this.selectCustomValue.set("");
   }
 
@@ -1217,6 +1253,20 @@ export class ProjectWorkspacePage {
     if (!this.selectedFilterFields().length) this.filterBuilderStep.set("fields");
   }
 
+  closeFilterBuilder() {
+    this.filterBuilderOpen.set(false);
+    this.activeFilterValueKey.set("");
+  }
+
+  submitFilterBuilder(event: Event) {
+    event.preventDefault();
+    if (this.filterBuilderStep() === "fields") {
+      this.goToFilterValues();
+      return;
+    }
+    this.closeFilterBuilder();
+  }
+
   filterableColumns(): FieldSchema[] {
     return this.columnsFor(this.activeSection());
   }
@@ -1251,6 +1301,7 @@ export class ProjectWorkspacePage {
 
   clearFieldFilters() {
     this.selectedFilters.set({});
+    this.activeFilterValueKey.set("");
   }
 
   filterValues(key: string): string[] {
@@ -1265,9 +1316,30 @@ export class ProjectWorkspacePage {
     return [...values].sort((a, b) => a.localeCompare(b));
   }
 
+  openFilterValueMenu(key: string) {
+    this.activeFilterValueKey.set(key);
+  }
+
+  toggleFilterValueMenu(key: string) {
+    this.activeFilterValueKey.update((activeKey) => (activeKey === key ? "" : key));
+  }
+
+  chooseFilterSuggestion(key: string, value: string) {
+    this.setFilter(key, value);
+    this.activeFilterValueKey.set("");
+  }
+
+  filterSuggestions(key: string): string[] {
+    const query = String(this.selectedFilters()[key] || "").trim().toLowerCase();
+    const values = this.filterValues(key);
+    const matches = query ? values.filter((value) => value.toLowerCase().includes(query)) : values;
+    return matches.slice(0, 14);
+  }
+
   toggleDateFilter() {
     this.dateFilterOpen.update((open) => !open);
     this.filterBuilderOpen.set(false);
+    this.activeFilterValueKey.set("");
   }
 
   setDateRange(key: "start" | "end", value: string) {

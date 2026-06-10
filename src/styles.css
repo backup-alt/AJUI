@@ -11156,6 +11156,133 @@ th:hover .column-insert-action,
   margin-left: auto;
 }
 
+.filter-dialog {
+  width: min(900px, calc(100vw - 48px));
+  max-height: min(86vh, 740px);
+}
+
+.filter-dialog .dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.filter-dialog .dialog-head p {
+  max-width: 560px;
+  margin: 7px 0 0;
+  color: #5d6a80;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.filter-dialog-body {
+  overflow: auto;
+  padding: 20px 24px 22px;
+}
+
+.filter-dialog-field-grid,
+.filter-dialog-value-grid {
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 14px 18px;
+}
+
+.filter-dialog-field-grid button {
+  min-height: 76px;
+  padding: 13px 14px;
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.filter-dialog-field-grid button.selected {
+  border-color: #002263;
+  background: linear-gradient(180deg, #f4f8ff 0%, #ebf2ff 100%);
+}
+
+.filter-combo-field {
+  position: relative;
+  display: grid;
+  gap: 7px;
+}
+
+.filter-combo-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  overflow: hidden;
+  min-height: 43px;
+  border: 1px solid #cdd8e8;
+  border-radius: 9px;
+  background: #ffffff;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.filter-combo-control:focus-within {
+  border-color: #8aa4d1;
+  box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.12);
+}
+
+.filter-combo-control input {
+  min-height: 41px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.filter-combo-control button {
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid #e1e8f2;
+  background: #f8fbff;
+  color: #002263;
+}
+
+.filter-combo-control svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.filter-suggestion-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  display: grid;
+  max-height: 246px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid #a9bddc;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(0, 34, 99, 0.16);
+}
+
+.filter-suggestion-menu button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #0f1d33;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 780;
+}
+
+.filter-suggestion-menu button:hover,
+.filter-suggestion-menu button.selected {
+  background: #eaf2ff;
+  color: #002263;
+}
+
 .table-filter-builder,
 .date-filter-panel,
 .active-filter-strip {
@@ -11247,6 +11374,24 @@ th:hover .column-insert-action,
   white-space: nowrap;
 }
 
+.filter-field-grid.filter-dialog-field-grid,
+.filter-value-grid.filter-dialog-value-grid {
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 14px 18px;
+}
+
+.filter-field-grid.filter-dialog-field-grid button {
+  min-height: 76px;
+  padding: 13px 14px;
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.filter-field-grid.filter-dialog-field-grid button.selected {
+  border-color: #002263;
+  background: linear-gradient(180deg, #f4f8ff 0%, #ebf2ff 100%);
+}
+
 .filter-value-grid label,
 .date-filter-panel label {
   display: grid;
@@ -11320,6 +11465,11 @@ th:hover .column-insert-action,
     grid-template-columns: repeat(3, minmax(120px, 1fr));
   }
 
+  .filter-field-grid.filter-dialog-field-grid,
+  .filter-value-grid.filter-dialog-value-grid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+
   .date-filter-panel {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
@@ -11334,6 +11484,19 @@ th:hover .column-insert-action,
 
   .filter-clear-button {
     margin-left: 0;
+  }
+
+  .filter-field-grid.filter-dialog-field-grid,
+  .filter-value-grid.filter-dialog-value-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-dialog {
+    width: min(100%, calc(100vw - 24px));
+  }
+
+  .filter-dialog-body {
+    padding: 16px;
   }
 }
 
@@ -11350,7 +11513,8 @@ th:hover .column-insert-action,
 .dark-mode .filter-builder-head > div:last-child button,
 .dark-mode .filter-field-grid button,
 .dark-mode .filter-value-grid input,
-.dark-mode .date-filter-panel input {
+.dark-mode .date-filter-panel input,
+.dark-mode .filter-combo-control {
   border-color: #385175 !important;
   background: #0d182b !important;
   color: #edf4ff !important;
@@ -11366,15 +11530,39 @@ th:hover .column-insert-action,
 }
 
 .dark-mode .filter-builder-head strong,
-.dark-mode .filter-field-grid button span {
+.dark-mode .filter-field-grid button span,
+.dark-mode .filter-dialog .dialog-head h2 {
   color: #f8fbff !important;
 }
 
 .dark-mode .filter-builder-head span,
 .dark-mode .filter-field-grid button small,
 .dark-mode .filter-value-grid label span,
-.dark-mode .date-filter-panel label span {
+.dark-mode .date-filter-panel label span,
+.dark-mode .filter-dialog .dialog-head p {
   color: #b8c7dd !important;
+}
+
+.dark-mode .filter-combo-control button {
+  border-left-color: #2a4268 !important;
+  background: #13233b !important;
+  color: #dbeafe !important;
+}
+
+.dark-mode .filter-suggestion-menu {
+  border-color: #3b5f94 !important;
+  background: #0d182b !important;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.42) !important;
+}
+
+.dark-mode .filter-suggestion-menu button {
+  color: #edf4ff !important;
+}
+
+.dark-mode .filter-suggestion-menu button:hover,
+.dark-mode .filter-suggestion-menu button.selected {
+  background: #17345d !important;
+  color: #ffffff !important;
 }
 
 .dark-mode .date-filter-panel strong {
