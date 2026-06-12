@@ -19,6 +19,10 @@ import {
           </div>
 
           <div class="toolbar-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="toolbar-search-icon">
+              <path d="m21 21-4.3-4.3" />
+              <circle cx="11" cy="11" r="7" />
+            </svg>
             <input [placeholder]="searchPlaceholder" />
           </div>
 
