@@ -5372,6 +5372,7 @@ select {
 
 body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  zoom: 0.9;
 }
 
 .workspace-shell {
