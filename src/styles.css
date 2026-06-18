@@ -12692,3 +12692,33 @@ ion-split-pane > .ion-page > ion-content {
     min-height: calc((100vh - 72px) / 0.9) !important;
   }
 }
+
+/* Sidebar nav spacing — more relaxed padding and item height */
+ion-menu.enterprise-sidebar .sidebar-nav {
+  padding: 16px 12px 8px;
+}
+
+ion-menu.enterprise-sidebar .sidebar-nav ion-item {
+  --min-height: 50px;
+  margin: 3px 0;
+  --padding-start: 12px;
+  --inner-padding-end: 12px;
+}
+
+ion-menu.enterprise-sidebar .sidebar-nav ion-item::part(native) {
+  border-radius: 10px;
+}
+
+ion-menu.enterprise-sidebar .sidebar-logo-wrap {
+  padding: 16px 16px 14px;
+  min-height: 96px;
+}
+
+ion-menu.enterprise-sidebar .sidebar-logo {
+  width: 56px;
+  height: 56px;
+}
+
+ion-menu.enterprise-sidebar .sidebar-action {
+  padding: 20px 14px 16px;
+}
