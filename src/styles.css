@@ -12660,3 +12660,86 @@ ion-menu.enterprise-sidebar .sidebar-logo {
 ion-menu.enterprise-sidebar .sidebar-action {
   padding: 14px 12px 10px;
 }
+
+/* Status badge — highlighted for Active, On Hold, Completed */
+ion-badge.status-active {
+  --background: #dcfce7;
+  --color: #166534;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+ion-badge.status-on-hold {
+  --background: #fff3cd;
+  --color: #856404;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+ion-badge.status-completed {
+  --background: #eef2f7;
+  --color: #344054;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+/* Project directory card — full card is clickable */
+.projects-directory-card {
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.projects-directory-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 34, 99, 0.35);
+  box-shadow: 0 14px 30px rgba(15, 31, 66, 0.12);
+}
+
+.projects-directory-card:active {
+  transform: translateY(0);
+}
+
+/* Ensure project select card cursor is consistent */
+.project-select-card {
+  cursor: pointer;
+}
+
+/* Directory status badge — span version styling for projects directory */
+.status-active {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.status-on-hold {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff3cd;
+  color: #856404;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.status-completed {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
