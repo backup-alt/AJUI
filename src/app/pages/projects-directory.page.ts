@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
-import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
+import { IonBadge, IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import type { Project } from "../../data/dashboardData";
 import { ErpDataService } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -10,7 +10,7 @@ import { formatMoney, statusClass } from "../shared/format";
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, IonContent, IonIcon, IonBadge, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="projects"></agb-enterprise-sidebar>
@@ -39,10 +39,10 @@ import { formatMoney, statusClass } from "../shared/format";
             </section>
 
             <section class="projects-directory-list">
-              <article *ngFor="let project of filteredProjects(); trackBy: trackProject" class="projects-directory-card">
+              <article *ngFor="let project of filteredProjects(); trackBy: trackProject" class="projects-directory-card" role="button" tabindex="0" (click)="openProject(project)" (keydown.enter)="openProject(project)">
                 <div class="projects-directory-title">
                   <div>
-                    <span [class]="statusClass(project.status)">{{ project.status }}</span>
+                    <ion-badge class="status" [ngClass]="statusClass(project.status)">{{ project.status }}</ion-badge>
                     <h2>{{ project.name }}</h2>
                     <p>{{ project.client }} - {{ project.address }}</p>
                   </div>
@@ -64,7 +64,7 @@ import { formatMoney, statusClass } from "../shared/format";
 
                 <div class="projects-directory-footer">
                   <span>{{ project.sites.join(", ") }}</span>
-                  <button type="button" (click)="openProject(project)">
+                  <button type="button" (click)="openProject(project); $event.stopPropagation()">
                     Open Project
                     <ion-icon name="arrow-forward-outline"></ion-icon>
                   </button>
