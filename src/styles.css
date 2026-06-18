@@ -5372,7 +5372,6 @@ select {
 
 body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  zoom: 0.9;
 }
 
 .workspace-shell {
@@ -12656,4 +12655,40 @@ th:hover .column-insert-action,
 
 .erp-form > label {
   padding: 10px 0;
+}
+
+/* Zoom 0.9 — makes 100% feel like old 90%, with compensated container heights to prevent cropping */
+ion-split-pane {
+  overflow: auto;
+  height: auto;
+  min-height: 100vh;
+}
+
+ion-split-pane > .ion-page {
+  zoom: 0.9;
+  transform-origin: top center;
+  min-height: 100vh;
+  height: auto;
+}
+
+ion-split-pane > .ion-page > ion-content {
+  height: auto !important;
+  min-height: calc((100vh - 72px) / 0.9) !important;
+}
+
+.ion-page > ion-content {
+  height: auto !important;
+  min-height: calc((100vh - 72px) / 0.9) !important;
+}
+
+@media (min-width: 1024px) {
+  ion-split-pane {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  ion-split-pane > .ion-page > ion-content {
+    height: auto !important;
+    min-height: calc((100vh - 72px) / 0.9) !important;
+  }
 }
