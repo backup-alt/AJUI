@@ -12601,117 +12601,55 @@ th:hover .column-insert-action,
   }
 }
 
-/* Spacing improvements — reduce cramped feeling without altering other UI elements */
-.dashboard-kpi-board {
-  gap: 14px;
-}
-
+/* Spacing improvements — comfortable spacing without making things look bigger */
 .dashboard-kpi-board > div {
-  min-height: 68px;
-  padding: 13px 15px;
+  min-height: 62px;
+  padding: 10px 12px;
 }
 
 .dashboard-kpi-board strong {
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .universal-workbench .operations-tabs button {
-  padding: 0 18px;
+  padding: 0 14px;
 }
 
 .universal-workbench .table-first-toolbar {
-  padding: 16px 20px;
-}
-
-.universal-filter-bar {
-  padding: 12px 18px;
-  gap: 10px;
+  padding: 12px 16px;
 }
 
 .table-meta-strip {
-  gap: 10px;
-  padding: 9px 18px;
+  padding: 7px 16px;
 }
 
 .universal-table th {
-  height: 44px;
-  padding: 11px 14px;
+  height: 40px;
+  padding: 9px 12px;
 }
 
 .universal-table td {
-  height: 48px;
-  padding: 12px 14px;
-}
-
-.site-workbench {
-  padding: 14px 18px;
-  gap: 12px;
-}
-
-.operations-workbench .table-first-toolbar,
-.project-workbench .table-first-toolbar {
-  padding: 15px 18px;
+  height: 44px;
+  padding: 10px 12px;
 }
 
 .erp-form > label {
-  padding: 10px 0;
+  padding: 8px 0;
 }
 
-/* Zoom 0.9 — makes 100% feel like old 90%, with compensated container heights to prevent cropping */
-ion-split-pane {
-  overflow: auto;
-  height: auto;
-  min-height: 100vh;
-}
-
-ion-split-pane > .ion-page {
-  zoom: 0.9;
-  transform-origin: top center;
-  min-height: 100vh;
-  height: auto;
-}
-
-ion-split-pane > .ion-page > ion-content {
-  height: auto !important;
-  min-height: calc((100vh - 72px) / 0.9) !important;
-}
-
-.ion-page > ion-content {
-  height: auto !important;
-  min-height: calc((100vh - 72px) / 0.9) !important;
-}
-
-@media (min-width: 1024px) {
-  ion-split-pane {
-    height: auto;
-    min-height: 100vh;
-  }
-
-  ion-split-pane > .ion-page > ion-content {
-    height: auto !important;
-    min-height: calc((100vh - 72px) / 0.9) !important;
-  }
-}
-
-/* Sidebar nav spacing — more relaxed padding and item height */
+/* Sidebar — compact, not loose */
 ion-menu.enterprise-sidebar .sidebar-nav {
-  padding: 16px 12px 8px;
+  padding: 10px 10px 0;
 }
 
 ion-menu.enterprise-sidebar .sidebar-nav ion-item {
-  --min-height: 50px;
-  margin: 3px 0;
-  --padding-start: 12px;
-  --inner-padding-end: 12px;
-}
-
-ion-menu.enterprise-sidebar .sidebar-nav ion-item::part(native) {
-  border-radius: 10px;
+  --min-height: 42px;
+  margin: 2px 0;
 }
 
 ion-menu.enterprise-sidebar .sidebar-logo-wrap {
-  padding: 16px 16px 14px;
-  min-height: 96px;
+  padding: 12px 14px 10px;
+  min-height: 88px;
 }
 
 ion-menu.enterprise-sidebar .sidebar-logo {
@@ -12720,5 +12658,5 @@ ion-menu.enterprise-sidebar .sidebar-logo {
 }
 
 ion-menu.enterprise-sidebar .sidebar-action {
-  padding: 20px 14px 16px;
+  padding: 14px 12px 10px;
 }
