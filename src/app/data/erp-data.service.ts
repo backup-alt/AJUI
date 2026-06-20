@@ -735,7 +735,7 @@ export class ErpDataService {
     this.writeState(seedKey, true);
   }
 
-  addClient(input: { name: string; mobile: string; address: string; supervisor: string }): Client {
+  addClient(input: { name: string; mobile: string; address: string; supervisor: string; status?: ClientStatus }): Client {
     const nextNumber =
       Math.max(
         1000,
@@ -755,7 +755,7 @@ export class ErpDataService {
       name: input.name,
       mobile: input.mobile,
       address: input.address,
-      status: "Active",
+      status: input.status ?? "Active",
       projectIds: [],
       supervisor: input.supervisor,
     };

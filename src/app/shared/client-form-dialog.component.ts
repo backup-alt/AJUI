@@ -7,6 +7,7 @@ export type ClientFormValue = {
   mobile: string;
   address: string;
   supervisor: string;
+  status?: "Active" | "On Hold" | "Completed";
 };
 
 @Component({
@@ -46,7 +47,11 @@ export type ClientFormValue = {
           </label>
           <label>
             <span>Status</span>
-            <input value="Active" readonly />
+            <select name="status" [value]="initialValue?.status || 'Active'">
+              <option value="Active">Active</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Completed">Completed</option>
+            </select>
           </label>
 
           <div class="dialog-actions span-2">
@@ -72,12 +77,14 @@ export class ClientFormDialogComponent {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
+    const status = formData.get("status") as string || "Active";
 
     this.create.emit({
       name: String(formData.get("name") ?? "").trim(),
       mobile: String(formData.get("mobile") ?? "").trim(),
       address: String(formData.get("address") ?? "").trim(),
       supervisor: String(formData.get("supervisor") ?? "").trim(),
+      status: status as "Active" | "On Hold" | "Completed",
     });
   }
 }

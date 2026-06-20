@@ -278,6 +278,7 @@ export class ClientWorkspacePage implements OnInit {
       mobile: currentClient.mobile,
       address: currentClient.address,
       supervisor: currentClient.supervisor,
+      status: currentClient.status,
     };
   }
 

@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { IonBadge, IonContent, IonIcon, IonProgressBar, IonSplitPane } from "@ionic/angular/standalone";
-import { ErpDataService, type Client } from "../data/erp-data.service";
+import { Client, ErpDataService } from "../data/erp-data.service";
 import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
@@ -20,7 +20,7 @@ import { formatMoney, statusClass } from "../shared/format";
           title="Clients"
           eyebrow="Client Registry"
           metaLabel=""
-          [blurred]="showClientForm()"
+          [blurred]="showClientForm() || !!editingClient()"
           [showTitle]="false"
           searchPlaceholder="Search clients, projects, receipts..."
         />
@@ -74,7 +74,9 @@ import { formatMoney, statusClass } from "../shared/format";
                 <div class="client-card-footer">
                   <span>Open Client</span>
                   <div class="client-card-footer-actions">
-                    <strong>Edit Client</strong>
+                    <button type="button" class="client-edit-action" aria-label="Edit client" title="Edit Client" (click)="editClient(client, $event)">
+                      <strong>Edit Client</strong>
+                    </button>
                     <button type="button" class="client-delete-action" aria-label="Delete client" title="Delete client" (click)="deleteClient(client, $event)">
                       <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                         <path d="M4 7h16" />
@@ -91,7 +93,16 @@ import { formatMoney, statusClass } from "../shared/format";
           </main>
         </ion-content>
 
-        <agb-client-form-dialog *ngIf="showClientForm()" (cancel)="showClientForm.set(false)" (create)="createClient($event)"></agb-client-form-dialog>
+        <agb-client-form-dialog
+          *ngIf="showClientForm() || editingClient()"
+          eyebrow="{{ editingClient() ? 'Client Edit' : 'Client Setup' }}"
+          title="{{ editingClient() ? 'Edit Client' : 'Add New Client' }}"
+          description="{{ editingClient() ? 'Update client contact, address, supervisor, and status information.' : 'Create the client record first. Projects, ledgers, and site records stay separated under this client.' }}"
+          submitLabel="{{ editingClient() ? 'Save Changes' : 'Create Client' }}"
+          [initialValue]="editingClient() ? clientEditValue(editingClient()!) : null"
+          (cancel)="closeClientForm()"
+          (create)="editingClient() ? updateClient($event) : createClient($event)"
+        ></agb-client-form-dialog>
       </div>
     </ion-split-pane>
   `,
@@ -102,6 +113,7 @@ export class ClientDashboardPage {
   readonly router = inject(Router);
   readonly search = signal("");
   readonly showClientForm = signal(false);
+  readonly editingClient = signal<Client | null>(null);
   readonly clients = this.data.clients;
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
@@ -118,6 +130,33 @@ export class ClientDashboardPage {
     const project = this.data.createDefaultProject(client);
     this.showClientForm.set(false);
     setTimeout(() => void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]));
+  }
+
+  editClient(client: Client, event: Event) {
+    event.stopPropagation();
+    this.editingClient.set(client);
+  }
+
+  closeClientForm() {
+    this.showClientForm.set(false);
+    this.editingClient.set(null);
+  }
+
+  clientEditValue(client: Client): ClientFormValue {
+    return {
+      name: client.name,
+      mobile: client.mobile,
+      address: client.address,
+      supervisor: client.supervisor,
+      status: client.status,
+    };
+  }
+
+  updateClient(value: ClientFormValue) {
+    const client = this.editingClient();
+    if (!client || !value.name || !value.mobile || !value.address || !value.supervisor) return;
+    this.data.updateClient(client.id, value);
+    this.closeClientForm();
   }
 
   deleteClient(client: Client, event: Event) {
