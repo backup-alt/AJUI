@@ -1,0 +1,8 @@
+{
+  "appId": "com.annaibuilders.agb.supervisor",
+  "appName": "AGB(Annai Golden Builders)",
+  "webDir": "www/browser",
+  "android": {
+    "allowMixedContent": false
+  }
+}
