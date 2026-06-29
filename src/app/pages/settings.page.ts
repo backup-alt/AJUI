@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { FormsModule } from "@angular/forms";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
 import {
   ErpDataService,
@@ -10,6 +11,7 @@ import {
 } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
+import { ApiService } from "../core/api.service";
 
 type PermissionModuleKey = Exclude<SharedModuleKey, "settings">;
 type PermissionField = { key: string; label: string };
@@ -170,13 +172,13 @@ const permissionGroups: PermissionGroup[] = [
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="settings"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        <agb-enterprise-header title="Settings" eyebrow="Administration" metaLabel="System preferences" [showTitle]="false" searchPlaceholder="Search settings..." />
+        <agb-enterprise-header title="Settings" eyebrow="Administration" metaLabel="System preferences" [showTitle]="false" searchPlaceholder="Search" />
 
         <ion-content class="erp-page">
           <main class="workspace-shell settings-shell">
@@ -193,6 +195,54 @@ const permissionGroups: PermissionGroup[] = [
             </section>
 
             <section class="settings-grid">
+              <article class="settings-card settings-supervisor-card">
+                <div>
+                  <span>Team</span>
+                  <h2>Add Supervisor</h2>
+                  <p>Generate a QR code for a new site supervisor. They scan it from the mobile app to activate their account.</p>
+                </div>
+
+                <ng-container *ngIf="!supervisorInvite()">
+                  <label>
+                    <span>Supervisor Name</span>
+                    <input
+                      type="text"
+                      [value]="supervisorNameDraft()"
+                      (input)="supervisorNameDraft.set($any($event.target).value)"
+                      placeholder="e.g. Rajesh Kumar"
+                      maxlength="80"
+                    />
+                  </label>
+                  <p class="settings-error" *ngIf="supervisorError()">{{ supervisorError() }}</p>
+                  <button
+                    type="button"
+                    class="settings-inline-action"
+                    [disabled]="supervisorLoading()"
+                    (click)="generateSupervisorQr()">
+                    {{ supervisorLoading() ? 'Generating…' : 'Generate QR Code' }}
+                  </button>
+                </ng-container>
+
+                <ng-container *ngIf="supervisorInvite() as invite">
+                  <div class="settings-qr-preview">
+                    <div class="settings-qr-frame">
+                      <img [src]="invite.qrDataUrl" alt="Supervisor QR Code" />
+                    </div>
+                    <div class="settings-qr-meta">
+                      <strong>{{ invite.supervisorName }}</strong>
+                      <small>Expires {{ formatInviteExpiry(invite.expiresAt) }}</small>
+                    </div>
+                  </div>
+                  <p class="settings-hint">Ask the supervisor to open the AGB mobile app and tap <strong>Scan QR</strong> on the welcome screen.</p>
+                  <button
+                    type="button"
+                    class="settings-inline-action settings-secondary-action"
+                    (click)="resetSupervisorInvite()">
+                    Generate another
+                  </button>
+                </ng-container>
+              </article>
+
               <article class="settings-card">
                 <div>
                   <span>Projects</span>
@@ -448,6 +498,7 @@ const permissionGroups: PermissionGroup[] = [
 })
 export class SettingsPage {
   readonly data = inject(ErpDataService);
+  private readonly api = inject(ApiService);
 
   readonly roles = managedRoleNames;
   readonly permissionLevels = permissionLevels;
@@ -455,6 +506,22 @@ export class SettingsPage {
   readonly roleOptionDraft = signal("");
   readonly profileSites = signal(this.allKnownSites());
   readonly siteDraft = signal("");
+
+  // Add Supervisor flow
+  readonly supervisorNameDraft = signal("");
+  readonly supervisorLoading = signal(false);
+  readonly supervisorError = signal<string | null>(null);
+  readonly supervisorInvite = signal<null | {
+    inviteId: string;
+    token: string;
+    qrUrl: string;
+    qrDataUrl: string;
+    supervisorName: string;
+    role: string;
+    projectId?: string;
+    expiresAt: string;
+    createdAt: string;
+  }>(null);
 
   allKnownSites(): string[] {
     return [...new Set(this.data.projects().flatMap((project) => project.sites).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -522,5 +589,41 @@ export class SettingsPage {
     if (role === "Project Manager") return "Project managers usually review approvals, project progress, site records, and subcontract work.";
     if (role === "Accountant") return "Accountants usually manage payment collections, ledgers, expenses, exports, and verification.";
     return "Supervisors usually enter field-level material, labour, attendance, and site expense records.";
+  }
+
+  // ---------- Add Supervisor (QR generation) ----------
+  generateSupervisorQr() {
+    const name = this.supervisorNameDraft().trim();
+    if (name.length < 2) {
+      this.supervisorError.set("Please enter at least 2 characters.");
+      return;
+    }
+    this.supervisorError.set(null);
+    this.supervisorLoading.set(true);
+    this.api.createSupervisorInvite({ supervisorName: name }).subscribe({
+      next: (invite) => {
+        this.supervisorInvite.set(invite);
+        this.supervisorLoading.set(false);
+      },
+      error: (err) => {
+        this.supervisorError.set(err?.message || "Failed to generate QR. Please try again.");
+        this.supervisorLoading.set(false);
+      },
+    });
+  }
+
+  resetSupervisorInvite() {
+    this.supervisorInvite.set(null);
+    this.supervisorNameDraft.set("");
+    this.supervisorError.set(null);
+  }
+
+  formatInviteExpiry(iso: string): string {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString();
+    } catch {
+      return iso;
+    }
   }
 }

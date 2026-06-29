@@ -24,6 +24,7 @@ export type Client = {
   status: ClientStatus;
   projectIds: string[];
   supervisor: string;
+  _id?: string;
 };
 
 export type Vendor = {
@@ -33,6 +34,7 @@ export type Vendor = {
   phone: string;
   address: string;
   gst: string;
+  _id?: string;
 };
 
 export type Supervisor = {
@@ -46,6 +48,7 @@ export type Supervisor = {
   activeAdvances: number;
   approvalAuthority: string;
   status: "Active" | "On Leave" | "Inactive";
+  _id?: string;
 };
 
 export type Subcontractor = {
@@ -61,6 +64,7 @@ export type Subcontractor = {
   supervisor: string;
   approvalStatus: "Pending" | "Approved" | "Rejected";
   paymentStatus: "Not Started" | "Part Paid" | "Paid";
+  _id?: string;
 };
 
 export type SharedModuleKey =

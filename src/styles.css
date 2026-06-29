@@ -6091,11 +6091,15 @@ body {
 }
 
 .sidebar-project-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   margin: 14px 12px 0;
   padding-top: 14px;
   border-top: 1px solid var(--ui-line);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar-section-head {
@@ -12342,14 +12346,16 @@ th:hover .column-insert-action,
   flex: 0 0 auto;
 }
 
-.sidebar-project-list .sidebar-project-filters {
-  grid-row: 2;
-}
+  .sidebar-project-list .sidebar-project-filters {
+    grid-row: 2;
+  }
 
 .sidebar-project-scroll {
   grid-row: 3;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -12368,11 +12374,12 @@ th:hover .column-insert-action,
 }
 
 .sidebar-view-all-projects {
-  grid-row: 4;
-  display: flex !important;
-  align-items: center;
-  justify-content: space-between;
-  flex: 0 0 auto;
+    flex: 0 0 auto;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding: 10px 4px;
   min-height: 38px;
   margin-top: 4px;
   border: 1px solid #d7e0ee !important;
@@ -12479,10 +12486,14 @@ th:hover .column-insert-action,
 }
 
 .projects-directory-title h2 {
-  margin: 8px 0 4px;
-  color: #101828;
-  font-size: 18px;
-}
+    margin: 8px 0 4px;
+    color: #101828;
+    font-size: 18px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
 
 .projects-directory-title p,
 .projects-directory-footer span,
@@ -12742,4 +12753,97 @@ ion-badge.status-completed {
   font-size: 12px;
   font-weight: 800;
   text-transform: capitalize;
+}
+
+/* ====== Add Supervisor (QR) card ====== */
+.settings-supervisor-card {
+  background:
+    linear-gradient(135deg, rgba(0, 34, 99, 0.10), rgba(255, 255, 255, 0.94) 58%),
+    #ffffff;
+  border-color: rgba(0, 34, 99, 0.18);
+}
+
+.settings-supervisor-card label {
+  margin-top: 14px;
+}
+
+.settings-supervisor-card .settings-inline-action[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.settings-error {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(216, 68, 58, 0.10);
+  color: #c0392b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-qr-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #d5dcea;
+  border-radius: 12px;
+}
+
+.settings-qr-frame {
+  width: 220px;
+  height: 220px;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e6eaf2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-qr-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.settings-qr-meta {
+  text-align: center;
+}
+
+.settings-qr-meta strong {
+  display: block;
+  color: #002263;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.settings-qr-meta small {
+  display: block;
+  color: #667085;
+  font-size: 11px;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+.settings-hint {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(43, 127, 204, 0.10);
+  color: #1c4a86;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-secondary-action {
+  margin-top: 12px;
+  background: #ffffff;
+  color: #002263;
+  border: 1px solid #002263;
 }
