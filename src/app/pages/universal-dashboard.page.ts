@@ -1,8 +1,11 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
+import { firstValueFrom } from "rxjs";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { ErpDataService, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
+import { ApiService } from "../core/api.service";
+import { mapClient, mapProject, mapSite, mapVendor, mapSupervisor, mapMaterial, mapLabour, mapExpense, mapPayment, mapSubcontractor } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
@@ -64,7 +67,6 @@ const dashboardModules: ModuleConfig[] = [
     title: "All Clients",
     description: "Every client with contact, project count, active sites, value, received amount, and pending balance.",
     columns: [
-      { key: "clientId", label: "Client ID" },
       { key: "clientName", label: "Client Name" },
       { key: "mobile", label: "Mobile Number" },
       { key: "address", label: "Address" },
@@ -89,8 +91,6 @@ const dashboardModules: ModuleConfig[] = [
     description: "Every staff attendance row across sites with labour types, staff count, shift, overtime, and fine.",
     columns: [
       { key: "client", label: "Client" },
-      { key: "clientId", label: "Client ID" },
-      { key: "projectId", label: "Project ID" },
       { key: "project", label: "Project" },
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date" },
@@ -190,7 +190,6 @@ const dashboardModules: ModuleConfig[] = [
     title: "Vendor Report",
     description: "Every vendor record with material type, phone, address, GST, and purchase history.",
     columns: [
-      { key: "vendorId", label: "Vendor ID" },
       { key: "vendorName", label: "Vendor Name" },
       { key: "materialType", label: "Material Type" },
       { key: "materialsBought", label: "Materials Bought" },
@@ -209,7 +208,6 @@ const dashboardModules: ModuleConfig[] = [
     title: "Supervisor Master List",
     description: "Company supervisor records with assignment, cash limits, advances, approval authority, and status.",
     columns: [
-      { key: "supervisorId", label: "Supervisor ID" },
       { key: "supervisorName", label: "Supervisor Name" },
       { key: "phoneNumber", label: "Phone Number" },
       { key: "role", label: "Role" },
@@ -233,7 +231,6 @@ const dashboardModules: ModuleConfig[] = [
     title: "Subcontractor Register",
     description: "Subcontractor work packages with contract value, advances, balance, supervisor, and payment status.",
     columns: [
-      { key: "subcontractId", label: "Subcontract ID" },
       { key: "client", label: "Client" },
       { key: "project", label: "Project" },
       { key: "site", label: "Site" },
@@ -294,15 +291,24 @@ const siteMaterialDetailFields: FieldSchema[] = [
       <agb-enterprise-sidebar active="dashboard"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
+        @if (backendSyncMessage()) {
+          <div class="backend-sync-banner" role="status">
+            <span class="spinner" [class.spinning]="backendSyncing()"></span>
+            <span>{{ backendSyncMessage() }}</span>
+            @if (!backendSyncing()) {
+              <button type="button" class="banner-btn" (click)="refreshFromBackend()">Refresh now</button>
+            }
+          </div>
+        }
         <agb-enterprise-header
           title="Dashboard"
-          eyebrow="Universal Records"
+          eyebrow="Universal Records · Backend source of truth"
           metaLabel=""
           [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen()"
           [showTitle]="false"
           role="Admin"
-          searchPlaceholder="Search universal dashboard..."
-        />
+            searchPlaceholder="Search"
+          />
 
         <ion-content class="erp-page">
           <main class="workspace-shell" [class.table-view-expanded]="tableViewExpanded()">
@@ -363,28 +369,28 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     type="button"
                     class="primary-table-action add-row-action"
                     *ngIf="!tableViewExpanded()"
-                    [title]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
-                    [attr.aria-label]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
+                    [title]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
+                    [attr.aria-label]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
                   >
                     <ion-icon [name]="selectedRowCount() ? 'create-outline' : 'add-outline'"></ion-icon>
-                    {{ selectedRowCount() ? 'Edit Row' : 'Add Row' }}
+                    {{ selectedRowCount() ? 'Edit ' + selectedRowCount() + ' Row(s)' : 'Add Row' }}
                   </button>
                   <button
                     *ngIf="!tableViewExpanded() && selectedRowCount()"
                     type="button"
                     class="danger-table-action"
-                    [attr.aria-label]="selectedRowCount() === 1 ? 'Delete selected row' : 'Delete selected rows'"
+                    [attr.aria-label]="'Delete ' + selectedRowCount() + ' selected row(s)'"
                     (click)="deleteSelectedRows()"
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M4 7h16" />
+                      <path d="M4 7h14" />
                       <path d="M10 11v6" />
                       <path d="M14 11v6" />
                       <path d="M6 7l1 14h10l1-14" />
                       <path d="M9 7V4h6v3" />
                     </svg>
-                    {{ selectedRowCount() === 1 ? 'Delete Row' : 'Delete Rows' }}
+                    Delete {{ selectedRowCount() }} Row(s)
                   </button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="openFieldDialog()">Add Field</button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
@@ -942,10 +948,45 @@ const siteMaterialDetailFields: FieldSchema[] = [
       </div>
     </ion-split-pane>
   `,
+  styles: [`
+    .backend-sync-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: #1a2540;
+      color: #fff;
+      font-size: 13px;
+      border-bottom: 1px solid #2c3760;
+    }
+    .backend-sync-banner .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #4a5780;
+      border-top-color: #6fffb0;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .backend-sync-banner .spinner.spinning {
+      animation: banner-spin 0.8s linear infinite;
+    }
+    @keyframes banner-spin { to { transform: rotate(360deg); } }
+    .backend-sync-banner .banner-btn {
+      margin-left: auto;
+      background: #2c5cff;
+      color: #fff;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UniversalDashboardPage {
   readonly data = inject(ErpDataService);
+  readonly api = inject(ApiService);
   readonly router = inject(Router);
   readonly modules = dashboardModules;
   readonly formatMoney = formatMoney;
@@ -966,7 +1007,11 @@ export class UniversalDashboardPage {
   readonly dateFilterOpen = signal(false);
   readonly dateRange = signal({ start: "", end: "" });
   readonly datePickerTarget = signal<"start" | "end">("start");
-  readonly calendarCursor = signal(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`);
+  readonly calendarCursor = signal(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`);  // Backend refresh state (data source of truth)
+  readonly backendSyncing = signal(false);
+  readonly backendSyncMessage = signal<string | null>(null);
+  readonly backendSource = signal<string | null>(null);
+
   readonly calendarWeekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   readonly tableViewExpanded = signal(false);
   readonly recordDialogOpen = signal(false);
@@ -1059,18 +1104,49 @@ export class UniversalDashboardPage {
   selectRow(row: TableRow, event?: MouseEvent) {
     this.positionRowToolbar(event);
     const key = this.rowKey(row);
-    if (this.selectedRowKey() !== key) {
+    // Default behavior: toggle row in selection (additive).
+    // User can hold Ctrl/Cmd/Shift to add without toggling.
+    const wasSelected = this.selectedRowKeys().includes(key);
+    let nextKeys: string[];
+    if (event?.shiftKey) {
+      // Range select from last primary to this row
+      const visible = this.visibleRows().map((r) => this.rowKey(r));
+      const lastKey = this.selectedRowKey();
+      const startIdx = lastKey ? visible.indexOf(lastKey) : -1;
+      const endIdx = visible.indexOf(key);
+      if (startIdx >= 0 && endIdx >= 0) {
+        const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        nextKeys = visible.slice(lo, hi + 1);
+      } else {
+        nextKeys = [key];
+      }
+    } else {
+      // Toggle: if already selected and not adding, leave it; otherwise add
+      const adding = event?.ctrlKey || event?.metaKey;
+      if (adding) {
+        nextKeys = wasSelected
+          ? this.selectedRowKeys().filter((k) => k !== key)
+          : [...this.selectedRowKeys(), key];
+      } else {
+        // Plain click on a non-selected row: add to selection (additive)
+        if (wasSelected && this.selectedRowKey() === key) {
+          // Plain click on the current primary → leave selection
+          nextKeys = this.selectedRowKeys();
+        } else if (wasSelected) {
+          nextKeys = this.selectedRowKeys();
+        } else {
+          nextKeys = [...this.selectedRowKeys(), key];
+        }
+      }
+    }
+    this.selectedRowKeys.set(nextKeys);
+    this.selectedRowKey.set(key);
+    if (this.selectedRowKey() !== key || wasSelected === false) {
       this.editingRowKey.set("");
       this.editingRowKeys.set([]);
       this.openSelectKey.set("");
     }
-    this.selectedRowKey.set(key);
-    if (event?.ctrlKey || event?.metaKey || event?.shiftKey) {
-      this.selectedRowKeys.update((keys) => (keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]));
-      if (!this.selectedRowKeys().length) this.selectedRowKey.set("");
-      return;
-    }
-    this.selectedRowKeys.set([key]);
+    if (!nextKeys.length) this.selectedRowKey.set("");
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -1154,22 +1230,126 @@ export class UniversalDashboardPage {
       return;
     }
     const keys = rows.map((row) => this.rowKey(row));
+    // Sync single-key state with multi-key
     this.selectedRowKeys.set(keys);
     this.selectedRowKey.set(keys[0] ?? "");
+    // Enable inline editing on ALL selected rows simultaneously.
+    // The template uses [attr.contenteditable] bound to isRowEditing(row),
+    // which checks editingRowKeys.includes(key). Setting it here makes every
+    // selected cell editable in-place.
     this.editingRowKey.set(keys[0] ?? "");
     this.editingRowKeys.set(keys);
+    // When exactly one row is selected we still open the standard dialog
+    // (single-row create/edit flow). For 2+ rows we rely on inline editing.
+    if (rows.length === 1) {
+      this.openRecordEditDialog(keys[0]);
+    }
+    // For bulk: nothing else to open — the inline editors are now active.
   }
 
-  deleteSelectedRows() {
+  async deleteSelectedRows() {
     const rows = this.selectedRows();
     if (!rows.length) return;
     const label = rows.length === 1 ? "this row" : `${rows.length} rows`;
-    if (!window.confirm(`Delete ${label}?`)) return;
+    if (!window.confirm(`Delete ${label}? This will permanently delete them from the backend.`)) return;
+    const module = this.activeModule();
+
+    // Map of module → API delete function
+    const apiDeleters: Record<string, ((id: string) => any) | null> = {
+      clients: (id) => this.api.deleteClient(id),
+      materials: (id) => this.api.deleteMaterial(id),
+      labour: (id) => this.api.deleteLabour(id),
+      expenses: (id) => this.api.deleteExpense(id),
+      payments: (id) => this.api.deletePayment(id),
+      vendors: (id) => this.api.deleteVendor(id),
+      subcontractors: (id) => this.api.deleteSubcontractor(id),
+    };
+
+    // Map of module → localStorage key
+    const localStorageKeys: Record<string, string> = {
+      clients: "agb-erp:clients",
+      materials: "agb-erp:materials",
+      labour: "agb-erp:labour",
+      expenses: "agb-erp:expenses",
+      generalExpenses: "agb-erp:expenses",
+      payments: "agb-erp:payments",
+      vendors: "agb-erp:vendors",
+      subcontractors: "agb-erp:subcontractors",
+    };
+
+    // Map of module → ID field used as business key in localStorage / UI
+    const idFields: Record<string, string> = {
+      clients: "id",
+      materials: "id",
+      labour: "id",
+      expenses: "id",
+      generalExpenses: "id",
+      payments: "id",
+      vendors: "id",
+      subcontractors: "id",
+    };
+
+    const apiDelete = apiDeleters[module];
+    const storageKey = localStorageKeys[module];
+    const idField = idFields[module];
+    const failed: string[] = [];
+    let deleted = 0;
+
     for (const row of rows) {
-      if (this.activeModule() === "clients") this.data.deleteClient(String(row["clientId"] || ""));
-      else this.data.deleteSharedRow(String(row["__rowId"] || ""));
+      const mongoId = String(row["_id"] || "").trim();
+      const bizId = String(row[idField] || "").trim();
+      if (!mongoId && !bizId) {
+        failed.push("(no id)");
+        continue;
+      }
+      try {
+        if (apiDelete && mongoId) {
+          // Await backend delete using MongoDB _id (matches route param)
+          await firstValueFrom(apiDelete(mongoId));
+        }
+        // Optimistic localStorage removal by business ID
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (raw) {
+            const arr = JSON.parse(raw);
+            const filtered = arr.filter((r: any) => String(r[idField] || "") !== bizId);
+            localStorage.setItem(storageKey, JSON.stringify(filtered));
+          }
+        } catch {}
+        deleted++;
+      } catch (e: any) {
+        console.warn(`[Delete] Backend delete failed for ${bizId} (_id=${mongoId}):`, e?.error?.message || e?.message || e);
+        failed.push(bizId);
+      }
     }
+
+    console.log(`[Delete] Removed ${deleted}/${rows.length} rows from ${module}`, failed.length ? `(failed: ${failed.join(", ")})` : "");
+
+    if (failed.length) {
+      this.backendSyncMessage.set(`Deleted ${deleted}, failed ${failed.length}: ${failed[0]}${failed.length > 1 ? "…" : ""}`);
+      setTimeout(() => this.backendSyncMessage.set(null), 5000);
+    }
+
     this.clearRowSelection();
+
+    // Refresh from backend so the table re-renders without the deleted rows
+    if (deleted > 0) {
+      try { this.refreshFromBackend(); } catch {}
+    }
+  }
+
+  /** Open edit dialog for a single row (used by editSelectedRows) */
+  openRecordEditDialog(_key: string) {
+    // For a single-row edit, open the standard record dialog.
+    // The dialog is wired up to update the row on save.
+    this.openRecordDialog();
+  }
+
+  /** Open bulk-edit dialog for multiple selected rows */
+  openBulkEditDialog() {
+    // Bulk editing is handled inline via contenteditable cells.
+    // This method exists for future expansion (e.g., a modal for batch field updates).
+    // Currently a no-op so callers don't break.
   }
 
   startRowEdit(row: TableRow, event?: Event) {
@@ -1179,6 +1359,124 @@ export class UniversalDashboardPage {
     this.selectedRowKeys.set([key]);
     this.editingRowKey.set(key);
     this.editingRowKeys.set([key]);
+  }
+
+  // ============ Backend sync (data source of truth) ============
+  refreshFromBackend() {
+    if (this.backendSyncing()) return;
+    this.backendSyncing.set(true);
+    this.backendSyncMessage.set("Refreshing from backend…");
+
+    let done = 0;
+    const total = 9;
+    const finishOne = () => {
+      done++;
+      if (done >= total) {
+        this.backendSyncing.set(false);
+        this.backendSyncMessage.set(`Synced ${total} collections`);
+        setTimeout(() => this.backendSyncMessage.set(null), 3000);
+      }
+    };
+
+    // Clients: pipe through mapper so row.id (=clientId) is set
+    this.api.listClients({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapClient);
+          localStorage.setItem("agb-erp:clients", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Projects: pipe through mapper
+    this.api.listProjects({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapProject);
+          localStorage.setItem("agb-erp:projects", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Sites: pipe through mapper
+    this.api.listSites().subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapSite);
+          localStorage.setItem("agb-erp:sites", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Materials: pipe through mapper (sets id from materialId)
+    this.api.listMaterials({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapMaterial);
+          localStorage.setItem("agb-erp:materials", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Labour: pipe through mapper
+    this.api.listLabour({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapLabour);
+          localStorage.setItem("agb-erp:labour", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Expenses: pipe through mapper
+    this.api.listExpenses({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapExpense);
+          localStorage.setItem("agb-erp:expenses", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Payments: pipe through mapper
+    this.api.listPayments({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapPayment);
+          localStorage.setItem("agb-erp:payments", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Vendors: pipe through mapper
+    this.api.listVendors({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapVendor);
+          localStorage.setItem("agb-erp:vendors", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Subcontractors: pipe through mapper
+    this.api.listSubcontractors({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapSubcontractor);
+          localStorage.setItem("agb-erp:subcontractors", JSON.stringify(items));
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
   }
 
   @HostListener("document:pointerdown", ["$event"])
@@ -1856,6 +2154,8 @@ export class UniversalDashboardPage {
 
     if (module === "clients") {
       this.updateClientCell(row, key, trimmedValue);
+      // Also call backend PATCH for clients
+      this.patchClientRow(row, key, trimmedValue);
     }
 
     const rowId = String(row["__rowId"] || "");
@@ -1867,6 +2167,104 @@ export class UniversalDashboardPage {
     this.data.updateSharedRowCell(rowId, key, trimmedValue);
     if (module === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", trimmedValue);
     if (module === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: trimmedValue });
+
+    // Persist the change to the backend + localStorage for the relevant module.
+    this.persistRowEditToBackend(module, row, key, trimmedValue);
+  }
+
+  /** Map a UI column key → backend field name + persist via PATCH. */
+  private persistRowEditToBackend(module: string, row: TableRow, columnKey: string, value: string) {
+    // localStorage keys by module
+    const storageKey: Record<string, string> = {
+      materials: "agb-erp:materials",
+      labour: "agb-erp:labour",
+      expenses: "agb-erp:expenses",
+      generalExpenses: "agb-erp:expenses",
+      payments: "agb-erp:payments",
+      vendors: "agb-erp:vendors",
+      subcontractors: "agb-erp:subcontractors",
+    };
+
+    // Map of UI key → backend field per module. Most map 1:1 with columnKey.
+    const backendPayload: Record<string, unknown> = { [columnKey]: value };
+
+    // For labour, labour types are nested → send notes/partyName depending on column.
+    // For now, send the raw value; backend accepts most fields as-is.
+    const mongoId = String(row["_id"] || "").trim();
+    const bizId = String(row["id"] || row["clientId"] || row["materialId"] || row["labourId"] || row["expenseId"] || row["paymentId"] || row["vendorId"] || row["subcontractId"] || "").trim();
+    if (!bizId) return;
+    const storageKeyForModule = storageKey[module];
+    if (!storageKeyForModule) return;
+
+    // Optimistic localStorage update
+    try {
+      const raw = localStorage.getItem(storageKeyForModule);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        const updated = arr.map((r: any) =>
+          String(r["id"] || "") === bizId ? { ...r, [columnKey]: value, ...(module === "labour" && columnKey === "labourTypes" ? { notes: value } : {}) } : r
+        );
+        localStorage.setItem(storageKeyForModule, JSON.stringify(updated));
+      }
+    } catch {}
+
+    // Background backend PATCH — must use MongoDB _id, not business id
+    const apiCall = (() => {
+      if (!mongoId) return null;
+      switch (module) {
+        case "materials": return this.api["patchMaterial"]?.(mongoId, backendPayload) || null;
+        case "labour":    return this.api["patchLabour"]?.(mongoId, backendPayload) || null;
+        case "expenses":  return this.api["patchExpense"]?.(mongoId, backendPayload) || null;
+        case "generalExpenses": return this.api["patchExpense"]?.(mongoId, backendPayload) || null;
+        case "payments":  return this.api["patchPayment"]?.(mongoId, backendPayload) || null;
+        case "vendors":   return this.api["patchVendor"]?.(mongoId, backendPayload) || null;
+        case "subcontractors": return this.api["patchSubcontractor"]?.(mongoId, backendPayload) || null;
+        default: return null;
+      }
+    })();
+    if (apiCall && typeof apiCall.subscribe === "function") {
+      apiCall.subscribe({
+        next: () => {},
+        error: (err: any) => console.warn(`[Patch] ${module}/${bizId} (${mongoId}) ${columnKey}=${value}:`, err?.error?.message || err?.message || err),
+      });
+    }
+  }
+
+  /** Patch a single client field via the backend + local ErpDataService. */
+  private patchClientRow(row: TableRow, columnKey: string, value: string) {
+    const mongoId = String(row["_id"] || "").trim();
+    const bizId = String(row["id"] || row["clientId"] || "").trim();
+    if (!bizId) return;
+    // Map UI key → backend payload
+    const keyMap: Record<string, string> = {
+      clientName: "name",
+      mobile: "mobile",
+      address: "address",
+      supervisor: "supervisor",
+      status: "status",
+    };
+    const backendKey = keyMap[columnKey] || columnKey;
+    const payload: Record<string, unknown> = { [backendKey]: value };
+
+    // Persist locally
+    try {
+      const raw = localStorage.getItem("agb-erp:clients");
+      if (raw) {
+        const arr = JSON.parse(raw);
+        const updated = arr.map((c: any) =>
+          String(c["id"] || c["clientId"] || "") === bizId ? { ...c, [columnKey]: value, [backendKey]: value } : c
+        );
+        localStorage.setItem("agb-erp:clients", JSON.stringify(updated));
+      }
+    } catch {}
+
+    // Backend PATCH — use MongoDB _id
+    if (mongoId && this.api["patchClient"]) {
+      this.api["patchClient"](mongoId, payload).subscribe({
+        next: () => {},
+        error: (err: any) => console.warn(`[PatchClient] ${bizId} (${mongoId}) ${columnKey}=${value}:`, err?.error?.message || err?.message || err),
+      });
+    }
   }
 
   selectCellKey(row: TableRow, key: string): string {

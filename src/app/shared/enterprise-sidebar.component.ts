@@ -67,7 +67,6 @@ type SidebarItem = {
                 <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']">
                   <span>{{ project.name }}</span>
                   <small>
-                    <strong>{{ project.id }}</strong>
                     <em>
                       <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                         <path d="M12 7v5l3 2" />

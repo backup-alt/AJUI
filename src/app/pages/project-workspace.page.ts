@@ -185,7 +185,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
           [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm()"
           [showTitle]="false"
           role="Admin"
-          searchPlaceholder="Search table records..."
+          searchPlaceholder="Search"
         />
 
         <ion-content class="erp-page">
@@ -200,7 +200,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
             <section class="project-compact-strip" *ngIf="!tableViewExpanded()">
               <div>
-                <span>{{ currentProject.id }}</span>
                 <h1>{{ currentProject.name }}</h1>
                 <p>{{ currentProject.client }} - {{ currentProject.address }}</p>
               </div>

@@ -6,6 +6,7 @@ import {
 } from "@angular/router";
 import { bootstrapApplication } from "@angular/platform-browser";
 import { provideIonicAngular } from "@ionic/angular/standalone";
+import { provideHttpClient, withInterceptors } from "@angular/common/http";
 import { addIcons } from "ionicons";
 import {
   addOutline,
@@ -37,6 +38,7 @@ import {
 } from "ionicons/icons";
 import { AppComponent } from "./app/app.component";
 import { routes } from "./app/app.routes";
+import { authInterceptor } from "./app/core/auth.interceptor";
 
 addIcons({
   "add-outline": addOutline,
@@ -75,5 +77,6 @@ bootstrapApplication(AppComponent, {
       withPreloading(PreloadAllModules),
       withHashLocation(),
     ),
+    provideHttpClient(withInterceptors([authInterceptor])),
   ],
 }).catch((error) => console.error(error));

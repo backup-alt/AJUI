@@ -110,7 +110,6 @@ import { formatMoney, statusClass } from "../shared/format";
                       <h3>{{ project.name }}</h3>
                       <p>{{ project.client }}</p>
                     </div>
-                    <strong>{{ project.id }}</strong>
                   </div>
                   <div class="project-select-meta">
                     <span><ion-icon name="calendar-outline"></ion-icon>Started {{ project.startDate }}</span>

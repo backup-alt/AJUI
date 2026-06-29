@@ -94,7 +94,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
           eyebrow="Approval Queue"
           metaLabel=""
           [showTitle]="false"
-          searchPlaceholder="Search approvals..."
+          searchPlaceholder="Search"
         />
 
         <ion-content class="erp-page">

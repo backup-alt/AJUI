@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/cor
 import { Router } from "@angular/router";
 import { IonBadge, IonContent, IonIcon, IonProgressBar, IonSplitPane } from "@ionic/angular/standalone";
 import { Client, ErpDataService } from "../data/erp-data.service";
+import { ApiService } from "../core/api.service";
 import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
@@ -16,13 +17,22 @@ import { formatMoney, statusClass } from "../shared/format";
       <agb-enterprise-sidebar active="clients"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
+        @if (refreshMessage()) {
+          <div class="backend-sync-banner" role="status">
+            <span class="spinner" [class.spinning]="refreshing()"></span>
+            <span>{{ refreshMessage() }}</span>
+            @if (!refreshing()) {
+              <button type="button" class="banner-btn" (click)="refreshFromBackend()">Refresh from backend</button>
+            }
+          </div>
+        }
         <agb-enterprise-header
           title="Clients"
-          eyebrow="Client Registry"
+          eyebrow="Client Registry · Backend source of truth"
           metaLabel=""
           [blurred]="showClientForm() || !!editingClient()"
           [showTitle]="false"
-          searchPlaceholder="Search clients, projects, receipts..."
+          searchPlaceholder="Search"
         />
 
         <ion-content class="erp-page">
@@ -106,16 +116,88 @@ import { formatMoney, statusClass } from "../shared/format";
       </div>
     </ion-split-pane>
   `,
+  styles: [`
+    .backend-sync-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: #1a2540;
+      color: #fff;
+      font-size: 13px;
+      border-bottom: 1px solid #2c3760;
+    }
+    .backend-sync-banner .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #4a5780;
+      border-top-color: #6fffb0;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .backend-sync-banner .spinner.spinning {
+      animation: cd-spin 0.8s linear infinite;
+    }
+    @keyframes cd-spin { to { transform: rotate(360deg); } }
+    .backend-sync-banner .banner-btn {
+      margin-left: auto;
+      background: #2c5cff;
+      color: #fff;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ClientDashboardPage {
   readonly data = inject(ErpDataService);
+  readonly api = inject(ApiService);
   readonly router = inject(Router);
   readonly search = signal("");
   readonly showClientForm = signal(false);
   readonly editingClient = signal<Client | null>(null);
   readonly clients = this.data.clients;
+  readonly refreshing = signal(false);
+  readonly refreshMessage = signal<string | null>(null);
   readonly formatMoney = formatMoney;
+
+  refreshFromBackend() {
+    if (this.refreshing()) return;
+    this.refreshing.set(true);
+    this.refreshMessage.set("Refreshing clients from backend…");
+    this.api.listClients({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          localStorage.setItem(
+            "agb-erp:clients",
+            JSON.stringify(
+              (r.items || []).map((c: any) => ({
+                id: c.clientId,
+                initials: c.initials,
+                name: c.name,
+                mobile: c.mobile,
+                address: c.address,
+                status: c.status,
+                projectIds: c.projectIds || [],
+                supervisor: c.supervisor || "",
+              }))
+            )
+          );
+        } catch {}
+        this.refreshing.set(false);
+        this.refreshMessage.set(`Synced ${r.total} clients`);
+        setTimeout(() => this.refreshMessage.set(null), 2500);
+      },
+      error: (e) => {
+        this.refreshing.set(false);
+        this.refreshMessage.set("Sync failed: " + (e?.message || "unknown"));
+        setTimeout(() => this.refreshMessage.set(null), 4000);
+      },
+    });
+  }
   readonly statusClass = statusClass;
 
   openClient(client: Client) {
@@ -163,7 +245,22 @@ export class ClientDashboardPage {
     event.stopPropagation();
     const confirmed = window.confirm(`Delete ${client.name}? This removes the client and linked project records.`);
     if (!confirmed) return;
-    this.data.deleteClient(client.id);
+    const mongoId = (client as any)._id;
+    if (mongoId) {
+      this.api.deleteClient(String(mongoId)).subscribe({
+        next: () => this.data.deleteClient(client.id),
+        error: (err: any) => {
+          const msg = err?.error?.message || err?.message || "Unknown error";
+          if (err?.status === 409) {
+            window.alert(`Cannot delete ${client.name}: ${msg}`);
+          } else {
+            window.alert(`Delete failed for ${client.name}: ${msg}`);
+          }
+        },
+      });
+    } else {
+      this.data.deleteClient(client.id);
+    }
   }
 
   summary(client: Client) {

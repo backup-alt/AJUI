@@ -65,7 +65,7 @@ export class EnterpriseHeaderComponent {
   @Input() showLogo = false;
   @Input() showTitle = true;
   @Input() showMenu = false;
-  @Input() searchPlaceholder = "Search clients, projects, vendors...";
+  @Input() searchPlaceholder = "Search";
 
   readonly darkMode = signal(false);
   readonly logoPath = "assets/logo.png";

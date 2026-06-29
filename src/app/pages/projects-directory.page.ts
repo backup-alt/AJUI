@@ -21,7 +21,7 @@ import { formatMoney, statusClass } from "../shared/format";
           eyebrow="Projects"
           metaLabel=""
           [showTitle]="false"
-          searchPlaceholder="Search clients, projects, vendors..."
+          searchPlaceholder="Search"
         />
 
         <ion-content class="erp-page">
@@ -41,12 +41,11 @@ import { formatMoney, statusClass } from "../shared/format";
             <section class="projects-directory-list">
               <article *ngFor="let project of filteredProjects(); trackBy: trackProject" class="projects-directory-card" role="button" tabindex="0" (click)="openProject(project)" (keydown.enter)="openProject(project)">
                 <div class="projects-directory-title">
-                  <div>
+                  <div class="title-stack">
                     <ion-badge class="status" [ngClass]="statusClass(project.status)">{{ project.status }}</ion-badge>
                     <h2>{{ project.name }}</h2>
                     <p>{{ project.client }} - {{ project.address }}</p>
                   </div>
-                  <strong>{{ project.id }}</strong>
                 </div>
 
                 <div class="projects-directory-meta">
