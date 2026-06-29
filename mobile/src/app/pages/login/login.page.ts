@@ -35,6 +35,7 @@ import {
   BarcodeFormat,
   LensFacing,
 } from '@capacitor-mlkit/barcode-scanning';
+import { environment } from '../../../environments/environment';
 
 interface QrPayload {
   token: string;
@@ -43,14 +44,11 @@ interface QrPayload {
 }
 
 // The single, fixed QR payload for the offline test mode.
-// The mobile app knows this exact value; the admin's web app also generates
-// a QR with this exact payload (see Settings → Add Supervisor on the web).
-// In production, the backend issues a unique one-time token per supervisor
-// and the QR encodes the full JSON payload.
+// Values come from environment.ts so we can blank them out in production
+// builds and force the app to always verify against the backend.
 const TEST_QR_PAYLOAD: QrPayload = {
-  token: 'AGB-SUPERVISOR-2026-OFFLINE-TEST-TOKEN',
-  supervisorName: 'Rajesh Kumar',
-  // 24 hours from now (fixed for deterministic builds)
+  token: environment.testQrToken || 'AGB-DISABLED',
+  supervisorName: environment.testQrSupervisorName || 'Supervisor',
   expiresAt: Date.now() + 24 * 60 * 60 * 1000,
 };
 
@@ -515,8 +513,14 @@ export class LoginPage implements OnInit {
 
   /**
    * Offline-first token validation.
-   * - In test mode: compares to the hardcoded TEST_QR_PAYLOAD.
-   * - In production: would POST to /api/auth/supervisor/verify/:token on the backend.
+   *
+   * Production flow:
+   *   POSTs the scanned token to `${environment.backendUrl}/api/auth/supervisor/verify`
+   *   and returns the supervisor profile the backend decoded from the invite.
+   *
+   * Offline test flow (development builds only):
+   *   Compares the token to the hardcoded TEST_QR_PAYLOAD. If the env-supplied
+   *   testQrToken is empty (production build), the offline path is disabled.
    */
   private async validateToken(token: string, nameHint: string): Promise<{
     ok: boolean;
@@ -525,8 +529,33 @@ export class LoginPage implements OnInit {
     phone?: string;
     email?: string;
   }> {
-    // 1) Match against offline test payload
-    if (token === TEST_QR_PAYLOAD.token) {
+    // --- Production path: always ask the backend first ---
+    try {
+      const res = await fetch(`${environment.backendUrl}/api/auth/supervisor/verify/${encodeURIComponent(token)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.valid) {
+          return {
+            ok: true,
+            supervisorName: data.supervisorName || nameHint || 'Supervisor',
+            // Phone/email are collected on the signup form; backend issues them
+            // later when the supervisor finalizes their account.
+          };
+        }
+        return { ok: false, reason: data?.message || 'Invite rejected by server.' };
+      }
+      // If the backend isn't reachable, fall through to the offline path
+      // only in development builds.
+    } catch (e) {
+      console.warn('[validateToken] backend unreachable, falling back to offline mode', e);
+    }
+
+    // --- Offline path (development only) ---
+    if (!environment.testQrToken) {
+      return { ok: false, reason: 'Cannot reach the server. Please check your connection.' };
+    }
+
+    if (token === TEST_QR_PAYLOAD.token && environment.testQrToken) {
       return {
         ok: true,
         supervisorName: TEST_QR_PAYLOAD.supervisorName,
@@ -535,22 +564,14 @@ export class LoginPage implements OnInit {
       };
     }
 
-    // 2) Any non-empty token containing "AGB-SUPERVISOR" is accepted in test mode
     if (token.includes('AGB-SUPERVISOR') && !token.includes('EXPIRED')) {
       return {
         ok: true,
-        supervisorName: nameHint || 'Supervisor',
+        supervisorName: nameHint || TEST_QR_PAYLOAD.supervisorName,
         phone: '+91 98765 43210',
         email: 'supervisor@agbuilders.com',
       };
     }
-
-    // 3) Production path (commented until backend is deployed):
-    // return await fetch(`${environment.backendUrl}/api/auth/supervisor/verify/${token}`)
-    //   .then(r => r.ok ? r.json() : null)
-    //   .then((data) => data?.valid
-    //     ? { ok: true, supervisorName: data.supervisorName, phone: data.phone, email: data.email }
-    //     : { ok: false, reason: 'Invalid invite.' });
 
     return { ok: false, reason: 'QR code not recognised. Please contact your administrator.' };
   }
