@@ -17,24 +17,14 @@ import {
   qrCodeOutline,
   checkmarkCircleOutline,
   alertCircleOutline,
-  personCircleOutline,
-  callOutline,
-  mailOutline,
   lockClosedOutline,
   scanOutline,
-  flashOutline,
-  flashOffOutline,
   refreshOutline,
-  closeOutline,
   arrowForwardOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { MockDataService } from '../../core/services/mock-data.service';
-import {
-  BarcodeScanner,
-  BarcodeFormat,
-  LensFacing,
-} from '@capacitor-mlkit/barcode-scanning';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { environment } from '../../../environments/environment';
 
 interface QrPayload {
@@ -43,9 +33,9 @@ interface QrPayload {
   expiresAt: number;
 }
 
-// The single, fixed QR payload for the offline test mode.
-// Values come from environment.ts so we can blank them out in production
-// builds and force the app to always verify against the backend.
+// In offline test mode the only accepted token is the one we baked into
+// environment.ts. In production the env-supplied testQrToken is empty and
+// the app always validates against the backend.
 const TEST_QR_PAYLOAD: QrPayload = {
   token: environment.testQrToken || 'AGB-DISABLED',
   supervisorName: environment.testQrSupervisorName || 'Supervisor',
@@ -103,47 +93,15 @@ const TEST_QR_PAYLOAD: QrPayload = {
           <div class="hint">
             <ion-icon name="alert-circle-outline"></ion-icon>
             <div>
-              <strong>No camera?</strong>
-              <button class="link-btn" (click)="useOfflineToken()">Use the offline test token instead</button>
+              <strong>No camera or testing on an emulator?</strong>
+              <button class="link-btn" (click)="useOfflineToken()">
+                Use the offline test token instead
+              </button>
             </div>
           </div>
         </div>
 
-        <div class="footer-meta">AGB Supervisor · v0.3.0-phase3</div>
-      </div>
-
-      <!-- ============== STEP 2: Camera Scanner ============== -->
-      <div *ngIf="step === 'scanning'" class="scanner-wrap">
-        <div class="scanner-header">
-          <div class="scanner-title">
-            <ion-icon name="qr-code-outline"></ion-icon>
-            <span>Scan QR Code</span>
-          </div>
-          <ion-button fill="clear" size="small" class="close-btn" (click)="stopScan()">
-            <ion-icon name="close-outline" slot="icon-only"></ion-icon>
-          </ion-button>
-        </div>
-
-        <!-- The ML Kit plugin renders its own camera preview here -->
-        <div class="scanner-stage" id="scanner-stage"></div>
-
-        <div class="scanner-overlay">
-          <div class="scanner-frame">
-            <div class="corner tl"></div>
-            <div class="corner tr"></div>
-            <div class="corner bl"></div>
-            <div class="corner br"></div>
-          </div>
-          <p class="scanner-hint">Align the QR code from the web dashboard within the frame.</p>
-          <div class="scanner-actions">
-            <ion-button fill="clear" class="scanner-toggle" (click)="toggleTorch()" *ngIf="torchSupported">
-              <ion-icon [name]="torchOn() ? 'flash-off-outline' : 'flash-outline'" slot="icon-only"></ion-icon>
-            </ion-button>
-            <ion-button fill="clear" class="scanner-toggle" (click)="useOfflineToken()">
-              <ion-icon name="refresh-outline" slot="icon-only"></ion-icon>
-            </ion-button>
-          </div>
-        </div>
+        <div class="footer-meta">AGB Supervisor · v0.4.0-phase3</div>
       </div>
 
       <!-- ============== STEP 3: Account setup ============== -->
@@ -181,12 +139,16 @@ const TEST_QR_PAYLOAD: QrPayload = {
 
           <ion-item class="agb-field" lines="none">
             <ion-label position="stacked">Password</ion-label>
-            <ion-input [(ngModel)]="signupPassword" type="password" placeholder="Min 6 characters"></ion-input>
+            <ion-input
+              [(ngModel)]="signupPassword"
+              type="password"
+              placeholder="Min 6 characters"
+            ></ion-input>
           </ion-item>
 
           <ion-button expand="block" class="agb-primary" (click)="completeSignup()" [disabled]="loading">
             <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
-            <span *ngIf="!loading">Activate & Continue</span>
+            <span *ngIf="!loading">Activate &amp; Continue</span>
             <ion-spinner *ngIf="loading" name="dots"></ion-spinner>
           </ion-button>
 
@@ -223,9 +185,7 @@ const TEST_QR_PAYLOAD: QrPayload = {
     .brand-mark.small {
       width: 56px; height: 56px; border-radius: 16px; font-size: 18px; margin-bottom: 12px;
     }
-    .brand.small h2 {
-      margin: 0; font-size: 20px; font-weight: 700;
-    }
+    .brand.small h2 { margin: 0; font-size: 20px; font-weight: 700; }
     .brand h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
     .brand p { margin: 4px 0 0; font-size: 13px; opacity: 0.85; letter-spacing: 0.4px; text-transform: uppercase; }
 
@@ -276,85 +236,20 @@ const TEST_QR_PAYLOAD: QrPayload = {
     }
     .agb-text-btn { --color: var(--agb-primary); font-weight: 600; text-transform: none; margin-top: 8px; }
     .footer-meta { text-align: center; color: rgba(255,255,255,0.65); font-size: 11px; padding: 6px; }
-
-    /* ====== Scanner ====== */
-    .scanner-wrap {
-      position: relative; width: 100%; height: 100%;
-      background: #000000;
-    }
-    .scanner-header {
-      position: absolute; top: 0; left: 0; right: 0; z-index: 10;
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 14px 16px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.6), transparent);
-    }
-    .scanner-title {
-      display: flex; align-items: center; gap: 8px;
-      color: #ffffff; font-weight: 700; font-size: 15px;
-    }
-    .close-btn { --color: #ffffff; }
-    .scanner-stage {
-      position: absolute; inset: 0;
-    }
-    .scanner-stage canvas, .scanner-stage video {
-      width: 100% !important; height: 100% !important;
-      object-fit: cover !important;
-    }
-    .scanner-overlay {
-      position: absolute; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      pointer-events: none;
-    }
-    .scanner-frame {
-      position: relative;
-      width: 240px; height: 240px;
-    }
-    .corner {
-      position: absolute; width: 36px; height: 36px;
-      border: 4px solid var(--agb-gold);
-    }
-    .corner.tl { top: 0; left: 0; border-right: none; border-bottom: none; border-top-left-radius: 16px; }
-    .corner.tr { top: 0; right: 0; border-left: none; border-bottom: none; border-top-right-radius: 16px; }
-    .corner.bl { bottom: 0; left: 0; border-right: none; border-top: none; border-bottom-left-radius: 16px; }
-    .corner.br { bottom: 0; right: 0; border-left: none; border-top: none; border-bottom-right-radius: 16px; }
-
-    .scanner-hint {
-      margin-top: 32px;
-      color: #ffffff; font-size: 13px;
-      background: rgba(0,0,0,0.55); padding: 8px 14px; border-radius: 999px;
-      max-width: 80%; text-align: center;
-    }
-    .scanner-actions {
-      display: flex; gap: 16px;
-      margin-top: 28px; pointer-events: auto;
-    }
-    .scanner-toggle {
-      --color: #ffffff;
-      --background: rgba(255,255,255,0.16);
-      --border-radius: 50%;
-      width: 52px; height: 52px;
-    }
   `],
 })
 export class LoginPage implements OnInit {
-  step: 'welcome' | 'scanning' | 'signup' = 'welcome';
+  step: 'welcome' | 'signup' = 'welcome';
   loading = false;
   errorMessage = '';
 
-  // Scanned invite data (prefilled into the signup form)
   scannedName = signal('');
   scannedToken = signal('');
-  scannedExpiresAt = signal(0);
 
   signupName = '';
   signupPhone = '';
   signupEmail = '';
   signupPassword = '';
-
-  torchOn = signal(false);
-  torchSupported = false;
-  private scanListener: any = null;
 
   constructor(
     private auth: AuthService,
@@ -366,148 +261,101 @@ export class LoginPage implements OnInit {
       'qr-code-outline': qrCodeOutline,
       'checkmark-circle-outline': checkmarkCircleOutline,
       'alert-circle-outline': alertCircleOutline,
-      'person-circle-outline': personCircleOutline,
-      'call-outline': callOutline,
-      'mail-outline': mailOutline,
       'lock-closed-outline': lockClosedOutline,
       'scan-outline': scanOutline,
-      'flash-outline': flashOutline,
-      'flash-off-outline': flashOffOutline,
       'refresh-outline': refreshOutline,
-      'close-outline': closeOutline,
       'arrow-forward-outline': arrowForwardOutline,
     });
   }
 
-  async ngOnInit() {
-    try {
-      const supported = await BarcodeScanner.isSupported();
-      this.torchSupported = supported.supported;
-    } catch {}
+  ngOnInit() {
+    // No setup needed at the moment.
   }
 
-  // ============== Step 1: Start camera scan ==============
+  // ============== Step 1: Trigger native QR scan ==============
   async startScan() {
     this.errorMessage = '';
     this.loading = true;
+
     try {
+      // Ask for camera permission. The plugin throws a clear error if denied.
       const status = await BarcodeScanner.requestPermissions();
       if (status.camera !== 'granted') {
-        this.errorMessage = 'Camera permission is required to scan the QR code.';
+        this.errorMessage =
+          'Camera permission is required to scan the QR code. ' +
+          'Tap the offline test token below to skip the camera.';
         this.loading = false;
         return;
       }
 
-      // Mount the camera preview into our container
-      const stage = document.getElementById('scanner-stage');
-      if (!stage) {
-        this.errorMessage = 'Scanner UI not ready. Please try again.';
+      // Use the simple `scan()` API: it opens Google's Code Scanner activity,
+      // waits for a successful scan, and resolves with the barcode payload.
+      // This avoids the more complex `startScan()` flow which requires the
+      // GMS module to be installed on the device.
+      const result = await BarcodeScanner.scan();
+      const raw = result?.barcodes?.[0]?.rawValue;
+      if (!raw) {
+        this.errorMessage = 'No QR code was captured. Please try again.';
         this.loading = false;
         return;
       }
-
-      // Listen for scans BEFORE starting the camera (some plugins require this order)
-      this.scanListener = await BarcodeScanner.addListener('barcodesScanned', async (result) => {
-        const code = result.barcodes?.[0]?.rawValue;
-        if (code) {
-          await this.onScanned(code);
-        }
-      });
-
-      // Hide WebView so the native camera preview shows through
-      document.body.classList.add('scanner-active');
-
-      await BarcodeScanner.startScan({
-        formats: [BarcodeFormat.QrCode],
-        lensFacing: LensFacing.Back,
-      });
-
-      this.step = 'scanning';
-      this.loading = false;
+      await this.onScanned(raw);
     } catch (e: any) {
-      console.error('[Scanner] failed to start:', e);
-      this.errorMessage =
-        'Could not start the camera. ' +
-        (e?.message || '') +
-        ' Use the offline test token below.';
-      this.loading = false;
-      this.step = 'welcome';
-      document.body.classList.remove('scanner-active');
-    }
-  }
-
-  async stopScan() {
-    try {
-      await BarcodeScanner.stopScan();
-    } catch {}
-    if (this.scanListener) {
-      try { this.scanListener.remove(); } catch {}
-      this.scanListener = null;
-    }
-    document.body.classList.remove('scanner-active');
-    this.torchOn.set(false);
-    this.step = 'welcome';
-  }
-
-  async toggleTorch() {
-    try {
-      if (this.torchOn()) {
-        await BarcodeScanner.disableTorch();
-        this.torchOn.set(false);
+      const msg = String(e?.message || e || '');
+      if (msg.toLowerCase().includes('cancel')) {
+        // User dismissed the scanner; stay on the welcome screen.
+        this.errorMessage = '';
+      } else if (msg.toLowerCase().includes('unavailable')) {
+        this.errorMessage =
+          'The barcode scanner is not available on this device. ' +
+          'Tap the offline test token below to continue.';
       } else {
-        await BarcodeScanner.enableTorch();
-        this.torchOn.set(true);
+        this.errorMessage = 'Scanner error: ' + msg;
       }
-    } catch {}
+      this.loading = false;
+    }
   }
 
-  // ============== Step 2: Handle scanned value ==============
+  // ============== Step 2: Validate scanned value ==============
   async onScanned(raw: string) {
-    // Stop the camera immediately so we don't get duplicate scans
-    await this.stopScan();
+    this.errorMessage = '';
 
-    if (!raw) {
-      this.errorMessage = 'Could not read the QR code. Please try again.';
-      return;
-    }
-
-    // Try to parse as the structured JSON payload first (production path)
+    // Try parsing as the structured JSON payload first (production path).
     let payload: QrPayload | null = null;
     try {
       payload = JSON.parse(raw) as QrPayload;
     } catch {
-      // Could be a raw token string (legacy); treat as token-only
+      // Treat as a raw token string (legacy / fallback)
       payload = { token: raw.trim(), supervisorName: '', expiresAt: 0 };
     }
 
     if (!payload?.token) {
       this.errorMessage = 'Invalid QR code format.';
+      this.loading = false;
       return;
     }
 
-    // Expiry check
     if (payload.expiresAt && payload.expiresAt < Date.now()) {
       this.errorMessage = 'This invite has expired. Please ask your admin for a new one.';
+      this.loading = false;
       return;
     }
 
-    // Validate the token: in offline test mode, the only accepted token is the
-    // hardcoded one. In production, this calls the backend's verify endpoint.
     const valid = await this.validateToken(payload.token, payload.supervisorName);
     if (!valid.ok) {
       this.errorMessage = valid.reason || 'Invalid QR code.';
+      this.loading = false;
       return;
     }
 
-    // Prefill the signup form
     this.scannedName.set(valid.supervisorName || 'Supervisor');
     this.scannedToken.set(payload.token);
-    this.scannedExpiresAt.set(payload.expiresAt || Date.now() + 24 * 60 * 60 * 1000);
 
     this.signupName = valid.supervisorName || 'Supervisor';
     this.signupPhone = valid.phone || '+91 98765 43210';
     this.signupEmail = valid.email || 'supervisor@agbuilders.com';
 
+    this.loading = false;
     this.step = 'signup';
   }
 
@@ -522,7 +370,10 @@ export class LoginPage implements OnInit {
    *   Compares the token to the hardcoded TEST_QR_PAYLOAD. If the env-supplied
    *   testQrToken is empty (production build), the offline path is disabled.
    */
-  private async validateToken(token: string, nameHint: string): Promise<{
+  private async validateToken(
+    token: string,
+    nameHint: string,
+  ): Promise<{
     ok: boolean;
     reason?: string;
     supervisorName?: string;
@@ -531,21 +382,19 @@ export class LoginPage implements OnInit {
   }> {
     // --- Production path: always ask the backend first ---
     try {
-      const res = await fetch(`${environment.backendUrl}/api/auth/supervisor/verify/${encodeURIComponent(token)}`);
+      const res = await fetch(
+        `${environment.backendUrl}/api/auth/supervisor/verify/${encodeURIComponent(token)}`,
+      );
       if (res.ok) {
         const data = await res.json();
         if (data?.valid) {
           return {
             ok: true,
             supervisorName: data.supervisorName || nameHint || 'Supervisor',
-            // Phone/email are collected on the signup form; backend issues them
-            // later when the supervisor finalizes their account.
           };
         }
         return { ok: false, reason: data?.message || 'Invite rejected by server.' };
       }
-      // If the backend isn't reachable, fall through to the offline path
-      // only in development builds.
     } catch (e) {
       console.warn('[validateToken] backend unreachable, falling back to offline mode', e);
     }
@@ -555,7 +404,7 @@ export class LoginPage implements OnInit {
       return { ok: false, reason: 'Cannot reach the server. Please check your connection.' };
     }
 
-    if (token === TEST_QR_PAYLOAD.token && environment.testQrToken) {
+    if (token === TEST_QR_PAYLOAD.token) {
       return {
         ok: true,
         supervisorName: TEST_QR_PAYLOAD.supervisorName,
@@ -573,7 +422,10 @@ export class LoginPage implements OnInit {
       };
     }
 
-    return { ok: false, reason: 'QR code not recognised. Please contact your administrator.' };
+    return {
+      ok: false,
+      reason: 'QR code not recognised. Please contact your administrator.',
+    };
   }
 
   // Allow users without a camera (or in dev) to bypass the scanner with the
