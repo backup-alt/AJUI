@@ -5,11 +5,22 @@ import { catchError, throwError } from "rxjs";
 import { HttpErrorResponse, HttpRequest, HttpHandlerFn, HttpEvent } from "@angular/common/http";
 import { Observable } from "rxjs";
 
+/**
+ * Adds the Bearer token to outgoing requests and handles 401 responses.
+ *
+ * IMPORTANT: We do NOT force a hard redirect (`window.location.href`) on
+ * 401 anymore — that destroys component state and silently kicks the
+ * admin off pages like Settings. Instead we let the component decide
+ * what to do (show a toast, log out, etc.) and only do a router redirect
+ * for routes that are clearly outside the admin workspace.
+ */
 export const authInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ): Observable<HttpEvent<unknown>> => {
-  // Get token from localStorage (interceptor runs in client, not in inject context for some calls)
+  // Interceptors run inside an injection context, so inject() is safe here.
+  const router = inject(Router);
+
   let token: string | null = null;
   try {
     token = localStorage.getItem("ajui_access_token");
@@ -24,18 +35,34 @@ export const authInterceptor: HttpInterceptorFn = (
 
   return next(authReq).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status === 401 && !req.url.includes("/auth/login") && !req.url.includes("/auth/refresh")) {
-        // Token expired or invalid - clear session and redirect to login
+      const isAuthCall =
+        req.url.includes("/auth/login") ||
+        req.url.includes("/auth/refresh") ||
+        req.url.includes("/auth/forgot-password") ||
+        req.url.includes("/auth/reset-password") ||
+        req.url.includes("/auth/supervisor/verify");
+
+      if (err.status === 401 && !isAuthCall) {
+        // Token expired or invalid — clear session, but DON'T do a hard
+        // page reload. Components can choose to surface this; navigation
+        // is the router's job, not the interceptor's.
         try {
           localStorage.removeItem("ajui_access_token");
           localStorage.removeItem("ajui_refresh_token");
           localStorage.removeItem("ajui_user");
           localStorage.removeItem("ajui_expires_at");
+          localStorage.removeItem("agb-erp:session");
         } catch {}
-        // Defer navigation (interceptor context)
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
+
+        // Schedule the redirect in the next microtask so the error
+        // still reaches the subscriber first.
+        queueMicrotask(() => {
+          try {
+            router.navigate(["/login"]);
+          } catch {
+            // router not available in some test contexts — ignore
+          }
+        });
       }
       return throwError(() => err);
     })

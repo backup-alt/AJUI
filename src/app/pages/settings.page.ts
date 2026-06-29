@@ -606,8 +606,29 @@ export class SettingsPage {
         this.supervisorLoading.set(false);
       },
       error: (err) => {
-        this.supervisorError.set(err?.message || "Failed to generate QR. Please try again.");
+        // Surface a verbose error so the admin can act on it without
+        // opening devtools. Possible causes:
+        //   - Backend not running (network error)
+        //   - Wrong apiUrl in environments/
+        //   - Admin token expired or missing (401)
+        //   - CORS rejection (status 0)
+        const status = err?.status ?? err?.statusCode;
+        const detail =
+          err?.message ||
+          err?.error?.error ||
+          err?.statusText ||
+          "Failed to generate QR. Please try again.";
+        const hint =
+          status === 0
+            ? " (network error — is the backend running at the configured apiUrl?)"
+            : status === 401
+            ? " (session expired — please sign in again)"
+            : status === 403
+            ? " (your account isn't an admin)"
+            : "";
+        this.supervisorError.set(`[${status ?? "?"}] ${detail}${hint}`);
         this.supervisorLoading.set(false);
+        // Don't auto-clear — let the admin see the error and retry.
       },
     });
   }
