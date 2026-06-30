@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import * as dashboardService from "../services/dashboard.service";
-import * as reportService from "../services/report.service";
+import * as dashboardService from "../services/dashboard.service.js";
+import * as reportService from "../services/report.service.js";
 
 export async function getKPIs(_req: Request, res: Response, next: NextFunction) {
   try {

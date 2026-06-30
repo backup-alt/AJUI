@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import { Types } from "mongoose";
-import { InviteToken, IInviteToken } from "../models/InviteToken";
-import { env } from "../config/env";
-import { AppError } from "../middleware/errorHandler";
+import { InviteToken, IInviteToken } from "../models/InviteToken.js";
+import { env } from "../config/env.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 const DEFAULT_EXPIRY_HOURS = 24;
 

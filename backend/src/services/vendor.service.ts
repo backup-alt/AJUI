@@ -1,9 +1,9 @@
 import { Types } from "mongoose";
-import { Vendor } from "../models/Vendor";
-import { Material } from "../models/Material";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
-import { CreateVendorInput } from "../schemas/financial.schema";
+import { Vendor } from "../models/Vendor.js";
+import { Material } from "../models/Material.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
+import { CreateVendorInput } from "../schemas/financial.schema.js";
 
 export async function createVendor(input: CreateVendorInput) {
   const vendorId = await generateId("VEN");

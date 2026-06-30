@@ -1,16 +1,16 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import * as authService from "../services/auth.service";
-import * as inviteService from "../services/invite.service";
-import { getRefreshCookieName } from "../services/auth.service";
-import { verifyInviteSchema, supervisorSignupSchema } from "../schemas/auth.schema";
-import { User } from "../models/User";
-import { hashPassword, compareToken } from "../utils/password";
-import { AppError } from "../middleware/errorHandler";
-import { generateQRDataURL } from "../utils/qr-code";
-import { sendEmail } from "../config/sendgrid";
-import { PasswordResetToken } from "../models/PasswordResetToken";
-import { hashToken } from "../utils/password";
+import * as authService from "../services/auth.service.js";
+import * as inviteService from "../services/invite.service.js";
+import { getRefreshCookieName } from "../services/auth.service.js";
+import { verifyInviteSchema, supervisorSignupSchema } from "../schemas/auth.schema.js";
+import { User } from "../models/User.js";
+import { hashPassword, compareToken } from "../utils/password.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateQRDataURL } from "../utils/qr-code.js";
+import { sendEmail } from "../config/sendgrid.js";
+import { PasswordResetToken } from "../models/PasswordResetToken.js";
+import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {

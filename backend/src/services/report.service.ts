@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
-import { Report, IReport, ReportCategory, ReportScope } from "../models/Report";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
+import { Report, IReport, ReportCategory, ReportScope } from "../models/Report.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
 
 export interface CreateReportInput {
   category: ReportCategory;

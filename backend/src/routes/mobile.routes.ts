@@ -1,8 +1,8 @@
 import { Router } from "express";
-import * as ctrl from "../controllers/mobile.controller";
-import { validate } from "../middleware/validation";
-import { requireAuth } from "../middleware/auth";
-import { updateOwnProfileSchema, registerDeviceSchema, unregisterDeviceSchema } from "../schemas/mobile.schema";
+import * as ctrl from "../controllers/mobile.controller.js";
+import { validate } from "../middleware/validation.js";
+import { requireAuth } from "../middleware/auth.js";
+import { updateOwnProfileSchema, registerDeviceSchema, unregisterDeviceSchema } from "../schemas/mobile.schema.js";
 
 const router = Router();
 router.use(requireAuth);

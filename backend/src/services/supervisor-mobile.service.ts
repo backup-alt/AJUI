@@ -1,15 +1,15 @@
 import { Types } from "mongoose";
-import { User } from "../models/User";
-import { Supervisor } from "../models/Supervisor";
-import { Project } from "../models/Project";
-import { Site } from "../models/Site";
-import { Material } from "../models/Material";
-import { Labour } from "../models/Labour";
-import { Expense } from "../models/Expense";
-import { Payment } from "../models/Payment";
-import { Approval } from "../models/Approval";
-import { Subcontractor } from "../models/Subcontractor";
-import { AppError } from "../middleware/errorHandler";
+import { User } from "../models/User.js";
+import { Supervisor } from "../models/Supervisor.js";
+import { Project } from "../models/Project.js";
+import { Site } from "../models/Site.js";
+import { Material } from "../models/Material.js";
+import { Labour } from "../models/Labour.js";
+import { Expense } from "../models/Expense.js";
+import { Payment } from "../models/Payment.js";
+import { Approval } from "../models/Approval.js";
+import { Subcontractor } from "../models/Subcontractor.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 export async function getSupervisorByUserId(userId: string) {
   const user = await User.findById(userId);

@@ -1,7 +1,7 @@
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
-import { Express } from "express";
-import { env } from "./env";
+import { Express, Request, Response } from "express";
+import { env } from "./env.js";
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -229,7 +229,7 @@ export function setupSwagger(app: Express): void {
       filter: true,
     },
   }));
-  app.get("/api/docs.json", (_req, res) => {
+  app.get("/api/docs.json", (_req: Request, res: Response) => {
     res.json(swaggerSpec);
   });
 }

@@ -1,8 +1,8 @@
 import { Router } from "express";
-import * as ctrl from "../controllers/entities.controller";
-import { validate } from "../middleware/validation";
-import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
+import * as ctrl from "../controllers/entities.controller.js";
+import { validate } from "../middleware/validation.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireRole } from "../middleware/rbac.js";
 import {
   createClientSchema,
   updateClientSchema,
@@ -17,7 +17,7 @@ import {
   createCustomFieldSchema,
   updateCustomFieldSchema,
   getCustomFieldsSchema,
-} from "../schemas/entities.schema";
+} from "../schemas/entities.schema.js";
 
 const router = Router();
 router.use(requireAuth);

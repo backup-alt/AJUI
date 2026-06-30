@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
-import { CustomField, CustomFieldEntityType } from "../models/CustomField";
-import { AppError } from "../middleware/errorHandler";
-import { CreateCustomFieldInput, UpdateCustomFieldInput } from "../schemas/entities.schema";
+import { CustomField, CustomFieldEntityType } from "../models/CustomField.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { CreateCustomFieldInput, UpdateCustomFieldInput } from "../schemas/entities.schema.js";
 
 export async function createCustomField(input: CreateCustomFieldInput) {
   const entityId = new Types.ObjectId(input.entityId);

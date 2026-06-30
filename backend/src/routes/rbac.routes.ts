@@ -1,8 +1,8 @@
 import { Router } from "express";
-import * as ctrl from "../controllers/rbac.controller";
-import { validate } from "../middleware/validation";
-import { requireAuth } from "../middleware/auth";
-import { updatePermissionSchema, getPermissionsSchema } from "../schemas/rbac.schema";
+import * as ctrl from "../controllers/rbac.controller.js";
+import { validate } from "../middleware/validation.js";
+import { requireAuth } from "../middleware/auth.js";
+import { updatePermissionSchema, getPermissionsSchema } from "../schemas/rbac.schema.js";
 
 const router = Router();
 router.use(requireAuth);

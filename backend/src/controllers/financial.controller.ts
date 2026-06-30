@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from "express";
-import * as materialService from "../services/material.service";
-import * as labourService from "../services/labour.service";
-import * as expenseService from "../services/expense.service";
-import * as paymentService from "../services/payment.service";
-import * as vendorService from "../services/vendor.service";
-import * as subcontractorService from "../services/subcontractor.service";
-import * as approvalService from "../services/approval.service";
+import * as materialService from "../services/material.service.js";
+import * as labourService from "../services/labour.service.js";
+import * as expenseService from "../services/expense.service.js";
+import * as paymentService from "../services/payment.service.js";
+import * as vendorService from "../services/vendor.service.js";
+import * as subcontractorService from "../services/subcontractor.service.js";
+import * as approvalService from "../services/approval.service.js";
 
 // =================== MATERIALS ===================
 export async function createMaterial(req: Request, res: Response, next: NextFunction) {

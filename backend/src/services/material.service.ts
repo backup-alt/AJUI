@@ -1,12 +1,12 @@
 import { Types } from "mongoose";
-import { Material } from "../models/Material";
-import { Project } from "../models/Project";
-import { Client } from "../models/Client";
-import { Vendor } from "../models/Vendor";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
-import { createApproval } from "./approval.service";
-import { CreateMaterialInput } from "../schemas/financial.schema";
+import { Material } from "../models/Material.js";
+import { Project } from "../models/Project.js";
+import { Client } from "../models/Client.js";
+import { Vendor } from "../models/Vendor.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
+import { createApproval } from "./approval.service.js";
+import { CreateMaterialInput } from "../schemas/financial.schema.js";
 
 async function populateRefs(input: CreateMaterialInput) {
   const project = await Project.findById(input.projectId);

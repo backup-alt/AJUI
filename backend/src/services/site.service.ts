@@ -1,8 +1,8 @@
-import { Site } from "../models/Site";
-import { Project } from "../models/Project";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
-import { CreateSiteInput, UpdateSiteInput } from "../schemas/entities.schema";
+import { Site } from "../models/Site.js";
+import { Project } from "../models/Project.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
+import { CreateSiteInput, UpdateSiteInput } from "../schemas/entities.schema.js";
 import { Types } from "mongoose";
 
 export async function createSite(input: CreateSiteInput) {

@@ -1,14 +1,14 @@
 import { Router } from "express";
-import * as ctrl from "../controllers/dashboard.controller";
-import { validate } from "../middleware/validation";
-import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
+import * as ctrl from "../controllers/dashboard.controller.js";
+import { validate } from "../middleware/validation.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireRole } from "../middleware/rbac.js";
 import {
   dashboardQuerySchema,
   createReportSchema,
   updateReportSchema,
   listReportsSchema,
-} from "../schemas/dashboard.schema";
+} from "../schemas/dashboard.schema.js";
 
 const router = Router();
 router.use(requireAuth);

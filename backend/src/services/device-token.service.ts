@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
-import { DeviceToken } from "../models/DeviceToken";
-import { sendMulticast, sendPushNotification } from "../config/firebase";
-import { AppError } from "../middleware/errorHandler";
+import { DeviceToken } from "../models/DeviceToken.js";
+import { sendMulticast, sendPushNotification } from "../config/firebase.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 export async function registerDeviceToken(input: {
   userId: string;
@@ -72,9 +72,9 @@ export async function notifyProjectSupervisors(
   body: string,
   data?: Record<string, string>
 ): Promise<number> {
-  const { Project } = await import("../models/Project");
-  const { User } = await import("../models/User");
-  const { Supervisor } = await import("../models/Supervisor");
+  const { Project } = await import("../models/Project.js");
+  const { User } = await import("../models/User.js");
+  const { Supervisor } = await import("../models/Supervisor.js");
 
   const pid = typeof projectId === "string" ? new Types.ObjectId(projectId) : projectId;
   const project = await Project.findById(pid).lean();

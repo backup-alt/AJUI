@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import * as clientService from "../services/client.service";
-import * as siteService from "../services/site.service";
-import * as projectService from "../services/project.service";
-import * as supervisorService from "../services/supervisor.service";
-import * as customFieldService from "../services/custom-fields.service";
+import * as clientService from "../services/client.service.js";
+import * as siteService from "../services/site.service.js";
+import * as projectService from "../services/project.service.js";
+import * as supervisorService from "../services/supervisor.service.js";
+import * as customFieldService from "../services/custom-fields.service.js";
 
 // =================== CLIENTS ===================
 export async function createClient(req: Request, res: Response, next: NextFunction) {
@@ -15,7 +15,7 @@ export async function createClient(req: Request, res: Response, next: NextFuncti
 
 export async function listClients(req: Request, res: Response, next: NextFunction) {
   try {
-    const { getScopedClientQuery } = await import("../middleware/rbac");
+    const { getScopedClientQuery } = await import("../middleware/rbac.js");
     const scopeQuery = await getScopedClientQuery(req);
     const result = await clientService.listClients({
       search: req.query.search as string | undefined,
@@ -105,7 +105,7 @@ export async function createProject(req: Request, res: Response, next: NextFunct
 
 export async function listProjects(req: Request, res: Response, next: NextFunction) {
   try {
-    const { getScopedProjectQuery } = await import("../middleware/rbac");
+    const { getScopedProjectQuery } = await import("../middleware/rbac.js");
     const scopeQuery = await getScopedProjectQuery(req);
     const result = await projectService.listProjects({
       search: req.query.search as string | undefined,

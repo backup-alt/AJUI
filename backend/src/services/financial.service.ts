@@ -1,11 +1,11 @@
 import { Types } from "mongoose";
-import { Project } from "../models/Project";
-import { Client } from "../models/Client";
-import { Material } from "../models/Material";
-import { Labour } from "../models/Labour";
-import { Expense } from "../models/Expense";
-import { Payment } from "../models/Payment";
-import { AppError } from "../middleware/errorHandler";
+import { Project } from "../models/Project.js";
+import { Client } from "../models/Client.js";
+import { Material } from "../models/Material.js";
+import { Labour } from "../models/Labour.js";
+import { Expense } from "../models/Expense.js";
+import { Payment } from "../models/Payment.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 export interface ProjectFinancialSummary {
   projectId: string;

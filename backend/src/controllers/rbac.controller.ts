@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import * as rbacService from "../services/rbac.service";
-import { AppError } from "../middleware/errorHandler";
+import * as rbacService from "../services/rbac.service.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 export async function getAllPermissions(req: Request, res: Response, next: NextFunction) {
   try {

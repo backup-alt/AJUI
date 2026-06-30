@@ -1,7 +1,7 @@
 import { Router } from "express";
-import * as ctrl from "../controllers/auth.controller";
-import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
+import * as ctrl from "../controllers/auth.controller.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireRole } from "../middleware/rbac.js";
 
 const router = Router();
 

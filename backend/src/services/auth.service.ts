@@ -1,15 +1,15 @@
 import crypto from "crypto";
-import { User, IUser } from "../models/User";
-import { RefreshToken } from "../models/RefreshToken";
-import { hashPassword, verifyPassword, hashToken, compareToken } from "../utils/password";
+import { User, IUser } from "../models/User.js";
+import { RefreshToken } from "../models/RefreshToken.js";
+import { hashPassword, verifyPassword, hashToken, compareToken } from "../utils/password.js";
 import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
   refreshTokenExpiryDate,
-} from "../utils/jwt";
-import { AppError } from "../middleware/errorHandler";
-import { env, isProduction } from "../config/env";
+} from "../utils/jwt.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { env, isProduction } from "../config/env.js";
 
 export interface AuthTokens {
   accessToken: string;

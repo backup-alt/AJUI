@@ -1,11 +1,11 @@
 import { Types } from "mongoose";
-import { Labour } from "../models/Labour";
-import { Project } from "../models/Project";
-import { Client } from "../models/Client";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
-import { createApproval } from "./approval.service";
-import { CreateLabourInput } from "../schemas/financial.schema";
+import { Labour } from "../models/Labour.js";
+import { Project } from "../models/Project.js";
+import { Client } from "../models/Client.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
+import { createApproval } from "./approval.service.js";
+import { CreateLabourInput } from "../schemas/financial.schema.js";
 
 export async function createLabour(input: CreateLabourInput) {
   const project = await Project.findById(input.projectId);

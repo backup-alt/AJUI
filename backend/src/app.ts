@@ -2,20 +2,20 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-import { env } from "./config/env";
-import { connectDatabase } from "./config/db";
-import { initSendGrid } from "./config/sendgrid";
-import { initFirebase } from "./config/firebase";
-import { errorHandler, notFound } from "./middleware/errorHandler";
-import { setupSwagger } from "./config/swagger";
-import authRoutes from "./routes/auth.routes";
-import adminRoutes from "./routes/admin.routes";
-import entitiesRoutes from "./routes/entities.routes";
-import financialRoutes from "./routes/financial.routes";
-import dashboardRoutes from "./routes/dashboard.routes";
-import mobileRoutes from "./routes/mobile.routes";
-import rbacRoutes from "./routes/rbac.routes";
-import { ensureDefaultPermissions } from "./models/RolePermission";
+import { env } from "./config/env.js";
+import { connectDatabase } from "./config/db.js";
+import { initSendGrid } from "./config/sendgrid.js";
+import { initFirebase } from "./config/firebase.js";
+import { errorHandler, notFound } from "./middleware/errorHandler.js";
+import { setupSwagger } from "./config/swagger.js";
+import authRoutes from "./routes/auth.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
+import entitiesRoutes from "./routes/entities.routes.js";
+import financialRoutes from "./routes/financial.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
+import mobileRoutes from "./routes/mobile.routes.js";
+import rbacRoutes from "./routes/rbac.routes.js";
+import { ensureDefaultPermissions } from "./models/RolePermission.js";
 
 export function createApp(): express.Application {
   const app = express();
@@ -52,7 +52,7 @@ export function createApp(): express.Application {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  app.get("/health", (_req, res) => {
+  app.get("/health", (_req: express.Request, res: express.Response) => {
     res.json({
       status: "ok",
       env: env.NODE_ENV,
@@ -84,7 +84,7 @@ export async function bootstrap(): Promise<void> {
   initSendGrid();
   initFirebase();
   await ensureDefaultPermissions();
-  const { seedDefaultReports } = await import("./utils/seed-reports");
+  const { seedDefaultReports } = await import("./utils/seed-reports.js");
   await seedDefaultReports();
 
   const app = createApp();

@@ -1,4 +1,4 @@
-import { Counter } from "../models/Counter";
+import { Counter } from "../models/Counter.js";
 
 export type IdPrefix =
   | "CLI"

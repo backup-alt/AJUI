@@ -1,13 +1,13 @@
 import { Types } from "mongoose";
-import { Approval, ApprovalType, IApproval } from "../models/Approval";
-import { Material } from "../models/Material";
-import { Labour } from "../models/Labour";
-import { Expense } from "../models/Expense";
-import { Payment } from "../models/Payment";
-import { Subcontractor } from "../models/Subcontractor";
-import { generateId } from "./id-generator.service";
-import { recomputeProjectTotals } from "./financial.service";
-import { AppError } from "../middleware/errorHandler";
+import { Approval, ApprovalType, IApproval } from "../models/Approval.js";
+import { Material } from "../models/Material.js";
+import { Labour } from "../models/Labour.js";
+import { Expense } from "../models/Expense.js";
+import { Payment } from "../models/Payment.js";
+import { Subcontractor } from "../models/Subcontractor.js";
+import { generateId } from "./id-generator.service.js";
+import { recomputeProjectTotals } from "./financial.service.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 export interface CreateApprovalParams {
   type: ApprovalType;
@@ -97,7 +97,7 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
 
   // Send push notification to project supervisors (non-blocking best-effort)
   try {
-    const { notifyProjectSupervisors } = await import("./device-token.service");
+    const { notifyProjectSupervisors } = await import("./device-token.service.js");
     if (projectId) {
       await notifyProjectSupervisors(
         projectId,
@@ -156,7 +156,7 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
 
   // Send push notification to project supervisors
   try {
-    const { notifyProjectSupervisors } = await import("./device-token.service");
+    const { notifyProjectSupervisors } = await import("./device-token.service.js");
     await notifyProjectSupervisors(
       approval.projectId || "",
       `${approval.title} - Rejected`,

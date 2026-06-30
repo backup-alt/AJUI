@@ -1,14 +1,14 @@
 import { Types } from "mongoose";
-import { Project } from "../models/Project";
-import { Client } from "../models/Client";
-import { Site } from "../models/Site";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
+import { Project } from "../models/Project.js";
+import { Client } from "../models/Client.js";
+import { Site } from "../models/Site.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
 import {
   CreateProjectInput,
   UpdateProjectInput,
-} from "../schemas/entities.schema";
-import { recomputeClientTotals, computeProjectLedger } from "./financial.service";
+} from "../schemas/entities.schema.js";
+import { recomputeClientTotals, computeProjectLedger } from "./financial.service.js";
 
 export async function createProject(input: CreateProjectInput) {
   const client = await Client.findById(input.clientId);

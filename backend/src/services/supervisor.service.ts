@@ -1,11 +1,11 @@
 import { Types } from "mongoose";
-import { Supervisor } from "../models/Supervisor";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
+import { Supervisor } from "../models/Supervisor.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
 import {
   CreateSupervisorInput,
   UpdateSupervisorInput,
-} from "../schemas/entities.schema";
+} from "../schemas/entities.schema.js";
 
 export async function createSupervisor(input: CreateSupervisorInput) {
   const supervisorId = await generateId("SUP");

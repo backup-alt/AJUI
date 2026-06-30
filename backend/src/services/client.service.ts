@@ -1,9 +1,9 @@
-import { Client } from "../models/Client";
-import { Project } from "../models/Project";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
-import { CreateClientInput, UpdateClientInput } from "../schemas/entities.schema";
-import { recomputeClientTotals } from "./financial.service";
+import { Client } from "../models/Client.js";
+import { Project } from "../models/Project.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
+import { CreateClientInput, UpdateClientInput } from "../schemas/entities.schema.js";
+import { recomputeClientTotals } from "./financial.service.js";
 
 export async function createClient(input: CreateClientInput) {
   const clientId = await generateId("CLI");

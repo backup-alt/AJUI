@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import { AppError } from "../middleware/errorHandler";
-import * as mobileService from "../services/supervisor-mobile.service";
-import * as deviceService from "../services/device-token.service";
+import { AppError } from "../middleware/errorHandler.js";
+import * as mobileService from "../services/supervisor-mobile.service.js";
+import * as deviceService from "../services/device-token.service.js";
 
 function requireSupervisor(req: Request): string {
   if (!req.user?.sub) throw new AppError(401, "Not authenticated");

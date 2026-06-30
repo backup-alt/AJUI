@@ -1,15 +1,15 @@
 import { Types } from "mongoose";
-import { Client } from "../models/Client";
-import { Site } from "../models/Site";
-import { Project } from "../models/Project";
-import { Supervisor } from "../models/Supervisor";
-import { Material } from "../models/Material";
-import { Labour } from "../models/Labour";
-import { Expense } from "../models/Expense";
-import { Payment } from "../models/Payment";
-import { Vendor } from "../models/Vendor";
-import { Subcontractor } from "../models/Subcontractor";
-import { Approval } from "../models/Approval";
+import { Client } from "../models/Client.js";
+import { Site } from "../models/Site.js";
+import { Project } from "../models/Project.js";
+import { Supervisor } from "../models/Supervisor.js";
+import { Material } from "../models/Material.js";
+import { Labour } from "../models/Labour.js";
+import { Expense } from "../models/Expense.js";
+import { Payment } from "../models/Payment.js";
+import { Vendor } from "../models/Vendor.js";
+import { Subcontractor } from "../models/Subcontractor.js";
+import { Approval } from "../models/Approval.js";
 
 export interface DashboardKPIs {
   counts: {

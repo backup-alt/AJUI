@@ -1,8 +1,8 @@
 import { Router } from "express";
-import * as ctrl from "../controllers/financial.controller";
-import { validate } from "../middleware/validation";
-import { requireAuth } from "../middleware/auth";
-import { requireRole, canCreateMaterials, canCreateLabour, canCreateExpenses, canCreatePayments, canCreateVendors, canCreateSubcontractors } from "../middleware/rbac";
+import * as ctrl from "../controllers/financial.controller.js";
+import { validate } from "../middleware/validation.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireRole, canCreateMaterials, canCreateLabour, canCreateExpenses, canCreatePayments, canCreateVendors, canCreateSubcontractors } from "../middleware/rbac.js";
 import {
   createMaterialSchema,
   updateMaterialSchema,
@@ -23,7 +23,7 @@ import {
   updateSubcontractorSchema,
   listSubcontractorsSchema,
   listApprovalsSchema,
-} from "../schemas/financial.schema";
+} from "../schemas/financial.schema.js";
 
 const router = Router();
 router.use(requireAuth);

@@ -1,5 +1,5 @@
-import { Report } from "../models/Report";
-import { generateId } from "../services/id-generator.service";
+import { Report } from "../models/Report.js";
+import { generateId } from "../services/id-generator.service.js";
 
 export async function seedDefaultReports(): Promise<void> {
   const defaultReports = [

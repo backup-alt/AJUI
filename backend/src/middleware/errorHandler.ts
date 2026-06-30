@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { isProduction } from "../config/env";
+import { isProduction } from "../config/env.js";
 
 export class AppError extends Error {
   constructor(

@@ -7,8 +7,8 @@ import {
   PermissionScope,
   IRolePermission,
   DEFAULT_PERMISSIONS,
-} from "../models/RolePermission";
-import { AppError } from "../middleware/errorHandler";
+} from "../models/RolePermission.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 export async function getAllPermissions(): Promise<IRolePermission[]> {
   return RolePermission.find().sort({ role: 1, module: 1 }).lean() as unknown as Promise<IRolePermission[]>;

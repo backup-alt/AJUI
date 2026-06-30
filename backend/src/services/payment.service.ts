@@ -1,11 +1,11 @@
 import { Types } from "mongoose";
-import { Payment } from "../models/Payment";
-import { Project } from "../models/Project";
-import { Client } from "../models/Client";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
-import { createApproval } from "./approval.service";
-import { CreatePaymentInput } from "../schemas/financial.schema";
+import { Payment } from "../models/Payment.js";
+import { Project } from "../models/Project.js";
+import { Client } from "../models/Client.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
+import { createApproval } from "./approval.service.js";
+import { CreatePaymentInput } from "../schemas/financial.schema.js";
 
 export async function createPayment(input: CreatePaymentInput) {
   const project = await Project.findById(input.projectId);

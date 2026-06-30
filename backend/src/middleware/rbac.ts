@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
-import { AppError } from "./errorHandler";
-import { User, UserRole } from "../models/User";
-import { Project } from "../models/Project";
-import { Supervisor } from "../models/Supervisor";
+import { AppError } from "./errorHandler.js";
+import { User, UserRole } from "../models/User.js";
+import { Project } from "../models/Project.js";
+import { Supervisor } from "../models/Supervisor.js";
 
-import { AccessTokenPayload } from "../utils/jwt";
+import { AccessTokenPayload } from "../utils/jwt.js";
 
 declare global {
   namespace Express {

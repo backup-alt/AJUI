@@ -1,11 +1,11 @@
 import { Types } from "mongoose";
-import { Expense } from "../models/Expense";
-import { Project } from "../models/Project";
-import { Client } from "../models/Client";
-import { AppError } from "../middleware/errorHandler";
-import { generateId } from "./id-generator.service";
-import { createApproval } from "./approval.service";
-import { CreateExpenseInput } from "../schemas/financial.schema";
+import { Expense } from "../models/Expense.js";
+import { Project } from "../models/Project.js";
+import { Client } from "../models/Client.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
+import { createApproval } from "./approval.service.js";
+import { CreateExpenseInput } from "../schemas/financial.schema.js";
 
 async function computeRunningBalance(
   projectId: Types.ObjectId,
