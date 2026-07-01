@@ -9,5 +9,7 @@ router.use(requireAuth);
 router.use(requireRole("admin"));
 
 router.post("/invites/supervisor", ctrl.adminCreateInvite);
+router.get("/invites/active", ctrl.listActiveInvites);
+router.post("/invites/supervisor/resend-otp", ctrl.resendInviteOtp);
 
 export default router;

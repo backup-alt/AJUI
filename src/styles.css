@@ -12847,3 +12847,228 @@ ion-badge.status-completed {
   color: #002263;
   border: 1px solid #002263;
 }
+
+/* Add Supervisor form */
+.settings-invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* QR card with countdown */
+.settings-qr-card {
+  margin-top: 14px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #d5dcea;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-qr-card.settings-qr-scanned {
+  border-color: #28a745;
+  background: #f0fff4;
+}
+
+.settings-qr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.settings-qr-header > div:first-child strong {
+  display: block;
+  color: #002263;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.settings-qr-header > div:first-child small {
+  display: block;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.settings-qr-timer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #002263;
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 52px;
+  flex-shrink: 0;
+}
+
+.settings-qr-timer svg {
+  width: 20px;
+  height: 20px;
+}
+
+.settings-qr-timer svg text {
+  font-family: monospace;
+  font-size: 6px;
+  font-weight: 700;
+  fill: currentColor;
+}
+
+.settings-qr-expired,
+.settings-qr-expired-label {
+  color: #c0392b;
+}
+
+.settings-qr-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+
+.settings-resend-btn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #c9a227;
+  background: #fff;
+  color: #c9a227;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-resend-btn:hover:not(:disabled) {
+  background: #fffbf0;
+}
+
+.settings-resend-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-scan-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #d4edda;
+  color: #155724;
+  font-size: 13px;
+  font-weight: 600;
+  width: 100%;
+}
+
+.settings-scan-success svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.settings-scan-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.settings-scan-success-banner svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.settings-scan-success-banner button {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid #155724;
+  border-radius: 6px;
+  background: transparent;
+  color: #155724;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-active-invites {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e6eaf2;
+  width: 100%;
+}
+
+.settings-active-invites h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #667085;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 10px;
+}
+
+.settings-invite-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.settings-invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid #e6eaf2;
+  border-radius: 8px;
+}
+
+.settings-invite-row-info strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #002263;
+}
+
+.settings-invite-row-info small {
+  font-size: 11px;
+  color: #667085;
+  font-weight: 600;
+}
+
+.settings-invite-row-timer {
+  font-size: 13px;
+  font-weight: 700;
+  color: #002263;
+  font-family: monospace;
+}
+
+.settings-badge-settings {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-badge-scanned {
+  background: #d4edda;
+  color: #28a745;
+}

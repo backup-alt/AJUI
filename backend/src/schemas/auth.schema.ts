@@ -51,6 +51,7 @@ export const verifyInviteSchema = z.object({
 export const supervisorSignupSchema = z.object({
   body: z.object({
     token: z.string().min(1),
+    otp: z.string().length(6, "OTP must be 6 digits"),
     name: z.string().trim().min(2).max(100),
     phone: phoneSchema,
     email: emailSchema,

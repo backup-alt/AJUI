@@ -1,7 +1,8 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, inject, signal, OnDestroy, DestroyRef } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
   ErpDataService,
   managedRoleNames,
@@ -134,7 +135,7 @@ const permissionGroups: PermissionGroup[] = [
       { key: "role", label: "Role" },
       { key: "assignedProject", label: "Assigned Project" },
       { key: "assignedSite", label: "Assigned Site" },
-      { key: "cashLimit", label: "Cash Limit" },
+      { key: "cashLimits", label: "Cash Limit" },
       { key: "activeAdvances", label: "Active Advances" },
       { key: "approvalAuthority", label: "Approval Authority" },
       { key: "status", label: "Status" },
@@ -170,6 +171,17 @@ const permissionGroups: PermissionGroup[] = [
   },
 ];
 
+export interface ActiveInviteDisplay {
+  inviteId: string;
+  token: string;
+  qrDataUrl: string;
+  supervisorName: string;
+  supervisorEmail: string;
+  expiresAt: string;
+  remainingMs: number;
+  scanned: boolean;
+}
+
 @Component({
   standalone: true,
   imports: [CommonModule, FormsModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
@@ -199,48 +211,115 @@ const permissionGroups: PermissionGroup[] = [
                 <div>
                   <span>Team</span>
                   <h2>Add Supervisor</h2>
-                  <p>Generate a QR code for a new site supervisor. They scan it from the mobile app to activate their account.</p>
+                  <p>Enter the supervisor's name and email to generate a time-limited QR code. They scan it from the AGB app to activate their account.</p>
                 </div>
 
-                <ng-container *ngIf="!supervisorInvite()">
-                  <label>
-                    <span>Supervisor Name</span>
-                    <input
-                      type="text"
-                      [value]="supervisorNameDraft()"
-                      (input)="supervisorNameDraft.set($any($event.target).value)"
-                      placeholder="e.g. Rajesh Kumar"
-                      maxlength="80"
-                    />
-                  </label>
-                  <p class="settings-error" *ngIf="supervisorError()">{{ supervisorError() }}</p>
-                  <button
-                    type="button"
-                    class="settings-inline-action"
-                    [disabled]="supervisorLoading()"
-                    (click)="generateSupervisorQr()">
-                    {{ supervisorLoading() ? 'Generating…' : 'Generate QR Code' }}
-                  </button>
+                <ng-container *ngIf="!currentInvite() && !scanSuccess()">
+                  <div class="settings-invite-form">
+                    <label>
+                      <span>Supervisor Name</span>
+                      <input
+                        type="text"
+                        [value]="supervisorNameDraft()"
+                        (input)="supervisorNameDraft.set($any($event.target).value)"
+                        placeholder="e.g. Rajesh Kumar"
+                        maxlength="80"
+                      />
+                    </label>
+                    <label>
+                      <span>Supervisor Email</span>
+                      <input
+                        type="email"
+                        [value]="supervisorEmailDraft()"
+                        (input)="supervisorEmailDraft.set($any($event.target).value)"
+                        placeholder="e.g. rajesh@annabuilders.com"
+                      />
+                    </label>
+                    <p class="settings-error" *ngIf="supervisorError()">{{ supervisorError() }}</p>
+                    <button
+                      type="button"
+                      class="settings-inline-action"
+                      [disabled]="supervisorLoading()"
+                      (click)="generateSupervisorQr()">
+                      {{ supervisorLoading() ? 'Generating…' : 'Generate QR Code' }}
+                    </button>
+                  </div>
                 </ng-container>
 
-                <ng-container *ngIf="supervisorInvite() as invite">
-                  <div class="settings-qr-preview">
+                <ng-container *ngIf="currentInvite() as invite">
+                  <div class="settings-qr-card" [class.settings-qr-scanned]="invite.scanned">
+                    <div class="settings-qr-header">
+                      <div>
+                        <strong>{{ invite.supervisorName }}</strong>
+                        <small>{{ invite.supervisorEmail }}</small>
+                      </div>
+                      <div class="settings-qr-timer" [class.settings-qr-expired]="invite.remainingMs <= 0">
+                        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                          <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" fill="none"
+                            [style.stroke-dasharray]="countdownCircle(invite.remainingMs)"
+                            stroke-dashoffset="0"
+                            transform="rotate(-90 10 10)"
+                          />
+                          <text x="10" y="14" text-anchor="middle" font-size="7" fill="currentColor">{{ formatCountdown(invite.remainingMs) }}</text>
+                        </svg>
+                        <span *ngIf="invite.remainingMs > 0">{{ formatCountdown(invite.remainingMs) }}</span>
+                        <span *ngIf="invite.remainingMs <= 0" class="settings-qr-expired-label">Expired</span>
+                      </div>
+                    </div>
                     <div class="settings-qr-frame">
                       <img [src]="invite.qrDataUrl" alt="Supervisor QR Code" />
                     </div>
-                    <div class="settings-qr-meta">
-                      <strong>{{ invite.supervisorName }}</strong>
-                      <small>Expires {{ formatInviteExpiry(invite.expiresAt) }}</small>
+                    <p class="settings-hint" *ngIf="!invite.scanned">
+                      Ask the supervisor to open the <strong>AGB</strong> app, tap <strong>Scan QR</strong> on the welcome screen, and enter the OTP sent to their email.
+                    </p>
+                    <div class="settings-scan-success" *ngIf="invite.scanned">
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <circle cx="10" cy="10" r="8" fill="#d4edda" stroke="#28a745" stroke-width="1.5"/>
+                        <path d="m6 10.5 2.5 2.5 5-5" stroke="#28a745" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                      </svg>
+                      <span>Supervisor scanned! They can now set up their password.</span>
+                    </div>
+                    <div class="settings-qr-actions">
+                      <button type="button" class="settings-resend-btn" (click)="resendOtp(invite.token)" [disabled]="resendingOtp()">
+                        {{ resendingOtp() ? 'Sending…' : 'Resend OTP' }}
+                      </button>
+                      <button type="button" class="settings-inline-action settings-secondary-action" (click)="resetSupervisorInvite()">
+                        Generate another
+                      </button>
                     </div>
                   </div>
-                  <p class="settings-hint">Ask the supervisor to open the AGB mobile app and tap <strong>Scan QR</strong> on the welcome screen.</p>
-                  <button
-                    type="button"
-                    class="settings-inline-action settings-secondary-action"
-                    (click)="resetSupervisorInvite()">
-                    Generate another
-                  </button>
                 </ng-container>
+
+                <div class="settings-scan-success-banner" *ngIf="scanSuccess() && !currentInvite()">
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <circle cx="10" cy="10" r="8" fill="#d4edda" stroke="#28a745" stroke-width="1.5"/>
+                    <path d="m6 10.5 2.5 2.5 5-5" stroke="#28a745" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                  </svg>
+                  <span>Supervisor account activated! They can now log in with their phone and password.</span>
+                  <button type="button" (click)="scanSuccess.set(false)">Dismiss</button>
+                </div>
+
+                <div class="settings-active-invites" *ngIf="activeInvites().length > 0">
+                  <h3>Active QR Codes</h3>
+                  <div class="settings-invite-list">
+                    <div
+                      class="settings-invite-row"
+                      *ngFor="let inv of activeInvites()"
+                      [class.settings-invite-scanned]="!isInviteInList(inv.token)"
+                    >
+                      <div class="settings-invite-row-info">
+                        <strong>{{ inv.supervisorName }}</strong>
+                        <small>{{ inv.supervisorEmail }}</small>
+                      </div>
+                      <div class="settings-invite-row-timer" *ngIf="isInviteInList(inv.token)">
+                        <span [class.settings-qr-expired-label]="inv.remainingMs <= 0">{{ formatCountdown(inv.remainingMs) }}</span>
+                      </div>
+                      <div class="settings-invite-row-status" *ngIf="!isInviteInList(inv.token)">
+                        <span class="settings-badge-settings settings-badge-scanned">Scanned</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </article>
 
               <article class="settings-card">
@@ -496,9 +575,10 @@ const permissionGroups: PermissionGroup[] = [
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SettingsPage {
+export class SettingsPage implements OnDestroy {
   readonly data = inject(ErpDataService);
   private readonly api = inject(ApiService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly roles = managedRoleNames;
   readonly permissionLevels = permissionLevels;
@@ -507,21 +587,160 @@ export class SettingsPage {
   readonly profileSites = signal(this.allKnownSites());
   readonly siteDraft = signal("");
 
-  // Add Supervisor flow
   readonly supervisorNameDraft = signal("");
+  readonly supervisorEmailDraft = signal("");
   readonly supervisorLoading = signal(false);
   readonly supervisorError = signal<string | null>(null);
-  readonly supervisorInvite = signal<null | {
-    inviteId: string;
-    token: string;
-    qrUrl: string;
-    qrDataUrl: string;
-    supervisorName: string;
-    role: string;
-    projectId?: string;
-    expiresAt: string;
-    createdAt: string;
-  }>(null);
+  readonly resendingOtp = signal(false);
+  readonly currentInvite = signal<ActiveInviteDisplay | null>(null);
+  readonly activeInvites = signal<Array<{ token: string; supervisorName: string; supervisorEmail: string; expiresAt: string; remainingMs: number }>>([]);
+  readonly scanSuccess = signal(false);
+
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private countdownInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    this.startActiveInvitesPoll();
+  }
+
+  ngOnDestroy() {
+    this.stopPolls();
+  }
+
+  private startActiveInvitesPoll() {
+    this.pollActiveInvites();
+    this.pollInterval = setInterval(() => this.pollActiveInvites(), 10_000);
+  }
+
+  private stopPolls() {
+    if (this.pollInterval) { clearInterval(this.pollInterval); this.pollInterval = null; }
+    if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
+  }
+
+  private pollActiveInvites() {
+    this.api.listActiveInvites().subscribe({
+      next: (res) => {
+        const fresh = res.invites.map((inv) => ({
+          token: inv.token,
+          supervisorName: inv.supervisorName,
+          supervisorEmail: inv.supervisorEmail,
+          expiresAt: inv.expiresAt,
+          remainingMs: Math.max(0, inv.remainingMs),
+        }));
+        this.activeInvites.set(fresh);
+
+        const current = this.currentInvite();
+        if (current && !current.scanned) {
+          const found = fresh.find((f) => f.token === current.token);
+          if (!found) {
+            this.currentInvite.set({ ...current, scanned: true });
+            this.scanSuccess.set(true);
+            setTimeout(() => {
+              this.currentInvite.set(null);
+              this.scanSuccess.set(false);
+            }, 5000);
+          } else {
+            this.currentInvite.update((c) => c ? { ...c, remainingMs: found.remainingMs } : c);
+          }
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  private startCountdown() {
+    this.stopPolls();
+    this.countdownInterval = setInterval(() => {
+      const current = this.currentInvite();
+      if (!current) return;
+      const newRemaining = Math.max(0, current.remainingMs - 1000);
+      if (newRemaining <= 0) {
+        this.currentInvite.update((c) => c ? { ...c, remainingMs: 0 } : c);
+        clearInterval(this.countdownInterval!);
+        return;
+      }
+      this.currentInvite.update((c) => c ? { ...c, remainingMs: newRemaining } : c);
+    }, 1000);
+    this.pollInterval = setInterval(() => this.pollActiveInvites(), 10_000);
+  }
+
+  generateSupervisorQr() {
+    const name = this.supervisorNameDraft().trim();
+    const email = this.supervisorEmailDraft().trim();
+    if (name.length < 2) {
+      this.supervisorError.set("Please enter at least 2 characters for the name.");
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.supervisorError.set("Please enter a valid email address.");
+      return;
+    }
+    this.supervisorError.set(null);
+    this.supervisorLoading.set(true);
+
+    this.api.createSupervisorInvite({ supervisorName: name, supervisorEmail: email }).subscribe({
+      next: (invite) => {
+        const fiveMinMs = 5 * 60 * 1000;
+        this.currentInvite.set({
+          inviteId: invite.inviteId,
+          token: invite.token,
+          qrDataUrl: invite.qrDataUrl,
+          supervisorName: invite.supervisorName,
+          supervisorEmail: invite.supervisorEmail,
+          expiresAt: invite.expiresAt,
+          remainingMs: fiveMinMs,
+          scanned: false,
+        });
+        this.supervisorLoading.set(false);
+        this.startCountdown();
+      },
+      error: (err) => {
+        const status = err?.status ?? err?.statusCode;
+        const detail = err?.error?.error || err?.message || "Failed to generate QR.";
+        const hint =
+          status === 0 ? " (network error — is the backend running?)" :
+          status === 401 ? " (session expired — sign in again)" :
+          status === 403 ? " (your account isn't an admin)" : "";
+        this.supervisorError.set(`[${status ?? "?"}] ${detail}${hint}`);
+        this.supervisorLoading.set(false);
+      },
+    });
+  }
+
+  resetSupervisorInvite() {
+    this.stopPolls();
+    this.currentInvite.set(null);
+    this.supervisorNameDraft.set("");
+    this.supervisorEmailDraft.set("");
+    this.supervisorError.set(null);
+    this.startActiveInvitesPoll();
+  }
+
+  resendOtp(token: string) {
+    this.resendingOtp.set(true);
+    this.api.resendInviteOtp(token).subscribe({
+      next: () => this.resendingOtp.set(false),
+      error: () => this.resendingOtp.set(false),
+    });
+  }
+
+  isInviteInList(token: string): boolean {
+    return this.activeInvites().some((inv) => inv.token === token);
+  }
+
+  formatCountdown(ms: number): string {
+    if (ms <= 0) return "Expired";
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  }
+
+  countdownCircle(ms: number): string {
+    const circumference = 2 * Math.PI * 8;
+    const progress = Math.max(0, ms / (5 * 60 * 1000));
+    return `${circumference * progress} ${circumference}`;
+  }
 
   allKnownSites(): string[] {
     return [...new Set(this.data.projects().flatMap((project) => project.sites).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -531,12 +750,14 @@ export class SettingsPage {
     event?.preventDefault();
     const site = this.siteDraft().trim();
     if (!site) return;
-    this.profileSites.update((sites) => (sites.some((value) => value.toLowerCase() === site.toLowerCase()) ? sites : [...sites, site].sort((a, b) => a.localeCompare(b))));
+    this.profileSites.update((sites) =>
+      sites.some((v) => v.toLowerCase() === site.toLowerCase()) ? sites : [...sites, site].sort((a, b) => a.localeCompare(b))
+    );
     this.siteDraft.set("");
   }
 
   removeProfileSite(site: string) {
-    this.profileSites.update((sites) => sites.filter((value) => value !== site));
+    this.profileSites.update((sites) => sites.filter((v) => v !== site));
   }
 
   updateSingleApproval(enabled: boolean) {
@@ -589,62 +810,5 @@ export class SettingsPage {
     if (role === "Project Manager") return "Project managers usually review approvals, project progress, site records, and subcontract work.";
     if (role === "Accountant") return "Accountants usually manage payment collections, ledgers, expenses, exports, and verification.";
     return "Supervisors usually enter field-level material, labour, attendance, and site expense records.";
-  }
-
-  // ---------- Add Supervisor (QR generation) ----------
-  generateSupervisorQr() {
-    const name = this.supervisorNameDraft().trim();
-    if (name.length < 2) {
-      this.supervisorError.set("Please enter at least 2 characters.");
-      return;
-    }
-    this.supervisorError.set(null);
-    this.supervisorLoading.set(true);
-    this.api.createSupervisorInvite({ supervisorName: name }).subscribe({
-      next: (invite) => {
-        this.supervisorInvite.set(invite);
-        this.supervisorLoading.set(false);
-      },
-      error: (err) => {
-        // Surface a verbose error so the admin can act on it without
-        // opening devtools. Possible causes:
-        //   - Backend not running (network error)
-        //   - Wrong apiUrl in environments/
-        //   - Admin token expired or missing (401)
-        //   - CORS rejection (status 0)
-        const status = err?.status ?? err?.statusCode;
-        const detail =
-          err?.message ||
-          err?.error?.error ||
-          err?.statusText ||
-          "Failed to generate QR. Please try again.";
-        const hint =
-          status === 0
-            ? " (network error — is the backend running at the configured apiUrl?)"
-            : status === 401
-            ? " (session expired — please sign in again)"
-            : status === 403
-            ? " (your account isn't an admin)"
-            : "";
-        this.supervisorError.set(`[${status ?? "?"}] ${detail}${hint}`);
-        this.supervisorLoading.set(false);
-        // Don't auto-clear — let the admin see the error and retry.
-      },
-    });
-  }
-
-  resetSupervisorInvite() {
-    this.supervisorInvite.set(null);
-    this.supervisorNameDraft.set("");
-    this.supervisorError.set(null);
-  }
-
-  formatInviteExpiry(iso: string): string {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString();
-    } catch {
-      return iso;
-    }
   }
 }

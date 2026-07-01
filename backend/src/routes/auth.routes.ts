@@ -52,6 +52,8 @@ router.get(
   validate(verifyInviteSchema, "params"),
   ctrl.verifySupervisorInvite
 );
+router.post("/supervisor/verify-otp", ctrl.verifySupervisorOtp);
+router.post("/supervisor/resend-otp", ctrl.supervisorResendInviteOtp);
 router.post(
   "/supervisor/signup",
   strictLimiter,

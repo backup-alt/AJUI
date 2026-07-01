@@ -3,7 +3,10 @@ import { z } from "zod";
 import * as authService from "../services/auth.service.js";
 import * as inviteService from "../services/invite.service.js";
 import { getRefreshCookieName } from "../services/auth.service.js";
-import { verifyInviteSchema, supervisorSignupSchema } from "../schemas/auth.schema.js";
+import {
+  verifyInviteSchema,
+  supervisorSignupSchema,
+} from "../schemas/auth.schema.js";
 import { User } from "../models/User.js";
 import { hashPassword, compareToken } from "../utils/password.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -36,7 +39,10 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 export async function refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const cookieName = getRefreshCookieName();
-    const refreshToken = req.cookies?.[cookieName];
+    let refreshToken = req.cookies?.[cookieName];
+    if (!refreshToken && req.body?.refreshToken) {
+      refreshToken = req.body.refreshToken;
+    }
     if (!refreshToken) throw new AppError(401, "No refresh token");
 
     const { tokens, refreshCookie } = await authService.refreshSession(refreshToken, {
@@ -110,7 +116,7 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     const { token, password } = req.body as { token: string; password: string };
 
     const tokens = await PasswordResetToken.find({ usedAt: { $exists: false } });
-    let matched: typeof tokens[number] | undefined;
+    let matched: (typeof tokens)[number] | undefined;
     for (const t of tokens) {
       const ok = await compareToken(token, t.tokenHash);
       if (ok && t.expiresAt > new Date()) {
@@ -143,6 +149,7 @@ export async function verifySupervisorInvite(req: Request, res: Response, next: 
     await invite.populate("projectId");
     res.json({
       valid: true,
+      requiresOtp: true,
       role: invite.role,
       projectId: invite.projectId,
       supervisorName: inviteService.extractSupervisorName(invite),
@@ -157,7 +164,7 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
   try {
     const input = supervisorSignupSchema.parse({ body: req.body }).body;
 
-    const invite = await inviteService.verifyInvite(input.token);
+    const invite = await inviteService.verifyInviteOtp(input.token, input.otp);
     await invite.populate("projectId");
 
     const existing = await User.findOne({ $or: [{ email: input.email }, { phone: input.phone }] });
@@ -205,9 +212,9 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
 
 const adminCreateInviteSchema = z.object({
   supervisorName: z.string().trim().min(2, "Supervisor name is required").max(80),
+  supervisorEmail: z.string().email("Valid email is required"),
   projectId: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
-  expiryHours: z.number().min(1).max(168).optional(),
 });
 
 export async function adminCreateInvite(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -218,13 +225,12 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
     const { invite, qrUrl, qrPayload, expiresAt } = await inviteService.createInvite({
       createdByAdmin: req.user.sub,
       supervisorName: body.supervisorName,
+      supervisorEmail: body.supervisorEmail,
       projectId: body.projectId,
       metadata: body.metadata,
-      expiryHours: body.expiryHours,
+      expiryMinutes: 5,
     });
 
-    // QR encodes the structured JSON payload (token + supervisorName + expiry)
-    // so the mobile app can extract all info from a single scan.
     const qrDataUrl = await generateQRDataURL(JSON.stringify(qrPayload));
 
     res.status(201).json({
@@ -234,11 +240,69 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       qrPayload,
       qrDataUrl,
       supervisorName: body.supervisorName,
+      supervisorEmail: body.supervisorEmail,
       role: invite.role,
       projectId: invite.projectId,
       expiresAt,
       createdAt: invite.createdAt,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listActiveInvites(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+    const invites = await inviteService.listActiveInvites(req.user.sub);
+    res.json({
+      invites: invites.map((inv) => ({
+        inviteId: inv._id.toString(),
+        token: inv.token,
+        supervisorName: inviteService.extractSupervisorName(inv),
+        supervisorEmail: inv.supervisorEmail,
+        role: inv.role,
+        projectId: inv.projectId,
+        expiresAt: inv.expiresAt,
+        createdAt: inv.createdAt,
+        remainingMs: Math.max(0, inv.expiresAt.getTime() - Date.now()),
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resendInviteOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+    await inviteService.resendOtp(token);
+    res.json({ success: true, message: "New OTP sent to email" });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifySupervisorOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { inviteToken, otp } = z
+      .object({ inviteToken: z.string().min(1), otp: z.string().length(6) })
+      .parse(req.body);
+    await inviteService.verifyInviteOtp(inviteToken, otp);
+    res.json({ valid: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function supervisorResendInviteOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { inviteToken } = z
+      .object({ inviteToken: z.string().min(1) })
+      .parse(req.body);
+    await inviteService.resendOtp(inviteToken);
+    res.json({ success: true, message: "New OTP sent to email" });
   } catch (err) {
     next(err);
   }

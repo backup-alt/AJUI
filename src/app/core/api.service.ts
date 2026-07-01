@@ -95,8 +95,8 @@ export class ApiService {
   // =================== SUPERVISOR INVITES ===================
   createSupervisorInvite(payload: {
     supervisorName: string;
+    supervisorEmail: string;
     projectId?: string;
-    expiryHours?: number;
   }): Observable<{
     inviteId: string;
     token: string;
@@ -104,12 +104,37 @@ export class ApiService {
     qrPayload: { token: string; supervisorName: string; expiresAt: number };
     qrDataUrl: string;
     supervisorName: string;
+    supervisorEmail: string;
     role: string;
     projectId?: string;
     expiresAt: string;
     createdAt: string;
   }> {
     return this.http.post<any>(`${this.baseUrl}/admin/invites/supervisor`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  listActiveInvites(): Observable<{
+    invites: Array<{
+      inviteId: string;
+      token: string;
+      supervisorName: string;
+      supervisorEmail: string;
+      role: string;
+      projectId?: string;
+      expiresAt: string;
+      createdAt: string;
+      remainingMs: number;
+    }>;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/admin/invites/active`, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  resendInviteOtp(token: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/admin/invites/supervisor/resend-otp`, { token }, {
       headers: this.authHeaders(),
     }).pipe(catchError(this.handleError));
   }

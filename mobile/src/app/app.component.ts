@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
 import { AuthService } from './core/services/auth.service';
-import { MockDataService } from './core/services/mock-data.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-root',
@@ -14,21 +14,12 @@ import { MockDataService } from './core/services/mock-data.service';
   `,
 })
 export class AppComponent implements OnInit {
-  constructor(
-    private auth: AuthService,
-    private mock: MockDataService,
-  ) {}
+  constructor(private auth: AuthService, private router: Router) {}
 
-  ngOnInit() {
-    // Restore session if a previous QR signup completed.
-    try {
-      const raw = localStorage.getItem('agb_session');
-      if (raw) {
-        const data = JSON.parse(raw);
-        if (data?.id) {
-          this.auth.setUser(this.mock.currentUser());
-        }
-      }
-    } catch {}
+  async ngOnInit() {
+    await this.auth.init();
+    if (this.auth.isAuthenticated()) {
+      this.router.navigate(['/tabs/home']);
+    }
   }
 }

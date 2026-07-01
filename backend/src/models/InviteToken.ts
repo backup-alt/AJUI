@@ -12,6 +12,9 @@ export interface IInviteToken extends Document {
   usedAt?: Date;
   usedBy?: Types.ObjectId;
   metadata?: Record<string, unknown>;
+  supervisorEmail?: string;
+  otpHash?: string;
+  otpExpiresAt?: Date;
   createdAt: Date;
 }
 
@@ -24,7 +27,10 @@ const inviteTokenSchema = new Schema<IInviteToken>(
     expiresAt: { type: Date, required: true, index: { expires: 0 } },
     usedAt: { type: Date },
     usedBy: { type: Schema.Types.ObjectId, ref: "User" },
-    metadata: { type: Schema.Types.Mixed },
+    metadata: { type: Schema.Types.Mixed as any },
+    supervisorEmail: { type: String },
+    otpHash: { type: String },
+    otpExpiresAt: { type: Date },
   },
   { timestamps: true }
 );
