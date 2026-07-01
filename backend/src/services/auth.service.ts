@@ -36,8 +36,8 @@ function generateTokenId(): string {
 function buildRefreshCookieOptions(expiresAt: Date) {
   return {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax" as const,
+    secure: true,
+    sameSite: "none" as const,
     expires: expiresAt,
     path: "/api/auth",
   };

@@ -180,8 +180,8 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
     const tokens = await authService.issueTokens(user);
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      secure: true,
+      sameSite: "none" as const,
       expires: tokens.expiresAt,
       path: "/api/auth",
     };

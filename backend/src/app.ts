@@ -64,13 +64,17 @@ export function createApp(): express.Application {
   app.use(
     cors({
       origin: (origin, callback) => {
+        const normalize = (url: string) => url.replace(/\/+$/, "");
         const allowedOrigins = [
           env.FRONTEND_URL,
           ...(env.MOBILE_APP_URL !== "*" ? [env.MOBILE_APP_URL] : []),
-        ];
+        ]
+          .filter(Boolean)
+          .map(normalize);
+        const requestOrigin = origin ? normalize(origin) : null;
         if (
           !origin ||
-          allowedOrigins.includes(origin) ||
+          (requestOrigin && allowedOrigins.includes(requestOrigin)) ||
           env.MOBILE_APP_URL === "*"
         ) {
           callback(null, true);
@@ -93,7 +97,7 @@ export function createApp(): express.Application {
     legacyHeaders: false,
     message: { error: "Too many requests, please try again later" },
   });
-  app.use("/api", globalLimiter);
+  app.use(globalLimiter);
 
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true }));
@@ -108,6 +112,28 @@ export function createApp(): express.Application {
       backendUrl: env.BACKEND_PUBLIC_URL || null,
     });
   });
+
+  app.get("/", (_req, res) => {
+    res.redirect(302, env.FRONTEND_URL);
+  });
+
+  app.get("/favicon.ico", (_req, res) => {
+    res.status(204).end();
+  });
+
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain").send("User-agent: *\nDisallow: /\n");
+  });
+
+  if (
+    env.NODE_ENV === "production" &&
+    env.BACKEND_PUBLIC_URL &&
+    env.FRONTEND_URL.replace(/\/+$/, "") === env.BACKEND_PUBLIC_URL.replace(/\/+$/, "")
+  ) {
+    console.error(
+      "[FATAL] FRONTEND_URL points to the backend itself. Root redirect would cause an infinite loop."
+    );
+  }
 
   setupSwagger(app);
 
