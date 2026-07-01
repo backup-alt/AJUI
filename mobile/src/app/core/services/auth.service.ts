@@ -63,7 +63,7 @@ export class AuthService {
     ]);
   }
 
-  private async api(path: string, options: RequestInit = {}) {
+  private async api(path: string, options: RequestInit = {}): Promise<any> {
     const res = await fetch(`${this.backendUrl}${path}`, {
       ...options,
       headers: {
@@ -195,5 +195,18 @@ export class AuthService {
       await this.api('/api/auth/logout', { method: 'POST' });
     } catch {}
     await this.clearSession();
+  }
+
+  /**
+   * Update the current user (used by profile edits).
+   * Re-saves the updated user object in Capacitor Preferences.
+   */
+  async setUser(user: User | null) {
+    if (user) {
+      this.currentUser.set(user);
+      await Preferences.set({ key: KEYS.USER, value: JSON.stringify(user) });
+    } else {
+      await this.clearSession();
+    }
   }
 }
