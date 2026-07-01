@@ -7,7 +7,7 @@
     "dev": "ng serve --host 127.0.0.1",
     "start": "ng serve --host 127.0.0.1",
     "build": "ng build",
-    "build:pages": "ng build --base-href /AJUI/",
+    "build:pages": "ng build --configuration production --base-href /AJUI/",
     "preview": "ng serve --host 127.0.0.1 --configuration production",
     "serve:dist": "node scripts/serve-dist.cjs",
     "test": "echo \"Run tests in backend folder: cd backend && npm test\""
