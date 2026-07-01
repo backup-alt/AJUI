@@ -176,5 +176,5 @@ export async function registerUser(input: {
 }
 
 export function getRefreshCookieName(): string {
-  return `${env.NODE_ENV === "production" ? "__Host-" : ""}ajui_refresh`;
+  return `${isProduction ? "__Secure-" : ""}ajui_refresh`;
 }

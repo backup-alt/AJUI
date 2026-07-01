@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
+import rateLimit from "express-rate-limit";
 import { env } from "./config/env.js";
 import { connectDatabase } from "./config/db.js";
 import { initSendGrid } from "./config/sendgrid.js";
@@ -20,14 +21,12 @@ import { ensureDefaultPermissions } from "./models/RolePermission.js";
 export function createApp(): express.Application {
   const app = express();
 
-  // Trust first proxy (Render's load balancer) for correct client IP + HTTPS detection
   app.set("trust proxy", 1);
 
-  // Force HTTPS redirect in production (Render provides HTTPS automatically)
   if (env.NODE_ENV === "production") {
     app.use((req, res, next) => {
-      const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-      if (proto !== "https") {
+      const proto = req.headers["x-forwarded-proto"] as string;
+      if (proto === "http") {
         return res.redirect(301, `https://${req.headers.host}${req.url}`);
       }
       next();
@@ -36,18 +35,66 @@ export function createApp(): express.Application {
 
   app.use(
     helmet({
-      // Allow cross-origin resource sharing for dev (different ports for frontend/backend).
-      // In production, both frontend and backend are on the same domain (Render),
-      // so this defaults to 'same-origin' which is more secure.
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+        },
+      },
       crossOriginResourcePolicy: env.NODE_ENV === "production" ? { policy: "same-origin" } : { policy: "cross-origin" },
+      crossOriginEmbedderPolicy: false,
     })
   );
+
   app.use(
     cors({
-      origin: env.MOBILE_APP_URL === "*" ? true : [env.FRONTEND_URL, env.MOBILE_APP_URL],
+      origin: (origin, callback) => {
+        const allowedOrigins = [
+          env.FRONTEND_URL,
+          ...(env.MOBILE_APP_URL !== "*" ? [env.MOBILE_APP_URL] : []),
+        ];
+        if (
+          !origin ||
+          allowedOrigins.includes(origin) ||
+          env.MOBILE_APP_URL === "*"
+        ) {
+          callback(null, true);
+        } else {
+          callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+        }
+      },
       credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+      exposedHeaders: ["X-Request-Id"],
+      maxAge: 86400,
     })
   );
+
+  const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests, please try again later" },
+  });
+  app.use("/api", globalLimiter);
+
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
@@ -62,7 +109,6 @@ export function createApp(): express.Application {
     });
   });
 
-  // API documentation (Swagger UI)
   setupSwagger(app);
 
   app.use("/api/auth", authRoutes);
@@ -93,9 +139,7 @@ export async function bootstrap(): Promise<void> {
   });
 }
 
-async function seedDefaultReports(): Promise<void> {
-  // Moved to utils/seed-reports.ts
-}
+async function seedDefaultReports(): Promise<void> {}
 
 if (require.main === module) {
   bootstrap().catch((err) => {
