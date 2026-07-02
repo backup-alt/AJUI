@@ -9,7 +9,7 @@
  */
 export const environment = {
   production: true,
-  backendUrl: 'https://ajui-backend.onrender.com',
+  backendUrl: 'https://agb-o3cc.onrender.com',
   appName: 'AGB(Annai Golden Builders)',
   // Production builds never accept the offline test token.
   testQrToken: '',

@@ -180,6 +180,8 @@ export interface ActiveInviteDisplay {
   expiresAt: string;
   remainingMs: number;
   scanned: boolean;
+  otp?: string;
+  emailSent?: boolean;
 }
 
 @Component({
@@ -235,6 +237,15 @@ export interface ActiveInviteDisplay {
                         placeholder="e.g. rajesh@annabuilders.com"
                       />
                     </label>
+                    <label>
+                      <span>Supervisor Mobile Number</span>
+                      <input
+                        type="tel"
+                        [value]="supervisorPhoneDraft()"
+                        (input)="supervisorPhoneDraft.set($any($event.target).value)"
+                        placeholder="e.g. +91 98765 43210"
+                      />
+                    </label>
                     <p class="settings-error" *ngIf="supervisorError()">{{ supervisorError() }}</p>
                     <button
                       type="button"
@@ -272,6 +283,10 @@ export interface ActiveInviteDisplay {
                     <p class="settings-hint" *ngIf="!invite.scanned">
                       Ask the supervisor to open the <strong>AGB</strong> app, tap <strong>Scan QR</strong> on the welcome screen, and enter the OTP sent to their email.
                     </p>
+                    <div class="settings-otp-block" *ngIf="!invite.scanned && invite.otp && invite.emailSent === false">
+                      <span class="settings-otp-label">Email delivery failed — share this code verbally with the supervisor</span>
+                      <strong class="settings-otp-code">{{ invite.otp }}</strong>
+                    </div>
                     <div class="settings-scan-success" *ngIf="invite.scanned">
                       <svg viewBox="0 0 20 20" aria-hidden="true">
                         <circle cx="10" cy="10" r="8" fill="#d4edda" stroke="#28a745" stroke-width="1.5"/>
@@ -319,6 +334,35 @@ export interface ActiveInviteDisplay {
                       </div>
                     </div>
                   </div>
+                </div>
+              </article>
+
+              <article class="settings-card settings-deactivate-card">
+                <div>
+                  <span>Team</span>
+                  <h2>Deactivate Supervisor</h2>
+                  <p>Use this to remove a supervisor's access (for example, when they have already registered with their email/phone but cannot complete setup). Enter their email or phone number to find and deactivate their account.</p>
+                </div>
+
+                <div class="settings-invite-form">
+                  <label>
+                    <span>Email or Phone Number</span>
+                    <input
+                      type="text"
+                      [value]="deactivateSearch()"
+                      (input)="deactivateSearch.set($any($event.target).value)"
+                      placeholder="e.g. rajesh@agbuilders.com or +91 98765 43210"
+                    />
+                  </label>
+                  <p class="settings-error" *ngIf="deactivateError()">{{ deactivateError() }}</p>
+                  <p class="settings-success" *ngIf="deactivateSuccess()">{{ deactivateSuccess() }}</p>
+                  <button
+                    type="button"
+                    class="settings-inline-action settings-danger-action"
+                    [disabled]="deactivateLoading()"
+                    (click)="deactivateSupervisor()">
+                    {{ deactivateLoading() ? 'Deactivating…' : 'Deactivate Supervisor' }}
+                  </button>
                 </div>
               </article>
 
@@ -589,12 +633,18 @@ export class SettingsPage implements OnDestroy {
 
   readonly supervisorNameDraft = signal("");
   readonly supervisorEmailDraft = signal("");
+  readonly supervisorPhoneDraft = signal("");
   readonly supervisorLoading = signal(false);
   readonly supervisorError = signal<string | null>(null);
   readonly resendingOtp = signal(false);
   readonly currentInvite = signal<ActiveInviteDisplay | null>(null);
   readonly activeInvites = signal<Array<{ token: string; supervisorName: string; supervisorEmail: string; expiresAt: string; remainingMs: number }>>([]);
   readonly scanSuccess = signal(false);
+
+  readonly deactivateSearch = signal("");
+  readonly deactivateLoading = signal(false);
+  readonly deactivateError = signal<string | null>(null);
+  readonly deactivateSuccess = signal<string | null>(null);
 
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
@@ -667,6 +717,7 @@ export class SettingsPage implements OnDestroy {
   generateSupervisorQr() {
     const name = this.supervisorNameDraft().trim();
     const email = this.supervisorEmailDraft().trim();
+    const phone = this.supervisorPhoneDraft().trim();
     if (name.length < 2) {
       this.supervisorError.set("Please enter at least 2 characters for the name.");
       return;
@@ -675,10 +726,14 @@ export class SettingsPage implements OnDestroy {
       this.supervisorError.set("Please enter a valid email address.");
       return;
     }
+    if (!phone || phone.replace(/\D/g, "").length < 8) {
+      this.supervisorError.set("Please enter a valid mobile number (at least 8 digits).");
+      return;
+    }
     this.supervisorError.set(null);
     this.supervisorLoading.set(true);
 
-    this.api.createSupervisorInvite({ supervisorName: name, supervisorEmail: email }).subscribe({
+    this.api.createSupervisorInvite({ supervisorName: name, supervisorEmail: email, supervisorPhone: phone }).subscribe({
       next: (invite) => {
         const fiveMinMs = 5 * 60 * 1000;
         this.currentInvite.set({
@@ -690,6 +745,8 @@ export class SettingsPage implements OnDestroy {
           expiresAt: invite.expiresAt,
           remainingMs: fiveMinMs,
           scanned: false,
+          otp: invite.otp,
+          emailSent: invite.emailSent,
         });
         this.supervisorLoading.set(false);
         this.startCountdown();
@@ -712,8 +769,43 @@ export class SettingsPage implements OnDestroy {
     this.currentInvite.set(null);
     this.supervisorNameDraft.set("");
     this.supervisorEmailDraft.set("");
+    this.supervisorPhoneDraft.set("");
     this.supervisorError.set(null);
     this.startActiveInvitesPoll();
+  }
+
+  deactivateSupervisor() {
+    const search = this.deactivateSearch().trim();
+    if (!search) {
+      this.deactivateError.set("Please enter an email or phone number.");
+      return;
+    }
+
+    const payload: { email?: string; phone?: string } = {};
+    if (search.includes("@")) {
+      payload.email = search;
+    } else {
+      payload.phone = search;
+    }
+
+    this.deactivateLoading.set(true);
+    this.deactivateError.set(null);
+    this.deactivateSuccess.set(null);
+
+    this.api.deactivateSupervisor(payload).subscribe({
+      next: (res) => {
+        this.deactivateSuccess.set(`Supervisor "${res.supervisor.name}" (${res.supervisor.email || res.supervisor.phone}) has been deactivated.`);
+        this.deactivateSearch.set("");
+        this.deactivateLoading.set(false);
+        setTimeout(() => this.deactivateSuccess.set(null), 5000);
+      },
+      error: (err) => {
+        const status = err?.status ?? err?.statusCode;
+        const detail = err?.error?.error || err?.message || "Failed to deactivate supervisor.";
+        this.deactivateError.set(`[${status ?? "?"}] ${detail}`);
+        this.deactivateLoading.set(false);
+      },
+    });
   }
 
   resendOtp(token: string) {

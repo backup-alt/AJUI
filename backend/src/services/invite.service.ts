@@ -4,7 +4,7 @@ import { InviteToken, IInviteToken } from "../models/InviteToken.js";
 import { env } from "../config/env.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { compareToken } from "../utils/password.js";
-import { sendEmail } from "../config/sendgrid.js";
+import { sendEmail } from "../config/email.js";
 
 const QR_EXPIRY_MINUTES = 5;
 const OTP_LENGTH = 6;
@@ -21,6 +21,7 @@ export interface CreateInviteParams {
   createdByAdmin: string;
   supervisorName: string;
   supervisorEmail: string;
+  supervisorPhone: string;
   projectId?: string;
   metadata?: Record<string, unknown>;
   expiryMinutes?: number;
@@ -32,6 +33,8 @@ export async function createInvite(params: CreateInviteParams): Promise<{
   qrPayload: { token: string; supervisorName: string; expiresAt: number };
   expiresAt: Date;
   otpExpiresAt: Date;
+  otp: string;
+  emailSent: boolean;
 }> {
   const token = generateToken();
   const otp = generateOtp();
@@ -52,6 +55,7 @@ export async function createInvite(params: CreateInviteParams): Promise<{
     expiresAt,
     metadata,
     supervisorEmail: params.supervisorEmail,
+    supervisorPhone: params.supervisorPhone,
     otpHash: "", // will update after hashing
     otpExpiresAt,
   });
@@ -62,33 +66,37 @@ export async function createInvite(params: CreateInviteParams): Promise<{
   invite.otpHash = otpHash;
   await invite.save();
 
-  // Send OTP email to supervisor
-  const resetUrl = `${env.FRONTEND_URL || "http://localhost:4200"}/reset-password?token=${token}`;
-  try {
-    await sendEmail({
-      to: params.supervisorEmail,
-      subject: "Your AGB Supervisor Invite — OTP Code",
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
-          <div style="background:#002263;color:white;padding:16px 24px;border-radius:8px 8px 0 0">
-            <h2 style="margin:0;color:white">AGB Supervisor Invite</h2>
-          </div>
-          <div style="padding:24px">
-            <p style="font-size:16px">Hello <strong>${params.supervisorName}</strong>,</p>
-            <p style="font-size:14px;color:#555">You have been invited to join AGB (Annai Golden Builders) as a supervisor. Your one-time password is:</p>
-            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
-              <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${otp}</span>
-            </div>
-            <p style="font-size:12px;color:#888">This code expires in <strong>${expiryMinutes} minutes</strong>. Scan the QR code from the admin dashboard to set up your account.</p>
-            <hr style="border:none;border-top:1px solid #eee;margin:20px 0">
-            <p style="font-size:12px;color:#aaa;text-align:center">AGB (Annai Golden Builders) — Internal Use Only</p>
-          </div>
+  // Send OTP email to supervisor. This is fire-and-forget so the request
+  // that created the invite returns the QR code immediately.
+  const emailBody = {
+    to: params.supervisorEmail,
+    subject: "Your AGB Supervisor activation code",
+    html: `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
+        <div style="background:#002263;color:white;padding:16px 24px;border-radius:8px 8px 0 0">
+          <h2 style="margin:0;color:white">AGB Supervisor Invitation</h2>
         </div>
-      `,
+        <div style="padding:24px">
+          <p style="font-size:16px">Hello <strong>${params.supervisorName}</strong>,</p>
+          <p style="font-size:14px;color:#555">You have been invited to join AGB (Annai Golden Builders) as a supervisor. Your one-time activation code is:</p>
+          <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
+            <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${otp}</span>
+          </div>
+          <p style="font-size:12px;color:#888">This code expires in <strong>${expiryMinutes} minutes</strong>. Open the AGB app, tap "Scan QR", and enter this code to complete your setup.</p>
+          <hr style="border:none;border-top:1px solid #eee;margin:20px 0">
+          <p style="font-size:12px;color:#aaa;text-align:center">AGB (Annai Golden Builders) — Internal Use Only</p>
+        </div>
+      </div>
+    `,
+    text: `Hello ${params.supervisorName},\n\nYou have been invited to join AGB (Annai Golden Builders) as a supervisor.\n\nYour activation code: ${otp}\n\nThis code expires in ${expiryMinutes} minutes. Open the AGB app, tap "Scan QR", and enter this code to complete your setup.\n\n---\nAGB (Annai Golden Builders) — Internal Use Only`,
+  };
+  // Kick off delivery in the background. We don't await it.
+  let emailSent = false;
+  sendEmail(emailBody)
+    .then(() => { /* delivered */ })
+    .catch((emailErr) => {
+      console.error("[InviteService] Failed to send OTP email (non-blocking):", emailErr);
     });
-  } catch (emailErr) {
-    console.error("[InviteService] Failed to send OTP email:", emailErr);
-  }
 
   const separator = env.QR_BASE_URL.includes("?") ? "&" : "?";
   const qrUrl = `${env.QR_BASE_URL}${separator}token=${token}`;
@@ -96,10 +104,11 @@ export async function createInvite(params: CreateInviteParams): Promise<{
   const qrPayload = {
     token,
     supervisorName: params.supervisorName,
+    supervisorPhone: params.supervisorPhone,
     expiresAt: expiresAt.getTime(),
   };
 
-  return { invite, qrUrl, qrPayload, expiresAt, otpExpiresAt };
+  return { invite, qrUrl, qrPayload, expiresAt, otpExpiresAt, otp, emailSent };
 }
 
 export async function verifyInvite(token: string): Promise<IInviteToken> {
@@ -155,7 +164,7 @@ export async function listActiveInvites(createdByAdmin: string): Promise<Array<I
     .exec() as unknown as Promise<Array<IInviteToken & { _id: Types.ObjectId }>>;
 }
 
-export async function resendOtp(token: string): Promise<void> {
+export async function resendOtp(token: string): Promise<{ otp: string; emailSent: boolean }> {
   const invite = await InviteToken.findOne({ token });
   if (!invite) throw new AppError(404, "Invite token not found");
   if (invite.usedAt) throw new AppError(410, "Invite already used");
@@ -168,30 +177,37 @@ export async function resendOtp(token: string): Promise<void> {
   invite.otpExpiresAt = invite.expiresAt;
   await invite.save();
 
+  // Fire-and-forget email so the API returns instantly. `emailSent` is
+  // set to false on the response so the caller can show the OTP on
+  // screen if the SMTP call eventually fails.
+  let emailSent = false;
   if (invite.supervisorEmail) {
     const name = extractSupervisorName(invite);
-    try {
-      await sendEmail({
-        to: invite.supervisorEmail,
-        subject: "Your AGB Supervisor Invite — New OTP Code",
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
-            <div style="background:#002263;color:white;padding:16px 24px;border-radius:8px 8px 0 0">
-              <h2 style="margin:0;color:white">AGB Supervisor Invite — New OTP</h2>
-            </div>
-            <div style="padding:24px">
-              <p style="font-size:16px">Hello <strong>${name}</strong>,</p>
-              <p style="font-size:14px;color:#555">A new OTP has been generated for your AGB supervisor account. Your code is:</p>
-              <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
-                <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${otp}</span>
-              </div>
-              <p style="font-size:12px;color:#888">This code expires when the QR code expires.</p>
-            </div>
+    const emailBody = {
+      to: invite.supervisorEmail,
+      subject: "Your AGB Supervisor Invite — New OTP Code",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
+          <div style="background:#002263;color:white;padding:16px 24px;border-radius:8px 8px 0 0">
+            <h2 style="margin:0;color:white">AGB Supervisor Invite — New OTP</h2>
           </div>
-        `,
+          <div style="padding:24px">
+            <p style="font-size:16px">Hello <strong>${name}</strong>,</p>
+            <p style="font-size:14px;color:#555">A new OTP has been generated for your AGB supervisor account. Your code is:</p>
+            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
+              <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${otp}</span>
+            </div>
+            <p style="font-size:12px;color:#888">This code expires when the QR code expires.</p>
+          </div>
+        </div>
+      `,
+    };
+    sendEmail(emailBody)
+      .then(() => { /* delivered */ })
+      .catch((emailErr) => {
+        console.error("[InviteService] Failed to resend OTP email (non-blocking):", emailErr);
       });
-    } catch (emailErr) {
-      console.error("[InviteService] Failed to resend OTP email:", emailErr);
-    }
   }
+
+  return { otp, emailSent };
 }

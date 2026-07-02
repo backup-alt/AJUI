@@ -109,6 +109,8 @@ export class ApiService {
     projectId?: string;
     expiresAt: string;
     createdAt: string;
+    otp?: string;
+    emailSent?: boolean;
   }> {
     return this.http.post<any>(`${this.baseUrl}/admin/invites/supervisor`, payload, {
       headers: this.authHeaders(),
@@ -135,6 +137,12 @@ export class ApiService {
 
   resendInviteOtp(token: string): Observable<any> {
     return this.http.post(`${this.baseUrl}/admin/invites/supervisor/resend-otp`, { token }, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  deactivateSupervisor(payload: { email?: string; phone?: string }): Observable<any> {
+    return this.http.post(`${this.baseUrl}/admin/users/deactivate`, payload, {
       headers: this.authHeaders(),
     }).pipe(catchError(this.handleError));
   }

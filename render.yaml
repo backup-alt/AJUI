@@ -25,10 +25,10 @@ services:
         value: 15m
       - key: JWT_REFRESH_EXPIRY
         value: 7d
-      - key: SENDGRID_API_KEY
+      - key: GMAIL_USER
+        value: antigravity20263.0.3.0@gmail.com
+      - key: GMAIL_APP_PASSWORD
         sync: false
-      - key: SENDGRID_FROM_EMAIL
-        value: noreply@agbuilders.com
       - key: FRONTEND_URL
         sync: false
       - key: MOBILE_APP_URL

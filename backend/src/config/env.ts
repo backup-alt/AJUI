@@ -14,8 +14,8 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRY: z.string().default("15m"),
   JWT_REFRESH_EXPIRY: z.string().default("7d"),
 
-  SENDGRID_API_KEY: z.string().optional(),
-  SENDGRID_FROM_EMAIL: z.string().email().default("noreply@agbuilders.com"),
+  GMAIL_USER: z.string().email().default("antigravity20263.0.3.0@gmail.com"),
+  GMAIL_APP_PASSWORD: z.string().min(16, "GMAIL_APP_PASSWORD must be at least 16 chars"),
 
   FRONTEND_URL: z.string().url().default("http://localhost:4200"),
   MOBILE_APP_URL: z.string().default("*"),

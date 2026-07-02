@@ -111,9 +111,9 @@ export class AuthService {
 
   /**
    * GET /api/auth/supervisor/verify/:token
-   * Returns { valid, requiresOtp, supervisorName }
+   * Returns { valid, requiresOtp, supervisorName, supervisorEmail, projectId }
    */
-  async verifyInvite(token: string): Promise<{ valid: boolean; requiresOtp: boolean; supervisorName: string; message?: string }> {
+  async verifyInvite(token: string): Promise<{ valid: boolean; requiresOtp: boolean; supervisorName: string; supervisorEmail?: string; projectId?: string; message?: string }> {
     try {
       const res = await fetch(
         `${this.backendUrl}/api/auth/supervisor/verify/${encodeURIComponent(token)}`,
@@ -124,6 +124,8 @@ export class AuthService {
         valid: res.ok && !!body.valid,
         requiresOtp: !!body.requiresOtp,
         supervisorName: body.supervisorName || '',
+        supervisorEmail: body.supervisorEmail || '',
+        projectId: body.projectId || '',
         message: body.message,
       };
     } catch {
@@ -148,6 +150,29 @@ export class AuthService {
       return { valid: res.ok && !!body.valid, message: body.message };
     } catch {
       return { valid: false, message: 'Cannot reach server' };
+    }
+  }
+
+  /**
+   * POST /api/auth/supervisor/resend-otp
+   * Body: { inviteToken }
+   * Returns { success, otp?, emailSent? }
+   */
+  async resendInviteOtp(inviteToken: string): Promise<{ success: boolean; otp?: string; emailSent?: boolean; message?: string }> {
+    try {
+      const res = await fetch(
+        `${this.backendUrl}/api/auth/supervisor/resend-otp`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ inviteToken }),
+        }
+      );
+      const body = await res.json().catch(() => ({}));
+      return { success: res.ok && !!body.success, otp: body.otp, emailSent: body.emailSent, message: body.message };
+    } catch {
+      return { success: false, message: 'Cannot reach server' };
     }
   }
 

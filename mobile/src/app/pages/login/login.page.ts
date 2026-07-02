@@ -36,12 +36,14 @@ type Step = 'welcome' | 'verifying' | 'otp' | 'signup';
 interface QrPayload {
   token: string;
   supervisorName: string;
+  supervisorPhone?: string;
   expiresAt: number;
 }
 
 const TEST_QR_PAYLOAD: QrPayload = {
   token: environment.testQrToken || 'AGB-DISABLED',
   supervisorName: environment.testQrSupervisorName || 'Supervisor',
+  supervisorPhone: '+919876543210',
   expiresAt: Date.now() + 24 * 60 * 60 * 1000,
 };
 
@@ -221,11 +223,11 @@ const TEST_QR_PAYLOAD: QrPayload = {
 
           <div class="form-field">
             <label>Phone</label>
-            <ion-input [(ngModel)]="signupPhone" placeholder="+91 XXXXX XXXXX" type="tel"></ion-input>
+            <ion-input [(ngModel)]="signupPhone" placeholder="+91 XXXXX XXXXX" type="tel" [readonly]="true"></ion-input>
           </div>
 
           <div class="form-field">
-            <label>Email</label>
+            <label>Email (optional)</label>
             <ion-input [(ngModel)]="signupEmail" placeholder="you@example.com" type="email"></ion-input>
           </div>
 
@@ -253,10 +255,10 @@ const TEST_QR_PAYLOAD: QrPayload = {
 
       <!-- ============ Global error toast ============ -->
       <ion-toast
-        [isOpen]="!!toastMessage"
+        [isOpen]="!!toastMessage()"
         [message]="toastMessage()"
         [color]="toastColor()"
-        (didDismiss="toastMessage.set('')"
+        (didDismiss)="toastMessage.set('')"
         duration="3500"
         position="top"
       ></ion-toast>
@@ -549,12 +551,17 @@ export class LoginPage implements OnInit, OnDestroy {
       }
 
       this.scannedName.set(result.supervisorName || this.scannedName());
+      this.inviteEmail = result.supervisorEmail || this.inviteEmail;
+      this.signupEmail = this.inviteEmail;
+      this.signupName = this.scannedName();
+      // Pre-fill phone from the invite (via server response) or from the QR payload
+      const invitePhone = (result as any).supervisorPhone || payload.supervisorPhone || '';
+      if (invitePhone) {
+        this.signupPhone = invitePhone;
+      }
 
       // Check if OTP is required
       if (result.requiresOtp) {
-        // Move to OTP step - we don't have email yet from verify response
-        // Use a placeholder; mobile will show it once entered in signup
-        this.inviteEmail = '';
         this.step = 'otp';
         this.startOtpCountdown(5 * 60); // 5 min expiry
         this.startResendCooldown(30);
@@ -606,26 +613,24 @@ export class LoginPage implements OnInit, OnDestroy {
 
   async resendOtp() {
     if (this.resendCooldown() > 0) return;
-    try {
-      const res = await fetch(
-        `${environment.backendUrl}/api/auth/supervisor/resend-otp`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ inviteToken: this.scannedToken() }),
-        }
-      );
-      if (res.ok) {
+    const res = await this.auth.resendInviteOtp(this.scannedToken());
+    if (res.success) {
+      this.startResendCooldown(30);
+      this.startOtpCountdown(5 * 60);
+      if (res.emailSent) {
         this.showToast('New OTP sent to supervisor email.', 'success');
-        this.startResendCooldown(30);
-        this.startOtpCountdown(5 * 60);
+      } else if (res.otp) {
+        // Email delivery failed (e.g. SendGrid misconfigured / 403).
+        // The backend still returns the OTP in development so the
+        // supervisor can complete signup without an email.
+        this.otpDigits = res.otp.split('');
+        this.errorMessage = '';
+        this.showToast(`Email delivery failed. OTP shown on screen: ${res.otp}`, 'danger');
       } else {
-        const body = await res.json().catch(() => ({}));
-        this.showToast(body?.message || 'Failed to resend OTP.', 'danger');
+        this.showToast('New OTP generated. Check your email.', 'success');
       }
-    } catch {
-      this.showToast('Cannot reach server to resend OTP.', 'danger');
+    } else {
+      this.showToast(res.message || 'Failed to resend OTP.', 'danger');
     }
   }
 
@@ -694,21 +699,31 @@ export class LoginPage implements OnInit, OnDestroy {
       this.showToast('Password must be at least 6 characters.', 'danger');
       return;
     }
+    if (!this.signupPhone || this.signupPhone.replace(/\D/g, '').length < 8) {
+      this.showToast('Please enter a valid mobile number.', 'danger');
+      return;
+    }
     this.loading = true;
     try {
       const otp = this.otpDigits.join('');
-      await this.auth.supervisorSignup({
+      const tokens = await this.auth.supervisorSignup({
         inviteToken: this.scannedToken(),
         otp,
         password: this.signupPassword,
-        supervisorName: this.scannedName(),
+        supervisorName: this.signupName || this.scannedName(),
         phone: this.signupPhone,
         email: this.signupEmail,
       });
-      this.showToast('Welcome, ' + this.scannedName() + '!', 'success');
+      const displayName = (tokens as any)?.user?.name || this.scannedName();
+      this.showToast('Welcome, ' + displayName + '!', 'success');
       setTimeout(() => this.router.navigate(['/tabs/home']), 800);
     } catch (e: any) {
-      this.showToast(e?.message || 'Signup failed. Please try again.', 'danger');
+      const errorMsg = e?.message || 'Signup failed. Please try again.';
+      if (errorMsg.includes('already exists') || errorMsg.includes('409')) {
+        this.showToast('An account with this email or phone already exists. Please contact your administrator.', 'danger');
+      } else {
+        this.showToast(errorMsg, 'danger');
+      }
     } finally {
       this.loading = false;
     }

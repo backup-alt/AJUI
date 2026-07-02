@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { Types } from "mongoose";
 import { User, IUser } from "../models/User.js";
 import { RefreshToken } from "../models/RefreshToken.js";
 import { hashPassword, verifyPassword, hashToken, compareToken } from "../utils/password.js";
@@ -177,4 +178,36 @@ export async function registerUser(input: {
 
 export function getRefreshCookieName(): string {
   return `${isProduction ? "__Secure-" : ""}ajui_refresh`;
+}
+
+export async function deactivateUser(identifier: { email?: string; phone?: string }, deactivatedBy: string) {
+  if (!identifier.email && !identifier.phone) {
+    throw new AppError(400, "Email or phone is required");
+  }
+
+  const filter: any = {};
+  if (identifier.email) filter.email = identifier.email;
+  if (identifier.phone) filter.phone = identifier.phone;
+
+  const user = await User.findOne(filter);
+  if (!user) {
+    throw new AppError(404, "Supervisor not found");
+  }
+
+  if (user.status === "inactive") {
+    throw new AppError(409, "Supervisor is already inactive");
+  }
+
+  user.status = "inactive";
+  user.deactivatedAt = new Date();
+  user.deactivatedBy = new Types.ObjectId(deactivatedBy);
+  await user.save();
+
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    status: user.status,
+  };
 }

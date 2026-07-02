@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -14,7 +14,6 @@ import {
   IonItem,
   IonLabel,
   IonInput,
-  IonTextarea,
   ToastController,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -27,9 +26,10 @@ import {
   logOutOutline,
   createOutline,
   checkmarkOutline,
+  checkmarkDoneCircleOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
-import { MockDataService } from '../../core/services/mock-data.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-profile',
@@ -49,7 +49,6 @@ import { MockDataService } from '../../core/services/mock-data.service';
     IonItem,
     IonLabel,
     IonInput,
-    IonTextarea,
   ],
   template: `
     <ion-header [translucent]="true">
@@ -233,7 +232,7 @@ import { MockDataService } from '../../core/services/mock-data.service';
     }
   `],
 })
-export class ProfilePage {
+export class ProfilePage implements OnInit {
   user = this.auth.currentUser;
   editMode = false;
   edit = { name: '', phone: '', email: '' };
@@ -247,7 +246,6 @@ export class ProfilePage {
 
   constructor(
     private auth: AuthService,
-    private mock: MockDataService,
     private toastCtrl: ToastController,
   ) {
     addIcons({
@@ -259,8 +257,31 @@ export class ProfilePage {
       'log-out-outline': logOutOutline,
       'create-outline': createOutline,
       'checkmark-outline': checkmarkOutline,
-      'checkmark-done-circle-outline': () => null as any,
-    } as any);
+      'checkmark-done-circle-outline': checkmarkDoneCircleOutline,
+    });
+  }
+
+  async ngOnInit() {
+    try {
+      const res = await fetch(`${environment.backendUrl}/api/supervisor/profile`, {
+        headers: { Authorization: `Bearer ${this.auth.accessToken}` },
+      });
+      if (res.ok) {
+        const data: any = await res.json();
+        if (data?.user) {
+          await this.auth.setUser({
+            id: data.user.id,
+            name: data.user.name,
+            email: data.user.email,
+            phone: data.user.phone,
+            role: data.user.role,
+            status: data.user.status,
+            assignedProjectIds: this.user()?.assignedProjectIds || [],
+            createdAt: this.user()?.createdAt || new Date().toISOString(),
+          });
+        }
+      }
+    } catch {}
   }
 
   toggleEdit() {
@@ -275,27 +296,51 @@ export class ProfilePage {
   }
 
   async saveEdit() {
-    this.mock.updateUser({ ...this.edit });
-    this.auth.setUser(this.mock.currentUser());
-    this.editMode = false;
-    const toast = await this.toastCtrl.create({
-      message: 'Profile updated',
-      duration: 1500,
-      position: 'top',
-      cssClass: 'agb-toast',
-    });
-    await toast.present();
+    try {
+      const res = await fetch(`${environment.backendUrl}/api/supervisor/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.auth.accessToken}`,
+        },
+        body: JSON.stringify(this.edit),
+      });
+      const data: any = res.ok ? await res.json() : {};
+      if (res.ok && data?.user) {
+        await this.auth.setUser({
+          id: data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          phone: data.user.phone,
+          role: data.user.role,
+          status: data.user.status,
+          assignedProjectIds: this.user()?.assignedProjectIds || [],
+          createdAt: this.user()?.createdAt || new Date().toISOString(),
+        });
+        this.editMode = false;
+        await this.showToast('Profile updated');
+      } else {
+        await this.showToast(data?.message || 'Update failed', 'danger');
+      }
+    } catch {
+      await this.showToast('Update failed', 'danger');
+    }
   }
 
   async logout() {
     this.auth.logout();
+    await this.showToast('Signed out successfully');
+    location.href = '/login';
+  }
+
+  private async showToast(message: string, color: string = '') {
     const toast = await this.toastCtrl.create({
-      message: 'Signed out successfully',
+      message,
       duration: 1500,
       position: 'top',
+      color: color || undefined,
       cssClass: 'agb-toast',
     });
     await toast.present();
-    location.href = '/login';
   }
 }

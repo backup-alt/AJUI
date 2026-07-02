@@ -1,4 +1,4 @@
-import { Component, computed } from '@angular/core';
+import { Component, computed, OnInit } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import {
   IonHeader,
@@ -34,7 +34,7 @@ import {
   briefcaseOutline,
   cardOutline,
 } from 'ionicons/icons';
-import { MockDataService } from '../../core/services/mock-data.service';
+import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -245,12 +245,13 @@ import { AuthService } from '../../core/services/auth.service';
     .icon-bubble.subcontract { background: rgba(160,84,196,0.14); color: #8b4fa0; }
   `],
 })
-export class HomePage {
+export class HomePage implements OnInit {
   today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' });
-  stats = this.mock.stats;
-  projects = this.mock.projects;
-  activity = this.mock.recentActivity;
+  stats = this.api.stats;
+  projects = this.api.projects;
+  activity = this.api.activity;
   user = this.auth.currentUser;
+  loading = this.api.loading;
 
   greeting = computed(() => {
     const name = this.user()?.name?.split(' ')[0] || 'Supervisor';
@@ -261,7 +262,7 @@ export class HomePage {
   });
 
   constructor(
-    private mock: MockDataService,
+    private api: ApiService,
     private auth: AuthService,
   ) {
     addIcons({
@@ -278,10 +279,15 @@ export class HomePage {
     });
   }
 
-  handleRefresh(event: CustomEvent) {
+  async ngOnInit() {
+    await this.api.loadDashboard();
+  }
+
+  async handleRefresh(event: CustomEvent) {
+    await this.api.loadDashboard();
     setTimeout(() => {
       (event.target as any).complete();
-    }, 800);
+    }, 400);
   }
 
   sourceIcon(s: string) {

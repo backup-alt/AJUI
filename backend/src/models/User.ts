@@ -17,6 +17,8 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
   lastLoginAt?: Date;
+  deactivatedAt?: Date;
+  deactivatedBy?: Types.ObjectId;
 }
 
 const userSchema = new Schema<IUser>(
@@ -40,6 +42,8 @@ const userSchema = new Schema<IUser>(
     supervisorProfileId: { type: Schema.Types.ObjectId, ref: "Supervisor" },
     managedProjectIds: [{ type: Schema.Types.ObjectId, ref: "Project" }],
     lastLoginAt: { type: Date },
+    deactivatedAt: { type: Date },
+    deactivatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );

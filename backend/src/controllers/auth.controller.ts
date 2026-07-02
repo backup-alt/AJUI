@@ -11,7 +11,7 @@ import { User } from "../models/User.js";
 import { hashPassword, compareToken } from "../utils/password.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateQRDataURL } from "../utils/qr-code.js";
-import { sendEmail } from "../config/sendgrid.js";
+import { sendEmail } from "../config/email.js";
 import { PasswordResetToken } from "../models/PasswordResetToken.js";
 import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
@@ -153,6 +153,8 @@ export async function verifySupervisorInvite(req: Request, res: Response, next: 
       role: invite.role,
       projectId: invite.projectId,
       supervisorName: inviteService.extractSupervisorName(invite),
+      supervisorEmail: invite.supervisorEmail || "",
+      supervisorPhone: invite.supervisorPhone || "",
       expiresAt: invite.expiresAt,
     });
   } catch (err) {
@@ -167,14 +169,27 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
     const invite = await inviteService.verifyInviteOtp(input.token, input.otp);
     await invite.populate("projectId");
 
-    const existing = await User.findOne({ $or: [{ email: input.email }, { phone: input.phone }] });
+    // If the mobile app didn't supply an email/phone (e.g. it relied on
+    // whatever the QR carried), pre-fill from the invite so the supervisor
+    // can sign up even when the OTP email itself failed to send.
+    const fallbackEmail = invite.supervisorEmail || "";
+    const fallbackName = inviteService.extractSupervisorName(invite);
+    const finalEmail = (input.email && input.email.length > 0) ? input.email : fallbackEmail;
+    const finalName = (input.name && input.name.length > 0) ? input.name : fallbackName;
+    const finalPhone = input.phone && input.phone.length > 0 ? input.phone : `+910000000000`;
+
+    if (!finalEmail) {
+      throw new AppError(400, "Email is required to complete signup");
+    }
+
+    const existing = await User.findOne({ $or: [{ email: finalEmail }, { phone: finalPhone }] });
     if (existing) throw new AppError(409, "User with this email or phone already exists");
 
     const passwordHash = await hashPassword(input.password);
     const user = await User.create({
-      name: input.name,
-      email: input.email,
-      phone: input.phone,
+      name: finalName,
+      email: finalEmail,
+      phone: finalPhone,
       passwordHash,
       role: "supervisor",
       status: "active",
@@ -213,6 +228,7 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
 const adminCreateInviteSchema = z.object({
   supervisorName: z.string().trim().min(2, "Supervisor name is required").max(80),
   supervisorEmail: z.string().email("Valid email is required"),
+  supervisorPhone: z.string().min(8, "Phone must be at least 8 characters").max(20),
   projectId: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
@@ -222,10 +238,11 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
     const body = adminCreateInviteSchema.parse(req.body);
     if (!req.user?.sub) throw new AppError(401, "Not authenticated");
 
-    const { invite, qrUrl, qrPayload, expiresAt } = await inviteService.createInvite({
+    const { invite, qrUrl, qrPayload, expiresAt, otp, emailSent } = await inviteService.createInvite({
       createdByAdmin: req.user.sub,
       supervisorName: body.supervisorName,
       supervisorEmail: body.supervisorEmail,
+      supervisorPhone: body.supervisorPhone,
       projectId: body.projectId,
       metadata: body.metadata,
       expiryMinutes: 5,
@@ -241,10 +258,13 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       qrDataUrl,
       supervisorName: body.supervisorName,
       supervisorEmail: body.supervisorEmail,
+      supervisorPhone: body.supervisorPhone,
       role: invite.role,
       projectId: invite.projectId,
       expiresAt,
       createdAt: invite.createdAt,
+      otp,
+      emailSent,
     });
   } catch (err) {
     next(err);
@@ -277,8 +297,8 @@ export async function resendInviteOtp(req: Request, res: Response, next: NextFun
   try {
     const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
     if (!req.user?.sub) throw new AppError(401, "Not authenticated");
-    await inviteService.resendOtp(token);
-    res.json({ success: true, message: "New OTP sent to email" });
+    const { otp, emailSent } = await inviteService.resendOtp(token);
+    res.json({ success: true, message: "New OTP generated", otp, emailSent });
   } catch (err) {
     next(err);
   }
@@ -301,8 +321,8 @@ export async function supervisorResendInviteOtp(req: Request, res: Response, nex
     const { inviteToken } = z
       .object({ inviteToken: z.string().min(1) })
       .parse(req.body);
-    await inviteService.resendOtp(inviteToken);
-    res.json({ success: true, message: "New OTP sent to email" });
+    const { otp, emailSent } = await inviteService.resendOtp(inviteToken);
+    res.json({ success: true, message: "New OTP generated", otp, emailSent });
   } catch (err) {
     next(err);
   }

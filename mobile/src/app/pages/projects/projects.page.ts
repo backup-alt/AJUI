@@ -1,4 +1,4 @@
-import { Component, computed } from '@angular/core';
+import { Component, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -23,7 +23,7 @@ import {
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import { folderOutline, locationOutline, trendingUpOutline, chevronForwardOutline } from 'ionicons/icons';
-import { MockDataService } from '../../core/services/mock-data.service';
+import { ApiService } from '../../core/services/api.service';
 import { ProjectStatus } from '../../core/models/types';
 
 @Component({
@@ -278,8 +278,8 @@ import { ProjectStatus } from '../../core/models/types';
     }
   `],
 })
-export class ProjectsPage {
-  projects = this.mock.projects;
+export class ProjectsPage implements OnInit {
+  projects = this.api.projects;
   filter: 'all' | 'active' | 'hold' | 'done' = 'all';
   searchTerm = '';
 
@@ -301,13 +301,17 @@ export class ProjectsPage {
     });
   });
 
-  constructor(private mock: MockDataService, private router: Router) {
+  constructor(private api: ApiService, private router: Router) {
     addIcons({
       'folder-outline': folderOutline,
       'location-outline': locationOutline,
       'trending-up-outline': trendingUpOutline,
       'chevron-forward-outline': chevronForwardOutline,
     });
+  }
+
+  async ngOnInit() {
+    await this.api.loadProjects();
   }
 
   openProject(id: string) {

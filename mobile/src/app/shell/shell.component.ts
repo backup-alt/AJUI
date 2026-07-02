@@ -41,7 +41,7 @@ import {
   settingsOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../core/services/auth.service';
-import { MockDataService } from '../core/services/mock-data.service';
+import { ApiService } from '../core/services/api.service';
 
 @Component({
   selector: 'app-shell',
@@ -289,7 +289,7 @@ export class ShellComponent {
   approvalsIcon: string = 'checkmark-done-circle-outline';
 
   user = this.auth.currentUser;
-  projectCount = computed(() => this.user()?.assignedProjectIds.length ?? 0);
+  projectCount = computed(() => this.api.projects().length);
   userInitials = computed(() => {
     const name = this.user()?.name || 'Supervisor';
     const parts = name.trim().split(/\s+/);
@@ -299,7 +299,7 @@ export class ShellComponent {
 
   constructor(
     private auth: AuthService,
-    private mock: MockDataService,
+    private api: ApiService,
     private router: Router,
     private toastCtrl: ToastController,
   ) {

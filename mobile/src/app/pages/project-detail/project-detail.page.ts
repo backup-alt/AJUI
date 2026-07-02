@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -31,7 +31,7 @@ import {
   briefcaseOutline,
   chevronForwardOutline,
 } from 'ionicons/icons';
-import { MockDataService } from '../../core/services/mock-data.service';
+import { ApiService } from '../../core/services/api.service';
 
 @Component({
   selector: 'app-project-detail',
@@ -349,30 +349,30 @@ import { MockDataService } from '../../core/services/mock-data.service';
     .agb-chip-info { --background: rgba(43,127,204,0.12); --color: var(--agb-info); }
   `],
 })
-export class ProjectDetailPage {
+export class ProjectDetailPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private mock = inject(MockDataService);
+  private api = inject(ApiService);
 
   projectId = signal<string>('');
   tab: 'overview' | 'sites' | 'financials' = 'overview';
 
   project = computed(() => {
     const id = this.projectId();
-    return id ? this.mock.getProjectById(id) : undefined;
+    return id ? this.api.getProjectById(id) : undefined;
   });
 
   projectActivity = computed(() => {
     const p = this.project();
     if (!p) return [];
     const items: any[] = [];
-    this.mock.materials().filter((m) => m.projectId === p.id).forEach((m) =>
+    this.api.materials().filter((m) => m.projectId === p.id).forEach((m) =>
       items.push({ icon: 'cube-outline', title: m.name, subtitle: `${m.requestedQuantity} ${m.unit} · ${m.site}`, status: m.status, chipClass: this.statusChip(m.status) })
     );
-    this.mock.labour().filter((l) => l.projectId === p.id).forEach((l) =>
+    this.api.labour().filter((l) => l.projectId === p.id).forEach((l) =>
       items.push({ icon: 'people-outline', title: `Labour: ${l.totalWorkers} workers`, subtitle: `${l.site} · ${l.attendanceDate}`, status: l.status, chipClass: this.statusChip(l.status), amount: l.totalWages })
     );
-    this.mock.expenses().filter((e) => e.projectId === p.id).forEach((e) =>
+    this.api.expenses().filter((e) => e.projectId === p.id).forEach((e) =>
       items.push({ icon: 'wallet-outline', title: e.category, subtitle: `${e.site} · ${e.expenseDate}`, status: e.status, chipClass: this.statusChip(e.status), amount: e.amount })
     );
     return items.slice(0, 8);
@@ -390,8 +390,14 @@ export class ProjectDetailPage {
       'briefcase-outline': briefcaseOutline,
       'chevron-forward-outline': chevronForwardOutline,
     });
+  }
+
+  async ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
-    if (id) this.projectId.set(id);
+    if (id) {
+      this.projectId.set(id);
+      await this.api.loadProject(id);
+    }
   }
 
   statusClass(s: string) {
