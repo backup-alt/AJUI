@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import { env } from "./config/env.js";
 import { connectDatabase } from "./config/db.js";
-import { initEmail } from "./config/email.js";
+import { initEmail, verifyEmailConnection } from "./config/email.js";
 import { initFirebase } from "./config/firebase.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import { setupSwagger } from "./config/swagger.js";
@@ -154,6 +154,7 @@ export function createApp(): express.Application {
 export async function bootstrap(): Promise<void> {
   await connectDatabase();
   initEmail();
+  await verifyEmailConnection();
   initFirebase();
   await ensureDefaultPermissions();
   const { seedDefaultReports } = await import("./utils/seed-reports.js");

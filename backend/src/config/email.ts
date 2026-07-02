@@ -15,8 +15,9 @@ export function initEmail(): void {
 
   transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    port: 587,
+    secure: false,
+    requireTLS: true,
     auth: {
       user: env.GMAIL_USER,
       pass: env.GMAIL_APP_PASSWORD,
@@ -25,7 +26,19 @@ export function initEmail(): void {
 
   initialized = true;
   mockMode = false;
-  console.log("[Email] Gmail SMTP transport initialized");
+  console.log("[Email] Gmail SMTP transport initialized (port 587, STARTTLS)");
+}
+
+export async function verifyEmailConnection(): Promise<boolean> {
+  if (!transporter) return false;
+  try {
+    await transporter.verify();
+    console.log("[Email] SMTP connection verified successfully");
+    return true;
+  } catch (err: any) {
+    console.error("[Email] SMTP connection verification failed:", err?.message || err);
+    return false;
+  }
 }
 
 export function isEmailMocked(): boolean {
@@ -60,7 +73,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
   }
 
   try {
-    await withTimeout(
+    const result = await withTimeout(
       transporter.sendMail({
         from: env.GMAIL_USER,
         to,
@@ -68,8 +81,9 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
         html,
         text: text || html.replace(/<[^>]+>/g, ""),
       }),
-      10000
+      15000
     );
+    console.log(`[Email] Sent to ${to} (messageId: ${result.messageId})`);
   } catch (err: any) {
     const status = err?.responseCode || err?.statusCode;
     if (status === 535 || status === 401) {
