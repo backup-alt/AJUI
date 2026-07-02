@@ -223,7 +223,7 @@ const TEST_QR_PAYLOAD: QrPayload = {
 
           <div class="form-field">
             <label>Phone</label>
-            <ion-input [(ngModel)]="signupPhone" placeholder="+91 XXXXX XXXXX" type="tel" [readonly]="true"></ion-input>
+            <ion-input [(ngModel)]="signupPhone" placeholder="+91 XXXXX XXXXX" type="tel"></ion-input>
           </div>
 
           <div class="form-field">
