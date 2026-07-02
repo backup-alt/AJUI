@@ -96,15 +96,17 @@ export class ApiService {
   createSupervisorInvite(payload: {
     supervisorName: string;
     supervisorEmail: string;
+    supervisorPhone?: string;
     projectId?: string;
   }): Observable<{
     inviteId: string;
     token: string;
     qrUrl: string;
-    qrPayload: { token: string; supervisorName: string; expiresAt: number };
+    qrPayload: { token: string; supervisorName: string; supervisorPhone?: string; expiresAt: number };
     qrDataUrl: string;
     supervisorName: string;
     supervisorEmail: string;
+    supervisorPhone?: string;
     role: string;
     projectId?: string;
     expiresAt: string;
