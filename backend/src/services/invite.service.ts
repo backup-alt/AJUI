@@ -90,13 +90,16 @@ export async function createInvite(params: CreateInviteParams): Promise<{
     `,
     text: `Hello ${params.supervisorName},\n\nYou have been invited to join AGB (Annai Golden Builders) as a supervisor.\n\nYour activation code: ${otp}\n\nThis code expires in ${expiryMinutes} minutes. Open the AGB app, tap "Scan QR", and enter this code to complete your setup.\n\n---\nAGB (Annai Golden Builders) — Internal Use Only`,
   };
-  // Kick off delivery in the background. We don't await it.
+  // Kick off delivery but track success. We return `emailSent` and the
+  // raw `otp` so the caller can show the OTP on screen if SMTP fails
+  // (e.g. Gmail blocked, wrong App Password, Render port restriction).
   let emailSent = false;
-  sendEmail(emailBody)
-    .then(() => { /* delivered */ })
-    .catch((emailErr) => {
-      console.error("[InviteService] Failed to send OTP email (non-blocking):", emailErr);
-    });
+  try {
+    await sendEmail(emailBody);
+    emailSent = true;
+  } catch (emailErr) {
+    console.error("[InviteService] Failed to send OTP email (returning OTP for fallback):", emailErr);
+  }
 
   const separator = env.QR_BASE_URL.includes("?") ? "&" : "?";
   const qrUrl = `${env.QR_BASE_URL}${separator}token=${token}`;
@@ -202,11 +205,12 @@ export async function resendOtp(token: string): Promise<{ otp: string; emailSent
         </div>
       `,
     };
-    sendEmail(emailBody)
-      .then(() => { /* delivered */ })
-      .catch((emailErr) => {
-        console.error("[InviteService] Failed to resend OTP email (non-blocking):", emailErr);
-      });
+    try {
+      await sendEmail(emailBody);
+      emailSent = true;
+    } catch (emailErr) {
+      console.error("[InviteService] Failed to resend OTP email (returning OTP for fallback):", emailErr);
+    }
   }
 
   return { otp, emailSent };
