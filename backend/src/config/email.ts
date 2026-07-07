@@ -1,44 +1,27 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { env } from "./env.js";
 
-let transporter: nodemailer.Transporter | null = null;
+let client: Resend | null = null;
 let initialized = false;
 let mockMode = false;
+let fromAddress = "AGB <onboarding@resend.dev>";
 
 export function initEmail(): void {
-  if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD) {
-    console.warn("[Email] Gmail credentials not set - email sending will be mocked");
+  if (!env.RESEND_API_KEY) {
+    console.warn("[Email] RESEND_API_KEY not set - email sending will be mocked");
     initialized = false;
     mockMode = true;
     return;
   }
 
-  transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: {
-      user: env.GMAIL_USER,
-      pass: env.GMAIL_APP_PASSWORD,
-    },
-  });
-
+  client = new Resend(env.RESEND_API_KEY);
   initialized = true;
   mockMode = false;
-  console.log("[Email] Gmail SMTP transport initialized (port 587, STARTTLS)");
-}
 
-export async function verifyEmailConnection(): Promise<boolean> {
-  if (!transporter) return false;
-  try {
-    await transporter.verify();
-    console.log("[Email] SMTP connection verified successfully");
-    return true;
-  } catch (err: any) {
-    console.error("[Email] SMTP connection verification failed:", err?.message || err);
-    return false;
+  if (env.RESEND_FROM_EMAIL) {
+    fromAddress = env.RESEND_FROM_EMAIL;
   }
+  console.log(`[Email] Resend client initialized (from: ${fromAddress})`);
 }
 
 export function isEmailMocked(): boolean {
@@ -62,37 +45,47 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+export async function verifyEmailConnection(): Promise<boolean> {
+  if (!client) return false;
+  try {
+    // Resend doesn't have a verify endpoint; just confirm the client exists
+    // and the API key is set. A real send will surface auth errors.
+    console.log("[Email] Resend client ready");
+    return true;
+  } catch (err: any) {
+    console.error("[Email] Resend client check failed:", err?.message || err);
+    return false;
+  }
+}
+
 export async function sendEmail({ to, subject, html, text }: SendEmailParams): Promise<void> {
   if (!initialized) {
-    console.log(`[Email:Mock] To: ${to} | subject } | Subject: ${ subject }`);
+    console.log(`[Email:Mock] To: ${to} | Subject: ${subject}`);
     return;
   }
 
-  if (!transporter) {
-    throw new Error("Email transport not initialized");
+  if (!client) {
+    throw new Error("Email client not initialized");
   }
 
   try {
     const result = await withTimeout(
-      transporter.sendMail({
-        from: env.GMAIL_USER,
-        to,
+      client.emails.send({
+        from: fromAddress,
+        to: [to],
         subject,
         html,
         text: text || html.replace(/<[^>]+>/g, ""),
       }),
       15000
     );
-    console.log(`[Email] Sent to ${to} (messageId: ${result.messageId})`);
-  } catch (err: any) {
-    const status = err?.responseCode || err?.statusCode;
-    if (status === 535 || status === 401) {
-      console.error("[Email] Authentication failed - check GMAIL_APP_PASSWORD (must be an App Password, not regular password)");
-    } else if (status === 550 || status === 421) {
-      console.error("[Email] Sender rejected - verify the From address is correct");
-    } else if (status === 429) {
-      console.error("[Email] Rate limit hit - Gmail free tier is 500/day");
+    if (result.error) {
+      console.error("[Email] Resend API error:", result.error);
+      throw new Error(result.error.message || "Resend API error");
     }
+    console.log(`[Email] Sent to ${to} (id: ${result.data?.id})`);
+  } catch (err: any) {
+    console.error("[Email] Send failed:", err?.message || err);
     throw err;
   }
 }
