@@ -3,7 +3,6 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject
 import { Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenu } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
-import { ApiService } from "../core/api.service";
 import type { Project, ProjectStatus } from "../../data/dashboardData";
 
 type SidebarItem = {
@@ -95,17 +94,6 @@ type SidebarItem = {
               </svg>
             </a>
           </section>
-
-          <div class="sidebar-footer-actions">
-            <button type="button" class="sidebar-logout-minimal" aria-label="Sign out" (click)="logout()">
-              <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-              <span>Sign out</span>
-            </button>
-          </div>
         </div>
       </ion-content>
     </ion-menu>
@@ -115,7 +103,6 @@ type SidebarItem = {
 export class EnterpriseSidebarComponent {
   private readonly data = inject(ErpDataService);
   private readonly router = inject(Router);
-  private readonly api = inject(ApiService);
 
   @Input() active = "dashboard";
   @Input() clientId: string | null = null;
@@ -183,23 +170,6 @@ export class EnterpriseSidebarComponent {
       { key: "approvals", label: "Pending Approvals", icon: "checkmark-done-outline", route: ["/approvals"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
     ];
-  }
-
-  logout() {
-    this.api.logout().subscribe({
-      next: () => {
-        try {
-          localStorage.setItem("agb-erp:session", "logged-out");
-        } catch {}
-        void this.router.navigate(["/login"]);
-      },
-      error: () => {
-        try {
-          localStorage.setItem("agb-erp:session", "logged-out");
-        } catch {}
-        void this.router.navigate(["/login"]);
-      },
-    });
   }
 
   private hasOutputObservers<T>(emitter: EventEmitter<T>): boolean {
