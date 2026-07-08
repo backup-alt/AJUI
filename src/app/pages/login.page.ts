@@ -371,7 +371,7 @@ export class LoginPage {
       },
       error: (err) => {
         this.loading.set(false);
-        const msg = err?.error?.message || err?.error?.error || err?.message || "Unknown error";
+        const msg = err?.message || err?.error?.message || err?.error?.error || err?.statusText || "Unknown error";
         this.errorMessage.set(
           typeof msg === "string" ? msg : "Could not reach backend. Is the API server running?"
         );

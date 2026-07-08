@@ -90,7 +90,7 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
 export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { email } = req.body as { email: string };
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
       res.json({ success: true, message: "If the email exists, a reset link has been sent" });
       return;
@@ -106,11 +106,95 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       expiresAt,
     });
 
-    const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:4200"}/reset-password?token=${rawToken}`;
+    // Use BACKEND_PUBLIC_URL or FRONTEND_URL; strip trailing slash
+    const baseUrl = (process.env.BACKEND_PUBLIC_URL || process.env.FRONTEND_URL || "https://backup-alt.github.io/AJUI")
+      .replace(/\/+$/, "");
+    const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset your AGB password</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f6f8;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.06);">
+          <!-- Brand header -->
+          <tr>
+            <td style="background-color:#002263;padding:28px 32px;text-align:center;">
+              <div style="display:inline-block;background:#c9a227;color:#2a230a;width:48px;height:48px;line-height:48px;border-radius:12px;font-weight:800;font-size:18px;letter-spacing:1px;">AGB</div>
+              <h1 style="margin:14px 0 0;color:#ffffff;font-size:20px;font-weight:600;">Annai Golden Builders</h1>
+              <p style="margin:4px 0 0;color:#9bb3e0;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;">Operations Workspace</p>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px;">
+              <h2 style="margin:0 0 12px;color:#1d2939;font-size:22px;font-weight:700;">Reset your password</h2>
+              <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
+                Hi <strong>${user.name}</strong>, we received a request to reset the password for your AGB account.
+              </p>
+              <p style="margin:0 0 24px;color:#475467;font-size:15px;line-height:1.6;">
+                Click the button below to set a new password. This link expires in <strong>1 hour</strong>.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
+                <tr>
+                  <td style="background-color:#002263;border-radius:8px;">
+                    <a href="${resetUrl}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:0.02em;">Reset Password</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
+                If the button doesn't work, copy and paste this link into your browser:
+              </p>
+              <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
+                ${resetUrl}
+              </p>
+              <hr style="border:none;border-top:1px solid #e6eaf2;margin:24px 0;">
+              <p style="margin:0;color:#98a2b3;font-size:12px;line-height:1.5;">
+                If you didn't request this password reset, you can safely ignore this email. Your password will remain unchanged.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e6eaf2;">
+              <p style="margin:0;color:#98a2b3;font-size:11px;line-height:1.5;">
+                © ${new Date().getFullYear()} Annai Golden Builders. All rights reserved.<br>
+                <span style="color:#cfd8e6;">This is an automated security message.</span>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const text = `Hi ${user.name},
+
+We received a request to reset the password for your AGB account.
+
+Click the link below to set a new password. This link expires in 1 hour:
+
+${resetUrl}
+
+If you didn't request this password reset, you can safely ignore this email.
+
+---
+Annai Golden Builders
+Operations Workspace`;
+
     await sendEmail({
       to: user.email,
-      subject: "Reset your Annai Builders password",
-      html: `<p>Hi ${user.name},</p><p>Click the link below to reset your password (expires in 1 hour):</p><a href="${resetUrl}">${resetUrl}</a>`,
+      subject: "Reset your AGB password",
+      html,
+      text,
     });
 
     res.json({ success: true, message: "If the email exists, a reset link has been sent" });
