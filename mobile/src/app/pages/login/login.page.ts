@@ -31,7 +31,7 @@ import { NetworkService } from '../../core/services/network.service';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { environment } from '../../../environments/environment';
 
-type Step = 'welcome' | 'verifying' | 'otp' | 'signup';
+type Step = 'welcome' | 'login' | 'verifying' | 'otp' | 'signup';
 
 interface QrPayload {
   token: string;
@@ -103,6 +103,69 @@ const TEST_QR_PAYLOAD: QrPayload = {
               </button>
             </div>
           </div>
+        </div>
+
+        <ion-button expand="block" fill="clear" class="agb-text-btn" (click)="step = 'login'">
+          <ion-icon name="person-outline" slot="start"></ion-icon>
+          <span>Already have an account? Log in</span>
+        </ion-button>
+
+        <div class="footer-meta">AGB Supervisor · v0.4.0-phase3</div>
+      </div>
+
+      <!-- ============ STEP: Login (existing supervisors) ============ -->
+      <div *ngIf="step === 'login'" class="login-wrap">
+        <button class="back-btn" (click)="reset()">
+          <ion-icon name="arrow-back-outline"></ion-icon>
+        </button>
+
+        <div class="brand small">
+          <div class="brand-mark small">AGB</div>
+          <h2>Welcome back</h2>
+          <p class="brand-sub">Log in with your mobile number and password</p>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="head-icon">
+              <ion-icon name="person-outline"></ion-icon>
+            </div>
+            <div>
+              <h2>Supervisor Login</h2>
+              <p>Enter the phone number and password you set up.</p>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label>Mobile Number</label>
+            <ion-input [(ngModel)]="loginPhone" placeholder="+91 XXXXX XXXXX" type="tel"></ion-input>
+          </div>
+
+          <div class="form-field">
+            <label>Password</label>
+            <ion-input [(ngModel)]="loginPassword" type="password" placeholder="Your password"></ion-input>
+          </div>
+
+          <ion-button
+            expand="block"
+            class="agb-primary"
+            (click)="loginExisting()"
+            [disabled]="loading || !loginPhone || !loginPassword || !network.isOnline()"
+          >
+            <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+            <span *ngIf="!loading">Log In</span>
+            <ion-spinner *ngIf="loading" name="dots"></ion-spinner>
+          </ion-button>
+
+          <div *ngIf="errorMessage" class="error-banner">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <span>{{ errorMessage }}</span>
+          </div>
+
+          <ion-button expand="block" fill="clear" class="agb-text-btn" (click)="reset()">
+            <ion-icon name="qr-code-outline" slot="start"></ion-icon>
+            <span>Scan QR to activate a new device</span>
+          </ion-button>
         </div>
 
         <div class="footer-meta">AGB Supervisor · v0.4.0-phase3</div>
@@ -440,6 +503,10 @@ export class LoginPage implements OnInit, OnDestroy {
   signupPassword = '';
   verifyingMessage = '';
 
+  // Login state (existing supervisors)
+  loginPhone = '';
+  loginPassword = '';
+
   // OTP state
   otpDigits: string[] = ['', '', '', '', '', ''];
   otpCountdown = signal('05:00');
@@ -729,6 +796,37 @@ export class LoginPage implements OnInit, OnDestroy {
     }
   }
 
+  // ============== Step: Login (existing supervisors) ==============
+  async loginExisting() {
+    if (!this.loginPhone || this.loginPhone.replace(/\D/g, '').length < 8) {
+      this.showToast('Please enter a valid mobile number.', 'danger');
+      return;
+    }
+    if (!this.loginPassword || this.loginPassword.length < 6) {
+      this.showToast('Password must be at least 6 characters.', 'danger');
+      return;
+    }
+    this.loading = true;
+    this.errorMessage = '';
+    try {
+      const tokens = await this.auth.loginWithPassword(this.loginPhone, this.loginPassword);
+      const displayName = (tokens as any)?.user?.name || 'Supervisor';
+      this.showToast('Welcome back, ' + displayName + '!', 'success');
+      setTimeout(() => this.router.navigate(['/tabs/home']), 800);
+    } catch (e: any) {
+      const errorMsg = e?.message || 'Login failed. Check your credentials.';
+      if (errorMsg.includes('401') || errorMsg.toLowerCase().includes('invalid')) {
+        this.showToast('Wrong phone number or password.', 'danger');
+      } else if (errorMsg.includes('403') || errorMsg.toLowerCase().includes('deactivat')) {
+        this.showToast('Your account has been deactivated. Contact your administrator.', 'danger');
+      } else {
+        this.showToast(errorMsg, 'danger');
+      }
+    } finally {
+      this.loading = false;
+    }
+  }
+
   // ============== Helpers ==============
   private showToast(message: string, color: 'danger' | 'success') {
     this.toastMessage.set(message);
@@ -746,6 +844,8 @@ export class LoginPage implements OnInit, OnDestroy {
     this.signupPhone = '';
     this.signupEmail = '';
     this.signupPassword = '';
+    this.loginPhone = '';
+    this.loginPassword = '';
     this.otpDigits = ['', '', '', '', '', ''];
     this.clearTimers();
   }

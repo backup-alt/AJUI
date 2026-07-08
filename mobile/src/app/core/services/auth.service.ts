@@ -204,12 +204,12 @@ export class AuthService {
     return data;
   }
 
-  // ============== Token-based Login (for future use) ==============
+  // ============== Phone + Password Login (existing supervisors) ==============
 
-  async loginWithPassword(email: string, password: string): Promise<AuthTokens> {
+  async loginWithPassword(phone: string, password: string): Promise<AuthTokens> {
     const data = await this.api('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ phone, password }),
     });
     await this.storeSession(data);
     return data;
