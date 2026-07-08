@@ -13086,6 +13086,22 @@ ion-badge.status-completed {
 }
 
 /* ===== Header profile (top right) ===== */
+.enterprise-header {
+  position: relative !important;
+  z-index: 1000 !important;
+}
+
+.enterprise-header ion-toolbar,
+.enterprise-header ion-toolbar::part(container) {
+  overflow: visible !important;
+}
+
+.enterprise-header .header-profile-wrapper {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
 .enterprise-header .header-profile-trigger {
   position: relative !important;
   display: inline-flex !important;
@@ -13192,7 +13208,7 @@ ion-badge.status-completed {
   position: absolute !important;
   top: calc(100% + 8px) !important;
   right: 0 !important;
-  z-index: 200 !important;
+  z-index: 99999 !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 2px !important;
@@ -13490,6 +13506,66 @@ ion-menu.enterprise-sidebar .sidebar-logout-minimal .svg-icon {
 
 .dark-mode .enterprise-sidebar .sidebar-footer-actions {
   border-top-color: #2a4268 !important;
+}
+
+/* Constrain sidebar so projects scroll within a tab, not expand the sidebar */
+ion-menu.enterprise-sidebar {
+  --width: 280px;
+  max-width: 280px !important;
+}
+
+ion-menu.enterprise-sidebar ion-content {
+  --overflow: hidden !important;
+  height: 100% !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+ion-menu.enterprise-sidebar ion-content::part(scroll) {
+  overflow: hidden !important;
+}
+
+ion-menu.enterprise-sidebar .sidebar-shell {
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+ion-menu.enterprise-sidebar .sidebar-nav {
+  flex: 0 0 auto !important;
+}
+
+ion-menu.enterprise-sidebar .sidebar-project-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  margin: 14px 12px 0 !important;
+  padding: 0 !important;
+  border-top: 1px solid var(--ui-line) !important;
+  padding-top: 14px !important;
+}
+
+ion-menu.enterprise-sidebar .sidebar-section-head {
+  flex: 0 0 auto !important;
+}
+
+ion-menu.enterprise-sidebar .sidebar-project-scroll {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 4px !important;
+}
+
+ion-menu.enterprise-sidebar .sidebar-footer-actions {
+  flex: 0 0 auto !important;
 }
 
 /* Allow projects section to expand and show more projects */
