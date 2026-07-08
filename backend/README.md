@@ -8,7 +8,7 @@ Node.js + Express + MongoDB backend for the Annai Golden Builders operations pla
 - **Framework**: Express 4
 - **Database**: MongoDB (Mongoose 8)
 - **Auth**: JWT (access + refresh) in httpOnly cookies
-- **Email**: SendGrid API
+- **Email**: Resend API (HTTPS, works on Render free tier)
 - **Push Notifications**: Firebase Cloud Messaging (FCM)
 - **Validation**: Zod
 - **QR Codes**: `qrcode`
