@@ -12346,7 +12346,7 @@ th:hover .column-insert-action,
 .sidebar-project-list {
   display: grid !important;
   grid-template-rows: auto auto minmax(0, 1fr) auto !important;
-  max-height: min(42vh, 430px) !important;
+  max-height: min(38vh, 380px) !important;
   overflow: hidden !important;
   padding-right: 0 !important;
 }
@@ -12386,19 +12386,21 @@ th:hover .column-insert-action,
 }
 
 .sidebar-view-all-projects {
+    grid-row: 4;
     flex: 0 0 auto;
     display: flex !important;
     align-items: center;
     justify-content: space-between;
-    margin-top: auto;
-    padding: 10px 4px;
+    padding: 10px 12px;
   min-height: 38px;
-  margin-top: 4px;
+  margin-top: 8px;
+  margin-bottom: 0;
   border: 1px solid #d7e0ee !important;
   background: #f7faff !important;
   color: var(--ui-royal) !important;
   font-size: 12px;
   font-weight: 860;
+  border-radius: 10px;
 }
 
 .sidebar-view-all-projects .svg-icon {
@@ -13089,17 +13091,22 @@ ion-badge.status-completed {
 .enterprise-header {
   position: relative !important;
   z-index: 1000 !important;
+  overflow: visible !important;
 }
 
-.enterprise-header ion-toolbar,
-.enterprise-header ion-toolbar::part(container) {
+ion-header.enterprise-header,
+ion-header.enterprise-header ion-toolbar,
+ion-header.enterprise-header ion-toolbar::part(container),
+ion-header.enterprise-header ion-toolbar::part(content) {
   overflow: visible !important;
+  contain: none !important;
 }
 
 .enterprise-header .header-profile-wrapper {
   position: relative !important;
   display: inline-flex !important;
   align-items: center !important;
+  overflow: visible !important;
 }
 
 .enterprise-header .header-profile-trigger {
@@ -13356,7 +13363,14 @@ ion-badge.status-completed {
 }
 
 .enterprise-header .header-menu-logout {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   color: #64748b !important;
+  margin-top: 2px !important;
+  border-top: 1px solid #f1f5f9 !important;
+  padding-top: 11px !important;
+  border-radius: 0 0 8px 8px !important;
 }
 
 .enterprise-header .header-menu-logout:hover {
