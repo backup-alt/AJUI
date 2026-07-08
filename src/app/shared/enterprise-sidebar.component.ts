@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject
 import { Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenu } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
+import { ApiService } from "../core/api.service";
 import type { Project, ProjectStatus } from "../../data/dashboardData";
 
 type SidebarItem = {
@@ -106,22 +107,25 @@ type SidebarItem = {
           </section>
 
           <div class="sidebar-user-panel">
-            <div class="sidebar-profile-row">
-              <div class="sidebar-user-avatar" aria-hidden="true">
+            <div class="sidebar-profile-row" [routerLink]="['/settings']">
+              <div class="sidebar-user-avatar" [style.background]="avatarColor" aria-hidden="true">
                 {{ userInitial }}
               </div>
               <div class="sidebar-user-copy">
                 <strong>{{ userName }}</strong>
-                <span>{{ role }}</span>
+                <span class="role-badge">{{ role }}</span>
               </div>
+              <svg class="sidebar-profile-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
             </div>
             <button type="button" class="sidebar-logout" aria-label="Logout" (click)="logout()">
               <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                <path d="M10 6H6.5A2.5 2.5 0 0 0 4 8.5v7A2.5 2.5 0 0 0 6.5 18H10" />
-                <path d="M14 8l4 4-4 4" />
-                <path d="M18 12H9" />
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              <span>Logout</span>
+              <span>Sign out</span>
             </button>
           </div>
         </div>
@@ -133,15 +137,35 @@ type SidebarItem = {
 export class EnterpriseSidebarComponent {
   private readonly data = inject(ErpDataService);
   private readonly router = inject(Router);
+  private readonly api = inject(ApiService);
 
   @Input() active = "dashboard";
   @Input() clientId: string | null = null;
   @Input() projectId: string | null = null;
-  @Input() userName = "Karthik";
-  @Input() role = "Admin";
   @Output() newProject = new EventEmitter<void>();
   @Output() editProject = new EventEmitter<Project>();
   @Output() deleteProject = new EventEmitter<Project>();
+
+  // Live user from auth service (reactive)
+  readonly currentUser = this.api.user;
+
+  get userName(): string {
+    return this.currentUser()?.name || "User";
+  }
+
+  get role(): string {
+    return this.formatRole(this.currentUser()?.role || "admin");
+  }
+
+  private formatRole(role: string): string {
+    const map: Record<string, string> = {
+      admin: "Administrator",
+      accountant: "Accountant",
+      project_manager: "Project Manager",
+      supervisor: "Supervisor",
+    };
+    return map[role] || role;
+  }
 
   readonly logoPath = "assets/logo.png";
   readonly projectStatusFilters: ProjectStatus[] = ["Active", "On Hold", "Completed"];
@@ -210,13 +234,35 @@ export class EnterpriseSidebarComponent {
     return (this.userName || "A").trim().charAt(0).toUpperCase() || "A";
   }
 
+  get avatarColor(): string {
+    const colors = [
+      "linear-gradient(135deg, #002263, #1a4499)",
+      "linear-gradient(135deg, #1a5c2e, #2d8a4e)",
+      "linear-gradient(135deg, #7a3d00, #b86310)",
+      "linear-gradient(135deg, #5c1a5c, #8a2d8a)",
+      "linear-gradient(135deg, #1a3d5c, #2d608a)",
+      "linear-gradient(135deg, #5c1a1a, #8a2d2d)",
+    ];
+    const name = this.userName || "A";
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  }
+
   logout() {
-    try {
-      localStorage.setItem("agb-erp:session", "logged-out");
-    } catch {
-      // The static demo has no auth backend; this marks the local UI session only.
-    }
-    void this.router.navigate(["/login"]);
+    this.api.logout().subscribe({
+      next: () => {
+        try {
+          localStorage.setItem("agb-erp:session", "logged-out");
+        } catch {}
+        void this.router.navigate(["/login"]);
+      },
+      error: () => {
+        try {
+          localStorage.setItem("agb-erp:session", "logged-out");
+        } catch {}
+        void this.router.navigate(["/login"]);
+      },
+    });
   }
 
   private hasOutputObservers<T>(emitter: EventEmitter<T>): boolean {
