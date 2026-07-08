@@ -28,7 +28,7 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL
-        value: "AGB <onboarding@resend.dev>"
+        value: "AGB <noreply@annaigoldenbuilders.online>"
       - key: GMAIL_USER
         value: antigravity20263.0.3.0@gmail.com
       - key: GMAIL_APP_PASSWORD
