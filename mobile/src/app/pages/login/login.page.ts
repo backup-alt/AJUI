@@ -25,6 +25,8 @@ import {
   lockClosedOutline,
   arrowForwardOutline,
   cloudOfflineOutline,
+  callOutline,
+  chevronForwardOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { NetworkService } from '../../core/services/network.service';
@@ -72,15 +74,11 @@ const TEST_QR_PAYLOAD: QrPayload = {
           <p>Supervisor Console</p>
         </div>
 
-        <div class="card">
-          <div class="card-head">
-            <div class="head-icon">
-              <ion-icon name="qr-code-outline"></ion-icon>
-            </div>
-            <div>
-              <h2>Activate your device</h2>
-              <p>Scan the QR code shown by your administrator.</p>
-            </div>
+        <div class="card welcome-card">
+          <div class="welcome-headline">
+            <ion-icon name="qr-code-outline"></ion-icon>
+            <h2>First time here?</h2>
+            <p>Scan the QR code from your admin to activate this device.</p>
           </div>
 
           <ion-button expand="block" class="agb-primary" (click)="startScan()" [disabled]="loading">
@@ -105,10 +103,22 @@ const TEST_QR_PAYLOAD: QrPayload = {
           </div>
         </div>
 
-        <ion-button expand="block" fill="clear" class="agb-text-btn" (click)="step = 'login'">
-          <ion-icon name="person-outline" slot="start"></ion-icon>
-          <span>Already have an account? Log in</span>
-        </ion-button>
+        <div class="divider">
+          <span>or</span>
+        </div>
+
+        <div class="card login-card-compact" (click)="goToLogin()">
+          <div class="login-card-inner">
+            <div class="login-card-icon">
+              <ion-icon name="person-outline"></ion-icon>
+            </div>
+            <div class="login-card-text">
+              <strong>Already have an account?</strong>
+              <span>Log in with your phone &amp; password</span>
+            </div>
+            <ion-icon name="chevron-forward-outline" class="login-card-chevron"></ion-icon>
+          </div>
+        </div>
 
         <div class="footer-meta">AGB Supervisor · v0.4.0-phase3</div>
       </div>
@@ -117,33 +127,46 @@ const TEST_QR_PAYLOAD: QrPayload = {
       <div *ngIf="step === 'login'" class="login-wrap">
         <button class="back-btn" (click)="reset()">
           <ion-icon name="arrow-back-outline"></ion-icon>
+          <span>Back</span>
         </button>
 
         <div class="brand small">
           <div class="brand-mark small">AGB</div>
           <h2>Welcome back</h2>
-          <p class="brand-sub">Log in with your mobile number and password</p>
+          <p class="brand-sub">Log in to your supervisor account</p>
         </div>
 
-        <div class="card">
-          <div class="card-head">
-            <div class="head-icon">
-              <ion-icon name="person-outline"></ion-icon>
-            </div>
-            <div>
-              <h2>Supervisor Login</h2>
-              <p>Enter the phone number and password you set up.</p>
-            </div>
+        <div class="card login-form-card">
+          <div class="form-field">
+            <label>
+              <ion-icon name="call-outline"></ion-icon>
+              <span>Mobile Number</span>
+            </label>
+            <ion-input
+              [(ngModel)]="loginPhone"
+              placeholder="+91 XXXXX XXXXX"
+              type="tel"
+              inputmode="tel"
+              autocomplete="tel"
+            ></ion-input>
           </div>
 
           <div class="form-field">
-            <label>Mobile Number</label>
-            <ion-input [(ngModel)]="loginPhone" placeholder="+91 XXXXX XXXXX" type="tel"></ion-input>
+            <label>
+              <ion-icon name="lock-closed-outline"></ion-icon>
+              <span>Password</span>
+            </label>
+            <ion-input
+              [(ngModel)]="loginPassword"
+              type="password"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+            ></ion-input>
           </div>
 
-          <div class="form-field">
-            <label>Password</label>
-            <ion-input [(ngModel)]="loginPassword" type="password" placeholder="Your password"></ion-input>
+          <div *ngIf="errorMessage" class="error-banner">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <span>{{ errorMessage }}</span>
           </div>
 
           <ion-button
@@ -157,16 +180,19 @@ const TEST_QR_PAYLOAD: QrPayload = {
             <ion-spinner *ngIf="loading" name="dots"></ion-spinner>
           </ion-button>
 
-          <div *ngIf="errorMessage" class="error-banner">
-            <ion-icon name="alert-circle-outline"></ion-icon>
-            <span>{{ errorMessage }}</span>
+          <div class="forgot-link">
+            <a (click)="onForgotPassword()">Forgot password?</a>
           </div>
-
-          <ion-button expand="block" fill="clear" class="agb-text-btn" (click)="reset()">
-            <ion-icon name="qr-code-outline" slot="start"></ion-icon>
-            <span>Scan QR to activate a new device</span>
-          </ion-button>
         </div>
+
+        <div class="divider">
+          <span>need to activate?</span>
+        </div>
+
+        <ion-button expand="block" fill="clear" class="agb-text-btn" (click)="reset()">
+          <ion-icon name="qr-code-outline" slot="start"></ion-icon>
+          <span>Scan QR to activate a new device</span>
+        </ion-button>
 
         <div class="footer-meta">AGB Supervisor · v0.4.0-phase3</div>
       </div>
@@ -481,6 +507,75 @@ const TEST_QR_PAYLOAD: QrPayload = {
       --highlight-color-focused: var(--agb-primary);
       font-size: 15px;
     }
+
+    /* Welcome card with icon header */
+    .welcome-card { padding: 24px 20px 20px; }
+    .welcome-headline {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      text-align: center; margin-bottom: 20px;
+    }
+    .welcome-headline ion-icon {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: rgba(0,34,99,0.10); color: var(--agb-primary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; padding: 12px;
+    }
+    .welcome-headline h2 { margin: 4px 0 2px; font-size: 20px; font-weight: 700; color: var(--agb-text); }
+    .welcome-headline p { margin: 0; font-size: 13px; color: var(--agb-text-muted); line-height: 1.45; max-width: 280px; }
+
+    /* Divider */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      color: rgba(255,255,255,0.7); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 4px 0;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.25);
+    }
+
+    /* Compact login card on welcome */
+    .login-card-compact {
+      padding: 0; cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .login-card-compact:hover { transform: translateY(-1px); }
+    .login-card-compact:active { transform: scale(0.99); }
+    .login-card-inner {
+      display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+    }
+    .login-card-icon {
+      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+      background: rgba(201,162,39,0.15); color: var(--agb-gold, #c9a227);
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .login-card-text { flex: 1; min-width: 0; }
+    .login-card-text strong { display: block; font-size: 15px; font-weight: 700; color: var(--agb-text); }
+    .login-card-text span { display: block; font-size: 12px; color: var(--agb-text-muted); margin-top: 2px; }
+    .login-card-chevron { font-size: 20px; color: var(--agb-text-muted); }
+
+    /* Login form card */
+    .login-form-card { padding: 22px 20px 20px; }
+
+    /* Form field with icon */
+    .form-field label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 700;
+      color: var(--agb-text-muted); text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+    .form-field label ion-icon { font-size: 14px; }
+    .form-field label span { display: inline-block; }
+
+    /* Forgot password */
+    .forgot-link {
+      text-align: center; margin-top: 14px;
+    }
+    .forgot-link a {
+      color: var(--agb-primary); font-size: 13px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+    }
+    .forgot-link a:hover { text-decoration: underline; }
   `],
 })
 export class LoginPage implements OnInit, OnDestroy {
@@ -535,6 +630,8 @@ export class LoginPage implements OnInit, OnDestroy {
       'lock-closed-outline': lockClosedOutline,
       'arrow-forward-outline': arrowForwardOutline,
       'cloud-offline-outline': cloudOfflineOutline,
+      'call-outline': callOutline,
+      'chevron-forward-outline': chevronForwardOutline,
     });
   }
 
@@ -542,6 +639,16 @@ export class LoginPage implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.clearTimers();
+  }
+
+  // ============== Navigation helpers ==============
+  goToLogin() {
+    this.errorMessage = '';
+    this.step = 'login';
+  }
+
+  onForgotPassword() {
+    this.showToast('Please contact your administrator to reset your password.', 'danger');
   }
 
   // ============== Step 1: Scan QR ==============
