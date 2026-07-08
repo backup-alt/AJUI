@@ -107,26 +107,44 @@ type SidebarItem = {
           </section>
 
           <div class="sidebar-user-panel">
-            <div class="sidebar-profile-row" [routerLink]="['/settings']">
+            <button type="button" class="sidebar-profile-trigger" (click)="toggleProfileMenu()" [class.active]="profileMenuOpen()">
               <div class="sidebar-user-avatar" [style.background]="avatarColor" aria-hidden="true">
-                {{ userInitial }}
+                <span class="avatar-initial">{{ userInitial }}</span>
+                <span class="avatar-status" [class.inactive]="currentUser()?.status !== 'active'"></span>
               </div>
               <div class="sidebar-user-copy">
-                <strong>{{ userName }}</strong>
-                <span class="role-badge">{{ role }}</span>
+                <strong class="user-name">{{ userName }}</strong>
+                <span class="user-email">{{ currentUser()?.email || '' }}</span>
               </div>
-              <svg class="sidebar-profile-arrow" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m9 18 6-6-6-6"/>
+              <svg class="sidebar-profile-chevron" [class.rotated]="profileMenuOpen()" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m6 9 6 6 6-6"/>
               </svg>
-            </div>
-            <button type="button" class="sidebar-logout" aria-label="Logout" (click)="logout()">
-              <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              <span>Sign out</span>
             </button>
+
+            <div class="sidebar-profile-menu" *ngIf="profileMenuOpen()">
+              <div class="profile-menu-header">
+                <div class="profile-menu-role-badge">{{ role }}</div>
+                <div class="profile-menu-status" [class.active]="currentUser()?.status === 'active'">
+                  <span class="status-dot"></span>
+                  {{ currentUser()?.status === 'active' ? 'Active' : 'Inactive' }}
+                </div>
+              </div>
+              <a class="profile-menu-item" [routerLink]="['/settings']" (click)="closeProfileMenu()">
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="menu-icon">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Settings</span>
+              </a>
+              <button type="button" class="profile-menu-item profile-menu-logout" (click)="logout()">
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="menu-icon">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                <span>Sign out</span>
+              </button>
+            </div>
           </div>
         </div>
       </ion-content>
@@ -170,6 +188,17 @@ export class EnterpriseSidebarComponent {
   readonly logoPath = "assets/logo.png";
   readonly projectStatusFilters: ProjectStatus[] = ["Active", "On Hold", "Completed"];
   readonly projectStatusFilter = signal<ProjectStatus>("Active");
+
+  // Profile dropdown menu state
+  readonly profileMenuOpen = signal(false);
+
+  toggleProfileMenu() {
+    this.profileMenuOpen.update((v) => !v);
+  }
+
+  closeProfileMenu() {
+    this.profileMenuOpen.set(false);
+  }
 
   get clientProjects(): Project[] {
     return this.data.projectsForClient(this.data.clientById(this.clientId));
