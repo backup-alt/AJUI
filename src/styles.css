@@ -12346,9 +12346,10 @@ th:hover .column-insert-action,
 .sidebar-project-list {
   display: grid !important;
   grid-template-rows: auto auto minmax(0, 1fr) auto !important;
-  max-height: min(38vh, 380px) !important;
+  max-height: min(34vh, 340px) !important;
   overflow: hidden !important;
   padding-right: 0 !important;
+  padding-bottom: 6px !important;
 }
 
 .sidebar-project-list .sidebar-section-head {
@@ -12393,8 +12394,8 @@ th:hover .column-insert-action,
     justify-content: space-between;
     padding: 10px 12px;
   min-height: 38px;
-  margin-top: 8px;
-  margin-bottom: 0;
+  margin-top: 10px;
+  margin-bottom: 18px;
   border: 1px solid #d7e0ee !important;
   background: #f7faff !important;
   color: var(--ui-royal) !important;
