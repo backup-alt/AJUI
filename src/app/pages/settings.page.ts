@@ -192,7 +192,7 @@ export interface ActiveInviteDisplay {
       <agb-enterprise-sidebar active="settings"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        <agb-enterprise-header title="Settings" eyebrow="Administration" metaLabel="System preferences" [showTitle]="false" searchPlaceholder="Search" />
+        <agb-enterprise-header title="Settings" eyebrow="Administration" [showTitle]="false" searchPlaceholder="Search" />
 
         <ion-content class="erp-page">
           <main class="workspace-shell settings-shell">

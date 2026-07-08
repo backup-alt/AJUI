@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenu } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
@@ -53,16 +53,6 @@ type SidebarItem = {
                 </svg>
               </button>
             </div>
-            <div class="sidebar-project-filters" aria-label="Project status filters" *ngIf="!clientId">
-              <button
-                *ngFor="let status of projectStatusFilters"
-                type="button"
-                [class.active]="projectStatusFilter() === status"
-                (click)="projectStatusFilter.set(status)"
-              >
-                {{ status === 'On Hold' ? 'On-Hold' : status }}
-              </button>
-            </div>
             <div class="sidebar-project-scroll">
               <div *ngFor="let project of filteredSidebarProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
                 <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']">
@@ -106,45 +96,15 @@ type SidebarItem = {
             </a>
           </section>
 
-          <div class="sidebar-user-panel">
-            <button type="button" class="sidebar-profile-trigger" (click)="toggleProfileMenu()" [class.active]="profileMenuOpen()">
-              <div class="sidebar-user-avatar" [style.background]="avatarColor" aria-hidden="true">
-                <span class="avatar-initial">{{ userInitial }}</span>
-                <span class="avatar-status" [class.inactive]="currentUser()?.status !== 'active'"></span>
-              </div>
-              <div class="sidebar-user-copy">
-                <strong class="user-name">{{ userName }}</strong>
-                <span class="user-email">{{ currentUser()?.email || '' }}</span>
-              </div>
-              <svg class="sidebar-profile-chevron" [class.rotated]="profileMenuOpen()" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m6 9 6 6 6-6"/>
+          <div class="sidebar-footer-actions">
+            <button type="button" class="sidebar-logout-minimal" aria-label="Sign out" (click)="logout()">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
+              <span>Sign out</span>
             </button>
-
-            <div class="sidebar-profile-menu" *ngIf="profileMenuOpen()">
-              <div class="profile-menu-header">
-                <div class="profile-menu-role-badge">{{ role }}</div>
-                <div class="profile-menu-status" [class.active]="currentUser()?.status === 'active'">
-                  <span class="status-dot"></span>
-                  {{ currentUser()?.status === 'active' ? 'Active' : 'Inactive' }}
-                </div>
-              </div>
-              <a class="profile-menu-item" [routerLink]="['/settings']" (click)="closeProfileMenu()">
-                <svg viewBox="0 0 24 24" aria-hidden="true" class="menu-icon">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-                <span>Settings</span>
-              </a>
-              <button type="button" class="profile-menu-item profile-menu-logout" (click)="logout()">
-                <svg viewBox="0 0 24 24" aria-hidden="true" class="menu-icon">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                  <polyline points="16 17 21 12 16 7"/>
-                  <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                <span>Sign out</span>
-              </button>
-            </div>
           </div>
         </div>
       </ion-content>
@@ -164,41 +124,7 @@ export class EnterpriseSidebarComponent {
   @Output() editProject = new EventEmitter<Project>();
   @Output() deleteProject = new EventEmitter<Project>();
 
-  // Live user from auth service (reactive)
-  readonly currentUser = this.api.user;
-
-  get userName(): string {
-    return this.currentUser()?.name || "User";
-  }
-
-  get role(): string {
-    return this.formatRole(this.currentUser()?.role || "admin");
-  }
-
-  private formatRole(role: string): string {
-    const map: Record<string, string> = {
-      admin: "Administrator",
-      accountant: "Accountant",
-      project_manager: "Project Manager",
-      supervisor: "Supervisor",
-    };
-    return map[role] || role;
-  }
-
   readonly logoPath = "assets/logo.png";
-  readonly projectStatusFilters: ProjectStatus[] = ["Active", "On Hold", "Completed"];
-  readonly projectStatusFilter = signal<ProjectStatus>("Active");
-
-  // Profile dropdown menu state
-  readonly profileMenuOpen = signal(false);
-
-  toggleProfileMenu() {
-    this.profileMenuOpen.update((v) => !v);
-  }
-
-  closeProfileMenu() {
-    this.profileMenuOpen.set(false);
-  }
 
   get clientProjects(): Project[] {
     return this.data.projectsForClient(this.data.clientById(this.clientId));
@@ -211,8 +137,8 @@ export class EnterpriseSidebarComponent {
 
   get filteredSidebarProjects(): Project[] {
     if (this.clientId) return this.sidebarProjects;
-    const status = this.projectStatusFilter();
-    return this.sidebarProjects.filter((project) => project.status === status);
+    // Show all projects (no status filter) so the user can see more
+    return this.sidebarProjects;
   }
 
   projectClientId(project: Project): string {
@@ -257,24 +183,6 @@ export class EnterpriseSidebarComponent {
       { key: "approvals", label: "Pending Approvals", icon: "checkmark-done-outline", route: ["/approvals"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
     ];
-  }
-
-  get userInitial(): string {
-    return (this.userName || "A").trim().charAt(0).toUpperCase() || "A";
-  }
-
-  get avatarColor(): string {
-    const colors = [
-      "linear-gradient(135deg, #002263, #1a4499)",
-      "linear-gradient(135deg, #1a5c2e, #2d8a4e)",
-      "linear-gradient(135deg, #7a3d00, #b86310)",
-      "linear-gradient(135deg, #5c1a5c, #8a2d8a)",
-      "linear-gradient(135deg, #1a3d5c, #2d608a)",
-      "linear-gradient(135deg, #5c1a1a, #8a2d2d)",
-    ];
-    const name = this.userName || "A";
-    const index = name.charCodeAt(0) % colors.length;
-    return colors[index];
   }
 
   logout() {
