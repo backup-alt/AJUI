@@ -49,11 +49,25 @@ export class ApiService {
   isAuthenticated = computed(() => !!this.accessTokenSignal() && !!this.userSignal());
 
   // =================== AUTH ===================
-  login(phone: string, password: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login`, { phone, password }).pipe(
+  login(identifier: string, password: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login`, { identifier, password }).pipe(
       tap((res) => this.setSession(res)),
       catchError(this.handleError)
     );
+  }
+
+  forgotPassword(email: string): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.baseUrl}/auth/forgot-password`,
+      { email }
+    ).pipe(catchError(this.handleError));
+  }
+
+  resetPassword(token: string, password: string): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.baseUrl}/auth/reset-password`,
+      { token, password }
+    ).pipe(catchError(this.handleError));
   }
 
   logout(): Observable<any> {

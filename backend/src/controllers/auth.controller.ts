@@ -18,8 +18,16 @@ import crypto from "crypto";
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { phone, password } = req.body as { phone: string; password: string };
-    const { result, refreshCookie } = await authService.loginUser(phone, password, {
+    const { identifier, phone, email, password } = req.body as {
+      identifier?: string;
+      phone?: string;
+      email?: string;
+      password: string;
+    };
+    // Support both old {phone} and new {identifier/email} payloads
+    const loginId = identifier || phone || email;
+    if (!loginId) throw new AppError(400, "Email or phone is required");
+    const { result, refreshCookie } = await authService.loginUser(loginId, password, {
       userAgent: req.headers["user-agent"],
       ip: req.ip,
     });

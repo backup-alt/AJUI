@@ -45,16 +45,21 @@ function buildRefreshCookieOptions(expiresAt: Date) {
 }
 
 export async function loginUser(
-  phone: string,
+  identifier: string,
   password: string,
   meta: { userAgent?: string; ip?: string } = {}
 ): Promise<{ result: AuthResult; refreshCookie: ReturnType<typeof buildRefreshCookieOptions> }> {
-  const user = await User.findOne({ phone });
-  if (!user) throw new AppError(401, "Invalid phone or password");
+  // Accept either email or phone as the identifier
+  const query = identifier.includes("@")
+    ? { email: identifier.toLowerCase().trim() }
+    : { phone: identifier.trim() };
+
+  const user = await User.findOne(query);
+  if (!user) throw new AppError(401, "Invalid email/phone or password");
   if (user.status !== "active") throw new AppError(403, "Account is not active");
 
   const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) throw new AppError(401, "Invalid phone or password");
+  if (!valid) throw new AppError(401, "Invalid email/phone or password");
 
   const tokens = await issueTokens(user, meta);
   user.lastLoginAt = new Date();

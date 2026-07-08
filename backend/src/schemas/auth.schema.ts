@@ -16,9 +16,14 @@ export const emailSchema = z.string().email("Invalid email").trim().toLowerCase(
 
 export const loginSchema = z.object({
   body: z.object({
-    phone: phoneSchema,
+    identifier: z.string().trim().min(3, "Email or phone is required").optional(),
+    phone: phoneSchema.optional(),
+    email: emailSchema.optional(),
     password: passwordSchema,
-  }),
+  }).refine(
+    (data) => !!(data.identifier || data.phone || data.email),
+    { message: "Email or phone is required", path: ["identifier"] }
+  ),
 });
 
 export const refreshSchema = z.object({

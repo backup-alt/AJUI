@@ -159,6 +159,8 @@ export async function bootstrap(): Promise<void> {
   await ensureDefaultPermissions();
   const { seedDefaultReports } = await import("./utils/seed-reports.js");
   await seedDefaultReports();
+  const { seedDefaultAdmin } = await import("./utils/seed-admin.js");
+  await seedDefaultAdmin();
 
   const app = createApp();
   app.listen(env.PORT, () => {
