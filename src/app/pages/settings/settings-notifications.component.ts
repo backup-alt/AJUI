@@ -32,20 +32,6 @@ import { FormsModule } from "@angular/forms";
           </div>
           <input type="checkbox" [checked]="pushSubmission()" (change)="pushSubmission.set($any($event.target).checked)" />
         </label>
-        <label class="settings-w11-toggle-row">
-          <div>
-            <strong>Approval decisions</strong>
-            <small>When your submissions are approved or rejected by admin.</small>
-          </div>
-          <input type="checkbox" [checked]="pushDecisions()" (change)="pushDecisions.set($any($event.target).checked)" />
-        </label>
-        <label class="settings-w11-toggle-row">
-          <div>
-            <strong>Schedule reminders</strong>
-            <small>15-minute warning before a restricted access window starts.</small>
-          </div>
-          <input type="checkbox" [checked]="pushSchedule()" (change)="pushSchedule.set($any($event.target).checked)" />
-        </label>
       </div>
     </section>
 
@@ -85,8 +71,6 @@ import { FormsModule } from "@angular/forms";
 })
 export class SettingsNotificationsComponent {
   readonly pushSubmission = signal(true);
-  readonly pushDecisions = signal(true);
-  readonly pushSchedule = signal(false);
   readonly emailDaily = signal(true);
   readonly emailWeekly = signal(true);
   readonly emailMonthly = signal(false);

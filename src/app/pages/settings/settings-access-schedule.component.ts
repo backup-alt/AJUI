@@ -45,8 +45,8 @@ interface AccessWindow {
     </div>
 
     <section class="settings-w11-card">
-      <div class="settings-w11-toggle-row big">
-        <div>
+      <div class="settings-w11-enable-row">
+        <div class="settings-w11-enable-text">
           <strong>Enable Access Schedule</strong>
           <small>When ON, the schedule below is enforced. When OFF, all users can access at any time.</small>
         </div>
@@ -57,11 +57,13 @@ interface AccessWindow {
       </div>
       <div class="settings-w11-status-line">
         <span class="settings-w11-status-dot" [class.green]="!isCurrentlyRestricted()" [class.red]="isCurrentlyRestricted()"></span>
-        <span>
+        <span class="settings-w11-status-current">
           Currently:
           <strong>{{ isCurrentlyRestricted() ? 'Restricted — only admins' : 'Open access' }}</strong>
         </span>
-        <small> · {{ currentTime() }} · next change {{ nextChange() }}</small>
+        <span class="settings-w11-status-time">
+          {{ currentTime() }} &middot; next change {{ nextChange() }}
+        </span>
       </div>
     </section>
 

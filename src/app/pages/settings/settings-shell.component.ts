@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
+import { ApiService } from "../../core/api.service";
 
 type SettingsItem = {
   id: string;
@@ -47,7 +48,65 @@ type SettingsGroup = {
           <small>Manage your account, team, and workspace</small>
         </div>
         <div class="settings-w11-topbar-user">
-          <span class="settings-w11-avatar">{{ userInitials() }}</span>
+          <div class="settings-w11-profile-wrapper">
+            <button
+              type="button"
+              class="settings-w11-profile-trigger"
+              (click)="toggleProfileMenu()"
+              [class.active]="profileMenuOpen()"
+              aria-label="Open user menu"
+              [attr.aria-expanded]="profileMenuOpen()"
+            >
+              <span class="settings-w11-avatar-circle" [style.background]="avatarColor()">
+                {{ userInitials() }}
+              </span>
+              <span class="settings-w11-profile-info">
+                <strong>{{ userName() }}</strong>
+                <span>{{ userRole() }}</span>
+              </span>
+              <svg class="settings-w11-profile-chevron" [class.rotated]="profileMenuOpen()" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
+            </button>
+
+            @if (profileMenuOpen()) {
+              <div class="settings-w11-profile-menu">
+                <div class="settings-w11-menu-header">
+                  <div class="settings-w11-menu-user">
+                    <span class="settings-w11-avatar-circle lg" [style.background]="avatarColor()">
+                      {{ userInitials() }}
+                    </span>
+                    <div class="settings-w11-menu-user-info">
+                      <strong>{{ userName() }}</strong>
+                      <span>{{ userEmail() }}</span>
+                    </div>
+                  </div>
+                  <div class="settings-w11-menu-status-row">
+                    <span class="settings-w11-role-badge">{{ userRole() }}</span>
+                    <span class="settings-w11-status-indicator" [class.active]="true">
+                      <span class="settings-w11-status-dot-sm"></span>
+                      Active
+                    </span>
+                  </div>
+                </div>
+                <a class="settings-w11-menu-item" [routerLink]="['/settings']" (click)="profileMenuOpen.set(false)">
+                  <svg viewBox="0 0 24 24" class="settings-w11-menu-icon" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                  <span>Settings</span>
+                </a>
+                <button type="button" class="settings-w11-menu-item settings-w11-menu-logout" (click)="logout()">
+                  <svg viewBox="0 0 24 24" class="settings-w11-menu-icon" aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  <span>Sign out</span>
+                </button>
+              </div>
+            }
+          </div>
         </div>
       </header>
 
@@ -118,8 +177,43 @@ type SettingsGroup = {
 })
 export class SettingsShellComponent {
   private readonly router = inject(Router);
+  private readonly api = inject(ApiService);
 
   readonly searchQuery = signal("");
+  readonly profileMenuOpen = signal(false);
+
+  readonly currentUser = this.api.user;
+
+  readonly userName = computed(() => this.currentUser()?.name || "User");
+  readonly userRole = computed(() => this.currentUser()?.role || "Admin");
+
+  readonly userEmail = computed(() => {
+    const raw = localStorage.getItem("ajui_user");
+    if (!raw) return "";
+    try {
+      return JSON.parse(raw)?.email || "";
+    } catch {
+      return "";
+    }
+  });
+
+  readonly avatarColor = computed(() => {
+    const colors = [
+      "linear-gradient(135deg, #002263, #1a4499)",
+      "linear-gradient(135deg, #1a5c2e, #2d8a4e)",
+      "linear-gradient(135deg, #7a3d00, #b86310)",
+      "linear-gradient(135deg, #5c1a5c, #8a2d8a)",
+      "linear-gradient(135deg, #1a3d5c, #2d608a)",
+      "linear-gradient(135deg, #5c1a1a, #8a2d2d)",
+    ];
+    const name = this.userName() || "A";
+    return colors[name.charCodeAt(0) % colors.length];
+  });
+
+  readonly userInitials = computed(() => {
+    const name = this.userName();
+    return name.split(/\s+/).slice(0, 2).map((p: string) => p[0] || "").join("").toUpperCase() || "U";
+  });
 
   // Icon path library (24x24 viewBox, currentColor stroke)
   private readonly icons = {
@@ -176,19 +270,19 @@ export class SettingsShellComponent {
       .filter((g) => g.items.length > 0);
   });
 
-  readonly userInitials = computed(() => {
-    try {
-      const raw = localStorage.getItem("ajui_user");
-      if (!raw) return "U";
-      const u = JSON.parse(raw);
-      const name = (u?.name || "User").trim();
-      return name.split(/\s+/).slice(0, 2).map((p: string) => p[0] || "").join("").toUpperCase() || "U";
-    } catch {
-      return "U";
-    }
-  });
-
   goBack() {
     this.router.navigateByUrl("/dashboard");
+  }
+
+  toggleProfileMenu() {
+    this.profileMenuOpen.update((v) => !v);
+  }
+
+  logout() {
+    this.profileMenuOpen.set(false);
+    this.api.logout().subscribe({
+      next: () => void this.router.navigate(["/login"]),
+      error: () => void this.router.navigate(["/login"]),
+    });
   }
 }
