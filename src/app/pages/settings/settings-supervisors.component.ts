@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { Router } from "@angular/router";
 import { ErpDataService } from "../../data/erp-data.service";
 
 @Component({
@@ -14,8 +15,16 @@ import { ErpDataService } from "../../data/erp-data.service";
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <strong>Supervisors</strong>
       </nav>
-      <h1>Supervisors</h1>
-      <p>Field supervisors registered via QR invite. Add new supervisors from the "Add Supervisor" section above.</p>
+      <div class="settings-w11-header-row">
+        <div>
+          <h1>Supervisors</h1>
+          <p>Field supervisors registered via QR invite. Add new supervisors to your team.</p>
+        </div>
+        <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openAddSupervisor()">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          Add Supervisor
+        </button>
+      </div>
     </header>
 
     <section class="settings-w11-card">
@@ -149,6 +158,7 @@ import { ErpDataService } from "../../data/erp-data.service";
 })
 export class SettingsSupervisorsComponent {
   private readonly data = inject(ErpDataService);
+  private readonly router = inject(Router);
 
   readonly activeStatus = signal<"all" | "Active" | "On Leave" | "Inactive">("all");
   readonly search = signal("");
@@ -189,5 +199,9 @@ export class SettingsSupervisorsComponent {
     if (!s) return;
     alert(`Supervisor ${s.name} would be deactivated. (UI placeholder)`);
     this.close();
+  }
+
+  openAddSupervisor() {
+    this.router.navigateByUrl("/settings/roles?addSupervisor=true");
   }
 }

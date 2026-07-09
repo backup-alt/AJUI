@@ -36,11 +36,11 @@ type SettingsGroup = {
           class="settings-w11-back-btn"
           (click)="goBack()"
           aria-label="Back to dashboard"
+          title="Back"
         >
           <svg viewBox="0 0 20 20" aria-hidden="true">
             <path d="M12 4 6 10l6 6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <span>Back</span>
         </button>
         <div class="settings-w11-topbar-title">
           <strong>Settings</strong>

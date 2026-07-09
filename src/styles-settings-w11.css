@@ -26,21 +26,25 @@
 .settings-w11-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
   background: transparent;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #0f172a;
+  border-radius: 50%;
+  padding: 0;
   cursor: pointer;
   transition: all 0.12s;
+  flex-shrink: 0;
 }
 
 .settings-w11-back-btn:hover {
   background: #f1f5f9;
   border-color: #cbd5e1;
+}
+
+.settings-w11-back-btn:active {
+  background: #e2e8f0;
 }
 
 .settings-w11-back-btn svg {
@@ -249,7 +253,7 @@
 /* RIGHT PANE */
 .settings-w11-content {
   padding: 32px 40px;
-  max-width: 1100px;
+  max-width: 1200px;
   width: 100%;
   overflow-y: auto;
   min-height: 0;
@@ -257,6 +261,29 @@
 
 .settings-w11-header {
   margin-bottom: 24px;
+}
+
+.settings-w11-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.settings-w11-header-row h1 {
+  margin: 0;
+}
+
+.settings-w11-header-row p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.settings-w11-header .settings-w11-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .settings-w11-breadcrumb {
@@ -2388,6 +2415,42 @@
 }
 
 /* DARK MODE */
+.dark-mode .settings-w11-fullscreen {
+  background: #0f172a;
+}
+
+.dark-mode .settings-w11-topbar {
+  background: #1e293b;
+  border-bottom-color: #334155;
+}
+
+.dark-mode .settings-w11-topbar-title strong {
+  color: #f1f5f9;
+}
+
+.dark-mode .settings-w11-topbar-title small {
+  color: #94a3b8;
+}
+
+.dark-mode .settings-w11-back-btn {
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.dark-mode .settings-w11-back-btn:hover {
+  background: #334155;
+  border-color: #64748b;
+}
+
+.dark-mode .settings-w11-back-btn:active {
+  background: #475569;
+}
+
+.dark-mode .settings-w11-avatar {
+  background: #334155;
+  color: #e2e8f0;
+}
+
 .dark-mode .settings-w11-shell {
   background: #0f172a;
 }

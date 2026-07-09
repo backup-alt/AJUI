@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { ActivatedRoute, Router } from "@angular/router";
 import { ApiService } from "../../core/api.service";
 
 type Role = "Admin" | "Project Manager" | "Accountant";
@@ -491,6 +492,8 @@ interface PendingInvite {
 })
 export class SettingsRolesComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly activeTab = signal<"all" | "admin" | "pm" | "accountant">("all");
   readonly search = signal("");
@@ -555,6 +558,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.refreshInvites();
     this.pollInterval = setInterval(() => this.tickInvites(), 1000);
+    if (this.route.snapshot.queryParamMap.get("addSupervisor") === "true") {
+      this.openAddSupervisor();
+      this.router.navigate([], { queryParams: { addSupervisor: null }, queryParamsHandling: "merge", replaceUrl: true });
+    }
   }
 
   ngOnDestroy() {
