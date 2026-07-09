@@ -2,13 +2,86 @@
    SETTINGS — WINDOWS 11 STYLE LAYOUT
    ================================================================= */
 
+/* FULLSCREEN WRAPPER (no main sidebar) */
+.settings-w11-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: #f7f8fb;
+}
+
+.settings-w11-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.settings-w11-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.settings-w11-back-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.settings-w11-back-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.settings-w11-topbar-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-w11-topbar-title strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.settings-w11-topbar-title small {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.settings-w11-topbar-user {
+  flex-shrink: 0;
+}
+
 /* Shell */
 .settings-w11-shell {
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: 0;
-  min-height: calc(100vh - 80px);
+  flex: 1;
+  min-height: 0;
   background: #f7f8fb;
+  overflow: hidden;
 }
 
 /* LEFT PANE */
@@ -16,9 +89,6 @@
   background: #ffffff;
   border-right: 1px solid #e5e7eb;
   padding: 16px 12px;
-  position: sticky;
-  top: 0;
-  height: 100%;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -181,6 +251,8 @@
   padding: 32px 40px;
   max-width: 1100px;
   width: 100%;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .settings-w11-header {
@@ -2659,4 +2731,107 @@
 
 .dark-mode .settings-w11-slider-labels {
   color: #94a3b8;
+}
+
+/* WIDE MODAL */
+.settings-w11-modal-wide {
+  max-width: 520px;
+}
+
+/* TIMER / COUNTDOWN */
+.settings-w11-timer-circle {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.settings-w11-timer-circle svg {
+  width: 40px;
+  height: 40px;
+  transform: rotate(-90deg);
+}
+
+.settings-w11-timer-circle circle {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.settings-w11-timer-circle .bg {
+  stroke: #e5e7eb;
+}
+
+.settings-w11-timer-circle .fg {
+  stroke: #002263;
+  transition: stroke-dashoffset 1s linear, stroke #0.3s;
+}
+
+.settings-w11-timer-circle.expired .fg {
+  stroke: #dc2626;
+}
+
+.settings-w11-timer-circle .timer-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #002263;
+  font-family: ui-monospace, monospace;
+}
+
+.settings-w11-timer-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #002263;
+}
+
+.settings-w11-timer-text.expired {
+  color: #dc2626;
+}
+
+.settings-w11-expired-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+  padding: 2px 8px;
+  background: #fef2f2;
+  border-radius: 4px;
+}
+
+/* QR POPUP STYLES */
+.settings-w11-qr-popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.settings-w11-qr-popup .settings-w11-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+  max-width: 460px;
+  width: 100%;
+}
+
+/* SCANNED STATE */
+.settings-w11-table tr.scanned td {
+  opacity: 0.5;
+}
+
+.settings-w11-invite-row.scanned {
+  opacity: 0.6;
+}
+
+.settings-w11-qr-card.scanned {
+  opacity: 0.6;
 }

@@ -1,11 +1,7 @@
-import { CommonModule } from "@angular/common";
+import { CommonModule, Location } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { RouterLink, RouterLinkActive, RouterOutlet, Router, ActivatedRoute, NavigationEnd } from "@angular/router";
-import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
-import { filter } from "rxjs/operators";
-import { EnterpriseHeaderComponent } from "../../shared/enterprise-header.component";
-import { EnterpriseSidebarComponent } from "../../shared/enterprise-sidebar.component";
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
 type SettingsItem = {
   id: string;
@@ -30,94 +26,99 @@ type SettingsGroup = {
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
-    IonContent,
-    IonSplitPane,
-    EnterpriseHeaderComponent,
-    EnterpriseSidebarComponent,
   ],
   template: `
-    <ion-split-pane contentId="main-content" when="lg">
-      <agb-enterprise-sidebar active="settings"></agb-enterprise-sidebar>
+    <div class="settings-w11-fullscreen">
+      <!-- Top bar with back button -->
+      <header class="settings-w11-topbar">
+        <button
+          type="button"
+          class="settings-w11-back-btn"
+          (click)="goBack()"
+          aria-label="Back to dashboard"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M12 4 6 10l6 6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Back</span>
+        </button>
+        <div class="settings-w11-topbar-title">
+          <strong>Settings</strong>
+          <small>Manage your account, team, and workspace</small>
+        </div>
+        <div class="settings-w11-topbar-user">
+          <span class="settings-w11-avatar">{{ userInitials() }}</span>
+        </div>
+      </header>
 
-      <div class="ion-page" id="main-content">
-        <agb-enterprise-header
-          title="Settings"
-          eyebrow="Administration"
-          [showTitle]="false"
-          searchPlaceholder="Search settings"
-        />
-
-        <ion-content class="erp-page">
-          <div class="settings-w11-shell">
-            <!-- LEFT PANE: Navigation -->
-            <aside class="settings-w11-nav" aria-label="Settings navigation">
-              <div class="settings-w11-search">
-                <svg viewBox="0 0 20 20" aria-hidden="true" class="settings-w11-search-icon">
-                  <circle cx="9" cy="9" r="6" fill="none" stroke="currentColor" stroke-width="1.5" />
-                  <path d="m13.5 13.5 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Find a setting"
-                  [value]="searchQuery()"
-                  (input)="searchQuery.set($any($event.target).value)"
-                  aria-label="Search settings"
-                />
-              </div>
-
-              <nav class="settings-w11-nav-list" role="navigation">
-                @for (group of filteredGroups(); track group.label) {
-                  <div class="settings-w11-group">
-                    <div class="settings-w11-group-label">{{ group.label }}</div>
-                    @for (item of group.items; track item.id) {
-                      <a
-                        class="settings-w11-nav-item"
-                        [routerLink]="item.route"
-                        routerLinkActive="active"
-                        [routerLinkActiveOptions]="{ exact: false }"
-                        [attr.aria-label]="item.label"
-                      >
-                        <span class="settings-w11-nav-icon" aria-hidden="true">
-                          <svg viewBox="0 0 24 24">
-                            <path [attr.d]="item.icon" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
-                          </svg>
-                        </span>
-                        <span class="settings-w11-nav-text">
-                          <strong>{{ item.label }}</strong>
-                          @if (item.subtitle) {
-                            <small>{{ item.subtitle }}</small>
-                          }
-                        </span>
-                        @if (item.badge) {
-                          <span class="settings-w11-nav-badge">{{ item.badge }}</span>
-                        }
-                      </a>
-                    }
-                  </div>
-                }
-
-                @if (filteredGroups().length === 0) {
-                  <div class="settings-w11-empty">
-                    <p>No settings match "{{ searchQuery() }}"</p>
-                  </div>
-                }
-              </nav>
-            </aside>
-
-            <!-- RIGHT PANE: Content -->
-            <main class="settings-w11-content">
-              <router-outlet></router-outlet>
-            </main>
+      <div class="settings-w11-shell">
+        <!-- LEFT PANE: Navigation -->
+        <aside class="settings-w11-nav" aria-label="Settings navigation">
+          <div class="settings-w11-search">
+            <svg viewBox="0 0 20 20" aria-hidden="true" class="settings-w11-search-icon">
+              <circle cx="9" cy="9" r="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <path d="m13.5 13.5 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Find a setting"
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+              aria-label="Search settings"
+            />
           </div>
-        </ion-content>
+
+          <nav class="settings-w11-nav-list" role="navigation">
+            @for (group of filteredGroups(); track group.label) {
+              <div class="settings-w11-group">
+                <div class="settings-w11-group-label">{{ group.label }}</div>
+                @for (item of group.items; track item.id) {
+                  <a
+                    class="settings-w11-nav-item"
+                    [routerLink]="item.route"
+                    routerLinkActive="active"
+                    [routerLinkActiveOptions]="{ exact: false }"
+                    [attr.aria-label]="item.label"
+                  >
+                    <span class="settings-w11-nav-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path [attr.d]="item.icon" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                    <span class="settings-w11-nav-text">
+                      <strong>{{ item.label }}</strong>
+                      @if (item.subtitle) {
+                        <small>{{ item.subtitle }}</small>
+                      }
+                    </span>
+                    @if (item.badge) {
+                      <span class="settings-w11-nav-badge">{{ item.badge }}</span>
+                    }
+                  </a>
+                }
+              </div>
+            }
+
+            @if (filteredGroups().length === 0) {
+              <div class="settings-w11-empty">
+                <p>No settings match "{{ searchQuery() }}"</p>
+              </div>
+            }
+          </nav>
+        </aside>
+
+        <!-- RIGHT PANE: Content -->
+        <main class="settings-w11-content">
+          <router-outlet></router-outlet>
+        </main>
       </div>
-    </ion-split-pane>
+    </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsShellComponent {
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
+  private readonly location = inject(Location);
 
   readonly searchQuery = signal("");
 
@@ -131,11 +132,8 @@ export class SettingsShellComponent {
     people: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z M22 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75",
     check: "M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
     clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z M12 6v6l4 2",
-    device: "M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z M12 18h.01",
     lock: "M5 11h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z M7 11V7a5 5 0 0 1 10 0v4",
     doc: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z M14 2v6h6 M9 13h6 M9 17h6",
-    info: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z M12 16v-4 M12 8h.01",
-    activity: "M22 12h-4l-3 9L9 3l-3 9H2",
   };
 
   readonly groups = signal<SettingsGroup[]>([
@@ -160,10 +158,8 @@ export class SettingsShellComponent {
     {
       label: "System",
       items: [
-        { id: "devices", label: "Devices", subtitle: "Logged-in devices", icon: this.icons.device, route: "/settings/devices" },
         { id: "sessions", label: "Sessions", subtitle: "Active sign-ins", icon: this.icons.lock, route: "/settings/sessions" },
         { id: "reports", label: "Reports Settings", subtitle: "Default formats and emails", icon: this.icons.doc, route: "/settings/reports" },
-        { id: "about", label: "About", subtitle: "Version and support", icon: this.icons.info, route: "/settings/about" },
       ],
     },
   ]);
@@ -182,4 +178,25 @@ export class SettingsShellComponent {
       }))
       .filter((g) => g.items.length > 0);
   });
+
+  readonly userInitials = computed(() => {
+    try {
+      const raw = localStorage.getItem("ajui_user");
+      if (!raw) return "U";
+      const u = JSON.parse(raw);
+      const name = (u?.name || "User").trim();
+      return name.split(/\s+/).slice(0, 2).map((p: string) => p[0] || "").join("").toUpperCase() || "U";
+    } catch {
+      return "U";
+    }
+  });
+
+  goBack() {
+    // If there's a navigation history, go back; otherwise go to dashboard
+    if (window.history.length > 1) {
+      this.location.back();
+    } else {
+      this.router.navigateByUrl("/dashboard");
+    }
+  }
 }

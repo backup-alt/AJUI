@@ -114,29 +114,6 @@ type FontSize = "sm" | "md" | "lg";
     <section class="settings-w11-card">
       <div class="settings-w11-card-head">
         <div>
-          <h2>Accent color</h2>
-          <p>Customize the highlight color used across the app.</p>
-        </div>
-      </div>
-      <div class="settings-w11-card-body">
-        <div class="settings-w11-swatch-grid">
-          @for (c of accentColors; track c) {
-            <button
-              type="button"
-              class="settings-w11-swatch"
-              [class.active]="accent() === c"
-              [style.background]="c"
-              [attr.aria-label]="'Accent color ' + c"
-              (click)="accent.set(c)"
-            ></button>
-          }
-        </div>
-      </div>
-    </section>
-
-    <section class="settings-w11-card">
-      <div class="settings-w11-card-head">
-        <div>
           <h2>Density</h2>
           <p>Adjust spacing in lists and tables.</p>
         </div>
@@ -197,11 +174,9 @@ type FontSize = "sm" | "md" | "lg";
 })
 export class SettingsAppearanceComponent {
   readonly theme = signal<Theme>((localStorage.getItem("agb_theme") as Theme) || "light");
-  readonly accent = signal<string>(localStorage.getItem("agb_accent") || "#002263");
   readonly density = signal<Density>((localStorage.getItem("agb_density") as Density) || "comfortable");
   readonly fontIndex = signal<number>(parseInt(localStorage.getItem("agb_font") || "1", 10));
 
-  readonly accentColors = ["#002263", "#4a6cf7", "#16a34a", "#dc2626", "#f5a524", "#7c3aed"];
   readonly densities = [
     { value: "compact" as Density, label: "Compact", note: "Smaller padding and text" },
     { value: "comfortable" as Density, label: "Comfortable", note: "Default spacing" },
@@ -227,10 +202,8 @@ export class SettingsAppearanceComponent {
 
   apply() {
     localStorage.setItem("agb_theme", this.theme());
-    localStorage.setItem("agb_accent", this.accent());
     localStorage.setItem("agb_density", this.density());
     localStorage.setItem("agb_font", String(this.fontIndex()));
-    document.documentElement.style.setProperty("--agb-accent", this.accent());
     alert("Appearance updated. (UI placeholder — wire to backend in next step.)");
   }
 }

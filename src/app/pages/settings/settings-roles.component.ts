@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal, OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { RouterLink } from "@angular/router";
+import { ApiService } from "../../core/api.service";
 
 type Role = "Admin" | "Project Manager" | "Accountant";
 type Status = "active" | "inactive" | "on_leave";
@@ -18,10 +18,24 @@ interface Employee {
   projectIds: string[];
 }
 
+interface PendingInvite {
+  token: string;
+  inviteId: string;
+  supervisorName: string;
+  supervisorEmail: string;
+  supervisorPhone?: string;
+  expiresAt: string;
+  remainingMs: number;
+  qrDataUrl?: string;
+  scanned: boolean;
+  otp?: string;
+  emailSent?: boolean;
+}
+
 @Component({
   selector: "agb-settings-roles",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule],
   template: `
     <header class="settings-w11-header">
       <nav class="settings-w11-breadcrumb" aria-label="Breadcrumb">
@@ -70,14 +84,15 @@ interface Employee {
           </button>
         </div>
         <div class="settings-w11-toolbar-right">
-          <a
-            routerLink="/settings/roles/add-supervisor"
+          <button
+            type="button"
             class="settings-w11-btn settings-w11-btn-ghost"
-            title="Add a new supervisor via QR code"
+            (click)="openAddSupervisor()"
+            title="Generate a QR code for a new supervisor"
           >
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h3v8H3zM10 4h3v8h-3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
             Add Supervisor
-          </a>
+          </button>
           <input
             type="text"
             class="settings-w11-search-input"
@@ -128,6 +143,90 @@ interface Employee {
             } @empty {
               <tr>
                 <td colspan="7" class="settings-w11-empty-row">No employees match your search.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Pending Invites table -->
+    <section class="settings-w11-card">
+      <div class="settings-w11-card-head">
+        <div>
+          <h2>Pending Supervisor Invites</h2>
+          <p>Active QR codes waiting for the supervisor to scan and complete setup.</p>
+        </div>
+        <button
+          type="button"
+          class="settings-w11-btn settings-w11-btn-ghost small"
+          (click)="refreshInvites()"
+          [disabled]="invitesLoading()"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.5L13 3 M13 3v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {{ invitesLoading() ? 'Refreshing…' : 'Refresh' }}
+        </button>
+      </div>
+      <div class="settings-w11-table-wrap">
+        <table class="settings-w11-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Created</th>
+              <th>Time Left</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (inv of pendingInvites(); track inv.token) {
+              <tr [class.scanned]="inv.scanned">
+                <td>
+                  <div class="settings-w11-name-cell">
+                    <span class="settings-w11-avatar">{{ initials(inv.supervisorName) }}</span>
+                    <strong>{{ inv.supervisorName }}</strong>
+                  </div>
+                </td>
+                <td>{{ inv.supervisorEmail }}</td>
+                <td>{{ inv.supervisorPhone || '—' }}</td>
+                <td>{{ formatInviteDate(inv.expiresAt) }}</td>
+                <td>
+                  @if (inv.scanned) {
+                    <span class="settings-w11-timer-text">—</span>
+                  } @else if (inv.remainingMs <= 0) {
+                    <span class="settings-w11-timer-text expired">Expired</span>
+                  } @else {
+                    <span class="settings-w11-timer-text" [class.warning]="inv.remainingMs < 60000">
+                      <svg viewBox="0 0 16 16" aria-hidden="true" class="settings-w11-timer-icon"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                      {{ formatCountdown(inv.remainingMs) }}
+                    </span>
+                  }
+                </td>
+                <td>
+                  @if (inv.scanned) {
+                    <span class="settings-w11-status-pill" data-status="active">Scanned</span>
+                  } @else if (inv.remainingMs <= 0) {
+                    <span class="settings-w11-status-pill" data-status="inactive">Expired</span>
+                  } @else {
+                    <span class="settings-w11-status-pill" data-status="pending">Waiting</span>
+                  }
+                </td>
+                <td class="settings-w11-actions-cell">
+                  <button
+                    type="button"
+                    class="settings-w11-btn settings-w11-btn-ghost small"
+                    (click)="resendOtp(inv)"
+                    [disabled]="inv.scanned || inv.remainingMs <= 0 || resendingOtp()"
+                  >
+                    Resend
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="settings-w11-empty-row">No pending supervisor invites. Click "Add Supervisor" to create one.</td>
               </tr>
             }
           </tbody>
@@ -230,7 +329,7 @@ interface Employee {
       </aside>
     }
 
-    <!-- Invite modal -->
+    <!-- Invite Employee modal (admin/PM/accountant) -->
     @if (showInvite()) {
       <div class="settings-w11-modal-backdrop" (click)="closeInvite()" aria-hidden="true"></div>
       <div class="settings-w11-modal" role="dialog" aria-label="Invite employee">
@@ -268,20 +367,159 @@ interface Employee {
         </footer>
       </div>
     }
+
+    <!-- Add Supervisor modal (QR generation) -->
+    @if (showAddSupervisor()) {
+      <div class="settings-w11-modal-backdrop" (click)="closeAddSupervisor()" aria-hidden="true"></div>
+      <div class="settings-w11-modal settings-w11-modal-wide" role="dialog" aria-label="Add supervisor">
+        <header class="settings-w11-modal-head">
+          <div>
+            <h2>Add Supervisor</h2>
+            <small>Generate a time-limited QR code the supervisor scans from the AGB mobile app.</small>
+          </div>
+          <button type="button" class="settings-w11-icon-btn" (click)="closeAddSupervisor()" aria-label="Close">
+            <svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </header>
+
+        <div class="settings-w11-modal-body">
+          @if (!currentInvite()) {
+            <div class="settings-w11-form">
+              <div class="settings-w11-field">
+                <label>Supervisor name</label>
+                <input
+                  type="text"
+                  [value]="supervisorNameDraft()"
+                  (input)="supervisorNameDraft.set($any($event.target).value)"
+                  placeholder="e.g. Rajesh Kumar"
+                  maxlength="80"
+                />
+              </div>
+              <div class="settings-w11-field">
+                <label>Email</label>
+                <input
+                  type="email"
+                  [value]="supervisorEmailDraft()"
+                  (input)="supervisorEmailDraft.set($any($event.target).value)"
+                  placeholder="e.g. rajesh@agbuilders.com"
+                />
+              </div>
+              <div class="settings-w11-field">
+                <label>Phone</label>
+                <input
+                  type="tel"
+                  [value]="supervisorPhoneDraft()"
+                  (input)="supervisorPhoneDraft.set($any($event.target).value)"
+                  placeholder="e.g. +91 98765 43210"
+                />
+              </div>
+              @if (supervisorError()) {
+                <div class="settings-w11-message error">{{ supervisorError() }}</div>
+              }
+              <button
+                type="button"
+                class="settings-w11-btn settings-w11-btn-primary"
+                [disabled]="supervisorLoading()"
+                (click)="generateSupervisorQr()"
+              >
+                {{ supervisorLoading() ? 'Generating…' : 'Generate QR Code' }}
+              </button>
+            </div>
+          }
+
+          @if (currentInvite(); as invite) {
+            <div class="settings-w11-qr-popup" [class.scanned]="invite.scanned">
+              <header class="settings-w11-qr-popup-head">
+                <div>
+                  <strong>{{ invite.supervisorName }}</strong>
+                  <small>{{ invite.supervisorEmail }}</small>
+                </div>
+                <div class="settings-w11-qr-timer" [class.expired]="invite.remainingMs <= 0">
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" fill="none"
+                      [style.stroke-dasharray]="countdownCircle(invite.remainingMs)"
+                      stroke-dashoffset="0"
+                      transform="rotate(-90 10 10)"
+                    />
+                    <text x="10" y="14" text-anchor="middle" font-size="7" fill="currentColor">{{ formatCountdown(invite.remainingMs) }}</text>
+                  </svg>
+                  <span *ngIf="invite.remainingMs > 0">{{ formatCountdown(invite.remainingMs) }}</span>
+                  <span *ngIf="invite.remainingMs <= 0" class="settings-w11-expired-label">Expired</span>
+                </div>
+              </header>
+
+              <div class="settings-w11-qr-frame">
+                <img [src]="invite.qrDataUrl" alt="Supervisor QR Code" />
+              </div>
+
+              <p class="settings-w11-hint" *ngIf="!invite.scanned">
+                Ask the supervisor to open the <strong>AGB</strong> app, tap <strong>Scan QR</strong> on the welcome screen, and enter the OTP sent to their email.
+              </p>
+
+              <div class="settings-w11-otp-block" *ngIf="!invite.scanned && invite.otp && invite.emailSent === false">
+                <span class="settings-w11-otp-label">Email delivery failed — share this code verbally</span>
+                <strong class="settings-w11-otp-code">{{ invite.otp }}</strong>
+              </div>
+
+              <div class="settings-w11-scan-success" *ngIf="invite.scanned">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <circle cx="10" cy="10" r="8" fill="#d4edda" stroke="#28a745" stroke-width="1.5"/>
+                  <path d="m6 10.5 2.5 2.5 5-5" stroke="#28a745" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+                <span>Supervisor scanned! They can now set up their password.</span>
+              </div>
+
+              <div class="settings-w11-qr-actions">
+                <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="resendCurrentOtp()" [disabled]="resendingOtp()">
+                  {{ resendingOtp() ? 'Sending…' : 'Resend OTP' }}
+                </button>
+                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="generateAnother()">
+                  Generate another
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+        <footer class="settings-w11-modal-foot">
+          <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="closeAddSupervisor()">Close</button>
+        </footer>
+      </div>
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SettingsRolesComponent {
+export class SettingsRolesComponent implements OnInit, OnDestroy {
+  private readonly api = inject(ApiService);
+
   readonly activeTab = signal<"all" | "admin" | "pm" | "accountant">("all");
   readonly search = signal("");
   readonly selected = signal<Employee | null>(null);
   readonly drawerTab = signal<"profile" | "permissions" | "projects" | "activity">("profile");
 
+  // Invite Employee modal
   readonly showInvite = signal(false);
   readonly inviteName = signal("");
   readonly inviteEmail = signal("");
   readonly invitePhone = signal("");
   readonly inviteRole = signal<Role>("Project Manager");
+
+  // Add Supervisor modal
+  readonly showAddSupervisor = signal(false);
+  readonly supervisorNameDraft = signal("");
+  readonly supervisorEmailDraft = signal("");
+  readonly supervisorPhoneDraft = signal("");
+  readonly supervisorLoading = signal(false);
+  readonly supervisorError = signal<string | null>(null);
+  readonly currentInvite = signal<PendingInvite | null>(null);
+  readonly resendingOtp = signal(false);
+
+  // Pending invites table
+  readonly pendingInvites = signal<PendingInvite[]>([]);
+  readonly invitesLoading = signal(false);
+
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private countdownInterval: ReturnType<typeof setInterval> | null = null;
 
   readonly approvalTypes = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },
@@ -314,17 +552,59 @@ export class SettingsRolesComponent {
     });
   });
 
+  ngOnInit() {
+    this.refreshInvites();
+    this.pollInterval = setInterval(() => this.tickInvites(), 1000);
+  }
+
+  ngOnDestroy() {
+    if (this.pollInterval) { clearInterval(this.pollInterval); this.pollInterval = null; }
+    if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
+  }
+
+  refreshInvites() {
+    this.invitesLoading.set(true);
+    this.api.listActiveInvites().subscribe({
+      next: (res) => {
+        const fresh = res.invites.map((inv) => ({
+          token: inv.token,
+          inviteId: inv.inviteId,
+          supervisorName: inv.supervisorName,
+          supervisorEmail: inv.supervisorEmail,
+          expiresAt: inv.expiresAt,
+          remainingMs: Math.max(0, inv.remainingMs),
+          scanned: false,
+        }));
+        this.pendingInvites.set(fresh);
+        this.invitesLoading.set(false);
+      },
+      error: () => this.invitesLoading.set(false),
+    });
+  }
+
+  private tickInvites() {
+    this.pendingInvites.update((list) =>
+      list.map((inv) => {
+        if (inv.scanned) return inv;
+        const newRemaining = Math.max(0, inv.remainingMs - 1000);
+        return { ...inv, remainingMs: newRemaining };
+      })
+    );
+
+    // Tick current invite if modal is open
+    const current = this.currentInvite();
+    if (current && !current.scanned) {
+      const newRemaining = Math.max(0, current.remainingMs - 1000);
+      this.currentInvite.set({ ...current, remainingMs: newRemaining });
+    }
+  }
+
   countByRole(role: Role): number {
     return this.employees().filter((e) => e.role === role).length;
   }
 
   initials(name: string): string {
-    return name
-      .split(" ")
-      .map((p) => p[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase();
+    return (name || "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
   }
 
   formatDate(iso: string): string {
@@ -337,6 +617,26 @@ export class SettingsRolesComponent {
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days} days ago`;
     return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  }
+
+  formatInviteDate(iso: string): string {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
+  formatCountdown(ms: number): string {
+    const total = Math.floor(ms / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
+  countdownCircle(ms: number): string {
+    const total = 5 * 60 * 1000;
+    const remaining = Math.max(0, Math.min(total, ms));
+    const ratio = remaining / total;
+    const circumference = 2 * Math.PI * 8;
+    return `${(circumference * ratio).toFixed(2)} ${circumference.toFixed(2)}`;
   }
 
   select(e: Employee) {
@@ -366,6 +666,7 @@ export class SettingsRolesComponent {
     });
   }
 
+  // Invite Employee modal
   openInvite() {
     this.showInvite.set(true);
     this.inviteName.set("");
@@ -379,5 +680,117 @@ export class SettingsRolesComponent {
   sendInvite() {
     alert("Invite sent. (UI placeholder — wire to backend in next step.)");
     this.closeInvite();
+  }
+
+  // Add Supervisor modal
+  openAddSupervisor() {
+    this.showAddSupervisor.set(true);
+    this.currentInvite.set(null);
+    this.supervisorError.set(null);
+    this.supervisorNameDraft.set("");
+    this.supervisorEmailDraft.set("");
+    this.supervisorPhoneDraft.set("");
+  }
+
+  closeAddSupervisor() {
+    this.showAddSupervisor.set(false);
+    this.currentInvite.set(null);
+    this.supervisorError.set(null);
+    this.refreshInvites();
+  }
+
+  generateAnother() {
+    this.currentInvite.set(null);
+    this.supervisorError.set(null);
+    this.supervisorNameDraft.set("");
+    this.supervisorEmailDraft.set("");
+    this.supervisorPhoneDraft.set("");
+  }
+
+  generateSupervisorQr() {
+    const name = this.supervisorNameDraft().trim();
+    const email = this.supervisorEmailDraft().trim();
+    const phone = this.supervisorPhoneDraft().trim();
+    if (name.length < 2) {
+      this.supervisorError.set("Please enter at least 2 characters for the name.");
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.supervisorError.set("Please enter a valid email address.");
+      return;
+    }
+    if (!phone || phone.replace(/\D/g, "").length < 8) {
+      this.supervisorError.set("Please enter a valid mobile number (at least 8 digits).");
+      return;
+    }
+    this.supervisorError.set(null);
+    this.supervisorLoading.set(true);
+
+    this.api.createSupervisorInvite({ supervisorName: name, supervisorEmail: email, supervisorPhone: phone }).subscribe({
+      next: (invite) => {
+        const fiveMinMs = 5 * 60 * 1000;
+        this.currentInvite.set({
+          inviteId: invite.inviteId,
+          token: invite.token,
+          qrDataUrl: invite.qrDataUrl,
+          supervisorName: invite.supervisorName,
+          supervisorEmail: invite.supervisorEmail,
+          supervisorPhone: phone,
+          expiresAt: invite.expiresAt,
+          remainingMs: fiveMinMs,
+          scanned: false,
+          otp: invite.otp,
+          emailSent: invite.emailSent,
+        });
+        this.supervisorLoading.set(false);
+        this.refreshInvites();
+      },
+      error: (err) => {
+        const status = err?.status ?? err?.statusCode;
+        const detail = err?.error?.error || err?.message || "Failed to generate QR.";
+        this.supervisorError.set(`[${status ?? "?"}] ${detail}`);
+        this.supervisorLoading.set(false);
+      },
+    });
+  }
+
+  resendCurrentOtp() {
+    const inv = this.currentInvite();
+    if (!inv) return;
+    this.resendingOtp.set(true);
+    this.api.resendInviteOtp(inv.token).subscribe({
+      next: () => {
+        this.resendingOtp.set(false);
+        alert("OTP resent.");
+      },
+      error: () => {
+        this.resendingOtp.set(false);
+        alert("Failed to resend OTP.");
+      },
+    });
+  }
+
+  resendOtp(inv: PendingInvite) {
+    if (inv.remainingMs <= 0 || inv.scanned) return;
+    this.resendingOtp.set(true);
+    this.api.resendInviteOtp(inv.token).subscribe({
+      next: () => {
+        this.resendingOtp.set(false);
+        // refresh remaining time
+        this.api.listActiveInvites().subscribe({
+          next: (res) => {
+            const found = res.invites.find((x) => x.token === inv.token);
+            if (found) {
+              this.pendingInvites.update((list) =>
+                list.map((p) => (p.token === inv.token ? { ...p, remainingMs: Math.max(0, found.remainingMs) } : p))
+              );
+            }
+          },
+        });
+      },
+      error: () => {
+        this.resendingOtp.set(false);
+      },
+    });
   }
 }

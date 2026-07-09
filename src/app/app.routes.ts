@@ -40,10 +40,8 @@ export const routes: Routes = [
       { path: "supervisors", loadComponent: () => import("./pages/settings/settings-supervisors.component").then((m) => m.SettingsSupervisorsComponent) },
       { path: "approvals", loadComponent: () => import("./pages/settings/settings-approvals.component").then((m) => m.SettingsApprovalsComponent) },
       { path: "access-schedule", loadComponent: () => import("./pages/settings/settings-access-schedule.component").then((m) => m.SettingsAccessScheduleComponent) },
-      { path: "devices", loadComponent: () => import("./pages/settings/settings-devices.component").then((m) => m.SettingsDevicesComponent) },
       { path: "sessions", loadComponent: () => import("./pages/settings/settings-sessions.component").then((m) => m.SettingsSessionsComponent) },
       { path: "reports", loadComponent: () => import("./pages/settings/settings-reports.component").then((m) => m.SettingsReportsComponent) },
-      { path: "about", loadComponent: () => import("./pages/settings/settings-about.component").then((m) => m.SettingsAboutComponent) },
     ],
   },
   {
