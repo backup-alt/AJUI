@@ -119,7 +119,6 @@ type SettingsGroup = {
 })
 export class SettingsShellComponent implements OnDestroy {
   private readonly router = inject(Router);
-  private readonly location = inject(Location);
 
   readonly searchQuery = signal("");
   private readonly settingsHistory = signal<string[]>([]);
@@ -131,7 +130,10 @@ export class SettingsShellComponent implements OnDestroy {
       .subscribe((e) => {
         const url = (e as NavigationEnd).urlAfterRedirects;
         if (url.startsWith("/settings") && url !== "/settings") {
-          this.settingsHistory.update((h) => [...h, url]);
+          const current = this.settingsHistory();
+          if (current.length === 0 || current[current.length - 1] !== url) {
+            this.settingsHistory.update((h) => [...h, url]);
+          }
         }
       });
   }
