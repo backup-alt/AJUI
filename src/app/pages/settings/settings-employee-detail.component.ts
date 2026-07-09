@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { ActivatedRoute, Router } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { ErpDataService } from "../../data/erp-data.service";
 import { ApiService } from "../../core/api.service";
 
@@ -31,11 +31,11 @@ type ApprovalRight = {
 @Component({
   selector: "agb-settings-employee-detail",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <header class="settings-w11-header">
       <nav class="settings-w11-breadcrumb" aria-label="Breadcrumb">
-        <span>Settings</span>
+        <a routerLink="/settings">Settings</a>
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <a routerLink="/settings/roles">Roles and Employees</a>
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -55,11 +55,6 @@ type ApprovalRight = {
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 4-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Back to list
             </button>
-            @if (employee()!.status !== 'inactive') {
-              <button type="button" class="settings-w11-btn settings-w11-btn-danger-outline" (click)="deactivate()">Deactivate</button>
-            } @else {
-              <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="activate()">Activate</button>
-            }
           </div>
         </div>
       }
@@ -171,24 +166,45 @@ type ApprovalRight = {
           <section class="settings-w11-card">
             <div class="settings-w11-card-head">
               <div>
-                <h2>Access Control</h2>
-                <p>Additional access restrictions for this employee.</p>
+                <h2>Request Permission Control</h2>
+                <p>Restrict what this employee can submit and access in the system.</p>
               </div>
             </div>
             <div class="settings-w11-card-body">
               <label class="settings-w11-check-row">
                 <div>
-                  <strong>Can access mobile app</strong>
-                  <small>Allow this employee to use the AGB mobile supervisor app.</small>
+                  <strong>Can submit material requests</strong>
+                  <small>Allow this employee to submit new material requests.</small>
                 </div>
-                <input type="checkbox" [checked]="canAccessMobile()" (change)="canAccessMobile.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canSubmitMaterial()" (change)="canSubmitMaterial.set($any($event.target).checked)" />
               </label>
               <label class="settings-w11-check-row">
                 <div>
-                  <strong>Can view reports</strong>
-                  <small>Access to the Reports section in the admin console.</small>
+                  <strong>Can submit labour attendance</strong>
+                  <small>Allow this employee to mark daily attendance for workers.</small>
                 </div>
-                <input type="checkbox" [checked]="canViewReports()" (change)="canViewReports.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canSubmitLabour()" (change)="canSubmitLabour.set($any($event.target).checked)" />
+              </label>
+              <label class="settings-w11-check-row">
+                <div>
+                  <strong>Can submit site expenses</strong>
+                  <small>Allow this employee to log site-related expenses.</small>
+                </div>
+                <input type="checkbox" [checked]="canSubmitExpense()" (change)="canSubmitExpense.set($any($event.target).checked)" />
+              </label>
+              <label class="settings-w11-check-row">
+                <div>
+                  <strong>Can submit general expenses</strong>
+                  <small>Allow this employee to log office and general expenses.</small>
+                </div>
+                <input type="checkbox" [checked]="canSubmitGeneral()" (change)="canSubmitGeneral.set($any($event.target).checked)" />
+              </label>
+              <label class="settings-w11-check-row">
+                <div>
+                  <strong>Can submit subcontractor requests</strong>
+                  <small>Allow this employee to create subcontractor agreements.</small>
+                </div>
+                <input type="checkbox" [checked]="canSubmitSubcontract()" (change)="canSubmitSubcontract.set($any($event.target).checked)" />
               </label>
               <label class="settings-w11-check-row">
                 <div>
@@ -199,10 +215,10 @@ type ApprovalRight = {
               </label>
               <label class="settings-w11-check-row">
                 <div>
-                  <strong>Can approve wage overrides</strong>
-                  <small>Override the default wage rates for workers.</small>
+                  <strong>Can view reports</strong>
+                  <small>Access to the Reports section in the admin console.</small>
                 </div>
-                <input type="checkbox" [checked]="canApproveWages()" (change)="canApproveWages.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canViewReports()" (change)="canViewReports.set($any($event.target).checked)" />
               </label>
             </div>
           </section>
@@ -299,10 +315,13 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   readonly activeTab = signal<"profile" | "permissions" | "projects" | "activity">("profile");
 
-  readonly canAccessMobile = signal(true);
-  readonly canViewReports = signal(true);
+  readonly canSubmitMaterial = signal(true);
+  readonly canSubmitLabour = signal(true);
+  readonly canSubmitExpense = signal(true);
+  readonly canSubmitGeneral = signal(true);
+  readonly canSubmitSubcontract = signal(false);
   readonly canManageWorkers = signal(true);
-  readonly canApproveWages = signal(false);
+  readonly canViewReports = signal(true);
 
   readonly approvalTypes = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, bricks, etc." },
@@ -393,19 +412,5 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   goBack() {
     this.router.navigateByUrl("/settings/roles");
-  }
-
-  deactivate() {
-    if (confirm("Deactivate this employee? They will lose access immediately.")) {
-      this.employees.update((list) =>
-        list.map((e) => e.id === this.empId() ? { ...e, status: "inactive" as Status } : e)
-      );
-    }
-  }
-
-  activate() {
-    this.employees.update((list) =>
-      list.map((e) => e.id === this.empId() ? { ...e, status: "active" as Status } : e)
-    );
   }
 }

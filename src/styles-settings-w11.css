@@ -301,6 +301,18 @@
   font-weight: 500;
 }
 
+.settings-w11-breadcrumb a {
+  color: #64748b;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.settings-w11-breadcrumb a:hover {
+  color: #002263;
+  text-decoration: underline;
+}
+
 .settings-w11-breadcrumb svg {
   width: 12px;
   height: 12px;

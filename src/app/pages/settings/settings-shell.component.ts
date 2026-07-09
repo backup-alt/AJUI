@@ -1,8 +1,7 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject, signal, OnDestroy } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } from "@angular/router";
-import { filter, Subscription } from "rxjs";
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
 type SettingsItem = {
   id: string;
@@ -117,30 +116,10 @@ type SettingsGroup = {
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SettingsShellComponent implements OnDestroy {
+export class SettingsShellComponent {
   private readonly router = inject(Router);
 
   readonly searchQuery = signal("");
-  private readonly settingsHistory = signal<string[]>([]);
-  private readonly navSubscription: Subscription;
-
-  constructor() {
-    this.navSubscription = this.router.events
-      .pipe(filter((e) => e instanceof NavigationEnd))
-      .subscribe((e) => {
-        const url = (e as NavigationEnd).urlAfterRedirects;
-        if (url.startsWith("/settings") && url !== "/settings") {
-          const current = this.settingsHistory();
-          if (current.length === 0 || current[current.length - 1] !== url) {
-            this.settingsHistory.update((h) => [...h, url]);
-          }
-        }
-      });
-  }
-
-  ngOnDestroy() {
-    this.navSubscription.unsubscribe();
-  }
 
   // Icon path library (24x24 viewBox, currentColor stroke)
   private readonly icons = {
@@ -170,8 +149,6 @@ export class SettingsShellComponent implements OnDestroy {
       items: [
         { id: "roles", label: "Roles and Employees", subtitle: "Team access and permissions", icon: this.icons.people, route: "/settings/roles" },
         { id: "sites", label: "Sites Directory", subtitle: "All sites and their activity", icon: this.icons.pin, route: "/settings/sites" },
-        { id: "supervisors", label: "Supervisors", subtitle: "Field team management", icon: this.icons.shield, route: "/settings/supervisors" },
-        { id: "approvals", label: "Approval Rules", subtitle: "Field-level permissions", icon: this.icons.check, route: "/settings/approvals" },
         { id: "access-schedule", label: "Access Schedule", subtitle: "Restrict access windows", icon: this.icons.clock, route: "/settings/access-schedule" },
       ],
     },
@@ -212,13 +189,6 @@ export class SettingsShellComponent implements OnDestroy {
   });
 
   goBack() {
-    const history = this.settingsHistory();
-    if (history.length > 0) {
-      const prev = history[history.length - 1];
-      this.settingsHistory.update((h) => h.slice(0, -1));
-      this.router.navigateByUrl(prev);
-    } else {
-      this.router.navigateByUrl("/dashboard");
-    }
+    this.router.navigateByUrl("/dashboard");
   }
 }
