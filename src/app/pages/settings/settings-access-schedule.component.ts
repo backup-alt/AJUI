@@ -32,9 +32,7 @@ interface AccessWindow {
           <h1>Access Schedule</h1>
           <p>Define time windows where only admins can log in. Useful for maintenance, payroll, or sensitive data updates.</p>
         </div>
-        @if (dirty()) {
-          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="save()">Save Schedule</button>
-        }
+        <button type="button" class="settings-w11-btn settings-w11-btn-primary" [class.settings-w11-btn-dirty]="dirty()" (click)="save()">Save Schedule</button>
       </div>
     </div>
 
@@ -159,17 +157,10 @@ interface AccessWindow {
       <div class="settings-w11-card-body">
         <label class="settings-w11-toggle-row">
           <div>
-            <strong>Notify users 15 minutes before a restricted window</strong>
-            <small>Push and email warning before access is blocked.</small>
+            <strong>New submission notifications</strong>
+            <small>When a new approval request is submitted, the supervisor on duty will be notified immediately in the app and via email digest.</small>
           </div>
           <input type="checkbox" [checked]="notifyBefore()" (change)="setNotifyBefore($any($event.target).checked)" />
-        </label>
-        <label class="settings-w11-toggle-row">
-          <div>
-            <strong>Notify admin when a user is blocked</strong>
-            <small>Get notified about blocked login attempts.</small>
-          </div>
-          <input type="checkbox" [checked]="notifyAdmin()" (change)="setNotifyAdmin($any($event.target).checked)" />
         </label>
       </div>
     </section>

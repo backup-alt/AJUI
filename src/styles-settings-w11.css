@@ -512,19 +512,30 @@
 }
 
 .settings-w11-btn-primary {
-  background: #002263;
-  color: #ffffff;
-  border-color: #002263;
+  background: #e5e7eb;
+  color: #64748b;
+  border-color: #e5e7eb;
 }
 
 .settings-w11-btn-primary:hover:not(:disabled) {
-  background: #001a4d;
-  border-color: #001a4d;
+  background: #cbd5e1;
+  border-color: #cbd5e1;
 }
 
 .settings-w11-btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.settings-w11-btn-dirty {
+  background: #002263 !important;
+  color: #ffffff !important;
+  border-color: #002263 !important;
+}
+
+.settings-w11-btn-dirty:hover:not(:disabled) {
+  background: #001a4d !important;
+  border-color: #001a4d !important;
 }
 
 .settings-w11-btn-ghost {
