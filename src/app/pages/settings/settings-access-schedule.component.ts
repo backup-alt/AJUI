@@ -21,15 +21,22 @@ interface AccessWindow {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <header class="settings-w11-header">
+    <div class="settings-w11-page-head">
       <nav class="settings-w11-breadcrumb" aria-label="Breadcrumb">
         <span>Settings</span>
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <strong>Access Schedule</strong>
       </nav>
-      <h1>Access Schedule</h1>
-      <p>Define time windows where only admins can log in. Useful for maintenance, payroll, or sensitive data updates.</p>
-    </header>
+      <div class="settings-w11-page-head-row">
+        <div>
+          <h1>Access Schedule</h1>
+          <p>Define time windows where only admins can log in. Useful for maintenance, payroll, or sensitive data updates.</p>
+        </div>
+        @if (dirty()) {
+          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="save()">Save Schedule</button>
+        }
+      </div>
+    </div>
 
     <div class="settings-w11-callout">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 1 18h18L10 2Z M10 8v4 M10 14h.01" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -46,7 +53,7 @@ interface AccessWindow {
           <small>When ON, the schedule below is enforced. When OFF, all users can access at any time.</small>
         </div>
         <label class="settings-w11-switch">
-          <input type="checkbox" [checked]="enabled()" (change)="enabled.set($any($event.target).checked)" />
+          <input type="checkbox" [checked]="enabled()" (change)="setEnabled($any($event.target).checked)" />
           <span class="settings-w11-switch-slider"></span>
         </label>
       </div>
@@ -155,14 +162,14 @@ interface AccessWindow {
             <strong>Notify users 15 minutes before a restricted window</strong>
             <small>Push and email warning before access is blocked.</small>
           </div>
-          <input type="checkbox" [checked]="notifyBefore()" (change)="notifyBefore.set($any($event.target).checked)" />
+          <input type="checkbox" [checked]="notifyBefore()" (change)="setNotifyBefore($any($event.target).checked)" />
         </label>
         <label class="settings-w11-toggle-row">
           <div>
             <strong>Notify admin when a user is blocked</strong>
             <small>Get notified about blocked login attempts.</small>
           </div>
-          <input type="checkbox" [checked]="notifyAdmin()" (change)="notifyAdmin.set($any($event.target).checked)" />
+          <input type="checkbox" [checked]="notifyAdmin()" (change)="setNotifyAdmin($any($event.target).checked)" />
         </label>
       </div>
     </section>
@@ -181,7 +188,7 @@ interface AccessWindow {
             <strong>Log all access attempts during restricted windows</strong>
             <small>Keep a record of who tried to log in and when.</small>
           </div>
-          <input type="checkbox" [checked]="logAttempts()" (change)="logAttempts.set($any($event.target).checked)" />
+          <input type="checkbox" [checked]="logAttempts()" (change)="setLogAttempts($any($event.target).checked)" />
         </label>
         <div class="settings-w11-table-wrap" style="margin-top: 16px">
           <table class="settings-w11-table">
@@ -197,10 +204,6 @@ interface AccessWindow {
         </div>
       </div>
     </section>
-
-    <div class="settings-w11-sticky-actions">
-      <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="save()">Save schedule</button>
-    </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -209,6 +212,31 @@ export class SettingsAccessScheduleComponent {
   readonly notifyBefore = signal(true);
   readonly notifyAdmin = signal(true);
   readonly logAttempts = signal(true);
+  readonly dirty = signal(false);
+
+  private markDirty() {
+    this.dirty.set(true);
+  }
+
+  setEnabled(value: boolean) {
+    this.enabled.set(value);
+    this.markDirty();
+  }
+
+  setNotifyBefore(value: boolean) {
+    this.notifyBefore.set(value);
+    this.markDirty();
+  }
+
+  setNotifyAdmin(value: boolean) {
+    this.notifyAdmin.set(value);
+    this.markDirty();
+  }
+
+  setLogAttempts(value: boolean) {
+    this.logAttempts.set(value);
+    this.markDirty();
+  }
 
   readonly allDays: DayOfWeek[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -263,20 +291,24 @@ export class SettingsAccessScheduleComponent {
         createdBy: "You",
       },
     ]);
+    this.markDirty();
   }
 
   deleteWindow(id: string) {
     if (confirm("Delete this restricted window?")) {
       this.windows.update((list) => list.filter((w) => w.id !== id));
+      this.markDirty();
     }
   }
 
   toggleWindow(id: string, value: boolean) {
     this.windows.update((list) => list.map((w) => (w.id === id ? { ...w, isActive: value } : w)));
+    this.markDirty();
   }
 
   updateWindow(id: string, patch: Partial<AccessWindow>) {
     this.windows.update((list) => list.map((w) => (w.id === id ? { ...w, ...patch } : w)));
+    this.markDirty();
   }
 
   toggleDay(id: string, day: DayOfWeek) {
@@ -290,6 +322,7 @@ export class SettingsAccessScheduleComponent {
           : w
       )
     );
+    this.markDirty();
   }
 
   toggleRole(id: string, role: "project_manager" | "accountant") {
@@ -303,6 +336,7 @@ export class SettingsAccessScheduleComponent {
           : w
       )
     );
+    this.markDirty();
   }
 
   exportLog() {
@@ -310,6 +344,7 @@ export class SettingsAccessScheduleComponent {
   }
 
   save() {
+    this.dirty.set(false);
     alert("Schedule saved. (UI placeholder — wire to backend in next step.)");
   }
 }

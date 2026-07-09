@@ -334,6 +334,39 @@
   max-width: 600px;
 }
 
+/* PAGE HEAD (access schedule top layout) */
+.settings-w11-page-head {
+  margin-bottom: 20px;
+}
+
+.settings-w11-page-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.settings-w11-page-head-row h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.settings-w11-page-head-row p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+  max-width: 600px;
+}
+
+.settings-w11-page-head-row .settings-w11-btn {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
 /* CARDS */
 .settings-w11-card {
   background: #ffffff;
@@ -680,10 +713,15 @@
 
 .settings-w11-toggle-row.big {
   padding: 16px 0;
+  align-items: flex-start;
 }
 
 .settings-w11-toggle-row.big strong {
   font-size: 15px;
+}
+
+.settings-w11-toggle-row.big small {
+  margin-top: 4px;
 }
 
 .settings-w11-toggle-row input[type="checkbox"] {
@@ -2507,6 +2545,14 @@
 
 .dark-mode .settings-w11-breadcrumb strong {
   color: #f1f5f9;
+}
+
+.dark-mode .settings-w11-page-head-row h1 {
+  color: #f1f5f9;
+}
+
+.dark-mode .settings-w11-page-head-row p {
+  color: #94a3b8;
 }
 
 .dark-mode .settings-w11-toolbar {
