@@ -35,6 +35,7 @@ export const routes: Routes = [
       { path: "notifications", loadComponent: () => import("./pages/settings/settings-notifications.component").then((m) => m.SettingsNotificationsComponent) },
       { path: "appearance", loadComponent: () => import("./pages/settings/settings-appearance.component").then((m) => m.SettingsAppearanceComponent) },
       { path: "roles", loadComponent: () => import("./pages/settings/settings-roles.component").then((m) => m.SettingsRolesComponent) },
+      { path: "roles/employee/:id", loadComponent: () => import("./pages/settings/settings-employee-detail.component").then((m) => m.SettingsEmployeeDetailComponent) },
       { path: "roles/add-supervisor", loadComponent: () => import("./pages/settings/settings-add-supervisor.component").then((m) => m.SettingsAddSupervisorComponent) },
       { path: "sites", loadComponent: () => import("./pages/settings/settings-sites.component").then((m) => m.SettingsSitesComponent) },
       { path: "supervisors", loadComponent: () => import("./pages/settings/settings-supervisors.component").then((m) => m.SettingsSupervisorsComponent) },

@@ -91,7 +91,7 @@ interface PendingInvite {
             (click)="openAddSupervisor()"
             title="Generate a QR code for a new supervisor"
           >
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h3v8H3zM10 4h3v8h-3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5" height="5" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="9" width="5" height="5" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="10.5" y="10.5" width="3" height="3" rx="0.3" fill="currentColor"/></svg>
             Add Supervisor
           </button>
           <input
@@ -123,7 +123,7 @@ interface PendingInvite {
           </thead>
           <tbody>
             @for (e of filteredEmployees(); track e.id) {
-              <tr (click)="select(e)" class="settings-w11-row-clickable">
+              <tr (click)="viewEmployee(e)" class="settings-w11-row-clickable">
                 <td>
                   <div class="settings-w11-name-cell">
                     <span class="settings-w11-avatar">{{ initials(e.name) }}</span>
@@ -587,6 +587,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       },
       error: () => this.invitesLoading.set(false),
     });
+  }
+
+  viewEmployee(e: Employee) {
+    this.router.navigateByUrl(`/settings/roles/employee/${e.id}`);
   }
 
   private tickInvites() {
