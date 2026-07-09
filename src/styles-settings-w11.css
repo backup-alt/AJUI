@@ -253,10 +253,11 @@
 /* RIGHT PANE */
 .settings-w11-content {
   padding: 32px 40px;
-  max-width: 1200px;
+  max-width: 100%;
   width: 100%;
   overflow-y: auto;
   min-height: 0;
+  box-sizing: border-box;
 }
 
 .settings-w11-header {
@@ -2206,31 +2207,6 @@
   display: none;
 }
 
-/* TIMELINE */
-.settings-w11-timeline {
-  display: grid;
-  grid-template-columns: repeat(24, 1fr);
-  gap: 2px;
-  height: 36px;
-}
-
-.settings-w11-timeline-hour {
-  background: #f1f5f9;
-  border-radius: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  color: #94a3b8;
-  position: relative;
-}
-
-.settings-w11-timeline-hour.restricted {
-  background: #fecaca;
-  color: #991b1b;
-  font-weight: 600;
-}
-
 /* SITE CARDS (in Sites Directory) */
 .settings-w11-site-grid {
   display: grid;
@@ -2740,16 +2716,6 @@
   color: #94a3b8;
 }
 
-.dark-mode .settings-w11-timeline-hour {
-  background: #334155;
-  color: #64748b;
-}
-
-.dark-mode .settings-w11-timeline-hour.restricted {
-  background: #7f1d1d;
-  color: #fecaca;
-}
-
 .dark-mode .settings-w11-modal {
   background: #1e293b;
 }
@@ -2847,6 +2813,9 @@
 }
 
 .settings-w11-timer-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
   font-weight: 600;
   color: #002263;
@@ -2854,6 +2823,12 @@
 
 .settings-w11-timer-text.expired {
   color: #dc2626;
+}
+
+.settings-w11-timer-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .settings-w11-expired-label {
@@ -2867,23 +2842,27 @@
 
 /* QR POPUP STYLES */
 .settings-w11-qr-popup {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 16px;
+  text-align: center;
+  padding: 8px 0;
+  width: 100%;
 }
 
-.settings-w11-qr-popup .settings-w11-modal {
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
-  max-width: 460px;
+.settings-w11-qr-popup-head {
+  display: flex;
+  justify-content: space-between;
   width: 100%;
+  align-items: flex-start;
+  text-align: left;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.settings-w11-qr-popup-head > div:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 /* SCANNED STATE */

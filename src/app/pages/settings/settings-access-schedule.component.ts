@@ -145,24 +145,6 @@ interface AccessWindow {
     <section class="settings-w11-card">
       <div class="settings-w11-card-head">
         <div>
-          <h2>Today's Timeline</h2>
-          <p>Visual overview of when access is restricted today.</p>
-        </div>
-      </div>
-      <div class="settings-w11-card-body">
-        <div class="settings-w11-timeline">
-          @for (h of hours; track h) {
-            <div class="settings-w11-timeline-hour" [class.restricted]="isHourRestricted(h)">
-              <span>{{ formatHour(h) }}</span>
-            </div>
-          }
-        </div>
-      </div>
-    </section>
-
-    <section class="settings-w11-card">
-      <div class="settings-w11-card-head">
-        <div>
           <h2>Notifications</h2>
           <p>Stay informed about access changes.</p>
         </div>
@@ -229,7 +211,6 @@ export class SettingsAccessScheduleComponent {
   readonly logAttempts = signal(true);
 
   readonly allDays: DayOfWeek[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  readonly hours = Array.from({ length: 24 }, (_, i) => i);
 
   readonly windows = signal<AccessWindow[]>([
     {
@@ -265,24 +246,6 @@ export class SettingsAccessScheduleComponent {
 
   nextChange(): string {
     return "in 2h 14m";
-  }
-
-  isHourRestricted(h: number): boolean {
-    if (!this.enabled()) return false;
-    return this.windows().some((w) => {
-      if (!w.isActive) return false;
-      const [sh] = w.startTime.split(":").map(Number);
-      const [eh] = w.endTime.split(":").map(Number);
-      if (sh < eh) return h >= sh && h < eh;
-      return h >= sh || h < eh;
-    });
-  }
-
-  formatHour(h: number): string {
-    if (h === 0) return "12 AM";
-    if (h === 12) return "12 PM";
-    if (h < 12) return `${h} AM`;
-    return `${h - 12} PM`;
   }
 
   addWindow() {
