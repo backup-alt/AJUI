@@ -19,6 +19,10 @@ export const routes: Routes = [
     loadComponent: () => import("./pages/setup-account.component").then((m) => m.SetupAccountComponent),
   },
   {
+    path: "signup/employee",
+    loadComponent: () => import("./pages/setup-account.component").then((m) => m.SetupAccountComponent),
+  },
+  {
     path: "clients",
     loadComponent: () => import("./pages/client-dashboard.page").then((m) => m.ClientDashboardPage),
   },

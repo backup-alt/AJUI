@@ -61,4 +61,10 @@ router.post(
   ctrl.supervisorSignup
 );
 
+// Employee (admin / project_manager / accountant) invite routes
+router.get("/employee/verify/:token", ctrl.verifyEmployeeInvite);
+router.post("/employee/verify-otp", ctrl.verifyEmployeeOtp);
+router.post("/employee/resend-otp", strictLimiter, ctrl.employeeResendOtp);
+router.post("/employee/signup", strictLimiter, ctrl.employeeSignup);
+
 export default router;

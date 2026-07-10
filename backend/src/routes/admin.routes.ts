@@ -12,6 +12,8 @@ router.use(requireRole("admin"));
 router.post("/invites/supervisor", authCtrl.adminCreateInvite);
 router.get("/invites/active", authCtrl.listActiveInvites);
 router.post("/invites/supervisor/resend-otp", authCtrl.resendInviteOtp);
+router.post("/invites/supervisor/send-email", authCtrl.sendSupervisorInviteEmail);
+router.post("/invites/employee", authCtrl.adminCreateEmployeeInvite);
 router.post("/users/deactivate", adminCtrl.deactivateSupervisor);
 
 export default router;

@@ -419,3 +419,326 @@ export async function supervisorResendInviteOtp(req: Request, res: Response, nex
     next(err);
   }
 }
+
+// =================== EMPLOYEE INVITE FLOW (Admin / Project Manager / Accountant) ===================
+
+const adminCreateEmployeeInviteSchema = z.object({
+  name: z.string().trim().min(2, "Name is required").max(100),
+  email: z.string().email("Valid email is required").transform((v) => v.toLowerCase()),
+  phone: z.string().trim().min(8).max(20).optional(),
+  role: z.enum(["admin", "project_manager", "accountant"]),
+});
+
+export async function adminCreateEmployeeInvite(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const body = adminCreateEmployeeInviteSchema.parse(req.body);
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+
+    const result = await inviteService.createEmployeeInvite({
+      createdByAdmin: req.user.sub,
+      name: body.name,
+      email: body.email,
+      phone: body.phone,
+      role: body.role,
+    });
+
+    res.status(201).json({
+      inviteId: result.invite._id.toString(),
+      token: result.invite.token,
+      inviteUrl: result.inviteUrl,
+      supervisorName: result.recipientName,
+      supervisorEmail: result.recipientEmail,
+      role: result.invite.role,
+      expiresAt: result.expiresAt,
+      createdAt: result.invite.createdAt,
+      emailSent: result.emailSent,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function sendSupervisorInviteEmail(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+
+    const result = await inviteService.sendSupervisorInviteEmail(token);
+    res.json({
+      success: true,
+      emailSent: result.emailSent,
+      recipient: result.recipient,
+      deepLink: result.deepLink,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyEmployeeInvite(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { token } = z.object({ token: z.string().min(1) }).parse(req.params);
+    const invite = await inviteService.verifyInvite(token);
+    if (invite.role === "supervisor") {
+      throw new AppError(400, "This invite is not an employee invite");
+    }
+    res.json({
+      valid: true,
+      role: invite.role,
+      name: inviteService.extractInviteeName(invite),
+      email: invite.inviteeEmail || "",
+      phone: invite.inviteePhone || "",
+      expiresAt: invite.expiresAt,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+const employeeSignupSchema = z.object({
+  token: z.string().min(1),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+  name: z.string().trim().min(2).max(100),
+  phone: z.string().trim().min(8).max(20),
+  password: z.string().min(6).max(128),
+});
+
+export async function verifyEmployeeOtp(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const input = z
+      .object({
+        token: z.string().min(1),
+        otp: z.string().length(6, "OTP must be 6 digits"),
+        password: z.string().min(6).max(128).optional(),
+        name: z.string().trim().min(2).max(100).optional(),
+        phone: z.string().trim().min(8).max(20).optional(),
+      })
+      .parse(req.body);
+    const invite = await inviteService.verifyInvite(input.token);
+    if (invite.role === "supervisor") {
+      throw new AppError(400, "This invite is not an employee invite");
+    }
+    if (invite.usedAt) throw new AppError(410, "Invite already used");
+    if (!invite.otpHash) throw new AppError(400, "No OTP associated with this invite");
+    if (invite.otpExpiresAt && invite.otpExpiresAt < new Date()) {
+      throw new AppError(410, "OTP has expired. Please request a new code.");
+    }
+    const valid = await compareToken(input.otp, invite.otpHash);
+    if (!valid) throw new AppError(400, "Invalid OTP");
+
+    // If password is provided, complete signup in this same call so the
+    // single-page signup flow can finish in one round-trip.
+    if (input.password) {
+      const fallbackEmail = invite.inviteeEmail || "";
+      const fallbackName = inviteService.extractInviteeName(invite);
+      const finalEmail = fallbackEmail;
+      const finalName = input.name && input.name.length > 0 ? input.name : fallbackName;
+      const finalPhone =
+        input.phone ||
+        (invite.inviteePhone && invite.inviteePhone.length > 0
+          ? invite.inviteePhone
+          : `+910000000000`);
+
+      if (!finalEmail) {
+        throw new AppError(400, "Email is required to complete signup");
+      }
+
+      const existing = await User.findOne({
+        $or: [{ email: finalEmail }, { phone: finalPhone }],
+      });
+      if (existing) throw new AppError(409, "User with this email or phone already exists");
+
+      const passwordHash = await hashPassword(input.password);
+      const user = await User.create({
+        name: finalName,
+        email: finalEmail,
+        phone: finalPhone,
+        passwordHash,
+        role: invite.role,
+        status: "active",
+        createdBy: invite.createdByAdmin,
+      });
+
+      await inviteService.consumeInvite(input.token, user._id.toString());
+
+      const tokens = await authService.issueTokens(user);
+      const cookieOptions = {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none" as const,
+        expires: tokens.expiresAt,
+        path: "/api/auth",
+      };
+
+      res.cookie(getRefreshCookieName(), tokens.refreshToken, cookieOptions);
+      res.json({
+        success: true,
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+        },
+        accessToken: tokens.accessToken,
+        expiresAt: tokens.expiresAt,
+        message: "Account created successfully",
+      });
+      return;
+    }
+
+    res.json({ valid: true, role: invite.role });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function employeeResendOtp(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
+    const invite = await inviteService.verifyInvite(token);
+    if (invite.role === "supervisor") {
+      throw new AppError(400, "This invite is not an employee invite");
+    }
+
+    const newOtp = crypto.randomInt(0, 10 ** 6).toString().padStart(6, "0");
+    const otpHash = await hashToken(newOtp);
+    invite.otpHash = otpHash;
+    invite.otpExpiresAt = invite.expiresAt;
+    await invite.save();
+
+    let emailSent = false;
+    if (invite.inviteeEmail) {
+      const name = inviteService.extractInviteeName(invite);
+      const roleLabel =
+        invite.role === "project_manager"
+          ? "Project Manager"
+          : invite.role === "admin"
+          ? "Admin"
+          : "Accountant";
+      try {
+        await sendEmail({
+          to: invite.inviteeEmail,
+          subject: `Your AGB ${roleLabel} setup code`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
+            <div style="background:#002263;color:white;padding:16px 24px;border-radius:8px 8px 0 0">
+              <h2 style="margin:0;color:white">AGB ${roleLabel} Setup</h2>
+            </div>
+            <div style="padding:24px">
+              <p style="font-size:16px">Hello <strong>${name}</strong>,</p>
+              <p style="font-size:14px;color:#555">A new one-time code has been generated for your AGB account. Your code is:</p>
+              <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
+                <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${newOtp}</span>
+              </div>
+              <p style="font-size:12px;color:#888">This code expires when your invite expires.</p>
+            </div>
+          </div>`,
+        });
+        emailSent = true;
+      } catch (err) {
+        console.error("[Auth] Failed to resend employee OTP email:", err);
+      }
+    }
+
+    const expiresIn = Math.max(
+      0,
+      Math.floor((invite.expiresAt.getTime() - Date.now()) / 1000)
+    );
+    res.json({ success: true, message: "New OTP generated", otp: newOtp, emailSent, expiresIn });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function employeeSignup(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const input = employeeSignupSchema.parse(req.body);
+
+    const invite = await inviteService.verifyInvite(input.token);
+    if (invite.role === "supervisor") {
+      throw new AppError(400, "This invite is not an employee invite");
+    }
+
+    if (invite.otpHash) {
+      if (invite.otpExpiresAt && invite.otpExpiresAt < new Date()) {
+        throw new AppError(410, "OTP has expired. Please request a new code.");
+      }
+      const valid = await compareToken(input.otp, invite.otpHash);
+      if (!valid) throw new AppError(400, "Invalid OTP");
+    }
+
+    const fallbackEmail = invite.inviteeEmail || "";
+    const fallbackName = inviteService.extractInviteeName(invite);
+    const finalEmail = fallbackEmail;
+    const finalName = input.name && input.name.length > 0 ? input.name : fallbackName;
+    const finalPhone = input.phone;
+
+    if (!finalEmail) {
+      throw new AppError(400, "Email is required to complete signup");
+    }
+
+    const existing = await User.findOne({ $or: [{ email: finalEmail }, { phone: finalPhone }] });
+    if (existing) throw new AppError(409, "User with this email or phone already exists");
+
+    const passwordHash = await hashPassword(input.password);
+    const user = await User.create({
+      name: finalName,
+      email: finalEmail,
+      phone: finalPhone,
+      passwordHash,
+      role: invite.role,
+      status: "active",
+      createdBy: invite.createdByAdmin,
+    });
+
+    await inviteService.consumeInvite(input.token, user._id.toString());
+
+    const tokens = await authService.issueTokens(user);
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none" as const,
+      expires: tokens.expiresAt,
+      path: "/api/auth",
+    };
+
+    res.cookie(getRefreshCookieName(), tokens.refreshToken, cookieOptions);
+    res.status(201).json({
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+      accessToken: tokens.accessToken,
+      expiresAt: tokens.expiresAt,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
