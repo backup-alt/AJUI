@@ -3685,3 +3685,195 @@
 .dark-mode .settings-w11-status-line strong {
   color: #f1f5f9;
 }
+
+/* ============== Project selector in invite modal ============== */
+.settings-w11-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.settings-w11-project-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #e6eaf2;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.settings-w11-project-check:hover {
+  border-color: #002263;
+  background: #ffffff;
+}
+
+.settings-w11-project-check.checked {
+  border-color: #002263;
+  background: rgba(0, 34, 99, 0.04);
+}
+
+.settings-w11-project-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #002263;
+  flex-shrink: 0;
+}
+
+.settings-w11-project-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.settings-w11-project-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.settings-w11-hint-inline {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.settings-w11-empty-inline {
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.dark-mode .settings-w11-project-check {
+  border-color: #334155;
+  background: #1e293b;
+}
+
+.dark-mode .settings-w11-project-check:hover {
+  border-color: #002263;
+  background: #0f172a;
+}
+
+.dark-mode .settings-w11-project-check.checked {
+  border-color: #002263;
+  background: rgba(0, 34, 99, 0.2);
+}
+
+.dark-mode .settings-w11-project-name {
+  color: #f1f5f9;
+}
+
+/* ============== Font size slider ============== */
+.settings-w11-font-slider-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-w11-font-slider-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 200px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.settings-w11-font-slider-labels span:first-child {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.settings-w11-font-slider-labels span:last-child {
+  font-size: 18px;
+  color: #94a3b8;
+}
+
+.settings-w11-font-size-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  min-width: 60px;
+  text-align: center;
+  transition: color 0.2s;
+}
+
+.settings-w11-font-size-label.active {
+  color: #002263;
+}
+
+.settings-w11-font-slider {
+  width: 100%;
+  max-width: 200px;
+  height: 4px;
+  border-radius: 2px;
+  accent-color: #002263;
+  cursor: pointer;
+}
+
+.dark-mode .settings-w11-font-size-label {
+  color: #f1f5f9;
+}
+
+.dark-mode .settings-w11-font-slider-labels span:first-child,
+.dark-mode .settings-w11-font-slider-labels span:last-child {
+  color: #64748b;
+}
+
+/* ============== Site stats ============== */
+.settings-w11-site-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e6eaf2;
+}
+
+.settings-w11-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.settings-w11-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #002263;
+  line-height: 1.1;
+}
+
+.settings-w11-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dark-mode .settings-w11-site-stats {
+  border-top-color: #334155;
+}
+
+.dark-mode .settings-w11-stat {
+  background: #1e293b;
+}
+
+.dark-mode .settings-w11-stat-value {
+  color: #93c5fd;
+}

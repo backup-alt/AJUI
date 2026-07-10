@@ -34,6 +34,7 @@ export interface CreateEmployeeInviteParams {
   email: string;
   phone?: string;
   role: InviteRole;
+  projectIds?: string[];
 }
 
 export interface CreateEmployeeInviteResult {
@@ -147,6 +148,7 @@ export async function createEmployeeInvite(
     inviteePhone: params.phone,
     metadata: {
       inviteeName: params.name,
+      allocatedProjectIds: params.projectIds || [],
     },
     otpHash: "",
     otpExpiresAt,
@@ -156,7 +158,7 @@ export async function createEmployeeInvite(
   invite.otpHash = otpHash;
   await invite.save();
 
-  const baseUrl = (env.BACKEND_PUBLIC_URL || env.FRONTEND_URL).replace(/\/+$/, "");
+  const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
   const inviteUrl = `${baseUrl}/signup/employee?token=${token}`;
 
   const html = buildEmployeeInviteEmail({

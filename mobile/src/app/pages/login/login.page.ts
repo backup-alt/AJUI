@@ -1,7 +1,7 @@
 import { Component, signal, OnInit, OnDestroy, ViewChildren, QueryList, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import {
   IonContent,
   IonIcon,
@@ -615,6 +615,7 @@ export class LoginPage implements OnInit, OnDestroy {
     private auth: AuthService,
     public network: NetworkService,
     private router: Router,
+    private route: ActivatedRoute,
     private toastCtrl: ToastController,
   ) {
     addIcons({
@@ -635,7 +636,16 @@ export class LoginPage implements OnInit, OnDestroy {
     });
   }
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.route.queryParams.subscribe((params) => {
+      const token = params['token'];
+      if (token) {
+        // Deep link: ajui://supervisor/signup?token=xxx opened the app
+        // Auto-start verification flow, going straight to OTP screen
+        this.processQr(token);
+      }
+    });
+  }
 
   ngOnDestroy() {
     this.clearTimers();

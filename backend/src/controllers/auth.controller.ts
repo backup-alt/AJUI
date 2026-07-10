@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
+import { Types } from "mongoose";
 import * as authService from "../services/auth.service.js";
 import * as inviteService from "../services/invite.service.js";
 import { getRefreshCookieName } from "../services/auth.service.js";
@@ -427,6 +428,7 @@ const adminCreateEmployeeInviteSchema = z.object({
   email: z.string().email("Valid email is required").transform((v) => v.toLowerCase()),
   phone: z.string().trim().min(8).max(20).optional(),
   role: z.enum(["admin", "project_manager", "accountant"]),
+  projectIds: z.array(z.string()).optional(),
 });
 
 export async function adminCreateEmployeeInvite(
@@ -438,12 +440,28 @@ export async function adminCreateEmployeeInvite(
     const body = adminCreateEmployeeInviteSchema.parse(req.body);
     if (!req.user?.sub) throw new AppError(401, "Not authenticated");
 
+    const existingUser = await User.findOne({
+      $or: [
+        { email: body.email },
+        ...(body.phone ? [{ phone: body.phone }] : []),
+      ],
+    });
+    if (existingUser) {
+      res.status(409).json({
+        error: "A user with this email or phone already exists.",
+        duplicate: true,
+        field: existingUser.email === body.email ? "email" : "phone",
+      });
+      return;
+    }
+
     const result = await inviteService.createEmployeeInvite({
       createdByAdmin: req.user.sub,
       name: body.name,
       email: body.email,
       phone: body.phone,
       role: body.role,
+      projectIds: body.projectIds,
     });
 
     res.status(201).json({
@@ -565,6 +583,10 @@ export async function verifyEmployeeOtp(
       if (existing) throw new AppError(409, "User with this email or phone already exists");
 
       const passwordHash = await hashPassword(input.password);
+      const meta = (invite.metadata as Record<string, unknown>) || {};
+      const allocatedProjectIds: string[] = Array.isArray(meta.allocatedProjectIds)
+        ? (meta.allocatedProjectIds as string[])
+        : [];
       const user = await User.create({
         name: finalName,
         email: finalEmail,
@@ -573,6 +595,7 @@ export async function verifyEmployeeOtp(
         role: invite.role,
         status: "active",
         createdBy: invite.createdByAdmin,
+        managedProjectIds: allocatedProjectIds.map((id) => new Types.ObjectId(id)),
       });
 
       await inviteService.consumeInvite(input.token, user._id.toString());
@@ -705,6 +728,10 @@ export async function employeeSignup(
     if (existing) throw new AppError(409, "User with this email or phone already exists");
 
     const passwordHash = await hashPassword(input.password);
+    const meta = (invite.metadata as Record<string, unknown>) || {};
+    const allocatedProjectIds: string[] = Array.isArray(meta.allocatedProjectIds)
+      ? (meta.allocatedProjectIds as string[])
+      : [];
     const user = await User.create({
       name: finalName,
       email: finalEmail,
@@ -713,6 +740,7 @@ export async function employeeSignup(
       role: invite.role,
       status: "active",
       createdBy: invite.createdByAdmin,
+      managedProjectIds: allocatedProjectIds.map((id) => new Types.ObjectId(id)),
     });
 
     await inviteService.consumeInvite(input.token, user._id.toString());

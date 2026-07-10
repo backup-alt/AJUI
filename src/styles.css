@@ -20,7 +20,12 @@
   --amber: #b45309;
   --rose: #be123c;
   --indigo: #4f46e5;
+  --app-font-scale: 1;
 }
+
+:root[data-font-size="sm"] { --app-font-scale: 0.85; }
+:root[data-font-size="md"] { --app-font-scale: 1.00; }
+:root[data-font-size="lg"] { --app-font-scale: 1.15; }
 
 * {
   box-sizing: border-box;
@@ -30,6 +35,7 @@ body {
   margin: 0;
   background: var(--ion-background-color);
   color: var(--text-strong);
+  font-size: calc(14px * var(--app-font-scale, 1));
 }
 
 html,

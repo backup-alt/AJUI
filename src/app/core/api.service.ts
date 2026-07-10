@@ -578,6 +578,7 @@ export class ApiService {
     email: string;
     phone?: string;
     role: "Admin" | "Project Manager" | "Accountant";
+    projectIds?: string[];
   }): Observable<{
     inviteId: string;
     token: string;

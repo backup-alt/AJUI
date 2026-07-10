@@ -362,6 +362,27 @@ interface PendingInvite {
               <option value="Accountant">Accountant</option>
             </select>
           </div>
+          <div class="settings-w11-field">
+            <label>
+              Allocate projects
+              <small class="settings-w11-hint-inline">Choose which projects this person can access once they sign up</small>
+            </label>
+            <div class="settings-w11-project-list">
+              @for (p of availableProjects(); track p.id) {
+                <label class="settings-w11-project-check" [class.checked]="isProjectSelected(p.id)">
+                  <input
+                    type="checkbox"
+                    [checked]="isProjectSelected(p.id)"
+                    (change)="toggleProject(p.id)"
+                  />
+                  <span class="settings-w11-project-name">{{ p.name }}</span>
+                  <small class="settings-w11-project-meta">{{ p.client || p.address || '—' }}</small>
+                </label>
+              } @empty {
+                <div class="settings-w11-empty-inline">No projects available. Add a project first to allocate access.</div>
+              }
+            </div>
+          </div>
           @if (inviteError()) {
             <div class="settings-w11-message error">{{ inviteError() }}</div>
           }
@@ -517,6 +538,36 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly inviteEmail = signal("");
   readonly invitePhone = signal("");
   readonly inviteRole = signal<Role>("Project Manager");
+  readonly inviteProjectIds = signal<string[]>([]);
+  readonly projects = signal<{ id: string; name: string; client?: string; address?: string }[]>([]);
+
+  readonly availableProjects = computed(() => {
+    const fromErp = this.erp.projects().map((p) => ({
+      id: p.id,
+      name: p.name,
+      client: p.client,
+      address: p.address,
+    }));
+    const fromApi = this.projects();
+    const seen = new Set<string>();
+    const merged: { id: string; name: string; client?: string; address?: string }[] = [];
+    for (const p of [...fromErp, ...fromApi]) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      merged.push(p);
+    }
+    return merged;
+  });
+
+  isProjectSelected(id: string): boolean {
+    return this.inviteProjectIds().includes(id);
+  }
+
+  toggleProject(id: string) {
+    this.inviteProjectIds.update((ids) =>
+      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
+    );
+  }
 
   // Add Supervisor modal
   readonly showAddSupervisor = signal(false);
@@ -566,6 +617,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.refreshInvites();
     this.refreshEmployees();
+    this.loadProjects();
     this.pollInterval = setInterval(() => this.tickInvites(), 1000);
     if (this.route.snapshot.queryParamMap.get("addSupervisor") === "true") {
       this.openAddSupervisor();
@@ -653,6 +705,23 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         this.invitesLoading.set(false);
       },
       error: () => this.invitesLoading.set(false),
+    });
+  }
+
+  loadProjects() {
+    this.api.listProjects({ limit: 200 }).subscribe({
+      next: (res) => {
+        const items = (res?.items || []).map((row: any) => ({
+          id: row.id || row._id,
+          name: row.name || "Unnamed project",
+          client: row.client?.name || row.clientName || row.client,
+          address: row.address || "",
+        }));
+        this.projects.set(items);
+      },
+      error: () => {
+        // Fallback: erp.projects() will be used
+      },
     });
   }
 
@@ -751,15 +820,19 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.inviteEmail.set("");
     this.invitePhone.set("");
     this.inviteRole.set("Project Manager");
+    this.inviteProjectIds.set([]);
+    this.inviteError.set(null);
   }
   closeInvite() {
     this.showInvite.set(false);
+    this.inviteError.set(null);
   }
   sendInvite() {
     const name = this.inviteName().trim();
     const email = this.inviteEmail().trim();
     const phone = this.invitePhone().trim();
     const role = this.inviteRole();
+    const projectIds = this.inviteProjectIds();
 
     this.inviteError.set(null);
 
@@ -773,7 +846,13 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     }
 
     this.inviteSending.set(true);
-    this.api.createEmployeeInvite({ name, email, phone: phone || undefined, role: role as "Admin" | "Project Manager" | "Accountant" }).subscribe({
+    this.api.createEmployeeInvite({
+      name,
+      email,
+      phone: phone || undefined,
+      role: role as "Admin" | "Project Manager" | "Accountant",
+      projectIds: projectIds.length > 0 ? projectIds : undefined,
+    }).subscribe({
       next: (res) => {
         this.inviteSending.set(false);
         if (res?.emailSent) {
@@ -784,8 +863,15 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         this.closeInvite();
         this.refreshEmployees();
       },
-      error: () => {
+      error: (err) => {
         this.inviteSending.set(false);
+        if (err?.status === 409 || err?.details?.duplicate) {
+          const field = err?.details?.field || "email";
+          this.inviteError.set(
+            `A user with this ${field} already exists. Please use a different ${field} or ask the admin to remove the existing user first.`
+          );
+          return;
+        }
         this.erp.addUser({ name, email, phone: phone || undefined, role: role as AppUser["role"], status: "active", source: "admin" });
         alert(`Account created for ${email} (offline mode). Share the setup link manually.`);
         this.closeInvite();

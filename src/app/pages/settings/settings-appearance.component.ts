@@ -142,21 +142,21 @@ type FontSize = "sm" | "md" | "lg";
         </div>
       </div>
       <div class="settings-w11-card-body">
-        <div class="settings-w11-slider-row">
+        <div class="settings-w11-font-slider-wrap">
+          <div class="settings-w11-font-slider-labels">
+            <span>A</span>
+            <span class="settings-w11-font-size-label" [class.active]="true">{{ fontSizeLabel() }}</span>
+            <span>A</span>
+          </div>
           <input
             type="range"
             min="0"
-            max="2"
-            step="1"
-            [value]="fontIndex()"
-            (input)="fontIndex.set(+$any($event.target).value)"
+            max="100"
+            [value]="fontPercent()"
+            (input)="fontPercent.set(+$any($event.target).value)"
+            class="settings-w11-font-slider"
             aria-label="Font size"
           />
-          <div class="settings-w11-slider-labels">
-            <span [class.active]="fontSize() === 'sm'">Small</span>
-            <span [class.active]="fontSize() === 'md'">Medium</span>
-            <span [class.active]="fontSize() === 'lg'">Large</span>
-          </div>
         </div>
         <div class="settings-w11-font-preview" [attr.data-size]="fontSize()">
           <strong>Preview text</strong>
@@ -178,7 +178,7 @@ export class SettingsAppearanceComponent {
 
   readonly theme = signal<Theme>((localStorage.getItem("agb_theme") as Theme) || "light");
   readonly density = signal<Density>((localStorage.getItem("agb_density") as Density) || "comfortable");
-  readonly fontIndex = signal<number>(parseInt(localStorage.getItem("agb_font") || "1", 10));
+  readonly fontPercent = signal<number>(parseInt(localStorage.getItem("agb_font") || "50", 10));
 
   readonly densities = [
     { value: "compact" as Density, label: "Compact", note: "Smaller padding and text" },
@@ -186,7 +186,19 @@ export class SettingsAppearanceComponent {
     { value: "roomy" as Density, label: "Roomy", note: "More breathing room" },
   ];
 
-  readonly fontSize = (): FontSize => (["sm", "md", "lg"][this.fontIndex()] as FontSize) || "md";
+  readonly fontSize = (): FontSize => {
+    const p = this.fontPercent();
+    if (p <= 33) return "sm";
+    if (p <= 66) return "md";
+    return "lg";
+  };
+
+  readonly fontSizeLabel = (): string => {
+    const p = this.fontPercent();
+    if (p <= 33) return "Small";
+    if (p <= 66) return "Medium";
+    return "Large";
+  };
 
   constructor() {
     // Load preferences from backend
@@ -195,8 +207,8 @@ export class SettingsAppearanceComponent {
         if (prefs.theme) this.theme.set(prefs.theme);
         if (prefs.density) this.density.set(prefs.density);
         if (prefs.fontSize) {
-          const idx = ["sm", "md", "lg"].indexOf(prefs.fontSize);
-          if (idx >= 0) this.fontIndex.set(idx);
+          const map: Record<string, number> = { sm: 16, md: 50, lg: 84 };
+          if (prefs.fontSize in map) this.fontPercent.set(map[prefs.fontSize]);
         }
       },
       error: () => {
@@ -224,10 +236,12 @@ export class SettingsAppearanceComponent {
       document.documentElement.dataset["density"] = d;
     });
 
-    // Apply font size CSS variable to document
+    // Apply font scale to document (0-100 maps to 0.85x-1.15x)
     effect(() => {
-      const idx = this.fontIndex();
-      const size: FontSize = (["sm", "md", "lg"][idx] as FontSize) || "md";
+      const p = this.fontPercent();
+      const scale = 0.85 + (p / 100) * 0.30;
+      document.documentElement.style.setProperty("--app-font-scale", scale.toFixed(2));
+      const size = this.fontSize();
       document.documentElement.dataset["fontSize"] = size;
     });
   }
@@ -235,7 +249,7 @@ export class SettingsAppearanceComponent {
   apply() {
     localStorage.setItem("agb_theme", this.theme());
     localStorage.setItem("agb_density", this.density());
-    localStorage.setItem("agb_font", String(this.fontIndex()));
+    localStorage.setItem("agb_font", String(this.fontPercent()));
 
     this.api.saveAppearancePrefs({
       theme: this.theme(),

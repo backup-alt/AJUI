@@ -16,6 +16,9 @@ interface Site {
   targetEndDate: string;
   projectNames: string[];
   address: string;
+  totalDays?: number;
+  totalWorkers?: number;
+  totalEmployees?: number;
 }
 
 @Component({
@@ -84,6 +87,20 @@ interface Site {
                 <div class="settings-w11-site-row">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v2 M3 6h10v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6Z M6 9h4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   <span>{{ s.startDate }} → {{ s.targetEndDate }}</span>
+                </div>
+              </div>
+              <div class="settings-w11-site-stats">
+                <div class="settings-w11-stat">
+                  <span class="settings-w11-stat-value">{{ s.totalDays ?? '—' }}</span>
+                  <span class="settings-w11-stat-label">Days</span>
+                </div>
+                <div class="settings-w11-stat">
+                  <span class="settings-w11-stat-value">{{ s.totalWorkers ?? 0 }}</span>
+                  <span class="settings-w11-stat-label">Workers</span>
+                </div>
+                <div class="settings-w11-stat">
+                  <span class="settings-w11-stat-value">{{ s.totalEmployees ?? 0 }}</span>
+                  <span class="settings-w11-stat-label">Employees</span>
                 </div>
               </div>
               <footer class="settings-w11-site-card-foot">
@@ -166,17 +183,23 @@ export class SettingsSitesComponent implements OnInit {
     // Also fetch remote sites and merge if available
     this.api.listSites().subscribe({
       next: (res) => {
-        const remoteItems = (res?.items || []).map((row: any, index: number) => ({
-          id: row.id || row._id || `remote-site-${index}`,
-          siteId: row.siteId || row.id || `SIT-${String(localSites.length + index + 1).padStart(3, "0")}`,
-          name: row.name || row.sites?.[0] || "Unnamed Site",
-          status: (row.status || "Active") as SiteStatus,
-          supervisor: row.supervisor || "—",
-          startDate: row.startDate || "Not available",
-          targetEndDate: row.targetEndDate || row.endDate || "Not available",
-          projectNames: row.projectNames || (row.name ? [row.name] : []),
-          address: row.address || "Not available",
-        }));
+        const remoteItems = (res?.items || []).map((row: any, index: number) => {
+          const totalDays = this.computeTotalDays(row.startDate, row.targetEndDate || row.endDate);
+          return {
+            id: row.id || row._id || `remote-site-${index}`,
+            siteId: row.siteId || row.id || `SIT-${String(localSites.length + index + 1).padStart(3, "0")}`,
+            name: row.name || row.sites?.[0] || "Unnamed Site",
+            status: (row.status || "Active") as SiteStatus,
+            supervisor: row.supervisor || "—",
+            startDate: row.startDate || "Not available",
+            targetEndDate: row.targetEndDate || row.endDate || "Not available",
+            projectNames: row.projectNames || (row.name ? [row.name] : []),
+            address: row.address || "Not available",
+            totalDays,
+            totalWorkers: typeof row.totalWorkers === "number" ? row.totalWorkers : undefined,
+            totalEmployees: typeof row.totalEmployees === "number" ? row.totalEmployees : undefined,
+          };
+        });
         // Merge: local first, then remote (dedup by name)
         const merged = [...localSites];
         for (const r of remoteItems) {
@@ -190,8 +213,19 @@ export class SettingsSitesComponent implements OnInit {
     });
   }
 
+  private computeTotalDays(start: string | undefined, end: string | undefined): number | undefined {
+    if (!start || !end) return undefined;
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return undefined;
+    const diff = Math.max(0, endDate.getTime() - startDate.getTime());
+    return Math.round(diff / (1000 * 60 * 60 * 24));
+  }
+
   private buildLocalSites(): Site[] {
     const projects = this.erp.projects();
+    const users = this.erp.users();
+    const supervisors = this.erp.supervisors();
     const seen = new Set<string>();
     const out: Site[] = [];
     let counter = 1;
@@ -199,7 +233,6 @@ export class SettingsSitesComponent implements OnInit {
       for (const siteName of p.sites || []) {
         const key = siteName.toLowerCase();
         if (seen.has(key)) {
-          // Add this project to existing site
           const existing = out.find((s) => s.name.toLowerCase() === key);
           if (existing && !existing.projectNames.includes(p.name)) {
             existing.projectNames.push(p.name);
@@ -207,6 +240,13 @@ export class SettingsSitesComponent implements OnInit {
           continue;
         }
         seen.add(key);
+        const totalDays = this.computeTotalDays(p.startDate, undefined);
+        const siteSupervisors = supervisors.filter(
+          (s: any) => (s.site || "").toLowerCase() === key
+        ).length;
+        const siteEmployees = users.filter(
+          (u: any) => (u.site || "").toLowerCase() === key
+        ).length;
         out.push({
           id: `local-site-${counter++}`,
           siteId: `SIT-${String(counter).padStart(3, "0")}`,
@@ -217,6 +257,9 @@ export class SettingsSitesComponent implements OnInit {
           targetEndDate: "Not available",
           projectNames: [p.name],
           address: p.address || "Not available",
+          totalDays,
+          totalWorkers: siteSupervisors,
+          totalEmployees: siteEmployees,
         });
       }
     }
