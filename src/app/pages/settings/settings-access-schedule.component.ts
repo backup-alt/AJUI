@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { ApiService } from "../../core/api.service";
 
 type DayOfWeek = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
 
@@ -14,6 +15,16 @@ interface AccessWindow {
   isActive: boolean;
   createdAt: string;
   createdBy: string;
+}
+
+interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  user: string;
+  role: string;
+  action: string;
+  result: string;
+  ip?: string;
 }
 
 @Component({
@@ -171,44 +182,114 @@ interface AccessWindow {
       <div class="settings-w11-card-head">
         <div>
           <h2>Audit Log</h2>
-          <p>Record of access attempts during restricted windows.</p>
+          <p>Logins, logouts, and approval decisions from the last 7 days.</p>
         </div>
-        <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="exportLog()">Export log</button>
+        <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="exportLog()" [disabled]="exporting()">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v9 M4 9l4 4 4-4 M3 14h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {{ exporting() ? 'Exporting…' : 'Export log' }}
+        </button>
       </div>
       <div class="settings-w11-card-body">
-        <label class="settings-w11-toggle-row">
-          <div>
-            <strong>Log all access attempts during restricted windows</strong>
-            <small>Keep a record of who tried to log in and when.</small>
-          </div>
-          <input type="checkbox" [checked]="logAttempts()" (change)="setLogAttempts($any($event.target).checked)" />
-        </label>
-        <div class="settings-w11-table-wrap" style="margin-top: 16px">
-          <table class="settings-w11-table">
-            <thead>
-              <tr><th>Timestamp</th><th>User</th><th>Role</th><th>Action</th><th>Result</th><th>IP</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>Today 23:42</td><td>suresh@agbuilders.com</td><td>PM</td><td>Login attempt</td><td><span class="settings-w11-status-pill" data-status="rejected">Blocked</span></td><td>103.21.x.x</td></tr>
-              <tr><td>Today 23:15</td><td>anitha@agbuilders.com</td><td>PM</td><td>Settings access</td><td><span class="settings-w11-status-pill" data-status="rejected">Blocked</span></td><td>103.21.x.x</td></tr>
-              <tr><td>Yesterday 23:50</td><td>vinoth@agbuilders.com</td><td>Accountant</td><td>Login attempt</td><td><span class="settings-w11-status-pill" data-status="rejected">Blocked</span></td><td>157.45.x.x</td></tr>
-            </tbody>
-          </table>
+        <div class="settings-w11-table-wrap" style="margin-top: 8px">
+          @if (auditLogLoading()) {
+            <p class="settings-w11-empty-hint">Loading audit log…</p>
+          } @else if (auditLog().length === 0) {
+            <p class="settings-w11-empty-hint">No audit entries in the last 7 days.</p>
+          } @else {
+            <table class="settings-w11-table">
+              <thead>
+                <tr><th>Timestamp</th><th>User</th><th>Role</th><th>Action</th><th>Result</th><th>IP</th></tr>
+              </thead>
+              <tbody>
+                @for (entry of auditLog(); track entry.id) {
+                  <tr>
+                    <td>{{ formatLogTime(entry.timestamp) }}</td>
+                    <td>{{ entry.user }}</td>
+                    <td>{{ entry.role }}</td>
+                    <td>{{ entry.action }}</td>
+                    <td>
+                      <span class="settings-w11-status-pill" [attr.data-status]="(entry.result || '').toLowerCase()">{{ entry.result }}</span>
+                    </td>
+                    <td>{{ entry.ip || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
         </div>
       </div>
     </section>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SettingsAccessScheduleComponent {
+export class SettingsAccessScheduleComponent implements OnInit {
+  private readonly api = inject(ApiService);
+
   readonly enabled = signal(false);
   readonly notifyBefore = signal(true);
-  readonly notifyAdmin = signal(true);
   readonly logAttempts = signal(true);
   readonly dirty = signal(false);
+  readonly saving = signal(false);
+
+  readonly auditLog = signal<AuditLogEntry[]>([]);
+  readonly auditLogLoading = signal(false);
+  readonly exporting = signal(false);
 
   private markDirty() {
     this.dirty.set(true);
+  }
+
+  ngOnInit() {
+    this.loadSchedule();
+    this.loadAuditLog();
+  }
+
+  private loadSchedule() {
+    this.api.getAccessSchedule().subscribe({
+      next: (res) => {
+        this.enabled.set(!!res?.enabled);
+        this.notifyBefore.set(true);
+        if (Array.isArray(res?.windows)) {
+          this.windows.set(res.windows.map((w: any) => ({
+            id: w.id || `W-${Date.now()}`,
+            startTime: w.startTime || "00:00",
+            endTime: w.endTime || "00:00",
+            days: (w.days || []) as DayOfWeek[],
+            appliesTo: (w.appliesTo || ["project_manager", "accountant"]) as ("project_manager" | "accountant")[],
+            note: w.note || "",
+            isActive: w.isActive !== false,
+            createdAt: w.createdAt || new Date().toISOString().slice(0, 10),
+            createdBy: w.createdBy || "You",
+          })));
+        }
+      },
+      error: () => {
+        // Keep defaults
+      },
+    });
+  }
+
+  private loadAuditLog() {
+    this.auditLogLoading.set(true);
+    this.api.listAuditLogs({ days: 7, limit: 50 }).subscribe({
+      next: (res) => {
+        const items = (res?.items || []).map((row: any) => ({
+          id: row.id || row._id || `log-${Date.now()}-${Math.random()}`,
+          timestamp: row.timestamp || row.createdAt || row.date || "",
+          user: row.user || row.userName || row.email || "—",
+          role: row.role || row.userRole || "—",
+          action: row.action || row.event || "—",
+          result: row.result || row.status || "—",
+          ip: row.ip || row.ipAddress || "—",
+        }));
+        this.auditLog.set(items);
+        this.auditLogLoading.set(false);
+      },
+      error: () => {
+        this.auditLog.set([]);
+        this.auditLogLoading.set(false);
+      },
+    });
   }
 
   setEnabled(value: boolean) {
@@ -218,11 +299,6 @@ export class SettingsAccessScheduleComponent {
 
   setNotifyBefore(value: boolean) {
     this.notifyBefore.set(value);
-    this.markDirty();
-  }
-
-  setNotifyAdmin(value: boolean) {
-    this.notifyAdmin.set(value);
     this.markDirty();
   }
 
@@ -242,8 +318,8 @@ export class SettingsAccessScheduleComponent {
       appliesTo: ["project_manager", "accountant"],
       note: "Daily maintenance window",
       isActive: true,
-      createdAt: "2024-09-12",
-      createdBy: "Karthik Raja",
+      createdAt: new Date().toISOString().slice(0, 10),
+      createdBy: "You",
     },
   ]);
 
@@ -266,7 +342,23 @@ export class SettingsAccessScheduleComponent {
   }
 
   nextChange(): string {
-    return "in 2h 14m";
+    return "—";
+  }
+
+  formatLogTime(iso: string): string {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) {
+      return `Today ${d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
+    }
+    if (days === 1) {
+      return `Yesterday ${d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
+    }
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   }
 
   addWindow() {
@@ -333,11 +425,46 @@ export class SettingsAccessScheduleComponent {
   }
 
   exportLog() {
-    alert("Exporting audit log. (UI placeholder)");
+    this.exporting.set(true);
+    this.api.exportAuditLog({ days: 7 }).subscribe({
+      next: (blob) => {
+        this.exporting.set(false);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => {
+        this.exporting.set(false);
+        alert("Failed to export audit log.");
+      },
+    });
   }
 
   save() {
-    this.dirty.set(false);
-    alert("Schedule saved. (UI placeholder — wire to backend in next step.)");
+    this.saving.set(true);
+    this.api.saveAccessSchedule({
+      enabled: this.enabled(),
+      windows: this.windows().map((w) => ({
+        id: w.id,
+        startTime: w.startTime,
+        endTime: w.endTime,
+        days: w.days,
+        appliesTo: w.appliesTo,
+        note: w.note,
+        isActive: w.isActive,
+      })),
+    }).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.dirty.set(false);
+      },
+      error: () => {
+        this.saving.set(false);
+        alert("Failed to save access schedule.");
+      },
+    });
   }
 }

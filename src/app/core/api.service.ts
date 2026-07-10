@@ -422,6 +422,302 @@ export class ApiService {
     );
   }
 
+  // =================== ACCOUNT ===================
+  patchMe(payload: { name?: string; phone?: string }): Observable<{ user: ApiUser }> {
+    return this.http.patch<{ user: ApiUser }>(`${this.baseUrl}/auth/me`, payload, { headers: this.authHeaders() }).pipe(
+      tap((res) => this.userSignal.set(res.user)),
+      catchError(this.handleError)
+    );
+  }
+
+  changePassword(payload: { currentPassword: string; newPassword: string }): Observable<{ success: boolean; message: string }> {
+    return this.http.put<{ success: boolean; message: string }>(`${this.baseUrl}/auth/password`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== SESSIONS ===================
+  listSessions(): Observable<{ sessions: Array<{ id: string; device: string; ip: string; location?: string; lastActiveAt: string; isCurrent: boolean; createdAt: string }> }> {
+    return this.http.get<{ sessions: any[] }>(`${this.baseUrl}/auth/sessions`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  revokeSession(id: string): Observable<{ success: boolean }> {
+    return this.http.delete<{ success: boolean }>(`${this.baseUrl}/auth/sessions/${id}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  revokeAllOtherSessions(): Observable<{ success: boolean; revokedCount: number }> {
+    return this.http.delete<{ success: boolean; revokedCount: number }>(`${this.baseUrl}/auth/sessions`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== USER PREFERENCES ===================
+  getNotificationPrefs(): Observable<{
+    pushNewSubmission: boolean;
+    emailDaily: boolean;
+    emailWeekly: boolean;
+    emailMonthly: boolean;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/users/me/notifications`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  saveNotificationPrefs(prefs: {
+    pushNewSubmission?: boolean;
+    emailDaily?: boolean;
+    emailWeekly?: boolean;
+    emailMonthly?: boolean;
+  }): Observable<{ success: boolean; prefs: any }> {
+    return this.http.put<{ success: boolean; prefs: any }>(`${this.baseUrl}/users/me/notifications`, prefs, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getAppearancePrefs(): Observable<{
+    theme: "light" | "dark" | "system";
+    density: "compact" | "comfortable" | "roomy";
+    fontSize: "sm" | "md" | "lg";
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/users/me/appearance`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  saveAppearancePrefs(prefs: {
+    theme?: "light" | "dark" | "system";
+    density?: "compact" | "comfortable" | "roomy";
+    fontSize?: "sm" | "md" | "lg";
+  }): Observable<{ success: boolean; prefs: any }> {
+    return this.http.put<{ success: boolean; prefs: any }>(`${this.baseUrl}/users/me/appearance`, prefs, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== EMPLOYEES (Admin) ===================
+  listEmployees(params?: { search?: string; role?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/admin/users${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getEmployee(id: string): Observable<{ employee: any }> {
+    return this.http.get<{ employee: any }>(`${this.baseUrl}/admin/users/${id}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  patchEmployee(id: string, payload: any): Observable<{ employee: any }> {
+    return this.http.patch<{ employee: any }>(`${this.baseUrl}/admin/users/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getEmployeePermissions(id: string): Observable<{
+    permissions: Array<{ key: string; label: string; canApprove: boolean; canReject: boolean }>;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/admin/users/${id}/permissions`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  saveEmployeePermissions(id: string, payload: { permissions: Array<{ key: string; canApprove: boolean; canReject: boolean }> }): Observable<{ success: boolean }> {
+    return this.http.put<{ success: boolean }>(`${this.baseUrl}/admin/users/${id}/permissions`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getEmployeeRequestPermissions(id: string): Observable<{
+    canApproveMaterial: boolean;
+    canApproveLabour: boolean;
+    canApproveExpense: boolean;
+    canApproveGeneral: boolean;
+    canApproveSubcontract: boolean;
+    canApprovePayment: boolean;
+    canManageWorkers: boolean;
+    canViewReports: boolean;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/admin/users/${id}/request-permissions`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  saveEmployeeRequestPermissions(id: string, payload: any): Observable<{ success: boolean }> {
+    return this.http.put<{ success: boolean }>(`${this.baseUrl}/admin/users/${id}/request-permissions`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getEmployeeActivity(id: string, params?: { days?: number; limit?: number }): Observable<{
+    activity: Array<{ id: string; action: string; description: string; timestamp: string; meta?: any }>;
+  }> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get<any>(`${this.baseUrl}/admin/users/${id}/activity${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== EMPLOYEE INVITE FLOW (Two-Step) ===================
+  createEmployeeInvite(payload: {
+    name: string;
+    email: string;
+    phone?: string;
+    role: "Admin" | "Project Manager" | "Accountant";
+  }): Observable<{
+    inviteId: string;
+    token: string;
+    inviteUrl: string;
+    supervisorName: string;
+    supervisorEmail: string;
+    role: string;
+    expiresAt: string;
+    createdAt: string;
+    emailSent?: boolean;
+  }> {
+    return this.http.post<any>(`${this.baseUrl}/admin/invites/employee`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  sendEmployeeOtp(token: string): Observable<{ success: boolean; emailSent: boolean; expiresIn: number }> {
+    return this.http.post<any>(`${this.baseUrl}/auth/employee/resend-otp`, { token }, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  verifyEmployeeOtp(token: string, otp: string, password: string): Observable<{ success: boolean; user?: any; message: string }> {
+    return this.http.post<any>(`${this.baseUrl}/auth/employee/verify-otp`, { token, otp, password }, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  verifyEmployeeToken(token: string): Observable<{ valid: boolean; email?: string; name?: string; role?: string; expiresAt?: string }> {
+    return this.http.get<any>(`${this.baseUrl}/auth/employee/verify/${token}`).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== SUPERVISOR EMAIL INVITE ===================
+  sendSupervisorEmail(token: string): Observable<{ success: boolean; emailSent: boolean }> {
+    return this.http.post<any>(`${this.baseUrl}/admin/invites/supervisor/send-email`, { token }, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== ACCESS SCHEDULE ===================
+  getAccessSchedule(): Observable<{
+    enabled: boolean;
+    windows: Array<{
+      id: string;
+      startTime: string;
+      endTime: string;
+      days: string[];
+      appliesTo: string[];
+      note?: string;
+      isActive: boolean;
+    }>;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/admin/access-schedule`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  saveAccessSchedule(payload: {
+    enabled: boolean;
+    windows: Array<{
+      id?: string;
+      startTime: string;
+      endTime: string;
+      days: string[];
+      appliesTo: string[];
+      note?: string;
+      isActive: boolean;
+    }>;
+  }): Observable<{ success: boolean; schedule: any }> {
+    return this.http.put<{ success: boolean; schedule: any }>(`${this.baseUrl}/admin/access-schedule`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getAccessScheduleStatus(): Observable<{
+    isRestricted: boolean;
+    currentWindow?: { id: string; startTime: string; endTime: string; reason: string };
+    nextChange?: string;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/admin/access-schedule/status`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== AUDIT LOG ===================
+  listAuditLogs(params?: { days?: number; type?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/admin/audit-log${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  exportAuditLog(params?: { days?: number; type?: string }): Observable<Blob> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get(`${this.baseUrl}/admin/audit-log/export${query}`, { headers: this.authHeaders(), responseType: "blob" }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== REPORTS SETTINGS ===================
+  getReportsSettings(): Observable<{
+    format: "Excel" | "PDF" | "CSV";
+    fileNamePrefix: string;
+    includeProjectId: boolean;
+    recipients: string[];
+    dailyDigest: boolean;
+    weeklyDigest: boolean;
+    monthlyDigest: boolean;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/admin/reports/settings`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  saveReportsSettings(payload: {
+    format?: "Excel" | "PDF" | "CSV";
+    fileNamePrefix?: string;
+    includeProjectId?: boolean;
+    recipients?: string[];
+    dailyDigest?: boolean;
+    weeklyDigest?: boolean;
+    monthlyDigest?: boolean;
+  }): Observable<{ success: boolean; settings: any }> {
+    return this.http.put<{ success: boolean; settings: any }>(`${this.baseUrl}/admin/reports/settings`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== HELPERS ===================
   private authHeaders(): HttpHeaders {
     const token = this.accessTokenSignal();

@@ -101,7 +101,7 @@ interface PendingInvite {
             [value]="search()"
             (input)="search.set($any($event.target).value)"
           />
-          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openInvite()">
+          <button type="button" class="settings-w11-btn settings-w11-btn-invite" (click)="openInvite()">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10 M3 8h10" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
             Invite Employee
           </button>
@@ -361,10 +361,15 @@ interface PendingInvite {
               <option value="Accountant">Accountant</option>
             </select>
           </div>
+          @if (inviteError()) {
+            <div class="settings-w11-message error">{{ inviteError() }}</div>
+          }
         </div>
         <footer class="settings-w11-modal-foot">
           <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="closeInvite()">Cancel</button>
-          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="sendInvite()">Send invite</button>
+          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="sendInvite()" [disabled]="inviteSending()">
+            {{ inviteSending() ? 'Sending…' : 'Send invite' }}
+          </button>
         </footer>
       </div>
     }
@@ -471,6 +476,10 @@ interface PendingInvite {
               </div>
 
               <div class="settings-w11-qr-actions">
+                <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  {{ sendingEmail() ? 'Sending…' : 'Send via email' }}
+                </button>
                 <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="resendCurrentOtp()" [disabled]="resendingOtp()">
                   {{ resendingOtp() ? 'Sending…' : 'Resend OTP' }}
                 </button>
@@ -516,6 +525,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly supervisorError = signal<string | null>(null);
   readonly currentInvite = signal<PendingInvite | null>(null);
   readonly resendingOtp = signal(false);
+  readonly sendingEmail = signal(false);
 
   // Pending invites table
   readonly pendingInvites = signal<PendingInvite[]>([]);
@@ -534,14 +544,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
 
   readonly permissions = signal<Record<string, Record<string, { approve: boolean; reject: boolean }>>>({});
 
-  readonly employees = signal<Employee[]>([
-    { id: "E-001", name: "Karthik Raja", email: "karthik@agbuilders.com", phone: "+91 98765 43210", role: "Admin", status: "active", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), createdAt: "2024-01-15T00:00:00Z", projectIds: [] },
-    { id: "E-002", name: "Suresh Babu", email: "suresh@agbuilders.com", phone: "+91 98765 43211", role: "Project Manager", status: "active", lastLoginAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), createdAt: "2024-02-20T00:00:00Z", projectIds: ["PRJ-001", "PRJ-002"] },
-    { id: "E-003", name: "Anitha Kumari", email: "anitha@agbuilders.com", phone: "+91 98765 43212", role: "Project Manager", status: "active", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), createdAt: "2024-03-10T00:00:00Z", projectIds: ["PRJ-003"] },
-    { id: "E-004", name: "Vinoth Kumar", email: "vinoth@agbuilders.com", phone: "+91 98765 43213", role: "Accountant", status: "active", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), createdAt: "2024-01-25T00:00:00Z", projectIds: [] },
-    { id: "E-005", name: "Lakshmi Devi", email: "lakshmi@agbuilders.com", phone: "+91 98765 43214", role: "Accountant", status: "on_leave", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), createdAt: "2024-04-05T00:00:00Z", projectIds: [] },
-    { id: "E-006", name: "Ramesh Kannan", email: "ramesh@agbuilders.com", phone: "+91 98765 43215", role: "Project Manager", status: "inactive", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(), createdAt: "2024-02-01T00:00:00Z", projectIds: [] },
-  ]);
+  readonly employees = signal<Employee[]>([]);
+  readonly employeesLoading = signal(false);
+  readonly inviteSending = signal(false);
+  readonly inviteError = signal<string | null>(null);
 
   readonly filteredEmployees = computed<Employee[]>(() => {
     const tab = this.activeTab();
@@ -557,11 +563,38 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.refreshInvites();
+    this.refreshEmployees();
     this.pollInterval = setInterval(() => this.tickInvites(), 1000);
     if (this.route.snapshot.queryParamMap.get("addSupervisor") === "true") {
       this.openAddSupervisor();
       this.router.navigate([], { queryParams: { addSupervisor: null }, queryParamsHandling: "merge", replaceUrl: true });
     }
+  }
+
+  refreshEmployees() {
+    this.employeesLoading.set(true);
+    this.api.listEmployees({ limit: 100 }).subscribe({
+      next: (res) => {
+        const items = (res?.items || []).map((row: any) => ({
+          id: row.id || row._id,
+          name: row.name || "—",
+          email: row.email || "",
+          phone: row.phone || "",
+          role: (row.role || "Project Manager") as Role,
+          status: (row.status || "active") as Status,
+          lastLoginAt: row.lastLoginAt || "",
+          createdAt: row.createdAt || "",
+          projectIds: row.projectIds || [],
+        }));
+        this.employees.set(items);
+        this.employeesLoading.set(false);
+      },
+      error: () => {
+        // Fallback: show empty list
+        this.employees.set([]);
+        this.employeesLoading.set(false);
+      },
+    });
   }
 
   ngOnDestroy() {
@@ -689,8 +722,39 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.showInvite.set(false);
   }
   sendInvite() {
-    alert("Invite sent. (UI placeholder — wire to backend in next step.)");
-    this.closeInvite();
+    const name = this.inviteName().trim();
+    const email = this.inviteEmail().trim();
+    const phone = this.invitePhone().trim();
+    const role = this.inviteRole();
+
+    this.inviteError.set(null);
+
+    if (name.length < 2) {
+      this.inviteError.set("Please enter a name.");
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.inviteError.set("Please enter a valid email address.");
+      return;
+    }
+
+    this.inviteSending.set(true);
+    this.api.createEmployeeInvite({ name, email, phone: phone || undefined, role }).subscribe({
+      next: (res) => {
+        this.inviteSending.set(false);
+        if (res?.emailSent) {
+          alert(`Invite sent to ${email}. They will receive a link to set up their account.`);
+        } else {
+          alert(`Invite created for ${email}. Share the link with them manually: ${res?.inviteUrl || ""}`);
+        }
+        this.closeInvite();
+        this.refreshEmployees();
+      },
+      error: (err) => {
+        this.inviteSending.set(false);
+        this.inviteError.set(err?.message || "Failed to send invite. Please try again.");
+      },
+    });
   }
 
   // Add Supervisor modal
@@ -777,6 +841,24 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       error: () => {
         this.resendingOtp.set(false);
         alert("Failed to resend OTP.");
+      },
+    });
+  }
+
+  sendSupervisorEmail(inv: PendingInvite) {
+    this.sendingEmail.set(true);
+    this.api.sendSupervisorEmail(inv.token).subscribe({
+      next: (res) => {
+        this.sendingEmail.set(false);
+        if (res?.emailSent) {
+          alert(`Invite link sent to ${inv.supervisorEmail}.`);
+        } else {
+          alert("Could not send the email. Please try again or share the QR code directly.");
+        }
+      },
+      error: () => {
+        this.sendingEmail.set(false);
+        alert("Failed to send email. Please try again.");
       },
     });
   }

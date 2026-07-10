@@ -147,15 +147,30 @@ export class SettingsAccountComponent {
   readonly passwordError = signal(false);
 
   saveProfile() {
-    this.message.set("Profile changes are saved automatically on the next API call (UI placeholder).");
     this.isError.set(false);
+    this.message.set(null);
+    this.saving.set(true);
+
+    this.api.patchMe({ name: this.name().trim(), phone: this.phone().trim() }).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.message.set("Profile updated successfully.");
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.isError.set(true);
+        this.message.set(err?.message || "Failed to update profile. Please try again.");
+      },
+    });
   }
 
   changePassword() {
     this.passwordError.set(false);
-    if (this.newPassword().length < 6) {
+    this.passwordMessage.set(null);
+
+    if (this.newPassword().length < 8) {
       this.passwordError.set(true);
-      this.passwordMessage.set("New password must be at least 6 characters.");
+      this.passwordMessage.set("New password must be at least 8 characters.");
       return;
     }
     if (this.newPassword() !== this.confirmPassword()) {
@@ -163,6 +178,27 @@ export class SettingsAccountComponent {
       this.passwordMessage.set("Passwords do not match.");
       return;
     }
-    this.passwordMessage.set("Password change will be wired up once the auth endpoint is ready (UI placeholder).");
+    if (!this.currentPassword()) {
+      this.passwordError.set(true);
+      this.passwordMessage.set("Please enter your current password.");
+      return;
+    }
+
+    this.changingPassword.set(true);
+    this.api.changePassword({ currentPassword: this.currentPassword(), newPassword: this.newPassword() }).subscribe({
+      next: () => {
+        this.changingPassword.set(false);
+        this.passwordError.set(false);
+        this.passwordMessage.set("Password updated successfully.");
+        this.currentPassword.set("");
+        this.newPassword.set("");
+        this.confirmPassword.set("");
+      },
+      error: (err) => {
+        this.changingPassword.set(false);
+        this.passwordError.set(true);
+        this.passwordMessage.set(err?.message || "Failed to update password. Please check your current password.");
+      },
+    });
   }
 }

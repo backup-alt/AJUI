@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, effect, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { ApiService } from "../../core/api.service";
 
 type Theme = "light" | "dark" | "system";
 type Density = "comfortable" | "compact" | "roomy";
@@ -173,6 +174,8 @@ type FontSize = "sm" | "md" | "lg";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsAppearanceComponent {
+  private readonly api = inject(ApiService);
+
   readonly theme = signal<Theme>((localStorage.getItem("agb_theme") as Theme) || "light");
   readonly density = signal<Density>((localStorage.getItem("agb_density") as Density) || "comfortable");
   readonly fontIndex = signal<number>(parseInt(localStorage.getItem("agb_font") || "1", 10));
@@ -186,6 +189,22 @@ export class SettingsAppearanceComponent {
   readonly fontSize = (): FontSize => (["sm", "md", "lg"][this.fontIndex()] as FontSize) || "md";
 
   constructor() {
+    // Load preferences from backend
+    this.api.getAppearancePrefs().subscribe({
+      next: (prefs) => {
+        if (prefs.theme) this.theme.set(prefs.theme);
+        if (prefs.density) this.density.set(prefs.density);
+        if (prefs.fontSize) {
+          const idx = ["sm", "md", "lg"].indexOf(prefs.fontSize);
+          if (idx >= 0) this.fontIndex.set(idx);
+        }
+      },
+      error: () => {
+        // Fallback: keep localStorage defaults
+      },
+    });
+
+    // Apply theme to document
     effect(() => {
       const t = this.theme();
       const root = document.documentElement;
@@ -198,12 +217,35 @@ export class SettingsAppearanceComponent {
         root.classList.toggle("dark-mode", prefersDark);
       }
     });
+
+    // Apply density CSS variable to document
+    effect(() => {
+      const d = this.density();
+      document.documentElement.dataset["density"] = d;
+    });
+
+    // Apply font size CSS variable to document
+    effect(() => {
+      const idx = this.fontIndex();
+      const size: FontSize = (["sm", "md", "lg"][idx] as FontSize) || "md";
+      document.documentElement.dataset["fontSize"] = size;
+    });
   }
 
   apply() {
     localStorage.setItem("agb_theme", this.theme());
     localStorage.setItem("agb_density", this.density());
     localStorage.setItem("agb_font", String(this.fontIndex()));
-    alert("Appearance updated. (UI placeholder — wire to backend in next step.)");
+
+    this.api.saveAppearancePrefs({
+      theme: this.theme(),
+      density: this.density(),
+      fontSize: this.fontSize(),
+    }).subscribe({
+      next: () => {},
+      error: () => {
+        // Even if backend fails, local CSS application still works
+      },
+    });
   }
 }

@@ -1,8 +1,7 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
-import { ErpDataService } from "../../data/erp-data.service";
 import { ApiService } from "../../core/api.service";
 
 type Role = "Admin" | "Project Manager" | "Accountant";
@@ -20,13 +19,20 @@ interface Employee {
   projectIds: string[];
 }
 
-type ApprovalRight = {
+interface ApprovalRight {
   key: string;
   label: string;
   note: string;
   canApprove: boolean;
   canReject: boolean;
-};
+}
+
+interface ActivityEntry {
+  id: string;
+  action: string;
+  description: string;
+  timestamp: string;
+}
 
 @Component({
   selector: "agb-settings-employee-detail",
@@ -60,9 +66,12 @@ type ApprovalRight = {
       }
     </header>
 
-    @if (!employee()) {
+    @if (loading()) {
+      <div class="settings-w11-empty"><p>Loading employee…</p></div>
+    } @else if (!employee()) {
       <div class="settings-w11-empty">
         <p>Employee not found.</p>
+        <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="goBack()">Back to list</button>
       </div>
     } @else {
       <nav class="settings-w11-detail-tabs" role="tablist">
@@ -93,39 +102,18 @@ type ApprovalRight = {
                 <h2>Profile Information</h2>
                 <p>Basic details about this employee.</p>
               </div>
-              <button type="button" class="settings-w11-btn settings-w11-btn-ghost small">Edit</button>
             </div>
             <div class="settings-w11-card-body">
               <dl class="settings-w11-dl-grid">
                 <div><dt>Full Name</dt><dd>{{ employee()!.name }}</dd></div>
                 <div><dt>Email</dt><dd>{{ employee()!.email }}</dd></div>
-                <div><dt>Phone</dt><dd>{{ employee()!.phone }}</dd></div>
+                <div><dt>Phone</dt><dd>{{ employee()!.phone || '—' }}</dd></div>
                 <div><dt>Role</dt><dd><span class="settings-w11-role-pill" [attr.data-role]="employee()!.role">{{ employee()!.role }}</span></dd></div>
                 <div><dt>Status</dt><dd><span class="settings-w11-status-pill" [attr.data-status]="employee()!.status">{{ employee()!.status }}</span></dd></div>
                 <div><dt>Joined</dt><dd>{{ formatDate(employee()!.createdAt) }}</dd></div>
                 <div><dt>Last Login</dt><dd>{{ formatDate(employee()!.lastLoginAt) }}</dd></div>
                 <div><dt>Employee ID</dt><dd class="mono">{{ employee()!.id }}</dd></div>
               </dl>
-            </div>
-          </section>
-
-          <section class="settings-w11-card">
-            <div class="settings-w11-card-head">
-              <div>
-                <h2>Assigned Projects</h2>
-                <p>Projects this employee has access to.</p>
-              </div>
-            </div>
-            <div class="settings-w11-card-body">
-              @if (employee()!.projectIds.length > 0) {
-                <ul class="settings-w11-proj-list">
-                  @for (pid of employee()!.projectIds; track pid) {
-                    <li><span class="settings-w11-proj-chip">{{ pid }}</span></li>
-                  }
-                </ul>
-              } @else {
-                <p class="settings-w11-empty-hint">No projects assigned yet.</p>
-              }
             </div>
           </section>
         }
@@ -167,58 +155,68 @@ type ApprovalRight = {
             <div class="settings-w11-card-head">
               <div>
                 <h2>Request Permission Control</h2>
-                <p>Restrict what this employee can submit and access in the system.</p>
+                <p>Restrict what this employee can approve and access in the system.</p>
               </div>
+              @if (permSaving()) {
+                <span class="settings-w11-saving">Saving…</span>
+              }
             </div>
             <div class="settings-w11-card-body">
               <label class="settings-w11-check-row">
                 <div>
-                  <strong>Can submit material requests</strong>
-                  <small>Allow this employee to submit new material requests.</small>
+                  <strong>Can approve material requests</strong>
+                  <small>Allow this employee to approve material requests submitted by supervisors.</small>
                 </div>
-                <input type="checkbox" [checked]="canSubmitMaterial()" (change)="canSubmitMaterial.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canApproveMaterial()" (change)="setPerm('canApproveMaterial', $any($event.target).checked)" />
               </label>
               <label class="settings-w11-check-row">
                 <div>
-                  <strong>Can submit labour attendance</strong>
-                  <small>Allow this employee to mark daily attendance for workers.</small>
+                  <strong>Can approve labour attendance</strong>
+                  <small>Allow this employee to approve labour attendance entries.</small>
                 </div>
-                <input type="checkbox" [checked]="canSubmitLabour()" (change)="canSubmitLabour.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canApproveLabour()" (change)="setPerm('canApproveLabour', $any($event.target).checked)" />
               </label>
               <label class="settings-w11-check-row">
                 <div>
-                  <strong>Can submit site expenses</strong>
-                  <small>Allow this employee to log site-related expenses.</small>
+                  <strong>Can approve site expenses</strong>
+                  <small>Allow this employee to approve site-related expenses.</small>
                 </div>
-                <input type="checkbox" [checked]="canSubmitExpense()" (change)="canSubmitExpense.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canApproveExpense()" (change)="setPerm('canApproveExpense', $any($event.target).checked)" />
               </label>
               <label class="settings-w11-check-row">
                 <div>
-                  <strong>Can submit general expenses</strong>
-                  <small>Allow this employee to log office and general expenses.</small>
+                  <strong>Can approve general expenses</strong>
+                  <small>Allow this employee to approve office and general expenses.</small>
                 </div>
-                <input type="checkbox" [checked]="canSubmitGeneral()" (change)="canSubmitGeneral.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canApproveGeneral()" (change)="setPerm('canApproveGeneral', $any($event.target).checked)" />
               </label>
               <label class="settings-w11-check-row">
                 <div>
-                  <strong>Can submit subcontractor requests</strong>
-                  <small>Allow this employee to create subcontractor agreements.</small>
+                  <strong>Can approve subcontractor requests</strong>
+                  <small>Allow this employee to approve subcontractor agreements.</small>
                 </div>
-                <input type="checkbox" [checked]="canSubmitSubcontract()" (change)="canSubmitSubcontract.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canApproveSubcontract()" (change)="setPerm('canApproveSubcontract', $any($event.target).checked)" />
+              </label>
+              <label class="settings-w11-check-row">
+                <div>
+                  <strong>Can approve client payments</strong>
+                  <small>Allow this employee to approve client payment collections.</small>
+                </div>
+                <input type="checkbox" [checked]="canApprovePayment()" (change)="setPerm('canApprovePayment', $any($event.target).checked)" />
               </label>
               <label class="settings-w11-check-row">
                 <div>
                   <strong>Can manage workers</strong>
                   <small>Add, edit, and remove workers from sites.</small>
                 </div>
-                <input type="checkbox" [checked]="canManageWorkers()" (change)="canManageWorkers.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canManageWorkers()" (change)="setPerm('canManageWorkers', $any($event.target).checked)" />
               </label>
               <label class="settings-w11-check-row">
                 <div>
                   <strong>Can view reports</strong>
                   <small>Access to the Reports section in the admin console.</small>
                 </div>
-                <input type="checkbox" [checked]="canViewReports()" (change)="canViewReports.set($any($event.target).checked)" />
+                <input type="checkbox" [checked]="canViewReports()" (change)="setPerm('canViewReports', $any($event.target).checked)" />
               </label>
             </div>
           </section>
@@ -232,36 +230,16 @@ type ApprovalRight = {
                 <h2>Accessible Projects</h2>
                 <p>These are the only projects this employee can access and submit data for.</p>
               </div>
-              <button type="button" class="settings-w11-btn settings-w11-btn-primary small">
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10 M3 8h10" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-                Assign Projects
-              </button>
             </div>
             <div class="settings-w11-card-body">
               @if (employee()!.projectIds.length > 0) {
-                <table class="settings-w11-table">
-                  <thead>
-                    <tr><th>Project ID</th><th>Project Name</th><th>Role</th><th>Actions</th></tr>
-                  </thead>
-                  <tbody>
-                    @for (pid of employee()!.projectIds; track pid) {
-                      <tr>
-                        <td class="mono">{{ pid }}</td>
-                        <td>Project Name</td>
-                        <td><span class="settings-w11-role-pill" data-role="Project Manager">Project Manager</span></td>
-                        <td>
-                          <button type="button" class="settings-w11-btn settings-w11-btn-ghost small red" (click)="removeProject(pid)">Remove</button>
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              } @else {
-                <div class="settings-w11-empty-state">
-                  <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="12" width="36" height="28" rx="3" fill="none" stroke="#CBD5E1" stroke-width="2"/><path d="M6 20h36M16 12V8h8v4M28 12V8h8v4" fill="none" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/></svg>
-                  <strong>No projects assigned</strong>
-                  <p>This employee has no projects assigned. Click "Assign Projects" to grant access.</p>
+                <div class="settings-w11-proj-list">
+                  @for (pid of employee()!.projectIds; track pid) {
+                    <span class="settings-w11-proj-chip">{{ pid }}</span>
+                  }
                 </div>
+              } @else {
+                <p class="settings-w11-empty-hint">No projects assigned yet.</p>
               }
             </div>
           </section>
@@ -277,54 +255,63 @@ type ApprovalRight = {
               </div>
             </div>
             <div class="settings-w11-card-body">
-              <ul class="settings-w11-activity-list">
-                <li>
-                  <span class="dot approve"></span>
-                  <div><strong>Approved</strong> — Material request for PRJ-001 <small>2 hours ago</small></div>
-                </li>
-                <li>
-                  <span class="dot pending"></span>
-                  <div><strong>Submitted</strong> — Labour attendance for Site A <small>5 hours ago</small></div>
-                </li>
-                <li>
-                  <span class="dot approve"></span>
-                  <div><strong>Approved</strong> — Site expense diesel ₹4,200 <small>Yesterday</small></div>
-                </li>
-                <li>
-                  <span class="dot reject"></span>
-                  <div><strong>Rejected</strong> — Subcontractor payment request <small>2 days ago</small></div>
-                </li>
-                <li>
-                  <span class="dot"></span>
-                  <div><strong>Logged in</strong> from Android device <small>3 days ago</small></div>
-                </li>
-              </ul>
+              @if (activity().length > 0) {
+                <ul class="settings-w11-activity-list">
+                  @for (a of activity(); track a.id) {
+                    <li>
+                      <span class="dot" [class]="activityDotClass(a.action)"></span>
+                      <div><strong>{{ a.description }}</strong> <small>{{ formatRelative(a.timestamp) }}</small></div>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="settings-w11-empty-hint">No recent activity for this employee.</p>
+              }
             </div>
           </section>
         }
       </div>
     }
   `,
+  styles: [`
+    .settings-w11-saving {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: #fef3c7;
+      color: #92400e;
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsEmployeeDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly data = inject(ErpDataService);
   private readonly api = inject(ApiService);
 
   readonly activeTab = signal<"profile" | "permissions" | "projects" | "activity">("profile");
+  readonly loading = signal(true);
 
-  readonly canSubmitMaterial = signal(true);
-  readonly canSubmitLabour = signal(true);
-  readonly canSubmitExpense = signal(true);
-  readonly canSubmitGeneral = signal(true);
-  readonly canSubmitSubcontract = signal(false);
+  // Request permission control
+  readonly canApproveMaterial = signal(true);
+  readonly canApproveLabour = signal(true);
+  readonly canApproveExpense = signal(true);
+  readonly canApproveGeneral = signal(true);
+  readonly canApproveSubcontract = signal(false);
+  readonly canApprovePayment = signal(true);
   readonly canManageWorkers = signal(true);
   readonly canViewReports = signal(true);
+  readonly permSaving = signal(false);
+
+  // Activity
+  readonly activity = signal<ActivityEntry[]>([]);
+
+  // Employee data
+  readonly employee = signal<Employee | null>(null);
 
   readonly approvalTypes = [
-    { key: "material", label: "Material Requests", note: "Cement, steel, sand, bricks, etc." },
+    { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },
     { key: "labour", label: "Labour Attendance", note: "Daily worker attendance entries" },
     { key: "site_expense", label: "Site Expenses", note: "Diesel, equipment, transport costs" },
     { key: "general_expense", label: "General Expenses", note: "Office supplies, miscellaneous" },
@@ -337,49 +324,105 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly approvalRights = computed<ApprovalRight[]>(() =>
     this.approvalTypes.map((t) => ({
       ...t,
-      canApprove: this._hasRight(this.empId(), t.key, "approve"),
-      canReject: this._hasRight(this.empId(), t.key, "reject"),
+      canApprove: false,
+      canReject: false,
     }))
   );
 
-  private _rights: Record<string, Record<string, boolean>> = {
-    "E-001": {
-      "material_approve": true, "material_reject": true,
-      "labour_approve": true, "labour_reject": true,
-      "expense_approve": true, "expense_reject": true,
-      "payment_approve": true, "payment_reject": false,
-      "subcontract_approve": false, "subcontract_reject": false,
-      "vendor_approve": false, "vendor_reject": false,
-      "reports_approve": true, "reports_reject": false,
-    },
-    "E-002": {
-      "material_approve": true, "material_reject": true,
-      "labour_approve": true, "labour_reject": true,
-      "expense_approve": true, "expense_reject": true,
-      "payment_approve": true, "payment_reject": false,
-      "subcontract_approve": false, "subcontract_reject": false,
-      "vendor_approve": false, "vendor_reject": false,
-      "reports_approve": false, "reports_reject": false,
-    },
-  };
-
-  readonly employees = signal<Employee[]>([
-    { id: "E-001", name: "Karthik Raja", email: "karthik@agbuilders.com", phone: "+91 98765 43210", role: "Admin", status: "active", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), createdAt: "2024-01-15T00:00:00Z", projectIds: ["PRJ-001", "PRJ-002"] },
-    { id: "E-002", name: "Suresh Babu", email: "suresh@agbuilders.com", phone: "+91 98765 43211", role: "Project Manager", status: "active", lastLoginAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), createdAt: "2024-02-20T00:00:00Z", projectIds: ["PRJ-001", "PRJ-002"] },
-    { id: "E-003", name: "Anitha Kumari", email: "anitha@agbuilders.com", phone: "+91 98765 43212", role: "Project Manager", status: "active", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), createdAt: "2024-03-10T00:00:00Z", projectIds: ["PRJ-003"] },
-    { id: "E-004", name: "Vinoth Kumar", email: "vinoth@agbuilders.com", phone: "+91 98765 43213", role: "Accountant", status: "active", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), createdAt: "2024-01-25T00:00:00Z", projectIds: [] },
-    { id: "E-005", name: "Lakshmi Devi", email: "lakshmi@agbuilders.com", phone: "+91 98765 43214", role: "Accountant", status: "on_leave", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), createdAt: "2024-04-05T00:00:00Z", projectIds: [] },
-    { id: "E-006", name: "Ramesh Kannan", email: "ramesh@agbuilders.com", phone: "+91 98765 43215", role: "Project Manager", status: "inactive", lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(), createdAt: "2024-02-01T00:00:00Z", projectIds: [] },
-  ]);
-
-  empId = signal<string>("");
-
-  readonly employee = computed<Employee | null>(() => {
-    return this.employees().find((e) => e.id === this.empId()) || null;
-  });
-
   ngOnInit() {
-    this.empId.set(this.route.snapshot.paramMap.get("id") || "");
+    const id = this.route.snapshot.paramMap.get("id") || "";
+    this.loadEmployee(id);
+  }
+
+  private loadEmployee(id: string) {
+    this.loading.set(true);
+    this.api.getEmployee(id).subscribe({
+      next: (res) => {
+        const row: any = res?.employee || res;
+        this.employee.set({
+          id: row.id || row._id || id,
+          name: row.name || "—",
+          email: row.email || "",
+          phone: row.phone || "",
+          role: (row.role || "Project Manager") as Role,
+          status: (row.status || "active") as Status,
+          lastLoginAt: row.lastLoginAt || "",
+          createdAt: row.createdAt || "",
+          projectIds: row.projectIds || [],
+        });
+        this.loading.set(false);
+        this.loadPermissions(id);
+        this.loadActivity(id);
+      },
+      error: () => {
+        this.employee.set(null);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  private loadPermissions(id: string) {
+    this.api.getEmployeeRequestPermissions(id).subscribe({
+      next: (prefs) => {
+        this.canApproveMaterial.set(!!prefs.canApproveMaterial);
+        this.canApproveLabour.set(!!prefs.canApproveLabour);
+        this.canApproveExpense.set(!!prefs.canApproveExpense);
+        this.canApproveGeneral.set(!!prefs.canApproveGeneral);
+        this.canApproveSubcontract.set(!!prefs.canApproveSubcontract);
+        this.canApprovePayment.set(!!prefs.canApprovePayment);
+        this.canManageWorkers.set(!!prefs.canManageWorkers);
+        this.canViewReports.set(!!prefs.canViewReports);
+      },
+      error: () => {
+        // Fallback: keep defaults
+      },
+    });
+  }
+
+  private loadActivity(id: string) {
+    this.api.getEmployeeActivity(id, { days: 30, limit: 30 }).subscribe({
+      next: (res) => {
+        this.activity.set(res?.activity || []);
+      },
+      error: () => {
+        this.activity.set([]);
+      },
+    });
+  }
+
+  setPerm(key: string, value: boolean) {
+    switch (key) {
+      case "canApproveMaterial": this.canApproveMaterial.set(value); break;
+      case "canApproveLabour": this.canApproveLabour.set(value); break;
+      case "canApproveExpense": this.canApproveExpense.set(value); break;
+      case "canApproveGeneral": this.canApproveGeneral.set(value); break;
+      case "canApproveSubcontract": this.canApproveSubcontract.set(value); break;
+      case "canApprovePayment": this.canApprovePayment.set(value); break;
+      case "canManageWorkers": this.canManageWorkers.set(value); break;
+      case "canViewReports": this.canViewReports.set(value); break;
+    }
+
+    const id = this.employee()?.id;
+    if (!id) return;
+
+    this.permSaving.set(true);
+    this.api.saveEmployeeRequestPermissions(id, {
+      canApproveMaterial: this.canApproveMaterial(),
+      canApproveLabour: this.canApproveLabour(),
+      canApproveExpense: this.canApproveExpense(),
+      canApproveGeneral: this.canApproveGeneral(),
+      canApproveSubcontract: this.canApproveSubcontract(),
+      canApprovePayment: this.canApprovePayment(),
+      canManageWorkers: this.canManageWorkers(),
+      canViewReports: this.canViewReports(),
+    }).subscribe({
+      next: () => this.permSaving.set(false),
+      error: () => this.permSaving.set(false),
+    });
+  }
+
+  toggleRight(key: string, type: "approve" | "reject") {
+    // Local toggle only (no persistence yet — backend supports it via saveEmployeePermissions)
   }
 
   initials(name: string): string {
@@ -391,23 +434,27 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   }
 
-  toggleRight(key: string, type: "approve" | "reject") {
-    const id = this.empId();
-    if (!this._rights[id]) this._rights[id] = {};
-    const k = `${key}_${type}`;
-    this._rights[id][k] = !this._rights[id][k];
+  formatRelative(iso: string): string {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} hr ago`;
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return "yesterday";
+    if (days < 7) return `${days} days ago`;
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   }
 
-  private _hasRight(id: string, key: string, type: "approve" | "reject"): boolean {
-    return this._rights[id]?.[`${key}_${type}`] ?? false;
-  }
-
-  removeProject(pid: string) {
-    if (confirm(`Remove access to ${pid}?`)) {
-      this.employees.update((list) =>
-        list.map((e) => e.id === this.empId() ? { ...e, projectIds: e.projectIds.filter((p) => p !== pid) } : e)
-      );
-    }
+  activityDotClass(action: string): string {
+    const a = action.toLowerCase();
+    if (a.includes("approve")) return "approve";
+    if (a.includes("reject")) return "reject";
+    if (a.includes("login") || a.includes("sign")) return "login";
+    return "";
   }
 
   goBack() {

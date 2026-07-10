@@ -2,6 +2,43 @@
    SETTINGS — WINDOWS 11 STYLE LAYOUT
    ================================================================= */
 
+/* DENSITY & FONT SIZE VARIABLES (set by Appearance page) */
+:root {
+  --settings-space-unit: 8px;
+  --settings-card-padding-y: 20px;
+  --settings-card-padding-x: 24px;
+  --settings-row-padding: 12px;
+  --settings-font-base: 14px;
+  --settings-font-small: 12px;
+  --settings-font-large: 15px;
+}
+
+:root[data-density="compact"] {
+  --settings-space-unit: 6px;
+  --settings-card-padding-y: 14px;
+  --settings-card-padding-x: 18px;
+  --settings-row-padding: 8px;
+}
+
+:root[data-density="roomy"] {
+  --settings-space-unit: 10px;
+  --settings-card-padding-y: 24px;
+  --settings-card-padding-x: 28px;
+  --settings-row-padding: 16px;
+}
+
+:root[data-font-size="sm"] {
+  --settings-font-base: 13px;
+  --settings-font-small: 11px;
+  --settings-font-large: 14px;
+}
+
+:root[data-font-size="lg"] {
+  --settings-font-base: 15px;
+  --settings-font-small: 13px;
+  --settings-font-large: 16px;
+}
+
 /* FULLSCREEN WRAPPER (no main sidebar) */
 .settings-w11-fullscreen {
   position: fixed;
@@ -536,6 +573,23 @@
 .settings-w11-btn-dirty:hover:not(:disabled) {
   background: #001a4d !important;
   border-color: #001a4d !important;
+}
+
+/* INVITE BUTTON (always brand blue, not gray) */
+.settings-w11-btn-invite {
+  background: #002263 !important;
+  color: #ffffff !important;
+  border-color: #002263 !important;
+}
+
+.settings-w11-btn-invite:hover:not(:disabled) {
+  background: #001a4d !important;
+  border-color: #001a4d !important;
+}
+
+.settings-w11-btn-invite:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .settings-w11-btn-ghost {
