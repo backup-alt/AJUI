@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ApiService } from "../../core/api.service";
+import { ErpDataService } from "../../data/erp-data.service";
 
 type SiteStatus = "Active" | "On Hold" | "Completed";
 
@@ -131,6 +132,7 @@ interface Site {
 })
 export class SettingsSitesComponent implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly erp = inject(ErpDataService);
 
   readonly activeStatus = signal<"all" | SiteStatus>("all");
   readonly search = signal("");
@@ -155,11 +157,18 @@ export class SettingsSitesComponent implements OnInit {
 
   private loadSites() {
     this.loading.set(true);
+
+    // Primary source: derive sites from local projects
+    const localSites = this.buildLocalSites();
+    this.sites.set(localSites);
+    this.loading.set(false);
+
+    // Also fetch remote sites and merge if available
     this.api.listSites().subscribe({
       next: (res) => {
-        const items = (res?.items || []).map((row: any, index: number) => ({
-          id: row.id || row._id || `site-${index}`,
-          siteId: row.siteId || row.id || `SIT-${String(index + 1).padStart(3, "0")}`,
+        const remoteItems = (res?.items || []).map((row: any, index: number) => ({
+          id: row.id || row._id || `remote-site-${index}`,
+          siteId: row.siteId || row.id || `SIT-${String(localSites.length + index + 1).padStart(3, "0")}`,
           name: row.name || row.sites?.[0] || "Unnamed Site",
           status: (row.status || "Active") as SiteStatus,
           supervisor: row.supervisor || "—",
@@ -168,14 +177,50 @@ export class SettingsSitesComponent implements OnInit {
           projectNames: row.projectNames || (row.name ? [row.name] : []),
           address: row.address || "Not available",
         }));
-        this.sites.set(items);
-        this.loading.set(false);
+        // Merge: local first, then remote (dedup by name)
+        const merged = [...localSites];
+        for (const r of remoteItems) {
+          if (!merged.some((m) => m.name === r.name)) merged.push(r);
+        }
+        this.sites.set(merged);
       },
       error: () => {
-        this.sites.set([]);
-        this.loading.set(false);
+        // Keep local-only
       },
     });
+  }
+
+  private buildLocalSites(): Site[] {
+    const projects = this.erp.projects();
+    const seen = new Set<string>();
+    const out: Site[] = [];
+    let counter = 1;
+    for (const p of projects) {
+      for (const siteName of p.sites || []) {
+        const key = siteName.toLowerCase();
+        if (seen.has(key)) {
+          // Add this project to existing site
+          const existing = out.find((s) => s.name.toLowerCase() === key);
+          if (existing && !existing.projectNames.includes(p.name)) {
+            existing.projectNames.push(p.name);
+          }
+          continue;
+        }
+        seen.add(key);
+        out.push({
+          id: `local-site-${counter++}`,
+          siteId: `SIT-${String(counter).padStart(3, "0")}`,
+          name: siteName,
+          status: (p.status === "Completed" ? "Completed" : p.status === "On Hold" ? "On Hold" : "Active") as SiteStatus,
+          supervisor: p.supervisor || "—",
+          startDate: p.startDate || "Not available",
+          targetEndDate: "Not available",
+          projectNames: [p.name],
+          address: p.address || "Not available",
+        });
+      }
+    }
+    return out;
   }
 
   countByStatus(status: SiteStatus): number {

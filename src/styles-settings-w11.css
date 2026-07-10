@@ -549,14 +549,14 @@
 }
 
 .settings-w11-btn-primary {
-  background: #e5e7eb;
-  color: #64748b;
-  border-color: #e5e7eb;
+  background: #001a4d;
+  color: #ffffff;
+  border-color: #001a4d;
 }
 
 .settings-w11-btn-primary:hover:not(:disabled) {
-  background: #cbd5e1;
-  border-color: #cbd5e1;
+  background: #001233;
+  border-color: #001233;
 }
 
 .settings-w11-btn-primary:disabled {
@@ -565,26 +565,26 @@
 }
 
 .settings-w11-btn-dirty {
-  background: #002263 !important;
+  background: #001a4d !important;
   color: #ffffff !important;
-  border-color: #002263 !important;
+  border-color: #001a4d !important;
 }
 
 .settings-w11-btn-dirty:hover:not(:disabled) {
-  background: #001a4d !important;
-  border-color: #001a4d !important;
+  background: #001233 !important;
+  border-color: #001233 !important;
 }
 
 /* INVITE BUTTON (always brand blue, not gray) */
 .settings-w11-btn-invite {
-  background: #002263 !important;
+  background: #001a4d !important;
   color: #ffffff !important;
-  border-color: #002263 !important;
+  border-color: #001a4d !important;
 }
 
 .settings-w11-btn-invite:hover:not(:disabled) {
-  background: #001a4d !important;
-  border-color: #001a4d !important;
+  background: #001233 !important;
+  border-color: #001233 !important;
 }
 
 .settings-w11-btn-invite:disabled {

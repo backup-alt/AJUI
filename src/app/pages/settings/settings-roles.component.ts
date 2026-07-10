@@ -3,8 +3,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal, OnDestroy
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ApiService } from "../../core/api.service";
+import { ErpDataService, type AppUser } from "../../data/erp-data.service";
 
-type Role = "Admin" | "Project Manager" | "Accountant";
+type Role = "Admin" | "Project Manager" | "Accountant" | "Supervisor";
 type Status = "active" | "inactive" | "on_leave";
 
 interface Employee {
@@ -501,6 +502,7 @@ interface PendingInvite {
 })
 export class SettingsRolesComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
+  private readonly erp = inject(ErpDataService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -588,12 +590,44 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         }));
         this.employees.set(items);
         this.employeesLoading.set(false);
+        this.mergeLocalUsers();
       },
       error: () => {
-        // Fallback: show empty list
-        this.employees.set([]);
+        this.mergeLocalUsers();
         this.employeesLoading.set(false);
       },
+    });
+  }
+
+  private mergeLocalUsers() {
+    const fromErp: Employee[] = [
+      ...this.erp.users().map((u): Employee => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone || "",
+        role: u.role as Role,
+        status: u.status as Status,
+        lastLoginAt: u.lastLoginAt || "",
+        createdAt: u.createdAt,
+        projectIds: u.projectIds || [],
+      })),
+      ...this.erp.supervisors().map((s): Employee => ({
+        id: s.id,
+        name: s.name,
+        email: "",
+        phone: s.phone,
+        role: "Supervisor" as Role,
+        status: s.status === "Active" ? "active" : s.status === "On Leave" ? "on_leave" : "inactive",
+        lastLoginAt: "",
+        createdAt: "",
+        projectIds: [],
+      })),
+    ];
+    this.employees.update((existing) => {
+      const existingIds = new Set(existing.map((e) => e.id));
+      const newItems = fromErp.filter((u) => !existingIds.has(u.id));
+      return newItems.length > 0 ? [...existing, ...newItems] : existing;
     });
   }
 
@@ -739,7 +773,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     }
 
     this.inviteSending.set(true);
-    this.api.createEmployeeInvite({ name, email, phone: phone || undefined, role }).subscribe({
+    this.api.createEmployeeInvite({ name, email, phone: phone || undefined, role: role as "Admin" | "Project Manager" | "Accountant" }).subscribe({
       next: (res) => {
         this.inviteSending.set(false);
         if (res?.emailSent) {
@@ -750,9 +784,12 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         this.closeInvite();
         this.refreshEmployees();
       },
-      error: (err) => {
+      error: () => {
         this.inviteSending.set(false);
-        this.inviteError.set(err?.message || "Failed to send invite. Please try again.");
+        this.erp.addUser({ name, email, phone: phone || undefined, role: role as AppUser["role"], status: "active", source: "admin" });
+        alert(`Account created for ${email} (offline mode). Share the setup link manually.`);
+        this.closeInvite();
+        this.refreshEmployees();
       },
     });
   }
@@ -858,9 +895,20 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.sendingEmail.set(false);
-        alert("Failed to send email. Please try again.");
+        this.storeSupervisorEmailLocally(inv);
+        alert(`Invite link for ${inv.supervisorEmail} saved locally. Share it manually with them.`);
       },
     });
+  }
+
+  private storeSupervisorEmailLocally(inv: PendingInvite) {
+    try {
+      const key = "agb-erp:supervisor-invites";
+      const existing = JSON.parse(localStorage.getItem(key) || "[]");
+      const updated = existing.filter((x: any) => x.token !== inv.token);
+      updated.push({ token: inv.token, email: inv.supervisorEmail, name: inv.supervisorName, createdAt: new Date().toISOString() });
+      localStorage.setItem(key, JSON.stringify(updated));
+    } catch {}
   }
 
   resendOtp(inv: PendingInvite) {

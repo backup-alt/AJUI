@@ -67,6 +67,19 @@ export type Subcontractor = {
   _id?: string;
 };
 
+export type AppUser = {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: "Admin" | "Project Manager" | "Accountant" | "Supervisor";
+  status: "active" | "inactive" | "on_leave";
+  lastLoginAt?: string;
+  createdAt: string;
+  projectIds?: string[];
+  source?: "admin" | "supervisor" | "employee";
+};
+
 export type SharedModuleKey =
   | "materials"
   | "clients"
@@ -308,6 +321,8 @@ export class ErpDataService {
     "Site Summary",
   ]);
 
+  readonly users = signal<AppUser[]>(this.readState<AppUser[]>("appUsers", []));
+
   readonly activeClients = computed(() => this.clients().filter((client) => client.status === "Active").length);
   readonly customTableFields = signal<Record<SharedModuleKey, SharedTableField[]>>(
     this.readState<Record<SharedModuleKey, SharedTableField[]>>("customTableFields", this.emptySharedFieldMap()),
@@ -346,6 +361,36 @@ export class ErpDataService {
     effect(() => this.writeState("expenseOpeningBalances", this.expenseOpeningBalances()));
     effect(() => this.writeState("projectActivity", this.projectActivity()));
     effect(() => this.writeState("settings", this.settings()));
+    effect(() => this.writeState("appUsers", this.users()));
+  }
+
+  addUser(user: Omit<AppUser, "id" | "createdAt"> & { id?: string; createdAt?: string }): AppUser {
+    const numericIds = this.users()
+      .map((u) => Number(u.id.replace(/\D/g, "")))
+      .filter((n) => Number.isFinite(n));
+    const nextId = `U-${Math.max(1000, ...numericIds) + 1}`;
+    const newUser: AppUser = {
+      id: user.id || nextId,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      status: user.status || "active",
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt || new Date().toISOString(),
+      projectIds: user.projectIds || [],
+      source: user.source || "admin",
+    };
+    this.users.update((list) => [newUser, ...list]);
+    return newUser;
+  }
+
+  updateUser(userId: string, patch: Partial<AppUser>) {
+    this.users.update((list) => list.map((u) => (u.id === userId ? { ...u, ...patch } : u)));
+  }
+
+  deleteUser(userId: string) {
+    this.users.update((list) => list.filter((u) => u.id !== userId));
   }
 
   private ensureMeenakshiSampleProject() {
