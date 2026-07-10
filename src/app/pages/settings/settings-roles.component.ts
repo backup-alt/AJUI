@@ -2,10 +2,8 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
-import emailjs from "@emailjs/browser";
 import { ApiService } from "../../core/api.service";
 import { ErpDataService, type AppUser } from "../../data/erp-data.service";
-import { environment } from "../../../environments/environment";
 
 type Role = "Admin" | "Project Manager" | "Accountant" | "Supervisor";
 type Status = "active" | "inactive" | "on_leave";
@@ -886,29 +884,20 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
 
   sendSupervisorEmail(inv: PendingInvite) {
     this.sendingEmail.set(true);
-    const setupUrl = `${window.location.origin}/setup-account?token=${inv.token}`;
-    const templateParams = {
-      supervisor_name: inv.supervisorName,
-      supervisor_email: inv.supervisorEmail,
-      setup_url: setupUrl,
-      otp: inv.otp || "",
-    };
-    const { serviceId, publicKey, templateId } = environment.emailjs;
-    if (serviceId === "YOUR_EMAILJS_SERVICE_ID" || !serviceId) {
-      this.sendingEmail.set(false);
-      alert(`EmailJS not configured. Share the setup link manually:\n\n${setupUrl}\n\nOTP: ${inv.otp || "N/A"}`);
-      return;
-    }
-    emailjs.send(serviceId, templateId, templateParams, publicKey).then(
-      () => {
+    this.api.sendSupervisorEmail(inv.token).subscribe({
+      next: (res) => {
         this.sendingEmail.set(false);
-        alert(`Invite sent to ${inv.supervisorEmail}!`);
+        if (res?.emailSent) {
+          alert(`Invite link sent to ${inv.supervisorEmail}.`);
+        } else {
+          alert("Could not send the email. Please try again or share the QR code directly.");
+        }
       },
-      (err) => {
+      error: () => {
         this.sendingEmail.set(false);
-        alert(`Failed to send email. Share manually:\n\n${setupUrl}\n\nOTP: ${inv.otp || "N/A"}`);
-      }
-    );
+        alert("Failed to send email. Please try again.");
+      },
+    });
   }
 
   resendOtp(inv: PendingInvite) {
