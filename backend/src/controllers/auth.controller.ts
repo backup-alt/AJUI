@@ -464,28 +464,40 @@ async function resolveProjectObjectIds(projectIds: string[]): Promise<string[]> 
   }
 
   const objectIds = requestedIds
-    .filter((id) => Types.ObjectId.isValid(id))
+    .filter((id) => /^[0-9a-fA-F]{24}$/.test(id))
     .map((id) => new Types.ObjectId(id));
 
-  const query: Record<string, unknown>[] = [{ projectId: { $in: requestedIds } }];
+  const humanReadableIds = requestedIds.filter((id) => !/^[0-9a-fA-F]{24}$/.test(id));
+
+  const query: Record<string, unknown>[] = [];
   if (objectIds.length > 0) {
     query.push({ _id: { $in: objectIds } });
   }
+  if (humanReadableIds.length > 0) {
+    query.push({ projectId: { $in: humanReadableIds } });
+  }
+
+  if (query.length === 0) {
+    throw new AppError(400, `Invalid project id format: ${requestedIds.join(", ")}`);
+  }
 
   const projects = await Project.find({ $or: query }).select("_id projectId").lean();
-  const projectIdByInput = new Map<string, string>();
+  const foundIds = new Set<string>();
+  const foundProjectIds = new Set<string>();
   for (const project of projects) {
-    const id = project._id.toString();
-    projectIdByInput.set(id, id);
-    projectIdByInput.set(project.projectId, id);
+    foundIds.add(project._id.toString());
+    foundProjectIds.add(project.projectId);
   }
 
-  const missingIds = requestedIds.filter((id) => !projectIdByInput.has(id));
-  if (missingIds.length > 0) {
-    throw new AppError(400, `Invalid project id: ${missingIds.join(", ")}`);
+  const missingObjectIds = objectIds.filter((id) => !foundIds.has(id.toString())).map((id) => id.toString());
+  const missingHumanReadable = humanReadableIds.filter((id) => !foundProjectIds.has(id));
+
+  if (missingObjectIds.length > 0 || missingHumanReadable.length > 0) {
+    const allMissing = [...missingObjectIds, ...missingHumanReadable];
+    throw new AppError(400, `Project(s) not found: ${allMissing.join(", ")}. Please refresh the project list and try again.`);
   }
 
-  return [...new Set(requestedIds.map((id) => projectIdByInput.get(id)!))];
+  return foundIds ? [...foundIds] : [];
 }
 
 function allocatedProjectObjectIds(invite: { metadata?: unknown }): Types.ObjectId[] {
