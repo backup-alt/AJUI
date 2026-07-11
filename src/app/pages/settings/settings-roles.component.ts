@@ -957,25 +957,25 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   loadProjects() {
     this.api.listProjects({ limit: 200 }).subscribe({
       next: (res) => {
-        const items = (res?.items || []).map((row: any) => {
+        const items: { id: string; name: string; client?: string; address?: string; status?: string }[] = [];
+        for (const row of res?.items || []) {
           const id = row._id || row.id;
-          if (!id) return null;
-          return {
-            id: String(id),
-            projectId: row.projectId,
-            name: row.name || "Unnamed project",
-            client: row.client || "",
-            address: row.address || "",
-            status: row.status || "Active",
-          };
-        }).filter(Boolean);
+          if (id) {
+            items.push({
+              id: String(id),
+              name: row.name || "Unnamed project",
+              client: row.client || "",
+              address: row.address || "",
+              status: row.status || "Active",
+            });
+          }
+        }
         this.projects.set(items);
       },
       error: () => {
         this.projects.set([]);
         const fallback = this.erp.projects().map((p) => ({
           id: p.id,
-          projectId: (p as any).projectId,
           name: p.name,
           client: p.client,
           address: p.address,
