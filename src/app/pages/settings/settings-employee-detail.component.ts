@@ -79,6 +79,10 @@ interface ActivityEntry {
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M1 14s0-5 7-5 7 5 7 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           Profile
         </button>
+        <button type="button" role="tab" [class.active]="activeTab() === 'permissions'" (click)="activeTab.set('permissions')">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v4a5 5 0 0 1-2 4.04V14H5V11.04A5 5 0 0 1 3 7V3l5-2Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Permissions
+        </button>
         <button type="button" role="tab" [class.active]="activeTab() === 'projects'" (click)="activeTab.set('projects')">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           Projects
@@ -110,6 +114,37 @@ interface ActivityEntry {
                 <div><dt>Last Login</dt><dd>{{ formatDate(employee()!.lastLoginAt) }}</dd></div>
                 <div><dt>Employee ID</dt><dd class="mono">{{ employee()!.id }}</dd></div>
               </dl>
+            </div>
+          </section>
+        }
+
+        <!-- PERMISSIONS TAB -->
+        @if (activeTab() === 'permissions') {
+          <section class="settings-w11-card">
+            <div class="settings-w11-card-head">
+              <div>
+                <h2>Approval Access</h2>
+                <p>Toggle which approval types this employee can access. This overrides the role defaults.</p>
+              </div>
+              @if (permSaving()) {
+                <span class="settings-w11-saving">Saving…</span>
+              }
+            </div>
+            <div class="settings-w11-card-body">
+              <div class="settings-w11-approval-list">
+                @for (type of approvalTypes; track type.key) {
+                  <div class="settings-w11-approval-row">
+                    <div class="settings-w11-approval-label">
+                      <strong>{{ type.label }}</strong>
+                      <small>{{ type.note }}</small>
+                    </div>
+                    <label class="settings-w11-toggle-check" [class.on]="getPermission(type.key)" (click)="setPermission(type.key, !getPermission(type.key))">
+                      <span class="toggle-indicator"></span>
+                      <span>{{ getPermission(type.key) ? 'Access' : 'No Access' }}</span>
+                    </label>
+                  </div>
+                }
+              </div>
             </div>
           </section>
         }
@@ -209,8 +244,6 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     { key: "general_expense", label: "General Expenses", note: "Office supplies, miscellaneous" },
     { key: "payment", label: "Client Payments", note: "Collections from clients" },
     { key: "subcontract", label: "Subcontracts", note: "Subcontractor agreements and payments" },
-    { key: "vendor", label: "Vendor Payments", note: "Payments to vendors and suppliers" },
-    { key: "reports", label: "Reports", note: "Generate and download reports" },
   ];
 
   readonly approvalRights = computed<ApprovalRight[]>(() =>
@@ -307,6 +340,45 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       canApprovePayment: this.canApprovePayment(),
       canManageWorkers: this.canManageWorkers(),
       canViewReports: this.canViewReports(),
+    }).subscribe({
+      next: () => this.permSaving.set(false),
+      error: () => this.permSaving.set(false),
+    });
+  }
+
+  getPermission(key: string): boolean {
+    switch (key) {
+      case "material": return this.canApproveMaterial();
+      case "labour": return this.canApproveLabour();
+      case "site_expense": return this.canApproveExpense();
+      case "general_expense": return this.canApproveGeneral();
+      case "subcontract": return this.canApproveSubcontract();
+      case "payment": return this.canApprovePayment();
+      default: return false;
+    }
+  }
+
+  setPermission(key: string, value: boolean) {
+    switch (key) {
+      case "material": this.canApproveMaterial.set(value); break;
+      case "labour": this.canApproveLabour.set(value); break;
+      case "site_expense": this.canApproveExpense.set(value); break;
+      case "general_expense": this.canApproveGeneral.set(value); break;
+      case "subcontract": this.canApproveSubcontract.set(value); break;
+      case "payment": this.canApprovePayment.set(value); break;
+    }
+
+    const id = this.employee()?.id;
+    if (!id) return;
+
+    this.permSaving.set(true);
+    this.api.saveEmployeeRequestPermissions(id, {
+      canApproveMaterial: this.canApproveMaterial(),
+      canApproveLabour: this.canApproveLabour(),
+      canApproveExpense: this.canApproveExpense(),
+      canApproveGeneral: this.canApproveGeneral(),
+      canApproveSubcontract: this.canApproveSubcontract(),
+      canApprovePayment: this.canApprovePayment(),
     }).subscribe({
       next: () => this.permSaving.set(false),
       error: () => this.permSaving.set(false),

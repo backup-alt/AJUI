@@ -84,6 +84,9 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     });
 
     const accessStatus = await checkAccessRestriction(result.user.role);
+    if (accessStatus.isRestricted) {
+      throw new AppError(403, `Access restricted until ${accessStatus.currentWindow?.endTime || "scheduled end"}. Contact admin if you need access.`);
+    }
 
     res.cookie(getRefreshCookieName(), result.tokens.refreshToken, refreshCookie);
 
@@ -91,8 +94,6 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       user: result.user,
       accessToken: result.tokens.accessToken,
       expiresAt: result.tokens.expiresAt,
-      isRestricted: accessStatus.isRestricted,
-      restrictedUntil: accessStatus.currentWindow,
     });
   } catch (err) {
     next(err);

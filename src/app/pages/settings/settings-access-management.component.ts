@@ -184,6 +184,10 @@ export class SettingsAccessManagementComponent implements OnInit {
         }
       }
     }
+    if (raw && raw.expense !== undefined && result.site_expense === undefined && result.general_expense === undefined) {
+      result.site_expense = { canApprove: raw.expense.canApprove || false };
+      result.general_expense = { canApprove: false };
+    }
     return result;
   }
 

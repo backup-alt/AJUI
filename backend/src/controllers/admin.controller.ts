@@ -142,12 +142,10 @@ export async function updateAccessTemplate(req: Request, res: Response, next: Ne
     if (name !== undefined) template.name = name;
     if (approvalTypes) {
       for (const [key, value] of Object.entries(approvalTypes)) {
-        if (template.approvalTypes[key as keyof typeof template.approvalTypes]) {
-          (template.approvalTypes as any)[key] = {
-            ...template.approvalTypes[key as keyof typeof template.approvalTypes],
-            ...value,
-          };
-        }
+        (template.approvalTypes as any)[key] = {
+          ...(template.approvalTypes as any)[key] || {},
+          ...value,
+        };
       }
     }
 
