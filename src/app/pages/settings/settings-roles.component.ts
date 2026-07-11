@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal, OnDestroy
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ApiService } from "../../core/api.service";
-import { ErpDataService, type AppUser } from "../../data/erp-data.service";
+import { ErpDataService } from "../../data/erp-data.service";
 
 type Role = "Admin" | "Project Manager" | "Accountant" | "Supervisor";
 type Status = "active" | "inactive" | "on_leave";
@@ -275,6 +275,7 @@ interface EmployeeInvite {
               <th>Role</th>
               <th>Time Left</th>
               <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -306,10 +307,21 @@ interface EmployeeInvite {
                     <span class="settings-w11-status-pill" data-status="pending">Pending</span>
                   }
                 </td>
+                <td>
+                  <button
+                    type="button"
+                    class="settings-w11-btn settings-w11-btn-ghost small"
+                    (click)="resendEmployeeInvite(inv)"
+                    [disabled]="inv.remainingMs <= 0 || employeeEmailSendingToken() === inv.token"
+                  >
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    {{ employeeEmailSendingToken() === inv.token ? 'Sending...' : 'Resend email' }}
+                  </button>
+                </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="6" class="settings-w11-empty-row">No pending employee invites.</td>
+                <td colspan="7" class="settings-w11-empty-row">No pending employee invites.</td>
               </tr>
             }
           </tbody>
@@ -797,6 +809,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly pendingEmployeeInvites = signal<EmployeeInvite[]>([]);
   readonly invitesLoading = signal(false);
   readonly employeeInvitesLoading = signal(false);
+  readonly employeeEmailSendingToken = signal<string | null>(null);
 
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
@@ -1129,6 +1142,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         }
         this.closeInvite();
         this.refreshEmployees();
+        this.refreshInvites();
       },
       error: (err) => {
         this.inviteSending.set(false);
@@ -1139,10 +1153,8 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
           );
           return;
         }
-        this.erp.addUser({ name, email, phone: phone || undefined, role: role as AppUser["role"], status: "active", source: "admin" });
-        alert(`Account created for ${email} (offline mode). Share the setup link manually.`);
-        this.closeInvite();
-        this.refreshEmployees();
+        const detail = err?.error?.error || err?.error?.message || err?.message || "Failed to send invite. Please try again.";
+        this.inviteError.set(typeof detail === "string" ? detail : "Failed to send invite. Please try again.");
       },
     });
   }
@@ -1249,6 +1261,27 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       error: () => {
         this.sendingEmail.set(false);
         alert("Failed to send email. Please try again.");
+      },
+    });
+  }
+
+  resendEmployeeInvite(inv: EmployeeInvite) {
+    if (inv.remainingMs <= 0) return;
+    this.employeeEmailSendingToken.set(inv.token);
+    this.api.sendEmployeeOtp(inv.token).subscribe({
+      next: (res) => {
+        this.employeeEmailSendingToken.set(null);
+        if (res?.emailSent) {
+          alert(`Setup email sent to ${inv.email}.`);
+        } else {
+          alert("Could not send the setup email. Please check the email provider logs or share the invite link manually.");
+        }
+        this.refreshInvites();
+      },
+      error: (err) => {
+        this.employeeEmailSendingToken.set(null);
+        const detail = err?.error?.error || err?.error?.message || err?.message || "Failed to send setup email.";
+        alert(typeof detail === "string" ? detail : "Failed to send setup email.");
       },
     });
   }

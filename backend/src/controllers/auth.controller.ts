@@ -9,10 +9,12 @@ import {
   supervisorSignupSchema,
 } from "../schemas/auth.schema.js";
 import { User } from "../models/User.js";
+import { Project } from "../models/Project.js";
 import { hashPassword, compareToken } from "../utils/password.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateQRDataURL } from "../utils/qr-code.js";
 import { sendEmail } from "../config/email.js";
+import { env } from "../config/env.js";
 import { PasswordResetToken } from "../models/PasswordResetToken.js";
 import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
@@ -451,9 +453,40 @@ const adminCreateEmployeeInviteSchema = z.object({
   phone: z.string().trim().min(8).max(20).optional(),
   role: z.enum(["admin", "project_manager", "accountant"]),
   projectIds: z
-    .array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid project id"))
+    .array(z.string().trim().min(1, "Invalid project id"))
     .min(1, "Select at least one project for this employee"),
 });
+
+async function resolveProjectObjectIds(projectIds: string[]): Promise<string[]> {
+  const requestedIds = [...new Set(projectIds.map((id) => id.trim()).filter(Boolean))];
+  if (requestedIds.length === 0) {
+    throw new AppError(400, "Select at least one project for this employee");
+  }
+
+  const objectIds = requestedIds
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
+
+  const query: Record<string, unknown>[] = [{ projectId: { $in: requestedIds } }];
+  if (objectIds.length > 0) {
+    query.push({ _id: { $in: objectIds } });
+  }
+
+  const projects = await Project.find({ $or: query }).select("_id projectId").lean();
+  const projectIdByInput = new Map<string, string>();
+  for (const project of projects) {
+    const id = project._id.toString();
+    projectIdByInput.set(id, id);
+    projectIdByInput.set(project.projectId, id);
+  }
+
+  const missingIds = requestedIds.filter((id) => !projectIdByInput.has(id));
+  if (missingIds.length > 0) {
+    throw new AppError(400, `Invalid project id: ${missingIds.join(", ")}`);
+  }
+
+  return [...new Set(requestedIds.map((id) => projectIdByInput.get(id)!))];
+}
 
 function allocatedProjectObjectIds(invite: { metadata?: unknown }): Types.ObjectId[] {
   const meta = (invite.metadata as Record<string, unknown>) || {};
@@ -495,13 +528,14 @@ export async function adminCreateEmployeeInvite(
       return;
     }
 
+    const projectIds = await resolveProjectObjectIds(body.projectIds);
     const result = await inviteService.createEmployeeInvite({
       createdByAdmin: req.user.sub,
       name: body.name,
       email: body.email,
       phone: body.phone,
       role: body.role,
-      projectIds: body.projectIds,
+      projectIds,
     });
 
     res.status(201).json({
@@ -691,6 +725,8 @@ export async function employeeResendOtp(
     let emailSent = false;
     if (invite.inviteeEmail) {
       const name = inviteService.extractInviteeName(invite);
+      const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
+      const inviteUrl = `${baseUrl}/signup/employee?token=${encodeURIComponent(token)}`;
       const roleLabel =
         invite.role === "project_manager"
           ? "Project Manager"
@@ -711,9 +747,25 @@ export async function employeeResendOtp(
               <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
                 <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${newOtp}</span>
               </div>
+              <p style="font-size:14px;color:#555;line-height:1.6">Open the setup page below, enter this code, and choose your password.</p>
+              <p style="margin:20px 0">
+                <a href="${inviteUrl}" target="_blank" style="display:inline-block;background:#002263;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Set Up My Account</a>
+              </p>
+              <p style="font-size:12px;color:#888;word-break:break-all">If the button does not work, copy this link: ${inviteUrl}</p>
               <p style="font-size:12px;color:#888">This code expires when your invite expires.</p>
             </div>
           </div>`,
+          text: `Hi ${name},
+
+You have been invited to join AGB as a ${roleLabel}.
+
+Open this setup link, enter the code below, and choose your password:
+${inviteUrl}
+
+Your one-time code: ${newOtp}
+
+This code expires when your invite expires.
+`,
         });
         emailSent = true;
       } catch (err) {
