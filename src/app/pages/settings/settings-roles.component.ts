@@ -385,7 +385,7 @@ interface PendingInvite {
                     <input
                       type="checkbox"
                       [checked]="allActiveOnHoldSelected()"
-                      [indeterminate]="!allActiveOnHoldSelected() && activeOnHoldProjects().some(p => this.isProjectSelected(p.id))"
+                      [indeterminate]="someActiveOnHoldSelected()"
                       (change)="toggleAllActiveOnHold()"
                     />
                     <span>Active / On Hold</span>
@@ -418,7 +418,7 @@ interface PendingInvite {
                     <input
                       type="checkbox"
                       [checked]="allCompletedSelected()"
-                      [indeterminate]="!allCompletedSelected() && completedProjects().some(p => this.isProjectSelected(p.id))"
+                      [indeterminate]="someCompletedSelected()"
                       (change)="toggleAllCompleted()"
                     />
                     <span>Completed</span>
@@ -629,6 +629,18 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly allCompletedSelected = computed(() => {
     const ids = this.completedProjects().map((p) => p.id);
     return ids.length > 0 && ids.every((id) => this.inviteProjectIds().includes(id));
+  });
+
+  readonly someActiveOnHoldSelected = computed(() => {
+    const ids = this.activeOnHoldProjects().map((p) => p.id);
+    const selected = ids.filter((id) => this.inviteProjectIds().includes(id));
+    return selected.length > 0 && selected.length < ids.length;
+  });
+
+  readonly someCompletedSelected = computed(() => {
+    const ids = this.completedProjects().map((p) => p.id);
+    const selected = ids.filter((id) => this.inviteProjectIds().includes(id));
+    return selected.length > 0 && selected.length < ids.length;
   });
 
   readonly availableProjects = computed(() => {
