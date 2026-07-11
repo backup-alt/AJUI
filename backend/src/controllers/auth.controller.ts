@@ -8,10 +8,11 @@ import { AccessSchedule } from "../models/AccessSchedule.js";
 import {
   verifyInviteSchema,
   supervisorSignupSchema,
+  changePasswordSchema,
 } from "../schemas/auth.schema.js";
 import { User } from "../models/User.js";
 import { Project } from "../models/Project.js";
-import { hashPassword, compareToken } from "../utils/password.js";
+import { hashPassword, verifyPassword, compareToken } from "../utils/password.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateQRDataURL } from "../utils/qr-code.js";
 import { sendEmail } from "../config/email.js";
@@ -198,6 +199,26 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
   }
 }
 
+export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { currentPassword, newPassword } = changePasswordSchema.parse(req.body).body;
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+
+    const user = await User.findById(req.user.sub).select("+passwordHash");
+    if (!user) throw new AppError(404, "User not found");
+
+    const isValid = await verifyPassword(currentPassword, user.passwordHash);
+    if (!isValid) throw new AppError(400, "Current password is incorrect");
+
+    user.passwordHash = await hashPassword(newPassword);
+    await user.save();
+
+    res.json({ success: true, message: "Password updated successfully" });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { email } = req.body as { email: string };
@@ -220,7 +241,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     // Use BACKEND_PUBLIC_URL or FRONTEND_URL; strip trailing slash
     const baseUrl = (process.env.BACKEND_PUBLIC_URL || process.env.FRONTEND_URL || "https://backup-alt.github.io/AJUI")
       .replace(/\/+$/, "");
-    const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+    const resetUrl = `${baseUrl}/#/login?token=${rawToken}`;
 
     const html = `<!DOCTYPE html>
 <html>

@@ -115,7 +115,6 @@ export class SettingsAccessManagementComponent implements OnInit {
   readonly roles = [
     { key: "project_manager", label: "Project Manager", description: "Manage projects and approve related requests" },
     { key: "accountant", label: "Accountant", description: "Handle financials, payments and reports" },
-    { key: "supervisor", label: "Supervisor", description: "Oversee sites and submit attendance/expenses" },
   ];
 
   private templates: Map<string, RoleTemplate> = new Map();

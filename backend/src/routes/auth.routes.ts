@@ -7,6 +7,7 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  changePasswordSchema,
   verifyInviteSchema,
   supervisorSignupSchema,
 } from "../schemas/auth.schema.js";
@@ -36,6 +37,7 @@ router.get("/me", requireAuth, ctrl.me);
 router.get("/sessions", requireAuth, ctrl.getSessions);
 router.delete("/sessions/:sessionId", requireAuth, ctrl.revokeSession);
 router.delete("/sessions", requireAuth, ctrl.revokeAllSessions);
+router.put("/password", requireAuth, validate(changePasswordSchema), ctrl.changePassword);
 
 router.post(
   "/forgot-password",

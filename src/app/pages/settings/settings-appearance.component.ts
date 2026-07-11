@@ -133,11 +133,19 @@ export class SettingsAppearanceComponent {
 
   constructor() {
     this.applyThemeToDocument();
+    this.syncLegacyDarkMode();
+  }
+
+  private syncLegacyDarkMode() {
+    const t = this.theme();
+    const isDark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    localStorage.setItem("agb-erp:darkMode", String(isDark));
   }
 
   setTheme(t: Theme) {
     this.theme.set(t);
     this.applyThemeToDocument();
+    this.syncLegacyDarkMode();
   }
 
   private applyThemeToDocument() {
