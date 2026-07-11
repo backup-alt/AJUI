@@ -813,7 +813,7 @@ export class ApiService {
     } catch {}
   }
 
-  private clearSession(): void {
+  clearSession(): void {
     this.accessTokenSignal.set(null);
     this.userSignal.set(null);
     this.expiresAtSignal.set(null);
