@@ -46,6 +46,18 @@ interface EmployeeInvite {
   emailSent?: boolean;
 }
 
+type CombinedInvite = {
+  type: "supervisor" | "employee";
+  token: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role?: string;
+  expiresAt: string;
+  remainingMs: number;
+  scanned?: boolean;
+};
+
 @Component({
   selector: "agb-settings-roles",
   standalone: true,
@@ -159,53 +171,61 @@ interface EmployeeInvite {
                 <td colspan="7" class="settings-w11-empty-row">No employees match your search.</td>
               </tr>
             }
-          </tbody>
+</tbody>
         </table>
       </div>
     </section>
 
-    <!-- Pending Invites table -->
+    <!-- Pending Invites table (Combined) -->
     <section class="settings-w11-card">
       <div class="settings-w11-card-head">
         <div>
-          <h2>Pending Supervisor Invites</h2>
-          <p>Active QR codes waiting for the supervisor to scan and complete setup.</p>
+          <h2>Pending Invites</h2>
+          <p>All active invites waiting for recipients to complete setup. Supervisors scan QR codes, employees use email links.</p>
         </div>
         <button
           type="button"
           class="settings-w11-btn settings-w11-btn-ghost small"
           (click)="refreshInvites()"
-          [disabled]="invitesLoading()"
+          [disabled]="invitesLoading() || employeeInvitesLoading()"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.5L13 3 M13 3v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {{ invitesLoading() ? 'Refreshing…' : 'Refresh' }}
+          {{ invitesLoading() || employeeInvitesLoading() ? 'Refreshing…' : 'Refresh' }}
         </button>
       </div>
       <div class="settings-w11-table-wrap">
         <table class="settings-w11-table">
           <thead>
             <tr>
+              <th>Type</th>
               <th>Name</th>
               <th>Email</th>
               <th>Phone</th>
-              <th>Created</th>
+              <th>Role</th>
               <th>Time Left</th>
               <th>Status</th>
-              <th></th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            @for (inv of pendingInvites(); track inv.token) {
+            @for (inv of allPendingInvites(); track inv.token + inv.type) {
               <tr [class.scanned]="inv.scanned">
                 <td>
+                  @if (inv.type === 'supervisor') {
+                    <span class="settings-w11-role-pill" data-role="Supervisor">Supervisor</span>
+                  } @else {
+                    <span class="settings-w11-role-pill" [attr.data-role]="inv.role">{{ inv.role }}</span>
+                  }
+                </td>
+                <td>
                   <div class="settings-w11-name-cell">
-                    <span class="settings-w11-avatar">{{ initials(inv.supervisorName) }}</span>
-                    <strong>{{ inv.supervisorName }}</strong>
+                    <span class="settings-w11-avatar">{{ initials(inv.name) }}</span>
+                    <strong>{{ inv.name }}</strong>
                   </div>
                 </td>
-                <td>{{ inv.supervisorEmail }}</td>
-                <td>{{ inv.supervisorPhone || '—' }}</td>
-                <td>{{ formatInviteDate(inv.expiresAt) }}</td>
+                <td>{{ inv.email }}</td>
+                <td>{{ inv.phone || '—' }}</td>
+                <td>{{ inv.role || '—' }}</td>
                 <td>
                   @if (inv.scanned) {
                     <span class="settings-w11-timer-text">—</span>
@@ -219,109 +239,40 @@ interface EmployeeInvite {
                   }
                 </td>
                 <td>
-                  @if (inv.scanned) {
+                  @if (inv.type === 'supervisor' && inv.scanned) {
                     <span class="settings-w11-status-pill" data-status="active">Scanned</span>
                   } @else if (inv.remainingMs <= 0) {
                     <span class="settings-w11-status-pill" data-status="inactive">Expired</span>
                   } @else {
-                    <span class="settings-w11-status-pill" data-status="pending">Waiting</span>
+                    <span class="settings-w11-status-pill" data-status="pending">{{ inv.type === 'supervisor' ? 'Waiting' : 'Pending' }}</span>
                   }
                 </td>
-                <td class="settings-w11-actions-cell">
-                  <button
-                    type="button"
-                    class="settings-w11-btn settings-w11-btn-ghost small"
-                    (click)="resendOtp(inv)"
-                    [disabled]="inv.scanned || inv.remainingMs <= 0 || resendingOtp()"
-                  >
-                    Resend
-                  </button>
+                <td>
+                  @if (inv.type === 'supervisor') {
+                    <button
+                      type="button"
+                      class="settings-w11-btn settings-w11-btn-ghost small"
+                      (click)="resendOtpByToken(inv.token)"
+                      [disabled]="inv.scanned || inv.remainingMs <= 0 || resendingOtp()"
+                    >
+                      Resend
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="settings-w11-btn settings-w11-btn-ghost small"
+                      (click)="resendEmployeeInviteByToken(inv.token)"
+                      [disabled]="inv.remainingMs <= 0 || employeeEmailSendingToken() === inv.token"
+                    >
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      {{ employeeEmailSendingToken() === inv.token ? 'Sending...' : 'Resend' }}
+                    </button>
+                  }
                 </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="7" class="settings-w11-empty-row">No pending supervisor invites. Click "Add Supervisor" to create one.</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Pending Employee Invites table -->
-    <section class="settings-w11-card">
-      <div class="settings-w11-card-head">
-        <div>
-          <h2>Pending Employee Invites</h2>
-          <p>Employees invited but not yet completed account setup. Each invite expires in 5 minutes.</p>
-        </div>
-        <button
-          type="button"
-          class="settings-w11-btn settings-w11-btn-ghost small"
-          (click)="refreshInvites()"
-          [disabled]="employeeInvitesLoading()"
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.5L13 3 M13 3v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {{ employeeInvitesLoading() ? 'Refreshing…' : 'Refresh' }}
-        </button>
-      </div>
-      <div class="settings-w11-table-wrap">
-        <table class="settings-w11-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Role</th>
-              <th>Time Left</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (inv of pendingEmployeeInvites(); track inv.token) {
-              <tr>
-                <td>
-                  <div class="settings-w11-name-cell">
-                    <span class="settings-w11-avatar">{{ initials(inv.name) }}</span>
-                    <strong>{{ inv.name }}</strong>
-                  </div>
-                </td>
-                <td>{{ inv.email }}</td>
-                <td>{{ inv.phone || '—' }}</td>
-                <td><span class="settings-w11-role-pill" [attr.data-role]="inv.role">{{ inv.role }}</span></td>
-                <td>
-                  @if (inv.remainingMs <= 0) {
-                    <span class="settings-w11-timer-text expired">Expired</span>
-                  } @else {
-                    <span class="settings-w11-timer-text" [class.warning]="inv.remainingMs < 60000">
-                      <svg viewBox="0 0 16 16" aria-hidden="true" class="settings-w11-timer-icon"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                      {{ formatCountdown(inv.remainingMs) }}
-                    </span>
-                  }
-                </td>
-                <td>
-                  @if (inv.remainingMs <= 0) {
-                    <span class="settings-w11-status-pill" data-status="inactive">Expired</span>
-                  } @else {
-                    <span class="settings-w11-status-pill" data-status="pending">Pending</span>
-                  }
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    class="settings-w11-btn settings-w11-btn-ghost small"
-                    (click)="resendEmployeeInvite(inv)"
-                    [disabled]="inv.remainingMs <= 0 || employeeEmailSendingToken() === inv.token"
-                  >
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    {{ employeeEmailSendingToken() === inv.token ? 'Sending...' : 'Resend email' }}
-                  </button>
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="7" class="settings-w11-empty-row">No pending employee invites.</td>
+                <td colspan="8" class="settings-w11-empty-row">No pending invites. Use "Add Supervisor" or "Invite Employee" to create one.</td>
               </tr>
             }
           </tbody>
@@ -784,6 +735,31 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly invitesLoading = signal(false);
   readonly employeeInvitesLoading = signal(false);
   readonly employeeEmailSendingToken = signal<string | null>(null);
+
+  readonly allPendingInvites = computed<CombinedInvite[]>(() => {
+    const supervisorInvites: CombinedInvite[] = this.pendingInvites().map(inv => ({
+      type: "supervisor" as const,
+      token: inv.token,
+      name: inv.supervisorName,
+      email: inv.supervisorEmail,
+      phone: inv.supervisorPhone,
+      role: "Supervisor",
+      expiresAt: inv.expiresAt,
+      remainingMs: inv.remainingMs,
+      scanned: inv.scanned,
+    }));
+    const employeeInvites: CombinedInvite[] = this.pendingEmployeeInvites().map(inv => ({
+      type: "employee" as const,
+      token: inv.token,
+      name: inv.name,
+      email: inv.email,
+      phone: inv.phone,
+      role: inv.role,
+      expiresAt: inv.expiresAt,
+      remainingMs: inv.remainingMs,
+    }));
+    return [...supervisorInvites, ...employeeInvites];
+  });
 
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
@@ -1266,6 +1242,13 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     });
   }
 
+  resendEmployeeInviteByToken(token: string) {
+    const inv = this.pendingEmployeeInvites().find(i => i.token === token);
+    if (inv) {
+      this.resendEmployeeInvite(inv);
+    }
+  }
+
   resendOtp(inv: PendingInvite) {
     if (inv.remainingMs <= 0 || inv.scanned) return;
     this.resendingOtp.set(true);
@@ -1288,5 +1271,12 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         this.resendingOtp.set(false);
       },
     });
+  }
+
+  resendOtpByToken(token: string) {
+    const inv = this.pendingInvites().find(i => i.token === token);
+    if (inv) {
+      this.resendOtp(inv);
+    }
   }
 }
