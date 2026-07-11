@@ -856,16 +856,16 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.employeesLoading.set(true);
     this.api.listEmployees({ limit: 100 }).subscribe({
       next: (res) => {
-        const items = (res?.items || []).map((row: any) => ({
-          id: row.id || row._id,
+        const items = (res?.items || []).map((row: any): Employee => ({
+          id: row._id ? String(row._id) : (row.id || ""),
           name: row.name || "—",
           email: row.email || "",
           phone: row.phone || "",
-          role: (row.role || "Project Manager") as Role,
+          role: (row.role === "admin" ? "Admin" : row.role === "project_manager" ? "Project Manager" : row.role === "accountant" ? "Accountant" : row.role === "supervisor" ? "Supervisor" : "Project Manager") as Role,
           status: (row.status || "active") as Status,
           lastLoginAt: row.lastLoginAt || "",
           createdAt: row.createdAt || "",
-          projectIds: row.projectIds || [],
+          projectIds: row.managedProjectIds ? row.managedProjectIds.map((id: any) => String(id)) : [],
         }));
         this.employees.set(items);
         this.employeesLoading.set(false);

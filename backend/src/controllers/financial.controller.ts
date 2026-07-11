@@ -368,6 +368,7 @@ export async function listApprovals(req: Request, res: Response, next: NextFunct
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
       scopeProjectIds,
+      userRole: req.user?.role,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -403,6 +404,7 @@ export async function getApprovalCount(req: Request, res: Response, next: NextFu
       projectId: req.query.projectId as string | undefined,
       type: req.query.type as never,
       scopeProjectIds,
+      userRole: req.user?.role,
     });
     res.json(count);
   } catch (e) { next(e); }

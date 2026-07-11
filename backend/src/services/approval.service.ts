@@ -183,13 +183,39 @@ export async function listApprovals(filter: {
   page: number;
   limit: number;
   scopeProjectIds?: ProjectScopeIds;
+  userRole?: string;
 }) {
   const query: Record<string, unknown> = {};
-  if (filter.type) query.type = filter.type;
-  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   if (filter.status) query.status = filter.status;
   else query.status = "Pending";
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
+
+  // Filter by access template permissions if userRole provided
+  if (filter.userRole) {
+    const { AccessTemplate } = await import("../models/AccessTemplate.js");
+    const template = await AccessTemplate.findOne({ role: filter.userRole }).lean();
+    if (template) {
+      const allowedTypes: ApprovalType[] = [];
+      for (const [key, value] of Object.entries(template.approvalTypes || {})) {
+        if (value.canApprove) {
+          allowedTypes.push(key as ApprovalType);
+        }
+      }
+      if (allowedTypes.length > 0) {
+        query.type = { $in: allowedTypes };
+      } else {
+        // No approvals allowed for this role, return empty
+        return { items: [], total: 0, page: filter.page, limit: filter.limit, pages: 0 };
+      }
+    }
+    if (filter.type) {
+      query.type = filter.type;
+    }
+  } else if (filter.type) {
+    query.type = filter.type;
+  }
+
+  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
@@ -205,11 +231,35 @@ export async function getApprovalById(id: string) {
   return approval;
 }
 
-export async function getApprovalCount(filter: { projectId?: string; type?: ApprovalType; scopeProjectIds?: ProjectScopeIds } = {}) {
+export async function getApprovalCount(filter: { projectId?: string; type?: ApprovalType; scopeProjectIds?: ProjectScopeIds; userRole?: string } = {}) {
   const query: Record<string, unknown> = { status: "Pending" };
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
-  if (filter.type) query.type = filter.type;
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
+
+  // Filter by access template permissions if userRole provided
+  if (filter.userRole) {
+    const { AccessTemplate } = await import("../models/AccessTemplate.js");
+    const template = await AccessTemplate.findOne({ role: filter.userRole }).lean();
+    if (template) {
+      const allowedTypes: ApprovalType[] = [];
+      for (const [key, value] of Object.entries(template.approvalTypes || {})) {
+        if (value.canApprove) {
+          allowedTypes.push(key as ApprovalType);
+        }
+      }
+      if (allowedTypes.length > 0) {
+        query.type = { $in: allowedTypes };
+      } else {
+        return { total: 0, byType: [] };
+      }
+    }
+    if (filter.type) {
+      query.type = filter.type;
+    }
+  } else if (filter.type) {
+    query.type = filter.type;
+  }
+
   const [total, byType] = await Promise.all([
     Approval.countDocuments(query),
     Approval.aggregate([

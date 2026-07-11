@@ -9,6 +9,7 @@ const router = Router();
 router.use(requireAuth);
 router.use(requireRole("admin"));
 
+router.get("/users", adminCtrl.listAllUsers);
 router.post("/invites/supervisor", authCtrl.adminCreateInvite);
 router.get("/invites/active", authCtrl.listActiveInvites);
 router.get("/invites/employee/active", authCtrl.listActiveEmployeeInvites);

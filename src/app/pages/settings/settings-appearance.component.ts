@@ -4,8 +4,6 @@ import { FormsModule } from "@angular/forms";
 import { ApiService } from "../../core/api.service";
 
 type Theme = "light" | "dark" | "system";
-type Density = "comfortable" | "compact" | "roomy";
-type FontSize = "sm" | "md" | "lg";
 
 @Component({
   selector: "agb-settings-appearance",
@@ -112,59 +110,6 @@ type FontSize = "sm" | "md" | "lg";
       </div>
     </section>
 
-    <section class="settings-w11-card">
-      <div class="settings-w11-card-head">
-        <div>
-          <h2>Density</h2>
-          <p>Adjust spacing in lists and tables.</p>
-        </div>
-      </div>
-      <div class="settings-w11-card-body">
-        <div class="settings-w11-radio-row">
-          @for (d of densities; track d.value) {
-            <label class="settings-w11-radio-card" [class.active]="density() === d.value">
-              <input type="radio" name="density" [value]="d.value" [checked]="density() === d.value" (change)="density.set(d.value)" />
-              <div>
-                <strong>{{ d.label }}</strong>
-                <small>{{ d.note }}</small>
-              </div>
-            </label>
-          }
-        </div>
-      </div>
-    </section>
-
-    <section class="settings-w11-card">
-      <div class="settings-w11-card-head">
-        <div>
-          <h2>Font size</h2>
-          <p>Adjust the text size across the app.</p>
-        </div>
-      </div>
-      <div class="settings-w11-card-body">
-        <div class="settings-w11-font-slider-wrap">
-          <div class="settings-w11-font-slider-labels">
-            <span>A</span>
-            <span class="settings-w11-font-size-label" [class.active]="true">{{ fontSizeLabel() }}</span>
-            <span>A</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            [value]="fontPercent()"
-            (input)="fontPercent.set(+$any($event.target).value)"
-            class="settings-w11-font-slider"
-            aria-label="Font size"
-          />
-        </div>
-        <div class="settings-w11-font-preview" [attr.data-size]="fontSize()">
-          <strong>Preview text</strong>
-          <p>Your text will appear like this across the app. Larger sizes improve readability on smaller screens.</p>
-        </div>
-      </div>
-    </section>
-
     <div class="settings-w11-sticky-actions">
       <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="apply()">
         Apply changes
@@ -176,90 +121,45 @@ type FontSize = "sm" | "md" | "lg";
 export class SettingsAppearanceComponent {
   private readonly api = inject(ApiService);
 
-  readonly theme = signal<Theme>((localStorage.getItem("agb_theme") as Theme) || "light");
-  readonly density = signal<Density>((localStorage.getItem("agb_density") as Density) || "comfortable");
-  readonly fontPercent = signal<number>(parseInt(localStorage.getItem("agb_font") || "50", 10));
+  readonly theme = signal<Theme>((localStorage.getItem("agb_theme") as Theme) || this.getPersistedTheme());
 
-  readonly densities = [
-    { value: "compact" as Density, label: "Compact", note: "Smaller padding and text" },
-    { value: "comfortable" as Density, label: "Comfortable", note: "Default spacing" },
-    { value: "roomy" as Density, label: "Roomy", note: "More breathing room" },
-  ];
-
-  readonly fontSize = (): FontSize => {
-    const p = this.fontPercent();
-    if (p <= 33) return "sm";
-    if (p <= 66) return "md";
-    return "lg";
-  };
-
-  readonly fontSizeLabel = (): string => {
-    const p = this.fontPercent();
-    if (p <= 33) return "Small";
-    if (p <= 66) return "Medium";
-    return "Large";
-  };
+  private getPersistedTheme(): Theme {
+    const saved = localStorage.getItem("agb_theme");
+    if (saved === "light" || saved === "dark" || saved === "system") {
+      return saved;
+    }
+    return "system";
+  }
 
   constructor() {
-    // Load preferences from backend
-    this.api.getAppearancePrefs().subscribe({
-      next: (prefs) => {
-        if (prefs.theme) this.theme.set(prefs.theme);
-        if (prefs.density) this.density.set(prefs.density);
-        if (prefs.fontSize) {
-          const map: Record<string, number> = { sm: 16, md: 50, lg: 84 };
-          if (prefs.fontSize in map) this.fontPercent.set(map[prefs.fontSize]);
-        }
-      },
-      error: () => {
-        // Fallback: keep localStorage defaults
-      },
-    });
+    this.applyTheme();
 
-    // Apply theme to document
     effect(() => {
-      const t = this.theme();
-      const root = document.documentElement;
-      if (t === "dark") {
-        root.classList.add("dark-mode");
-      } else if (t === "light") {
-        root.classList.remove("dark-mode");
-      } else {
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        root.classList.toggle("dark-mode", prefersDark);
-      }
+      this.applyTheme();
     });
+  }
 
-    // Apply density CSS variable to document
-    effect(() => {
-      const d = this.density();
-      document.documentElement.dataset["density"] = d;
-    });
-
-    // Apply font scale to document (0-100 maps to 0.85x-1.15x)
-    effect(() => {
-      const p = this.fontPercent();
-      const scale = 0.85 + (p / 100) * 0.30;
-      document.documentElement.style.setProperty("--app-font-scale", scale.toFixed(2));
-      const size = this.fontSize();
-      document.documentElement.dataset["fontSize"] = size;
-    });
+  private applyTheme() {
+    const t = this.theme();
+    const root = document.documentElement;
+    if (t === "dark") {
+      root.classList.add("dark-mode");
+    } else if (t === "light") {
+      root.classList.remove("dark-mode");
+    } else {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      root.classList.toggle("dark-mode", prefersDark);
+    }
   }
 
   apply() {
     localStorage.setItem("agb_theme", this.theme());
-    localStorage.setItem("agb_density", this.density());
-    localStorage.setItem("agb_font", String(this.fontPercent()));
 
     this.api.saveAppearancePrefs({
       theme: this.theme(),
-      density: this.density(),
-      fontSize: this.fontSize(),
     }).subscribe({
       next: () => {},
-      error: () => {
-        // Even if backend fails, local CSS application still works
-      },
+      error: () => {},
     });
   }
 }
