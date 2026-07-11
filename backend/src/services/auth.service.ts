@@ -26,6 +26,7 @@ export interface AuthResult {
     phone: string;
     role: string;
     status: string;
+    managedProjectIds: string[];
   };
   tokens: AuthTokens;
 }

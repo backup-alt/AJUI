@@ -1,7 +1,7 @@
-import { Schema, model, Document } from "mongoose";
+import { Schema, model, Document, Types } from "mongoose";
 
 export interface IAccessTemplate extends Document {
-  _id: Schema.Types.ObjectId;
+  _id: Types.ObjectId;
   name: string;
   role: "admin" | "project_manager" | "accountant" | "supervisor";
   approvalTypes: {
@@ -25,18 +25,35 @@ const accessTemplateSchema = new Schema<IAccessTemplate>(
       unique: true,
     },
     approvalTypes: {
-      type: Schema.Types.Map,
-      of: {
-        canApprove: { type: Boolean, default: false },
-        canReject: { type: Boolean, default: false },
+      type: {
+        material: {
+          canApprove: { type: Boolean, default: false },
+          canReject: { type: Boolean, default: false },
+        },
+        labour: {
+          canApprove: { type: Boolean, default: false },
+          canReject: { type: Boolean, default: false },
+        },
+        expense: {
+          canApprove: { type: Boolean, default: false },
+          canReject: { type: Boolean, default: false },
+        },
+        payment: {
+          canApprove: { type: Boolean, default: false },
+          canReject: { type: Boolean, default: false },
+        },
+        subcontract: {
+          canApprove: { type: Boolean, default: false },
+          canReject: { type: Boolean, default: false },
+        },
       },
-      default: () => new Map([
-        ["material", { canApprove: false, canReject: false }],
-        ["labour", { canApprove: false, canReject: false }],
-        ["expense", { canApprove: false, canReject: false }],
-        ["payment", { canApprove: false, canReject: false }],
-        ["subcontract", { canApprove: false, canReject: false }],
-      ]),
+      default: () => ({
+        material: { canApprove: false, canReject: false },
+        labour: { canApprove: false, canReject: false },
+        expense: { canApprove: false, canReject: false },
+        payment: { canApprove: false, canReject: false },
+        subcontract: { canApprove: false, canReject: false },
+      }),
     },
   },
   { timestamps: true }

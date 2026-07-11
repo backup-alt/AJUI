@@ -95,13 +95,13 @@ export async function getAccessTemplateByRole(req: Request, res: Response, next:
         {
           role,
           name: `${role.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())} Default`,
-          approvalTypes: new Map([
-            ["material", { canApprove: false, canReject: false }],
-            ["labour", { canApprove: false, canReject: false }],
-            ["expense", { canApprove: false, canReject: false }],
-            ["payment", { canApprove: false, canReject: false }],
-            ["subcontract", { canApprove: false, canReject: false }],
-          ]),
+          approvalTypes: {
+            material: { canApprove: false, canReject: false },
+            labour: { canApprove: false, canReject: false },
+            expense: { canApprove: false, canReject: false },
+            payment: { canApprove: false, canReject: false },
+            subcontract: { canApprove: false, canReject: false },
+          },
         },
         { upsert: true, new: true, lean: true }
       );
@@ -137,9 +137,11 @@ export async function updateAccessTemplate(req: Request, res: Response, next: Ne
     if (name !== undefined) template.name = name;
     if (approvalTypes) {
       for (const [key, value] of Object.entries(approvalTypes)) {
-        const existing = template.approvalTypes.get(key);
-        if (existing) {
-          template.approvalTypes.set(key, { ...existing, ...value });
+        if (template.approvalTypes[key as keyof typeof template.approvalTypes]) {
+          (template.approvalTypes as any)[key] = {
+            ...template.approvalTypes[key as keyof typeof template.approvalTypes],
+            ...value,
+          };
         }
       }
     }
