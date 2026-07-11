@@ -18,6 +18,48 @@ function generateOtp(): string {
   return crypto.randomInt(0, 10 ** OTP_LENGTH).toString().padStart(OTP_LENGTH, "0");
 }
 
+function inviteWindowExpiresAt(invite: Pick<IInviteToken, "createdAt" | "expiresAt">): Date {
+  const createdAt = new Date(invite.createdAt);
+  const configuredExpiresAt = new Date(invite.expiresAt);
+  const windowExpiresAt = new Date(createdAt.getTime() + INVITE_EXPIRY_MINUTES * 60 * 1000);
+  return configuredExpiresAt.getTime() < windowExpiresAt.getTime()
+    ? configuredExpiresAt
+    : windowExpiresAt;
+}
+
+function inviteActiveCutoff(now = new Date()): Date {
+  return new Date(now.getTime() - INVITE_EXPIRY_MINUTES * 60 * 1000);
+}
+
+export function getInviteRemainingMs(invite: Pick<IInviteToken, "createdAt" | "expiresAt">): number {
+  return Math.max(0, inviteWindowExpiresAt(invite).getTime() - Date.now());
+}
+
+async function markStaleInvitesExpired(createdByAdmin: string, roleFilter: Record<string, unknown>): Promise<void> {
+  const now = new Date();
+  await InviteToken.updateMany(
+    {
+      createdByAdmin: new Types.ObjectId(createdByAdmin),
+      status: "pending",
+      ...roleFilter,
+      $or: [
+        { expiresAt: { $lte: now } },
+        { createdAt: { $lt: inviteActiveCutoff(now) } },
+      ],
+    },
+    { $set: { status: "expired" } }
+  );
+}
+
+async function expireInviteIfNeeded(invite: IInviteToken): Promise<void> {
+  if (inviteWindowExpiresAt(invite).getTime() > Date.now()) return;
+  if (invite.status === "pending") {
+    invite.status = "expired";
+    await invite.save();
+  }
+  throw new AppError(410, "Invite token expired");
+}
+
 export interface CreateInviteParams {
   createdByAdmin: string;
   supervisorName: string;
@@ -322,7 +364,7 @@ export async function verifyInvite(token: string): Promise<IInviteToken> {
   const invite = await InviteToken.findOne({ token });
   if (!invite) throw new AppError(404, "Invite token not found");
   if (invite.usedAt) throw new AppError(410, "Invite token already used");
-  if (invite.expiresAt < new Date()) throw new AppError(410, "Invite token expired");
+  await expireInviteIfNeeded(invite);
   return invite;
 }
 
@@ -355,7 +397,7 @@ export async function consumeInvite(token: string, usedBy: string): Promise<IInv
   const invite = await InviteToken.findOne({ token });
   if (!invite) throw new AppError(404, "Invite token not found");
   if (invite.status === "accepted") throw new AppError(410, "Invite token already used");
-  if (invite.expiresAt < new Date()) throw new AppError(410, "Invite token expired");
+  await expireInviteIfNeeded(invite);
 
   invite.status = "accepted";
   invite.usedAt = new Date();
@@ -369,11 +411,14 @@ export async function revokeInvite(token: string): Promise<void> {
 }
 
 export async function listActiveInvites(createdByAdmin: string): Promise<Array<IInviteToken & { _id: Types.ObjectId }>> {
+  await markStaleInvitesExpired(createdByAdmin, { role: "supervisor" });
+  const now = new Date();
   return InviteToken.find({
     createdByAdmin: new Types.ObjectId(createdByAdmin),
     role: "supervisor",
     status: "pending",
-    expiresAt: { $gt: new Date() },
+    expiresAt: { $gt: now },
+    createdAt: { $gte: inviteActiveCutoff(now) },
   })
     .sort({ createdAt: -1 })
     .lean()
@@ -381,11 +426,14 @@ export async function listActiveInvites(createdByAdmin: string): Promise<Array<I
 }
 
 export async function listActiveEmployeeInvites(createdByAdmin: string): Promise<Array<IInviteToken & { _id: Types.ObjectId }>> {
+  await markStaleInvitesExpired(createdByAdmin, { role: { $in: ["admin", "project_manager", "accountant"] } });
+  const now = new Date();
   return InviteToken.find({
     createdByAdmin: new Types.ObjectId(createdByAdmin),
     role: { $in: ["admin", "project_manager", "accountant"] },
     status: "pending",
-    expiresAt: { $gt: new Date() },
+    expiresAt: { $gt: now },
+    createdAt: { $gte: inviteActiveCutoff(now) },
   })
     .sort({ createdAt: -1 })
     .lean()
@@ -396,7 +444,7 @@ export async function resendOtp(token: string): Promise<{ otp: string; emailSent
   const invite = await InviteToken.findOne({ token });
   if (!invite) throw new AppError(404, "Invite token not found");
   if (invite.usedAt) throw new AppError(410, "Invite already used");
-  if (invite.expiresAt < new Date()) throw new AppError(410, "Invite expired");
+  await expireInviteIfNeeded(invite);
 
   const otp = generateOtp();
   const otpHash = await hashToken(otp);
@@ -449,7 +497,7 @@ export async function sendSupervisorInviteEmail(
   const invite = await InviteToken.findOne({ token });
   if (!invite) throw new AppError(404, "Invite token not found");
   if (invite.usedAt) throw new AppError(410, "Invite already used");
-  if (invite.expiresAt < new Date()) throw new AppError(410, "Invite expired");
+  await expireInviteIfNeeded(invite);
   if (invite.role !== "supervisor") {
     throw new AppError(400, "This invite is not a supervisor invite");
   }

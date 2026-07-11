@@ -1,26 +1,26 @@
 import { Request, Response, NextFunction } from "express";
 import * as dashboardService from "../services/dashboard.service.js";
 import * as reportService from "../services/report.service.js";
-import { getScopedProjectQuery } from "../middleware/rbac.js";
+import { getScopedProjectIds } from "../middleware/rbac.js";
 
 export async function getKPIs(req: Request, res: Response, next: NextFunction) {
   try {
-    const scopeQuery = await getScopedProjectQuery(req);
-    const kpis = await dashboardService.getDashboardKPIs(scopeQuery);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const kpis = await dashboardService.getDashboardKPIs(scopeProjectIds);
     res.json({ kpis });
   } catch (e) { next(e); }
 }
 
 export async function getUniversalDashboard(req: Request, res: Response, next: NextFunction) {
   try {
-    const scopeQuery = await getScopedProjectQuery(req);
+    const scopeProjectIds = await getScopedProjectIds(req);
     const data = await dashboardService.getUniversalDashboard({
       projectId: req.query.projectId as string | undefined,
       clientId: req.query.clientId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       from: req.query.from as string | undefined,
       to: req.query.to as string | undefined,
-      scopeQuery,
+      scopeProjectIds,
     });
     res.json(data);
   } catch (e) { next(e); }

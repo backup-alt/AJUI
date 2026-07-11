@@ -6,6 +6,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { createApproval } from "./approval.service.js";
 import { CreateExpenseInput } from "../schemas/financial.schema.js";
+import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 async function computeRunningBalance(
   projectId: Types.ObjectId,
@@ -89,6 +90,7 @@ export async function listExpenses(filter: {
   to?: string;
   page: number;
   limit: number;
+  scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
   if (filter.type) query.type = filter.type;
@@ -100,6 +102,7 @@ export async function listExpenses(filter: {
     if (filter.from) (query.date as Record<string, string>).$gte = filter.from;
     if (filter.to) (query.date as Record<string, string>).$lte = filter.to;
   }
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
@@ -131,13 +134,17 @@ export async function deleteExpense(id: string) {
   if (result.deletedCount === 0) throw new AppError(404, "Expense not found");
 }
 
-export async function getExpenseLedger(projectId: string, site: string) {
+export async function getExpenseLedger(projectId: string, site: string, scopeProjectIds?: ProjectScopeIds) {
   const pid = new Types.ObjectId(projectId);
-  return Expense.find({ projectId: pid, site, type: "site" })
+  const query: Record<string, unknown> = { projectId: pid, site, type: "site" };
+  applyProjectScope(query, "projectId", scopeProjectIds);
+  return Expense.find(query)
     .sort({ date: 1, createdAt: 1 })
     .lean();
 }
 
-export async function getPendingExpenses() {
-  return Expense.find({ status: "Pending" }).sort({ createdAt: -1 }).lean();
+export async function getPendingExpenses(scopeProjectIds?: ProjectScopeIds) {
+  const query: Record<string, unknown> = { status: "Pending" };
+  applyProjectScope(query, "projectId", scopeProjectIds);
+  return Expense.find(query).sort({ createdAt: -1 }).lean();
 }

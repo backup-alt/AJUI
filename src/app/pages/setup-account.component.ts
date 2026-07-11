@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from "@ang
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ApiService } from "../core/api.service";
+import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
 
 type Step = "loading" | "password" | "otp" | "success" | "invalid" | "error";
 
@@ -310,6 +311,7 @@ export class SetupAccountComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly hydration = inject(WorkspaceHydrationService);
 
   readonly step = signal<Step>("loading");
   readonly inviteeEmail = signal("");
@@ -402,6 +404,7 @@ export class SetupAccountComponent implements OnInit {
         this.busy.set(false);
         if (res?.success && res?.accessToken && res?.user) {
           this.api.setEmployeeSession(res.user, res.accessToken, res.expiresAt || "");
+          this.hydration.hydrateFromBackend();
           void this.router.navigate(["/clients"]);
         } else if (res?.success) {
           this.step.set("success");

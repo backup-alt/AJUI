@@ -378,7 +378,7 @@ export async function listActiveInvites(req: Request, res: Response, next: NextF
         projectId: inv.projectId,
         expiresAt: inv.expiresAt,
         createdAt: inv.createdAt,
-        remainingMs: Math.max(0, inv.expiresAt.getTime() - Date.now()),
+        remainingMs: inviteService.getInviteRemainingMs(inv),
       })),
     });
   } catch (err) {
@@ -400,7 +400,7 @@ export async function listActiveEmployeeInvites(req: Request, res: Response, nex
         role: inv.role,
         expiresAt: inv.expiresAt,
         createdAt: inv.createdAt,
-        remainingMs: Math.max(0, inv.expiresAt.getTime() - Date.now()),
+        remainingMs: inviteService.getInviteRemainingMs(inv),
       })),
     });
   } catch (err) {
@@ -450,8 +450,26 @@ const adminCreateEmployeeInviteSchema = z.object({
   email: z.string().email("Valid email is required").transform((v) => v.toLowerCase()),
   phone: z.string().trim().min(8).max(20).optional(),
   role: z.enum(["admin", "project_manager", "accountant"]),
-  projectIds: z.array(z.string()).optional(),
+  projectIds: z
+    .array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid project id"))
+    .min(1, "Select at least one project for this employee"),
 });
+
+function allocatedProjectObjectIds(invite: { metadata?: unknown }): Types.ObjectId[] {
+  const meta = (invite.metadata as Record<string, unknown>) || {};
+  const allocatedProjectIds = Array.isArray(meta.allocatedProjectIds)
+    ? (meta.allocatedProjectIds as string[])
+    : [];
+  const ids = allocatedProjectIds
+    .filter((id) => typeof id === "string" && Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
+
+  if (ids.length === 0) {
+    throw new AppError(400, "This invite does not have any project access assigned");
+  }
+
+  return ids;
+}
 
 export async function adminCreateEmployeeInvite(
   req: Request,
@@ -605,10 +623,6 @@ export async function verifyEmployeeOtp(
       if (existing) throw new AppError(409, "User with this email or phone already exists");
 
       const passwordHash = await hashPassword(input.password);
-      const meta = (invite.metadata as Record<string, unknown>) || {};
-      const allocatedProjectIds: string[] = Array.isArray(meta.allocatedProjectIds)
-        ? (meta.allocatedProjectIds as string[])
-        : [];
       const user = await User.create({
         name: finalName,
         email: finalEmail,
@@ -617,7 +631,7 @@ export async function verifyEmployeeOtp(
         role: invite.role,
         status: "active",
         createdBy: invite.createdByAdmin,
-        managedProjectIds: allocatedProjectIds.map((id) => new Types.ObjectId(id)),
+        managedProjectIds: allocatedProjectObjectIds(invite),
       });
 
       await inviteService.consumeInvite(input.token, user._id.toString());
@@ -752,10 +766,6 @@ export async function employeeSignup(
     if (existing) throw new AppError(409, "User with this email or phone already exists");
 
     const passwordHash = await hashPassword(input.password);
-    const meta = (invite.metadata as Record<string, unknown>) || {};
-    const allocatedProjectIds: string[] = Array.isArray(meta.allocatedProjectIds)
-      ? (meta.allocatedProjectIds as string[])
-      : [];
     const user = await User.create({
       name: finalName,
       email: finalEmail,
@@ -764,7 +774,7 @@ export async function employeeSignup(
       role: invite.role,
       status: "active",
       createdBy: invite.createdByAdmin,
-      managedProjectIds: allocatedProjectIds.map((id) => new Types.ObjectId(id)),
+      managedProjectIds: allocatedProjectObjectIds(invite),
     });
 
     await inviteService.consumeInvite(input.token, user._id.toString());

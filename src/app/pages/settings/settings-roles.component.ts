@@ -916,7 +916,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
           remainingMs: Math.max(0, inv.remainingMs),
           scanned: false,
         }));
-        this.pendingInvites.set(fresh);
+        this.pendingInvites.set(fresh.filter((inv) => inv.remainingMs > 0));
         this.invitesLoading.set(false);
       },
       error: () => this.invitesLoading.set(false),
@@ -934,7 +934,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
           remainingMs: Math.max(0, inv.remainingMs),
           emailSent: inv.emailSent,
         }));
-        this.pendingEmployeeInvites.set(fresh);
+        this.pendingEmployeeInvites.set(fresh.filter((inv) => inv.remainingMs > 0));
         this.employeeInvitesLoading.set(false);
       },
       error: () => this.employeeInvitesLoading.set(false),
@@ -979,13 +979,13 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         if (inv.scanned) return inv;
         const newRemaining = Math.max(0, inv.remainingMs - 1000);
         return { ...inv, remainingMs: newRemaining };
-      })
+      }).filter((inv) => inv.scanned || inv.remainingMs > 0)
     );
     this.pendingEmployeeInvites.update((list) =>
       list.map((inv) => {
         const newRemaining = Math.max(0, inv.remainingMs - 1000);
         return { ...inv, remainingMs: newRemaining };
-      })
+      }).filter((inv) => inv.remainingMs > 0)
     );
 
     // Tick current invite if modal is open
@@ -1108,6 +1108,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     const projectIds = this.inviteProjectIds();
 
     this.inviteError.set(null);
+    if (projectIds.length === 0) {
+      this.inviteError.set("Please select at least one project for this employee.");
+      return;
+    }
     this.inviteSending.set(true);
     this.api.createEmployeeInvite({
       name,

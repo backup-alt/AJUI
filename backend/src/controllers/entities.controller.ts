@@ -4,6 +4,7 @@ import * as siteService from "../services/site.service.js";
 import * as projectService from "../services/project.service.js";
 import * as supervisorService from "../services/supervisor.service.js";
 import * as customFieldService from "../services/custom-fields.service.js";
+import { getScopedClientQuery, getScopedProjectIds, getScopedProjectQuery } from "../middleware/rbac.js";
 
 // =================== CLIENTS ===================
 export async function createClient(req: Request, res: Response, next: NextFunction) {
@@ -15,7 +16,6 @@ export async function createClient(req: Request, res: Response, next: NextFuncti
 
 export async function listClients(req: Request, res: Response, next: NextFunction) {
   try {
-    const { getScopedClientQuery } = await import("../middleware/rbac.js");
     const scopeQuery = await getScopedClientQuery(req);
     const result = await clientService.listClients({
       search: req.query.search as string | undefined,
@@ -30,28 +30,33 @@ export async function listClients(req: Request, res: Response, next: NextFunctio
 
 export async function getClient(req: Request, res: Response, next: NextFunction) {
   try {
-    const client = await clientService.getClientById(req.params.id);
+    const scopeQuery = await getScopedClientQuery(req);
+    const client = await clientService.getClientById(req.params.id, scopeQuery);
     res.json({ client });
   } catch (e) { next(e); }
 }
 
 export async function updateClient(req: Request, res: Response, next: NextFunction) {
   try {
-    const client = await clientService.updateClient(req.params.id, req.body);
+    const scopeQuery = await getScopedClientQuery(req);
+    const client = await clientService.updateClient(req.params.id, req.body, scopeQuery);
     res.json({ client });
   } catch (e) { next(e); }
 }
 
 export async function deleteClient(req: Request, res: Response, next: NextFunction) {
   try {
-    await clientService.deleteClient(req.params.id);
+    const scopeQuery = await getScopedClientQuery(req);
+    await clientService.deleteClient(req.params.id, scopeQuery);
     res.json({ success: true });
   } catch (e) { next(e); }
 }
 
 export async function getClientSummary(req: Request, res: Response, next: NextFunction) {
   try {
-    const summary = await clientService.getClientSummary(req.params.id);
+    const scopeQuery = await getScopedClientQuery(req);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const summary = await clientService.getClientSummary(req.params.id, scopeQuery, scopeProjectIds);
     res.json(summary);
   } catch (e) { next(e); }
 }
@@ -66,9 +71,11 @@ export async function createSite(req: Request, res: Response, next: NextFunction
 
 export async function listSites(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const sites = await siteService.listSites({
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,
+      scopeProjectIds,
     });
     res.json({ sites });
   } catch (e) { next(e); }
@@ -76,21 +83,24 @@ export async function listSites(req: Request, res: Response, next: NextFunction)
 
 export async function getSite(req: Request, res: Response, next: NextFunction) {
   try {
-    const site = await siteService.getSiteById(req.params.id);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const site = await siteService.getSiteById(req.params.id, scopeProjectIds);
     res.json({ site });
   } catch (e) { next(e); }
 }
 
 export async function updateSite(req: Request, res: Response, next: NextFunction) {
   try {
-    const site = await siteService.updateSite(req.params.id, req.body);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const site = await siteService.updateSite(req.params.id, req.body, scopeProjectIds);
     res.json({ site });
   } catch (e) { next(e); }
 }
 
 export async function deleteSite(req: Request, res: Response, next: NextFunction) {
   try {
-    await siteService.deleteSite(req.params.id);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    await siteService.deleteSite(req.params.id, scopeProjectIds);
     res.json({ success: true });
   } catch (e) { next(e); }
 }
@@ -105,7 +115,6 @@ export async function createProject(req: Request, res: Response, next: NextFunct
 
 export async function listProjects(req: Request, res: Response, next: NextFunction) {
   try {
-    const { getScopedProjectQuery } = await import("../middleware/rbac.js");
     const scopeQuery = await getScopedProjectQuery(req);
     const result = await projectService.listProjects({
       search: req.query.search as string | undefined,
@@ -123,35 +132,40 @@ export async function listProjects(req: Request, res: Response, next: NextFuncti
 
 export async function getProject(req: Request, res: Response, next: NextFunction) {
   try {
-    const project = await projectService.getProjectById(req.params.id);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const project = await projectService.getProjectById(req.params.id, scopeProjectIds);
     res.json({ project });
   } catch (e) { next(e); }
 }
 
 export async function updateProject(req: Request, res: Response, next: NextFunction) {
   try {
-    const project = await projectService.updateProject(req.params.id, req.body);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const project = await projectService.updateProject(req.params.id, req.body, scopeProjectIds);
     res.json({ project });
   } catch (e) { next(e); }
 }
 
 export async function deleteProject(req: Request, res: Response, next: NextFunction) {
   try {
-    await projectService.deleteProject(req.params.id);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    await projectService.deleteProject(req.params.id, scopeProjectIds);
     res.json({ success: true });
   } catch (e) { next(e); }
 }
 
 export async function getProjectLedger(req: Request, res: Response, next: NextFunction) {
   try {
-    const ledger = await projectService.getProjectLedger(req.params.id);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const ledger = await projectService.getProjectLedger(req.params.id, scopeProjectIds);
     res.json({ ledger });
   } catch (e) { next(e); }
 }
 
-export async function getProjectsSummary(_req: Request, res: Response, next: NextFunction) {
+export async function getProjectsSummary(req: Request, res: Response, next: NextFunction) {
   try {
-    const summary = await projectService.getProjectsSummary();
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const summary = await projectService.getProjectsSummary(scopeProjectIds);
     res.json(summary);
   } catch (e) { next(e); }
 }
@@ -166,9 +180,11 @@ export async function createSupervisor(req: Request, res: Response, next: NextFu
 
 export async function listSupervisors(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const supervisors = await supervisorService.listSupervisors({
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,
+      scopeProjectIds,
     });
     res.json({ supervisors });
   } catch (e) { next(e); }
@@ -176,21 +192,24 @@ export async function listSupervisors(req: Request, res: Response, next: NextFun
 
 export async function getSupervisor(req: Request, res: Response, next: NextFunction) {
   try {
-    const supervisor = await supervisorService.getSupervisorById(req.params.id);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const supervisor = await supervisorService.getSupervisorById(req.params.id, scopeProjectIds);
     res.json({ supervisor });
   } catch (e) { next(e); }
 }
 
 export async function updateSupervisor(req: Request, res: Response, next: NextFunction) {
   try {
-    const supervisor = await supervisorService.updateSupervisor(req.params.id, req.body);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const supervisor = await supervisorService.updateSupervisor(req.params.id, req.body, scopeProjectIds);
     res.json({ supervisor });
   } catch (e) { next(e); }
 }
 
 export async function deleteSupervisor(req: Request, res: Response, next: NextFunction) {
   try {
-    await supervisorService.deleteSupervisor(req.params.id);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    await supervisorService.deleteSupervisor(req.params.id, scopeProjectIds);
     res.json({ success: true });
   } catch (e) { next(e); }
 }

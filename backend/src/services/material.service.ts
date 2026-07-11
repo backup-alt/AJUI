@@ -7,6 +7,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { createApproval } from "./approval.service.js";
 import { CreateMaterialInput } from "../schemas/financial.schema.js";
+import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 async function populateRefs(input: CreateMaterialInput) {
   const project = await Project.findById(input.projectId);
@@ -75,6 +76,7 @@ export async function listMaterials(filter: {
   search?: string;
   page: number;
   limit: number;
+  scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
@@ -82,6 +84,7 @@ export async function listMaterials(filter: {
   if (filter.vendorId) query.vendorId = new Types.ObjectId(filter.vendorId);
   if (filter.status) query.status = filter.status;
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
@@ -112,6 +115,8 @@ export async function deleteMaterial(id: string) {
   if (result.deletedCount === 0) throw new AppError(404, "Material not found");
 }
 
-export async function getPendingMaterials() {
-  return Material.find({ status: "Pending" }).sort({ createdAt: -1 }).lean();
+export async function getPendingMaterials(scopeProjectIds?: ProjectScopeIds) {
+  const query: Record<string, unknown> = { status: "Pending" };
+  applyProjectScope(query, "projectId", scopeProjectIds);
+  return Material.find(query).sort({ createdAt: -1 }).lean();
 }

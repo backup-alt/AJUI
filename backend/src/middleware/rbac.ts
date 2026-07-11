@@ -4,6 +4,7 @@ import { AppError } from "./errorHandler.js";
 import { User, UserRole } from "../models/User.js";
 import { Project } from "../models/Project.js";
 import { Supervisor } from "../models/Supervisor.js";
+import { ProjectScopeIds, uniqueObjectIds } from "../utils/scope.js";
 
 import { AccessTokenPayload } from "../utils/jwt.js";
 
@@ -66,50 +67,51 @@ export function applyScope(req: Request, _res: Response, next: NextFunction): vo
 
 export async function getScopedProjectQuery(req: Request): Promise<Record<string, unknown>> {
   if (!req.user?.sub) return {};
-  const role = req.user.role;
 
-  if (role === "admin" || role === "accountant") {
+  const projectIds = await getScopedProjectIds(req);
+  if (projectIds === null) {
     return {};
   }
 
-  const userId = new Types.ObjectId(req.user.sub);
+  return { _id: { $in: projectIds } };
+}
 
-  if (role === "supervisor") {
-    const supervisor = await Supervisor.findOne({ userId }).lean();
-    const projectIds = supervisor?.assignedProjectId
-      ? [supervisor.assignedProjectId]
-      : [];
-    const user = await User.findById(userId).lean();
-    if (user?.managedProjectIds?.length) {
-      projectIds.push(...user.managedProjectIds);
-    }
-    const uniqueProjectIds = [...new Set(projectIds.map((id) => id.toString()))].map(
-      (id) => new Types.ObjectId(id)
-    );
-    return { _id: { $in: uniqueProjectIds } };
+export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds> {
+  if (!req.user?.sub) return null;
+
+  const role = req.user.role;
+  const userId = new Types.ObjectId(req.user.sub);
+  const user = await User.findById(userId).select("managedProjectIds").lean();
+  const managedProjectIds = (user?.managedProjectIds || []).map((id) => new Types.ObjectId(id));
+
+  if (role === "admin" || role === "accountant") {
+    return managedProjectIds.length > 0 ? uniqueObjectIds(managedProjectIds) : null;
   }
 
   if (role === "project_manager") {
-    const user = await User.findById(userId).lean();
-    const projectIds = (user?.managedProjectIds || []).map((id) => new Types.ObjectId(id));
-    return { _id: { $in: projectIds } };
+    return uniqueObjectIds(managedProjectIds);
   }
 
-  return {};
+  if (role === "supervisor") {
+    const supervisor = await Supervisor.findOne({ userId }).select("assignedProjectId").lean();
+    const projectIds = supervisor?.assignedProjectId
+      ? [new Types.ObjectId(supervisor.assignedProjectId), ...managedProjectIds]
+      : managedProjectIds;
+    return uniqueObjectIds(projectIds);
+  }
+
+  return [];
 }
 
 export async function getScopedClientQuery(req: Request): Promise<Record<string, unknown>> {
   if (!req.user?.sub) return {};
-  const role = req.user.role;
 
-  if (role === "admin" || role === "accountant") {
+  const projectIds = await getScopedProjectIds(req);
+  if (projectIds === null) {
     return {};
   }
 
-  // For PM/Supervisor: clients of projects they have access to
-  const projectQuery = await getScopedProjectQuery(req);
-  if (Object.keys(projectQuery).length === 0) return {};
-  const projects = await Project.find(projectQuery).select("clientId").lean();
+  const projects = await Project.find({ _id: { $in: projectIds } }).select("clientId").lean();
   const clientIds = [...new Set(projects.map((p) => p.clientId?.toString()).filter(Boolean))].map(
     (id) => new Types.ObjectId(id!)
   );

@@ -9,6 +9,7 @@ import {
   UpdateProjectInput,
 } from "../schemas/entities.schema.js";
 import { recomputeClientTotals, computeProjectLedger } from "./financial.service.js";
+import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 export async function createProject(input: CreateProjectInput) {
   const client = await Client.findById(input.clientId);
@@ -101,13 +102,16 @@ export async function listProjects(filter: {
   };
 }
 
-export async function getProjectById(id: string) {
-  const project = await Project.findById(id).lean();
+export async function getProjectById(id: string, scopeProjectIds?: ProjectScopeIds) {
+  const query: Record<string, unknown> = { _id: id };
+  applyProjectScope(query, "_id", scopeProjectIds);
+  const project = await Project.findOne(query).lean();
   if (!project) throw new AppError(404, "Project not found");
   return project;
 }
 
-export async function updateProject(id: string, patch: UpdateProjectInput) {
+export async function updateProject(id: string, patch: UpdateProjectInput, scopeProjectIds?: ProjectScopeIds) {
+  await getProjectById(id, scopeProjectIds);
   const updateData: Record<string, unknown> = { ...patch };
   if (patch.clientId) updateData.clientId = new Types.ObjectId(patch.clientId);
   if (patch.supervisorId) updateData.supervisorId = new Types.ObjectId(patch.supervisorId);
@@ -129,7 +133,8 @@ export async function updateProject(id: string, patch: UpdateProjectInput) {
   return project.toObject();
 }
 
-export async function deleteProject(id: string) {
+export async function deleteProject(id: string, scopeProjectIds?: ProjectScopeIds) {
+  await getProjectById(id, scopeProjectIds);
   const project = await Project.findById(id);
   if (!project) throw new AppError(404, "Project not found");
 
@@ -147,18 +152,21 @@ export async function deleteProject(id: string) {
   await Project.deleteOne({ _id: id });
 }
 
-export async function getProjectLedger(id: string) {
-  const project = await getProjectById(id);
+export async function getProjectLedger(id: string, scopeProjectIds?: ProjectScopeIds) {
+  const project = await getProjectById(id, scopeProjectIds);
   await recomputeClientTotals(project.clientId);
   return computeProjectLedger(project);
 }
 
-export async function getProjectsSummary() {
+export async function getProjectsSummary(scopeProjectIds?: ProjectScopeIds) {
+  const projectQuery: Record<string, unknown> = {};
+  applyProjectScope(projectQuery, "_id", scopeProjectIds);
   const [active, onHold, completed, financials] = await Promise.all([
-    Project.countDocuments({ status: "Active" }),
-    Project.countDocuments({ status: "On Hold" }),
-    Project.countDocuments({ status: "Completed" }),
+    Project.countDocuments({ ...projectQuery, status: "Active" }),
+    Project.countDocuments({ ...projectQuery, status: "On Hold" }),
+    Project.countDocuments({ ...projectQuery, status: "Completed" }),
     Project.aggregate([
+      { $match: projectQuery },
       {
         $group: {
           _id: null,

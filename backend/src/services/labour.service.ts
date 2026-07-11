@@ -6,6 +6,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { createApproval } from "./approval.service.js";
 import { CreateLabourInput } from "../schemas/financial.schema.js";
+import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 export async function createLabour(input: CreateLabourInput) {
   const project = await Project.findById(input.projectId);
@@ -65,6 +66,7 @@ export async function listLabour(filter: {
   to?: string;
   page: number;
   limit: number;
+  scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
@@ -76,6 +78,7 @@ export async function listLabour(filter: {
     if (filter.from) (query.attendanceDate as Record<string, string>).$gte = filter.from;
     if (filter.to) (query.attendanceDate as Record<string, string>).$lte = filter.to;
   }
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
@@ -105,10 +108,12 @@ export async function deleteLabour(id: string) {
   if (result.deletedCount === 0) throw new AppError(404, "Labour record not found");
 }
 
-export async function getLabourSummary(projectId: string) {
+export async function getLabourSummary(projectId: string, scopeProjectIds?: ProjectScopeIds) {
   const pid = new Types.ObjectId(projectId);
+  const query: Record<string, unknown> = { projectId: pid, status: "Approved" };
+  applyProjectScope(query, "projectId", scopeProjectIds);
   const agg = await Labour.aggregate([
-    { $match: { projectId: pid, status: "Approved" } },
+    { $match: query },
     {
       $group: {
         _id: "$category",
@@ -122,6 +127,8 @@ export async function getLabourSummary(projectId: string) {
   return agg;
 }
 
-export async function getPendingLabour() {
-  return Labour.find({ status: "Pending" }).sort({ createdAt: -1 }).lean();
+export async function getPendingLabour(scopeProjectIds?: ProjectScopeIds) {
+  const query: Record<string, unknown> = { status: "Pending" };
+  applyProjectScope(query, "projectId", scopeProjectIds);
+  return Labour.find(query).sort({ createdAt: -1 }).lean();
 }

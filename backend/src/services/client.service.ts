@@ -1,9 +1,11 @@
+import { Types } from "mongoose";
 import { Client } from "../models/Client.js";
 import { Project } from "../models/Project.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { CreateClientInput, UpdateClientInput } from "../schemas/entities.schema.js";
 import { recomputeClientTotals } from "./financial.service.js";
+import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 export async function createClient(input: CreateClientInput) {
   const clientId = await generateId("CLI");
@@ -47,19 +49,25 @@ export async function listClients(filter: {
   };
 }
 
-export async function getClientById(id: string) {
-  const client = await Client.findById(id).lean();
+export async function getClientById(id: string, scopeQuery?: Record<string, unknown>) {
+  const query: Record<string, unknown> =
+    scopeQuery && Object.keys(scopeQuery).length > 0
+      ? { $and: [{ _id: new Types.ObjectId(id) }, scopeQuery] }
+      : { _id: new Types.ObjectId(id) };
+  const client = await Client.findOne(query).lean();
   if (!client) throw new AppError(404, "Client not found");
   return client;
 }
 
-export async function updateClient(id: string, patch: UpdateClientInput) {
+export async function updateClient(id: string, patch: UpdateClientInput, scopeQuery?: Record<string, unknown>) {
+  await getClientById(id, scopeQuery);
   const client = await Client.findByIdAndUpdate(id, patch, { new: true });
   if (!client) throw new AppError(404, "Client not found");
   return client.toObject();
 }
 
-export async function deleteClient(id: string) {
+export async function deleteClient(id: string, scopeQuery?: Record<string, unknown>) {
+  await getClientById(id, scopeQuery);
   const projects = await Project.find({ clientId: id });
   if (projects.length > 0) {
     throw new AppError(409, `Cannot delete client with ${projects.length} active project(s)`);
@@ -68,11 +76,13 @@ export async function deleteClient(id: string) {
   if (result.deletedCount === 0) throw new AppError(404, "Client not found");
 }
 
-export async function getClientSummary(id: string) {
-  const client = await getClientById(id);
+export async function getClientSummary(id: string, scopeQuery?: Record<string, unknown>, scopeProjectIds?: ProjectScopeIds) {
+  const client = await getClientById(id, scopeQuery);
   await recomputeClientTotals(client._id);
-  const updated = await getClientById(id);
-  const projects = await Project.find({ clientId: id }).select("_id name status totalValue receivedAmount");
+  const updated = await getClientById(id, scopeQuery);
+  const projectQuery: Record<string, unknown> = { clientId: id };
+  applyProjectScope(projectQuery, "_id", scopeProjectIds);
+  const projects = await Project.find(projectQuery).select("_id name status totalValue receivedAmount");
   return {
     client: updated,
     projectCount: projects.length,

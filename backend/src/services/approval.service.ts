@@ -8,6 +8,7 @@ import { Subcontractor } from "../models/Subcontractor.js";
 import { generateId } from "./id-generator.service.js";
 import { recomputeProjectTotals } from "./financial.service.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 export interface CreateApprovalParams {
   type: ApprovalType;
@@ -181,12 +182,14 @@ export async function listApprovals(filter: {
   status?: string;
   page: number;
   limit: number;
+  scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
   if (filter.type) query.type = filter.type;
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   if (filter.status) query.status = filter.status;
   else query.status = "Pending";
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
@@ -202,10 +205,11 @@ export async function getApprovalById(id: string) {
   return approval;
 }
 
-export async function getApprovalCount(filter: { projectId?: string; type?: ApprovalType } = {}) {
+export async function getApprovalCount(filter: { projectId?: string; type?: ApprovalType; scopeProjectIds?: ProjectScopeIds } = {}) {
   const query: Record<string, unknown> = { status: "Pending" };
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   if (filter.type) query.type = filter.type;
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
   const [total, byType] = await Promise.all([
     Approval.countDocuments(query),
     Approval.aggregate([

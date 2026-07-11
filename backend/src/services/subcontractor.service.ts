@@ -6,6 +6,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { createApproval } from "./approval.service.js";
 import { CreateSubcontractorInput } from "../schemas/financial.schema.js";
+import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 export async function createSubcontractor(input: CreateSubcontractorInput) {
   const project = await Project.findById(input.projectId);
@@ -55,11 +56,13 @@ export async function listSubcontractors(filter: {
   paymentStatus?: string;
   page: number;
   limit: number;
+  scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   if (filter.approvalStatus) query.approvalStatus = filter.approvalStatus;
   if (filter.paymentStatus) query.paymentStatus = filter.paymentStatus;
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
@@ -94,6 +97,8 @@ export async function deleteSubcontractor(id: string) {
   if (result.deletedCount === 0) throw new AppError(404, "Subcontractor not found");
 }
 
-export async function getPendingSubcontractors() {
-  return Subcontractor.find({ approvalStatus: "Pending" }).sort({ createdAt: -1 }).lean();
+export async function getPendingSubcontractors(scopeProjectIds?: ProjectScopeIds) {
+  const query: Record<string, unknown> = { approvalStatus: "Pending" };
+  applyProjectScope(query, "projectId", scopeProjectIds);
+  return Subcontractor.find(query).sort({ createdAt: -1 }).lean();
 }

@@ -6,6 +6,7 @@ import * as paymentService from "../services/payment.service.js";
 import * as vendorService from "../services/vendor.service.js";
 import * as subcontractorService from "../services/subcontractor.service.js";
 import * as approvalService from "../services/approval.service.js";
+import { getScopedProjectIds } from "../middleware/rbac.js";
 
 // =================== MATERIALS ===================
 export async function createMaterial(req: Request, res: Response, next: NextFunction) {
@@ -17,6 +18,7 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
 
 export async function listMaterials(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const result = await materialService.listMaterials({
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
@@ -25,6 +27,7 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       search: req.query.search as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      scopeProjectIds,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -51,9 +54,10 @@ export async function deleteMaterial(req: Request, res: Response, next: NextFunc
   } catch (e) { next(e); }
 }
 
-export async function getPendingMaterials(_req: Request, res: Response, next: NextFunction) {
+export async function getPendingMaterials(req: Request, res: Response, next: NextFunction) {
   try {
-    const materials = await materialService.getPendingMaterials();
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const materials = await materialService.getPendingMaterials(scopeProjectIds);
     res.json({ materials });
   } catch (e) { next(e); }
 }
@@ -68,6 +72,7 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
 
 export async function listLabour(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const result = await labourService.listLabour({
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
@@ -77,6 +82,7 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
       to: req.query.to as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      scopeProjectIds,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -105,14 +111,16 @@ export async function deleteLabour(req: Request, res: Response, next: NextFuncti
 
 export async function getLabourSummary(req: Request, res: Response, next: NextFunction) {
   try {
-    const summary = await labourService.getLabourSummary(req.params.projectId);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const summary = await labourService.getLabourSummary(req.params.projectId, scopeProjectIds);
     res.json({ summary });
   } catch (e) { next(e); }
 }
 
-export async function getPendingLabour(_req: Request, res: Response, next: NextFunction) {
+export async function getPendingLabour(req: Request, res: Response, next: NextFunction) {
   try {
-    const labour = await labourService.getPendingLabour();
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const labour = await labourService.getPendingLabour(scopeProjectIds);
     res.json({ labour });
   } catch (e) { next(e); }
 }
@@ -127,6 +135,7 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
 
 export async function listExpenses(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const result = await expenseService.listExpenses({
       type: req.query.type as string | undefined,
       projectId: req.query.projectId as string | undefined,
@@ -136,6 +145,7 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       to: req.query.to as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      scopeProjectIds,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -164,14 +174,16 @@ export async function deleteExpense(req: Request, res: Response, next: NextFunct
 
 export async function getExpenseLedger(req: Request, res: Response, next: NextFunction) {
   try {
-    const ledger = await expenseService.getExpenseLedger(req.params.projectId, req.params.site);
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const ledger = await expenseService.getExpenseLedger(req.params.projectId, req.params.site, scopeProjectIds);
     res.json({ ledger });
   } catch (e) { next(e); }
 }
 
-export async function getPendingExpenses(_req: Request, res: Response, next: NextFunction) {
+export async function getPendingExpenses(req: Request, res: Response, next: NextFunction) {
   try {
-    const expenses = await expenseService.getPendingExpenses();
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const expenses = await expenseService.getPendingExpenses(scopeProjectIds);
     res.json({ expenses });
   } catch (e) { next(e); }
 }
@@ -186,6 +198,7 @@ export async function createPayment(req: Request, res: Response, next: NextFunct
 
 export async function listPayments(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const result = await paymentService.listPayments({
       projectId: req.query.projectId as string | undefined,
       clientId: req.query.clientId as string | undefined,
@@ -195,6 +208,7 @@ export async function listPayments(req: Request, res: Response, next: NextFuncti
       to: req.query.to as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      scopeProjectIds,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -223,18 +237,21 @@ export async function deletePayment(req: Request, res: Response, next: NextFunct
 
 export async function getPaymentCollectionSummary(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const summary = await paymentService.getCollectionSummary({
       projectId: req.query.projectId as string | undefined,
       from: req.query.from as string | undefined,
       to: req.query.to as string | undefined,
+      scopeProjectIds,
     });
     res.json({ summary });
   } catch (e) { next(e); }
 }
 
-export async function getPendingPayments(_req: Request, res: Response, next: NextFunction) {
+export async function getPendingPayments(req: Request, res: Response, next: NextFunction) {
   try {
-    const payments = await paymentService.getPendingPayments();
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const payments = await paymentService.getPendingPayments(scopeProjectIds);
     res.json({ payments });
   } catch (e) { next(e); }
 }
@@ -298,12 +315,14 @@ export async function createSubcontractor(req: Request, res: Response, next: Nex
 
 export async function listSubcontractors(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const result = await subcontractorService.listSubcontractors({
       projectId: req.query.projectId as string | undefined,
       approvalStatus: req.query.approvalStatus as string | undefined,
       paymentStatus: req.query.paymentStatus as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      scopeProjectIds,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -330,9 +349,10 @@ export async function deleteSubcontractor(req: Request, res: Response, next: Nex
   } catch (e) { next(e); }
 }
 
-export async function getPendingSubcontractors(_req: Request, res: Response, next: NextFunction) {
+export async function getPendingSubcontractors(req: Request, res: Response, next: NextFunction) {
   try {
-    const subs = await subcontractorService.getPendingSubcontractors();
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const subs = await subcontractorService.getPendingSubcontractors(scopeProjectIds);
     res.json({ subcontractors: subs });
   } catch (e) { next(e); }
 }
@@ -340,12 +360,14 @@ export async function getPendingSubcontractors(_req: Request, res: Response, nex
 // =================== APPROVALS ===================
 export async function listApprovals(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const result = await approvalService.listApprovals({
       type: req.query.type as never,
       projectId: req.query.projectId as string | undefined,
       status: req.query.status as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      scopeProjectIds,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -376,9 +398,11 @@ export async function rejectApproval(req: Request, res: Response, next: NextFunc
 
 export async function getApprovalCount(req: Request, res: Response, next: NextFunction) {
   try {
+    const scopeProjectIds = await getScopedProjectIds(req);
     const count = await approvalService.getApprovalCount({
       projectId: req.query.projectId as string | undefined,
       type: req.query.type as never,
+      scopeProjectIds,
     });
     res.json(count);
   } catch (e) { next(e); }

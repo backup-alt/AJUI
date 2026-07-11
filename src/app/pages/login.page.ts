@@ -3,8 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/cor
 import { FormsModule } from "@angular/forms";
 import { Router, ActivatedRoute } from "@angular/router";
 import { ApiService } from "../core/api.service";
-import { ErpDataService } from "../data/erp-data.service";
-import { mapClient, mapProject, mapSite, mapVendor, mapSupervisor, mapMaterial, mapLabour, mapExpense, mapPayment, mapSubcontractor } from "../core/mappers";
+import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
 
 type Mode = 'login' | 'forgot' | 'reset';
 
@@ -310,7 +309,7 @@ export class LoginPage {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(ApiService);
-  private readonly erp = inject(ErpDataService);
+  private readonly hydration = inject(WorkspaceHydrationService);
 
   mode = signal<Mode>('login');
   loading = signal(false);
@@ -366,7 +365,7 @@ export class LoginPage {
           this.sessionRole.set(this.formatRole(role));
         } catch {}
 
-        this.hydrateFromBackend();
+        this.hydration.hydrateFromBackend();
         void this.router.navigate(["/dashboard"]);
       },
       error: (err) => {
@@ -447,16 +446,4 @@ export class LoginPage {
     return map[role] || role;
   }
 
-  private hydrateFromBackend() {
-    this.api.listClients({ limit: 100 }).subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:clients", JSON.stringify((res.items || []).map(mapClient))); } catch {} }, error: () => {} });
-    this.api.listProjects({ limit: 100 }).subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:projects", JSON.stringify((res.items || []).map(mapProject))); } catch {} }, error: () => {} });
-    this.api.listSites().subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:sites", JSON.stringify((res.items || []).map(mapSite))); } catch {} }, error: () => {} });
-    this.api.listVendors({ limit: 100 }).subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:vendors", JSON.stringify((res.items || []).map(mapVendor))); } catch {} }, error: () => {} });
-    this.api.listSupervisors().subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:supervisors", JSON.stringify((res.items || []).map(mapSupervisor))); } catch {} }, error: () => {} });
-    this.api.listMaterials({ limit: 100 }).subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:materials", JSON.stringify((res.items || []).map(mapMaterial))); } catch {} }, error: () => {} });
-    this.api.listLabour({ limit: 100 }).subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:labour", JSON.stringify((res.items || []).map(mapLabour))); } catch {} }, error: () => {} });
-    this.api.listExpenses({ limit: 100 }).subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:expenses", JSON.stringify((res.items || []).map(mapExpense))); } catch {} }, error: () => {} });
-    this.api.listPayments({ limit: 100 }).subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:payments", JSON.stringify((res.items || []).map(mapPayment))); } catch {} }, error: () => {} });
-    this.api.listSubcontractors({ limit: 100 }).subscribe({ next: (res) => { try { localStorage.setItem("agb-erp:subcontractors", JSON.stringify((res.items || []).map(mapSubcontractor))); } catch {} }, error: () => {} });
-  }
 }
