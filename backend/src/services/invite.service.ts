@@ -261,7 +261,7 @@ role: InviteRole;
                 <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${params.otp}</span>
               </div>
               <p style="margin:0 0 24px;color:#475467;font-size:15px;line-height:1.6;">
-                Click the button below to open the setup page, enter this code, and choose a password. This link expires in <strong>${params.expiresHours} hours</strong>.
+                Click the button below to open the setup page, enter this code, and choose a password. This link expires in <strong>${params.expiresMinutes} minutes</strong>.
               </p>
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
                 <tr>
@@ -307,7 +307,7 @@ You have been invited to join AGB (Annai Golden Builders) as a ${formatRole(para
 
 Your one-time verification code: ${params.otp}
 
-Click the link below to open the setup page, enter this code, and choose a password. This link expires in ${params.expiresHours} hours:
+Click the link below to open the setup page, enter this code, and choose a password. This link expires in ${params.expiresMinutes} minutes:
 
 ${params.inviteUrl}
 
