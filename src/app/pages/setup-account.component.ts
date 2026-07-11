@@ -336,6 +336,9 @@ export class SetupAccountComponent implements OnInit {
       return;
     }
 
+    // Clear any existing session - this is a fresh signup via invite link
+    this.api.clearSession();
+
     this.api.verifyEmployeeToken(this.token).subscribe({
       next: (res) => {
         if (res?.valid) {
