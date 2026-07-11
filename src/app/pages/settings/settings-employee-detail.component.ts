@@ -340,15 +340,15 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       next: (res) => {
         const row: any = res?.employee || res;
         this.employee.set({
-          id: row.id || row._id || id,
+          id: row._id ? String(row._id) : (row.id || id),
           name: row.name || "—",
           email: row.email || "",
           phone: row.phone || "",
-          role: (row.role || "Project Manager") as Role,
+          role: (row.role === "admin" ? "Admin" : row.role === "project_manager" ? "Project Manager" : row.role === "accountant" ? "Accountant" : row.role === "supervisor" ? "Supervisor" : "Project Manager") as Role,
           status: (row.status || "active") as Status,
           lastLoginAt: row.lastLoginAt || "",
           createdAt: row.createdAt || "",
-          projectIds: row.projectIds || [],
+          projectIds: row.managedProjectIds ? row.managedProjectIds.map((id: any) => String(id)) : [],
         });
         this.loading.set(false);
         this.loadPermissions(id);

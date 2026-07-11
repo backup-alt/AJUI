@@ -4,6 +4,7 @@ import { Types } from "mongoose";
 import * as authService from "../services/auth.service.js";
 import * as inviteService from "../services/invite.service.js";
 import { getRefreshCookieName } from "../services/auth.service.js";
+import { AccessSchedule } from "../models/AccessSchedule.js";
 import {
   verifyInviteSchema,
   supervisorSignupSchema,
@@ -19,6 +20,53 @@ import { PasswordResetToken } from "../models/PasswordResetToken.js";
 import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
 
+async function checkAccessRestriction(userRole: string): Promise<{ isRestricted: boolean; currentWindow?: { startTime: string; endTime: string; reason: string } }> {
+  try {
+    const schedule = await AccessSchedule.findOne().lean();
+    if (!schedule || !schedule.enabled) {
+      return { isRestricted: false };
+    }
+
+    const now = new Date();
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const currentDay = dayNames[now.getDay()];
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    for (const window of schedule.windows) {
+      if (!window.isActive) continue;
+      if (!window.days.includes(currentDay)) continue;
+      if (window.appliesTo.length > 0 && !window.appliesTo.includes(userRole)) continue;
+
+      const [sh, sm] = window.startTime.split(":").map(Number);
+      const [eh, em] = window.endTime.split(":").map(Number);
+      const startMinutes = sh * 60 + sm;
+      const endMinutes = eh * 60 + em;
+
+      let isWithin = false;
+      if (startMinutes < endMinutes) {
+        isWithin = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+      } else {
+        isWithin = currentMinutes >= startMinutes || currentMinutes < endMinutes;
+      }
+
+      if (isWithin) {
+        return {
+          isRestricted: true,
+          currentWindow: {
+            startTime: window.startTime,
+            endTime: window.endTime,
+            reason: window.note || "Access restricted during scheduled window",
+          },
+        };
+      }
+    }
+
+    return { isRestricted: false };
+  } catch {
+    return { isRestricted: false };
+  }
+}
+
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { identifier, phone, email, password } = req.body as {
@@ -27,7 +75,6 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       email?: string;
       password: string;
     };
-    // Support both old {phone} and new {identifier/email} payloads
     const loginId = identifier || phone || email;
     if (!loginId) throw new AppError(400, "Email or phone is required");
     const { result, refreshCookie } = await authService.loginUser(loginId, password, {
@@ -35,12 +82,16 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       ip: req.ip,
     });
 
+    const accessStatus = await checkAccessRestriction(result.user.role);
+
     res.cookie(getRefreshCookieName(), result.tokens.refreshToken, refreshCookie);
 
     res.json({
       user: result.user,
       accessToken: result.tokens.accessToken,
       expiresAt: result.tokens.expiresAt,
+      isRestricted: accessStatus.isRestricted,
+      restrictedUntil: accessStatus.currentWindow,
     });
   } catch (err) {
     next(err);
@@ -74,6 +125,63 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
     const refreshToken = req.cookies?.[cookieName];
     await authService.logout(refreshToken);
     res.clearCookie(cookieName, { path: "/api/auth" });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+    const { RefreshToken } = await import("../models/RefreshToken.js");
+    const sessions = await RefreshToken.find({
+      userId: req.user.sub,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    })
+      .select("userAgent ip createdAt expiresAt")
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({
+      sessions: sessions.map((s) => ({
+        id: s._id.toString(),
+        userAgent: s.userAgent || "Unknown",
+        ip: s.ip || "Unknown",
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+        isCurrent: false,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function revokeSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+    const { sessionId } = req.params;
+    const { RefreshToken } = await import("../models/RefreshToken.js");
+    const session = await RefreshToken.findOneAndUpdate(
+      { _id: sessionId, userId: req.user.sub },
+      { revokedAt: new Date() }
+    );
+    if (!session) throw new AppError(404, "Session not found");
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function revokeAllSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+    const { RefreshToken } = await import("../models/RefreshToken.js");
+    await RefreshToken.updateMany(
+      { userId: req.user.sub, revokedAt: null },
+      { revokedAt: new Date() }
+    );
     res.json({ success: true });
   } catch (err) {
     next(err);

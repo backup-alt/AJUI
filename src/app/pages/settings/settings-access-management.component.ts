@@ -1,6 +1,5 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal, OnInit } from "@angular/core";
-import { Router } from "@angular/router";
 import { ApiService } from "../../core/api.service";
 
 interface ApprovalType {
@@ -13,10 +12,11 @@ interface RoleTemplate {
   id?: string;
   name: string;
   role: string;
-  approvalTypes: Record<string, { canApprove: boolean; canReject: boolean }>;
+  approvalTypes: Record<string, { canApprove: boolean }>;
 }
 
 @Component({
+  selector: "agb-settings-access-management",
   standalone: true,
   imports: [CommonModule],
   template: `
@@ -27,14 +27,14 @@ interface RoleTemplate {
         <strong>Access Management</strong>
       </nav>
       <h1>Access Management</h1>
-      <p>Set default approval permissions for each role. These defaults are applied when inviting new employees.</p>
+      <p>Set default approval permissions for each role. When enabled, employees with this role can view, approve, and reject requests of that type.</p>
     </header>
 
     <section class="settings-w11-card">
       <div class="settings-w11-card-head">
         <div>
           <h2>Role Permissions</h2>
-          <p>Configure what approvals each role can approve or reject by default.</p>
+          <p>Configure what approvals each role can access by default.</p>
         </div>
         <button
           type="button"
@@ -59,9 +59,8 @@ interface RoleTemplate {
                 </div>
                 <div class="access-perm-table">
                   <div class="access-perm-header">
-                    <span>Approval Type</span>
-                    <span>Approve</span>
-                    <span>Reject</span>
+                    <span>Request Type</span>
+                    <span>Has Access</span>
                   </div>
                   @for (approval of approvalTypes; track approval.key) {
                     <div class="access-perm-row">
@@ -72,16 +71,8 @@ interface RoleTemplate {
                       <label class="access-mini-toggle">
                         <input
                           type="checkbox"
-                          [checked]="getPermission(role.key, approval.key, 'canApprove')"
-                          (change)="setPermission(role.key, approval.key, 'canApprove', $any($event.target).checked)"
-                        />
-                        <span class="toggle-slider"></span>
-                      </label>
-                      <label class="access-mini-toggle">
-                        <input
-                          type="checkbox"
-                          [checked]="getPermission(role.key, approval.key, 'canReject')"
-                          (change)="setPermission(role.key, approval.key, 'canReject', $any($event.target).checked)"
+                          [checked]="getPermission(role.key, approval.key)"
+                          (change)="setPermission(role.key, approval.key, $any($event.target).checked)"
                         />
                         <span class="toggle-slider"></span>
                       </label>
@@ -122,7 +113,6 @@ export class SettingsAccessManagementComponent implements OnInit {
   ];
 
   readonly roles = [
-    { key: "admin", label: "Admin", description: "Full system access with all permissions" },
     { key: "project_manager", label: "Project Manager", description: "Manage projects and approve related requests" },
     { key: "accountant", label: "Accountant", description: "Handle financials, payments and reports" },
     { key: "supervisor", label: "Supervisor", description: "Oversee sites and submit attendance/expenses" },
@@ -142,6 +132,7 @@ export class SettingsAccessManagementComponent implements OnInit {
         this.templates.clear();
         this.originalTemplates.clear();
         for (const t of res.templates || []) {
+          if (t.role === "admin") continue;
           const template: RoleTemplate = {
             id: t._id,
             name: t.name,
@@ -180,42 +171,42 @@ export class SettingsAccessManagementComponent implements OnInit {
     });
   }
 
-  private mapApprovalTypes(raw: any): Record<string, { canApprove: boolean; canReject: boolean }> {
-    const result: Record<string, { canApprove: boolean; canReject: boolean }> = {};
+  private mapApprovalTypes(raw: any): Record<string, { canApprove: boolean }> {
+    const result: Record<string, { canApprove: boolean }> = {};
     if (raw instanceof Map) {
       raw.forEach((value: any, key: string) => {
-        result[key] = { canApprove: value.canApprove || false, canReject: value.canReject || false };
+        result[key] = { canApprove: value.canApprove || false };
       });
     } else if (raw && typeof raw === "object") {
       for (const [key, value] of Object.entries(raw)) {
         if (typeof value === "object" && value !== null) {
-          result[key] = { canApprove: (value as any).canApprove || false, canReject: (value as any).canReject || false };
+          result[key] = { canApprove: (value as any).canApprove || false };
         }
       }
     }
     return result;
   }
 
-  private getDefaultApprovalTypes(): Record<string, { canApprove: boolean; canReject: boolean }> {
-    const result: Record<string, { canApprove: boolean; canReject: boolean }> = {};
+  private getDefaultApprovalTypes(): Record<string, { canApprove: boolean }> {
+    const result: Record<string, { canApprove: boolean }> = {};
     for (const approval of this.approvalTypes) {
-      result[approval.key] = { canApprove: false, canReject: false };
+      result[approval.key] = { canApprove: false };
     }
     return result;
   }
 
-  getPermission(roleKey: string, approvalKey: string, type: "canApprove" | "canReject"): boolean {
+  getPermission(roleKey: string, approvalKey: string): boolean {
     const template = this.templates.get(roleKey);
-    return template?.approvalTypes[approvalKey]?.[type] || false;
+    return template?.approvalTypes[approvalKey]?.canApprove || false;
   }
 
-  setPermission(roleKey: string, approvalKey: string, type: "canApprove" | "canReject", value: boolean) {
+  setPermission(roleKey: string, approvalKey: string, value: boolean) {
     const template = this.templates.get(roleKey);
     if (template) {
       if (!template.approvalTypes[approvalKey]) {
-        template.approvalTypes[approvalKey] = { canApprove: false, canReject: false };
+        template.approvalTypes[approvalKey] = { canApprove: false };
       }
-      template.approvalTypes[approvalKey][type] = value;
+      template.approvalTypes[approvalKey].canApprove = value;
       this.success.set(false);
     }
   }
@@ -228,7 +219,7 @@ export class SettingsAccessManagementComponent implements OnInit {
         const current = template.approvalTypes[approval.key];
         const orig = original.approvalTypes[approval.key];
         if (!current || !orig) return true;
-        if (current.canApprove !== orig.canApprove || current.canReject !== orig.canReject) {
+        if (current.canApprove !== orig.canApprove) {
           return true;
         }
       }
@@ -251,7 +242,8 @@ export class SettingsAccessManagementComponent implements OnInit {
       const original = this.originalTemplates.get(roleKey);
       const approvalTypes: Record<string, { canApprove: boolean; canReject: boolean }> = {};
       for (const approval of this.approvalTypes) {
-        approvalTypes[approval.key] = template.approvalTypes[approval.key] || { canApprove: false, canReject: false };
+        const val = template.approvalTypes[approval.key]?.canApprove || false;
+        approvalTypes[approval.key] = { canApprove: val, canReject: val };
       }
 
       if (original?.id) {

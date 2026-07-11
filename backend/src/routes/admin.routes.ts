@@ -10,6 +10,10 @@ router.use(requireAuth);
 router.use(requireRole("admin"));
 
 router.get("/users", adminCtrl.listAllUsers);
+router.get("/users/:id", adminCtrl.getUserById);
+router.get("/access-schedule", adminCtrl.getAccessSchedule);
+router.put("/access-schedule", adminCtrl.saveAccessSchedule);
+router.get("/access-schedule/status", adminCtrl.getAccessScheduleStatus);
 router.post("/invites/supervisor", authCtrl.adminCreateInvite);
 router.get("/invites/active", authCtrl.listActiveInvites);
 router.get("/invites/employee/active", authCtrl.listActiveEmployeeInvites);

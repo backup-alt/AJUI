@@ -33,6 +33,9 @@ router.post("/login", authLimiter, validate(loginSchema), ctrl.login);
 router.post("/refresh", ctrl.refresh);
 router.post("/logout", ctrl.logout);
 router.get("/me", requireAuth, ctrl.me);
+router.get("/sessions", requireAuth, ctrl.getSessions);
+router.delete("/sessions/:sessionId", requireAuth, ctrl.revokeSession);
+router.delete("/sessions", requireAuth, ctrl.revokeAllSessions);
 
 router.post(
   "/forgot-password",

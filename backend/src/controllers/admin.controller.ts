@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { AccessTemplate } from "../models/AccessTemplate.js";
+import { AccessSchedule } from "../models/AccessSchedule.js";
 import { User } from "../models/User.js";
 
 const deactivateSchema = z.object({
@@ -187,6 +188,104 @@ export async function listAllUsers(req: Request, res: Response, next: NextFuncti
       limit,
       pages: Math.ceil(total / limit),
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await User.findById(req.params.id)
+      .select("_id name email phone role status managedProjectIds createdAt lastLoginAt")
+      .lean();
+    if (!user) throw new AppError(404, "User not found");
+    res.json({ employee: user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAccessSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    let schedule = await AccessSchedule.findOne().lean();
+    if (!schedule) {
+      const created = await AccessSchedule.create({
+        enabled: false,
+        windows: [],
+      });
+      res.json({
+        enabled: false,
+        windows: [],
+      });
+      return;
+    }
+    res.json({
+      enabled: schedule.enabled,
+      windows: schedule.windows,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function saveAccessSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { enabled, windows } = req.body;
+    const schedule = await AccessSchedule.findOneAndUpdate(
+      {},
+      { enabled, windows, updatedAt: new Date() },
+      { upsert: true, new: true, lean: true }
+    );
+    res.json({ success: true, schedule });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAccessScheduleStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const schedule = await AccessSchedule.findOne().lean();
+    if (!schedule || !schedule.enabled) {
+      res.json({ isRestricted: false });
+      return;
+    }
+
+    const now = new Date();
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const currentDay = dayNames[now.getDay()];
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    for (const window of schedule.windows) {
+      if (!window.isActive) continue;
+      if (!window.days.includes(currentDay)) continue;
+
+      const [sh, sm] = window.startTime.split(":").map(Number);
+      const [eh, em] = window.endTime.split(":").map(Number);
+      const startMinutes = sh * 60 + sm;
+      const endMinutes = eh * 60 + em;
+
+      let isWithin = false;
+      if (startMinutes < endMinutes) {
+        isWithin = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+      } else {
+        isWithin = currentMinutes >= startMinutes || currentMinutes < endMinutes;
+      }
+
+      if (isWithin) {
+        res.json({
+          isRestricted: true,
+          currentWindow: {
+            id: window.id,
+            startTime: window.startTime,
+            endTime: window.endTime,
+            reason: window.note || "Access restricted during scheduled window",
+          },
+        });
+        return;
+      }
+    }
+
+    res.json({ isRestricted: false });
   } catch (err) {
     next(err);
   }

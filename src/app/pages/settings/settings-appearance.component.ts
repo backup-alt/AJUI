@@ -33,7 +33,7 @@ type Theme = "light" | "dark" | "system";
             type="button"
             class="settings-w11-theme-card"
             [class.active]="theme() === 'light'"
-            (click)="theme.set('light')"
+            (click)="setTheme('light')"
             aria-label="Light theme"
           >
             <div class="settings-w11-theme-preview settings-w11-theme-preview-light">
@@ -59,7 +59,7 @@ type Theme = "light" | "dark" | "system";
             type="button"
             class="settings-w11-theme-card"
             [class.active]="theme() === 'dark'"
-            (click)="theme.set('dark')"
+            (click)="setTheme('dark')"
             aria-label="Dark theme"
           >
             <div class="settings-w11-theme-preview settings-w11-theme-preview-dark">
@@ -85,7 +85,7 @@ type Theme = "light" | "dark" | "system";
             type="button"
             class="settings-w11-theme-card"
             [class.active]="theme() === 'system'"
-            (click)="theme.set('system')"
+            (click)="setTheme('system')"
             aria-label="System theme"
           >
             <div class="settings-w11-theme-preview settings-w11-theme-preview-system">
@@ -121,9 +121,9 @@ type Theme = "light" | "dark" | "system";
 export class SettingsAppearanceComponent {
   private readonly api = inject(ApiService);
 
-  readonly theme = signal<Theme>((localStorage.getItem("agb_theme") as Theme) || this.getPersistedTheme());
+  readonly theme = signal<Theme>(this.getSavedTheme());
 
-  private getPersistedTheme(): Theme {
+  private getSavedTheme(): Theme {
     const saved = localStorage.getItem("agb_theme");
     if (saved === "light" || saved === "dark" || saved === "system") {
       return saved;
@@ -132,14 +132,15 @@ export class SettingsAppearanceComponent {
   }
 
   constructor() {
-    this.applyTheme();
-
-    effect(() => {
-      this.applyTheme();
-    });
+    this.applyThemeToDocument();
   }
 
-  private applyTheme() {
+  setTheme(t: Theme) {
+    this.theme.set(t);
+    this.applyThemeToDocument();
+  }
+
+  private applyThemeToDocument() {
     const t = this.theme();
     const root = document.documentElement;
     if (t === "dark") {
@@ -154,10 +155,7 @@ export class SettingsAppearanceComponent {
 
   apply() {
     localStorage.setItem("agb_theme", this.theme());
-
-    this.api.saveAppearancePrefs({
-      theme: this.theme(),
-    }).subscribe({
+    this.api.saveAppearancePrefs({ theme: this.theme() }).subscribe({
       next: () => {},
       error: () => {},
     });
