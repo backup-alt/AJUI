@@ -200,8 +200,8 @@ export async function createEmployeeInvite(
   invite.otpHash = otpHash;
   await invite.save();
 
-  const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
-  const inviteUrl = `${baseUrl}/signup/employee?token=${token}`;
+const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
+  const inviteUrl = `${baseUrl}/#/signup/employee?token=${token}`;
 
   const html = buildEmployeeInviteEmail({
     name: params.name,
