@@ -618,6 +618,8 @@ export async function verifyEmployeeOtp(
           email: user.email,
           phone: user.phone,
           role: user.role,
+          status: user.status,
+          managedProjectIds: (user.managedProjectIds || []).map((id: Types.ObjectId) => id.toString()),
         },
         accessToken: tokens.accessToken,
         expiresAt: tokens.expiresAt,
