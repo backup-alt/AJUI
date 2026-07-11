@@ -38,7 +38,6 @@ export async function deactivateSupervisor(req: Request, res: Response, next: Ne
 // Access Templates CRUD
 const approvalTypeSchema = z.object({
   canApprove: z.boolean(),
-  canReject: z.boolean(),
 });
 
 const accessTemplateSchema = z.object({
@@ -48,7 +47,9 @@ const accessTemplateSchema = z.object({
     approvalTypes: z.object({
       material: approvalTypeSchema,
       labour: approvalTypeSchema,
-      expense: approvalTypeSchema,
+      attendance: approvalTypeSchema,
+      site_expense: approvalTypeSchema,
+      general_expense: approvalTypeSchema,
       payment: approvalTypeSchema,
       subcontract: approvalTypeSchema,
     }),
@@ -61,7 +62,9 @@ const updateAccessTemplateSchema = z.object({
     approvalTypes: z.object({
       material: approvalTypeSchema.partial(),
       labour: approvalTypeSchema.partial(),
-      expense: approvalTypeSchema.partial(),
+      attendance: approvalTypeSchema.partial(),
+      site_expense: approvalTypeSchema.partial(),
+      general_expense: approvalTypeSchema.partial(),
       payment: approvalTypeSchema.partial(),
       subcontract: approvalTypeSchema.partial(),
     }).optional(),

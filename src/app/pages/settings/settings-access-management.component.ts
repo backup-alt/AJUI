@@ -27,14 +27,14 @@ interface RoleTemplate {
         <strong>Access Management</strong>
       </nav>
       <h1>Access Management</h1>
-      <p>Set default approval permissions for each role. When enabled, employees with this role can view, approve, and reject requests of that type.</p>
+      <p>Control which approval types each role can access. When disabled, employees with that role cannot view, approve, or reject that request type.</p>
     </header>
 
     <section class="settings-w11-card">
       <div class="settings-w11-card-head">
         <div>
           <h2>Role Permissions</h2>
-          <p>Configure what approvals each role can access by default.</p>
+          <p>Toggle access for each approval type per role.</p>
         </div>
         <button
           type="button"
@@ -106,8 +106,9 @@ export class SettingsAccessManagementComponent implements OnInit {
 
   readonly approvalTypes: ApprovalType[] = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },
-    { key: "labour", label: "Labour Attendance", note: "Daily attendance submissions" },
-    { key: "expense", label: "Site Expenses", note: "Diesel, equipment, transport" },
+    { key: "labour", label: "Labour / Attendance", note: "Daily attendance submissions" },
+    { key: "site_expense", label: "Site Expenses", note: "Diesel, equipment, transport" },
+    { key: "general_expense", label: "General Expenses", note: "Office supplies, miscellaneous" },
     { key: "payment", label: "Client Payments", note: "Collections from clients" },
     { key: "subcontract", label: "Subcontracts", note: "Subcontractor agreements" },
   ];
@@ -131,7 +132,7 @@ export class SettingsAccessManagementComponent implements OnInit {
         this.templates.clear();
         this.originalTemplates.clear();
         for (const t of res.templates || []) {
-          if (t.role === "admin") continue;
+          if (t.role === "admin" || t.role === "supervisor") continue;
           const template: RoleTemplate = {
             id: t._id,
             name: t.name,
@@ -207,6 +208,7 @@ export class SettingsAccessManagementComponent implements OnInit {
       }
       template.approvalTypes[approvalKey].canApprove = value;
       this.success.set(false);
+      this.error.set(null);
     }
   }
 
@@ -228,7 +230,9 @@ export class SettingsAccessManagementComponent implements OnInit {
 
   saveAll() {
     if (!this.hasChanges()) {
-      this.error.set("No changes to save");
+      this.error.set(null);
+      this.success.set(true);
+      setTimeout(() => this.success.set(false), 2000);
       return;
     }
 
@@ -236,21 +240,23 @@ export class SettingsAccessManagementComponent implements OnInit {
     this.error.set(null);
     this.success.set(false);
 
-    const savePromises: Promise<any>[] = [];
+    const operations: Promise<any>[] = [];
+
     for (const [roleKey, template] of this.templates) {
       const original = this.originalTemplates.get(roleKey);
-      const approvalTypes: Record<string, { canApprove: boolean; canReject: boolean }> = {};
+      const approvalTypes: Record<string, { canApprove: boolean }> = {};
+
       for (const approval of this.approvalTypes) {
         const val = template.approvalTypes[approval.key]?.canApprove || false;
-        approvalTypes[approval.key] = { canApprove: val, canReject: val };
+        approvalTypes[approval.key] = { canApprove: val };
       }
 
       if (original?.id) {
-        savePromises.push(
+        operations.push(
           this.api.updateAccessTemplate(original.id, { approvalTypes }).toPromise()
         );
       } else {
-        savePromises.push(
+        operations.push(
           this.api.createAccessTemplate({
             name: template.name || `${roleKey} Default`,
             role: roleKey,
@@ -260,8 +266,8 @@ export class SettingsAccessManagementComponent implements OnInit {
       }
     }
 
-    Promise.all(savePromises)
-      .then(() => {
+    Promise.all(operations)
+      .then((results) => {
         this.success.set(true);
         this.saving.set(false);
         this.originalTemplates.clear();
@@ -271,7 +277,7 @@ export class SettingsAccessManagementComponent implements OnInit {
         setTimeout(() => this.success.set(false), 3000);
       })
       .catch((err) => {
-        this.error.set("Failed to save some templates");
+        this.error.set("Failed to save some templates. Please try again.");
         this.saving.set(false);
       });
   }

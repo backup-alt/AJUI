@@ -717,7 +717,7 @@ export class ApiService {
   createAccessTemplate(payload: {
     name: string;
     role: string;
-    approvalTypes: Record<string, { canApprove: boolean; canReject: boolean }>;
+    approvalTypes: Record<string, { canApprove: boolean }>;
   }): Observable<{ template: any }> {
     return this.http.post<{ template: any }>(`${this.baseUrl}/admin/access-templates`, payload, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
@@ -726,7 +726,7 @@ export class ApiService {
 
   updateAccessTemplate(id: string, payload: {
     name?: string;
-    approvalTypes?: Record<string, { canApprove?: boolean; canReject?: boolean }>;
+    approvalTypes?: Record<string, { canApprove: boolean }>;
   }): Observable<{ template: any }> {
     return this.http.patch<{ template: any }>(`${this.baseUrl}/admin/access-templates/${id}`, payload, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
