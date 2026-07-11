@@ -184,7 +184,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
           metaLabel="Site records"
           [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm()"
           [showTitle]="false"
-          role="Admin"
           searchPlaceholder="Search"
         />
 

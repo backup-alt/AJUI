@@ -47,7 +47,6 @@ import { formatMoney, statusClass } from "../shared/format";
           metaLabel=""
           [blurred]="showProjectForm() || editingClient()"
           [showTitle]="false"
-          role="Admin"
         />
 
         <ion-content class="erp-page">

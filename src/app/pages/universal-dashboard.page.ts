@@ -306,8 +306,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
           metaLabel=""
           [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen()"
           [showTitle]="false"
-          role="Admin"
-            searchPlaceholder="Search"
+          searchPlaceholder="Search"
           />
 
         <ion-content class="erp-page">

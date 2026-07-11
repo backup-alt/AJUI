@@ -185,7 +185,16 @@ export class SettingsShellComponent {
   readonly currentUser = this.api.user;
 
   readonly userName = computed(() => this.currentUser()?.name || "User");
-  readonly userRole = computed(() => this.currentUser()?.role || "Admin");
+  readonly userRole = computed(() => {
+    const roleMap: Record<string, string> = {
+      admin: "Admin",
+      project_manager: "Project Manager",
+      accountant: "Accountant",
+      supervisor: "Supervisor",
+    };
+    const role = this.currentUser()?.role || "admin";
+    return roleMap[role] || role;
+  });
 
   readonly userEmail = computed(() => {
     const raw = localStorage.getItem("ajui_user");
@@ -258,8 +267,27 @@ export class SettingsShellComponent {
 
   readonly filteredGroups = computed<SettingsGroup[]>(() => {
     const query = this.searchQuery().trim().toLowerCase();
-    if (!query) return this.groups();
-    return this.groups()
+    const role = this.currentUser()?.role;
+    const isAdmin = role === "admin";
+
+    let groups = this.groups();
+
+    // Filter out admin-only sections for non-admins
+    if (!isAdmin) {
+      groups = groups.map((g) => ({
+        ...g,
+        items: g.items.filter((item) => {
+          // These sections are admin-only
+          if (item.id === "roles" || item.id === "access-management" || item.id === "access-schedule" || item.id === "sessions") {
+            return false;
+          }
+          return true;
+        }),
+      })).filter((g) => g.items.length > 0);
+    }
+
+    if (!query) return groups;
+    return groups
       .map((g) => ({
         ...g,
         items: g.items.filter(
