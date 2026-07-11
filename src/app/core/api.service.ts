@@ -163,6 +163,24 @@ export class ApiService {
     }).pipe(catchError(this.handleError));
   }
 
+  listActiveEmployeeInvites(): Observable<{
+    invites: Array<{
+      inviteId: string;
+      token: string;
+      name: string;
+      email: string;
+      phone?: string;
+      role: string;
+      expiresAt: string;
+      createdAt: string;
+      remainingMs: number;
+    }>;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/admin/invites/employee/active`, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
   resendInviteOtp(token: string): Observable<any> {
     return this.http.post(`${this.baseUrl}/admin/invites/supervisor/resend-otp`, { token }, {
       headers: this.authHeaders(),

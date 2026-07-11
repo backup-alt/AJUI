@@ -34,6 +34,18 @@ interface PendingInvite {
   emailSent?: boolean;
 }
 
+interface EmployeeInvite {
+  token: string;
+  inviteId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: Role;
+  expiresAt: string;
+  remainingMs: number;
+  emailSent?: boolean;
+}
+
 @Component({
   selector: "agb-settings-roles",
   standalone: true,
@@ -229,6 +241,75 @@ interface PendingInvite {
             } @empty {
               <tr>
                 <td colspan="7" class="settings-w11-empty-row">No pending supervisor invites. Click "Add Supervisor" to create one.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Pending Employee Invites table -->
+    <section class="settings-w11-card">
+      <div class="settings-w11-card-head">
+        <div>
+          <h2>Pending Employee Invites</h2>
+          <p>Employees invited but not yet completed account setup. Each invite expires in 5 minutes.</p>
+        </div>
+        <button
+          type="button"
+          class="settings-w11-btn settings-w11-btn-ghost small"
+          (click)="refreshInvites()"
+          [disabled]="employeeInvitesLoading()"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.5L13 3 M13 3v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {{ employeeInvitesLoading() ? 'Refreshing…' : 'Refresh' }}
+        </button>
+      </div>
+      <div class="settings-w11-table-wrap">
+        <table class="settings-w11-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Role</th>
+              <th>Time Left</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (inv of pendingEmployeeInvites(); track inv.token) {
+              <tr>
+                <td>
+                  <div class="settings-w11-name-cell">
+                    <span class="settings-w11-avatar">{{ initials(inv.name) }}</span>
+                    <strong>{{ inv.name }}</strong>
+                  </div>
+                </td>
+                <td>{{ inv.email }}</td>
+                <td>{{ inv.phone || '—' }}</td>
+                <td><span class="settings-w11-role-pill" [attr.data-role]="inv.role">{{ inv.role }}</span></td>
+                <td>
+                  @if (inv.remainingMs <= 0) {
+                    <span class="settings-w11-timer-text expired">Expired</span>
+                  } @else {
+                    <span class="settings-w11-timer-text" [class.warning]="inv.remainingMs < 60000">
+                      <svg viewBox="0 0 16 16" aria-hidden="true" class="settings-w11-timer-icon"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                      {{ formatCountdown(inv.remainingMs) }}
+                    </span>
+                  }
+                </td>
+                <td>
+                  @if (inv.remainingMs <= 0) {
+                    <span class="settings-w11-status-pill" data-status="inactive">Expired</span>
+                  } @else {
+                    <span class="settings-w11-status-pill" data-status="pending">Pending</span>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="settings-w11-empty-row">No pending employee invites.</td>
               </tr>
             }
           </tbody>
@@ -713,7 +794,9 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
 
   // Pending invites table
   readonly pendingInvites = signal<PendingInvite[]>([]);
+  readonly pendingEmployeeInvites = signal<EmployeeInvite[]>([]);
   readonly invitesLoading = signal(false);
+  readonly employeeInvitesLoading = signal(false);
 
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
@@ -821,6 +904,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
 
   refreshInvites() {
     this.invitesLoading.set(true);
+    this.employeeInvitesLoading.set(true);
     this.api.listActiveInvites().subscribe({
       next: (res) => {
         const fresh = res.invites.map((inv) => ({
@@ -836,6 +920,24 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         this.invitesLoading.set(false);
       },
       error: () => this.invitesLoading.set(false),
+    });
+    this.api.listActiveEmployeeInvites().subscribe({
+      next: (res) => {
+        const fresh = (res.invites || []).map((inv: any) => ({
+          token: inv.token,
+          inviteId: inv.inviteId,
+          name: inv.name || inv.email,
+          email: inv.email,
+          phone: inv.phone,
+          role: (inv.role === "admin" ? "Admin" : inv.role === "project_manager" ? "Project Manager" : "Accountant") as Role,
+          expiresAt: inv.expiresAt,
+          remainingMs: Math.max(0, inv.remainingMs),
+          emailSent: inv.emailSent,
+        }));
+        this.pendingEmployeeInvites.set(fresh);
+        this.employeeInvitesLoading.set(false);
+      },
+      error: () => this.employeeInvitesLoading.set(false),
     });
   }
 
@@ -875,6 +977,12 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.pendingInvites.update((list) =>
       list.map((inv) => {
         if (inv.scanned) return inv;
+        const newRemaining = Math.max(0, inv.remainingMs - 1000);
+        return { ...inv, remainingMs: newRemaining };
+      })
+    );
+    this.pendingEmployeeInvites.update((list) =>
+      list.map((inv) => {
         const newRemaining = Math.max(0, inv.remainingMs - 1000);
         return { ...inv, remainingMs: newRemaining };
       })

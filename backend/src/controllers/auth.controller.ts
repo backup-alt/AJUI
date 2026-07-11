@@ -386,6 +386,28 @@ export async function listActiveInvites(req: Request, res: Response, next: NextF
   }
 }
 
+export async function listActiveEmployeeInvites(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+    const invites = await inviteService.listActiveEmployeeInvites(req.user.sub);
+    res.json({
+      invites: invites.map((inv) => ({
+        inviteId: inv._id.toString(),
+        token: inv.token,
+        name: inv.inviteeName || inviteService.extractInviteeName(inv),
+        email: inv.inviteeEmail,
+        phone: inv.inviteePhone,
+        role: inv.role,
+        expiresAt: inv.expiresAt,
+        createdAt: inv.createdAt,
+        remainingMs: Math.max(0, inv.expiresAt.getTime() - Date.now()),
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function resendInviteOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { token } = z.object({ token: z.string().min(1) }).parse(req.body);

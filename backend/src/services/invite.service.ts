@@ -7,7 +7,7 @@ import { compareToken, hashToken } from "../utils/password.js";
 import { sendEmail } from "../config/email.js";
 
 const QR_EXPIRY_MINUTES = 5;
-const INVITE_EXPIRY_HOURS = 48;
+const INVITE_EXPIRY_MINUTES = 5;
 const OTP_LENGTH = 6;
 
 function generateToken(): string {
@@ -135,7 +135,7 @@ export async function createEmployeeInvite(
 
   const token = generateToken();
   const otp = generateOtp();
-  const expiresAt = new Date(Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + INVITE_EXPIRY_MINUTES * 60 * 1000);
   const otpExpiresAt = expiresAt;
 
   const invite = await InviteToken.create({
@@ -166,14 +166,14 @@ export async function createEmployeeInvite(
     role: params.role,
     inviteUrl,
     otp,
-    expiresHours: INVITE_EXPIRY_HOURS,
+    expiresMinutes: INVITE_EXPIRY_MINUTES,
   });
   const text = buildEmployeeInviteEmailText({
     name: params.name,
     role: params.role,
     inviteUrl,
     otp,
-    expiresHours: INVITE_EXPIRY_HOURS,
+    expiresMinutes: INVITE_EXPIRY_MINUTES,
   });
 
   let emailSent = false;
@@ -223,10 +223,10 @@ function formatRole(role: InviteRole): string {
 
 function buildEmployeeInviteEmail(params: {
   name: string;
-  role: InviteRole;
+role: InviteRole;
   inviteUrl: string;
   otp: string;
-  expiresHours: number;
+  expiresMinutes: number;
 }): string {
   const roleLabel = formatRole(params.role);
   return `<!DOCTYPE html>
@@ -296,10 +296,10 @@ function buildEmployeeInviteEmail(params: {
 
 function buildEmployeeInviteEmailText(params: {
   name: string;
-  role: InviteRole;
+role: InviteRole;
   inviteUrl: string;
   otp: string;
-  expiresHours: number;
+  expiresMinutes: number;
 }): string {
   return `Hi ${params.name},
 
@@ -371,6 +371,19 @@ export async function revokeInvite(token: string): Promise<void> {
 export async function listActiveInvites(createdByAdmin: string): Promise<Array<IInviteToken & { _id: Types.ObjectId }>> {
   return InviteToken.find({
     createdByAdmin: new Types.ObjectId(createdByAdmin),
+    role: "supervisor",
+    status: "pending",
+    expiresAt: { $gt: new Date() },
+  })
+    .sort({ createdAt: -1 })
+    .lean()
+    .exec() as unknown as Promise<Array<IInviteToken & { _id: Types.ObjectId }>>;
+}
+
+export async function listActiveEmployeeInvites(createdByAdmin: string): Promise<Array<IInviteToken & { _id: Types.ObjectId }>> {
+  return InviteToken.find({
+    createdByAdmin: new Types.ObjectId(createdByAdmin),
+    role: { $in: ["admin", "project_manager", "accountant"] },
     status: "pending",
     expiresAt: { $gt: new Date() },
   })
@@ -538,3 +551,5 @@ Operations Workspace`;
 
   return { emailSent, recipient, deepLink };
 }
+
+
