@@ -57,6 +57,17 @@ export class ApiService {
     );
   }
 
+  setEmployeeSession(user: ApiUser, accessToken: string, expiresAt: string): void {
+    this.accessTokenSignal.set(accessToken);
+    this.userSignal.set(user);
+    this.expiresAtSignal.set(expiresAt);
+    try {
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt);
+    } catch {}
+  }
+
   forgotPassword(email: string): Observable<{ success: boolean; message: string }> {
     return this.http.post<{ success: boolean; message: string }>(
       `${this.baseUrl}/auth/forgot-password`,
@@ -608,8 +619,8 @@ export class ApiService {
     );
   }
 
-  verifyEmployeeOtp(token: string, otp: string, password: string): Observable<{ success: boolean; user?: any; message: string }> {
-    return this.http.post<any>(`${this.baseUrl}/auth/employee/verify-otp`, { token, otp, password }, { headers: this.authHeaders() }).pipe(
+  verifyEmployeeOtp(token: string, otp: string, password: string): Observable<{ success: boolean; user?: any; accessToken?: string; expiresAt?: string; message?: string }> {
+    return this.http.post<any>(`${this.baseUrl}/auth/employee/verify-otp`, { token, otp, password }).pipe(
       catchError(this.handleError)
     );
   }

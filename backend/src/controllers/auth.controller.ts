@@ -754,14 +754,16 @@ export async function employeeSignup(
       path: "/api/auth",
     };
 
-    res.cookie(getRefreshCookieName(), tokens.refreshToken, cookieOptions);
     res.status(201).json({
+      success: true,
       user: {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
+        status: user.status,
+        managedProjectIds: (user.managedProjectIds || []).map((id) => id.toString()),
       },
       accessToken: tokens.accessToken,
       expiresAt: tokens.expiresAt,

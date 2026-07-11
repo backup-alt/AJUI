@@ -400,7 +400,10 @@ export class SetupAccountComponent implements OnInit {
     this.api.verifyEmployeeOtp(this.token, this.otp, this.password).subscribe({
       next: (res) => {
         this.busy.set(false);
-        if (res?.success) {
+        if (res?.success && res?.accessToken && res?.user) {
+          this.api.setEmployeeSession(res.user, res.accessToken, res.expiresAt || "");
+          void this.router.navigate(["/clients"]);
+        } else if (res?.success) {
           this.step.set("success");
         } else {
           this.errorMessage.set(res?.message || "Invalid code. Please try again.");

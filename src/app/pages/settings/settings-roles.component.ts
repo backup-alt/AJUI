@@ -644,7 +644,15 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   });
 
   readonly availableProjects = computed(() => {
-    return this.projects();
+    const apiProjects = this.projects();
+    if (apiProjects.length > 0) return apiProjects;
+    return this.erp.projects().map((p) => ({
+      id: p.id,
+      name: p.name,
+      client: p.client,
+      address: p.address,
+      status: p.status,
+    }));
   });
 
   isProjectSelected(id: string): boolean {
@@ -834,16 +842,28 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   loadProjects() {
     this.api.listProjects({ limit: 200 }).subscribe({
       next: (res) => {
-        const items = (res?.items || []).map((row: any) => ({
-          id: row.id || row._id,
-          name: row.name || "Unnamed project",
-          client: row.client?.name || row.clientName || row.client,
-          address: row.address || "",
-          status: row.status,
-        }));
+        const items = (res?.items || []).map((row: any) => {
+          const id = row._id ? String(row._id) : row.id;
+          return {
+            id: String(id),
+            name: row.name || "Unnamed project",
+            client: row.client || "",
+            address: row.address || "",
+            status: row.status || "Active",
+          };
+        });
         this.projects.set(items);
       },
-      error: () => {},
+      error: () => {
+        const fallback = this.erp.projects().map((p) => ({
+          id: p.id,
+          name: p.name,
+          client: p.client,
+          address: p.address,
+          status: p.status,
+        }));
+        this.projects.set(fallback);
+      },
     });
   }
 
