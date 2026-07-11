@@ -60,10 +60,10 @@ import { ApiService } from "../core/api.service";
                 <span class="header-avatar" [style.background]="avatarColor">
                   {{ userInitial }}
                 </span>
-                <span class="header-user-info">
-                  <strong class="header-user-name">{{ userName }}</strong>
-                  <span class="header-user-role">{{ role }}</span>
-                </span>
+<span class="header-user-info">
+                    <strong class="header-user-name">{{ userName }}</strong>
+                    <span class="header-user-role">{{ userRole }}</span>
+                  </span>
                 <svg class="header-chevron" [class.rotated]="profileMenuOpen()" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m6 9 6 6 6-6"/>
                 </svg>
@@ -79,7 +79,7 @@ import { ApiService } from "../core/api.service";
                     </div>
                   </div>
                   <div class="header-menu-status-row">
-                    <span class="header-role-badge">{{ role }}</span>
+                    <span class="header-role-badge">{{ userRole }}</span>
                     <span class="header-status" [class.active]="currentUser()?.status === 'active'">
                       <span class="status-dot"></span>
                       {{ currentUser()?.status === 'active' ? 'Active' : 'Inactive' }}
@@ -117,7 +117,7 @@ export class EnterpriseHeaderComponent {
   @Input() title = "Dashboard";
   @Input() eyebrow = "Annai Golden Builders";
   @Input() metaLabel = "";
-  @Input() role = "Admin";
+  @Input() role = "";
   @Input() dark = false;
   @Input() blurred = false;
   @Input() showLogo = false;
@@ -133,6 +133,17 @@ export class EnterpriseHeaderComponent {
 
   get userName(): string {
     return this.currentUser()?.name || "User";
+  }
+
+  get userRole(): string {
+    const roleMap: Record<string, string> = {
+      admin: "Admin",
+      project_manager: "Project Manager",
+      accountant: "Accountant",
+      supervisor: "Supervisor",
+    };
+    if (this.role) return this.role;
+    return roleMap[this.currentUser()?.role || ""] || this.currentUser()?.role || "User";
   }
 
   get userInitial(): string {

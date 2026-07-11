@@ -10,6 +10,7 @@ export interface ApiUser {
   phone: string;
   role: string;
   status: string;
+  managedProjectIds?: string[];
 }
 
 export interface LoginResponse {
@@ -667,6 +668,44 @@ export class ApiService {
     nextChange?: string;
   }> {
     return this.http.get<any>(`${this.baseUrl}/admin/access-schedule/status`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== ACCESS TEMPLATES ===================
+  listAccessTemplates(): Observable<{ templates: any[] }> {
+    return this.http.get<{ templates: any[] }>(`${this.baseUrl}/admin/access-templates`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getAccessTemplateByRole(role: string): Observable<{ template: any }> {
+    return this.http.get<{ template: any }>(`${this.baseUrl}/admin/access-templates/role/${role}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  createAccessTemplate(payload: {
+    name: string;
+    role: string;
+    approvalTypes: Record<string, { canApprove: boolean; canReject: boolean }>;
+  }): Observable<{ template: any }> {
+    return this.http.post<{ template: any }>(`${this.baseUrl}/admin/access-templates`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  updateAccessTemplate(id: string, payload: {
+    name?: string;
+    approvalTypes?: Record<string, { canApprove?: boolean; canReject?: boolean }>;
+  }): Observable<{ template: any }> {
+    return this.http.patch<{ template: any }>(`${this.baseUrl}/admin/access-templates/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  deleteAccessTemplate(id: string): Observable<{ success: boolean }> {
+    return this.http.delete<{ success: boolean }>(`${this.baseUrl}/admin/access-templates/${id}`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
     );
   }

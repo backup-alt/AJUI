@@ -347,9 +347,10 @@ export function extractInviteeName(invite: IInviteToken): string {
 export async function consumeInvite(token: string, usedBy: string): Promise<IInviteToken> {
   const invite = await InviteToken.findOne({ token });
   if (!invite) throw new AppError(404, "Invite token not found");
-  if (invite.usedAt) throw new AppError(410, "Invite token already used");
+  if (invite.status === "accepted") throw new AppError(410, "Invite token already used");
   if (invite.expiresAt < new Date()) throw new AppError(410, "Invite token expired");
 
+  invite.status = "accepted";
   invite.usedAt = new Date();
   invite.usedBy = new Types.ObjectId(usedBy);
   await invite.save();
@@ -363,7 +364,7 @@ export async function revokeInvite(token: string): Promise<void> {
 export async function listActiveInvites(createdByAdmin: string): Promise<Array<IInviteToken & { _id: Types.ObjectId }>> {
   return InviteToken.find({
     createdByAdmin: new Types.ObjectId(createdByAdmin),
-    usedAt: { $exists: false },
+    status: "pending",
     expiresAt: { $gt: new Date() },
   })
     .sort({ createdAt: -1 })

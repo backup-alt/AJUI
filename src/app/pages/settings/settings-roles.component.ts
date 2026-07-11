@@ -377,22 +377,71 @@ interface PendingInvite {
                 Allocate projects
                 <small class="settings-w11-hint-inline">Choose which projects this person can access once they sign up</small>
               </label>
-              <div class="settings-w11-project-grid">
-                @for (p of availableProjects(); track p.id) {
-                  <label class="settings-w11-project-card" [class.checked]="isProjectSelected(p.id)">
+
+              <!-- Active / On Hold Section -->
+              <div class="settings-w11-project-group">
+                <div class="settings-w11-project-group-header">
+                  <label class="settings-w11-select-all">
                     <input
                       type="checkbox"
-                      [checked]="isProjectSelected(p.id)"
-                      (change)="toggleProject(p.id)"
+                      [checked]="allActiveOnHoldSelected()"
+                      [indeterminate]="!allActiveOnHoldSelected() && activeOnHoldProjects().some(p => this.isProjectSelected(p.id))"
+                      (change)="toggleAllActiveOnHold()"
                     />
-                    <div class="settings-w11-project-card-inner">
-                      <span class="settings-w11-project-name">{{ p.name }}</span>
-                      <small class="settings-w11-project-meta">{{ p.client || p.address || '—' }}</small>
-                    </div>
+                    <span>Active / On Hold</span>
+                    <strong>({{ activeOnHoldProjects().length }})</strong>
                   </label>
-                } @empty {
-                  <div class="settings-w11-empty-inline">No projects available. All projects will be accessible.</div>
-                }
+                </div>
+                <div class="settings-w11-project-grid">
+                  @for (p of activeOnHoldProjects(); track p.id) {
+                    <label class="settings-w11-project-card" [class.checked]="isProjectSelected(p.id)">
+                      <input
+                        type="checkbox"
+                        [checked]="isProjectSelected(p.id)"
+                        (change)="toggleProject(p.id)"
+                      />
+                      <div class="settings-w11-project-card-inner">
+                        <span class="settings-w11-project-name">{{ p.name }}</span>
+                        <small class="settings-w11-project-meta">{{ p.client || p.address || '—' }}</small>
+                      </div>
+                    </label>
+                  } @empty {
+                    <div class="settings-w11-empty-inline">No active/on-hold projects.</div>
+                  }
+                </div>
+              </div>
+
+              <!-- Completed Section -->
+              <div class="settings-w11-project-group">
+                <div class="settings-w11-project-group-header">
+                  <label class="settings-w11-select-all">
+                    <input
+                      type="checkbox"
+                      [checked]="allCompletedSelected()"
+                      [indeterminate]="!allCompletedSelected() && completedProjects().some(p => this.isProjectSelected(p.id))"
+                      (change)="toggleAllCompleted()"
+                    />
+                    <span>Completed</span>
+                    <strong>({{ completedProjects().length }})</strong>
+                  </label>
+                </div>
+                <div class="settings-w11-project-grid">
+                  @for (p of completedProjects(); track p.id) {
+                    <label class="settings-w11-project-card" [class.checked]="isProjectSelected(p.id)">
+                      <input
+                        type="checkbox"
+                        [checked]="isProjectSelected(p.id)"
+                        (change)="toggleProject(p.id)"
+                      />
+                      <div class="settings-w11-project-card-inner">
+                        <span class="settings-w11-project-name">{{ p.name }}</span>
+                        <small class="settings-w11-project-meta">{{ p.client || p.address || '—' }}</small>
+                      </div>
+                    </label>
+                  } @empty {
+                    <div class="settings-w11-empty-inline">No completed projects.</div>
+                  }
+                </div>
               </div>
             </div>
           }
@@ -562,24 +611,28 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly inviteRole = signal<Role>("Project Manager");
   readonly inviteProjectIds = signal<string[]>([]);
   readonly inviteStep = signal<1 | 2>(1);
-  readonly projects = signal<{ id: string; name: string; client?: string; address?: string }[]>([]);
+  readonly projects = signal<{ id: string; name: string; client?: string; address?: string; status?: string }[]>([]);
+
+  readonly activeOnHoldProjects = computed(() => {
+    return this.projects().filter((p) => p.status === "Active" || p.status === "On Hold");
+  });
+
+  readonly completedProjects = computed(() => {
+    return this.projects().filter((p) => p.status === "Completed");
+  });
+
+  readonly allActiveOnHoldSelected = computed(() => {
+    const ids = this.activeOnHoldProjects().map((p) => p.id);
+    return ids.length > 0 && ids.every((id) => this.inviteProjectIds().includes(id));
+  });
+
+  readonly allCompletedSelected = computed(() => {
+    const ids = this.completedProjects().map((p) => p.id);
+    return ids.length > 0 && ids.every((id) => this.inviteProjectIds().includes(id));
+  });
 
   readonly availableProjects = computed(() => {
-    const fromErp = this.erp.projects().map((p) => ({
-      id: p.id,
-      name: p.name,
-      client: p.client,
-      address: p.address,
-    }));
-    const fromApi = this.projects();
-    const seen = new Set<string>();
-    const merged: { id: string; name: string; client?: string; address?: string }[] = [];
-    for (const p of [...fromErp, ...fromApi]) {
-      if (seen.has(p.id)) continue;
-      seen.add(p.id);
-      merged.push(p);
-    }
-    return merged;
+    return this.projects();
   });
 
   isProjectSelected(id: string): boolean {
@@ -590,6 +643,32 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.inviteProjectIds.update((ids) =>
       ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
     );
+  }
+
+  toggleAllActiveOnHold() {
+    const ids = this.activeOnHoldProjects().map((p) => p.id);
+    const allSelected = this.allActiveOnHoldSelected();
+    this.inviteProjectIds.update((current) => {
+      if (allSelected) {
+        return current.filter((id) => !ids.includes(id));
+      } else {
+        const newIds = new Set([...current, ...ids]);
+        return Array.from(newIds);
+      }
+    });
+  }
+
+  toggleAllCompleted() {
+    const ids = this.completedProjects().map((p) => p.id);
+    const allSelected = this.allCompletedSelected();
+    this.inviteProjectIds.update((current) => {
+      if (allSelected) {
+        return current.filter((id) => !ids.includes(id));
+      } else {
+        const newIds = new Set([...current, ...ids]);
+        return Array.from(newIds);
+      }
+    });
   }
 
   private mapRoleToBackend(role: Role): "admin" | "project_manager" | "accountant" {
@@ -748,12 +827,11 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
           name: row.name || "Unnamed project",
           client: row.client?.name || row.clientName || row.client,
           address: row.address || "",
+          status: row.status,
         }));
         this.projects.set(items);
       },
-      error: () => {
-        // Fallback: erp.projects() will be used
-      },
+      error: () => {},
     });
   }
 

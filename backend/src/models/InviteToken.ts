@@ -1,6 +1,7 @@
 import { Schema, model, Document, Types } from "mongoose";
 
 export type InviteRole = "supervisor" | "admin" | "project_manager" | "accountant";
+export type InviteStatus = "pending" | "accepted" | "expired" | "revoked";
 
 export interface IInviteToken extends Document {
   _id: Types.ObjectId;
@@ -8,6 +9,7 @@ export interface IInviteToken extends Document {
   createdByAdmin: Types.ObjectId;
   projectId?: Types.ObjectId;
   role: InviteRole;
+  status: InviteStatus;
   expiresAt: Date;
   usedAt?: Date;
   usedBy?: Types.ObjectId;
@@ -32,6 +34,12 @@ const inviteTokenSchema = new Schema<IInviteToken>(
       enum: ["supervisor", "admin", "project_manager", "accountant"],
       default: "supervisor",
       required: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "accepted", "expired", "revoked"],
+      default: "pending",
+      index: true,
     },
     expiresAt: { type: Date, required: true, index: { expires: 0 } },
     usedAt: { type: Date },

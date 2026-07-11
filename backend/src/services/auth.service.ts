@@ -73,6 +73,7 @@ export async function loginUser(
       phone: user.phone,
       role: user.role,
       status: user.status,
+      managedProjectIds: user.managedProjectIds?.map((id) => id.toString()) || [],
     },
     tokens,
   };

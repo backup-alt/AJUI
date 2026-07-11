@@ -16,4 +16,12 @@ router.post("/invites/supervisor/send-email", authCtrl.sendSupervisorInviteEmail
 router.post("/invites/employee", authCtrl.adminCreateEmployeeInvite);
 router.post("/users/deactivate", adminCtrl.deactivateSupervisor);
 
+// Access Templates
+router.get("/access-templates", adminCtrl.listAccessTemplates);
+router.get("/access-templates/role/:role", adminCtrl.getAccessTemplateByRole);
+router.get("/access-templates/:id", adminCtrl.getAccessTemplate);
+router.post("/access-templates", adminCtrl.createAccessTemplate);
+router.patch("/access-templates/:id", adminCtrl.updateAccessTemplate);
+router.delete("/access-templates/:id", adminCtrl.deleteAccessTemplate);
+
 export default router;
