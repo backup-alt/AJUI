@@ -79,10 +79,6 @@ interface ActivityEntry {
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M1 14s0-5 7-5 7 5 7 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           Profile
         </button>
-        <button type="button" role="tab" [class.active]="activeTab() === 'permissions'" (click)="activeTab.set('permissions')">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v4a5 5 0 0 1-2 4.04V14H5V11.04A5 5 0 0 1 3 7V3l5-2Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 8.5l2 2 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Permissions
-        </button>
         <button type="button" role="tab" [class.active]="activeTab() === 'projects'" (click)="activeTab.set('projects')">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           Projects
@@ -114,110 +110,6 @@ interface ActivityEntry {
                 <div><dt>Last Login</dt><dd>{{ formatDate(employee()!.lastLoginAt) }}</dd></div>
                 <div><dt>Employee ID</dt><dd class="mono">{{ employee()!.id }}</dd></div>
               </dl>
-            </div>
-          </section>
-        }
-
-        <!-- PERMISSIONS TAB -->
-        @if (activeTab() === 'permissions') {
-          <section class="settings-w11-card">
-            <div class="settings-w11-card-head">
-              <div>
-                <h2>Approval Rights</h2>
-                <p>Toggle which actions this employee can approve or reject.</p>
-              </div>
-            </div>
-            <div class="settings-w11-card-body">
-              <div class="settings-w11-approval-list">
-                @for (r of approvalRights(); track r.key) {
-                  <div class="settings-w11-approval-row">
-                    <div class="settings-w11-approval-label">
-                      <strong>{{ r.label }}</strong>
-                      <small>{{ r.note }}</small>
-                    </div>
-                    <div class="settings-w11-approval-toggles">
-                      <label class="settings-w11-toggle-check" [class.on]="r.canApprove" (click)="toggleRight(r.key, 'approve')">
-                        <span class="toggle-indicator"></span>
-                        <span>Approve</span>
-                      </label>
-                      <label class="settings-w11-toggle-check" [class.on]="r.canReject" (click)="toggleRight(r.key, 'reject')">
-                        <span class="toggle-indicator"></span>
-                        <span>Reject</span>
-                      </label>
-                    </div>
-                  </div>
-                }
-              </div>
-            </div>
-          </section>
-
-          <section class="settings-w11-card">
-            <div class="settings-w11-card-head">
-              <div>
-                <h2>Request Permission Control</h2>
-                <p>Restrict what this employee can approve and access in the system.</p>
-              </div>
-              @if (permSaving()) {
-                <span class="settings-w11-saving">Saving…</span>
-              }
-            </div>
-            <div class="settings-w11-card-body">
-              <label class="settings-w11-check-row">
-                <div>
-                  <strong>Can approve material requests</strong>
-                  <small>Allow this employee to approve material requests submitted by supervisors.</small>
-                </div>
-                <input type="checkbox" [checked]="canApproveMaterial()" (change)="setPerm('canApproveMaterial', $any($event.target).checked)" />
-              </label>
-              <label class="settings-w11-check-row">
-                <div>
-                  <strong>Can approve labour attendance</strong>
-                  <small>Allow this employee to approve labour attendance entries.</small>
-                </div>
-                <input type="checkbox" [checked]="canApproveLabour()" (change)="setPerm('canApproveLabour', $any($event.target).checked)" />
-              </label>
-              <label class="settings-w11-check-row">
-                <div>
-                  <strong>Can approve site expenses</strong>
-                  <small>Allow this employee to approve site-related expenses.</small>
-                </div>
-                <input type="checkbox" [checked]="canApproveExpense()" (change)="setPerm('canApproveExpense', $any($event.target).checked)" />
-              </label>
-              <label class="settings-w11-check-row">
-                <div>
-                  <strong>Can approve general expenses</strong>
-                  <small>Allow this employee to approve office and general expenses.</small>
-                </div>
-                <input type="checkbox" [checked]="canApproveGeneral()" (change)="setPerm('canApproveGeneral', $any($event.target).checked)" />
-              </label>
-              <label class="settings-w11-check-row">
-                <div>
-                  <strong>Can approve subcontractor requests</strong>
-                  <small>Allow this employee to approve subcontractor agreements.</small>
-                </div>
-                <input type="checkbox" [checked]="canApproveSubcontract()" (change)="setPerm('canApproveSubcontract', $any($event.target).checked)" />
-              </label>
-              <label class="settings-w11-check-row">
-                <div>
-                  <strong>Can approve client payments</strong>
-                  <small>Allow this employee to approve client payment collections.</small>
-                </div>
-                <input type="checkbox" [checked]="canApprovePayment()" (change)="setPerm('canApprovePayment', $any($event.target).checked)" />
-              </label>
-              <label class="settings-w11-check-row">
-                <div>
-                  <strong>Can manage workers</strong>
-                  <small>Add, edit, and remove workers from sites.</small>
-                </div>
-                <input type="checkbox" [checked]="canManageWorkers()" (change)="setPerm('canManageWorkers', $any($event.target).checked)" />
-              </label>
-              <label class="settings-w11-check-row">
-                <div>
-                  <strong>Can view reports</strong>
-                  <small>Access to the Reports section in the admin console.</small>
-                </div>
-                <input type="checkbox" [checked]="canViewReports()" (change)="setPerm('canViewReports', $any($event.target).checked)" />
-              </label>
             </div>
           </section>
         }

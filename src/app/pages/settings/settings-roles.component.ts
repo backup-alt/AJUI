@@ -351,7 +351,6 @@ interface EmployeeInvite {
 
         <nav class="settings-w11-drawer-tabs" role="tablist">
           <button type="button" role="tab" [class.active]="drawerTab() === 'profile'" (click)="drawerTab.set('profile')">Profile</button>
-          <button type="button" role="tab" [class.active]="drawerTab() === 'permissions'" (click)="drawerTab.set('permissions')">Permissions</button>
           <button type="button" role="tab" [class.active]="drawerTab() === 'projects'" (click)="drawerTab.set('projects')">Projects</button>
           <button type="button" role="tab" [class.active]="drawerTab() === 'activity'" (click)="drawerTab.set('activity')">Activity</button>
         </nav>
@@ -366,31 +365,6 @@ interface EmployeeInvite {
               <div><dt>Joined</dt><dd>{{ formatDate(selected()!.createdAt) }}</dd></div>
               <div><dt>Last Login</dt><dd>{{ formatDate(selected()!.lastLoginAt) }}</dd></div>
             </dl>
-          }
-
-          @if (drawerTab() === 'permissions') {
-            <h3 class="settings-w11-drawer-h3">Approval rights</h3>
-            <p class="settings-w11-drawer-hint">Toggle which approval types this employee can approve or reject.</p>
-            <div class="settings-w11-perm-list">
-              @for (p of approvalTypes; track p.key) {
-                <div class="settings-w11-perm-row">
-                  <div class="settings-w11-perm-label">
-                    <strong>{{ p.label }}</strong>
-                    <small>{{ p.note }}</small>
-                  </div>
-                  <div class="settings-w11-perm-toggles">
-                    <label class="settings-w11-mini-toggle">
-                      <input type="checkbox" [checked]="permFor(selected()!.id, p.key, 'approve')" (change)="togglePerm(selected()!.id, p.key, 'approve', $any($event.target).checked)" />
-                      <span>Approve</span>
-                    </label>
-                    <label class="settings-w11-mini-toggle">
-                      <input type="checkbox" [checked]="permFor(selected()!.id, p.key, 'reject')" (change)="togglePerm(selected()!.id, p.key, 'reject', $any($event.target).checked)" />
-                      <span>Reject</span>
-                    </label>
-                  </div>
-                </div>
-              }
-            </div>
           }
 
           @if (drawerTab() === 'projects') {

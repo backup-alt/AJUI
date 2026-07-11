@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
 import type { Project } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableRow } from "../data/erp-data.service";
@@ -112,7 +112,30 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
               </div>
             </section>
 
+            <section class="approval-filter-bar">
+              <span class="filter-label">Show:</span>
+              <button type="button" class="filter-chip" [class.active]="isFilterActive('material')" (click)="toggleFilter('material')">
+                Material ({{ materialApprovals().length }})
+              </button>
+              <button type="button" class="filter-chip" [class.active]="isFilterActive('labour')" (click)="toggleFilter('labour')">
+                Labour ({{ labourApprovals().length }})
+              </button>
+              <button type="button" class="filter-chip" [class.active]="isFilterActive('site_expense')" (click)="toggleFilter('site_expense')">
+                Site Expense ({{ siteExpenseApprovals().length }})
+              </button>
+              <button type="button" class="filter-chip" [class.active]="isFilterActive('general_expense')" (click)="toggleFilter('general_expense')">
+                General Expense ({{ generalExpenseApprovals().length }})
+              </button>
+              <button type="button" class="filter-chip" [class.active]="isFilterActive('payment')" (click)="toggleFilter('payment')">
+                Payment ({{ paymentApprovals().length }})
+              </button>
+              <button type="button" class="filter-chip" [class.active]="isFilterActive('subcontract')" (click)="toggleFilter('subcontract')">
+                Subcontract ({{ subcontractApprovals().length }})
+              </button>
+            </section>
+
             <div class="approvals-stack">
+              @if (showMaterial()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
                   <div>
@@ -178,7 +201,9 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                   </table>
                 </div>
               </section>
+              }
 
+              @if (showLabour()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
                   <div>
@@ -228,7 +253,9 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                   </table>
                 </div>
               </section>
+              }
 
+              @if (showSiteExpense()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
                   <div>
@@ -276,7 +303,9 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                   </table>
                 </div>
               </section>
+              }
 
+              @if (showGeneralExpense()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
                   <div>
@@ -320,7 +349,9 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                   </table>
                 </div>
               </section>
+              }
 
+              @if (showPayment()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
                   <div>
@@ -366,7 +397,9 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                   </table>
                 </div>
               </section>
+              }
 
+              @if (showSubcontract()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
                   <div>
@@ -418,6 +451,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                   </table>
                 </div>
               </section>
+              }
             </div>
           </main>
         </ion-content>
@@ -429,12 +463,31 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 export class PendingApprovalsPage {
   private readonly data = inject(ErpDataService);
 
-  readonly materialApprovals = computed(() => this.materialRows().filter((row) => this.isPending(row.status)));
-  readonly labourApprovals = computed(() => this.labourRows().filter((row) => this.isPending(row.status)));
-  readonly siteExpenseApprovals = computed(() => this.siteExpenseRows().filter((row) => this.isPending(row.status)));
-  readonly generalExpenseApprovals = computed(() => this.generalExpenseRows().filter((row) => this.isPending(row.status)));
-  readonly paymentApprovals = computed(() => this.paymentRows().filter((row) => this.isPending(row.status)));
-  readonly subcontractApprovals = computed(() => this.subcontractRows().filter((row) => this.isPending(row.status)));
+  readonly showMaterial = signal(true);
+  readonly showLabour = signal(true);
+  readonly showSiteExpense = signal(true);
+  readonly showGeneralExpense = signal(true);
+  readonly showPayment = signal(true);
+  readonly showSubcontract = signal(true);
+
+  readonly materialApprovals = computed(() =>
+    this.showMaterial() ? this.materialRows().filter((row) => this.isPending(row.status)) : []
+  );
+  readonly labourApprovals = computed(() =>
+    this.showLabour() ? this.labourRows().filter((row) => this.isPending(row.status)) : []
+  );
+  readonly siteExpenseApprovals = computed(() =>
+    this.showSiteExpense() ? this.siteExpenseRows().filter((row) => this.isPending(row.status)) : []
+  );
+  readonly generalExpenseApprovals = computed(() =>
+    this.showGeneralExpense() ? this.generalExpenseRows().filter((row) => this.isPending(row.status)) : []
+  );
+  readonly paymentApprovals = computed(() =>
+    this.showPayment() ? this.paymentRows().filter((row) => this.isPending(row.status)) : []
+  );
+  readonly subcontractApprovals = computed(() =>
+    this.showSubcontract() ? this.subcontractRows().filter((row) => this.isPending(row.status)) : []
+  );
 
   pendingTotal(): number {
     return this.allPendingRows().length;
@@ -446,6 +499,29 @@ export class PendingApprovalsPage {
 
   pendingProjectCount(): number {
     return new Set(this.allPendingRows().map((row) => row.project).filter(Boolean)).size;
+  }
+
+  toggleFilter(type: string) {
+    switch (type) {
+      case "material": this.showMaterial.update(v => !v); break;
+      case "labour": this.showLabour.update(v => !v); break;
+      case "site_expense": this.showSiteExpense.update(v => !v); break;
+      case "general_expense": this.showGeneralExpense.update(v => !v); break;
+      case "payment": this.showPayment.update(v => !v); break;
+      case "subcontract": this.showSubcontract.update(v => !v); break;
+    }
+  }
+
+  isFilterActive(type: string): boolean {
+    switch (type) {
+      case "material": return this.showMaterial();
+      case "labour": return this.showLabour();
+      case "site_expense": return this.showSiteExpense();
+      case "general_expense": return this.showGeneralExpense();
+      case "payment": return this.showPayment();
+      case "subcontract": return this.showSubcontract();
+      default: return true;
+    }
   }
 
   vendorOptions(currentVendor = ""): string[] {
