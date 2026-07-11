@@ -185,8 +185,15 @@ export async function createEmployeeInvite(
       text,
     });
     emailSent = true;
-  } catch (err) {
-    console.error("[InviteService] Failed to send employee invite email:", err);
+    console.log(`[InviteService] Employee invite email SENT successfully to ${params.email}`);
+    console.log(`[InviteService] Invite URL: ${inviteUrl}`);
+  } catch (err: any) {
+    console.error("[InviteService] FAILED to send employee invite email:", err?.message || err);
+    console.log(`[InviteService] Manual share URL: ${inviteUrl}`);
+  }
+
+  if (!emailSent) {
+    console.warn(`[InviteService] Email was NOT sent. Admin should share link manually: ${inviteUrl}`);
   }
 
   return {
