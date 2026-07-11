@@ -98,10 +98,6 @@ interface Site {
                   <span class="settings-w11-stat-value">{{ s.totalWorkers ?? 0 }}</span>
                   <span class="settings-w11-stat-label">Workers</span>
                 </div>
-                <div class="settings-w11-stat">
-                  <span class="settings-w11-stat-value">{{ s.totalEmployees ?? 0 }}</span>
-                  <span class="settings-w11-stat-label">Employees</span>
-                </div>
               </div>
               <footer class="settings-w11-site-card-foot">
                 <span>View details →</span>

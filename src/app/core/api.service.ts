@@ -590,7 +590,13 @@ export class ApiService {
     createdAt: string;
     emailSent?: boolean;
   }> {
-    return this.http.post<any>(`${this.baseUrl}/admin/invites/employee`, payload, { headers: this.authHeaders() }).pipe(
+    const roleMap: Record<string, string> = {
+      Admin: "admin",
+      "Project Manager": "project_manager",
+      Accountant: "accountant",
+    };
+    const backendRole = roleMap[payload.role] || "project_manager";
+    return this.http.post<any>(`${this.baseUrl}/admin/invites/employee`, { ...payload, role: backendRole }, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
     );
   }

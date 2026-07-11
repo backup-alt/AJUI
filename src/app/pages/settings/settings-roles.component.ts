@@ -336,62 +336,84 @@ interface PendingInvite {
       <div class="settings-w11-modal-backdrop" (click)="closeInvite()" aria-hidden="true"></div>
       <div class="settings-w11-modal" role="dialog" aria-label="Invite employee">
         <header class="settings-w11-modal-head">
-          <h2>Invite Employee</h2>
+          <div>
+            <h2>Invite Employee</h2>
+            <small class="settings-w11-step-label">Step {{ inviteStep() }} of 2</small>
+          </div>
           <button type="button" class="settings-w11-icon-btn" (click)="closeInvite()" aria-label="Close">
             <svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
         </header>
         <div class="settings-w11-modal-body">
-          <div class="settings-w11-field">
-            <label>Name</label>
-            <input type="text" placeholder="Full name" [value]="inviteName()" (input)="inviteName.set($any($event.target).value)" />
-          </div>
-          <div class="settings-w11-field">
-            <label>Email</label>
-            <input type="email" placeholder="email@agbuilders.com" [value]="inviteEmail()" (input)="inviteEmail.set($any($event.target).value)" />
-          </div>
-          <div class="settings-w11-field">
-            <label>Phone</label>
-            <input type="tel" placeholder="+91 98765 43210" [value]="invitePhone()" (input)="invitePhone.set($any($event.target).value)" />
-          </div>
-          <div class="settings-w11-field">
-            <label>Role</label>
-            <select [value]="inviteRole()" (change)="inviteRole.set($any($event.target).value)">
-              <option value="Admin">Admin</option>
-              <option value="Project Manager">Project Manager</option>
-              <option value="Accountant">Accountant</option>
-            </select>
-          </div>
-          <div class="settings-w11-field">
-            <label>
-              Allocate projects
-              <small class="settings-w11-hint-inline">Choose which projects this person can access once they sign up</small>
-            </label>
-            <div class="settings-w11-project-list">
-              @for (p of availableProjects(); track p.id) {
-                <label class="settings-w11-project-check" [class.checked]="isProjectSelected(p.id)">
-                  <input
-                    type="checkbox"
-                    [checked]="isProjectSelected(p.id)"
-                    (change)="toggleProject(p.id)"
-                  />
-                  <span class="settings-w11-project-name">{{ p.name }}</span>
-                  <small class="settings-w11-project-meta">{{ p.client || p.address || '—' }}</small>
-                </label>
-              } @empty {
-                <div class="settings-w11-empty-inline">No projects available. Add a project first to allocate access.</div>
-              }
+
+          @if (inviteStep() === 1) {
+            <!-- Step 1: Basic details -->
+            <div class="settings-w11-field">
+              <label>Name</label>
+              <input type="text" placeholder="Full name" [value]="inviteName()" (input)="inviteName.set($any($event.target).value)" />
             </div>
-          </div>
+            <div class="settings-w11-field">
+              <label>Email</label>
+              <input type="email" placeholder="email@agbuilders.com" [value]="inviteEmail()" (input)="inviteEmail.set($any($event.target).value)" />
+            </div>
+            <div class="settings-w11-field">
+              <label>Phone</label>
+              <input type="tel" placeholder="+91 98765 43210" [value]="invitePhone()" (input)="invitePhone.set($any($event.target).value)" />
+            </div>
+            <div class="settings-w11-field">
+              <label>Role</label>
+              <select [value]="inviteRole()" (change)="inviteRole.set($any($event.target).value)">
+                <option value="Admin">Admin</option>
+                <option value="Project Manager">Project Manager</option>
+                <option value="Accountant">Accountant</option>
+              </select>
+            </div>
+          }
+
+          @if (inviteStep() === 2) {
+            <!-- Step 2: Project allocation -->
+            <div class="settings-w11-field">
+              <label>
+                Allocate projects
+                <small class="settings-w11-hint-inline">Choose which projects this person can access once they sign up</small>
+              </label>
+              <div class="settings-w11-project-grid">
+                @for (p of availableProjects(); track p.id) {
+                  <label class="settings-w11-project-card" [class.checked]="isProjectSelected(p.id)">
+                    <input
+                      type="checkbox"
+                      [checked]="isProjectSelected(p.id)"
+                      (change)="toggleProject(p.id)"
+                    />
+                    <div class="settings-w11-project-card-inner">
+                      <span class="settings-w11-project-name">{{ p.name }}</span>
+                      <small class="settings-w11-project-meta">{{ p.client || p.address || '—' }}</small>
+                    </div>
+                  </label>
+                } @empty {
+                  <div class="settings-w11-empty-inline">No projects available. All projects will be accessible.</div>
+                }
+              </div>
+            </div>
+          }
+
           @if (inviteError()) {
             <div class="settings-w11-message error">{{ inviteError() }}</div>
           }
         </div>
         <footer class="settings-w11-modal-foot">
-          <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="closeInvite()">Cancel</button>
-          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="sendInvite()" [disabled]="inviteSending()">
-            {{ inviteSending() ? 'Sending…' : 'Send invite' }}
-          </button>
+          @if (inviteStep() === 1) {
+            <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="closeInvite()">Cancel</button>
+            <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="nextInviteStep()">
+              Next
+            </button>
+          }
+          @if (inviteStep() === 2) {
+            <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="backInviteStep()">Back</button>
+            <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="sendInvite()" [disabled]="inviteSending()">
+              {{ inviteSending() ? 'Sending…' : 'Send invite' }}
+            </button>
+          }
         </footer>
       </div>
     }
@@ -539,6 +561,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly invitePhone = signal("");
   readonly inviteRole = signal<Role>("Project Manager");
   readonly inviteProjectIds = signal<string[]>([]);
+  readonly inviteStep = signal<1 | 2>(1);
   readonly projects = signal<{ id: string; name: string; client?: string; address?: string }[]>([]);
 
   readonly availableProjects = computed(() => {
@@ -567,6 +590,15 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.inviteProjectIds.update((ids) =>
       ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
     );
+  }
+
+  private mapRoleToBackend(role: Role): "admin" | "project_manager" | "accountant" {
+    switch (role) {
+      case "Admin": return "admin";
+      case "Project Manager": return "project_manager";
+      case "Accountant": return "accountant";
+      default: return "project_manager";
+    }
   }
 
   // Add Supervisor modal
@@ -821,10 +853,33 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.invitePhone.set("");
     this.inviteRole.set("Project Manager");
     this.inviteProjectIds.set([]);
+    this.inviteStep.set(1);
     this.inviteError.set(null);
   }
   closeInvite() {
     this.showInvite.set(false);
+    this.inviteError.set(null);
+  }
+
+  nextInviteStep() {
+    const name = this.inviteName().trim();
+    const email = this.inviteEmail().trim();
+    const phone = this.invitePhone().trim();
+
+    this.inviteError.set(null);
+    if (name.length < 2) {
+      this.inviteError.set("Please enter a name.");
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.inviteError.set("Please enter a valid email address.");
+      return;
+    }
+    this.inviteStep.set(2);
+  }
+
+  backInviteStep() {
+    this.inviteStep.set(1);
     this.inviteError.set(null);
   }
   sendInvite() {
@@ -835,16 +890,6 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     const projectIds = this.inviteProjectIds();
 
     this.inviteError.set(null);
-
-    if (name.length < 2) {
-      this.inviteError.set("Please enter a name.");
-      return;
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      this.inviteError.set("Please enter a valid email address.");
-      return;
-    }
-
     this.inviteSending.set(true);
     this.api.createEmployeeInvite({
       name,
