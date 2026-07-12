@@ -80,12 +80,6 @@ interface ActivityEntry {
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M1 14s0-5 7-5 7 5 7 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           Profile
         </button>
-        @if (employee()?.role !== 'Supervisor') {
-        <button type="button" role="tab" [class.active]="activeTab() === 'permissions'" (click)="activeTab.set('permissions')">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v4a5 5 0 0 1-2 4.04V14H5V11.04A5 5 0 0 1 3 7V3l5-2Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Permissions
-        </button>
-        }
         <button type="button" role="tab" [class.active]="activeTab() === 'projects'" (click)="activeTab.set('projects')">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           Projects

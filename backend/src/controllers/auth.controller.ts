@@ -627,7 +627,8 @@ const adminCreateEmployeeInviteSchema = z.object({
   role: z.enum(["admin", "project_manager", "accountant"]),
   projectIds: z
     .array(z.string().trim().min(1, "Invalid project id"))
-    .min(1, "Select at least one project for this employee"),
+    .min(1, "Select at least one project for this employee")
+    .optional(),
 });
 
 async function resolveProjectObjectIds(projectIds: string[]): Promise<string[]> {
@@ -713,7 +714,7 @@ export async function adminCreateEmployeeInvite(
       return;
     }
 
-    const projectIds = await resolveProjectObjectIds(body.projectIds);
+const projectIds = body.role === "admin" ? [] : await resolveProjectObjectIds(body.projectIds || []);
     const result = await inviteService.createEmployeeInvite({
       createdByAdmin: req.user.sub,
       name: body.name,

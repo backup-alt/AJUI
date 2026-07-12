@@ -343,7 +343,6 @@ export class ErpDataService {
 
   constructor() {
     this.ensureMeenakshiSampleProject();
-    this.ensureLargeDemoDataset();
     effect(() => this.writeState("clients", this.clients()));
     effect(() => this.writeState("projects", this.projects()));
     effect(() => this.writeState("materials", this.materials()));

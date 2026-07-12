@@ -1,7 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
-import { ApiService } from "../core/api.service";
 import type { Project } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableRow } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -441,7 +440,6 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 })
 export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
-  private readonly api = inject(ApiService);
 
   readonly showMaterial = signal(false);
   readonly showLabour = signal(false);
@@ -451,30 +449,12 @@ export class PendingApprovalsPage implements OnInit {
   readonly showSubcontract = signal(false);
 
   ngOnInit() {
-    const user = this.api.user();
-    if (!user) return;
-
-    if (user.role === "admin") {
-      this.showMaterial.set(true);
-      this.showLabour.set(true);
-      this.showSiteExpense.set(true);
-      this.showGeneralExpense.set(true);
-      this.showPayment.set(true);
-      this.showSubcontract.set(true);
-      return;
-    }
-
-    this.api.getEmployeeRequestPermissions(user.id).subscribe({
-      next: (prefs) => {
-        this.showMaterial.set(!!prefs.canApproveMaterial);
-        this.showLabour.set(!!prefs.canApproveLabour);
-        this.showSiteExpense.set(!!prefs.canApproveExpense);
-        this.showGeneralExpense.set(!!prefs.canApproveGeneral);
-        this.showSubcontract.set(!!prefs.canApproveSubcontract);
-        this.showPayment.set(!!prefs.canApprovePayment);
-      },
-      error: () => {},
-    });
+    this.showMaterial.set(true);
+    this.showLabour.set(true);
+    this.showSiteExpense.set(true);
+    this.showGeneralExpense.set(true);
+    this.showPayment.set(true);
+    this.showSubcontract.set(true);
   }
 
   readonly materialApprovals = computed(() =>
