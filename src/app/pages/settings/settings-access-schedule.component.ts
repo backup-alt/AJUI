@@ -150,23 +150,7 @@ interface AccessWindow {
       </div>
     </section>
 
-    <section class="settings-w11-card">
-      <div class="settings-w11-card-head">
-        <div>
-          <h2>Notifications</h2>
-          <p>Stay informed about access changes.</p>
-        </div>
-      </div>
-      <div class="settings-w11-card-body">
-        <label class="settings-w11-toggle-row">
-          <div>
-            <strong>New submission notifications</strong>
-            <small>When a new approval request is submitted, the supervisor on duty will be notified immediately in the app and via email digest.</small>
-          </div>
-          <input type="checkbox" [checked]="notifyBefore()" (change)="setNotifyBefore($any($event.target).checked)" />
-        </label>
-      </div>
-    </section>
+    
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

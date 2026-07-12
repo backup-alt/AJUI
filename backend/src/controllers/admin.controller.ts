@@ -429,9 +429,11 @@ export async function getAccessScheduleStatus(req: Request, res: Response, next:
 export async function getAllSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { RefreshToken } = await import("../models/RefreshToken.js");
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const sessions = await RefreshToken.find({
       revokedAt: null,
       expiresAt: { $gt: new Date() },
+      createdAt: { $gte: twentyFourHoursAgo },
     })
       .populate("userId", "name email role")
       .sort({ createdAt: -1 })

@@ -1057,6 +1057,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       this.inviteError.set("Please enter a valid email address.");
       return;
     }
+    if (this.inviteRole() === "Admin") {
+      this.sendInvite();
+      return;
+    }
     this.inviteStep.set(2);
   }
 
@@ -1072,7 +1076,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     const projectIds = this.inviteProjectIds();
 
     this.inviteError.set(null);
-    if (projectIds.length === 0) {
+    if (role !== "Admin" && projectIds.length === 0) {
       this.inviteError.set("Please select at least one project for this employee.");
       return;
     }
@@ -1082,7 +1086,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       email,
       phone: phone || undefined,
       role: role as "Admin" | "Project Manager" | "Accountant",
-      projectIds: projectIds.length > 0 ? projectIds : undefined,
+      projectIds: role === "Admin" ? undefined : (projectIds.length > 0 ? projectIds : undefined),
     }).subscribe({
       next: (res) => {
         this.inviteSending.set(false);

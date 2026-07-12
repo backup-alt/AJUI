@@ -87,6 +87,10 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       ip: req.ip,
     });
 
+    if (result.user.role === "supervisor") {
+      throw new AppError(403, "Supervisor accounts cannot log in. Please contact admin for access.");
+    }
+
     const accessStatus = await checkAccessRestriction(result.user.role);
     if (accessStatus.isRestricted) {
       throw new AppError(403, `Access restricted until ${accessStatus.currentWindow?.endTime || "scheduled end"}. Contact admin if you need access.`);
@@ -838,7 +842,7 @@ export async function verifyEmployeeOtp(
       if (existing) throw new AppError(409, "User with this email or phone already exists");
 
       const passwordHash = await hashPassword(input.password);
-      const user = await User.create({
+const user = await User.create({
         name: finalName,
         email: finalEmail,
         phone: finalPhone,
@@ -846,7 +850,7 @@ export async function verifyEmployeeOtp(
         role: invite.role,
         status: "active",
         createdBy: invite.createdByAdmin,
-        managedProjectIds: allocatedProjectObjectIds(invite),
+        managedProjectIds: invite.role === "admin" ? [] : allocatedProjectObjectIds(invite),
       });
 
       await inviteService.consumeInvite(input.token, user._id.toString());
