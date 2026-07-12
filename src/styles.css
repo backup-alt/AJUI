@@ -1861,6 +1861,8 @@ td {
   gap: 18px;
   min-height: 72px;
   padding: 0 24px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .toolbar-left,
@@ -1886,6 +1888,16 @@ td {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex-shrink: 0;
+}
+
+.toolbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding-right: 8px;
 }
 
 .toolbar-context span {
@@ -8278,7 +8290,7 @@ body {
 }
 
 .toolbar-right {
-  min-width: 0;
+  flex-shrink: 0;
   padding-right: 8px;
 }
 
