@@ -1855,8 +1855,8 @@ td {
 }
 
 .enterprise-toolbar {
-  display: grid;
-  grid-template-columns: auto minmax(280px, 520px) auto;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 18px;
   min-height: 72px;
@@ -1880,6 +1880,27 @@ td {
   color: inherit;
   font-size: 18px;
   font-weight: 850;
+}
+
+.toolbar-context {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toolbar-context span {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #64748b);
+}
+
+.toolbar-context strong {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text, #1e293b);
+  white-space: nowrap;
 }
 
 .toolbar-left ion-menu-button {
