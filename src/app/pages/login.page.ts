@@ -330,6 +330,9 @@ export class LoginPage {
   private resetToken: string | null = null;
 
   ngOnInit() {
+    // Force light mode for password reset flows
+    this.forceLightMode();
+
     // Check for ?token=... query param (password reset link)
     this.route.queryParams.subscribe((params) => {
       if (params['token']) {
@@ -341,10 +344,19 @@ export class LoginPage {
     });
   }
 
+  private forceLightMode() {
+    try {
+      document.documentElement.classList.remove("dark-mode");
+    } catch {}
+  }
+
   switchMode(m: Mode) {
     this.errorMessage.set(null);
     this.successMessage.set(null);
     this.mode.set(m);
+    if (m === 'reset' || m === 'forgot') {
+      this.forceLightMode();
+    }
   }
 
   onLogin() {
