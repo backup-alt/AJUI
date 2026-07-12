@@ -87,15 +87,6 @@ import { formatMoney, statusClass } from "../shared/format";
                     <button type="button" class="client-edit-action" aria-label="Edit client" title="Edit Client" (click)="editClient(client, $event)">
                       <strong>Edit Client</strong>
                     </button>
-                    <button type="button" class="client-delete-action" aria-label="Delete client" title="Delete client" (click)="deleteClient(client, $event)">
-                      <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                        <path d="M4 7h16" />
-                        <path d="M10 11v6" />
-                        <path d="M14 11v6" />
-                        <path d="M6 7l1 14h10l1-14" />
-                        <path d="M9 7V4h6v3" />
-                      </svg>
-                    </button>
                   </div>
                 </div>
               </article>

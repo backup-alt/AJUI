@@ -2200,9 +2200,8 @@ ion-menu.enterprise-sidebar::part(container) {
 }
 
 .add-client-icon {
-  display: grid;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   width: 56px;
   height: 56px;

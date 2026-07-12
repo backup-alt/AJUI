@@ -6,9 +6,6 @@ import { ApiService } from "../../core/api.service";
 
 interface NotificationPrefs {
   pushNewSubmission: boolean;
-  emailDaily: boolean;
-  emailWeekly: boolean;
-  emailMonthly: boolean;
   singleApprovalForSiteExpenseMaterials: boolean;
 }
 
@@ -21,17 +18,17 @@ interface NotificationPrefs {
       <nav class="settings-w11-breadcrumb" aria-label="Breadcrumb">
         <span>Settings</span>
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <strong>Notifications</strong>
+        <strong>General Settings</strong>
       </nav>
-      <h1>Notifications</h1>
-      <p>Choose what you want to be notified about and how.</p>
+      <h1>General Settings</h1>
+      <p>Configure notifications and approval behavior for your workspace.</p>
     </header>
 
     <section class="settings-w11-card">
       <div class="settings-w11-card-head">
         <div>
-          <h2>Push notifications</h2>
-          <p>Sent to your browser or mobile when something important happens.</p>
+          <h2>Approvals</h2>
+          <p>Control how approvals work across the system.</p>
         </div>
         @if (saving()) {
           <span class="settings-w11-saving">Saving…</span>
@@ -40,13 +37,6 @@ interface NotificationPrefs {
         }
       </div>
       <div class="settings-w11-card-body">
-        <label class="settings-w11-toggle-row">
-          <div>
-            <strong>New submission</strong>
-            <small>When a supervisor submits materials, labour, expenses, or payments.</small>
-          </div>
-          <input type="checkbox" [checked]="pushNewSubmission()" (change)="onToggle('pushNewSubmission', $any($event.target).checked)" />
-        </label>
         <label class="settings-w11-toggle-row">
           <div>
             <strong>One approval for material and expense</strong>
@@ -60,31 +50,17 @@ interface NotificationPrefs {
     <section class="settings-w11-card">
       <div class="settings-w11-card-head">
         <div>
-          <h2>Email digests</h2>
-          <p>Receive a summary of activity by email.</p>
+          <h2>Push notifications</h2>
+          <p>Sent to your browser or mobile when something important happens.</p>
         </div>
       </div>
       <div class="settings-w11-card-body">
         <label class="settings-w11-toggle-row">
           <div>
-            <strong>Daily summary</strong>
-            <small>Sent every morning at 8:00 AM with yesterday's activity.</small>
+            <strong>New submission</strong>
+            <small>When a supervisor submits materials, labour, expenses, or payments.</small>
           </div>
-          <input type="checkbox" [checked]="emailDaily()" (change)="onToggle('emailDaily', $any($event.target).checked)" />
-        </label>
-        <label class="settings-w11-toggle-row">
-          <div>
-            <strong>Weekly summary</strong>
-            <small>Sent every Monday with last week's totals and pending items.</small>
-          </div>
-          <input type="checkbox" [checked]="emailWeekly()" (change)="onToggle('emailWeekly', $any($event.target).checked)" />
-        </label>
-        <label class="settings-w11-toggle-row">
-          <div>
-            <strong>Monthly report</strong>
-            <small>Sent on the 1st of each month with full financial summary.</small>
-          </div>
-          <input type="checkbox" [checked]="emailMonthly()" (change)="onToggle('emailMonthly', $any($event.target).checked)" />
+          <input type="checkbox" [checked]="pushNewSubmission()" (change)="onToggle('pushNewSubmission', $any($event.target).checked)" />
         </label>
       </div>
     </section>
@@ -113,9 +89,6 @@ export class SettingsNotificationsComponent implements OnInit, OnDestroy {
   private readonly saveSubject = new Subject<Partial<NotificationPrefs>>();
 
   readonly pushNewSubmission = signal(true);
-  readonly emailDaily = signal(true);
-  readonly emailWeekly = signal(true);
-  readonly emailMonthly = signal(false);
   readonly singleApprovalForSiteExpenseMaterials = signal(false);
 
   readonly saving = signal(false);
@@ -138,9 +111,6 @@ export class SettingsNotificationsComponent implements OnInit, OnDestroy {
     this.api.getNotificationPrefs().subscribe({
       next: (prefs) => {
         this.pushNewSubmission.set(prefs.pushNewSubmission ?? true);
-        this.emailDaily.set(prefs.emailDaily ?? true);
-        this.emailWeekly.set(prefs.emailWeekly ?? true);
-        this.emailMonthly.set(prefs.emailMonthly ?? false);
         this.singleApprovalForSiteExpenseMaterials.set(prefs.singleApprovalForSiteExpenseMaterials ?? false);
       },
       error: () => {
@@ -151,9 +121,6 @@ export class SettingsNotificationsComponent implements OnInit, OnDestroy {
 
   onToggle(key: keyof NotificationPrefs, value: boolean) {
     if (key === "pushNewSubmission") this.pushNewSubmission.set(value);
-    if (key === "emailDaily") this.emailDaily.set(value);
-    if (key === "emailWeekly") this.emailWeekly.set(value);
-    if (key === "emailMonthly") this.emailMonthly.set(value);
     if (key === "singleApprovalForSiteExpenseMaterials") this.singleApprovalForSiteExpenseMaterials.set(value);
 
     this.lastSaved.set(false);
