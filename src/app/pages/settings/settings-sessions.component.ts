@@ -7,6 +7,8 @@ interface Session {
   device: string;
   ip: string;
   location?: string;
+  userEmail?: string;
+  userRole?: string;
   lastActiveAt: string;
   isCurrent: boolean;
   createdAt: string;
@@ -54,8 +56,8 @@ interface Session {
                 <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 20h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               </div>
               <div class="settings-w11-device-info">
-                <strong>{{ s.device }}</strong>
-                <small>{{ s.ip }}{{ s.location ? ' · ' + s.location : '' }} · Last active {{ formatRelative(s.lastActiveAt) }}</small>
+                <strong>{{ s.location || 'Unknown' }}</strong>
+                <small>Last active {{ formatRelative(s.lastActiveAt) }}</small>
               </div>
               @if (s.isCurrent) {
                 <span class="settings-w11-status-pill" data-status="active">Active now</span>
@@ -93,7 +95,7 @@ export class SettingsSessionsComponent implements OnInit {
 
   private loadSessions() {
     this.loading.set(true);
-    this.api.listSessions().subscribe({
+    this.api.listAllSessions().subscribe({
       next: (res) => {
         this.sessions.set(res?.sessions || []);
         this.loading.set(false);

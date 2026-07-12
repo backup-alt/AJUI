@@ -113,7 +113,6 @@ interface ActivityEntry {
                 <div><dt>Status</dt><dd><span class="settings-w11-status-pill" [attr.data-status]="employee()!.status">{{ employee()!.status }}</span></dd></div>
                 <div><dt>Joined</dt><dd>{{ formatDate(employee()!.createdAt) }}</dd></div>
                 <div><dt>Last Login</dt><dd>{{ formatDate(employee()!.lastLoginAt) }}</dd></div>
-                <div><dt>Employee ID</dt><dd class="mono">{{ employee()!.id }}</dd></div>
               </dl>
             </div>
           </section>
@@ -412,16 +411,15 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   formatRelative(iso: string): string {
     if (!iso) return "—";
     const d = new Date(iso);
-    const diff = Date.now() - d.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins} min ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs} hr ago`;
-    const days = Math.floor(hrs / 24);
-    if (days === 1) return "yesterday";
-    if (days < 7) return `${days} days ago`;
-    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    if (isNaN(d.getTime())) return "—";
+    const utc = d.getTime() + (5.5 * 60 * 60 * 1000);
+    const istDate = new Date(utc);
+    const hours = istDate.getUTCHours();
+    const minutes = istDate.getUTCMinutes();
+    const ampm = hours >= 12 ? "P.M" : "A.M";
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, "0");
+    return `${displayHours}:${displayMinutes} ${ampm}`;
   }
 
   activityDotClass(action: string): string {

@@ -425,3 +425,33 @@ export async function getAccessScheduleStatus(req: Request, res: Response, next:
     next(err);
   }
 }
+
+export async function getAllSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { RefreshToken } = await import("../models/RefreshToken.js");
+    const sessions = await RefreshToken.find({
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    })
+      .populate("userId", "name email role")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      sessions: sessions.map((s) => ({
+        id: s._id.toString(),
+        device: s.userAgent || "Unknown",
+        ip: s.ip || "Unknown",
+        location: (s.userId as any)?.name || "Unknown User",
+        userEmail: (s.userId as any)?.email || "",
+        userRole: (s.userId as any)?.role || "",
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+        isCurrent: s.userId?.toString() === req.user?.sub,
+        lastActiveAt: s.createdAt,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+}

@@ -373,6 +373,7 @@ export async function listApprovals(req: Request, res: Response, next: NextFunct
       limit: Number(req.query.limit) || 20,
       scopeProjectIds,
       userRole: req.user?.role,
+      userId: req.user?.sub,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -473,6 +474,7 @@ export async function getApprovalCount(req: Request, res: Response, next: NextFu
       type: req.query.type as never,
       scopeProjectIds,
       userRole: req.user?.role,
+      userId: req.user?.sub,
     });
     res.json(count);
   } catch (e) { next(e); }

@@ -473,6 +473,12 @@ export class ApiService {
     );
   }
 
+  listAllSessions(): Observable<{ sessions: Array<{ id: string; device: string; ip: string; location?: string; userEmail?: string; userRole?: string; lastActiveAt: string; isCurrent: boolean; createdAt: string }> }> {
+    return this.http.get<{ sessions: any[] }>(`${this.baseUrl}/admin/sessions`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   revokeSession(id: string): Observable<{ success: boolean }> {
     return this.http.delete<{ success: boolean }>(`${this.baseUrl}/auth/sessions/${id}`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
