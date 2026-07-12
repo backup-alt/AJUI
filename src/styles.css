@@ -3946,7 +3946,8 @@ ion-badge.neutral {
 
 @media (max-width: 1180px) {
   .enterprise-toolbar {
-    grid-template-columns: auto 1fr auto;
+    display: flex;
+    justify-content: space-between;
   }
 
   .project-select-grid {
