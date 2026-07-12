@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { Types } from "mongoose";
 import * as materialService from "../services/material.service.js";
 import * as labourService from "../services/labour.service.js";
 import * as expenseService from "../services/expense.service.js";
@@ -8,6 +9,7 @@ import * as subcontractorService from "../services/subcontractor.service.js";
 import * as approvalService from "../services/approval.service.js";
 import { getScopedProjectIds } from "../middleware/rbac.js";
 import { User } from "../models/User.js";
+import { ActivityLog } from "../models/ActivityLog.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 // =================== MATERIALS ===================
@@ -407,6 +409,18 @@ export async function approveApproval(req: Request, res: Response, next: NextFun
     }
 
     const updated = await approvalService.approveRequest(req.params.id, reviewer);
+
+    if (req.user?.sub) {
+      await ActivityLog.create({
+        userId: new Types.ObjectId(req.user.sub),
+        action: "approval_approved",
+        description: `Approved ${approval.type} request: ${approval.title || approval.approvalId}`,
+        metadata: { approvalId: req.params.id, approvalType: approval.type },
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+      }).catch(() => {});
+    }
+
     res.json({ approval: updated });
   } catch (e) { next(e); }
 }
@@ -435,6 +449,18 @@ export async function rejectApproval(req: Request, res: Response, next: NextFunc
     }
 
     const updated = await approvalService.rejectRequest(req.params.id, reviewer);
+
+    if (req.user?.sub) {
+      await ActivityLog.create({
+        userId: new Types.ObjectId(req.user.sub),
+        action: "approval_rejected",
+        description: `Rejected ${approval.type} request: ${approval.title || approval.approvalId}`,
+        metadata: { approvalId: req.params.id, approvalType: approval.type },
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+      }).catch(() => {});
+    }
+
     res.json({ approval: updated });
   } catch (e) { next(e); }
 }

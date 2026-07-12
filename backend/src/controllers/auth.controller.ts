@@ -5,6 +5,7 @@ import * as authService from "../services/auth.service.js";
 import * as inviteService from "../services/invite.service.js";
 import { getRefreshCookieName } from "../services/auth.service.js";
 import { AccessSchedule } from "../models/AccessSchedule.js";
+import { ActivityLog } from "../models/ActivityLog.js";
 import {
   verifyInviteSchema,
   supervisorSignupSchema,
@@ -91,6 +92,14 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       throw new AppError(403, `Access restricted until ${accessStatus.currentWindow?.endTime || "scheduled end"}. Contact admin if you need access.`);
     }
 
+    await ActivityLog.create({
+      userId: result.user.id,
+      action: "sign_in",
+      description: `Signed in from ${req.ip || "Unknown IP"}`,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
     res.cookie(getRefreshCookieName(), result.tokens.refreshToken, refreshCookie);
 
     res.json({
@@ -128,7 +137,26 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
   try {
     const cookieName = getRefreshCookieName();
     const refreshToken = req.cookies?.[cookieName];
+    let userId: string | null = null;
+    if (refreshToken) {
+      try {
+        const { verifyRefreshToken } = await import("../utils/jwt.js");
+        const payload = verifyRefreshToken(refreshToken);
+        userId = payload.sub;
+      } catch {}
+    }
     await authService.logout(refreshToken);
+
+    if (userId) {
+      await ActivityLog.create({
+        userId: new Types.ObjectId(userId),
+        action: "sign_out",
+        description: "Signed out",
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+      }).catch(() => {});
+    }
+
     res.clearCookie(cookieName, { path: "/api/auth" });
     res.json({ success: true });
   } catch (err) {
@@ -140,6 +168,11 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
   try {
     if (!req.user?.sub) throw new AppError(401, "Not authenticated");
     const { RefreshToken } = await import("../models/RefreshToken.js");
+    const { User } = await import("../models/User.js");
+
+    const user = await User.findById(req.user.sub).select("name").lean();
+    const userName = user?.name || "Unknown";
+
     const sessions = await RefreshToken.find({
       userId: req.user.sub,
       revokedAt: null,
@@ -148,14 +181,17 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
       .select("userAgent ip createdAt expiresAt")
       .sort({ createdAt: -1 })
       .lean();
+
     res.json({
-      sessions: sessions.map((s) => ({
+      sessions: sessions.map((s, index) => ({
         id: s._id.toString(),
-        userAgent: s.userAgent || "Unknown",
+        device: s.userAgent || "Unknown",
         ip: s.ip || "Unknown",
+        location: userName,
         createdAt: s.createdAt,
         expiresAt: s.expiresAt,
-        isCurrent: false,
+        isCurrent: index === 0,
+        lastActiveAt: s.createdAt,
       })),
     });
   } catch (err) {

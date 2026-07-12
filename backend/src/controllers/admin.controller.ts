@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
+import { Types } from "mongoose";
 import * as authService from "../services/auth.service.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
@@ -7,6 +8,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { AccessTemplate } from "../models/AccessTemplate.js";
 import { AccessSchedule } from "../models/AccessSchedule.js";
 import { User } from "../models/User.js";
+import { ActivityLog } from "../models/ActivityLog.js";
 
 const deactivateSchema = z.object({
   body: z.object({
@@ -290,7 +292,49 @@ export async function saveUserRequestPermissions(req: Request, res: Response, ne
       { new: true, runValidators: true }
     ).select("requestPermissions").lean();
     if (!user) throw new AppError(404, "User not found");
+
+    if (req.user?.sub) {
+      await ActivityLog.create({
+        userId: new Types.ObjectId(req.user.sub),
+        action: "permission_updated",
+        description: `Updated permissions for user ${req.params.id}`,
+        metadata: { targetUserId: req.params.id, permissions: req.body },
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+      }).catch(() => {});
+    }
+
     res.json({ success: true, requestPermissions: user.requestPermissions });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getEmployeeActivity(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.params.id;
+    const days = Number(req.query.days) || 30;
+    const limit = Number(req.query.limit) || 50;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    const logs = await ActivityLog.find({
+      userId: new Types.ObjectId(userId),
+      createdAt: { $gte: cutoff },
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json({
+      activity: logs.map((log) => ({
+        id: log._id.toString(),
+        action: log.action,
+        description: log.description,
+        timestamp: log.createdAt.toISOString(),
+        metadata: log.metadata,
+      })),
+    });
   } catch (err) {
     next(err);
   }

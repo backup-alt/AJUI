@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { ApiService } from "../../core/api.service";
+import { ErpDataService } from "../../data/erp-data.service";
 
 type Role = "Admin" | "Project Manager" | "Accountant";
 type Status = "active" | "inactive" | "on_leave";
@@ -159,10 +160,10 @@ interface ActivityEntry {
               </div>
             </div>
             <div class="settings-w11-card-body">
-              @if (employee()!.projectIds.length > 0) {
+              @if (employeeProjectNames().length > 0) {
                 <div class="settings-w11-proj-list">
-                  @for (pid of employee()!.projectIds; track pid) {
-                    <span class="settings-w11-proj-chip">{{ pid }}</span>
+                  @for (name of employeeProjectNames(); track name) {
+                    <span class="settings-w11-proj-chip">{{ name }}</span>
                   }
                 </div>
               } @else {
@@ -216,6 +217,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
+  private readonly erp = inject(ErpDataService);
 
   readonly activeTab = signal<"profile" | "permissions" | "projects" | "activity">("profile");
   readonly loading = signal(true);
@@ -236,6 +238,15 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   // Employee data
   readonly employee = signal<Employee | null>(null);
+
+  readonly employeeProjectNames = computed<string[]>(() => {
+    const emp = this.employee();
+    if (!emp || !emp.projectIds.length) return [];
+    const projects = this.erp.projects();
+    return emp.projectIds
+      .map((pid) => projects.find((p) => p.id === pid || String(p.id) === pid)?.name || pid)
+      .filter(Boolean);
+  });
 
   readonly approvalTypes = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },

@@ -259,7 +259,6 @@ export class SettingsShellComponent {
       label: "System",
       items: [
         { id: "sessions", label: "Sessions", subtitle: "Active sign-ins", icon: this.icons.lock, route: "/settings/sessions" },
-        { id: "reports", label: "Reports Settings", subtitle: "Default formats and emails", icon: this.icons.doc, route: "/settings/reports" },
       ],
     },
   ]);

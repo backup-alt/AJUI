@@ -13,6 +13,7 @@ router.get("/users", adminCtrl.listAllUsers);
 router.get("/users/:id", adminCtrl.getUserById);
 router.get("/users/:id/request-permissions", adminCtrl.getUserRequestPermissions);
 router.put("/users/:id/request-permissions", adminCtrl.saveUserRequestPermissions);
+router.get("/users/:id/activity", adminCtrl.getEmployeeActivity);
 router.get("/access-schedule", adminCtrl.getAccessSchedule);
 router.put("/access-schedule", adminCtrl.saveAccessSchedule);
 router.get("/access-schedule/status", adminCtrl.getAccessScheduleStatus);
