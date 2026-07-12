@@ -20,10 +20,6 @@ import { ApiService } from "../core/api.service";
             <strong>{{ title }}</strong>
           </div>
 
-          <div class="toolbar-search">
-            <input [placeholder]="searchPlaceholder" />
-          </div>
-
           <div class="toolbar-right">
             <button
               type="button"

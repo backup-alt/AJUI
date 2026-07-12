@@ -80,45 +80,23 @@ import { ApiService } from "../../core/api.service";
       <div class="settings-w11-card-head">
         <div>
           <h2>Change password</h2>
-          <p>Use a strong password with at least 8 characters.</p>
+          <p>Request a password reset link to be sent to your email.</p>
         </div>
       </div>
       <div class="settings-w11-card-body">
         <div class="settings-w11-field">
-          <label for="account-current">Current password</label>
+          <label for="account-email">Email</label>
           <input
-            id="account-current"
-            type="password"
-            [value]="currentPassword()"
-            (input)="currentPassword.set($any($event.target).value)"
-            autocomplete="current-password"
+            id="account-email"
+            type="email"
+            [value]="email()"
+            readonly
+            class="settings-w11-readonly-input"
           />
         </div>
-        <div class="settings-w11-field-row">
-          <div class="settings-w11-field">
-            <label for="account-new">New password</label>
-            <input
-              id="account-new"
-              type="password"
-              [value]="newPassword()"
-              (input)="newPassword.set($any($event.target).value)"
-              autocomplete="new-password"
-            />
-          </div>
-          <div class="settings-w11-field">
-            <label for="account-confirm">Confirm new password</label>
-            <input
-              id="account-confirm"
-              type="password"
-              [value]="confirmPassword()"
-              (input)="confirmPassword.set($any($event.target).value)"
-              autocomplete="new-password"
-            />
-          </div>
-        </div>
         <div class="settings-w11-actions">
-          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="changePassword()">
-            {{ changingPassword() ? 'Updating…' : 'Update password' }}
+          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="requestPasswordReset()">
+            {{ sendingReset() ? 'Sending…' : 'Send password reset link' }}
           </button>
         </div>
         @if (passwordMessage()) {
@@ -142,7 +120,7 @@ export class SettingsAccountComponent {
   readonly currentPassword = signal("");
   readonly newPassword = signal("");
   readonly confirmPassword = signal("");
-  readonly changingPassword = signal(false);
+  readonly sendingReset = signal(false);
   readonly passwordMessage = signal<string | null>(null);
   readonly passwordError = signal(false);
 
@@ -164,40 +142,21 @@ export class SettingsAccountComponent {
     });
   }
 
-  changePassword() {
+  requestPasswordReset() {
     this.passwordError.set(false);
     this.passwordMessage.set(null);
 
-    if (this.newPassword().length < 8) {
-      this.passwordError.set(true);
-      this.passwordMessage.set("New password must be at least 8 characters.");
-      return;
-    }
-    if (this.newPassword() !== this.confirmPassword()) {
-      this.passwordError.set(true);
-      this.passwordMessage.set("Passwords do not match.");
-      return;
-    }
-    if (!this.currentPassword()) {
-      this.passwordError.set(true);
-      this.passwordMessage.set("Please enter your current password.");
-      return;
-    }
-
-    this.changingPassword.set(true);
-    this.api.changePassword({ currentPassword: this.currentPassword(), newPassword: this.newPassword() }).subscribe({
+    this.sendingReset.set(true);
+    this.api.forgotPassword(this.email()).subscribe({
       next: () => {
-        this.changingPassword.set(false);
+        this.sendingReset.set(false);
         this.passwordError.set(false);
-        this.passwordMessage.set("Password updated successfully.");
-        this.currentPassword.set("");
-        this.newPassword.set("");
-        this.confirmPassword.set("");
+        this.passwordMessage.set("Password reset link sent! Check your email.");
       },
       error: (err) => {
-        this.changingPassword.set(false);
-        this.passwordError.set(true);
-        this.passwordMessage.set(err?.message || "Failed to update password. Please check your current password.");
+        this.sendingReset.set(false);
+        this.passwordError.set(false);
+        this.passwordMessage.set("If an account exists with this email, a reset link has been sent.");
       },
     });
   }
