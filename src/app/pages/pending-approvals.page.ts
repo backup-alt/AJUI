@@ -443,16 +443,26 @@ export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
   private readonly api = inject(ApiService);
 
-  readonly showMaterial = signal(true);
-  readonly showLabour = signal(true);
-  readonly showSiteExpense = signal(true);
-  readonly showGeneralExpense = signal(true);
-  readonly showPayment = signal(true);
-  readonly showSubcontract = signal(true);
+  readonly showMaterial = signal(false);
+  readonly showLabour = signal(false);
+  readonly showSiteExpense = signal(false);
+  readonly showGeneralExpense = signal(false);
+  readonly showPayment = signal(false);
+  readonly showSubcontract = signal(false);
 
   ngOnInit() {
     const user = this.api.user();
-    if (!user || user.role === "admin") return;
+    if (!user) return;
+
+    if (user.role === "admin") {
+      this.showMaterial.set(true);
+      this.showLabour.set(true);
+      this.showSiteExpense.set(true);
+      this.showGeneralExpense.set(true);
+      this.showPayment.set(true);
+      this.showSubcontract.set(true);
+      return;
+    }
 
     this.api.getEmployeeRequestPermissions(user.id).subscribe({
       next: (prefs) => {

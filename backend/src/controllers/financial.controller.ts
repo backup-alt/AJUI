@@ -7,6 +7,8 @@ import * as vendorService from "../services/vendor.service.js";
 import * as subcontractorService from "../services/subcontractor.service.js";
 import * as approvalService from "../services/approval.service.js";
 import { getScopedProjectIds } from "../middleware/rbac.js";
+import { User } from "../models/User.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 // =================== MATERIALS ===================
 export async function createMaterial(req: Request, res: Response, next: NextFunction) {
@@ -384,16 +386,56 @@ export async function getApproval(req: Request, res: Response, next: NextFunctio
 export async function approveApproval(req: Request, res: Response, next: NextFunction) {
   try {
     const reviewer = req.user?.sub || "unknown";
-    const approval = await approvalService.approveRequest(req.params.id, reviewer);
-    res.json({ approval });
+    const approval = await approvalService.getApprovalById(req.params.id);
+    if (!approval) throw new AppError(404, "Approval not found");
+
+    if (req.user?.role !== "admin") {
+      const user = await User.findById(req.user?.sub).select("requestPermissions").lean();
+      const perms = user?.requestPermissions;
+
+      const permMap: Record<string, boolean> = {
+        material: perms?.canApproveMaterial ?? false,
+        labour: perms?.canApproveLabour ?? false,
+        expense: perms?.canApproveExpense ?? false,
+        payment: perms?.canApprovePayment ?? false,
+        subcontract: perms?.canApproveSubcontract ?? false,
+      };
+
+      if (!permMap[approval.type]) {
+        throw new AppError(403, `You do not have permission to approve ${approval.type} requests`);
+      }
+    }
+
+    const updated = await approvalService.approveRequest(req.params.id, reviewer);
+    res.json({ approval: updated });
   } catch (e) { next(e); }
 }
 
 export async function rejectApproval(req: Request, res: Response, next: NextFunction) {
   try {
     const reviewer = req.user?.sub || "unknown";
-    const approval = await approvalService.rejectRequest(req.params.id, reviewer);
-    res.json({ approval });
+    const approval = await approvalService.getApprovalById(req.params.id);
+    if (!approval) throw new AppError(404, "Approval not found");
+
+    if (req.user?.role !== "admin") {
+      const user = await User.findById(req.user?.sub).select("requestPermissions").lean();
+      const perms = user?.requestPermissions;
+
+      const permMap: Record<string, boolean> = {
+        material: perms?.canApproveMaterial ?? false,
+        labour: perms?.canApproveLabour ?? false,
+        expense: perms?.canApproveExpense ?? false,
+        payment: perms?.canApprovePayment ?? false,
+        subcontract: perms?.canApproveSubcontract ?? false,
+      };
+
+      if (!permMap[approval.type]) {
+        throw new AppError(403, `You do not have permission to reject ${approval.type} requests`);
+      }
+    }
+
+    const updated = await approvalService.rejectRequest(req.params.id, reviewer);
+    res.json({ approval: updated });
   } catch (e) { next(e); }
 }
 
