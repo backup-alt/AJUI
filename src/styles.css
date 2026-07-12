@@ -7996,8 +7996,10 @@ body {
 .toolbar-right {
   display: inline-flex;
   align-items: center;
-  justify-self: end;
   gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding-right: 8px;
 }
 
 .dark-mode-toggle {
@@ -8276,7 +8278,7 @@ body {
 
 .toolbar-right {
   min-width: 0;
-  padding-right: 14px;
+  padding-right: 8px;
 }
 
 .enterprise-header.modal-blurred {
