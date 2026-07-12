@@ -95,7 +95,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     await ActivityLog.create({
       userId: result.user.id,
       action: "sign_in",
-      description: `Signed in from ${req.ip || "Unknown IP"}`,
+      description: `Signed in`,
       ip: req.ip,
       userAgent: req.headers["user-agent"],
     });

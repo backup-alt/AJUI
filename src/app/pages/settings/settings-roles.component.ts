@@ -160,11 +160,6 @@ type CombinedInvite = {
                 <td><span class="settings-w11-role-pill" [attr.data-role]="e.role">{{ e.role }}</span></td>
                 <td><span class="settings-w11-status-pill" [attr.data-status]="e.status">{{ e.status }}</span></td>
                 <td>{{ formatDate(e.lastLoginAt) }}</td>
-                <td class="settings-w11-actions-cell">
-                  <button type="button" class="settings-w11-icon-btn" (click)="select(e); $event.stopPropagation()" aria-label="Open details">
-                    <svg viewBox="0 0 16 16"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  </button>
-                </td>
               </tr>
             } @empty {
               <tr>

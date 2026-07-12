@@ -17,16 +17,6 @@ interface AccessWindow {
   createdBy: string;
 }
 
-interface AuditLogEntry {
-  id: string;
-  timestamp: string;
-  user: string;
-  role: string;
-  action: string;
-  result: string;
-  ip?: string;
-}
-
 @Component({
   selector: "agb-settings-access-schedule",
   standalone: true,
@@ -177,48 +167,6 @@ interface AuditLogEntry {
         </label>
       </div>
     </section>
-
-    <section class="settings-w11-card">
-      <div class="settings-w11-card-head">
-        <div>
-          <h2>Audit Log</h2>
-          <p>Logins, logouts, and approval decisions from the last 7 days.</p>
-        </div>
-        <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="exportLog()" [disabled]="exporting()">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v9 M4 9l4 4 4-4 M3 14h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {{ exporting() ? 'Exporting…' : 'Export log' }}
-        </button>
-      </div>
-      <div class="settings-w11-card-body">
-        <div class="settings-w11-table-wrap" style="margin-top: 8px">
-          @if (auditLogLoading()) {
-            <p class="settings-w11-empty-hint">Loading audit log…</p>
-          } @else if (auditLog().length === 0) {
-            <p class="settings-w11-empty-hint">No audit entries in the last 7 days.</p>
-          } @else {
-            <table class="settings-w11-table">
-              <thead>
-                <tr><th>Timestamp</th><th>User</th><th>Role</th><th>Action</th><th>Result</th><th>IP</th></tr>
-              </thead>
-              <tbody>
-                @for (entry of auditLog(); track entry.id) {
-                  <tr>
-                    <td>{{ formatLogTime(entry.timestamp) }}</td>
-                    <td>{{ entry.user }}</td>
-                    <td>{{ entry.role }}</td>
-                    <td>{{ entry.action }}</td>
-                    <td>
-                      <span class="settings-w11-status-pill" [attr.data-status]="(entry.result || '').toLowerCase()">{{ entry.result }}</span>
-                    </td>
-                    <td>{{ entry.ip || '—' }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
-        </div>
-      </div>
-    </section>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -231,17 +179,12 @@ export class SettingsAccessScheduleComponent implements OnInit {
   readonly dirty = signal(false);
   readonly saving = signal(false);
 
-  readonly auditLog = signal<AuditLogEntry[]>([]);
-  readonly auditLogLoading = signal(false);
-  readonly exporting = signal(false);
-
   private markDirty() {
     this.dirty.set(true);
   }
 
   ngOnInit() {
     this.loadSchedule();
-    this.loadAuditLog();
   }
 
   private loadSchedule() {
@@ -265,29 +208,6 @@ export class SettingsAccessScheduleComponent implements OnInit {
       },
       error: () => {
         // Keep defaults
-      },
-    });
-  }
-
-  private loadAuditLog() {
-    this.auditLogLoading.set(true);
-    this.api.listAuditLogs({ days: 7, limit: 50 }).subscribe({
-      next: (res) => {
-        const items = (res?.items || []).map((row: any) => ({
-          id: row.id || row._id || `log-${Date.now()}-${Math.random()}`,
-          timestamp: row.timestamp || row.createdAt || row.date || "",
-          user: row.user || row.userName || row.email || "—",
-          role: row.role || row.userRole || "—",
-          action: row.action || row.event || "—",
-          result: row.result || row.status || "—",
-          ip: row.ip || row.ipAddress || "—",
-        }));
-        this.auditLog.set(items);
-        this.auditLogLoading.set(false);
-      },
-      error: () => {
-        this.auditLog.set([]);
-        this.auditLogLoading.set(false);
       },
     });
   }
@@ -343,22 +263,6 @@ export class SettingsAccessScheduleComponent implements OnInit {
 
   nextChange(): string {
     return "—";
-  }
-
-  formatLogTime(iso: string): string {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    const now = new Date();
-    const diff = now.getTime() - d.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    if (days === 0) {
-      return `Today ${d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
-    }
-    if (days === 1) {
-      return `Yesterday ${d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
-    }
-    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   }
 
   addWindow() {
@@ -422,25 +326,6 @@ export class SettingsAccessScheduleComponent implements OnInit {
       )
     );
     this.markDirty();
-  }
-
-  exportLog() {
-    this.exporting.set(true);
-    this.api.exportAuditLog({ days: 7 }).subscribe({
-      next: (blob) => {
-        this.exporting.set(false);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-      },
-      error: () => {
-        this.exporting.set(false);
-        alert("Failed to export audit log.");
-      },
-    });
   }
 
   save() {
