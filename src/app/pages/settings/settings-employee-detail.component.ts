@@ -225,7 +225,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly canApproveLabour = signal(true);
   readonly canApproveExpense = signal(true);
   readonly canApproveGeneral = signal(true);
-  readonly canApproveSubcontract = signal(false);
+  readonly canApproveSubcontract = signal(true);
   readonly canApprovePayment = signal(true);
   readonly canManageWorkers = signal(true);
   readonly canViewReports = signal(true);

@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
+import { ApiService } from "../core/api.service";
 import type { Project } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableRow } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -438,8 +439,9 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PendingApprovalsPage {
+export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
+  private readonly api = inject(ApiService);
 
   readonly showMaterial = signal(true);
   readonly showLabour = signal(true);
@@ -447,6 +449,23 @@ export class PendingApprovalsPage {
   readonly showGeneralExpense = signal(true);
   readonly showPayment = signal(true);
   readonly showSubcontract = signal(true);
+
+  ngOnInit() {
+    const user = this.api.user();
+    if (!user || user.role === "admin") return;
+
+    this.api.getEmployeeRequestPermissions(user.id).subscribe({
+      next: (prefs) => {
+        this.showMaterial.set(!!prefs.canApproveMaterial);
+        this.showLabour.set(!!prefs.canApproveLabour);
+        this.showSiteExpense.set(!!prefs.canApproveExpense);
+        this.showGeneralExpense.set(!!prefs.canApproveGeneral);
+        this.showSubcontract.set(!!prefs.canApproveSubcontract);
+        this.showPayment.set(!!prefs.canApprovePayment);
+      },
+      error: () => {},
+    });
+  }
 
   readonly materialApprovals = computed(() =>
     this.showMaterial() ? this.materialRows().filter((row) => this.isPending(row.status)) : []

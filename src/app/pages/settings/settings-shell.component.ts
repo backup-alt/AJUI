@@ -251,7 +251,6 @@ export class SettingsShellComponent {
       label: "Management",
       items: [
         { id: "roles", label: "Roles and Employees", subtitle: "Team access and permissions", icon: this.icons.people, route: "/settings/roles" },
-        { id: "access-management", label: "Access Management", subtitle: "Default approval permissions", icon: this.icons.lock, route: "/settings/access-management" },
         { id: "sites", label: "Sites Directory", subtitle: "All sites and their activity", icon: this.icons.pin, route: "/settings/sites" },
         { id: "access-schedule", label: "Access Schedule", subtitle: "Restrict access windows", icon: this.icons.clock, route: "/settings/access-schedule" },
       ],
@@ -278,7 +277,7 @@ export class SettingsShellComponent {
         ...g,
         items: g.items.filter((item) => {
           // These sections are admin-only
-          if (item.id === "roles" || item.id === "access-management" || item.id === "access-schedule" || item.id === "sessions") {
+          if (item.id === "roles" || item.id === "access-schedule" || item.id === "sessions") {
             return false;
           }
           return true;

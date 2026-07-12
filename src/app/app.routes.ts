@@ -44,7 +44,6 @@ export const routes: Routes = [
       { path: "appearance", loadComponent: () => import("./pages/settings/settings-appearance.component").then((m) => m.SettingsAppearanceComponent) },
       { path: "roles", loadComponent: () => import("./pages/settings/settings-roles.component").then((m) => m.SettingsRolesComponent) },
       { path: "roles/employee/:id", loadComponent: () => import("./pages/settings/settings-employee-detail.component").then((m) => m.SettingsEmployeeDetailComponent) },
-      { path: "access-management", loadComponent: () => import("./pages/settings/settings-access-management.component").then((m) => m.SettingsAccessManagementComponent) },
       { path: "sites", loadComponent: () => import("./pages/settings/settings-sites.component").then((m) => m.SettingsSitesComponent) },
       { path: "access-schedule", loadComponent: () => import("./pages/settings/settings-access-schedule.component").then((m) => m.SettingsAccessScheduleComponent) },
       { path: "sessions", loadComponent: () => import("./pages/settings/settings-sessions.component").then((m) => m.SettingsSessionsComponent) },
