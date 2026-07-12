@@ -112,28 +112,6 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
               </div>
             </section>
 
-            <section class="approval-filter-bar">
-              <span class="filter-label">Show:</span>
-              <button type="button" class="filter-chip" [class.active]="isFilterActive('material')" (click)="toggleFilter('material')">
-                Material ({{ materialApprovals().length }})
-              </button>
-              <button type="button" class="filter-chip" [class.active]="isFilterActive('labour')" (click)="toggleFilter('labour')">
-                Labour ({{ labourApprovals().length }})
-              </button>
-              <button type="button" class="filter-chip" [class.active]="isFilterActive('site_expense')" (click)="toggleFilter('site_expense')">
-                Site Expense ({{ siteExpenseApprovals().length }})
-              </button>
-              <button type="button" class="filter-chip" [class.active]="isFilterActive('general_expense')" (click)="toggleFilter('general_expense')">
-                General Expense ({{ generalExpenseApprovals().length }})
-              </button>
-              <button type="button" class="filter-chip" [class.active]="isFilterActive('payment')" (click)="toggleFilter('payment')">
-                Payment ({{ paymentApprovals().length }})
-              </button>
-              <button type="button" class="filter-chip" [class.active]="isFilterActive('subcontract')" (click)="toggleFilter('subcontract')">
-                Subcontract ({{ subcontractApprovals().length }})
-              </button>
-            </section>
-
             <div class="approvals-stack">
               @if (showMaterial()) {
               <section class="operations-workbench approvals-workbench approval-section">

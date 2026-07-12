@@ -30,8 +30,11 @@ async function checkAccessRestriction(userRole: string): Promise<{ isRestricted:
 
     const now = new Date();
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const currentDay = dayNames[now.getDay()];
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const istMinutes = (utcMinutes + 330) % (24 * 60);
+    const dayOffset = Math.floor((utcMinutes + 330) / (24 * 60));
+    const currentDayIndex = (now.getUTCDay() + dayOffset) % 7;
+    const currentDay = dayNames[currentDayIndex];
 
     for (const window of schedule.windows) {
       if (!window.isActive) continue;
@@ -45,9 +48,9 @@ async function checkAccessRestriction(userRole: string): Promise<{ isRestricted:
 
       let isWithin = false;
       if (startMinutes < endMinutes) {
-        isWithin = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+        isWithin = istMinutes >= startMinutes && istMinutes < endMinutes;
       } else {
-        isWithin = currentMinutes >= startMinutes || currentMinutes < endMinutes;
+        isWithin = istMinutes >= startMinutes || istMinutes < endMinutes;
       }
 
       if (isWithin) {

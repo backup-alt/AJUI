@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject
 import { Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenu } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
+import { ApiService } from "../core/api.service";
 import type { Project, ProjectStatus } from "../../data/dashboardData";
 
 type SidebarItem = {
@@ -102,6 +103,7 @@ type SidebarItem = {
 })
 export class EnterpriseSidebarComponent {
   private readonly data = inject(ErpDataService);
+  private readonly api = inject(ApiService);
   private readonly router = inject(Router);
 
   @Input() active = "dashboard";
@@ -119,7 +121,24 @@ export class EnterpriseSidebarComponent {
 
   get sidebarProjects(): Project[] {
     if (this.clientId) return this.clientProjects;
-    return this.data.sortProjectsByLastWorked(this.data.projects());
+
+    const user = this.api.user();
+    const allProjects = this.data.projects();
+
+    if (!user) {
+      return this.data.sortProjectsByLastWorked(allProjects);
+    }
+
+    if (user.role === "project_manager" || user.role === "supervisor") {
+      const managedIds = user.managedProjectIds || [];
+      if (managedIds.length === 0) {
+        return [];
+      }
+      const filtered = allProjects.filter((p) => managedIds.includes(p.id));
+      return this.data.sortProjectsByLastWorked(filtered);
+    }
+
+    return this.data.sortProjectsByLastWorked(allProjects);
   }
 
   get filteredSidebarProjects(): Project[] {

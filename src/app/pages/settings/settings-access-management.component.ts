@@ -257,7 +257,7 @@ export class SettingsAccessManagementComponent implements OnInit {
 
       if (original?.id) {
         operations.push(
-          this.api.updateAccessTemplate(original.id, { approvalTypes }).toPromise()
+          this.api.updateAccessTemplateByRole(roleKey, { approvalTypes }).toPromise()
         );
       } else {
         operations.push(

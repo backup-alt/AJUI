@@ -43,9 +43,6 @@ export const authInterceptor: HttpInterceptorFn = (
         req.url.includes("/auth/supervisor/verify");
 
       if (err.status === 401 && !isAuthCall) {
-        // Token expired or invalid — clear session, but DON'T do a hard
-        // page reload. Components can choose to surface this; navigation
-        // is the router's job, not the interceptor's.
         try {
           localStorage.removeItem("ajui_access_token");
           localStorage.removeItem("ajui_refresh_token");
@@ -54,16 +51,34 @@ export const authInterceptor: HttpInterceptorFn = (
           localStorage.removeItem("agb-erp:session");
         } catch {}
 
-        // Schedule the redirect in the next microtask so the error
-        // still reaches the subscriber first.
         queueMicrotask(() => {
           try {
             router.navigate(["/login"]);
-          } catch {
-            // router not available in some test contexts — ignore
-          }
+          } catch {}
         });
       }
+
+      if (err.status === 403) {
+        const errorCode = err.error?.code || err.error?.error?.code;
+        const errorMessage = err.error?.error || err.error?.message || "";
+
+        if (errorCode === "ACCESS_SCHEDULE_RESTRICTED" || errorMessage.includes("Access timing is over")) {
+          try {
+            localStorage.removeItem("ajui_access_token");
+            localStorage.removeItem("ajui_refresh_token");
+            localStorage.removeItem("ajui_user");
+            localStorage.removeItem("ajui_expires_at");
+            localStorage.removeItem("agb-erp:session");
+          } catch {}
+
+          queueMicrotask(() => {
+            try {
+              router.navigate(["/login"], { queryParams: { reason: "access_schedule" } });
+            } catch {}
+          });
+        }
+      }
+
       return throwError(() => err);
     })
   );

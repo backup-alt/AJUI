@@ -733,6 +733,15 @@ export class ApiService {
     );
   }
 
+  updateAccessTemplateByRole(role: string, payload: {
+    name?: string;
+    approvalTypes?: Record<string, { canApprove: boolean }>;
+  }): Observable<{ template: any }> {
+    return this.http.patch<{ template: any }>(`${this.baseUrl}/admin/access-templates/role/${role}`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   deleteAccessTemplate(id: string): Observable<{ success: boolean }> {
     return this.http.delete<{ success: boolean }>(`${this.baseUrl}/admin/access-templates/${id}`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)

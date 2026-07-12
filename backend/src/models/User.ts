@@ -14,6 +14,16 @@ export interface IUser extends Document {
   createdBy?: Types.ObjectId;
   supervisorProfileId?: Types.ObjectId;
   managedProjectIds: Types.ObjectId[];
+  requestPermissions?: {
+    canApproveMaterial: boolean;
+    canApproveLabour: boolean;
+    canApproveExpense: boolean;
+    canApproveGeneral: boolean;
+    canApproveSubcontract: boolean;
+    canApprovePayment: boolean;
+    canManageWorkers: boolean;
+    canViewReports: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
   lastLoginAt?: Date;
@@ -44,6 +54,16 @@ const userSchema = new Schema<IUser>(
     lastLoginAt: { type: Date },
     deactivatedAt: { type: Date },
     deactivatedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    requestPermissions: {
+      canApproveMaterial: { type: Boolean, default: false },
+      canApproveLabour: { type: Boolean, default: false },
+      canApproveExpense: { type: Boolean, default: false },
+      canApproveGeneral: { type: Boolean, default: false },
+      canApproveSubcontract: { type: Boolean, default: false },
+      canApprovePayment: { type: Boolean, default: false },
+      canManageWorkers: { type: Boolean, default: false },
+      canViewReports: { type: Boolean, default: false },
+    },
   },
   { timestamps: true }
 );

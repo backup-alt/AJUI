@@ -11,6 +11,8 @@ router.use(requireRole("admin"));
 
 router.get("/users", adminCtrl.listAllUsers);
 router.get("/users/:id", adminCtrl.getUserById);
+router.get("/users/:id/request-permissions", adminCtrl.getUserRequestPermissions);
+router.put("/users/:id/request-permissions", adminCtrl.saveUserRequestPermissions);
 router.get("/access-schedule", adminCtrl.getAccessSchedule);
 router.put("/access-schedule", adminCtrl.saveAccessSchedule);
 router.get("/access-schedule/status", adminCtrl.getAccessScheduleStatus);
@@ -25,6 +27,7 @@ router.post("/users/deactivate", adminCtrl.deactivateSupervisor);
 // Access Templates
 router.get("/access-templates", adminCtrl.listAccessTemplates);
 router.get("/access-templates/role/:role", adminCtrl.getAccessTemplateByRole);
+router.patch("/access-templates/role/:role", adminCtrl.updateAccessTemplateByRole);
 router.get("/access-templates/:id", adminCtrl.getAccessTemplate);
 router.post("/access-templates", adminCtrl.createAccessTemplate);
 router.patch("/access-templates/:id", adminCtrl.updateAccessTemplate);

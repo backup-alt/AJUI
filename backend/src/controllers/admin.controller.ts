@@ -156,6 +156,51 @@ export async function updateAccessTemplate(req: Request, res: Response, next: Ne
   }
 }
 
+const updateAccessTemplateByRoleSchema = z.object({
+  body: z.object({
+    name: z.string().min(1).max(100).optional(),
+    approvalTypes: z.object({
+      material: z.object({ canApprove: z.boolean() }).partial().optional(),
+      labour: z.object({ canApprove: z.boolean() }).partial().optional(),
+      attendance: z.object({ canApprove: z.boolean() }).partial().optional(),
+      site_expense: z.object({ canApprove: z.boolean() }).partial().optional(),
+      general_expense: z.object({ canApprove: z.boolean() }).partial().optional(),
+      payment: z.object({ canApprove: z.boolean() }).partial().optional(),
+      subcontract: z.object({ canApprove: z.boolean() }).partial().optional(),
+    }).optional(),
+  }),
+});
+
+export async function updateAccessTemplateByRole(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { role } = req.params;
+    const { name, approvalTypes } = updateAccessTemplateByRoleSchema.parse(req.body).body;
+
+    const template = await AccessTemplate.findOneAndUpdate(
+      { role },
+      {
+        ...(name && { name }),
+        ...(approvalTypes && {
+          approvalTypes: {
+            material: { canApprove: approvalTypes.material?.canApprove ?? false },
+            labour: { canApprove: approvalTypes.labour?.canApprove ?? false },
+            attendance: { canApprove: approvalTypes.attendance?.canApprove ?? false },
+            site_expense: { canApprove: approvalTypes.site_expense?.canApprove ?? false },
+            general_expense: { canApprove: approvalTypes.general_expense?.canApprove ?? false },
+            payment: { canApprove: approvalTypes.payment?.canApprove ?? false },
+            subcontract: { canApprove: approvalTypes.subcontract?.canApprove ?? false },
+          },
+        }),
+      },
+      { new: true, runValidators: true, upsert: true }
+    ).lean();
+
+    res.json({ template });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function deleteAccessTemplate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const template = await AccessTemplate.findByIdAndDelete(req.params.id);
@@ -197,10 +242,55 @@ export async function listAllUsers(req: Request, res: Response, next: NextFuncti
 export async function getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const user = await User.findById(req.params.id)
-      .select("_id name email phone role status managedProjectIds createdAt lastLoginAt")
+      .select("_id name email phone role status managedProjectIds createdAt lastLoginAt requestPermissions")
       .lean();
     if (!user) throw new AppError(404, "User not found");
     res.json({ employee: user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getUserRequestPermissions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await User.findById(req.params.id).select("requestPermissions").lean();
+    if (!user) throw new AppError(404, "User not found");
+    res.json({
+      canApproveMaterial: user.requestPermissions?.canApproveMaterial ?? false,
+      canApproveLabour: user.requestPermissions?.canApproveLabour ?? false,
+      canApproveExpense: user.requestPermissions?.canApproveExpense ?? false,
+      canApproveGeneral: user.requestPermissions?.canApproveGeneral ?? false,
+      canApproveSubcontract: user.requestPermissions?.canApproveSubcontract ?? false,
+      canApprovePayment: user.requestPermissions?.canApprovePayment ?? false,
+      canManageWorkers: user.requestPermissions?.canManageWorkers ?? false,
+      canViewReports: user.requestPermissions?.canViewReports ?? false,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function saveUserRequestPermissions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { canApproveMaterial, canApproveLabour, canApproveExpense, canApproveGeneral, canApproveSubcontract, canApprovePayment, canManageWorkers, canViewReports } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      {
+        requestPermissions: {
+          canApproveMaterial: !!canApproveMaterial,
+          canApproveLabour: !!canApproveLabour,
+          canApproveExpense: !!canApproveExpense,
+          canApproveGeneral: !!canApproveGeneral,
+          canApproveSubcontract: !!canApproveSubcontract,
+          canApprovePayment: !!canApprovePayment,
+          canManageWorkers: !!canManageWorkers,
+          canViewReports: !!canViewReports,
+        },
+      },
+      { new: true, runValidators: true }
+    ).select("requestPermissions").lean();
+    if (!user) throw new AppError(404, "User not found");
+    res.json({ success: true, requestPermissions: user.requestPermissions });
   } catch (err) {
     next(err);
   }
