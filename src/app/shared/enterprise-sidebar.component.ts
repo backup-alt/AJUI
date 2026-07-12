@@ -74,16 +74,6 @@ type SidebarItem = {
                       <path d="m14.8 7.2 3 3" />
                     </svg>
                   </button>
-                  <button type="button" aria-label="Delete project" (click)="requestDeleteProject(project, $event)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M5 7h14" />
-                      <path d="M9 7V5h6v2" />
-                      <path d="M8 10v8" />
-                      <path d="M12 10v8" />
-                      <path d="M16 10v8" />
-                      <path d="M7 7l1 14h8l1-14" />
-                    </svg>
-                  </button>
                 </div>
               </div>
             </div>

@@ -1098,9 +1098,8 @@ ion-split-pane.landing-split {
 }
 
 .add-client-icon {
-  display: grid;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   width: 58px;
   height: 58px;
@@ -8107,9 +8106,8 @@ body {
 }
 
 .login-shell {
-  display: grid;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   min-height: 100vh;
   padding: 24px;

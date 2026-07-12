@@ -497,6 +497,7 @@ export class ApiService {
     emailDaily: boolean;
     emailWeekly: boolean;
     emailMonthly: boolean;
+    singleApprovalForSiteExpenseMaterials: boolean;
   }> {
     return this.http.get<any>(`${this.baseUrl}/users/me/notifications`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
@@ -508,6 +509,7 @@ export class ApiService {
     emailDaily?: boolean;
     emailWeekly?: boolean;
     emailMonthly?: boolean;
+    singleApprovalForSiteExpenseMaterials?: boolean;
   }): Observable<{ success: boolean; prefs: any }> {
     return this.http.put<{ success: boolean; prefs: any }>(`${this.baseUrl}/users/me/notifications`, prefs, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)

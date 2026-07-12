@@ -9,6 +9,7 @@ interface NotificationPrefs {
   emailDaily: boolean;
   emailWeekly: boolean;
   emailMonthly: boolean;
+  singleApprovalForSiteExpenseMaterials: boolean;
 }
 
 @Component({
@@ -45,6 +46,13 @@ interface NotificationPrefs {
             <small>When a supervisor submits materials, labour, expenses, or payments.</small>
           </div>
           <input type="checkbox" [checked]="pushNewSubmission()" (change)="onToggle('pushNewSubmission', $any($event.target).checked)" />
+        </label>
+        <label class="settings-w11-toggle-row">
+          <div>
+            <strong>One approval for material and expense</strong>
+            <small>When a site material is added as expense, only one approval on either table is required.</small>
+          </div>
+          <input type="checkbox" [checked]="singleApprovalForSiteExpenseMaterials()" (change)="onToggle('singleApprovalForSiteExpenseMaterials', $any($event.target).checked)" />
         </label>
       </div>
     </section>
@@ -108,6 +116,7 @@ export class SettingsNotificationsComponent implements OnInit, OnDestroy {
   readonly emailDaily = signal(true);
   readonly emailWeekly = signal(true);
   readonly emailMonthly = signal(false);
+  readonly singleApprovalForSiteExpenseMaterials = signal(false);
 
   readonly saving = signal(false);
   readonly lastSaved = signal(false);
@@ -132,6 +141,7 @@ export class SettingsNotificationsComponent implements OnInit, OnDestroy {
         this.emailDaily.set(prefs.emailDaily ?? true);
         this.emailWeekly.set(prefs.emailWeekly ?? true);
         this.emailMonthly.set(prefs.emailMonthly ?? false);
+        this.singleApprovalForSiteExpenseMaterials.set(prefs.singleApprovalForSiteExpenseMaterials ?? false);
       },
       error: () => {
         // Fallback: keep defaults
@@ -144,6 +154,7 @@ export class SettingsNotificationsComponent implements OnInit, OnDestroy {
     if (key === "emailDaily") this.emailDaily.set(value);
     if (key === "emailWeekly") this.emailWeekly.set(value);
     if (key === "emailMonthly") this.emailMonthly.set(value);
+    if (key === "singleApprovalForSiteExpenseMaterials") this.singleApprovalForSiteExpenseMaterials.set(value);
 
     this.lastSaved.set(false);
     this.saveSubject.next({ [key]: value } as any);
