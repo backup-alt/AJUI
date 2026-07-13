@@ -34,4 +34,9 @@ export const AUTH_ROUTES: Routes = [
     path: 'signup',
     loadComponent: () => import('./signup/signup.page').then((m) => m.SignupPage),
   },
+  {
+    path: 'change-password',
+    loadComponent: () =>
+      import('./change-password/change-password.page').then((m) => m.ChangePasswordPage),
+  },
 ];

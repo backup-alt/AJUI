@@ -23,6 +23,27 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Custom-scheme deep link for invite emails:
+                 agb-supervisor://invite?token=ABC&otp=123456
+                 Tapping a link in the email opens the app on the signup page with the token pre-filled. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="agb-supervisor" android:host="invite" />
+            </intent-filter>
+
+            <!-- Universal Link for invite emails:
+                 https://agb-o3cc.onrender.com/invite?token=ABC
+                 (If you set up assetlinks.json at /.well-known/assetlinks.json with the
+                 matching SHA-256 fingerprint, you can also drop the autoVerify="false".) -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="agb-o3cc.onrender.com" android:pathPrefix="/invite" />
+            </intent-filter>
+
         </activity>
 
         <provider

@@ -6,6 +6,7 @@ import {
   AlertController, ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
   personCircleOutline, mailOutline, callOutline, businessOutline,
@@ -14,6 +15,7 @@ import {
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-profile',
@@ -183,9 +185,11 @@ export class ProfilePage implements OnInit {
   private supervisor = inject(SupervisorService);
   private alertCtrl = inject(AlertController);
   private toastCtrl = inject(ToastController);
+  private notifications = inject(NotificationService);
+  router = inject(Router);
 
   currentUser = signal<{ name: string; email: string; phone: string } | null>(null);
-  pushEnabled = true;
+  pushEnabled = false;
   darkMode = false;
 
   userInitials(): string {
@@ -203,67 +207,30 @@ export class ProfilePage implements OnInit {
     });
 
     this.currentUser.set(this.auth.currentUser());
+    this.pushEnabled = this.notifications.pushEnabled();
+    this.darkMode = document.documentElement.classList.contains('dark');
   }
 
-  togglePush(): void {
-    // TODO: Implement push notification toggle
+  async togglePush(): Promise<void> {
+    if (this.pushEnabled) {
+      await this.notifications.requestPermission();
+    } else {
+      await this.notifications.disable();
+    }
+    this.pushEnabled = this.notifications.pushEnabled();
   }
 
   toggleDarkMode(): void {
-    document.body.classList.toggle('dark', this.darkMode);
+    document.documentElement.classList.toggle('dark', this.darkMode);
+    try {
+      localStorage.setItem('agb:theme', this.darkMode ? 'dark' : 'light');
+    } catch {
+      // ignore
+    }
   }
 
-  async changePassword(): Promise<void> {
-    const alert = await this.alertCtrl.create({
-      header: 'Change Password',
-      inputs: [
-        { name: 'current', type: 'password', placeholder: 'Current Password' },
-        { name: 'new', type: 'password', placeholder: 'New Password' },
-      ],
-      buttons: [
-        { text: 'Cancel', role: 'cancel' },
-        {
-          text: 'Change',
-          handler: async (data: { current: string; new: string }) => {
-            if (!data.current || !data.new) {
-              const toast = await this.toastCtrl.create({
-                message: 'Please fill all fields',
-                duration: 2000,
-                position: 'top',
-                color: 'warning',
-              });
-              await toast.present();
-              return;
-            }
-            try {
-              await new Promise((resolve, reject) => {
-                this.auth.changePassword(data.current, data.new).subscribe({
-                  next: resolve,
-                  error: reject,
-                });
-              });
-              const toast = await this.toastCtrl.create({
-                message: 'Password changed successfully',
-                duration: 2000,
-                position: 'top',
-                color: 'success',
-              });
-              await toast.present();
-            } catch (error: unknown) {
-              const errorMessage = error instanceof Error ? error.message : 'Failed to change password';
-              const toast = await this.toastCtrl.create({
-                message: errorMessage,
-                duration: 2000,
-                position: 'top',
-                color: 'danger',
-              });
-              await toast.present();
-            }
-          },
-        },
-      ],
-    });
-    await alert.present();
+  changePassword(): void {
+    this.router.navigate(['/auth/change-password']);
   }
 
   async logout(): Promise<void> {
