@@ -45,9 +45,15 @@ export interface CreateExpenseRequest {
 
 export interface ExpenseListResponse {
   expenses: Expense[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+  total?: number;
+  page?: number;
+  limit?: number;
 }
 
 export interface ExpenseFilters {

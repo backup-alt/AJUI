@@ -387,4 +387,13 @@ export class MaterialsPage implements OnInit, OnDestroy {
       default: return 'medium';
     }
   }
+
+  /**
+   * Total material count for the header. Falls back to the array length when
+   * the backend omits the pagination object.
+   */
+  totalCount = (): number => {
+    const total = (this.materials() || []).length;
+    return total;
+  };
 }

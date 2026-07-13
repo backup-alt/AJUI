@@ -354,6 +354,7 @@ export async function listMaterialsForSupervisor(
 
   return {
     materials: items.map((m) => ({
+      _id: m._id.toString(),
       materialId: m.materialId,
       projectId: m.projectId,
       projectName: m.projectName,
@@ -370,8 +371,10 @@ export async function listMaterialsForSupervisor(
       poNumber: m.poNumber,
       requestDate: m.requestDate,
       status: m.status,
+      notes: m.notes,
       createdBy: m.createdBy,
       createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   };
@@ -397,6 +400,7 @@ export async function listLabourForSupervisor(
 
   return {
     labour: items.map((l) => ({
+      _id: l._id.toString(),
       labourId: l.labourId,
       projectId: l.projectId,
       projectName: l.projectName,
@@ -411,6 +415,7 @@ export async function listLabourForSupervisor(
       status: l.status,
       submittedBy: l.submittedBy,
       createdAt: l.createdAt,
+      updatedAt: l.updatedAt,
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   };
@@ -437,6 +442,7 @@ export async function listExpensesForSupervisor(
 
   return {
     expenses: items.map((e) => ({
+      _id: e._id.toString(),
       expenseId: e.expenseId,
       type: e.type,
       projectId: e.projectId,
@@ -451,6 +457,7 @@ export async function listExpensesForSupervisor(
       status: e.status,
       submittedBy: e.submittedBy,
       createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   };

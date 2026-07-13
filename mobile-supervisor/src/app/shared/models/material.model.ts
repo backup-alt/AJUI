@@ -21,6 +21,7 @@ export interface Material {
   requestDate: string;
   approvalDate?: string;
   status: MaterialStatus;
+  notes?: string;
   createdBy?: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -40,13 +41,20 @@ export interface CreateMaterialRequest {
   vendorId?: string;
   poNumber?: string;
   requestDate: string;
+  notes?: string;
 }
 
 export interface MaterialsListResponse {
   materials: Material[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+  total?: number;
+  page?: number;
+  limit?: number;
 }
 
 export interface MaterialFilters {

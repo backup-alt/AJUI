@@ -67,6 +67,14 @@ import { Material } from '../../../shared/models';
                     </ion-label>
                   </ion-item>
                 }
+                @if (material()!.notes) {
+                  <ion-item>
+                    <ion-label>
+                      <p>Notes</p>
+                      <h3>{{ material()!.notes }}</h3>
+                    </ion-label>
+                  </ion-item>
+                }
                 <ion-item>
                   <ion-label>
                     <p>Request Date</p>

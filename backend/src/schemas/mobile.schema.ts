@@ -39,6 +39,7 @@ export const createMaterialMobileSchema = z.object({
     vendor: z.string().trim().optional(),
     poNumber: z.string().trim().optional(),
     requestDate: z.string().min(1),
+    notes: z.string().trim().max(2000).optional(),
   }),
 });
 

@@ -59,9 +59,15 @@ export interface CreateLabourRequest {
 
 export interface LabourListResponse {
   labour: Labour[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+  total?: number;
+  page?: number;
+  limit?: number;
 }
 
 export interface LabourFilters {

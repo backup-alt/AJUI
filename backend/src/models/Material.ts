@@ -24,6 +24,7 @@ export interface IMaterial extends Document {
   requestDate: string;
   approvalDate?: string;
   status: MaterialStatus;
+  notes?: string;
   createdBy?: string;
   approvedBy?: string;
   approvedAt?: Date;
@@ -61,6 +62,7 @@ const materialSchema = new Schema<IMaterial>(
     createdBy: { type: String },
     approvedBy: { type: String },
     approvedAt: { type: Date },
+    notes: { type: String, trim: true, maxlength: 2000 },
   },
   { timestamps: true }
 );

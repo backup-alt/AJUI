@@ -80,14 +80,15 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
         }
 
         <ion-list lines="none" class="form-list">
-          <ion-item class="form-item">
-            <ion-label position="stacked">Material Name *</ion-label>
-            <ion-input
-              placeholder="e.g., Cement 53 Grade"
-              [(ngModel)]="material.name"
-              [clearInput]="true"
-            ></ion-input>
-          </ion-item>
+            <ion-item class="form-item">
+              <ion-label position="stacked">Material Name *</ion-label>
+              <ion-input
+                placeholder="e.g., Cement 53 Grade"
+                [(ngModel)]="material.name"
+                (ionBlur)="suggestRemainingFromExisting()"
+                [clearInput]="true"
+              ></ion-input>
+            </ion-item>
 
           <div class="form-row">
             <ion-item class="form-item form-item-half">
@@ -304,6 +305,30 @@ export class MaterialCreatePage implements OnInit {
     this.siteProjectId.set(this.supervisor.selectedProjectId());
   }
 
+  /**
+   * If the user has entered a material name, and an existing material with the
+   * same name+site is in the supervisor's list, pre-fill `remainingStock` with
+   * that material's current remaining stock. Otherwise default to
+   * `requestedQuantity`.
+   */
+  async suggestRemainingFromExisting(): Promise<void> {
+    const name = (this.material.name || '').trim();
+    if (!name) return;
+    const siteId = this.selectedSiteId();
+    if (!siteId) return;
+    this.supervisor.getMaterials({ siteId, limit: 200 }).subscribe({
+      next: (res) => {
+        const match = (res.materials || []).find(
+          (m) => m.name.trim().toLowerCase() === name.toLowerCase()
+        );
+        if (match && match.remainingStock !== undefined) {
+          this.material.remainingStock = match.remainingStock;
+        }
+      },
+      error: () => undefined,
+    });
+  }
+
   syncRemaining() {
     if (this.material.remainingStock === null) {
       this.material.remainingStock = this.material.requestedQuantity;
@@ -352,10 +377,14 @@ export class MaterialCreatePage implements OnInit {
       name: this.material.name,
       unit: this.material.unit,
       requestedQuantity: this.material.requestedQuantity || 0,
-      remainingStock: this.material.remainingStock !== null ? this.material.remainingStock : (this.material.requestedQuantity || 0),
+      remainingStock:
+        this.material.remainingStock !== null
+          ? this.material.remainingStock
+          : this.material.requestedQuantity || 0,
       vendor: this.material.vendor || undefined,
       poNumber: this.material.poNumber || undefined,
       requestDate: new Date().toISOString().slice(0, 10),
+      notes: this.material.notes || undefined,
     };
 
     this.supervisor.createMaterial(payload).subscribe({
