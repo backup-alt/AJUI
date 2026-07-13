@@ -1,96 +1,99 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Preferences } from '@capacitor/preferences';
-import { Observable, throwError, from } from 'rxjs';
-import { catchError, switchMap, take } from 'rxjs/operators';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
-  private baseUrl = environment.apiUrl;
-  private refreshPromise: Promise<string> | null = null;
+  readonly baseUrl = environment.apiUrl;
 
-  get<T>(path: string, params?: Record<string, string>): Observable<T> {
-    return this.http.get<T>(`${this.baseUrl}${path}`, { params }).pipe(
-      catchError((err) => this.handleError(err))
-    );
+  get<T>(path: string, params?: Record<string, string | number | boolean>): Observable<T> {
+    let httpParams = new HttpParams();
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== '') {
+          httpParams = httpParams.set(k, String(v));
+        }
+      }
+    }
+    return this.http
+      .get<T>(`${this.baseUrl}${path}`, { params: httpParams })
+      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
   }
 
   post<T>(path: string, body: unknown): Observable<T> {
-    return this.http.post<T>(`${this.baseUrl}${path}`, body).pipe(
-      catchError((err) => this.handleError(err))
-    );
+    return this.http
+      .post<T>(`${this.baseUrl}${path}`, body)
+      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
   }
 
   patch<T>(path: string, body: unknown): Observable<T> {
-    return this.http.patch<T>(`${this.baseUrl}${path}`, body).pipe(
-      catchError((err) => this.handleError(err))
-    );
+    return this.http
+      .patch<T>(`${this.baseUrl}${path}`, body)
+      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
   }
 
   put<T>(path: string, body: unknown): Observable<T> {
-    return this.http.put<T>(`${this.baseUrl}${path}`, body).pipe(
-      catchError((err) => this.handleError(err))
-    );
+    return this.http
+      .put<T>(`${this.baseUrl}${path}`, body)
+      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
   }
 
   delete<T>(path: string): Observable<T> {
-    return this.http.delete<T>(`${this.baseUrl}${path}`).pipe(
-      catchError((err) => this.handleError(err))
-    );
+    return this.http
+      .delete<T>(`${this.baseUrl}${path}`)
+      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
   }
 
-  private handleError(error: HttpErrorResponse): Observable<never> {
-    let message = 'An unexpected error occurred';
-
+  /** Canonical HTTP error → AppError converter. */
+  toAppError(error: HttpErrorResponse): Error {
     if (error.error instanceof ErrorEvent) {
-      message = error.error.message || 'Network error';
-    } else if (error.status === 0) {
-      message = 'Unable to connect to server. Please check your internet connection.';
-    } else if (error.error && typeof error.error === 'object' && error.error.message) {
-      message = error.error.message;
-    } else {
-      switch (error.status) {
-        case 400:
-          message = 'Invalid request';
-          break;
-        case 401:
-          message = 'Session expired. Please login again.';
-          break;
-        case 403:
-          message = error.error?.message || 'Access denied';
-          break;
-        case 404:
-          message = error.error?.message || 'Resource not found';
-          break;
-        case 409:
-          message = error.error?.message || 'Conflict occurred';
-          break;
-        case 410:
-          message = error.error?.message || 'Resource no longer available';
-          break;
-        case 422:
-          message = error.error?.message || 'Validation failed';
-          break;
-        case 429:
-          message = 'Too many requests. Please wait a moment and try again.';
-          break;
-        case 500:
-          message = 'Server error. Please try again later.';
-          break;
-        case 502:
-        case 503:
-        case 504:
-          message = 'Server temporarily unavailable. Please try again later.';
-          break;
-        default:
-          message = error.error?.message || `Request failed (${error.status})`;
-      }
+      return new Error(error.error.message || 'Network error');
+    }
+    if (error.status === 0) {
+      return new Error('Unable to connect to server. Please check your internet connection.');
     }
 
-    return throwError(() => new Error(message));
+    const serverMessage =
+      (typeof error.error === 'object' && error.error && 'message' in error.error
+        ? (error.error as { message?: string }).message
+        : undefined) ||
+      (typeof error.error === 'object' && error.error && 'error' in error.error
+        ? (error.error as { error?: string }).error
+        : undefined);
+
+    switch (error.status) {
+      case 400:
+        return new Error(serverMessage || 'Invalid request');
+      case 401:
+        return new Error(serverMessage || 'Session expired. Please login again.');
+      case 403:
+        return new Error(serverMessage || 'You do not have permission to perform this action');
+      case 404:
+        return new Error(serverMessage || 'Resource not found');
+      case 409:
+        return new Error(serverMessage || 'Conflict occurred');
+      case 410:
+        return new Error(serverMessage || 'Resource no longer available');
+      case 422:
+        return new Error(serverMessage || 'Validation failed');
+      case 429:
+        return new Error('Too many requests. Please wait a moment and try again.');
+      case 500:
+        return new Error('Server error. Please try again later.');
+      case 502:
+      case 503:
+      case 504:
+        return new Error('Server temporarily unavailable. Please try again later.');
+      default:
+        return new Error(serverMessage || `Request failed (${error.status})`);
+    }
   }
+
+  // ---------------- Token storage ----------------
 
   async getAccessToken(): Promise<string | null> {
     const { value } = await Preferences.get({ key: 'accessToken' });
@@ -132,6 +135,8 @@ export class ApiService {
   async setUserRole(role: string): Promise<void> {
     await Preferences.set({ key: 'userRole', value: role });
   }
+
+  // ---------------- Selected site / project storage ----------------
 
   async getSelectedSiteId(): Promise<string | null> {
     const { value } = await Preferences.get({ key: 'selectedSiteId' });
@@ -176,41 +181,48 @@ export class ApiService {
     await Preferences.remove({ key: 'selectedSiteName' });
   }
 
-  isAuthenticated(): Promise<boolean> {
-    return this.getAccessToken().then((token) => !!token);
+  async isAuthenticated(): Promise<boolean> {
+    const token = await this.getAccessToken();
+    return !!token;
   }
 
+  // ---------------- Refresh token (with safe fallback) ----------------
+
+  /**
+   * Refresh the access token. Throws on failure.
+   * Used by the interceptor; pages should not call this directly.
+   */
   async refreshAccessToken(): Promise<string> {
+    return this.refreshAccessTokenSafely();
+  }
+
+  /**
+   * Same as refreshAccessToken but never throws "No refresh token" — returns empty string instead.
+   * This is the version the auth interceptor uses, so a missing refresh token simply
+   * triggers logout rather than an opaque error.
+   */
+  async refreshAccessTokenSafely(): Promise<string> {
     const refreshToken = await this.getRefreshToken();
-    if (!refreshToken) {
-      throw new Error('No refresh token');
-    }
+    if (!refreshToken) return '';
 
     const response = await fetch(`${this.baseUrl}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
-      credentials: 'include',
     });
 
     if (!response.ok) {
       await this.clearTokens();
-      throw new Error('Session expired');
+      return '';
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { accessToken?: string };
+    if (!data.accessToken) {
+      await this.clearTokens();
+      return '';
+    }
+
     await this.setAccessToken(data.accessToken);
     return data.accessToken;
-  }
-
-  async ensureValidToken(): Promise<string> {
-    const token = await this.getAccessToken();
-    if (token) return token;
-
-    try {
-      return await this.refreshAccessToken();
-    } catch {
-      throw new Error('Not authenticated');
-    }
   }
 }

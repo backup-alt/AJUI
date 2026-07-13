@@ -8,12 +8,10 @@ import {
   IonIcon,
   IonInput,
   IonItem,
-  IonLabel,
-  IonText,
+  IonTextarea,
   IonSpinner,
   IonBackButton,
   IonButtons,
-  IonRouterLink,
   ToastController,
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -28,8 +26,11 @@ import {
   eyeOffOutline,
   checkmarkCircleOutline,
   chevronBackOutline,
+  homeOutline,
+  arrowForwardOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../../core/services/auth.service';
+import { VerifyInviteResponse } from '../../../shared/models';
 
 @Component({
   selector: 'app-signup',
@@ -43,12 +44,10 @@ import { AuthService } from '../../../core/services/auth.service';
     IonIcon,
     IonInput,
     IonItem,
-    IonLabel,
-    IonText,
+    IonTextarea,
     IonSpinner,
     IonBackButton,
     IonButtons,
-    IonRouterLink,
     FormsModule,
   ],
   template: `
@@ -78,67 +77,92 @@ import { AuthService } from '../../../core/services/auth.service';
             @if (isSuccess()) {
               Your supervisor account has been created successfully.
             } @else {
-              Enter your details to complete registration
+              We've pre-filled the details from your invite. Choose a password to finish.
             }
           </p>
         </div>
 
         @if (!isSuccess()) {
           <div class="signup-form">
-            <div class="input-group">
-              <ion-item class="agb-input">
-                <ion-icon name="person-outline" slot="start"></ion-icon>
-                <ion-input
-                  type="text"
-                  placeholder="Full Name"
-                  [(ngModel)]="name"
-                  autocomplete="name"
-                />
-              </ion-item>
-            </div>
-
-            <div class="input-group">
-              <ion-item class="agb-input">
-                <ion-icon name="mail-outline" slot="start"></ion-icon>
-                <ion-input
-                  type="email"
-                  placeholder="Email Address"
-                  [(ngModel)]="email"
-                  autocomplete="email"
-                />
-              </ion-item>
-            </div>
-
-            <div class="input-group">
-              <ion-item class="agb-input">
-                <ion-icon name="call-outline" slot="start"></ion-icon>
-                <ion-input
-                  type="tel"
-                  placeholder="Phone Number"
-                  [(ngModel)]="phone"
-                  autocomplete="tel"
-                />
-              </ion-item>
-            </div>
-
-            <div class="input-group">
-              <ion-item class="agb-input">
-                <ion-icon name="lock-closed-outline" slot="start"></ion-icon>
-                <ion-input
-                  [type]="showPassword() ? 'text' : 'password'"
-                  placeholder="Create Password"
-                  [(ngModel)]="password"
-                  autocomplete="new-password"
-                />
-                <ion-button slot="end" fill="clear" class="password-toggle" (click)="togglePassword()">
-                  <ion-icon [name]="showPassword() ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-                </ion-button>
-              </ion-item>
-              <div class="password-hint">
-                <span [class.valid]="password.length >= 8">8+ characters</span>
-                <span [class.valid]="hasUpperCase()">Uppercase</span>
-                <span [class.valid]="hasNumber()">Number</span>
+            @if (siteCount() > 0) {
+              <div class="prefill-banner">
+                <ion-icon name="home-outline"></ion-icon>
+                <div>
+                  <div class="prefill-label">Assigned Sites</div>
+                  <div class="prefill-value">
+                    {{ siteCount() }} site{{ siteCount() === 1 ? '' : 's' }} assigned to you
+                  </div>
+                </div>
               </div>
+            }
+
+            <ion-item class="agb-input">
+              <ion-icon name="person-outline" slot="start"></ion-icon>
+              <ion-input
+                type="text"
+                label="Full Name"
+                labelPlacement="stacked"
+                [(ngModel)]="name"
+                autocomplete="name"
+              />
+            </ion-item>
+
+            <ion-item class="agb-input">
+              <ion-icon name="mail-outline" slot="start"></ion-icon>
+              <ion-input
+                type="email"
+                label="Email Address"
+                labelPlacement="stacked"
+                [(ngModel)]="email"
+                [readonly]="emailLocked"
+                autocomplete="email"
+              />
+            </ion-item>
+
+            <ion-item class="agb-input">
+              <ion-icon name="call-outline" slot="start"></ion-icon>
+              <ion-input
+                type="tel"
+                label="Phone Number"
+                labelPlacement="stacked"
+                [(ngModel)]="phone"
+                autocomplete="tel"
+              />
+            </ion-item>
+
+            <ion-item class="agb-input">
+              <ion-icon name="home-outline" slot="start"></ion-icon>
+              <ion-input
+                type="text"
+                label="Address (optional)"
+                labelPlacement="stacked"
+                [(ngModel)]="address"
+                autocomplete="street-address"
+              />
+            </ion-item>
+
+            <ion-item class="agb-input">
+              <ion-icon name="lock-closed-outline" slot="start"></ion-icon>
+              <ion-input
+                [type]="showPassword() ? 'text' : 'password'"
+                label="Create Password"
+                labelPlacement="stacked"
+                [(ngModel)]="password"
+                autocomplete="new-password"
+              />
+              <ion-button
+                slot="end"
+                fill="clear"
+                class="password-toggle"
+                (click)="togglePassword()"
+              >
+                <ion-icon [name]="showPassword() ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+              </ion-button>
+            </ion-item>
+            <div class="password-hint">
+              <span [class.valid]="password.length >= 8">8+ characters</span>
+              <span [class.valid]="hasUpperCase()">Uppercase</span>
+              <span [class.valid]="hasNumber()">Number</span>
             </div>
 
             <ion-button
@@ -150,7 +174,8 @@ import { AuthService } from '../../../core/services/auth.service';
               @if (isLoading()) {
                 <ion-spinner name="crescent"></ion-spinner>
               } @else {
-                Create Account
+                <span>Create Account</span>
+                <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
               }
             </ion-button>
 
@@ -175,85 +200,93 @@ import { AuthService } from '../../../core/services/auth.service';
       --background: var(--agb-white);
       --border-color: var(--agb-light-gray);
     }
-    .signup-content {
-      --background: var(--agb-off-white);
-    }
+    .signup-content { --background: #f8f9fa; }
     .signup-container {
       min-height: 100%;
       padding: 24px;
     }
     .signup-header {
       text-align: center;
-      padding: 32px 0;
+      padding: 24px 0;
     }
     .success-icon {
       width: 80px;
       height: 80px;
-      border-radius: 50%;
+      border-radius: 8px;
       background: rgba(25, 135, 84, 0.1);
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 24px;
+      margin: 0 auto 16px;
       opacity: 0;
       transform: scale(0.5);
       transition: all 0.5s ease;
     }
-    .success-icon.visible {
-      opacity: 1;
-      transform: scale(1);
-    }
-    .success-icon ion-icon {
-      font-size: 48px;
-      color: var(--agb-success);
-    }
+    .success-icon.visible { opacity: 1; transform: scale(1); }
+    .success-icon ion-icon { font-size: 48px; color: #198754; }
     .signup-title {
       font-size: 24px;
       font-weight: 700;
-      color: var(--agb-navy);
+      color: #002263;
       margin: 0 0 8px;
     }
     .signup-subtitle {
       font-size: 14px;
-      color: var(--agb-gray);
+      color: #6c757d;
       margin: 0;
     }
     .signup-form {
-      background: var(--agb-white);
-      border-radius: var(--agb-radius-xl);
-      padding: 32px 24px;
-      box-shadow: var(--agb-shadow-md);
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 24px 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
-    .input-group {
+    .prefill-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0, 34, 99, 0.05);
+      border-left: 3px solid #c9a227;
+      border-radius: 8px;
+      padding: 12px 14px;
       margin-bottom: 16px;
     }
+    .prefill-banner ion-icon {
+      color: #002263;
+      font-size: 18px;
+    }
+    .prefill-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #6c757d;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .prefill-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+    }
     .agb-input {
-      --background: var(--agb-off-white);
-      --border-radius: var(--agb-radius-md);
+      --background: #f8f9fa;
+      --border-radius: 8px;
       --padding-start: 12px;
       --padding-end: 12px;
-      border-radius: var(--agb-radius-md);
-      --min-height: 56px;
+      --min-height: 64px;
+      margin-bottom: 12px;
     }
-    .agb-input ion-icon {
-      color: var(--agb-primary);
-      font-size: 20px;
-    }
-    .agb-input ion-input {
-      font-size: 15px;
-    }
-    .password-toggle {
-      --color: var(--agb-gray);
-    }
+    .agb-input ion-icon { color: #002263; font-size: 20px; }
+    .agb-input ion-input { font-size: 15px; }
+    .password-toggle { --color: #6c757d; }
     .password-hint {
       display: flex;
       gap: 12px;
-      margin-top: 8px;
+      margin: 4px 0 16px;
       padding: 0 4px;
     }
     .password-hint span {
       font-size: 11px;
-      color: var(--agb-gray);
+      color: #6c757d;
       display: flex;
       align-items: center;
       gap: 4px;
@@ -262,42 +295,34 @@ import { AuthService } from '../../../core/services/auth.service';
       content: '';
       width: 6px;
       height: 6px;
-      border-radius: 50%;
-      background: var(--agb-light-gray);
+      border-radius: 8px;
+      background: #e9ecef;
     }
-    .password-hint span.valid {
-      color: var(--agb-success);
-    }
-    .password-hint span.valid::before {
-      background: var(--agb-success);
-    }
+    .password-hint span.valid { color: #198754; }
+    .password-hint span.valid::before { background: #198754; }
     .signup-btn {
-      --background: var(--agb-primary);
-      --color: var(--agb-white);
-      --border-radius: var(--agb-radius-md);
+      --background: #002263;
+      --color: #ffffff;
+      --border-radius: 8px;
       font-weight: 600;
       font-size: 16px;
       height: 52px;
       margin-top: 8px;
     }
+    .signup-btn:hover { --background: #001a4d; }
     .terms-text {
       font-size: 12px;
-      color: var(--agb-gray);
+      color: #6c757d;
       text-align: center;
       margin: 16px 0 0;
       line-height: 1.6;
     }
-    .terms-text a {
-      color: var(--agb-primary);
-      text-decoration: none;
-    }
-    .success-content {
-      text-align: center;
-    }
+    .terms-text a { color: #002263; text-decoration: none; }
+    .success-content { text-align: center; }
     .continue-btn {
-      --background: var(--agb-primary);
-      --color: var(--agb-white);
-      --border-radius: var(--agb-radius-md);
+      --background: #002263;
+      --color: #ffffff;
+      --border-radius: 8px;
       font-weight: 600;
       font-size: 16px;
       height: 52px;
@@ -316,7 +341,11 @@ export class SignupPage implements OnInit {
   name = '';
   email = '';
   phone = '';
+  address = '';
   password = '';
+
+  emailLocked = false;
+  siteCount = signal(0);
 
   showPassword = signal(false);
   isLoading = signal(false);
@@ -332,12 +361,32 @@ export class SignupPage implements OnInit {
       eyeOffOutline,
       checkmarkCircleOutline,
       chevronBackOutline,
+      homeOutline,
+      arrowForwardOutline,
     });
 
     this.route.queryParams.subscribe((params) => {
       this.token = params['token'] || '';
       this.otp = params['otp'] || '';
     });
+
+    // Pre-fill from the cached verify response (set by QR scanner / manual-token).
+    try {
+      const raw = sessionStorage.getItem('agb:pending-invite');
+      if (raw) {
+        const invite = JSON.parse(raw) as VerifyInviteResponse & { siteIds?: string[] };
+        if (invite.supervisorName) this.name = invite.supervisorName;
+        if (invite.supervisorEmail) {
+          this.email = invite.supervisorEmail;
+          this.emailLocked = true;
+        }
+        if (invite.supervisorPhone) this.phone = invite.supervisorPhone;
+        if (Array.isArray(invite.siteIds)) this.siteCount.set(invite.siteIds.length);
+        sessionStorage.removeItem('agb:pending-invite');
+      }
+    } catch {
+      // ignore
+    }
   }
 
   togglePassword(): void {
@@ -365,33 +414,45 @@ export class SignupPage implements OnInit {
 
   async createAccount(): Promise<void> {
     if (!this.isFormValid()) return;
+    if (!this.token) {
+      const toast = await this.toastCtrl.create({
+        message: 'Missing invite token. Please restart the signup flow.',
+        duration: 3000,
+        color: 'warning',
+        position: 'top',
+      });
+      await toast.present();
+      return;
+    }
 
     this.isLoading.set(true);
 
-    this.auth.signup({
-      token: this.token,
-      otp: this.otp,
-      name: this.name,
-      email: this.email,
-      phone: this.phone,
-      password: this.password,
-    }).subscribe({
-      next: () => {
-        this.isLoading.set(false);
-        this.isSuccess.set(true);
-      },
-      error: async (error: unknown) => {
-        this.isLoading.set(false);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const toast = await this.toastCtrl.create({
-          message: errorMessage || 'Failed to create account',
-          duration: 3000,
-          position: 'top',
-          color: 'danger',
-        });
-        await toast.present();
-      },
-    });
+    this.auth
+      .signup({
+        token: this.token,
+        otp: this.otp,
+        name: this.name,
+        email: this.email,
+        phone: this.phone,
+        password: this.password,
+      })
+      .subscribe({
+        next: () => {
+          this.isLoading.set(false);
+          this.isSuccess.set(true);
+        },
+        error: async (error: unknown) => {
+          this.isLoading.set(false);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const toast = await this.toastCtrl.create({
+            message: errorMessage || 'Failed to create account',
+            duration: 3000,
+            position: 'top',
+            color: 'danger',
+          });
+          await toast.present();
+        },
+      });
   }
 
   goToDashboard(): void {

@@ -199,30 +199,39 @@ export class ExpensesPage implements OnInit {
   async ngOnInit(): Promise<void> {
     addIcons({ addOutline, walletOutline, timeOutline, receiptOutline });
     await this.supervisor.init();
-    this.selectedSiteName.set(await this.supervisor.getSelectedSiteName());
+    this.selectedSiteName.set(this.supervisor.selectedSiteName());
     await this.loadExpenses();
   }
 
   async loadExpenses(): Promise<void> {
     this.isLoading.set(true);
     try {
-      const projectId = await this.supervisor.getSelectedProjectId();
-      const siteId = await this.supervisor.getSelectedSiteId();
-      const data = await new Promise<{ expenses: Expense[] }>((resolve) => {
-        this.supervisor.getExpenses({
-          projectId: projectId || undefined,
-          siteId: siteId || undefined,
+      const projectId = this.supervisor.selectedProjectId();
+      const siteId = this.supervisor.selectedSiteId();
+      this.supervisor
+        .getExpenses({
+          projectId: projectId ?? undefined,
+          siteId: siteId ?? undefined,
           type: 'site',
-          limit: 100
-        }).subscribe({
-          next: (r) => resolve(r as unknown as { expenses: Expense[] }),
-          error: () => resolve({ expenses: [] }),
+          limit: 100,
+        })
+        .subscribe({
+          next: (r) => {
+            this.expenses.set(r.expenses || []);
+            this.filterExpenses();
+            this.isLoading.set(false);
+          },
+          error: (err) => {
+            console.error('[Expenses] failed to load', err);
+            this.expenses.set([]);
+            this.filterExpenses();
+            this.isLoading.set(false);
+          },
         });
-      });
-      this.expenses.set(data.expenses || []);
-      this.filterExpenses();
-    } catch (e) { console.error(e); }
-    finally { this.isLoading.set(false); }
+    } catch (e) {
+      console.error(e);
+      this.isLoading.set(false);
+    }
   }
 
   async refreshExpenses(event: CustomEvent): Promise<void> {
@@ -240,7 +249,7 @@ export class ExpensesPage implements OnInit {
     this.filteredExpenses.set(filtered);
   }
 
-  viewExpense(expense: Expense): void { this.router.navigate(['/tabs/expenses', expense.expenseId]); }
+  viewExpense(expense: Expense): void { this.router.navigate(['/tabs/expenses', expense._id]); }
   createExpense(): void { this.router.navigate(['/tabs/expenses/create']); }
 
   getStatusColor(status: ExpenseStatus): string {

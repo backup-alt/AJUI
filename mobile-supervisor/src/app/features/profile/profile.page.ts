@@ -202,7 +202,7 @@ export class ProfilePage implements OnInit {
       logOutOutline, chevronForwardOutline, shieldCheckmarkOutline,
     });
 
-    this.currentUser.set(this.auth.currentUser);
+    this.currentUser.set(this.auth.currentUser());
   }
 
   togglePush(): void {

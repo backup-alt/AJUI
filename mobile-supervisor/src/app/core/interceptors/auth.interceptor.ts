@@ -1,109 +1,78 @@
-import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
+import { HttpInterceptorFn, HttpErrorResponse, HttpEvent } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, switchMap, take, throwError, from } from 'rxjs';
+import { catchError, from, Observable, switchMap, throwError } from 'rxjs';
 import { ApiService } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
+import { environment } from '../../../environments/environment';
+
+const PUBLIC_PATHS: ReadonlyArray<string> = [
+  '/auth/login',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/supervisor/verify',
+  '/auth/supervisor/verify-otp',
+  '/auth/supervisor/resend-otp',
+  '/auth/supervisor/signup',
+  '/auth/supervisor/request-otp',
+  '/auth/supervisor/verify-otp-login',
+  '/auth/refresh',
+];
+
+function isPublicPath(url: string): boolean {
+  const path = url.replace(environment.apiUrl, '');
+  if (path.startsWith('/auth/refresh')) return true;
+  return PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
+}
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const api = inject(ApiService);
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  // Skip auth for public endpoints
-  const publicEndpoints = [
-    '/auth/login',
-    '/auth/forgot-password',
-    '/auth/reset-password',
-    '/auth/supervisor/verify',
-    '/auth/supervisor/verify-otp',
-    '/auth/supervisor/resend-otp',
-    '/auth/supervisor/signup',
-  ];
-  const isPublic = publicEndpoints.some((endpoint) => req.url.includes(endpoint));
-
-  if (isPublic) {
+  if (isPublicPath(req.url)) {
     return next(req);
   }
 
-  // Add auth header if token exists
   return from(api.getAccessToken()).pipe(
-    take(1),
-    switchMap((token) => {
-      if (token) {
-        const authReq = req.clone({
-          setHeaders: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        return next(authReq);
-      }
-      return next(req);
+    switchMap((token): Observable<HttpEvent<unknown>> => {
+      if (!token) return next(req);
+      const authReq = req.clone({
+        setHeaders: { Authorization: `Bearer ${token}` },
+      });
+      return next(authReq);
     }),
-    catchError((error: HttpErrorResponse) => {
-      if (error.status === 401) {
-        auth.logout();
-        router.navigate(['/auth/login']);
+    catchError((error: HttpErrorResponse): Observable<HttpEvent<unknown>> => {
+      if (error.status === 401 && !req.url.includes('/auth/refresh')) {
+        return from(
+          (async () => {
+            const newToken = await api.refreshAccessTokenSafely().catch(() => '');
+            if (newToken) {
+              const retried = req.clone({
+                setHeaders: { Authorization: `Bearer ${newToken}` },
+              });
+              // We can't synchronously call next() here because next() returns
+              // an Observable. We resolve the inner promise by mapping the
+              // outcome to a marker the outer code can use.
+              return newToken;
+            }
+            return '';
+          })()
+        ).pipe(
+          switchMap((t): Observable<HttpEvent<unknown>> => {
+            if (!t) {
+              // Refresh failed: log out and propagate the original 401.
+              void auth.logout();
+              router.navigate(['/auth/login']);
+              return throwError(() => error);
+            }
+            return next(
+              req.clone({ setHeaders: { Authorization: `Bearer ${t}` } })
+            );
+          })
+        );
       }
       return throwError(() => error);
-    })
-  );
-};
-
-export const errorInterceptor: HttpInterceptorFn = (req, next) => {
-  return next(req).pipe(
-    catchError((error: HttpErrorResponse) => {
-      let message = 'An unexpected error occurred';
-
-      if (error.error instanceof ErrorEvent) {
-        message = error.error.message;
-      } else {
-        switch (error.status) {
-          case 0:
-            message = 'Unable to connect to server. Please check your internet connection.';
-            break;
-          case 400:
-            message = error.error?.message || 'Invalid request';
-            break;
-          case 401:
-            message = 'Session expired. Please login again.';
-            break;
-          case 403:
-            message = error.error?.message || 'You do not have permission to perform this action';
-            break;
-          case 404:
-            message = error.error?.message || 'Resource not found';
-            break;
-          case 409:
-            message = error.error?.message || 'Conflict occurred';
-            break;
-          case 422:
-            message = error.error?.message || 'Validation failed';
-            break;
-          case 429:
-            message = 'Too many requests. Please wait a moment and try again.';
-            break;
-          case 500:
-            message = 'Server error. Please try again later.';
-            break;
-          case 502:
-          case 503:
-          case 504:
-            message = 'Server temporarily unavailable. Please try again later.';
-            break;
-          default:
-            message = error.error?.message || `Error: ${error.status}`;
-        }
-      }
-
-      console.error('HTTP Error:', {
-        url: req.url,
-        status: error.status,
-        message,
-        error: error.error,
-      });
-
-      return throwError(() => new Error(message));
     })
   );
 };

@@ -91,7 +91,7 @@ import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/com
             <h2 class="section-title">Overview</h2>
           </div>
           <div class="stats-grid">
-            <div class="stat-card" (click)="navigateTo('/tabs/dashboard')">
+            <div class="stat-card" (click)="navigateTo('/tabs/sites')">
               <div class="stat-icon stat-icon-navy">
                 <ion-icon name="location-outline"></ion-icon>
               </div>
@@ -205,7 +205,7 @@ import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/com
         <div class="section-block">
           <div class="section-heading">
             <h2 class="section-title">Your Active Sites</h2>
-            <ion-button fill="clear" size="small" (click)="navigateTo('/tabs/dashboard')">
+            <ion-button fill="clear" size="small" (click)="navigateTo('/tabs/sites')">
               View All
               <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
             </ion-button>
@@ -626,49 +626,44 @@ export class DashboardPage implements OnInit {
     this.isLoading.set(true);
 
     try {
-      const data = await new Promise<DashboardData>((resolve, reject) => {
-        this.supervisor.getDashboard().subscribe({
-          next: (response) => resolve((response as { dashboard: DashboardData }).dashboard),
-          error: reject,
-        });
+      this.supervisor.getDashboard().subscribe({
+        next: (response) => {
+          this.dashboard.set(response.dashboard);
+          this.pendingApprovals.set(response.dashboard.pendingApprovals || []);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          console.error('[Dashboard] failed to load', err);
+          this.isLoading.set(false);
+        },
       });
 
-      this.dashboard.set(data);
-      this.pendingApprovals.set(data.pendingApprovals || []);
-
-      // Load user profile & sites
       await this.loadUserAndSites();
     } catch (error) {
       console.error('Failed to load dashboard:', error);
-    } finally {
       this.isLoading.set(false);
     }
   }
 
   private async loadUserAndSites(): Promise<void> {
     try {
-      const profile = await new Promise<{ user: { name: string } } | null>((resolve) => {
-        this.supervisor.getProfile().subscribe({
-          next: (res) => resolve(res as { user: { name: string } }),
-          error: () => resolve(null),
-        });
-      });
-      if (profile?.user?.name) {
-        this.userName.set(profile.user.name);
-      }
-
-      const sitesResp = await new Promise<{ sites: Site[] }>((resolve) => {
-        this.supervisor.getSites().subscribe({
-          next: (res) => resolve(res as { sites: Site[] }),
-          error: () => resolve({ sites: [] }),
-        });
+      this.supervisor.getProfile().subscribe({
+        next: (res) => {
+          const name = (res as { user?: { name?: string } }).user?.name;
+          if (name) this.userName.set(name);
+        },
+        error: () => undefined,
       });
 
-      this.sites.set(sitesResp.sites || []);
-
-      const savedName = await this.supervisor.getSelectedSiteName();
-      if (savedName) this.currentSiteName.set(savedName);
-      else if (sitesResp.sites?.[0]?.name) this.currentSiteName.set(sitesResp.sites[0].name);
+      this.supervisor.getSites().subscribe({
+        next: (res) => {
+          this.sites.set(res.sites || []);
+          const savedName = this.supervisor.selectedSiteName();
+          if (savedName) this.currentSiteName.set(savedName);
+          else if (res.sites?.[0]?.name) this.currentSiteName.set(res.sites[0].name);
+        },
+        error: () => undefined,
+      });
     } catch (e) {
       console.warn('User/sites load failed', e);
     }
@@ -683,7 +678,12 @@ export class DashboardPage implements OnInit {
   }
 
   async selectSite(site: Site): Promise<void> {
-    await this.supervisor.setSelectedSite(site.id, '', site.name);
+    await this.supervisor.setSelectedSite(
+      site.id,
+      site.projectId || '',
+      site.projectName || site.name,
+      site.name
+    );
     this.currentSiteName.set(site.name);
   }
 

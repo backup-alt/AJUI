@@ -8,8 +8,7 @@ export const AUTH_ROUTES: Routes = [
   },
   {
     path: 'login',
-    loadComponent: () =>
-      import('./login/login.page').then((m) => m.LoginPage),
+    loadComponent: () => import('./login/login.page').then((m) => m.LoginPage),
   },
   {
     path: 'qr-scanner',
@@ -17,8 +16,22 @@ export const AUTH_ROUTES: Routes = [
       import('./qr-scanner/qr-scanner.page').then((m) => m.QrScannerPage),
   },
   {
-    path: 'signup',
+    path: 'otp-login',
     loadComponent: () =>
-      import('./signup/signup.page').then((m) => m.SignupPage),
+      import('./otp-login/otp-login.page').then((m) => m.OtpLoginPage),
+  },
+  {
+    path: 'manual-token',
+    loadComponent: () =>
+      import('./manual-token/manual-token.page').then((m) => m.ManualTokenPage),
+  },
+  {
+    path: 'verify-otp',
+    loadComponent: () =>
+      import('./verify-otp/verify-otp.page').then((m) => m.VerifyOtpPage),
+  },
+  {
+    path: 'signup',
+    loadComponent: () => import('./signup/signup.page').then((m) => m.SignupPage),
   },
 ];

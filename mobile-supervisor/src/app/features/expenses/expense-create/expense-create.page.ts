@@ -268,9 +268,9 @@ export class ExpenseCreatePage implements OnInit {
   async ngOnInit(): Promise<void> {
     addIcons({ locationOutline, walletOutline, checkmarkCircleOutline });
     await this.supervisor.init();
-    this.selectedSiteId.set(await this.supervisor.getSelectedSiteId());
-    this.selectedSiteName.set(await this.supervisor.getSelectedSiteName());
-    this.siteProjectId.set(await this.supervisor.getSelectedProjectId());
+    this.selectedSiteId.set(this.supervisor.selectedSiteId());
+    this.selectedSiteName.set(this.supervisor.selectedSiteName());
+    this.siteProjectId.set(this.supervisor.selectedProjectId());
   }
 
   selectType(type: 'Purchase' | 'Cash Added') {
@@ -286,25 +286,27 @@ export class ExpenseCreatePage implements OnInit {
   }
 
   async loadBalance() {
-    const siteId = this.selectedSiteId();
-    const projectId = this.siteProjectId();
-    this.supervisor.getExpenses({
-      siteId: siteId || undefined,
-      projectId: projectId || undefined,
-      type: 'site',
-      limit: 100,
-    }).subscribe({
-      next: (res) => {
-        const cashAdded = res.expenses
-          .filter((e) => e.status === 'Approved' && e.transactionType === 'Cash Added')
-          .reduce((s, e) => s + (e.amount || 0), 0);
-        const spent = res.expenses
-          .filter((e) => e.status === 'Approved' && e.transactionType !== 'Cash Added')
-          .reduce((s, e) => s + (e.amount || 0), 0);
-        this.currentBalance.set(cashAdded - spent);
-      },
-      error: () => this.currentBalance.set(0),
-    });
+    const siteId = this.supervisor.selectedSiteId();
+    const projectId = this.supervisor.selectedProjectId();
+    this.supervisor
+      .getExpenses({
+        siteId: siteId ?? undefined,
+        projectId: projectId ?? undefined,
+        type: 'site',
+        limit: 100,
+      })
+      .subscribe({
+        next: (res) => {
+          const cashAdded = res.expenses
+            .filter((e) => e.status === 'Approved' && e.transactionType === 'Cash Added')
+            .reduce((s, e) => s + (e.amount || 0), 0);
+          const spent = res.expenses
+            .filter((e) => e.status === 'Approved' && e.transactionType !== 'Cash Added')
+            .reduce((s, e) => s + (e.amount || 0), 0);
+          this.currentBalance.set(cashAdded - spent);
+        },
+        error: () => this.currentBalance.set(0),
+      });
   }
 
   onAmountChange() {

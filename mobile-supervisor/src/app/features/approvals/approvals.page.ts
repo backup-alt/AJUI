@@ -156,16 +156,23 @@ export class ApprovalsPage implements OnInit {
   async loadApprovals(): Promise<void> {
     this.isLoading.set(true);
     try {
-      const data = await new Promise<{ approvals: Approval[] }>((resolve) => {
-        this.supervisor.getApprovals().subscribe({
-          next: (r) => resolve(r as { approvals: Approval[] }),
-          error: () => resolve({ approvals: [] }),
-        });
+      this.supervisor.getApprovals().subscribe({
+        next: (r) => {
+          this.approvals.set(r.approvals || []);
+          this.filterApprovals();
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          console.error('[Approvals] failed to load', err);
+          this.approvals.set([]);
+          this.filterApprovals();
+          this.isLoading.set(false);
+        },
       });
-      this.approvals.set(data.approvals || []);
-      this.filterApprovals();
-    } catch (e) { console.error(e); }
-    finally { this.isLoading.set(false); }
+    } catch (e) {
+      console.error(e);
+      this.isLoading.set(false);
+    }
   }
 
   async refreshApprovals(event: CustomEvent): Promise<void> {

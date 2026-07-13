@@ -30,7 +30,7 @@ interface Employee {
     IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
     IonFab, IonFabButton, IonIcon, IonBadge, IonSkeletonText,
     IonRefresher, IonRefresherContent, FormsModule, DatePipe, CurrencyPipe,
-    IonItem, IonInput, IonButton,
+    IonInput, IonButton,
   ],
   template: `
     <ion-header class="agb-header">
@@ -304,17 +304,29 @@ export class LabourPage implements OnInit {
   async loadLabour(): Promise<void> {
     this.isLoading.set(true);
     try {
-      const projectId = await this.supervisor.getSelectedProjectId();
-      const siteId = await this.supervisor.getSelectedSiteId();
-      const data = await new Promise<{ labour: Labour[] }>((resolve) => {
-        this.supervisor.getLabourEntries({ projectId: projectId || undefined, siteId: siteId || undefined, limit: 100 }).subscribe({
-          next: (r) => resolve(r as unknown as { labour: Labour[] }),
-          error: () => resolve({ labour: [] }),
+      const projectId = this.supervisor.selectedProjectId();
+      const siteId = this.supervisor.selectedSiteId();
+      this.supervisor
+        .getLabourEntries({
+          projectId: projectId ?? undefined,
+          siteId: siteId ?? undefined,
+          limit: 100,
+        })
+        .subscribe({
+          next: (r) => {
+            this.labour.set(r.labour || []);
+            this.isLoading.set(false);
+          },
+          error: (err) => {
+            console.error('[Labour] failed to load', err);
+            this.labour.set([]);
+            this.isLoading.set(false);
+          },
         });
-      });
-      this.labour.set(data.labour || []);
-    } catch (e) { console.error(e); }
-    finally { this.isLoading.set(false); }
+    } catch (e) {
+      console.error(e);
+      this.isLoading.set(false);
+    }
   }
 
   async refreshAll(event: CustomEvent): Promise<void> {
@@ -363,7 +375,7 @@ export class LabourPage implements OnInit {
     this.newLabourType = '';
   }
 
-  viewLabour(entry: Labour): void { this.router.navigate(['/tabs/labour', entry.labourId]); }
+  viewLabour(entry: Labour): void { this.router.navigate(['/tabs/labour', entry._id]); }
   createLabour(): void { this.router.navigate(['/tabs/labour/create']); }
 
   getStatusColor(status: LabourStatus): string {

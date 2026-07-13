@@ -528,7 +528,7 @@ export class ShellComponent implements OnInit {
       gridOutline,
     });
 
-    this.currentUser.set(this.auth.currentUser);
+    this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
     await this.loadSites();
   }
@@ -545,8 +545,8 @@ export class ShellComponent implements OnInit {
 
       this.sites.set(response.sites);
 
-      const savedSiteId = await this.supervisor.getSelectedSiteId();
-      const savedSiteName = await this.supervisor.getSelectedSiteName();
+      const savedSiteId = this.supervisor.selectedSiteId();
+      const savedSiteName = this.supervisor.selectedSiteName();
 
       if (savedSiteId && savedSiteName) {
         this.selectedSiteId.set(savedSiteId);

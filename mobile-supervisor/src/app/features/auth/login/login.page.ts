@@ -6,8 +6,8 @@ import {
   IonInput,
   IonItem,
   IonSpinner,
-  IonRouterLink,
   ToastController,
+  ModalController,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -16,11 +16,11 @@ import {
   qrCodeOutline,
   personOutline,
   lockClosedOutline,
-  eyeOutline,
-  eyeOffOutline,
   arrowForwardOutline,
   shieldCheckmarkOutline,
+  mailOutline,
   timeOutline,
+  keyOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -34,13 +34,11 @@ import { AuthService } from '../../../core/services/auth.service';
     IonInput,
     IonItem,
     IonSpinner,
-    IonRouterLink,
     FormsModule,
   ],
   template: `
     <ion-content class="login-content">
       <div class="login-container">
-        <!-- Header with gradient background -->
         <div class="login-header-bg">
           <div class="header-content">
             <div class="logo-container">
@@ -51,104 +49,70 @@ import { AuthService } from '../../../core/services/auth.service';
               <p class="brand-tagline">Supervisor Portal</p>
             </div>
           </div>
-          <!-- Decorative shapes -->
           <div class="header-shape shape-1"></div>
           <div class="header-shape shape-2"></div>
         </div>
 
-        <!-- Login Form Card -->
         <div class="login-card">
           <div class="card-header">
-            <h2 class="card-title">Sign In</h2>
-            <p class="card-subtitle">Welcome back! Enter your credentials to continue.</p>
+            <h2 class="card-title">Welcome</h2>
+            <p class="card-subtitle">
+              Choose how you'd like to sign in to your supervisor account.
+            </p>
           </div>
 
-          <div class="login-form">
-            <div class="input-wrapper">
-              <label class="input-label">Email Address</label>
-              <div class="input-container" [class.focused]="emailFocused">
-                <ion-icon name="mail-outline" class="input-icon"></ion-icon>
-                <ion-input
-                  type="email"
-                  placeholder="Enter your email"
-                  [(ngModel)]="email"
-                  [clearInput]="true"
-                  autocomplete="email"
-                  (ionFocus)="emailFocused = true"
-                  (ionBlur)="emailFocused = false"
-                />
-              </div>
-            </div>
-
-            <div class="input-wrapper">
-              <label class="input-label">Password</label>
-              <div class="input-container" [class.focused]="passwordFocused">
-                <ion-icon name="lock-closed-outline" class="input-icon"></ion-icon>
-                <ion-input
-                  [type]="showPassword() ? 'text' : 'password'"
-                  placeholder="Enter your password"
-                  [(ngModel)]="password"
-                  autocomplete="current-password"
-                  (ionFocus)="passwordFocused = true"
-                  (ionBlur)="passwordFocused = false"
-                />
-                <button type="button" class="password-toggle" (click)="togglePassword()">
-                  <ion-icon [name]="showPassword() ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-                </button>
-              </div>
-            </div>
-
-            <div class="form-footer">
-              <a href="#" class="forgot-link">Forgot Password?</a>
-            </div>
-
+          <div class="actions">
             <ion-button
               expand="block"
-              class="login-btn"
+              class="primary-btn"
               [disabled]="isLoading()"
-              (click)="loginWithEmail()"
+              (click)="scanQRCode()"
             >
               @if (isLoading()) {
                 <ion-spinner name="crescent"></ion-spinner>
               } @else {
-                <span>Sign In</span>
+                <ion-icon name="qr-code-outline" slot="start"></ion-icon>
+                <span>Scan QR Code</span>
                 <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
               }
             </ion-button>
 
+            <ion-button
+              expand="block"
+              class="secondary-btn"
+              [disabled]="isLoading()"
+              (click)="openOtpLogin()"
+            >
+              <ion-icon name="key-outline" slot="start"></ion-icon>
+              <span>Sign in with OTP</span>
+            </ion-button>
+
             <div class="divider">
-              <span>or continue with</span>
+              <span>or</span>
             </div>
 
             <ion-button
               expand="block"
-              class="qr-btn"
-              (click)="scanQRCode()"
+              fill="clear"
+              class="text-btn"
               [disabled]="isLoading()"
+              (click)="openManualToken()"
             >
-              <div class="qr-btn-content">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="qr-icon-svg">
-                  <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
-                  <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
-                  <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
-                  <rect x="14" y="14" width="3" height="3" rx="0.5" fill="currentColor"/>
-                  <rect x="18" y="14" width="3" height="3" rx="0.5" fill="currentColor"/>
-                  <rect x="14" y="18" width="3" height="3" rx="0.5" fill="currentColor"/>
-                  <rect x="18" y="18" width="3" height="3" rx="0.5" fill="currentColor"/>
-                </svg>
-                <span>Sign in with QR Code</span>
-              </div>
+              Use invite token
             </ion-button>
           </div>
+
+          <p class="email-hint">
+            <ion-icon name="mail-outline"></ion-icon>
+            Or open the invite link from your email to start.
+          </p>
         </div>
 
-        <!-- Security Note -->
         <div class="security-note">
           <ion-icon name="shield-checkmark-outline"></ion-icon>
           <span>Secure supervisor access only</span>
         </div>
 
-        <!-- Footer -->
         <div class="login-footer">
           <p class="footer-text">Internal use only. AGB (Annai Golden Builders)</p>
         </div>
@@ -165,7 +129,6 @@ import { AuthService } from '../../../core/services/auth.service';
       flex-direction: column;
     }
 
-    /* Header with gradient */
     .login-header-bg {
       background: linear-gradient(135deg, #002263 0%, #003380 50%, #004d99 100%);
       padding: 40px 24px 60px;
@@ -183,7 +146,7 @@ import { AuthService } from '../../../core/services/auth.service';
     .logo-container {
       width: 80px;
       height: 80px;
-      border-radius: 20px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.15);
       backdrop-filter: blur(10px);
       display: flex;
@@ -235,11 +198,10 @@ import { AuthService } from '../../../core/services/auth.service';
       left: -40px;
     }
 
-    /* Login Card */
     .login-card {
       background: #ffffff;
       margin: -30px 16px 16px;
-      border-radius: 24px;
+      border-radius: 8px;
       padding: 28px 24px;
       box-shadow: 0 4px 24px rgba(0, 34, 99, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
       position: relative;
@@ -260,95 +222,38 @@ import { AuthService } from '../../../core/services/auth.service';
       margin: 0;
     }
 
-    /* Form Styles */
-    .login-form {
+    .actions {
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 12px;
     }
-    .input-wrapper {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .input-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: #495057;
-      margin: 0;
-    }
-    .input-container {
-      display: flex;
-      align-items: center;
-      background: #f8f9fa;
-      border: 2px solid transparent;
-      border-radius: 12px;
-      padding: 0 14px;
-      transition: all 0.2s ease;
-      min-height: 52px;
-    }
-    .input-container.focused {
-      background: #ffffff;
-      border-color: #002263;
-      box-shadow: 0 0 0 4px rgba(0, 34, 99, 0.08);
-    }
-    .input-icon {
-      color: #002263;
-      font-size: 20px;
-      margin-right: 10px;
-      min-width: 20px;
-    }
-    .input-container ion-input {
-      flex: 1;
-      font-size: 15px;
-      --padding-start: 0;
-      --padding-end: 0;
-    }
-    .password-toggle {
-      background: transparent;
-      border: none;
-      padding: 8px;
-      cursor: pointer;
-      color: #6c757d;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .password-toggle ion-icon {
-      font-size: 20px;
-    }
-    .form-footer {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: -8px;
-    }
-    .forgot-link {
-      font-size: 13px;
-      color: #002263;
-      text-decoration: none;
-      font-weight: 500;
-    }
-    .forgot-link:hover {
-      text-decoration: underline;
-    }
-
-    /* Login Button */
-    .login-btn {
-      --background: #002263;
-      --color: #ffffff;
-      --border-radius: 12px;
-      --box-shadow: 0 4px 14px rgba(0, 34, 99, 0.3);
+    .primary-btn,
+    .secondary-btn,
+    .text-btn {
+      height: 52px;
       font-weight: 600;
       font-size: 16px;
-      height: 52px;
-      margin-top: 8px;
-      letter-spacing: 0.3px;
+      --border-radius: 8px;
     }
-    .login-btn:hover {
-      --background: #001a4d;
+    .primary-btn {
+      --background: #002263;
+      --color: #ffffff;
+      --box-shadow: 0 4px 14px rgba(0, 34, 99, 0.3);
+    }
+    .primary-btn:hover { --background: #001a4d; }
+    .secondary-btn {
+      --background: #ffffff;
+      --color: #002263;
+      --border-color: #002263;
+      --border-style: solid;
+      --border-width: 2px;
+    }
+    .secondary-btn:hover { --background: rgba(0, 34, 99, 0.04); }
+    .text-btn {
+      --color: #002263;
+      font-weight: 500;
     }
 
-    /* Divider */
     .divider {
       display: flex;
       align-items: center;
@@ -370,31 +275,22 @@ import { AuthService } from '../../../core/services/auth.service';
       letter-spacing: 1px;
     }
 
-    /* QR Button */
-    .qr-btn {
-      --background: transparent;
-      --color: #002263;
-      --border-radius: 12px;
-      border: 2px solid #002263;
-      font-weight: 600;
-      font-size: 15px;
-      height: 52px;
-      --background: rgba(0, 34, 99, 0.04);
-    }
-    .qr-btn:hover {
-      --background: #002263;
-      --color: #ffffff;
-    }
-    .qr-btn-content {
+    .email-hint {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      font-size: 12px;
+      color: #6c757d;
+      margin: 16px 0 0;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
     }
-    .qr-icon-svg {
-      flex-shrink: 0;
+    .email-hint ion-icon {
+      color: #002263;
+      font-size: 16px;
     }
 
-    /* Security Note */
     .security-note {
       display: flex;
       align-items: center;
@@ -408,7 +304,6 @@ import { AuthService } from '../../../core/services/auth.service';
       font-size: 14px;
     }
 
-    /* Footer */
     .login-footer {
       text-align: center;
       padding: 0 24px 32px;
@@ -425,71 +320,32 @@ export class LoginPage implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
+  private modalCtrl = inject(ModalController);
 
-  email = '';
-  password = '';
-  showPassword = signal(false);
   isLoading = signal(false);
-  emailFocused = false;
-  passwordFocused = false;
 
   async ngOnInit(): Promise<void> {
     addIcons({
       qrCodeOutline,
       personOutline,
       lockClosedOutline,
-      eyeOutline,
-      eyeOffOutline,
       arrowForwardOutline,
       shieldCheckmarkOutline,
+      mailOutline,
       timeOutline,
-      mailOutline: personOutline,
-    });
-
-    const isLoggedIn = await this.auth.isLoggedIn();
-    if (isLoggedIn) {
-      this.router.navigate(['/tabs/dashboard']);
-    }
-  }
-
-  togglePassword(): void {
-    this.showPassword.set(!this.showPassword());
-  }
-
-  async loginWithEmail(): Promise<void> {
-    if (!this.email || !this.password) {
-      const toast = await this.toastCtrl.create({
-        message: 'Please enter email and password',
-        duration: 2000,
-        position: 'top',
-        color: 'warning',
-      });
-      await toast.present();
-      return;
-    }
-
-    this.isLoading.set(true);
-
-    this.auth.login(this.email, this.password).subscribe({
-      next: () => {
-        this.isLoading.set(false);
-        this.router.navigate(['/tabs/dashboard']);
-      },
-      error: async (error: unknown) => {
-        this.isLoading.set(false);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const toast = await this.toastCtrl.create({
-          message: errorMessage || 'Login failed',
-          duration: 3000,
-          position: 'top',
-          color: 'danger',
-        });
-        await toast.present();
-      },
+      keyOutline,
     });
   }
 
   async scanQRCode(): Promise<void> {
     this.router.navigate(['/auth/qr-scanner']);
+  }
+
+  async openOtpLogin(): Promise<void> {
+    this.router.navigate(['/auth/otp-login']);
+  }
+
+  async openManualToken(): Promise<void> {
+    this.router.navigate(['/auth/manual-token']);
   }
 }

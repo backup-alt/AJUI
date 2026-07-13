@@ -35,7 +35,7 @@ import {
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
-import { DatePipe, CurrencyPipe, DecimalPipe, TitleCasePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 
 @Component({
   selector: 'app-materials',
@@ -49,8 +49,6 @@ import { DatePipe, CurrencyPipe, DecimalPipe, TitleCasePipe } from '@angular/com
     IonSearchbar,
     IonSegment,
     IonSegmentButton,
-    IonList,
-    IonItem,
     IonLabel,
     IonBadge,
     IonFab,
@@ -64,9 +62,6 @@ import { DatePipe, CurrencyPipe, DecimalPipe, TitleCasePipe } from '@angular/com
     IonButtons,
     IonButton,
     DatePipe,
-    CurrencyPipe,
-    DecimalPipe,
-    TitleCasePipe,
   ],
   template: `
     <ion-header class="agb-header">
@@ -314,18 +309,24 @@ export class MaterialsPage implements OnInit {
   async loadMaterials(): Promise<void> {
     this.isLoading.set(true);
     try {
-      const projectId = await this.supervisor.getSelectedProjectId();
-      const data = await new Promise<{ materials: Material[] }>((resolve) => {
-        this.supervisor.getMaterials({ projectId: projectId || undefined, limit: 100 }).subscribe({
-          next: (response) => resolve(response as unknown as { materials: Material[] }),
-          error: () => resolve({ materials: [] }),
+      const projectId = this.supervisor.selectedProjectId();
+      this.supervisor
+        .getMaterials({ projectId: projectId ?? undefined, limit: 100 })
+        .subscribe({
+          next: (response) => {
+            this.materials.set(response.materials || []);
+            this.filterMaterials();
+            this.isLoading.set(false);
+          },
+          error: (err) => {
+            console.error('[Materials] failed to load', err);
+            this.materials.set([]);
+            this.filterMaterials();
+            this.isLoading.set(false);
+          },
         });
-      });
-      this.materials.set(data.materials || []);
-      this.filterMaterials();
     } catch (error) {
       console.error('Failed to load materials:', error);
-    } finally {
       this.isLoading.set(false);
     }
   }
@@ -357,7 +358,7 @@ export class MaterialsPage implements OnInit {
   }
 
   viewMaterial(material: Material): void {
-    this.router.navigate(['/tabs/materials', material.materialId]);
+    this.router.navigate(['/tabs/materials', material._id]);
   }
 
   createMaterial(): void {

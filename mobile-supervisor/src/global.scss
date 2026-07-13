@@ -1,19 +1,15 @@
 /*
  * App Global CSS
  * ----------------------------------------------------------------------------
- * AGB Supervisor - Professional, sharp-edged enterprise design
+ * AGB Supervisor - Professional, modern design with consistent 8px radius.
  */
 
-/* Core CSS required for Ionic components to work properly */
 @import "@ionic/angular/css/core.css";
-
-/* Basic CSS for apps built with Ionic */
 @import "@ionic/angular/css/normalize.css";
 @import "@ionic/angular/css/structure.css";
 @import "@ionic/angular/css/typography.css";
 @import "@ionic/angular/css/display.css";
 
-/* Optional CSS utils */
 @import "@ionic/angular/css/padding.css";
 @import "@ionic/angular/css/float-elements.css";
 @import "@ionic/angular/css/text-alignment.css";
@@ -22,18 +18,40 @@
 
 /* ================================================================
    AGB PROFESSIONAL DESIGN SYSTEM
-   Sharp edges · Enterprise feel · Construction industry
+   Consistent 8px radius · Premium feel · Construction industry
    ================================================================ */
 
 :root {
+  /* Radii - unified 8px */
   --agb-radius: 8px;
-  --agb-radius-pill: 8px;
+  --agb-radius-sm: 8px;
+  --agb-radius-md: 8px;
+  --agb-radius-lg: 8px;
+  --agb-radius-xl: 8px;
+  --agb-radius-pill: 9999px;
+  --agb-radius-full: 9999px;
+
+  /* Borders & dividers */
   --agb-divider: 1px solid #e5e7eb;
   --agb-border: 1px solid #d1d5db;
   --agb-border-strong: 1px solid #9ca3af;
 }
 
-/* Kill ALL default Ionic rounded corners */
+/* Global reset */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f5f6f8;
+  color: #111827;
+}
+
+/* Unified 8px corner radius for all Ionic surfaces (light mode). */
 ion-card,
 ion-button,
 ion-item,
@@ -61,35 +79,22 @@ ion-thumbnail,
 ion-avatar,
 ion-img,
 ion-list,
-.list-md,
+ion-list.list-md,
 ion-header,
 ion-footer,
 ion-content,
 ion-page {
-  --border-radius: 8px !important;
-  --inner-border-radius: 8px !important;
-  --box-shadow: none !important;
+  --border-radius: 8px;
+  --inner-border-radius: 8px;
+  --box-shadow: none;
 }
 
-/* Global reset */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-html,
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background: #f5f6f8;
-  color: #111827;
-}
-
-/* Sharp, professional card */
+/* Soft premium shadow on cards by default. */
 ion-card {
   margin: 8px 12px;
   border: 1px solid #e5e7eb;
   background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 ion-card-header {
@@ -101,9 +106,9 @@ ion-card-content {
   padding: 14px 16px;
 }
 
-/* Sharp button */
+/* Buttons. */
 ion-button {
-  --border-radius: 2px !important;
+  --border-radius: 8px;
   --padding-top: 12px;
   --padding-bottom: 12px;
   font-weight: 600;
@@ -113,13 +118,13 @@ ion-button {
 }
 
 ion-button[shape="round"] {
-  --border-radius: 2px !important;
+  --border-radius: 8px;
 }
 
-/* Form fields sharp */
+/* Form fields. */
 ion-item {
-  --border-radius: 2px !important;
-  --inner-border-radius: 2px !important;
+  --border-radius: 8px;
+  --inner-border-radius: 8px;
   --background: transparent;
   --border-color: #e5e7eb;
   --padding-start: 0;
@@ -131,7 +136,7 @@ ion-input,
 ion-textarea,
 ion-select {
   --background: #ffffff;
-  --border-radius: 2px !important;
+  --border-radius: 8px;
   --padding-start: 12px;
   --padding-end: 12px;
   --padding-top: 10px;
@@ -153,9 +158,8 @@ ion-label {
   margin-bottom: 4px;
 }
 
-/* Sharp badge */
 ion-badge {
-  --border-radius: 2px !important;
+  --border-radius: 8px;
   --padding-top: 4px;
   --padding-bottom: 4px;
   --padding-start: 8px;
@@ -166,7 +170,6 @@ ion-badge {
   letter-spacing: 0.5px;
 }
 
-/* Toolbar / header */
 ion-toolbar {
   --background: #ffffff;
   --border-color: #e5e7eb;
@@ -181,13 +184,11 @@ ion-title {
   color: #111827;
 }
 
-/* Page background */
 ion-content {
   --background: #f5f6f8;
   --color: #111827;
 }
 
-/* Menu styling */
 ion-menu {
   --width: 280px;
   --background: #ffffff;
@@ -202,8 +203,8 @@ ion-menu ion-toolbar {
 ion-menu ion-item {
   --background: transparent;
   --color: #111827;
-  --border-radius: 0 !important;
-  --inner-border-radius: 0 !important;
+  --border-radius: 0;
+  --inner-border-radius: 0;
   --padding-start: 20px;
   --padding-end: 20px;
   --min-height: 48px;
@@ -236,7 +237,6 @@ ion-menu ion-item.logout-item ion-icon {
   color: #dc3545;
 }
 
-/* Tab bar */
 ion-tab-bar {
   --background: #ffffff;
   --border: 1px solid #e5e7eb;
@@ -262,10 +262,9 @@ ion-tab-button ion-label {
   letter-spacing: 0.4px;
 }
 
-/* Popovers */
 ion-popover {
   --background: #ffffff;
-  --border-radius: 2px !important;
+  --border-radius: 8px;
   --box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   --width: 280px;
 }
@@ -278,8 +277,8 @@ ion-popover ion-list {
 
 ion-popover ion-item {
   --background: transparent;
-  --border-radius: 0 !important;
-  --inner-border-radius: 0 !important;
+  --border-radius: 0;
+  --inner-border-radius: 0;
   --padding-start: 16px;
   --padding-end: 16px;
   --min-height: 56px;
@@ -301,20 +300,17 @@ ion-popover ion-list-header {
   border-bottom: 1px solid #e5e7eb;
 }
 
-/* Toast */
 ion-toast {
-  --border-radius: 2px !important;
+  --border-radius: 8px;
   --box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   font-size: 14px;
   font-weight: 500;
 }
 
-/* Skeleton */
 ion-skeleton-text {
-  --border-radius: 2px !important;
+  --border-radius: 8px;
 }
 
-/* Lists */
 ion-list {
   background: transparent;
   padding: 0;
@@ -322,8 +318,8 @@ ion-list {
 
 ion-list ion-item {
   --background: #ffffff;
-  --border-radius: 0 !important;
-  --inner-border-radius: 0 !important;
+  --border-radius: 0;
+  --inner-border-radius: 0;
   --padding-start: 16px;
   --padding-end: 16px;
   --min-height: 60px;
@@ -334,14 +330,17 @@ ion-list ion-item:last-child {
   border-bottom: none;
 }
 
-/* Dividers between sections */
+ion-fab-button {
+  --box-shadow: 0 4px 14px rgba(0, 34, 99, 0.3);
+}
+
 .section-divider {
   height: 1px;
   background: #e5e7eb;
   margin: 16px 0;
 }
 
-/* Custom helper classes */
+/* Helper classes. */
 .text-primary { color: #002263 !important; }
 .text-muted { color: #6b7280 !important; }
 .text-danger { color: #dc3545 !important; }
@@ -356,7 +355,77 @@ ion-list ion-item:last-child {
 .bg-light { background: #f9fafb; }
 .bg-white { background: #ffffff; }
 
-/* Custom scrollbar */
+/* Dark mode (premium, consistent). */
+html.dark,
+html.theme-dark {
+  --agb-white: #0f172a;
+  --agb-off-white: #1e293b;
+  --agb-light-gray: #334155;
+  --agb-gray: #94a3b8;
+  --agb-dark-gray: #cbd5e1;
+  --agb-black: #f1f5f9;
+
+  --ion-background-color: #0f172a;
+  --ion-toolbar-background: #1e293b;
+  --ion-toolbar-border-color: #334155;
+  --ion-toolbar-color: #f1f5f9;
+  --ion-item-background: #1e293b;
+  --ion-card-background: #1e293b;
+  --ion-tab-bar-background: #1e293b;
+  --ion-tab-bar-border-color: #334155;
+  --ion-text-color: #f1f5f9;
+
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+html.dark ion-card,
+html.theme-dark ion-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html.dark ion-input,
+html.dark ion-textarea,
+html.dark ion-select,
+html.theme-dark ion-input,
+html.theme-dark ion-textarea,
+html.theme-dark ion-select {
+  --background: #0f172a;
+  --color: #f1f5f9;
+  --border-color: #334155;
+}
+
+html.dark ion-toolbar,
+html.theme-dark ion-toolbar {
+  --background: #1e293b;
+  --color: #f1f5f9;
+  --border-color: #334155;
+}
+
+html.dark ion-title,
+html.theme-dark ion-title {
+  color: #f1f5f9;
+}
+
+html.dark ion-content,
+html.theme-dark ion-content {
+  --background: #0f172a;
+  --color: #f1f5f9;
+}
+
+/* iOS safe-area fix. */
+@supports (padding: max(0px)) {
+  .ion-page {
+    --ion-safe-area-top: env(safe-area-inset-top);
+    --ion-safe-area-bottom: env(safe-area-inset-bottom);
+  }
+  ion-header ion-toolbar:first-of-type {
+    --ion-safe-area-top: env(safe-area-inset-top);
+  }
+}
+
+/* Custom scrollbar. */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -366,6 +435,7 @@ ion-list ion-item:last-child {
 }
 ::-webkit-scrollbar-thumb {
   background: #d1d5db;
+  border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;

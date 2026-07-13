@@ -6,7 +6,7 @@ import { ToastController } from '@ionic/angular';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
   IonCard, IonCardContent, IonBadge, IonItem, IonLabel, IonList,
-  IonInput, IonButton, IonSpinner, IonIcon, IonNote
+  IonInput, IonButton, IonSpinner
 } from '@ionic/angular/standalone';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Material } from '../../../shared/models';
@@ -18,7 +18,7 @@ import { Material } from '../../../shared/models';
     CommonModule, FormsModule, DatePipe,
     IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
     IonCard, IonCardContent, IonBadge, IonItem, IonLabel, IonList,
-    IonInput, IonButton, IonSpinner, IonIcon, IonNote
+    IonInput, IonButton, IonSpinner
   ],
   template: `
     <ion-header>

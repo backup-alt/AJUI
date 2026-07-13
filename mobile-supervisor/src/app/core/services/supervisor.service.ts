@@ -1,10 +1,7 @@
-import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import {
-  DashboardResponse,
-  ProjectsResponse,
-  SitesResponse,
+  DashboardData,
   Approval,
   ApprovalsListResponse,
   Material,
@@ -17,94 +14,96 @@ import {
   ExpenseListResponse,
   CreateExpenseRequest,
   ApprovalActionRequest,
+  Site,
+  SitesResponse,
 } from '../../shared/models';
+
+export interface SiteSelection {
+  siteId: string;
+  projectId: string;
+  projectName: string;
+  siteName: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class SupervisorService {
   private api = inject(ApiService);
-  private selectedSiteId: string | null = null;
-  private selectedProjectId: string | null = null;
-  private selectedProjectName: string | null = null;
-  private selectedSiteName: string | null = null;
+  private _selection = signal<SiteSelection | null>(null);
+  readonly selection = this._selection.asReadonly();
 
   async init(): Promise<void> {
-    this.selectedSiteId = await this.api.getSelectedSiteId();
-    this.selectedProjectId = await this.api.getSelectedProjectId();
-    this.selectedProjectName = await this.api.getSelectedProjectName();
-    this.selectedSiteName = await this.api.getSelectedSiteName();
+    const [siteId, projectId, projectName, siteName] = await Promise.all([
+      this.api.getSelectedSiteId(),
+      this.api.getSelectedProjectId(),
+      this.api.getSelectedProjectName(),
+      this.api.getSelectedSiteName(),
+    ]);
+    if (siteId && projectId) {
+      this._selection.set({ siteId, projectId, projectName: projectName || '', siteName: siteName || '' });
+    }
   }
 
-  // Profile
-  getProfile(): Observable<unknown> {
-    return this.api.get('/mobile/supervisor/profile');
+  // ---------------- Profile ----------------
+  getProfile() {
+    return this.api.get<{ user: unknown; profile: unknown }>('/mobile/supervisor/profile');
   }
 
-  // Dashboard
-  getDashboard(): Observable<DashboardResponse> {
-    return this.api.get<DashboardResponse>('/mobile/supervisor/dashboard');
+  // ---------------- Dashboard ----------------
+  getDashboard() {
+    return this.api.get<{ dashboard: DashboardData }>('/mobile/supervisor/dashboard');
   }
 
-  // Projects
-  getProjects(): Observable<ProjectsResponse> {
-    return this.api.get<ProjectsResponse>('/mobile/supervisor/projects');
-  }
-
-  getProjectsDetailed(): Observable<ProjectsResponse> {
-    return this.api.get<ProjectsResponse>('/mobile/supervisor/projects/detailed');
-  }
-
-  getProjectDetail(projectId: string): Observable<{ project: unknown }> {
-    return this.api.get<{ project: unknown }>(`/mobile/supervisor/projects/${projectId}`);
-  }
-
-  // Sites
-  getSites(): Observable<SitesResponse> {
+  // ---------------- Sites ----------------
+  getSites() {
     return this.api.get<SitesResponse>('/mobile/supervisor/sites');
   }
 
-  // Approvals
-  getApprovals(): Observable<ApprovalsListResponse> {
+  // ---------------- Approvals ----------------
+  getApprovals() {
     return this.api.get<ApprovalsListResponse>('/mobile/supervisor/approvals');
   }
 
-  getProjectApprovals(projectId: string): Observable<{ approvals: Approval[] }> {
-    return this.api.get<{ approvals: Approval[] }>(
-      `/mobile/supervisor/projects/${projectId}/approvals`
-    );
-  }
-
-  getApprovalDetail(approvalId: string): Observable<{ approval: Approval }> {
+  getApprovalDetail(approvalId: string) {
     return this.api.get<{ approval: Approval }>(`/mobile/supervisor/approvals/${approvalId}`);
   }
 
-  takeApprovalAction(approvalId: string, action: ApprovalActionRequest): Observable<unknown> {
-    return this.api.patch<unknown>(`/mobile/supervisor/approvals/${approvalId}`, action);
+  takeApprovalAction(approvalId: string, action: ApprovalActionRequest) {
+    return this.api.patch<{ approval: Approval }>(
+      `/mobile/supervisor/approvals/${approvalId}`,
+      action
+    );
   }
 
-  // Materials
+  // ---------------- Materials ----------------
   getMaterials(filters?: {
     projectId?: string;
     siteId?: string;
     status?: string;
     page?: number;
     limit?: number;
-  }): Observable<MaterialsListResponse> {
-    return this.api.get<MaterialsListResponse>('/mobile/supervisor/materials', filters as Record<string, string>);
+  }) {
+    return this.api.get<MaterialsListResponse>('/mobile/supervisor/materials', filters);
   }
 
-  getMaterialDetail(materialId: string): Observable<{ material: Material }> {
+  getMaterialDetail(materialId: string) {
     return this.api.get<{ material: Material }>(`/mobile/supervisor/materials/${materialId}`);
   }
 
-  createMaterial(request: CreateMaterialRequest): Observable<{ material: Material }> {
+  createMaterial(request: CreateMaterialRequest) {
     return this.api.post<{ material: Material }>('/mobile/supervisor/materials', request);
   }
 
-  updateMaterialStock(materialId: string, updates: { purchasedQuantity?: number; consumedQuantity?: number }): Observable<{ material: Material }> {
-    return this.api.patch<{ material: Material }>(`/mobile/supervisor/materials/${materialId}/stock`, updates);
+  updateMaterialStock(
+    materialId: string,
+    updates: { purchasedQuantity?: number; consumedQuantity?: number }
+  ) {
+    return this.api.patch<{ material: Material }>(
+      `/mobile/supervisor/materials/${materialId}/stock`,
+      updates
+    );
   }
 
-  // Labour
+  // ---------------- Labour ----------------
   getLabourEntries(filters?: {
     projectId?: string;
     siteId?: string;
@@ -113,19 +112,19 @@ export class SupervisorService {
     dateTo?: string;
     page?: number;
     limit?: number;
-  }): Observable<LabourListResponse> {
-    return this.api.get<LabourListResponse>('/mobile/supervisor/labour', filters as Record<string, string>);
+  }) {
+    return this.api.get<LabourListResponse>('/mobile/supervisor/labour', filters);
   }
 
-  getLabourDetail(labourId: string): Observable<{ labour: Labour }> {
+  getLabourDetail(labourId: string) {
     return this.api.get<{ labour: Labour }>(`/mobile/supervisor/labour/${labourId}`);
   }
 
-  createLabour(request: CreateLabourRequest): Observable<{ labour: Labour }> {
+  createLabour(request: CreateLabourRequest) {
     return this.api.post<{ labour: Labour }>('/mobile/supervisor/labour', request);
   }
 
-  // Expenses
+  // ---------------- Expenses ----------------
   getExpenses(filters?: {
     projectId?: string;
     siteId?: string;
@@ -135,67 +134,56 @@ export class SupervisorService {
     dateTo?: string;
     page?: number;
     limit?: number;
-  }): Observable<ExpenseListResponse> {
-    return this.api.get<ExpenseListResponse>('/mobile/supervisor/expenses', filters as Record<string, string>);
+  }) {
+    return this.api.get<ExpenseListResponse>('/mobile/supervisor/expenses', filters);
   }
 
-  getExpenseDetail(expenseId: string): Observable<{ expense: Expense }> {
+  getExpenseDetail(expenseId: string) {
     return this.api.get<{ expense: Expense }>(`/mobile/supervisor/expenses/${expenseId}`);
   }
 
-  createExpense(request: CreateExpenseRequest): Observable<{ expense: Expense }> {
+  createExpense(request: CreateExpenseRequest) {
     return this.api.post<{ expense: Expense }>('/mobile/supervisor/expenses', request);
   }
 
-  // Site Selection
-  async setSelectedSite(siteId: string, projectId: string, projectName: string, siteName?: string): Promise<void> {
-    this.selectedSiteId = siteId;
-    this.selectedProjectId = projectId;
-    this.selectedProjectName = projectName;
-    this.selectedSiteName = siteName || projectName;
+  // ---------------- Site Selection ----------------
+  async setSelectedSite(
+    siteId: string,
+    projectId: string,
+    projectName: string,
+    siteName?: string
+  ): Promise<void> {
+    const sel: SiteSelection = {
+      siteId,
+      projectId,
+      projectName,
+      siteName: siteName || projectName,
+    };
+    this._selection.set(sel);
     await this.api.setSelectedSiteId(siteId);
     await this.api.setSelectedProjectId(projectId);
     await this.api.setSelectedProjectName(projectName);
     if (siteName) await this.api.setSelectedSiteName(siteName);
   }
 
-  async getSelectedSiteId(): Promise<string | null> {
-    return this.selectedSiteId || this.api.getSelectedSiteId();
+  selectedSiteId(): string | null {
+    return this._selection()?.siteId ?? null;
   }
 
-  async getSelectedProjectId(): Promise<string | null> {
-    return this.selectedProjectId || this.api.getSelectedProjectId();
+  selectedProjectId(): string | null {
+    return this._selection()?.projectId ?? null;
   }
 
-  async getSelectedProjectName(): Promise<string | null> {
-    return this.selectedProjectName || this.api.getSelectedProjectName();
+  selectedProjectName(): string | null {
+    return this._selection()?.projectName ?? null;
   }
 
-  async getSelectedSiteName(): Promise<string | null> {
-    return this.selectedSiteName || this.api.getSelectedSiteName();
+  selectedSiteName(): string | null {
+    return this._selection()?.siteName ?? null;
   }
 
   async clearSiteSelection(): Promise<void> {
-    this.selectedSiteId = null;
-    this.selectedProjectId = null;
-    this.selectedProjectName = null;
-    this.selectedSiteName = null;
+    this._selection.set(null);
     await this.api.clearSiteSelection();
-  }
-
-  getSelectedSiteIdSync(): string | null {
-    return this.selectedSiteId;
-  }
-
-  getSelectedProjectIdSync(): string | null {
-    return this.selectedProjectId;
-  }
-
-  getSelectedProjectNameSync(): string | null {
-    return this.selectedProjectName;
-  }
-
-  getSelectedSiteNameSync(): string | null {
-    return this.selectedSiteName;
   }
 }

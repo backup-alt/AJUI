@@ -8,13 +8,11 @@ import {
   IonIcon,
   IonBackButton,
   IonButtons,
-  IonText,
   IonSpinner,
   AlertController,
   ToastController,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
 import {
   qrCodeOutline,
@@ -38,9 +36,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
     IonIcon,
     IonBackButton,
     IonButtons,
-    IonText,
     IonSpinner,
-    FormsModule,
   ],
   template: `
     <ion-header class="agb-header">
@@ -115,37 +111,6 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
           </ion-button>
         </div>
       </div>
-
-      @if (showOtpInput()) {
-        <div class="otp-modal">
-          <div class="otp-content">
-            <h3>Enter OTP</h3>
-            <p>We've sent a 6-digit code to your email</p>
-            <div class="otp-inputs">
-              @for (i of [0,1,2,3,4,5]; track i) {
-                <ion-input
-                  type="text"
-                  maxlength="1"
-                  class="otp-digit"
-                  [(ngModel)]="otpDigits[i]"
-                  (input)="onOtpInput($event, i)"
-                  (keydown)="onOtpKeyDown($event, i)"
-                />
-              }
-            </div>
-            <div class="otp-actions">
-              <ion-button expand="block" [disabled]="otpDigits.join('').length < 6 || isVerifying()" (click)="verifyOtp()">
-                @if (isVerifying()) {
-                  <ion-spinner name="crescent"></ion-spinner>
-                } @else {
-                  Verify & Continue
-                }
-              </ion-button>
-              <ion-button fill="clear" (click)="resendOtp()">Resend Code</ion-button>
-            </div>
-          </div>
-        </div>
-      }
     </ion-content>
   `,
   styles: [`
@@ -347,11 +312,8 @@ export class QrScannerPage implements OnInit {
   scannedData = signal<string | null>(null);
   scanError = signal(false);
   isProcessing = signal(false);
-  showOtpInput = signal(false);
-  isVerifying = signal(false);
 
   inviteToken = '';
-  otpDigits: string[] = ['', '', '', '', '', ''];
 
   async ngOnInit(): Promise<void> {
     addIcons({
@@ -389,8 +351,16 @@ qrCodeOutline,
               this.scannedData.set('Invite is no longer valid');
               return;
             }
+            // Stash the verify response for the signup page to pre-fill.
+            try {
+              sessionStorage.setItem('agb:pending-invite', JSON.stringify(response));
+            } catch {
+              // ignore
+            }
             if (response.requiresOtp) {
-              this.showOtpInput.set(true);
+              this.router.navigate(['/auth/verify-otp'], {
+                queryParams: { token: this.inviteToken },
+              });
             } else {
               this.router.navigate(['/auth/signup'], {
                 queryParams: { token: this.inviteToken },
@@ -415,81 +385,10 @@ qrCodeOutline,
   async retryScan(): Promise<void> {
     this.scannedData.set(null);
     this.scanError.set(false);
-    this.showOtpInput.set(false);
-    this.otpDigits = ['', '', '', '', '', ''];
     await this.startScanning();
   }
 
-  onOtpInput(event: Event, index: number): void {
-    const input = event.target as HTMLInputElement;
-    const value = input.value.replace(/\D/g, '');
-    this.otpDigits[index] = value;
-
-    if (value && index < 5) {
-      const nextInput = input.nextElementSibling as HTMLInputElement;
-      nextInput?.focus();
-    }
-  }
-
-  onOtpKeyDown(event: KeyboardEvent, index: number): void {
-    if (event.key === 'Backspace' && !this.otpDigits[index] && index > 0) {
-      const prevInput = (event.target as HTMLInputElement)
-        .previousElementSibling as HTMLInputElement;
-      prevInput?.focus();
-    }
-  }
-
-  async verifyOtp(): Promise<void> {
-    const otp = this.otpDigits.join('');
-    if (otp.length < 6) return;
-
-    this.isVerifying.set(true);
-
-    this.auth.verifyOtp(this.inviteToken, otp).subscribe({
-      next: () => {
-        this.router.navigate(['/auth/signup'], {
-          queryParams: { token: this.inviteToken, otp },
-        });
-      },
-      error: async (error: unknown) => {
-        this.isVerifying.set(false);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const toast = await this.toastCtrl.create({
-          message: errorMessage || 'Invalid OTP',
-          duration: 2000,
-          position: 'top',
-          color: 'danger',
-        });
-        await toast.present();
-      },
-    });
-  }
-
-  async resendOtp(): Promise<void> {
-    this.auth.resendOtp(this.inviteToken).subscribe({
-      next: async () => {
-        const toast = await this.toastCtrl.create({
-          message: 'OTP resent to your email',
-          duration: 2000,
-          position: 'top',
-          color: 'success',
-        });
-        await toast.present();
-      },
-      error: async (error: unknown) => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const toast = await this.toastCtrl.create({
-          message: errorMessage || 'Failed to resend OTP',
-          duration: 2000,
-          position: 'top',
-          color: 'danger',
-        });
-        await toast.present();
-      },
-    });
-  }
-
   showManualEntry(): void {
-    this.router.navigate(['/auth/signup']);
+    this.router.navigate(['/auth/manual-token']);
   }
 }

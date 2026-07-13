@@ -1,10 +1,10 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Preferences } from '@capacitor/preferences';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { Observable, from, of, throwError } from 'rxjs';
-import { map, tap, catchError, switchMap } from 'rxjs/operators';
+import { firstValueFrom, from, of, throwError } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import {
   LoginResponse,
@@ -13,124 +13,148 @@ import {
   SignupRequest,
   User,
 } from '../../shared/models';
-import { environment } from '../../../environments/environment';
+
+export interface QrScanResult {
+  scanned: boolean;
+  payload?: QRInvitePayload;
+  error?: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private api = inject(ApiService);
   private router = inject(Router);
 
-  currentUser: User | null = null;
-  isAuthenticated = false;
+  readonly currentUser = signal<User | null>(null);
+  readonly isAuthenticated = signal<boolean>(false);
 
   async init(): Promise<void> {
     const token = await this.api.getAccessToken();
-    this.isAuthenticated = !!token;
+    this.isAuthenticated.set(!!token);
 
-    if (this.isAuthenticated) {
+    if (token) {
       const userData = await Preferences.get({ key: 'currentUser' });
       if (userData.value) {
         try {
-          this.currentUser = JSON.parse(userData.value);
+          this.currentUser.set(JSON.parse(userData.value) as User);
         } catch {
-          this.currentUser = null;
+          this.currentUser.set(null);
         }
       }
     }
   }
 
-  async loginWithQRCode(): Promise<{ scanned: boolean; payload?: QRInvitePayload }> {
+  /**
+   * Open the camera and scan a supervisor invite QR code.
+   * Returns a typed result so the caller can decide what to do.
+   */
+  async loginWithQRCode(): Promise<QrScanResult> {
     try {
-      const scanner = BarcodeScanner;
-
-      const permResult = await scanner.requestPermissions();
-      const hasPermission =
-        permResult.camera === 'granted' ||
-        (permResult as unknown as { granted?: boolean }).granted === true ||
-        String(permResult).includes('granted');
-
-      if (!hasPermission) {
-        console.error('Camera permission denied:', permResult);
-        return { scanned: false };
+      const permResult = await BarcodeScanner.requestPermissions();
+      const granted = permResult.camera === 'granted';
+      if (!granted) {
+        return { scanned: false, error: 'Camera permission denied' };
       }
 
-      const { available } = await scanner.isGoogleBarcodeScannerModuleAvailable();
+      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
       if (!available) {
-        console.log('Installing Google Barcode Scanner module...');
-        await scanner.installGoogleBarcodeScannerModule();
+        await BarcodeScanner.installGoogleBarcodeScannerModule();
       }
 
       await Haptics.impact({ style: ImpactStyle.Light });
-
-      const result = await scanner.scan();
+      const result = await BarcodeScanner.scan();
       const barcodes = result.barcodes;
 
       if (!barcodes || barcodes.length === 0) {
         return { scanned: false };
       }
 
-      const scannedData = barcodes[0]?.rawValue;
-      if (!scannedData) {
-        return { scanned: false };
+      const raw = barcodes[0]?.rawValue;
+      if (!raw) {
+        return { scanned: false, error: 'Empty QR code' };
       }
-
-      console.log('QR scanned raw data:', scannedData);
 
       let payload: QRInvitePayload;
-
       try {
-        payload = JSON.parse(scannedData);
-        console.log('QR parsed as JSON:', payload);
+        payload = JSON.parse(raw);
       } catch {
-        console.log('QR is plain text, treating as token');
-        payload = { token: scannedData, type: 'supervisor' as const, expiresAt: '' };
+        // Plain text token (some admin flows emit a raw token string).
+        payload = { token: raw.trim(), type: 'supervisor', expiresAt: '' };
       }
-
-      console.log('QR payload type check:', payload.type);
 
       if (payload.type && payload.type !== 'supervisor') {
-        throw new Error('Invalid QR code for supervisor login');
+        return { scanned: true, error: 'Invalid QR code for supervisor login' };
       }
-
       if (!payload.token) {
-        throw new Error('Invalid QR code: missing token');
+        return { scanned: true, error: 'Invalid QR code: missing token' };
       }
 
       await Haptics.impact({ style: ImpactStyle.Medium });
       return { scanned: true, payload };
-    } catch (error) {
-      console.error('QR scan error:', error);
-      return { scanned: false };
+    } catch (err) {
+      console.error('[Auth] QR scan error', err);
+      return { scanned: false, error: (err as Error).message };
     }
   }
 
-      verifyInvite(token: string): Observable<VerifyInviteResponse> {
+  verifyInvite(token: string) {
     return this.api.get<VerifyInviteResponse>(`/auth/supervisor/verify/${token}`);
   }
 
-  verifyOtp(inviteToken: string, otp: string): Observable<{ valid: boolean }> {
+  verifyOtp(inviteToken: string, otp: string) {
     return this.api.post<{ valid: boolean }>('/auth/supervisor/verify-otp', {
       inviteToken,
       otp,
     });
   }
 
-  resendOtp(inviteToken: string): Observable<{ success: boolean; message?: string }> {
+  resendInviteOtp(inviteToken: string) {
     return this.api.post<{ success: boolean; message?: string }>(
       '/auth/supervisor/resend-otp',
       { inviteToken }
     );
   }
 
-  signup(request: SignupRequest): Observable<LoginResponse> {
+  signup(request: SignupRequest) {
     return this.api.post<LoginResponse>('/auth/supervisor/signup', request).pipe(
-      tap((response) => this.saveAuthData(response))
+      tap((response) => {
+        void this.saveAuthData(response);
+      })
     );
   }
 
-  login(email: string, password: string): Observable<LoginResponse> {
-    return this.api.post<LoginResponse>('/auth/login', { email, password }).pipe(
-      tap((response) => this.saveAuthData(response))
+  /** Request an OTP for an existing supervisor. */
+  requestLoginOtp(identifier: string) {
+    return this.api.post<{ success: boolean; message?: string }>(
+      '/auth/supervisor/request-otp',
+      { identifier }
+    );
+  }
+
+  /** Verify the OTP and log in. */
+  verifyLoginOtp(identifier: string, otp: string) {
+    return this.api.post<LoginResponse>('/auth/supervisor/verify-otp-login', {
+      identifier,
+      otp,
+    }).pipe(
+      tap((response) => {
+        void this.saveAuthData(response);
+      })
+    );
+  }
+
+  /** Forgot password — triggers a reset email. */
+  forgotPassword(email: string) {
+    return this.api.post<{ success: boolean; message?: string }>(
+      '/auth/forgot-password',
+      { email }
+    );
+  }
+
+  resetPassword(token: string, password: string) {
+    return this.api.post<{ success: boolean; message?: string }>(
+      '/auth/reset-password',
+      { token, password }
     );
   }
 
@@ -140,39 +164,39 @@ export class AuthService {
     await this.api.setUserRole(response.user.role);
     await Preferences.set({ key: 'currentUser', value: JSON.stringify(response.user) });
 
-    this.currentUser = response.user;
-    this.isAuthenticated = true;
+    this.currentUser.set(response.user);
+    this.isAuthenticated.set(true);
   }
 
   async logout(): Promise<void> {
     try {
-      await this.api.delete('/auth/logout');
+      await firstValueFrom(this.api.delete('/auth/logout').pipe(catchError(() => of(null))));
     } catch {
-      // Ignore logout errors
+      // ignore
     }
 
     await this.api.clearTokens();
     await Preferences.remove({ key: 'currentUser' });
-    this.currentUser = null;
-    this.isAuthenticated = false;
+    this.currentUser.set(null);
+    this.isAuthenticated.set(false);
 
-    await Haptics.impact({ style: ImpactStyle.Light });
-    this.router.navigate(['/auth/login']);
+    await Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+    await this.router.navigate(['/auth/login']);
   }
 
   async isLoggedIn(): Promise<boolean> {
     return this.api.isAuthenticated();
   }
 
-  getProfile(): Observable<{ user: User; profile: unknown }> {
+  getProfile() {
     return this.api.get<{ user: User; profile: unknown }>('/mobile/supervisor/profile');
   }
 
-  updateProfile(data: { name?: string; email?: string; phone?: string }): Observable<unknown> {
+  updateProfile(data: { name?: string; email?: string; phone?: string; address?: string }) {
     return this.api.patch<unknown>('/mobile/supervisor/profile', data);
   }
 
-  changePassword(currentPassword: string, newPassword: string): Observable<{ success: boolean }> {
+  changePassword(currentPassword: string, newPassword: string) {
     return this.api.put<{ success: boolean }>('/auth/password', {
       currentPassword,
       newPassword,
@@ -181,16 +205,6 @@ export class AuthService {
 
   async getAccessToken(): Promise<string | null> {
     return this.api.getAccessToken();
-  }
-
-  async refreshToken(): Promise<void> {
-    try {
-      const newToken = await this.api.refreshAccessToken();
-      await this.api.setAccessToken(newToken);
-    } catch (error) {
-      await this.logout();
-      throw error;
-    }
   }
 
   async hasRole(role: string): Promise<boolean> {

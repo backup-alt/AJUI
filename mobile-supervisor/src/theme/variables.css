@@ -47,12 +47,11 @@
   --agb-space-xl: 32px;
   --agb-space-2xl: 48px;
 
-  /* Border Radius - SHARP / PROFESSIONAL */
+  /* Unified Radius (always 8px) */
   --agb-radius-sm: 8px;
   --agb-radius-md: 8px;
   --agb-radius-lg: 8px;
   --agb-radius-xl: 8px;
-  --agb-radius-full: 8px;
 
   /* Shadows */
   --agb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -119,43 +118,4 @@
   --agb-tab-bar-height: 64px;
   --agb-safe-top: env(safe-area-inset-top);
   --agb-safe-bottom: env(safe-area-inset-bottom);
-}
-
-/* Dark mode support (if needed later) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --agb-white: #1a1a2e;
-    --agb-off-white: #16213e;
-    --agb-light-gray: #2d3a5e;
-    --agb-gray: #8b9dc3;
-    --ion-background-color: var(--agb-white);
-    --ion-toolbar-background: var(--agb-off-white);
-    --ion-item-background: var(--agb-off-white);
-    --ion-card-background: var(--agb-off-white);
-    --ion-tab-bar-background: var(--agb-off-white);
-  }
-}
-
-/* iOS safe area fix */
-@supports (padding: max(0px)) {
-  .ion-page {
-    --ion-safe-area-top: var(--agb-safe-top);
-    --ion-safe-area-bottom: var(--agb-safe-bottom);
-  }
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--agb-light-gray);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--agb-gray);
 }

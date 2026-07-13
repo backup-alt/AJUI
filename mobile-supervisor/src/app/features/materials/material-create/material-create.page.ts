@@ -299,9 +299,9 @@ export class MaterialCreatePage implements OnInit {
   async ngOnInit(): Promise<void> {
     addIcons({ locationOutline, cubeOutline, personOutline, checkmarkCircleOutline });
     await this.supervisor.init();
-    this.selectedSiteId.set(await this.supervisor.getSelectedSiteId());
-    this.selectedSiteName.set(await this.supervisor.getSelectedSiteName());
-    this.siteProjectId.set(await this.supervisor.getSelectedProjectId());
+    this.selectedSiteId.set(this.supervisor.selectedSiteId());
+    this.selectedSiteName.set(this.supervisor.selectedSiteName());
+    this.siteProjectId.set(this.supervisor.selectedProjectId());
   }
 
   syncRemaining() {

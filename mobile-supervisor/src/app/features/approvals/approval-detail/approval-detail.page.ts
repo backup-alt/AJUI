@@ -326,19 +326,16 @@ export class ApprovalDetailPage implements OnInit {
     }
 
     this.isLoading.set(true);
-    try {
-      const result = await new Promise<{ approval: any }>((resolve, reject) => {
-        this.supervisor.getApprovalDetail(id).subscribe({
-          next: (res) => resolve(res as { approval: any }),
-          error: reject,
-        });
-      });
-      this.approval.set(result.approval);
-    } catch (e) {
-      console.error('Failed to load approval', e);
-    } finally {
-      this.isLoading.set(false);
-    }
+    this.supervisor.getApprovalDetail(id).subscribe({
+      next: (result) => {
+        this.approval.set(result.approval as any);
+        this.isLoading.set(false);
+      },
+      error: (err) => {
+        console.error('[ApprovalDetail] failed to load', err);
+        this.isLoading.set(false);
+      },
+    });
   }
 
   async takeAction(action: 'approve' | 'reject'): Promise<void> {
