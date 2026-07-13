@@ -1,19 +1,21 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, InjectionToken } from '@angular/core';
 import { Preferences } from '@capacitor/preferences';
 
-/**
- * Abstraction over persistent storage. The default implementation uses
- * @capacitor/preferences which on iOS uses the Keychain (encrypted at rest)
- * and on Android uses SharedPreferences (unencrypted by default).
- *
- * On Android you can swap this implementation for a secure-store plugin
- * (e.g. @capacitor-community/secure-storage) without touching call sites.
- */
+export const StorageService = new InjectionToken<{
+  get(opts: { key: string }): Promise<{ value: string | null }>;
+  set(opts: { key: string; value: string }): Promise<void>;
+  remove(opts: { key: string }): Promise<void>;
+}>('StorageService', {
+  factory: () => Preferences,
+});
+
 @Injectable({ providedIn: 'root' })
 export class TokenStorageService {
+  private storage = inject(StorageService);
+
   async get(key: string): Promise<string | null> {
     try {
-      const { value } = await Preferences.get({ key });
+      const { value } = await this.storage.get({ key });
       return value || null;
     } catch {
       return null;
@@ -22,17 +24,15 @@ export class TokenStorageService {
 
   async set(key: string, value: string): Promise<void> {
     try {
-      await Preferences.set({ key, value });
+      await this.storage.set({ key, value });
     } catch {
-      // Storage failures are non-fatal — the user is still authenticated in memory.
     }
   }
 
   async remove(key: string): Promise<void> {
     try {
-      await Preferences.remove({ key });
+      await this.storage.remove({ key });
     } catch {
-      // ignore
     }
   }
 

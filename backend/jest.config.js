@@ -4,9 +4,12 @@ module.exports = {
   testMatch: ["**/__tests__/**/*.test.ts"],
   moduleFileExtensions: ["ts", "js"],
   testTimeout: 30000,
-  setupFilesAfterEach: ["<rootDir>/__tests__/setup.ts"],
+  setupFilesAfterFramework: ["<rootDir>/__tests__/setup.ts"],
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.test.ts"],
   coveragePathIgnorePatterns: ["/node_modules/", "/dist/", "/__tests__/"],
+  moduleNameMapper: {
+    "^(\\.{1,2}/.*)\\.js$": "$1",
+  },
   transform: {
     "^.+\\.ts$": ["ts-jest", { tsconfig: "tsconfig.test.json" }],
   },
