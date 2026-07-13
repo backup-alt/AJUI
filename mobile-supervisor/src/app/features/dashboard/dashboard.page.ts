@@ -610,16 +610,22 @@ export class DashboardPage implements OnInit, OnDestroy {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('agb:site-changed', this.handleSiteChange);
+      window.addEventListener('agb:approvals-changed', this.handleApprovalsChanged);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:site-changed', this.handleSiteChange);
+      window.removeEventListener('agb:approvals-changed', this.handleApprovalsChanged);
     }
   }
 
   private handleSiteChange = (): void => {
+    void this.loadDashboard();
+  };
+
+  private handleApprovalsChanged = (): void => {
     void this.loadDashboard();
   };
 

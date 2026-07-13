@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, OnDestroy } from '@angular/core';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonSegment,
   IonSegmentButton, IonLabel, IonCard, IonCardContent, IonIcon,
@@ -29,11 +29,19 @@ import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
     <ion-header class="agb-header">
       <ion-toolbar><ion-title>Approvals</ion-title></ion-toolbar>
       <ion-toolbar>
-        <ion-segment [(ngModel)]="typeFilter" (ionChange)="filterApprovals()" [value]="''">
-          <ion-segment-button [value]="''"><ion-label>All</ion-label></ion-segment-button>
+        <ion-segment [(ngModel)]="typeFilter" (ionChange)="filterApprovals()" [value]="'all'">
+          <ion-segment-button value="all"><ion-label>All</ion-label></ion-segment-button>
           <ion-segment-button value="material"><ion-label>Materials</ion-label></ion-segment-button>
           <ion-segment-button value="labour"><ion-label>Labour</ion-label></ion-segment-button>
-          <ion-segment-button value="expense"><ion-label>Expense</ion-label></ion-segment-button>
+          <ion-segment-button value="expense"><ion-label>Expenses</ion-label></ion-segment-button>
+          <ion-segment-button value="payment"><ion-label>Payments</ion-label></ion-segment-button>
+        </ion-segment>
+      </ion-toolbar>
+      <ion-toolbar>
+        <ion-segment [(ngModel)]="statusFilter" (ionChange)="filterApprovals()" [value]="'pending'">
+          <ion-segment-button value="pending"><ion-label>Pending</ion-label></ion-segment-button>
+          <ion-segment-button value="approved"><ion-label>Approved</ion-label></ion-segment-button>
+          <ion-segment-button value="rejected"><ion-label>Rejected</ion-label></ion-segment-button>
         </ion-segment>
       </ion-toolbar>
     </ion-header>
@@ -54,12 +62,30 @@ import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
         }
       } @else if (filteredApprovals().length === 0) {
         <div class="empty-state">
-          <ion-icon name="checkmark-done-circle-outline"></ion-icon>
-          <h3>All Caught Up!</h3>
-          <p>No pending approvals at the moment</p>
+          <ion-icon
+            [name]="statusFilter === 'pending' ? 'checkmark-done-circle-outline' : 'document-text-outline'"
+          ></ion-icon>
+          <h3>
+            @if (statusFilter === 'pending') {
+              All Caught Up!
+            } @else if (statusFilter === 'approved') {
+              No Approved Items
+            } @else {
+              No Rejected Items
+            }
+          </h3>
+          <p>
+            @if (statusFilter === 'pending') {
+              No pending approvals at the moment
+            } @else if (typeFilter !== 'all') {
+              No {{ typeFilter }} items in this status
+            } @else {
+              No items in this status
+            }
+          </p>
         </div>
       } @else {
-        @for (approval of filteredApprovals(); track approval.approvalId) {
+        @for (approval of filteredApprovals(); track approval._id || approval.approvalId) {
           <ion-card class="approval-card" (click)="viewApproval(approval)">
             <ion-card-content>
               <div class="approval-header">
@@ -67,7 +93,9 @@ import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
                   <ion-icon [name]="getTypeIcon(approval.type)"></ion-icon>
                   {{ approval.type | titlecase }}
                 </div>
-                <ion-badge color="warning">Pending</ion-badge>
+                <ion-badge [color]="getStatusColor(approval.status || 'Pending')">
+                  {{ approval.status || 'Pending' }}
+                </ion-badge>
               </div>
 
               <h3 class="approval-title">{{ approval.title }}</h3>
@@ -96,10 +124,12 @@ import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
                   <ion-icon name="time-outline"></ion-icon>
                   {{ approval.submittedAt | date:'MMM d, h:mm a' }}
                 </div>
-                <div class="approval-action">
-                  Review
-                  <ion-icon name="arrow-forward-outline"></ion-icon>
-                </div>
+                @if ((approval.status || 'Pending') === 'Pending') {
+                  <div class="approval-action">
+                    Review
+                    <ion-icon name="arrow-forward-outline"></ion-icon>
+                  </div>
+                }
               </div>
             </ion-card-content>
           </ion-card>
@@ -139,18 +169,37 @@ import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
     .skeleton { margin: 12px 16px; }
   `],
 })
-export class ApprovalsPage implements OnInit {
+export class ApprovalsPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
   approvals = signal<Approval[]>([]);
   filteredApprovals = signal<Approval[]>([]);
   isLoading = signal(true);
-  typeFilter: ApprovalType | '' = '';
+  typeFilter: 'all' | ApprovalType = 'all';
+  statusFilter: 'pending' | 'approved' | 'rejected' = 'pending';
 
   async ngOnInit(): Promise<void> {
     addIcons({ checkmarkDoneCircleOutline, timeOutline, arrowForwardOutline, cubeOutline, peopleOutline, walletOutline, cardOutline });
     await this.loadApprovals();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agb:approvals-changed', this.handleApprovalsChanged);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('agb:approvals-changed', this.handleApprovalsChanged);
+    }
+  }
+
+  private handleApprovalsChanged = (): void => {
+    void this.loadApprovals();
+  };
+
+  ionViewWillEnter(): void {
+    void this.loadApprovals();
   }
 
   async loadApprovals(): Promise<void> {
@@ -182,11 +231,28 @@ export class ApprovalsPage implements OnInit {
 
   filterApprovals(): void {
     let filtered = this.approvals();
-    if (this.typeFilter) filtered = filtered.filter((a) => a.type === this.typeFilter);
+    if (this.typeFilter !== 'all') {
+      filtered = filtered.filter((a) => a.type === this.typeFilter);
+    }
+    if (this.statusFilter !== 'pending') {
+      const target = this.statusFilter === 'approved' ? 'Approved' : 'Rejected';
+      filtered = filtered.filter((a) => (a.status || 'Pending') === target);
+    } else {
+      filtered = filtered.filter((a) => !a.status || a.status === 'Pending');
+    }
     this.filteredApprovals.set(filtered);
   }
 
-  viewApproval(approval: Approval): void { this.router.navigate(['/tabs/approvals', approval.approvalId]); }
+  viewApproval(approval: Approval): void { this.router.navigate(['/tabs/approvals', approval._id || approval.approvalId]); }
+
+  getStatusColor(status?: string): string {
+    switch (status) {
+      case 'Approved': return 'success';
+      case 'Rejected': return 'danger';
+      case 'Pending':
+      default: return 'warning';
+    }
+  }
 
   getTypeIcon(type: ApprovalType): string {
     switch (type) {

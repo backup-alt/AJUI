@@ -1,6 +1,7 @@
 import {
   Component,
   OnInit,
+  OnDestroy,
   inject,
   signal,
   computed,
@@ -478,7 +479,7 @@ import { Site, Project } from '../../shared/models';
     }
   `],
 })
-export class ShellComponent implements OnInit {
+export class ShellComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
@@ -535,6 +536,33 @@ export class ShellComponent implements OnInit {
     this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
     await this.loadSites();
+    await this.refreshPendingCount();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agb:approvals-changed', this.handleApprovalsChanged);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('agb:approvals-changed', this.handleApprovalsChanged);
+    }
+  }
+
+  private handleApprovalsChanged = (): void => {
+    void this.refreshPendingCount();
+  };
+
+  private async refreshPendingCount(): Promise<void> {
+    this.supervisor.getApprovals().subscribe({
+      next: (res) => {
+        const pending = (res.approvals || []).filter(
+          (a) => !a.status || a.status === 'Pending'
+        ).length;
+        this.pendingApprovalCount.set(pending);
+      },
+      error: () => this.pendingApprovalCount.set(0),
+    });
   }
 
   async loadSites(): Promise<void> {

@@ -364,6 +364,10 @@ export class ApprovalDetailPage implements OnInit {
     this.supervisor.takeApprovalAction(id, { action, comment: this.notes }).subscribe({
       next: async () => {
         this.isProcessing.set(false);
+        // Notify other pages that an approval status changed.
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:approvals-changed'));
+        }
         const toast = await this.toastCtrl.create({
           message: `Request ${action}d successfully`,
           duration: 2500,
