@@ -495,7 +495,26 @@ type CombinedInvite = {
         </header>
 
         <div class="settings-w11-modal-body">
-          @if (!currentInvite()) {
+          @if (supervisorStep() < 3) {
+            <div class="settings-w11-step-indicator">
+              <div class="settings-w11-step" [class.active]="supervisorStep() === 1" [class.done]="supervisorStep() > 1">
+                <span class="step-circle">{{ supervisorStep() > 1 ? '✓' : '1' }}</span>
+                <span class="step-label">Details</span>
+              </div>
+              <div class="step-line" [class.done]="supervisorStep() > 1"></div>
+              <div class="settings-w11-step" [class.active]="supervisorStep() === 2" [class.done]="supervisorStep() > 2">
+                <span class="step-circle">{{ supervisorStep() > 2 ? '✓' : '2' }}</span>
+                <span class="step-label">Sites</span>
+              </div>
+              <div class="step-line" [class.done]="supervisorStep() > 2"></div>
+              <div class="settings-w11-step" [class.active]="supervisorStep() === 3">
+                <span class="step-circle">3</span>
+                <span class="step-label">QR</span>
+              </div>
+            </div>
+          }
+
+          @if (supervisorStep() === 1) {
             <div class="settings-w11-form">
               <div class="settings-w11-field">
                 <label>Supervisor name</label>
@@ -531,7 +550,44 @@ type CombinedInvite = {
               <button
                 type="button"
                 class="settings-w11-btn settings-w11-btn-primary"
-                [disabled]="supervisorLoading()"
+                (click)="nextStep()"
+              >
+                Next: Select Sites
+              </button>
+            </div>
+          }
+
+          @if (supervisorStep() === 2) {
+            <div class="settings-w11-form">
+              <p class="settings-w11-step-hint">Select the sites this supervisor will manage:</p>
+              @if (sitesLoading()) {
+                <div class="settings-w11-loading">Loading sites...</div>
+              }
+              @if (!sitesLoading() && availableSites().length === 0) {
+                <div class="settings-w11-message info">No sites available.</div>
+              }
+              <div class="settings-w11-site-list">
+                @for (site of availableSites(); track site.id) {
+                  <label class="settings-w11-site-item" [class.selected]="selectedSiteIds().has(site.id)">
+                    <input
+                      type="checkbox"
+                      [checked]="selectedSiteIds().has(site.id)"
+                      (change)="toggleSite(site.id)"
+                    />
+                    <div class="site-item-info">
+                      <strong>{{ site.name }}</strong>
+                      <small>{{ site.projectName || 'No project' }}</small>
+                    </div>
+                  </label>
+                }
+              </div>
+              @if (supervisorError()) {
+                <div class="settings-w11-message error">{{ supervisorError() }}</div>
+              }
+              <button
+                type="button"
+                class="settings-w11-btn settings-w11-btn-primary"
+                [disabled]="supervisorLoading() || selectedSiteIds().size === 0"
                 (click)="generateSupervisorQr()"
               >
                 {{ supervisorLoading() ? 'Generating…' : 'Generate QR Code' }}
@@ -598,6 +654,9 @@ type CombinedInvite = {
         </div>
 
         <footer class="settings-w11-modal-foot">
+          @if (supervisorStep() === 2) {
+            <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="prevStep()">Back</button>
+          }
           <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="closeAddSupervisor()">Close</button>
         </footer>
       </div>
@@ -723,6 +782,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly currentInvite = signal<PendingInvite | null>(null);
   readonly resendingOtp = signal(false);
   readonly sendingEmail = signal(false);
+  readonly supervisorStep = signal(1);
+  readonly availableSites = signal<any[]>([]);
+  readonly selectedSiteIds = signal<Set<string>>(new Set());
+  readonly sitesLoading = signal(false);
 
   // Pending invites table
   readonly pendingInvites = signal<PendingInvite[]>([]);
@@ -1122,6 +1185,23 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.supervisorNameDraft.set("");
     this.supervisorEmailDraft.set("");
     this.supervisorPhoneDraft.set("");
+    this.supervisorStep.set(1);
+    this.selectedSiteIds.set(new Set());
+    this.loadAvailableSites();
+  }
+
+  loadAvailableSites() {
+    this.sitesLoading.set(true);
+    this.api.listSitesAdmin().subscribe({
+      next: (res) => {
+        this.availableSites.set(res.sites || []);
+        this.sitesLoading.set(false);
+      },
+      error: () => {
+        this.availableSites.set([]);
+        this.sitesLoading.set(false);
+      },
+    });
   }
 
   closeAddSupervisor() {
@@ -1137,6 +1217,43 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.supervisorNameDraft.set("");
     this.supervisorEmailDraft.set("");
     this.supervisorPhoneDraft.set("");
+    this.supervisorStep.set(1);
+    this.selectedSiteIds.set(new Set());
+  }
+
+  nextStep() {
+    const name = this.supervisorNameDraft().trim();
+    const email = this.supervisorEmailDraft().trim();
+    const phone = this.supervisorPhoneDraft().trim();
+    if (name.length < 2) {
+      this.supervisorError.set("Please enter at least 2 characters for the name.");
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.supervisorError.set("Please enter a valid email address.");
+      return;
+    }
+    if (!phone || phone.replace(/\D/g, "").length < 8) {
+      this.supervisorError.set("Please enter a valid mobile number (at least 8 digits).");
+      return;
+    }
+    this.supervisorError.set(null);
+    this.supervisorStep.set(2);
+  }
+
+  prevStep() {
+    this.supervisorStep.set(1);
+    this.supervisorError.set(null);
+  }
+
+  toggleSite(siteId: string) {
+    const current = new Set(this.selectedSiteIds());
+    if (current.has(siteId)) {
+      current.delete(siteId);
+    } else {
+      current.add(siteId);
+    }
+    this.selectedSiteIds.set(current);
   }
 
   generateSupervisorQr() {
@@ -1155,10 +1272,15 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       this.supervisorError.set("Please enter a valid mobile number (at least 8 digits).");
       return;
     }
+    const siteIds = Array.from(this.selectedSiteIds());
+    if (siteIds.length === 0) {
+      this.supervisorError.set("Please select at least one site.");
+      return;
+    }
     this.supervisorError.set(null);
     this.supervisorLoading.set(true);
 
-    this.api.createSupervisorInvite({ supervisorName: name, supervisorEmail: email, supervisorPhone: phone }).subscribe({
+    this.api.createSupervisorInvite({ supervisorName: name, supervisorEmail: email, supervisorPhone: phone, siteIds }).subscribe({
       next: (invite) => {
         const fiveMinMs = 5 * 60 * 1000;
         this.currentInvite.set({
@@ -1174,6 +1296,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
           otp: invite.otp,
           emailSent: invite.emailSent,
         });
+        this.supervisorStep.set(3);
         this.supervisorLoading.set(false);
         this.refreshInvites();
       },

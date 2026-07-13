@@ -9,6 +9,9 @@ import { AccessTemplate } from "../models/AccessTemplate.js";
 import { AccessSchedule } from "../models/AccessSchedule.js";
 import { User } from "../models/User.js";
 import { ActivityLog } from "../models/ActivityLog.js";
+import { Site } from "../models/Site.js";
+import { Project } from "../models/Project.js";
+import { Material } from "../models/Material.js";
 
 const deactivateSchema = z.object({
   body: z.object({
@@ -451,6 +454,68 @@ export async function getAllSessions(req: Request, res: Response, next: NextFunc
         expiresAt: s.expiresAt,
         isCurrent: s.userId?.toString() === req.user?.sub,
         lastActiveAt: s.createdAt,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listAllSites(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const sites = await Site.find().sort({ createdAt: -1 }).lean();
+
+    const allProjectIds = [...new Set(sites.flatMap((s) => (s.projectIds || []).map((id: Types.ObjectId) => id.toString())))];
+    const projects = allProjectIds.length > 0
+      ? await Project.find({ _id: { $in: allProjectIds.map((id) => new Types.ObjectId(id)) } }).lean()
+      : [];
+    const projectMap = new Map(projects.map((p) => [p._id.toString(), p.name]));
+
+    res.json({
+      sites: sites.map((s) => ({
+        id: s._id.toString(),
+        siteId: s.siteId,
+        name: s.name,
+        status: s.status,
+        supervisor: s.supervisor,
+        projectIds: (s.projectIds || []).map((id: Types.ObjectId) => id.toString()),
+        projectName: s.projectIds?.[0] ? projectMap.get(s.projectIds[0].toString()) : undefined,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getSiteMaterials(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const site = await Site.findById(req.params.id).lean();
+    if (!site) throw new AppError(404, "Site not found");
+
+    const materials = await Material.find({
+      $or: [
+        { siteId: new Types.ObjectId(req.params.id) },
+        { site: site.name },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    res.json({
+      materials: materials.map((m) => ({
+        id: m._id.toString(),
+        materialId: m.materialId,
+        name: m.name,
+        unit: m.unit,
+        requestedQuantity: m.requestedQuantity,
+        approvedQuantity: m.approvedQuantity,
+        purchasedQuantity: m.purchasedQuantity,
+        consumedQuantity: m.consumedQuantity,
+        remainingStock: m.remainingStock,
+        status: m.status,
+        requestDate: m.requestDate,
+        createdAt: m.createdAt,
       })),
     });
   } catch (err) {

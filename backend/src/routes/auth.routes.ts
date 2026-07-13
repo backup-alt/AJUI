@@ -10,6 +10,8 @@ import {
   changePasswordSchema,
   verifyInviteSchema,
   supervisorSignupSchema,
+  requestSupervisorOtpSchema,
+  verifySupervisorOtpLoginSchema,
 } from "../schemas/auth.schema.js";
 
 const router = Router();
@@ -64,6 +66,18 @@ router.post(
   strictLimiter,
   validate(supervisorSignupSchema),
   ctrl.supervisorSignup
+);
+router.post(
+  "/supervisor/request-otp",
+  authLimiter,
+  validate(requestSupervisorOtpSchema),
+  ctrl.requestSupervisorLoginOtp
+);
+router.post(
+  "/supervisor/verify-otp-login",
+  authLimiter,
+  validate(verifySupervisorOtpLoginSchema),
+  ctrl.verifySupervisorLoginOtp
 );
 
 // Employee (admin / project_manager / accountant) invite routes

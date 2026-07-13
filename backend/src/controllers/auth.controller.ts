@@ -420,6 +420,7 @@ export async function verifySupervisorInvite(req: Request, res: Response, next: 
       requiresOtp: true,
       role: invite.role,
       projectId: invite.projectId,
+      siteIds: (invite.siteIds || []).map((id) => id.toString()),
       supervisorName: inviteService.extractSupervisorName(invite),
       supervisorEmail: invite.supervisorEmail || "",
       supervisorPhone: invite.supervisorPhone || "",
@@ -435,7 +436,6 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
     const input = supervisorSignupSchema.parse({ body: req.body }).body;
 
     const invite = await inviteService.verifyInviteOtp(input.token, input.otp);
-    await invite.populate("projectId");
 
     // If the mobile app didn't supply an email/phone (e.g. it relied on
     // whatever the QR carried), pre-fill from the invite so the supervisor
@@ -454,6 +454,27 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
     if (existing) throw new AppError(409, "User with this email or phone already exists");
 
     const passwordHash = await hashPassword(input.password);
+
+    // Resolve assigned sites and primary project
+    const siteIds: Types.ObjectId[] = (invite.siteIds || []).map((id) => id);
+    const { Project } = await import("../models/Project.js");
+    const { Site } = await import("../models/Site.js");
+    const { generateId } = await import("../services/id-generator.service.js");
+    const { Supervisor } = await import("../models/Supervisor.js");
+
+    let managedProjectIds: Types.ObjectId[] = [];
+    if (invite.projectId) managedProjectIds.push(invite.projectId);
+    if (siteIds.length > 0) {
+      const sites = await Site.find({ _id: { $in: siteIds } }).select("projectIds").lean();
+      for (const s of sites) {
+        for (const pid of s.projectIds || []) {
+          if (!managedProjectIds.some((m) => m.toString() === pid.toString())) {
+            managedProjectIds.push(pid);
+          }
+        }
+      }
+    }
+
     const user = await User.create({
       name: finalName,
       email: finalEmail,
@@ -462,8 +483,38 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
       role: "supervisor",
       status: "active",
       createdBy: invite.createdByAdmin,
-      managedProjectIds: invite.projectId ? [invite.projectId] : [],
+      managedProjectIds,
     });
+
+    // Create the Supervisor profile with multi-site assignment
+    if (siteIds.length > 0 || managedProjectIds.length > 0) {
+      const supervisorProfile = await Supervisor.create({
+        supervisorId: await generateId("SUP"),
+        userId: user._id,
+        name: finalName,
+        phone: finalPhone,
+        email: finalEmail.toLowerCase(),
+        address: (invite.metadata as any)?.address || undefined,
+        role: "Site Supervisor",
+        assignedProjectId: managedProjectIds[0],
+        assignedProject: undefined,
+        assignedSiteIds: siteIds,
+        assignedSites: siteIds.map((id) => id.toString()),
+        cashLimit: Number((invite.metadata as any)?.cashLimit || 0),
+        approvalAuthority: 0,
+        status: "Active",
+      });
+      user.supervisorProfileId = supervisorProfile._id;
+      await user.save();
+    }
+
+    // Backfill site.supervisorId so the site is discoverable from the site side
+    if (siteIds.length > 0) {
+      await Site.updateMany(
+        { _id: { $in: siteIds } },
+        { $set: { supervisor: finalName, supervisorId: user.supervisorProfileId } }
+      );
+    }
 
     await inviteService.consumeInvite(input.token, user._id.toString());
 
@@ -484,6 +535,9 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
         email: user.email,
         phone: user.phone,
         role: user.role,
+        supervisorProfileId: user.supervisorProfileId?.toString(),
+        siteIds: siteIds.map((id) => id.toString()),
+        projectIds: managedProjectIds.map((id) => id.toString()),
       },
       accessToken: tokens.accessToken,
       expiresAt: tokens.expiresAt,
@@ -498,6 +552,9 @@ const adminCreateInviteSchema = z.object({
   supervisorEmail: z.string().email("Valid email is required"),
   supervisorPhone: z.string().min(8, "Phone must be at least 8 characters").max(20),
   projectId: z.string().optional(),
+  siteIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid site id")).min(1, "Select at least one site").optional(),
+  cashLimit: z.coerce.number().nonnegative().optional(),
+  address: z.string().trim().max(500).optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -512,6 +569,9 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       supervisorEmail: body.supervisorEmail,
       supervisorPhone: body.supervisorPhone,
       projectId: body.projectId,
+      siteIds: body.siteIds,
+      cashLimit: body.cashLimit,
+      address: body.address,
       metadata: body.metadata,
       expiryMinutes: 5,
     });
@@ -529,6 +589,9 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       supervisorPhone: body.supervisorPhone,
       role: invite.role,
       projectId: invite.projectId,
+      siteIds: body.siteIds || [],
+      cashLimit: body.cashLimit || 0,
+      address: body.address || "",
       expiresAt,
       createdAt: invite.createdAt,
       otp,
@@ -549,8 +612,10 @@ export async function listActiveInvites(req: Request, res: Response, next: NextF
         token: inv.token,
         supervisorName: inviteService.extractSupervisorName(inv),
         supervisorEmail: inv.supervisorEmail,
+        supervisorPhone: inv.supervisorPhone,
         role: inv.role,
         projectId: inv.projectId,
+        siteIds: (inv.siteIds || []).map((id) => id.toString()),
         expiresAt: inv.expiresAt,
         createdAt: inv.createdAt,
         remainingMs: inviteService.getInviteRemainingMs(inv),
@@ -1036,6 +1101,120 @@ export async function employeeSignup(
         role: user.role,
         status: user.status,
         managedProjectIds: (user.managedProjectIds || []).map((id) => id.toString()),
+      },
+      accessToken: tokens.accessToken,
+      expiresAt: tokens.expiresAt,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// =================== SUPERVISOR OTP LOGIN ===================
+export async function requestSupervisorLoginOtp(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { identifier } = z
+      .object({ identifier: z.string().trim().min(3) })
+      .parse(req.body);
+
+    const user = await User.findOne({
+      $or: [{ email: identifier.toLowerCase() }, { phone: identifier }],
+    });
+    if (!user) throw new AppError(404, "No supervisor account found with this email or phone");
+    if (user.role !== "supervisor") {
+      throw new AppError(403, "Only supervisor accounts can use OTP login");
+    }
+
+    const otp = crypto.randomInt(0, 10 ** 6).toString().padStart(6, "0");
+    const otpHash = await hashToken(otp);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    user.loginOtpHash = otpHash;
+    user.loginOtpExpiresAt = expiresAt;
+    await user.save();
+
+    if (user.email) {
+      const { buildOtpEmail } = await import("../services/email-templates/index.js");
+      const { subject, html } = buildOtpEmail({
+        name: user.name,
+        code: otp,
+        purpose: "sign in to your AGB supervisor account",
+        expiresMinutes: 10,
+      });
+      await sendEmail({ to: user.email, subject, html }).catch(() => {});
+    }
+
+    res.json({ success: true, message: "OTP sent to registered email" });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifySupervisorLoginOtp(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { identifier, otp } = z
+      .object({
+        identifier: z.string().trim().min(3),
+        otp: z.string().length(6),
+      })
+      .parse(req.body);
+
+    const user = await User.findOne({
+      $or: [{ email: identifier.toLowerCase() }, { phone: identifier }],
+    });
+    if (!user) throw new AppError(404, "No supervisor account found with this email or phone");
+    if (user.role !== "supervisor") {
+      throw new AppError(403, "Only supervisor accounts can use OTP login");
+    }
+    if (!user.loginOtpHash || !user.loginOtpExpiresAt) {
+      throw new AppError(400, "No active OTP. Please request a new one.");
+    }
+    if (user.loginOtpExpiresAt < new Date()) {
+      throw new AppError(410, "OTP has expired. Please request a new one.");
+    }
+
+    const valid = await compareToken(otp, user.loginOtpHash);
+    if (!valid) throw new AppError(400, "Invalid OTP");
+
+    user.loginOtpHash = undefined;
+    user.loginOtpExpiresAt = undefined;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    await ActivityLog.create({
+      userId: user._id,
+      action: "sign_in",
+      description: "Signed in via OTP",
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
+    const tokens = await authService.issueTokens(user);
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none" as const,
+      expires: tokens.expiresAt,
+      path: "/api/auth",
+    };
+    res.cookie(getRefreshCookieName(), tokens.refreshToken, cookieOptions);
+
+    res.json({
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        supervisorProfileId: user.supervisorProfileId?.toString(),
       },
       accessToken: tokens.accessToken,
       expiresAt: tokens.expiresAt,

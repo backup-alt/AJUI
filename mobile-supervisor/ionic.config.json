@@ -1,0 +1,7 @@
+{
+  "name": "mobile-supervisor",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}

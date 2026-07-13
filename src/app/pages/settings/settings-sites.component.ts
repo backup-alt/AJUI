@@ -16,9 +16,8 @@ interface Site {
   targetEndDate: string;
   projectNames: string[];
   address: string;
-  totalDays?: number;
-  totalWorkers?: number;
-  totalEmployees?: number;
+  employeeCount?: number;
+  daysActive?: number;
 }
 
 @Component({
@@ -91,12 +90,12 @@ interface Site {
               </div>
               <div class="settings-w11-site-stats">
                 <div class="settings-w11-stat">
-                  <span class="settings-w11-stat-value">{{ s.totalDays ?? '—' }}</span>
-                  <span class="settings-w11-stat-label">Days</span>
+                  <span class="settings-w11-stat-value">{{ s.daysActive ?? '—' }}</span>
+                  <span class="settings-w11-stat-label">Days Active</span>
                 </div>
                 <div class="settings-w11-stat">
-                  <span class="settings-w11-stat-value">{{ s.totalWorkers ?? 0 }}</span>
-                  <span class="settings-w11-stat-label">Workers</span>
+                  <span class="settings-w11-stat-value">{{ s.employeeCount ?? 0 }}</span>
+                  <span class="settings-w11-stat-label">Employees</span>
                 </div>
               </div>
               <footer class="settings-w11-site-card-foot">
@@ -124,19 +123,53 @@ interface Site {
           </button>
         </header>
 
+        <div class="settings-w11-tabs" role="tablist">
+          <button type="button" role="tab" [class.active]="drawerTab() === 'details'" (click)="drawerTab.set('details')">
+            Details
+          </button>
+          <button type="button" role="tab" [class.active]="drawerTab() === 'materials'" (click)="drawerTab.set('materials'); loadSiteMaterials()">
+            Materials
+          </button>
+        </div>
+
         <div class="settings-w11-drawer-body">
-          <dl class="settings-w11-dl">
-            <div><dt>Address</dt><dd>{{ selected()!.address }}</dd></div>
-            <div><dt>Supervisor</dt><dd>{{ selected()!.supervisor }}</dd></div>
-            <div><dt>Start Date</dt><dd>{{ selected()!.startDate }}</dd></div>
-            <div><dt>Target End</dt><dd>{{ selected()!.targetEndDate }}</dd></div>
-          </dl>
-          <h3 class="settings-w11-drawer-h3">Linked Projects</h3>
-          <div class="settings-w11-proj-list">
-            @for (p of selected()!.projectNames; track p) {
-              <span class="settings-w11-proj-chip">{{ p }}</span>
+          @if (drawerTab() === 'details') {
+            <dl class="settings-w11-dl">
+              <div><dt>Address</dt><dd>{{ selected()!.address }}</dd></div>
+              <div><dt>Supervisor</dt><dd>{{ selected()!.supervisor }}</dd></div>
+              <div><dt>Start Date</dt><dd>{{ selected()!.startDate }}</dd></div>
+              <div><dt>Target End</dt><dd>{{ selected()!.targetEndDate }}</dd></div>
+            </dl>
+            <h3 class="settings-w11-drawer-h3">Linked Projects</h3>
+            <div class="settings-w11-proj-list">
+              @for (p of selected()!.projectNames; track p) {
+                <span class="settings-w11-proj-chip">{{ p }}</span>
+              }
+            </div>
+          }
+
+          @if (drawerTab() === 'materials') {
+            @if (materialsLoading()) {
+              <div class="settings-w11-empty">Loading materials...</div>
+            } @else if (siteMaterials().length === 0) {
+              <div class="settings-w11-empty">No materials found for this site.</div>
+            } @else {
+              <div class="settings-w11-mat-list">
+                @for (m of siteMaterials(); track m.id) {
+                  <div class="settings-w11-mat-item">
+                    <div class="mat-item-info">
+                      <strong>{{ m.name }}</strong>
+                      <small>{{ m.requestDate }}</small>
+                    </div>
+                    <div class="mat-item-stats">
+                      <span class="mat-qty">{{ m.remainingStock }} {{ m.unit }}</span>
+                      <span class="settings-w11-status-pill" [attr.data-status]="m.status.toLowerCase()">{{ m.status }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
             }
-          </div>
+          }
         </div>
       </aside>
     }
@@ -153,6 +186,9 @@ export class SettingsSitesComponent implements OnInit {
   readonly loading = signal(false);
 
   readonly sites = signal<Site[]>([]);
+  readonly drawerTab = signal<"details" | "materials">("details");
+  readonly siteMaterials = signal<any[]>([]);
+  readonly materialsLoading = signal(false);
 
   readonly filteredSites = computed<Site[]>(() => {
     const s = this.activeStatus();
@@ -176,11 +212,10 @@ export class SettingsSitesComponent implements OnInit {
     this.sites.set(localSites);
     this.loading.set(false);
 
-    // Also fetch remote sites and merge if available
-    this.api.listSites().subscribe({
+    // Fetch admin sites (with live employeeCount and daysActive)
+    this.api.listSitesAdmin().subscribe({
       next: (res) => {
-        const remoteItems = (res?.items || []).map((row: any, index: number) => {
-          const totalDays = this.computeTotalDays(row.startDate, row.targetEndDate || row.endDate);
+        const remoteItems = (res?.sites || []).map((row: any, index: number) => {
           return {
             id: row.id || row._id || `remote-site-${index}`,
             siteId: row.siteId || row.id || `SIT-${String(localSites.length + index + 1).padStart(3, "0")}`,
@@ -189,11 +224,10 @@ export class SettingsSitesComponent implements OnInit {
             supervisor: row.supervisor || "—",
             startDate: row.startDate || "Not available",
             targetEndDate: row.targetEndDate || row.endDate || "Not available",
-            projectNames: row.projectNames || (row.name ? [row.name] : []),
+            projectNames: row.projectName ? [row.projectName] : [],
             address: row.address || "Not available",
-            totalDays,
-            totalWorkers: typeof row.totalWorkers === "number" ? row.totalWorkers : undefined,
-            totalEmployees: typeof row.totalEmployees === "number" ? row.totalEmployees : undefined,
+            employeeCount: typeof row.employeeCount === "number" ? row.employeeCount : undefined,
+            daysActive: typeof row.daysActive === "number" ? row.daysActive : undefined,
           };
         });
         // Merge: local first, then remote (dedup by name)
@@ -268,8 +302,29 @@ export class SettingsSitesComponent implements OnInit {
 
   select(s: Site) {
     this.selected.set(s);
+    this.drawerTab.set("details");
+    this.siteMaterials.set([]);
   }
+
   close() {
     this.selected.set(null);
+    this.drawerTab.set("details");
+    this.siteMaterials.set([]);
+  }
+
+  loadSiteMaterials() {
+    const site = this.selected();
+    if (!site) return;
+    this.materialsLoading.set(true);
+    this.api.getSiteMaterials(site.id).subscribe({
+      next: (res) => {
+        this.siteMaterials.set(res.materials || []);
+        this.materialsLoading.set(false);
+      },
+      error: () => {
+        this.siteMaterials.set([]);
+        this.materialsLoading.set(false);
+      },
+    });
   }
 }

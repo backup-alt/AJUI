@@ -18,6 +18,8 @@ router.get("/sessions", adminCtrl.getAllSessions);
 router.get("/access-schedule", adminCtrl.getAccessSchedule);
 router.put("/access-schedule", adminCtrl.saveAccessSchedule);
 router.get("/access-schedule/status", adminCtrl.getAccessScheduleStatus);
+router.get("/sites", adminCtrl.listAllSites);
+router.get("/sites/:id/materials", adminCtrl.getSiteMaterials);
 router.post("/invites/supervisor", authCtrl.adminCreateInvite);
 router.get("/invites/active", authCtrl.listActiveInvites);
 router.get("/invites/employee/active", authCtrl.listActiveEmployeeInvites);

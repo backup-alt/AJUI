@@ -75,3 +75,16 @@ export type LoginInput = z.infer<typeof loginSchema>["body"];
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>["body"];
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>["body"];
 export type SupervisorSignupInput = z.infer<typeof supervisorSignupSchema>["body"];
+
+export const requestSupervisorOtpSchema = z.object({
+  body: z.object({
+    identifier: z.string().trim().min(3, "Email or phone is required"),
+  }),
+});
+
+export const verifySupervisorOtpLoginSchema = z.object({
+  body: z.object({
+    identifier: z.string().trim().min(3, "Email or phone is required"),
+    otp: z.string().length(6, "OTP must be 6 digits"),
+  }),
+});

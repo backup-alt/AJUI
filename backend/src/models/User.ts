@@ -29,6 +29,8 @@ export interface IUser extends Document {
   lastLoginAt?: Date;
   deactivatedAt?: Date;
   deactivatedBy?: Types.ObjectId;
+  loginOtpHash?: string;
+  loginOtpExpiresAt?: Date;
 }
 
 const userSchema = new Schema<IUser>(
@@ -64,6 +66,8 @@ const userSchema = new Schema<IUser>(
       canManageWorkers: { type: Boolean, default: false },
       canViewReports: { type: Boolean, default: false },
     },
+    loginOtpHash: { type: String },
+    loginOtpExpiresAt: { type: Date },
   },
   { timestamps: true }
 );

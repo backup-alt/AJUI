@@ -48,8 +48,6 @@ const sectionConfigs: SectionConfig[] = [
     description: "Staff attendance with site, date, staff name, labour types, staff count, shift count, overtime, and fine.",
     columns: [
       { key: "client", label: "Client" },
-      { key: "clientId", label: "Client ID" },
-      { key: "projectId", label: "Project ID" },
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date", type: "date" },
       { key: "staffName", label: "Staff Name" },

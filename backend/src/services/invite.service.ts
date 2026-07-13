@@ -5,6 +5,12 @@ import { env } from "../config/env.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { compareToken, hashToken } from "../utils/password.js";
 import { sendEmail } from "../config/email.js";
+import {
+  buildOtpEmail,
+  buildSupervisorInviteEmail,
+  buildEmployeeInviteEmail,
+  buildCreateAccountEmail,
+} from "./email-templates/index.js";
 
 const QR_EXPIRY_MINUTES = 5;
 const INVITE_EXPIRY_MINUTES = 5;
@@ -66,6 +72,9 @@ export interface CreateInviteParams {
   supervisorEmail: string;
   supervisorPhone: string;
   projectId?: string;
+  siteIds?: string[];
+  cashLimit?: number;
+  address?: string;
   metadata?: Record<string, unknown>;
   expiryMinutes?: number;
 }
@@ -91,7 +100,15 @@ export interface CreateEmployeeInviteResult {
 export async function createInvite(params: CreateInviteParams): Promise<{
   invite: IInviteToken;
   qrUrl: string;
-  qrPayload: { token: string; supervisorName: string; expiresAt: number };
+  qrPayload: {
+    token: string;
+    supervisorName: string;
+    supervisorPhone: string;
+    supervisorEmail: string;
+    siteIds: string[];
+    projectId?: string;
+    expiresAt: number;
+  };
   expiresAt: Date;
   otpExpiresAt: Date;
   otp: string;
@@ -106,12 +123,15 @@ export async function createInvite(params: CreateInviteParams): Promise<{
   const metadata = {
     ...(params.metadata || {}),
     supervisorName: params.supervisorName,
+    cashLimit: params.cashLimit ?? 0,
+    address: params.address || "",
   };
 
   const invite = await InviteToken.create({
     token,
     createdByAdmin: new Types.ObjectId(params.createdByAdmin),
     projectId: params.projectId ? new Types.ObjectId(params.projectId) : undefined,
+    siteIds: (params.siteIds || []).map((id) => new Types.ObjectId(id)),
     role: "supervisor",
     expiresAt,
     metadata,
@@ -125,27 +145,17 @@ export async function createInvite(params: CreateInviteParams): Promise<{
   invite.otpHash = otpHash;
   await invite.save();
 
+  const { subject, html, text } = buildOtpEmail({
+    name: params.supervisorName,
+    code: otp,
+    purpose: "complete your supervisor account setup",
+    expiresMinutes: expiryMinutes,
+  });
   const emailBody = {
     to: params.supervisorEmail,
-    subject: "Your AGB Supervisor activation code",
-    html: `
-      <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
-        <div style="background:#002263;color:white;padding:16px 24px;border-radius:8px 8px 0 0">
-          <h2 style="margin:0;color:white">AGB Supervisor Invitation</h2>
-        </div>
-        <div style="padding:24px">
-          <p style="font-size:16px">Hello <strong>${params.supervisorName}</strong>,</p>
-          <p style="font-size:14px;color:#555">You have been invited to join AGB (Annai Golden Builders) as a supervisor. Your one-time activation code is:</p>
-          <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
-            <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${otp}</span>
-          </div>
-          <p style="font-size:12px;color:#888">This code expires in <strong>${expiryMinutes} minutes</strong>. Open the AGB app, tap "Scan QR", and enter this code to complete your setup.</p>
-          <hr style="border:none;border-top:1px solid #eee;margin:20px 0">
-          <p style="font-size:12px;color:#aaa;text-align:center">AGB (Annai Golden Builders) — Internal Use Only</p>
-        </div>
-      </div>
-    `,
-    text: `Hello ${params.supervisorName},\n\nYou have been invited to join AGB (Annai Golden Builders) as a supervisor.\n\nYour activation code: ${otp}\n\nThis code expires in ${expiryMinutes} minutes. Open the AGB app, tap "Scan QR", and enter this code to complete your setup.\n\n---\nAGB (Annai Golden Builders) — Internal Use Only`,
+    subject,
+    html,
+    text,
   };
   let emailSent = false;
   try {
@@ -162,6 +172,9 @@ export async function createInvite(params: CreateInviteParams): Promise<{
     token,
     supervisorName: params.supervisorName,
     supervisorPhone: params.supervisorPhone,
+    supervisorEmail: params.supervisorEmail,
+    siteIds: params.siteIds || [],
+    projectId: params.projectId,
     expiresAt: expiresAt.getTime(),
   };
 
@@ -200,29 +213,20 @@ export async function createEmployeeInvite(
   invite.otpHash = otpHash;
   await invite.save();
 
-const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
+  const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
   const inviteUrl = `${baseUrl}/#/signup/employee?token=${token}`;
 
-  const html = buildEmployeeInviteEmail({
+  const { subject, html, text } = buildEmployeeInviteEmail({
     name: params.name,
-    role: params.role,
-    inviteUrl,
-    otp,
-    expiresMinutes: INVITE_EXPIRY_MINUTES,
-  });
-  const text = buildEmployeeInviteEmailText({
-    name: params.name,
-    role: params.role,
-    inviteUrl,
-    otp,
-    expiresMinutes: INVITE_EXPIRY_MINUTES,
+    role: formatRole(params.role),
+    setupUrl: inviteUrl,
   });
 
   let emailSent = false;
   try {
     await sendEmail({
       to: params.email.toLowerCase(),
-      subject: `You're invited to join AGB as ${formatRole(params.role)}`,
+      subject,
       html,
       text,
     });
@@ -261,103 +265,6 @@ function formatRole(role: InviteRole): string {
     default:
       return role;
   }
-}
-
-function buildEmployeeInviteEmail(params: {
-  name: string;
-role: InviteRole;
-  inviteUrl: string;
-  otp: string;
-  expiresMinutes: number;
-}): string {
-  const roleLabel = formatRole(params.role);
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>You're invited to AGB</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f6f8;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.06);">
-          <tr>
-            <td style="background-color:#002263;padding:28px 32px;text-align:center;">
-              <div style="display:inline-block;background:#c9a227;color:#2a230a;width:48px;height:48px;line-height:48px;border-radius:12px;font-weight:800;font-size:18px;letter-spacing:1px;">AGB</div>
-              <h1 style="margin:14px 0 0;color:#ffffff;font-size:20px;font-weight:600;">Annai Golden Builders</h1>
-              <p style="margin:4px 0 0;color:#9bb3e0;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;">Operations Workspace</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px;">
-              <h2 style="margin:0 0 12px;color:#1d2939;font-size:22px;font-weight:700;">You've been invited</h2>
-              <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
-                Hi <strong>${params.name}</strong>, you have been invited to join AGB (Annai Golden Builders) as a <strong>${roleLabel}</strong>.
-              </p>
-              <p style="margin:0 0 12px;color:#475467;font-size:15px;line-height:1.6;">
-                Your one-time verification code is:
-              </p>
-              <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:0 0 20px 0">
-                <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${params.otp}</span>
-              </div>
-              <p style="margin:0 0 24px;color:#475467;font-size:15px;line-height:1.6;">
-                Click the button below to open the setup page, enter this code, and choose a password. This link expires in <strong>${params.expiresMinutes} minutes</strong>.
-              </p>
-              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
-                <tr>
-                  <td style="background-color:#002263;border-radius:8px;">
-                    <a href="${params.inviteUrl}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:0.02em;">Set Up My Account</a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
-                If the button doesn't work, copy and paste this link into your browser:
-              </p>
-              <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
-                ${params.inviteUrl}
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e6eaf2;">
-              <p style="margin:0;color:#98a2b3;font-size:11px;line-height:1.5;">
-                © ${new Date().getFullYear()} Annai Golden Builders. All rights reserved.<br>
-                <span style="color:#cfd8e6;">This is an automated invitation message.</span>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-function buildEmployeeInviteEmailText(params: {
-  name: string;
-role: InviteRole;
-  inviteUrl: string;
-  otp: string;
-  expiresMinutes: number;
-}): string {
-  return `Hi ${params.name},
-
-You have been invited to join AGB (Annai Golden Builders) as a ${formatRole(params.role)}.
-
-Your one-time verification code: ${params.otp}
-
-Click the link below to open the setup page, enter this code, and choose a password. This link expires in ${params.expiresMinutes} minutes:
-
-${params.inviteUrl}
-
-If you didn't expect this invitation, you can safely ignore this email.
-
----
-Annai Golden Builders
-Operations Workspace`;
 }
 
 export async function verifyInvite(token: string): Promise<IInviteToken> {
@@ -455,27 +362,19 @@ export async function resendOtp(token: string): Promise<{ otp: string; emailSent
   let emailSent = false;
   if (invite.supervisorEmail) {
     const name = extractSupervisorName(invite);
-    const emailBody = {
-      to: invite.supervisorEmail,
-      subject: "Your AGB Supervisor Invite — New OTP Code",
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
-          <div style="background:#002263;color:white;padding:16px 24px;border-radius:8px 8px 0 0">
-            <h2 style="margin:0;color:white">AGB Supervisor Invite — New OTP</h2>
-          </div>
-          <div style="padding:24px">
-            <p style="font-size:16px">Hello <strong>${name}</strong>,</p>
-            <p style="font-size:14px;color:#555">A new OTP has been generated for your AGB supervisor account. Your code is:</p>
-            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
-              <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#002263">${otp}</span>
-            </div>
-            <p style="font-size:12px;color:#888">This code expires when the QR code expires.</p>
-          </div>
-        </div>
-      `,
-    };
+    const { subject, html, text } = buildOtpEmail({
+      name,
+      code: otp,
+      purpose: "verify your supervisor account",
+      expiresMinutes: Math.max(1, Math.floor((invite.otpExpiresAt.getTime() - Date.now()) / 60000)),
+    });
     try {
-      await sendEmail(emailBody);
+      await sendEmail({
+        to: invite.supervisorEmail,
+        subject,
+        html,
+        text,
+      });
       emailSent = true;
     } catch (emailErr) {
       console.error("[InviteService] Failed to resend OTP email (returning OTP for fallback):", emailErr);

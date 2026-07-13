@@ -124,11 +124,12 @@ export class ApiService {
     supervisorEmail: string;
     supervisorPhone?: string;
     projectId?: string;
+    siteIds?: string[];
   }): Observable<{
     inviteId: string;
     token: string;
     qrUrl: string;
-    qrPayload: { token: string; supervisorName: string; supervisorPhone?: string; expiresAt: number };
+    qrPayload: { token: string; supervisorName: string; supervisorPhone?: string; siteIds?: string[]; expiresAt: number };
     qrDataUrl: string;
     supervisorName: string;
     supervisorEmail: string;
@@ -357,6 +358,18 @@ export class ApiService {
   // =================== SITES ===================
   listSites(): Observable<PaginatedResponse<any>> {
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/sites?limit=100`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  listSitesAdmin(): Observable<{ sites: any[] }> {
+    return this.http.get<{ sites: any[] }>(`${this.baseUrl}/admin/sites`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getSiteMaterials(siteId: string): Observable<{ materials: any[] }> {
+    return this.http.get<{ materials: any[] }>(`${this.baseUrl}/admin/sites/${siteId}/materials`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
     );
   }
