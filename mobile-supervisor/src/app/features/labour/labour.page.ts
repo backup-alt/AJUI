@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonSearchbar,
   IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
@@ -249,7 +249,7 @@ interface Employee {
     ion-fab-button { --background: var(--agb-primary); --color: var(--agb-white); }
   `],
 })
-export class LabourPage implements OnInit {
+export class LabourPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -299,7 +299,21 @@ export class LabourPage implements OnInit {
   async ngOnInit(): Promise<void> {
     addIcons({ addOutline, peopleOutline, timeOutline, personAddOutline, checkmarkOutline });
     await this.loadLabour();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agb:site-changed', this.handleSiteChange);
+    }
   }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('agb:site-changed', this.handleSiteChange);
+    }
+  }
+
+  private handleSiteChange = (): void => {
+    void this.loadLabour();
+  };
 
   async loadLabour(): Promise<void> {
     this.isLoading.set(true);

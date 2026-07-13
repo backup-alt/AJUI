@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonSearchbar,
   IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
@@ -173,7 +173,7 @@ import { DatePipe, CurrencyPipe } from '@angular/common';
     .ledger-balance.negative .stat-value { color: #fca5a5; }
   `],
 })
-export class ExpensesPage implements OnInit {
+export class ExpensesPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -201,7 +201,22 @@ export class ExpensesPage implements OnInit {
     await this.supervisor.init();
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     await this.loadExpenses();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agb:site-changed', this.handleSiteChange);
+    }
   }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('agb:site-changed', this.handleSiteChange);
+    }
+  }
+
+  private handleSiteChange = (): void => {
+    this.selectedSiteName.set(this.supervisor.selectedSiteName());
+    void this.loadExpenses();
+  };
 
   async loadExpenses(): Promise<void> {
     this.isLoading.set(true);

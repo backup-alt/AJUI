@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -291,7 +291,7 @@ import { DatePipe } from '@angular/common';
     }
   `],
 })
-export class MaterialsPage implements OnInit {
+export class MaterialsPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -304,7 +304,21 @@ export class MaterialsPage implements OnInit {
   async ngOnInit(): Promise<void> {
     addIcons({ addOutline, cubeOutline, filterOutline, timeOutline, checkmarkCircleOutline, closeCircleOutline });
     await this.loadMaterials();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agb:site-changed', this.handleSiteChange);
+    }
   }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('agb:site-changed', this.handleSiteChange);
+    }
+  }
+
+  private handleSiteChange = (): void => {
+    void this.loadMaterials();
+  };
 
   async loadMaterials(): Promise<void> {
     this.isLoading.set(true);

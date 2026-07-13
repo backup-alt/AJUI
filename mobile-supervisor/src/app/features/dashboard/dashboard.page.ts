@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import {
   IonContent,
   IonCard,
@@ -201,7 +201,7 @@ import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/com
           }
         </div>
 
-        <!-- Active Sites -->
+        <!-- Active Sites shortcut -->
         <div class="section-block">
           <div class="section-heading">
             <h2 class="section-title">Your Active Sites</h2>
@@ -211,25 +211,17 @@ import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/com
             </ion-button>
           </div>
 
-          @if (isLoading()) {
-            @for (i of [1, 2]; track i) {
-              <div class="site-card skeleton-card">
-                <ion-skeleton-text animated style="width: 70%; height: 18px;"></ion-skeleton-text>
-                <ion-skeleton-text animated style="width: 50%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-              </div>
-            }
-          } @else if (sites().length === 0) {
+          @if (sites().length === 0) {
             <div class="empty-state">
               <ion-icon name="location-outline"></ion-icon>
               <p>No active sites assigned.</p>
             </div>
           } @else {
-            @for (site of sites().slice(0, 5); track site.id) {
-              <div class="site-card" (click)="selectSite(site)">
+            @for (site of sites().slice(0, 3); track site.id) {
+              <div class="site-card" (click)="navigateTo('/tabs/sites')">
                 <div class="site-row">
                   <div class="site-info">
                     <h3 class="site-name">{{ site.name }}</h3>
-                    <p class="site-meta">Site ID: {{ site.siteId }}</p>
                     @if (site.employeeCount !== undefined || site.daysActive !== undefined) {
                       <p class="site-stats">
                         @if (site.employeeCount !== undefined) {
@@ -574,7 +566,7 @@ import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/com
     }
   `],
 })
-export class DashboardPage implements OnInit {
+export class DashboardPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -615,7 +607,21 @@ export class DashboardPage implements OnInit {
     });
 
     await this.loadDashboard();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agb:site-changed', this.handleSiteChange);
+    }
   }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('agb:site-changed', this.handleSiteChange);
+    }
+  }
+
+  private handleSiteChange = (): void => {
+    void this.loadDashboard();
+  };
 
   async refreshDashboard(event: CustomEvent): Promise<void> {
     await this.loadDashboard();

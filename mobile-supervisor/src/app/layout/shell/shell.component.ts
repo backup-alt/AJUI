@@ -124,6 +124,10 @@ import { Site, Project } from '../../shared/models';
             <ion-icon [name]="isActiveRoute('/tabs/dashboard') ? 'home-sharp' : 'home-outline'" slot="start"></ion-icon>
             <ion-label>Dashboard</ion-label>
           </ion-item>
+          <ion-item routerLink="/tabs/sites" routerLinkActive="selected" button detail="false">
+            <ion-icon [name]="isActiveRoute('/tabs/sites') ? 'location-sharp' : 'location-outline'" slot="start"></ion-icon>
+            <ion-label>My Sites</ion-label>
+          </ion-item>
           <ion-item routerLink="/tabs/materials" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/materials') ? 'cube-sharp' : 'cube-outline'" slot="start"></ion-icon>
             <ion-label>Materials</ion-label>
