@@ -38,6 +38,9 @@ import { NotificationService } from '../../core/services/notification.service';
         </ion-avatar>
         <h2 class="profile-name">{{ currentUser()?.name || 'Supervisor' }}</h2>
         <p class="profile-role">Site Supervisor</p>
+        @if (currentUser()?.email) {
+          <p class="profile-email">{{ currentUser()?.email }}</p>
+        }
       </div>
 
       <ion-card class="profile-card">
@@ -79,13 +82,27 @@ import { NotificationService } from '../../core/services/notification.service';
           <ion-list lines="none">
             <ion-item>
               <ion-icon name="notifications-outline" slot="start" color="primary"></ion-icon>
-              <ion-label>Push Notifications</ion-label>
-              <ion-toggle slot="end" [(ngModel)]="pushEnabled" (ionChange)="togglePush()"></ion-toggle>
+              <ion-label>
+                <h3>Push Notifications</h3>
+                <p>Receive alerts for approvals and updates</p>
+              </ion-label>
+              <ion-toggle
+                slot="end"
+                [checked]="pushEnabled"
+                (ionChange)="togglePush()"
+              ></ion-toggle>
             </ion-item>
             <ion-item>
               <ion-icon name="moon-outline" slot="start" color="primary"></ion-icon>
-              <ion-label>Dark Mode</ion-label>
-              <ion-toggle slot="end" [(ngModel)]="darkMode" (ionChange)="toggleDarkMode()"></ion-toggle>
+              <ion-label>
+                <h3>Dark Mode</h3>
+                <p>Use the dark theme</p>
+              </ion-label>
+              <ion-toggle
+                slot="end"
+                [checked]="darkMode"
+                (ionChange)="toggleDarkMode()"
+              ></ion-toggle>
             </ion-item>
           </ion-list>
         </ion-card-content>
@@ -99,13 +116,10 @@ import { NotificationService } from '../../core/services/notification.service';
           <ion-list lines="none">
             <ion-item button detail (click)="changePassword()">
               <ion-icon name="lock-closed-outline" slot="start" color="primary"></ion-icon>
-              <ion-label>Change Password</ion-label>
-              <ion-icon name="chevron-forward-outline" slot="end" color="medium"></ion-icon>
-            </ion-item>
-            <ion-item button detail>
-              <ion-icon name="shield-checkmark-outline" slot="start" color="primary"></ion-icon>
-              <ion-label>Privacy Policy</ion-label>
-              <ion-icon name="chevron-forward-outline" slot="end" color="medium"></ion-icon>
+              <ion-label>
+                <h3>Change Password</h3>
+                <p>Update your account password</p>
+              </ion-label>
             </ion-item>
           </ion-list>
         </ion-card-content>
@@ -119,13 +133,17 @@ import { NotificationService } from '../../core/services/notification.service';
           <ion-list lines="none">
             <ion-item button detail>
               <ion-icon name="help-circle-outline" slot="start" color="primary"></ion-icon>
-              <ion-label>Help & FAQ</ion-label>
-              <ion-icon name="chevron-forward-outline" slot="end" color="medium"></ion-icon>
+              <ion-label>
+                <h3>Help & FAQ</h3>
+                <p>Get help with the app</p>
+              </ion-label>
             </ion-item>
             <ion-item button detail>
               <ion-icon name="business-outline" slot="start" color="primary"></ion-icon>
-              <ion-label>About App</ion-label>
-              <ion-icon name="chevron-forward-outline" slot="end" color="medium"></ion-icon>
+              <ion-label>
+                <h3>About App</h3>
+                <p>AGB Supervisor v{{ version }}</p>
+              </ion-label>
             </ion-item>
           </ion-list>
         </ion-card-content>
@@ -136,7 +154,6 @@ import { NotificationService } from '../../core/services/notification.service';
           <ion-icon name="log-out-outline" slot="start"></ion-icon>
           Sign Out
         </ion-button>
-        <p class="version-text">AGB Supervisor v1.0.0</p>
       </div>
     </ion-content>
   `,
@@ -158,12 +175,17 @@ import { NotificationService } from '../../core/services/notification.service';
       font-weight: 700;
     }
     .profile-name { font-size: 22px; font-weight: 700; color: var(--agb-navy); margin: 0 0 4px; }
-    .profile-role { font-size: 14px; color: var(--agb-gray); margin: 0; }
+    .profile-role { font-size: 12px; color: var(--agb-gold-dark); margin: 0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .profile-email { font-size: 13px; color: var(--agb-gray); margin: 4px 0 0; }
     .profile-card { margin: 16px; }
     .profile-card ion-card-title { font-size: 16px; font-weight: 600; color: var(--agb-navy); }
     .profile-card ion-item { --padding-start: 0; --inner-padding-end: 0; margin-bottom: 4px; }
     .profile-card ion-item h3 { font-size: 14px; font-weight: 500; color: var(--agb-navy); margin: 2px 0 0; }
     .profile-card ion-item p { font-size: 12px; color: var(--agb-gray); margin: 0; }
+    html.dark .profile-card ion-item h3 { color: #f1f5f9; }
+    html.dark .profile-card ion-item p { color: #94a3b8; }
+    html.dark .profile-card { background: #1e293b; border-color: #334155; }
+    html.dark .profile-header { background: #1e293b; }
     .logout-section { padding: 24px 16px; text-align: center; }
     .logout-btn {
       --background: transparent;
@@ -191,6 +213,7 @@ export class ProfilePage implements OnInit {
   currentUser = signal<{ name: string; email: string; phone: string } | null>(null);
   pushEnabled = false;
   darkMode = false;
+  version = '1.0.0';
 
   userInitials(): string {
     const name = this.currentUser()?.name || 'S';
