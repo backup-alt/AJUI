@@ -22,6 +22,7 @@ export interface Expense {
   date: string;
   description: string;
   status: ExpenseStatus;
+  notes?: string;
   submittedBy?: string;
   approvedBy?: string;
   approvedAt?: string;

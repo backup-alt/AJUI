@@ -85,27 +85,45 @@ import { DatePipe, CurrencyPipe } from '@angular/common';
           <p>Log a site expense to get started</p>
         </div>
       } @else {
-        @for (expense of filteredExpenses(); track expense.expenseId) {
-          <ion-card class="expense-card" (click)="viewExpense(expense)">
+        @for (expense of filteredExpenses(); track expense._id) {
+          <ion-card
+            class="expense-card"
+            [class.cash-added]="expense.transactionType === 'Cash Added'"
+            (click)="viewExpense(expense)"
+          >
             <ion-card-content>
               <div class="expense-header">
                 <div class="expense-info">
+                  @if (expense.transactionType === 'Cash Added') {
+                    <span class="type-pill cash-added">
+                      <ion-icon name="cash-outline"></ion-icon>
+                      Cash Added
+                    </span>
+                  } @else {
+                    <span class="type-pill purchase">
+                      <ion-icon name="card-outline"></ion-icon>
+                      {{ expense.transactionType || 'Purchase' }}
+                    </span>
+                  }
                   <h3 class="expense-desc">{{ expense.description }}</h3>
                   <p class="expense-meta">{{ expense.site || 'General' }} • {{ expense.projectName || 'N/A' }}</p>
                 </div>
                 <ion-badge [color]="getStatusColor(expense.status)">{{ expense.status }}</ion-badge>
               </div>
 
-              <div class="expense-amount">
+              <div
+                class="expense-amount"
+                [class.cash-added]="expense.transactionType === 'Cash Added'"
+              >
                 {{ expense.amount | currency:'INR':'symbol':'1.0-0' }}
               </div>
 
               <div class="expense-details">
-                @if (expense.transactionType) {
-                  <span class="detail-tag">{{ expense.transactionType }}</span>
-                }
                 @if (expense.reference) {
                   <span class="detail-tag">Ref: {{ expense.reference }}</span>
+                }
+                @if (expense.amountPaidBy) {
+                  <span class="detail-tag">By: {{ expense.amountPaidBy }}</span>
                 }
               </div>
 
@@ -116,6 +134,9 @@ import { DatePipe, CurrencyPipe } from '@angular/common';
                 </div>
                 @if (expense.status === 'Pending') {
                   <ion-badge color="warning">Awaiting Approval</ion-badge>
+                }
+                @if (expense.status === 'Approved') {
+                  <ion-icon name="checkmark-circle-outline" color="success" class="approved-icon"></ion-icon>
                 }
               </div>
             </ion-card-content>
@@ -133,16 +154,42 @@ import { DatePipe, CurrencyPipe } from '@angular/common';
   styles: [`
     .agb-header { --background: var(--agb-white); }
     .expenses-content { --background: var(--agb-off-white); }
-    .expense-card { margin: 12px 16px; transition: all var(--agb-transition-fast); }
+    .expense-card {
+      margin: 12px 16px;
+      transition: all var(--agb-transition-fast);
+      border-left: 3px solid #002263;
+    }
+    .expense-card.cash-added {
+      border-left-color: #c9a227;
+      background: #fffbeb;
+    }
     .expense-card:active { transform: scale(0.98); }
-    .expense-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .expense-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px; }
+    .expense-info { min-width: 0; flex: 1; }
+    .type-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 3px 9px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+    }
+    .type-pill ion-icon { font-size: 12px; }
+    .type-pill.cash-added { background: rgba(201, 162, 39, 0.18); color: #a8861f; }
+    .type-pill.purchase { background: rgba(0, 34, 99, 0.08); color: #002263; }
     .expense-desc { font-size: 15px; font-weight: 600; color: var(--agb-navy); margin: 0 0 4px; }
-    .expense-meta { font-size: 13px; color: var(--agb-gray); margin: 0; }
-    .expense-amount { font-size: 24px; font-weight: 700; color: var(--agb-navy); margin-bottom: 12px; }
+    .expense-meta { font-size: 12px; color: var(--agb-gray); margin: 0; }
+    .expense-amount { font-size: 26px; font-weight: 700; color: var(--agb-navy); margin-bottom: 12px; }
+    .expense-amount.cash-added { color: #a8861f; }
     .expense-details { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .detail-tag { font-size: 11px; padding: 4px 8px; background: var(--agb-off-white); border-radius: var(--agb-radius-sm); color: var(--agb-dark-gray); }
     .expense-footer { display: flex; justify-content: space-between; align-items: center; }
     .expense-date { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--agb-gray); }
+    .approved-icon { font-size: 20px; }
     .empty-state { display: flex; flex-direction: column; align-items: center; padding: 64px 32px; text-align: center; }
     .empty-state ion-icon { font-size: 64px; color: var(--agb-light-gray); margin-bottom: 16px; }
     .empty-state h3 { font-size: 18px; font-weight: 600; color: var(--agb-navy); margin: 0 0 8px; }
