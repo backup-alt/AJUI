@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -161,18 +161,16 @@ import { Material } from '../../../shared/models';
   `],
 })
 export class MaterialDetailPage implements OnInit {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private supervisor = inject(SupervisorService);
+  private toast = inject(ToastController);
+
   material = signal<Material | null>(null);
   loading = signal(true);
   saving = signal(false);
   purchasedInput: number | null = null;
   consumedInput: number | null = null;
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private supervisor: SupervisorService,
-    private toast: ToastController,
-  ) {}
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
@@ -186,7 +184,7 @@ export class MaterialDetailPage implements OnInit {
   load(id: string) {
     this.loading.set(true);
     this.supervisor.getMaterialDetail(id).subscribe({
-      next: (res) => {
+      next: (res: { material: Material }) => {
         this.material.set(res.material);
         this.purchasedInput = res.material.purchasedQuantity || 0;
         this.consumedInput = res.material.consumedQuantity || 0;
@@ -207,7 +205,7 @@ export class MaterialDetailPage implements OnInit {
       purchasedQuantity: this.purchasedInput || 0,
       consumedQuantity: this.consumedInput || 0,
     }).subscribe({
-      next: (res) => {
+      next: (res: { material: Material }) => {
         this.material.set(res.material);
         this.saving.set(false);
         this.showToast('Stock updated', false);

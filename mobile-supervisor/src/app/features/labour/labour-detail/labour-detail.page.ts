@@ -313,7 +313,7 @@ export class LabourDetailPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // No-op for now.
+    // No active subscriptions to clean up; the labour detail is fetched once.
   }
 
   totalAmount = (): number => {
