@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, OnDestroy } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -290,7 +290,7 @@ import { Labour } from '../../../shared/models';
     .type-meta { font-size: 11px; color: #6b7280; }
   `],
 })
-export class LabourDetailPage implements OnInit, OnDestroy {
+export class LabourDetailPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private supervisor = inject(SupervisorService);
@@ -310,10 +310,6 @@ export class LabourDetailPage implements OnInit, OnDestroy {
       calendarOutline,
     });
     await this.load();
-  }
-
-  ngOnDestroy(): void {
-    // No active subscriptions to clean up; the labour detail is fetched once.
   }
 
   totalAmount = (): number => {

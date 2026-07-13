@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: backend
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend deps
+        run: cd backend && npm ci
+      - name: Backend typecheck
+        run: cd backend && npm run build
+      - name: Backend tests
+        run: cd backend && npm test
+        env:
+          MONGODB_TEST_URI: mongodb://localhost:27017/ajui_test
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: mobile-supervisor
+          cache-dependency-path: mobile-supervisor/package-lock.json
+      - name: Install Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium
+      - name: Install mobile deps
+        run: cd mobile-supervisor && npm ci
+      - name: Mobile typecheck
+        run: cd mobile-supervisor && npx tsc --noEmit
+      - name: Mobile lint
+        run: cd mobile-supervisor && npm run lint
+      - name: Mobile tests
+        run: cd mobile-supervisor && npm test -- --no-watch --no-progress --browsers=ChromeHeadless
+        env:
+          CI: true
