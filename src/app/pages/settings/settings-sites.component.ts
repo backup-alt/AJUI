@@ -287,9 +287,8 @@ export class SettingsSitesComponent implements OnInit {
           targetEndDate: "Not available",
           projectNames: [p.name],
           address: p.address || "Not available",
-          totalDays,
-          totalWorkers: siteSupervisors,
-          totalEmployees: siteEmployees,
+          daysActive: totalDays,
+          employeeCount: siteEmployees,
         });
       }
     }
