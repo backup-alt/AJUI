@@ -113,23 +113,21 @@ interface Employee {
         @if (showAddEmployee) {
           <div class="modal-backdrop" (click)="showAddEmployee = false"></div>
           <div class="add-emp-modal">
-            <h3>Add Employee</h3>
-            <ion-input
-              placeholder="Employee name"
-              [(ngModel)]="newEmployeeName"
-              class="emp-name-input"
-            ></ion-input>
-            <div class="default-types">
-              <span class="default-label">Labour types:</span>
-              <div class="type-chips">
-                @for (t of defaultTypes; track t) {
-                  <button class="type-chip" [class.selected]="newEmployeeTypes.includes(t)" (click)="toggleNewType(t)">{{ t }}</button>
-                }
-              </div>
-            </div>
+            <h3>How new employees are tracked</h3>
+            <p class="explainer">
+              In AGB, employees aren't a separate list — they're tracked as
+              <strong>labour entries</strong> by party name and category.
+            </p>
+            <p class="explainer">
+              To add a new employee, log their first day's attendance using the
+              <strong>Log Attendance</strong> button. They'll automatically appear
+              in the Employees tab once their first entry is recorded.
+            </p>
             <div class="modal-actions">
-              <ion-button fill="outline" (click)="showAddEmployee = false">Cancel</ion-button>
-              <ion-button (click)="saveNewEmployee()" [disabled]="!newEmployeeName.trim()">Save</ion-button>
+              <ion-button fill="outline" (click)="showAddEmployee = false">Got it</ion-button>
+              <ion-button (click)="logFirstAttendance()">
+                Log First Attendance
+              </ion-button>
             </div>
           </div>
         }
@@ -367,20 +365,25 @@ export class LabourPage implements OnInit, OnDestroy {
     else this.newEmployeeTypes.push(t);
   }
 
-  saveNewEmployee() {
-    if (!this.newEmployeeName.trim()) return;
+  /** The "Add Employee" UI explains how the employee list works and routes
+   * the user to the labour-create page so they can log a first attendance. */
+  logFirstAttendance(): void {
     this.showAddEmployee = false;
-    this.newEmployeeName = '';
-    this.newEmployeeTypes = [];
+    this.createLabour();
   }
 
   startAddType(empName: string) {
+    // The "add type" UI is hidden in the template (only the "Add type" button
+    // opens the inline form). For now, persisting custom types per-employee is
+    // not yet supported — the types are derived from past labour entries.
     this.addingTypeFor.set(empName);
     this.newLabourType = '';
   }
 
   addLabourType(empName: string) {
     if (!this.newLabourType.trim()) return;
+    // Note: custom types are derived on the backend from laborTypes[].name —
+    // we do not persist them per-employee client-side.
     const emp = this.employees().find((e) => e.name === empName);
     if (emp && !emp.labourTypes.includes(this.newLabourType.trim())) {
       emp.labourTypes.push(this.newLabourType.trim());

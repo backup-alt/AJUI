@@ -231,6 +231,7 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
     const { Site } = await import("../models/Site.js");
     const { generateId } = await import("../services/id-generator.service.js");
     const { Approval } = await import("../models/Approval.js");
+    const { Labour } = await import("../models/Labour.js");
 
     const project = await Project.findById(req.body.projectId).lean();
     if (!project) throw new AppError(404, "Project not found");
@@ -241,9 +242,27 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
       if (site) siteName = site.name;
     }
 
+    // Once-per-day-per-(site, partyName) guard. If a labour entry already exists
+    // for the same site + party + attendanceDate, reject the duplicate.
+    const attendanceDate = String(req.body.attendanceDate || "").slice(0, 10);
+    const partyName = String(req.body.partyName || "").trim();
+    if (req.body.siteId && partyName && attendanceDate) {
+      const existing = await Labour.findOne({
+        siteId: req.body.siteId,
+        partyName,
+        attendanceDate,
+      }).lean();
+      if (existing) {
+        throw new AppError(
+          409,
+          `Attendance for "${partyName}" on ${attendanceDate} has already been submitted.`
+        );
+      }
+    }
+
     const totalAmount = (req.body.dailyWage || 0) * (req.body.presentCount || 0);
     const labourId = await generateId("LAB");
-    const labour = await (await import("../models/Labour.js")).Labour.create({
+    const labour = await Labour.create({
       ...req.body,
       labourId,
       projectName: project.name,
