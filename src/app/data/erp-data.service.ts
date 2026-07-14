@@ -858,6 +858,36 @@ export class ErpDataService {
     this.subcontractors.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
   }
 
+  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string }): Vendor {
+    const nextNumber =
+      Math.max(
+        100,
+        ...this.vendors()
+          .map((v) => Number(v.id.replace(/\D/g, "")))
+          .filter((value) => Number.isFinite(value)),
+      ) + 1;
+    const vendor: Vendor = {
+      id: `VEN-${nextNumber}`,
+      name: input.name,
+      materialType: input.materialType,
+      phone: input.phone,
+      address: input.address,
+      gst: input.gst,
+    };
+    this.vendors.update((vendors) => [vendor, ...vendors]);
+    return vendor;
+  }
+
+  updateVendor(vendorId: string, patch: Partial<Omit<Vendor, "id">>) {
+    this.vendors.update((vendors) =>
+      vendors.map((v) => (v.id !== vendorId ? v : { ...v, ...patch })),
+    );
+  }
+
+  deleteVendor(vendorId: string) {
+    this.vendors.update((vendors) => vendors.filter((v) => v.id !== vendorId));
+  }
+
   createDefaultProject(client: Client): Project {
     return this.addProject(client, {
       name: `${client.name} Project`,
