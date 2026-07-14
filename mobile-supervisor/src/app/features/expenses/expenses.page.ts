@@ -38,7 +38,7 @@ import {
 
       <app-page-header
         title="Site expenses"
-        [subtitle]="selectedSiteName() ? 'For ' + selectedSiteName() : 'Track every rupee across sites'"
+        subtitle="Across all assigned sites"
       ></app-page-header>
 
       <div class="filter-stack">
@@ -63,7 +63,7 @@ import {
             <ion-icon name="wallet-outline"></ion-icon>
             Cash ledger
           </span>
-          <span class="ledger-site">{{ selectedSiteName() || 'All sites' }}</span>
+          <span class="ledger-site">All assigned sites</span>
         </header>
         <div class="ledger-stats">
           <div class="ledger-stat added">
@@ -301,12 +301,8 @@ export class ExpensesPage implements OnInit, OnDestroy {
   async loadExpenses(): Promise<void> {
     this.isLoading.set(true);
     try {
-      const projectId = this.supervisor.selectedProjectId();
-      const siteId = this.supervisor.selectedSiteId();
       this.supervisor
         .getExpenses({
-          projectId: projectId ?? undefined,
-          siteId: siteId ?? undefined,
           type: 'site',
           limit: 100,
         })

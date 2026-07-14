@@ -113,6 +113,8 @@ export const createSupervisorSchema = z.object({
     assignedProjectId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
     assignedSite: z.string().trim().optional(),
     assignedSiteId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
+    assignedSites: z.array(z.string().trim().min(1)).optional(),
+    assignedSiteIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).optional(),
     cashLimit: z.coerce.number().nonnegative().default(0),
     approvalAuthority: z.coerce.number().nonnegative().default(0),
     status: z.enum(["Active", "On Leave", "Inactive"]).default("Active"),

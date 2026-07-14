@@ -163,6 +163,8 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
     }
 
     const materialId = await generateId("MAT");
+    const initialStock =
+      typeof req.body.remainingStock === "number" ? req.body.remainingStock : 0;
     const material = await (await import("../models/Material.js")).Material.create({
       ...req.body,
       materialId,
@@ -170,6 +172,8 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
       clientId: project.clientId,
       clientName: project.client,
       site: siteName,
+      purchasedQuantity: initialStock,
+      consumedQuantity: 0,
       status: "Pending",
       createdBy: userId,
     });

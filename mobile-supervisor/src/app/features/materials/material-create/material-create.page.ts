@@ -17,12 +17,11 @@ import {
   IonIcon,
   IonSpinner,
   ToastController,
-  LoadingController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
-import { locationOutline, cubeOutline, personOutline, checkmarkCircleOutline } from 'ionicons/icons';
+import { locationOutline, cubeOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 
 @Component({
@@ -97,7 +96,6 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
                 type="number"
                 placeholder="0"
                 [(ngModel)]="material.requestedQuantity"
-                (ionInput)="syncRemaining()"
                 [clearInput]="true"
               ></ion-input>
             </ion-item>
@@ -280,7 +278,6 @@ export class MaterialCreatePage implements OnInit {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
-  private loadingCtrl = inject(LoadingController);
 
   material = {
     name: '',
@@ -298,7 +295,7 @@ export class MaterialCreatePage implements OnInit {
   siteProjectId = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
-    addIcons({ locationOutline, cubeOutline, personOutline, checkmarkCircleOutline });
+    addIcons({ locationOutline, cubeOutline });
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
@@ -308,8 +305,7 @@ export class MaterialCreatePage implements OnInit {
   /**
    * If the user has entered a material name, and an existing material with the
    * same name+site is in the supervisor's list, pre-fill `remainingStock` with
-   * that material's current remaining stock. Otherwise default to
-   * `requestedQuantity`.
+   * that material's current remaining stock.
    */
   async suggestRemainingFromExisting(): Promise<void> {
     const name = (this.material.name || '').trim();
@@ -329,14 +325,13 @@ export class MaterialCreatePage implements OnInit {
     });
   }
 
-  syncRemaining() {
-    if (this.material.remainingStock === null) {
-      this.material.remainingStock = this.material.requestedQuantity;
-    }
-  }
-
   isValid(): boolean {
-    return !!(this.material.name && this.material.requestedQuantity && this.material.unit);
+    return !!(
+      this.material.name.trim() &&
+      this.material.requestedQuantity &&
+      this.material.requestedQuantity > 0 &&
+      this.material.unit
+    );
   }
 
   async submit(): Promise<void> {
@@ -370,17 +365,15 @@ export class MaterialCreatePage implements OnInit {
 
     this.isSubmitting.set(true);
 
+    const remainingStock = this.material.remainingStock;
     const payload = {
       projectId,
       siteId,
       site: siteName,
-      name: this.material.name,
+      name: this.material.name.trim(),
       unit: this.material.unit,
       requestedQuantity: this.material.requestedQuantity || 0,
-      remainingStock:
-        this.material.remainingStock !== null
-          ? this.material.remainingStock
-          : this.material.requestedQuantity || 0,
+      ...(remainingStock !== null && remainingStock >= 0 ? { remainingStock } : {}),
       vendor: this.material.vendor || undefined,
       poNumber: this.material.poNumber || undefined,
       requestDate: new Date().toISOString().slice(0, 10),

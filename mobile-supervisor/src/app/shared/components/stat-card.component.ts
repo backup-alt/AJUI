@@ -1,11 +1,10 @@
 import { Component, Input } from '@angular/core';
 import { IonIcon } from '@ionic/angular/standalone';
-import { NgIf } from '@angular/common';
 
 @Component({
   selector: 'app-stat-card',
   standalone: true,
-  imports: [IonIcon, NgIf],
+  imports: [IonIcon],
   template: `
     <button class="agb-stat-card" type="button" [class.interactive]="!!clickable">
       <div class="agb-icon-tile" [style.background]="iconBg" [style.color]="iconColor">

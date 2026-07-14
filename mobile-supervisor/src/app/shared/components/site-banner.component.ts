@@ -1,11 +1,10 @@
 import { Component, Input } from '@angular/core';
 import { IonIcon } from '@ionic/angular/standalone';
-import { NgIf } from '@angular/common';
 
 @Component({
   selector: 'app-site-banner',
   standalone: true,
-  imports: [IonIcon, NgIf],
+  imports: [IonIcon],
   template: `
     <div class="agb-info-banner" [style.borderLeftColor]="accentColor">
       <ion-icon [name]="icon" [style.color]="accentColor"></ion-icon>

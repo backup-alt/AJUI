@@ -27,6 +27,7 @@
   --agb-divider: 1px solid #e5e7eb;
   --agb-border: 1px solid #e5e7eb;
   --agb-border-strong: 1px solid #d1d5db;
+  --agb-content-max-width: 720px;
 }
 
 /* Global reset */
@@ -44,6 +45,12 @@ body {
   color: #0f172a;
   font-size: 15px;
   line-height: 1.5;
+}
+
+ion-app,
+ion-router-outlet,
+.ion-page {
+  background: #f5f6f8;
 }
 
 /* ---------- Surfaces ---------- */
@@ -227,6 +234,7 @@ ion-title {
 ion-content {
   --background: #f5f6f8;
   --color: #0f172a;
+  --padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }
 
 ion-menu {
@@ -355,6 +363,11 @@ ion-fab-button {
   --box-shadow: 0 12px 32px -6px rgba(0, 34, 99, 0.40);
   --background: var(--agb-primary);
   --color: #ffffff;
+}
+
+ion-fab {
+  margin-bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 20;
 }
 
 ion-fab-button:hover {
@@ -629,6 +642,118 @@ html.theme-dark .agb-pill.neutral {
   }
   ion-header ion-toolbar:first-of-type {
     --ion-safe-area-top: env(safe-area-inset-top);
+  }
+}
+
+/* Production mobile layout guards */
+ion-header {
+  z-index: 30;
+}
+
+ion-popover {
+  z-index: 1000;
+}
+
+ion-popover ion-content {
+  --padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  max-height: min(72vh, 520px);
+}
+
+ion-modal,
+ion-alert,
+ion-action-sheet,
+ion-toast {
+  z-index: 1100;
+}
+
+.cards,
+.content-stack,
+.form-container,
+.filter-stack,
+.ledger-card {
+  box-sizing: border-box;
+  max-width: var(--agb-content-max-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.modal-backdrop {
+  z-index: 1000 !important;
+}
+
+.add-emp-modal {
+  z-index: 1001 !important;
+  max-height: calc(100vh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+body .form-container {
+  box-sizing: border-box;
+  max-width: var(--agb-content-max-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+body .page-header {
+  align-items: flex-start;
+}
+
+body .page-icon,
+body .site-banner,
+body .form-item {
+  border-radius: 16px !important;
+}
+
+body .page-icon,
+body .site-banner ion-icon {
+  flex-shrink: 0;
+}
+
+body .site-banner-value,
+body .page-title,
+body .page-subtitle {
+  overflow-wrap: anywhere;
+}
+
+body .form-list {
+  display: grid;
+  gap: 10px;
+  background: transparent;
+}
+
+body .form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  gap: 10px;
+}
+
+body .form-row .form-item,
+body .form-item {
+  border: 1px solid #e5e7eb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  margin-bottom: 0 !important;
+  --border-radius: 16px !important;
+  --inner-border-radius: 16px !important;
+}
+
+body .form-actions {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 380px) {
+  .material-stats,
+  .ledger-stats,
+  .labour-stats,
+  .stats-grid,
+  .site-stats {
+    grid-template-columns: 1fr !important;
+  }
+
+  .material-head,
+  .expense-head,
+  .labour-head {
+    align-items: flex-start;
   }
 }
 

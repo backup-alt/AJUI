@@ -1,12 +1,10 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { IonIcon, IonInput } from '@ionic/angular/standalone';
-import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-otp-input',
   standalone: true,
-  imports: [IonIcon, IonInput, NgIf, NgFor, FormsModule],
+  imports: [FormsModule],
   template: `
     <div class="agb-otp" [class.compact]="compact">
       @for (i of indices; track i) {

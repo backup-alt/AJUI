@@ -3,8 +3,8 @@ import { Router } from '@angular/router';
 import { Preferences } from '@capacitor/preferences';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { firstValueFrom, from, of, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
+import { firstValueFrom, from, of } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import { SupervisorService } from './supervisor.service';
 import {
@@ -119,10 +119,7 @@ export class AuthService {
 
   signup(request: SignupRequest) {
     return this.api.post<LoginResponse>('/auth/supervisor/signup', request).pipe(
-      tap((response) => {
-        void this.saveAuthData(response);
-        void this.initAfterLogin();
-      })
+      switchMap((response) => from(this.completeLogin(response)))
     );
   }
 
@@ -135,10 +132,7 @@ export class AuthService {
    */
   loginWithPassword(email: string, password: string) {
     return this.api.post<LoginResponse>('/auth/login', { identifier: email, password }).pipe(
-      tap((response) => {
-        void this.saveAuthData(response);
-        void this.initAfterLogin();
-      })
+      switchMap((response) => from(this.completeLogin(response)))
     );
   }
 
@@ -162,10 +156,7 @@ export class AuthService {
       identifier,
       otp,
     }).pipe(
-      tap((response) => {
-        void this.saveAuthData(response);
-        void this.initAfterLogin();
-      })
+      switchMap((response) => from(this.completeLogin(response)))
     );
   }
 
@@ -195,6 +186,12 @@ export class AuthService {
 
     this.currentUser.set(response.user);
     this.isAuthenticated.set(true);
+  }
+
+  private async completeLogin(response: LoginResponse): Promise<LoginResponse> {
+    await this.saveAuthData(response);
+    await this.initAfterLogin();
+    return response;
   }
 
   /**

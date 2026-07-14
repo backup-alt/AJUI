@@ -25,7 +25,6 @@ import {
   IonTitle,
   IonButton,
   ToastController,
-  Platform,
 } from '@ionic/angular/standalone';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { addIcons } from 'ionicons';
@@ -258,7 +257,7 @@ import { Site } from '../../shared/models';
     .agb-menu-header {
       background: var(--agb-gradient-hero);
       color: #ffffff;
-      padding: 20px 18px 24px;
+      padding: calc(20px + env(safe-area-inset-top)) 18px 24px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.10);
     }
     .menu-brand {
@@ -282,7 +281,11 @@ import { Site } from '../../shared/models';
     .menu-brand-name { font-size: 14px; font-weight: 700; }
     .menu-brand-sub { font-size: 10px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
 
-    .menu-content { --background: #f8fafc; --padding-top: 0; }
+    .menu-content {
+      --background: #f8fafc;
+      --padding-top: 0;
+      --padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
 
     /* User card */
     .user-card {
@@ -331,6 +334,11 @@ import { Site } from '../../shared/models';
       opacity: 0.85;
     }
     .user-project ion-icon { font-size: 12px; color: #c9a227; }
+    .user-project span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     /* Section labels */
     .menu-section-label {
@@ -366,7 +374,7 @@ import { Site } from '../../shared/models';
 
     .menu-spacer { flex: 1; min-height: 24px; }
 
-    .menu-footer { padding: 12px 12px 24px; }
+    .menu-footer { padding: 12px 12px calc(24px + env(safe-area-inset-bottom)); }
     .menu-footer ion-item {
       --background: transparent;
       --color: #dc2626;
@@ -406,7 +414,9 @@ import { Site } from '../../shared/models';
       padding: 6px 10px 6px 6px;
       border-radius: 14px;
       cursor: pointer;
-      max-width: 240px;
+      max-width: min(52vw, 240px);
+      min-width: 0;
+      margin: 0 auto;
       transition: background var(--agb-transition-fast), border-color var(--agb-transition-fast);
       font-family: inherit;
     }
@@ -421,6 +431,7 @@ import { Site } from '../../shared/models';
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
     .site-icon ion-icon { font-size: 16px; }
     .site-name {
@@ -430,8 +441,9 @@ import { Site } from '../../shared/models';
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 160px;
+      min-width: 0;
     }
+    .site-chev { flex-shrink: 0; }
     .site-chev ion-icon { color: #64748b; font-size: 16px; }
 
     .notification-btn { position: relative; --padding-end: 8px; }
@@ -463,6 +475,10 @@ import { Site } from '../../shared/models';
       letter-spacing: 0.6px;
       --background: transparent;
     }
+    ion-popover ion-content {
+      max-height: min(72vh, 520px);
+      --padding-bottom: env(safe-area-inset-bottom);
+    }
     .site-tile-icon {
       width: 38px;
       height: 38px;
@@ -472,6 +488,7 @@ import { Site } from '../../shared/models';
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
     .site-tile-icon ion-icon { font-size: 18px; }
     .empty-sites {

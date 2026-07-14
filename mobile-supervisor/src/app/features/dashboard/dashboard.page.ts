@@ -2,12 +2,9 @@ import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import {
   IonContent,
   IonIcon,
-  IonBadge,
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
-  IonButton,
-  IonSpinner,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
@@ -34,9 +31,8 @@ import {
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { AuthService } from '../../core/services/auth.service';
 import { DashboardData, Site, ApprovalSummary } from '../../shared/models';
-import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe, NgClass } from '@angular/common';
+import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
 import {
-  PageHeaderComponent,
   StatCardComponent,
   StatusPillComponent,
   EmptyStateComponent,
@@ -48,18 +44,12 @@ import {
   imports: [
     IonContent,
     IonIcon,
-    IonBadge,
     IonSkeletonText,
     IonRefresher,
     IonRefresherContent,
-    IonButton,
-    IonSpinner,
-    DecimalPipe,
     DatePipe,
     CurrencyPipe,
     TitleCasePipe,
-    NgClass,
-    PageHeaderComponent,
     StatCardComponent,
     StatusPillComponent,
     EmptyStateComponent,

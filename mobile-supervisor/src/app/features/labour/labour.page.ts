@@ -1,8 +1,8 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import {
   IonContent, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
-  IonFab, IonFabButton, IonIcon, IonBadge, IonSkeletonText,
-  IonRefresher, IonRefresherContent, IonInput, IonButton,
+  IonFab, IonFabButton, IonIcon, IonSkeletonText,
+  IonRefresher, IonRefresherContent,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -34,9 +34,9 @@ interface Employee {
   standalone: true,
   imports: [
     IonContent, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
-    IonFab, IonFabButton, IonIcon, IonBadge, IonSkeletonText,
+    IonFab, IonFabButton, IonIcon, IonSkeletonText,
     IonRefresher, IonRefresherContent, FormsModule, DatePipe, CurrencyPipe,
-    IonInput, IonButton, EmptyStateComponent, StatusPillComponent,
+    EmptyStateComponent, StatusPillComponent,
   ],
   template: `
     <ion-content class="labour-content">
@@ -421,12 +421,8 @@ export class LabourPage implements OnInit, OnDestroy {
   async loadLabour(): Promise<void> {
     this.isLoading.set(true);
     try {
-      const projectId = this.supervisor.selectedProjectId();
-      const siteId = this.supervisor.selectedSiteId();
       this.supervisor
         .getLabourEntries({
-          projectId: projectId ?? undefined,
-          siteId: siteId ?? undefined,
           limit: 100,
         })
         .subscribe({

@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import {
-  IonContent, IonList, IonItem, IonLabel, IonIcon, IonButton, IonToggle,
-  IonAvatar, AlertController, ToastController,
+  IonContent, IonList, IonItem, IonLabel, IonIcon, IonToggle,
+  AlertController, ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -20,8 +20,8 @@ import { NotificationService } from '../../core/services/notification.service';
   selector: 'app-profile',
   standalone: true,
 imports: [
-    IonContent, IonIcon, IonButton, IonToggle,
-    IonAvatar, FormsModule,
+    IonContent, IonIcon, IonToggle,
+    FormsModule,
   ],
   template: `
     <ion-content class="profile-content">

@@ -10,8 +10,7 @@ export const authGuard: CanActivateFn = async () => {
 
   const isAuthenticated = await auth.isLoggedIn();
   if (!isAuthenticated) {
-    router.navigate(['/auth/login']);
-    return false;
+    return router.createUrlTree(['/auth/login']);
   }
 
   // Ensure supervisor site selection is hydrated before any tab page runs.
@@ -25,8 +24,7 @@ export const guestGuard: CanActivateFn = async () => {
 
   const isAuthenticated = await auth.isLoggedIn();
   if (isAuthenticated) {
-    router.navigate(['/tabs/dashboard']);
-    return false;
+    return router.createUrlTree(['/tabs/dashboard']);
   }
   return true;
 };
@@ -37,8 +35,7 @@ export const supervisorGuard: CanActivateFn = async () => {
 
   const isSupervisor = await auth.isSupervisor();
   if (!isSupervisor) {
-    router.navigate(['/tabs/dashboard']);
-    return false;
+    return router.createUrlTree(['/tabs/dashboard']);
   }
   return true;
 };

@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { Supervisor } from "../models/Supervisor.js";
+import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import {
@@ -8,18 +9,96 @@ import {
 } from "../schemas/entities.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
+type SiteAssignmentInput = {
+  assignedSite?: string;
+  assignedSites?: string[];
+  assignedSiteId?: string;
+  assignedSiteIds?: string[];
+};
+
+function toObjectId(value: unknown): Types.ObjectId | undefined {
+  if (!value) return undefined;
+  const str = String(value).trim();
+  if (!str || !Types.ObjectId.isValid(str)) return undefined;
+  return new Types.ObjectId(str);
+}
+
+function uniqueObjectIds(values: Array<Types.ObjectId | undefined>): Types.ObjectId[] {
+  const seen = new Set<string>();
+  const ids: Types.ObjectId[] = [];
+  for (const value of values) {
+    if (!value) continue;
+    const key = value.toString();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ids.push(value);
+  }
+  return ids;
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  const seen = new Set<string>();
+  const list: string[] = [];
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    list.push(trimmed);
+  }
+  return list;
+}
+
+async function normalizeSiteAssignment(input: SiteAssignmentInput) {
+  const assignedSiteIds = uniqueObjectIds([
+    toObjectId(input.assignedSiteId),
+    ...(input.assignedSiteIds || []).map(toObjectId),
+  ]);
+
+  const inputSiteNames = uniqueStrings([
+    input.assignedSite,
+    ...(input.assignedSites || []),
+  ]);
+
+  const sites = assignedSiteIds.length > 0
+    ? await Site.find({ _id: { $in: assignedSiteIds } }).select("name").lean()
+    : [];
+
+  return {
+    assignedSiteId: assignedSiteIds[0],
+    assignedSiteIds,
+    assignedSites: uniqueStrings([
+      ...inputSiteNames,
+      ...sites.map((site) => site.name),
+    ]),
+  };
+}
+
+async function backfillAssignedSites(
+  supervisorId: Types.ObjectId,
+  supervisorName: string,
+  assignedSiteIds: Types.ObjectId[]
+) {
+  if (assignedSiteIds.length === 0) return;
+  await Site.updateMany(
+    { _id: { $in: assignedSiteIds } },
+    { $set: { supervisor: supervisorName, supervisorId } }
+  );
+}
+
 export async function createSupervisor(input: CreateSupervisorInput) {
   const supervisorId = await generateId("SUP");
+  const siteAssignment = await normalizeSiteAssignment(input);
   const supervisor = await Supervisor.create({
     ...input,
     supervisorId,
     assignedProjectId: input.assignedProjectId
       ? new Types.ObjectId(input.assignedProjectId)
       : undefined,
-    assignedSiteId: input.assignedSiteId
-      ? new Types.ObjectId(input.assignedSiteId)
-      : undefined,
+    ...siteAssignment,
   });
+  await backfillAssignedSites(supervisor._id, supervisor.name, siteAssignment.assignedSiteIds);
   return supervisor.toObject();
 }
 
@@ -51,11 +130,30 @@ export async function updateSupervisor(id: string, patch: UpdateSupervisorInput,
   if (patch.assignedProjectId) {
     updateData.assignedProjectId = new Types.ObjectId(patch.assignedProjectId);
   }
-  if (patch.assignedSiteId) {
-    updateData.assignedSiteId = new Types.ObjectId(patch.assignedSiteId);
+
+  const shouldNormalizeSites = ["assignedSite", "assignedSites", "assignedSiteId", "assignedSiteIds"].some((key) =>
+    Object.prototype.hasOwnProperty.call(patch, key)
+  );
+  if (shouldNormalizeSites) {
+    Object.assign(updateData, await normalizeSiteAssignment(patch));
+    delete updateData.assignedSite;
   }
-  const supervisor = await Supervisor.findByIdAndUpdate(id, updateData, { new: true });
+
+  const update: Record<string, unknown> = { $set: updateData };
+  if (shouldNormalizeSites && !updateData.assignedSiteId) {
+    delete updateData.assignedSiteId;
+    update.$unset = { assignedSiteId: "" };
+  }
+
+  const supervisor = await Supervisor.findByIdAndUpdate(id, update, { new: true });
   if (!supervisor) throw new AppError(404, "Supervisor not found");
+  if (shouldNormalizeSites) {
+    await backfillAssignedSites(
+      supervisor._id,
+      supervisor.name,
+      (updateData.assignedSiteIds as Types.ObjectId[] | undefined) || []
+    );
+  }
   return supervisor.toObject();
 }
 

@@ -14,6 +14,7 @@ export interface ISupervisor extends Document {
   assignedProject?: string;
   assignedProjectId?: Types.ObjectId;
   assignedSites?: string[];
+  assignedSiteId?: Types.ObjectId;
   assignedSiteIds: Types.ObjectId[];
   cashLimit: number;
   activeAdvances: number;
@@ -35,6 +36,7 @@ const supervisorSchema = new Schema<ISupervisor>(
     assignedProject: { type: String },
     assignedProjectId: { type: Schema.Types.ObjectId, ref: "Project" },
     assignedSites: [{ type: String }],
+    assignedSiteId: { type: Schema.Types.ObjectId, ref: "Site", index: true },
     assignedSiteIds: [{ type: Schema.Types.ObjectId, ref: "Site", index: true }],
     cashLimit: { type: Number, default: 0 },
     activeAdvances: { type: Number, default: 0 },

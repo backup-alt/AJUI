@@ -2,13 +2,10 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import {
   IonContent,
   IonIcon,
-  IonBadge,
-  IonButton,
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
   IonModal,
-  IonButtons,
   ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
@@ -30,7 +27,7 @@ import {
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Site, Material } from '../../shared/models';
-import { DatePipe, NgIf } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import {
   PageHeaderComponent,
   EmptyStateComponent,
@@ -43,15 +40,11 @@ import {
   imports: [
     IonContent,
     IonIcon,
-    IonBadge,
-    IonButton,
     IonSkeletonText,
     IonRefresher,
     IonRefresherContent,
     IonModal,
-    IonButtons,
     DatePipe,
-    NgIf,
     PageHeaderComponent,
     EmptyStateComponent,
     StatusPillComponent,

@@ -5,15 +5,12 @@ import {
   IonSegment,
   IonSegmentButton,
   IonLabel,
-  IonBadge,
   IonFab,
   IonFabButton,
   IonIcon,
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
-  IonButtons,
-  IonButton,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -47,14 +44,13 @@ import {
     IonSegment,
     IonSegmentButton,
     IonLabel,
-    IonBadge,
     IonFab,
     IonFabButton,
     IonIcon,
     IonSkeletonText,
-IonRefresher,
-  IonRefresherContent,
-  DatePipe,
+    IonRefresher,
+    IonRefresherContent,
+    DatePipe,
     PageHeaderComponent,
     EmptyStateComponent,
     StatusPillComponent,
@@ -280,12 +276,8 @@ export class MaterialsPage implements OnInit, OnDestroy {
   async loadMaterials(): Promise<void> {
     this.isLoading.set(true);
     try {
-      const projectId = this.supervisor.selectedProjectId();
-      const siteId = this.supervisor.selectedSiteId();
       this.supervisor
         .getMaterials({
-          projectId: projectId ?? undefined,
-          siteId: siteId ?? undefined,
           limit: 100,
         })
         .subscribe({

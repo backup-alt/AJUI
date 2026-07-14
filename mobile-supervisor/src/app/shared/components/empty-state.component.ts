@@ -1,11 +1,10 @@
 import { Component, Input } from '@angular/core';
 import { IonIcon } from '@ionic/angular/standalone';
-import { NgIf } from '@angular/common';
 
 @Component({
   selector: 'app-empty-state',
   standalone: true,
-  imports: [IonIcon, NgIf],
+  imports: [IonIcon],
   template: `
     <div class="agb-empty-state">
       <div class="icon-wrap" [style.background]="iconBg || 'rgba(0, 34, 99, 0.06)'" [style.color]="iconColor || '#002263'">

@@ -1,9 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import {
   IonContent,
-  IonButton,
   IonIcon,
-  IonSpinner,
   ToastController,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
@@ -23,7 +21,7 @@ import { AuthService } from '../../../core/services/auth.service';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [IonContent, IonButton, IonIcon, IonSpinner],
+  imports: [IonContent, IonIcon],
   template: `
     <ion-content class="login-content">
       <div class="login-shell">

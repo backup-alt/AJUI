@@ -1,11 +1,9 @@
 import { Component, Input } from '@angular/core';
-import { IonIcon } from '@ionic/angular/standalone';
-import { NgIf } from '@angular/common';
 
 @Component({
   selector: 'app-page-header',
   standalone: true,
-  imports: [IonIcon, NgIf],
+  imports: [],
   template: `
     <div class="agb-page-header">
       <div class="title-row">

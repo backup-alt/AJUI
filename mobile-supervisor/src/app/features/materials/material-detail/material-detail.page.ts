@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-  IonBadge, IonItem, IonInput, IonButton, IonSpinner, IonIcon,
+  IonInput, IonButton, IonSpinner, IonIcon,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline } from 'ionicons/icons';
@@ -19,7 +19,7 @@ import { StatusPillComponent } from '../../../shared/components';
   imports: [
     FormsModule, DatePipe,
     IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-    IonBadge, IonItem, IonInput, IonButton, IonSpinner, IonIcon,
+    IonInput, IonButton, IonSpinner, IonIcon,
     StatusPillComponent,
   ],
   template: `
