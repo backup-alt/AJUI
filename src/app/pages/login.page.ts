@@ -329,24 +329,22 @@ export class LoginPage {
   // Reset token from URL query param
   private resetToken: string | null = null;
 
-  ngOnInit() {
-    // Force light mode for password reset flows
-    this.forceLightMode();
+  private readonly REMEMBER_ME_KEY = "ajui_remember_me";
 
-    // Check for ?token=... query param (password reset link)
-    this.route.queryParams.subscribe((params) => {
-      if (params['token']) {
-        this.resetToken = params['token'];
-        this.switchMode('reset');
-      } else if (params['mode'] === 'forgot') {
-        this.switchMode('forgot');
-      }
-    });
+  ngOnInit() {
+    this.loadRememberedCredentials();
   }
 
-  private forceLightMode() {
+  private loadRememberedCredentials() {
     try {
-      document.documentElement.classList.remove("dark-mode");
+      const saved = localStorage.getItem(this.REMEMBER_ME_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data && data.email) {
+          this.loginEmail = data.email;
+          this.rememberMe = true;
+        }
+      }
     } catch {}
   }
 
@@ -354,9 +352,6 @@ export class LoginPage {
     this.errorMessage.set(null);
     this.successMessage.set(null);
     this.mode.set(m);
-    if (m === 'reset' || m === 'forgot') {
-      this.forceLightMode();
-    }
   }
 
   onLogin() {
@@ -372,6 +367,11 @@ export class LoginPage {
           Object.keys(localStorage).forEach((k) => {
             if (k.startsWith("agb-erp:")) localStorage.removeItem(k);
           });
+          if (this.rememberMe) {
+            localStorage.setItem(this.REMEMBER_ME_KEY, JSON.stringify({ email: this.loginEmail }));
+          } else {
+            localStorage.removeItem(this.REMEMBER_ME_KEY);
+          }
           localStorage.setItem("agb-erp:session", "active");
           const role = (res?.user as any)?.role || 'admin';
           this.sessionRole.set(this.formatRole(role));

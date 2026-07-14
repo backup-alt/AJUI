@@ -4664,7 +4664,7 @@ ion-progress-bar,
 
 .project-compact-strip {
   display: grid;
-  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.45fr);
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 12px;
   padding: 14px 16px;
@@ -4672,6 +4672,7 @@ ion-progress-bar,
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  overflow: hidden;
 }
 
 .project-compact-strip span {
@@ -4920,6 +4921,7 @@ ion-progress-bar,
 @media (max-width: 1180px) {
   .project-compact-strip {
     grid-template-columns: 1fr;
+    overflow: hidden;
   }
 
   .project-compact-strip dl {
@@ -4934,7 +4936,21 @@ ion-progress-bar,
 @media (max-width: 760px) {
   .project-compact-strip dl,
   .table-actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-compact-strip dl > div:last-child,
+  .project-compact-strip dl > div:nth-last-child(2):nth-child(odd) {
+    grid-column: span 1;
+  }
+
+  .status-edit-shell {
+    width: 100%;
+  }
+
+  .status-edit-shell select {
+    width: 100%;
+    max-width: 100%;
   }
 
   .table-first-toolbar {
@@ -6704,8 +6720,10 @@ body {
 }
 
 .status-edit-shell {
-  display: inline-grid;
+  display: inline-flex;
   min-width: 102px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .status-edit-shell select {
@@ -9942,23 +9960,26 @@ body {
   border-radius: 8px;
   background: #f8fbff;
   color: #172033;
-  padding: 0 29px 0 10px;
+  padding: 0 30px 0 10px;
   font-size: 12px;
   font-weight: 850;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .labour-type-chip strong {
-  display: inline-grid;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  min-width: 22px;
+  justify-content: center;
+  width: 22px;
   height: 20px;
   border-radius: 999px;
   background: #e9f0fb;
   color: #002263;
   font-size: 11px;
   font-weight: 900;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .labour-type-chip button {

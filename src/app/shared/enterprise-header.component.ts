@@ -21,29 +21,6 @@ import { ApiService } from "../core/api.service";
           </div>
 
           <div class="toolbar-right">
-            <button
-              type="button"
-              class="dark-mode-toggle"
-              [class.active]="darkMode()"
-              [attr.aria-label]="darkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
-              (click)="toggleDarkMode()"
-            >
-              <svg *ngIf="!darkMode()" viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                <path d="M20.5 14.2A7.4 7.4 0 0 1 9.8 3.5 8.3 8.3 0 1 0 20.5 14.2Z" />
-              </svg>
-              <svg *ngIf="darkMode()" viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2" />
-                <path d="M12 20v2" />
-                <path d="m4.93 4.93 1.41 1.41" />
-                <path d="m17.66 17.66 1.41 1.41" />
-                <path d="M2 12h2" />
-                <path d="M20 12h2" />
-                <path d="m6.34 17.66-1.41 1.41" />
-                <path d="m19.07 4.93-1.41 1.41" />
-              </svg>
-            </button>
-
             <div class="header-profile-wrapper">
               <button
                 type="button"
@@ -121,7 +98,6 @@ export class EnterpriseHeaderComponent {
   @Input() showMenu = false;
   @Input() searchPlaceholder = "Search";
 
-  readonly darkMode = signal(false);
   readonly profileMenuOpen = signal(false);
   readonly logoPath = "assets/logo.png";
 
@@ -160,15 +136,6 @@ export class EnterpriseHeaderComponent {
     return colors[index];
   }
 
-  constructor() {
-    const enabled = this.readDarkModePreference();
-    this.setDarkMode(enabled);
-  }
-
-  toggleDarkMode() {
-    this.setDarkMode(!this.darkMode());
-  }
-
   toggleProfileMenu() {
     this.profileMenuOpen.update((v) => !v);
   }
@@ -183,25 +150,5 @@ export class EnterpriseHeaderComponent {
       next: () => void this.router.navigate(["/login"]),
       error: () => void this.router.navigate(["/login"]),
     });
-  }
-
-  private setDarkMode(enabled: boolean) {
-    this.darkMode.set(enabled);
-    if (typeof document !== "undefined") {
-      document.documentElement.classList.toggle("dark-mode", enabled);
-    }
-    try {
-      localStorage.setItem("agb-erp:darkMode", String(enabled));
-    } catch {
-      // Dark mode is a UI preference only.
-    }
-  }
-
-  private readDarkModePreference(): boolean {
-    try {
-      return localStorage.getItem("agb-erp:darkMode") === "true";
-    } catch {
-      return false;
-    }
   }
 }

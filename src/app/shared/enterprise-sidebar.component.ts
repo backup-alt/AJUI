@@ -110,6 +110,10 @@ export class EnterpriseSidebarComponent {
   }
 
   get sidebarProjects(): Project[] {
+    if (!this.api.isAuthenticated()) {
+      return [];
+    }
+
     if (this.clientId) return this.clientProjects;
 
     const user = this.api.user();
