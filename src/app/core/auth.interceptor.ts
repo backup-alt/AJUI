@@ -4,6 +4,7 @@ import { Router } from "@angular/router";
 import { catchError, throwError } from "rxjs";
 import { HttpErrorResponse, HttpRequest, HttpHandlerFn, HttpEvent } from "@angular/common/http";
 import { Observable } from "rxjs";
+import { ApiService } from "./api.service";
 
 /**
  * Adds the Bearer token to outgoing requests and handles 401 responses.
@@ -20,6 +21,7 @@ export const authInterceptor: HttpInterceptorFn = (
 ): Observable<HttpEvent<unknown>> => {
   // Interceptors run inside an injection context, so inject() is safe here.
   const router = inject(Router);
+  const api = inject(ApiService);
 
   let token: string | null = null;
   try {
@@ -42,18 +44,20 @@ export const authInterceptor: HttpInterceptorFn = (
         req.url.includes("/auth/reset-password") ||
         req.url.includes("/auth/supervisor/verify");
 
-      if (err.status === 401 && !isAuthCall) {
+      const clearAuthState = () => {
+        api.clearSession();
         try {
-          localStorage.removeItem("ajui_access_token");
-          localStorage.removeItem("ajui_refresh_token");
-          localStorage.removeItem("ajui_user");
-          localStorage.removeItem("ajui_expires_at");
           localStorage.removeItem("agb-erp:session");
         } catch {}
+      };
+
+      if (err.status === 401 && !isAuthCall) {
+        const returnUrl = router.url && router.url !== "/login" ? router.url : undefined;
+        clearAuthState();
 
         queueMicrotask(() => {
           try {
-            router.navigate(["/login"]);
+            router.navigate(["/login"], { queryParams: returnUrl ? { returnUrl } : undefined });
           } catch {}
         });
       }
@@ -63,13 +67,7 @@ export const authInterceptor: HttpInterceptorFn = (
         const errorMessage = err.error?.error || err.error?.message || "";
 
         if (errorCode === "ACCESS_SCHEDULE_RESTRICTED" || errorMessage.includes("Access timing is over")) {
-          try {
-            localStorage.removeItem("ajui_access_token");
-            localStorage.removeItem("ajui_refresh_token");
-            localStorage.removeItem("ajui_user");
-            localStorage.removeItem("ajui_expires_at");
-            localStorage.removeItem("agb-erp:session");
-          } catch {}
+          clearAuthState();
 
           queueMicrotask(() => {
             try {

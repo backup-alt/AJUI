@@ -378,7 +378,7 @@ export class LoginPage {
         } catch {}
 
         this.hydration.hydrateFromBackend();
-        void this.router.navigate(["/dashboard"]);
+        void this.router.navigateByUrl(this.safeReturnUrl());
       },
       error: (err) => {
         this.loading.set(false);
@@ -456,6 +456,14 @@ export class LoginPage {
       supervisor: 'Supervisor',
     };
     return map[role] || role;
+  }
+
+  private safeReturnUrl(): string {
+    const returnUrl = this.route.snapshot.queryParamMap.get("returnUrl");
+    if (returnUrl && returnUrl.startsWith("/") && !returnUrl.startsWith("//") && !returnUrl.startsWith("/login")) {
+      return returnUrl;
+    }
+    return "/dashboard";
   }
 
 }
