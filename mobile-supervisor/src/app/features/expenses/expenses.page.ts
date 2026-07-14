@@ -36,10 +36,10 @@ import {
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      <agb-page-header
+      <app-page-header
         title="Site expenses"
         [subtitle]="selectedSiteName() ? 'For ' + selectedSiteName() : 'Track every rupee across sites'"
-      ></agb-page-header>
+      ></app-page-header>
 
       <div class="filter-stack">
         <ion-searchbar
@@ -91,11 +91,11 @@ import {
             </div>
           }
         } @else if (filteredExpenses().length === 0) {
-          <agb-empty-state
+          <app-empty-state
             icon="wallet-outline"
             title="No expenses yet"
             message="Log a site expense or cash top-up to get started."
-          ></agb-empty-state>
+          ></app-empty-state>
         } @else {
           @for (expense of filteredExpenses(); track expense._id) {
             <button
@@ -105,19 +105,19 @@ import {
             >
               <header class="expense-head">
                 <div class="expense-info">
-                  <agb-status-pill
+                  <app-status-pill
                     [tone]="expense.transactionType === 'Cash Added' ? 'warning' : 'info'"
                     [icon]="expense.transactionType === 'Cash Added' ? 'cash-outline' : 'card-outline'"
                   >
                     {{ expense.transactionType || 'Purchase' }}
-                  </agb-status-pill>
+                  </app-status-pill>
                   <h3 class="expense-desc">{{ expense.description }}</h3>
                   <p class="expense-meta">
                     <ion-icon name="location-outline"></ion-icon>
                     {{ expense.site || 'General' }} - {{ expense.projectName || 'N/A' }}
                   </p>
                 </div>
-                <agb-status-pill [tone]="getStatusTone(expense.status)">{{ expense.status }}</agb-status-pill>
+                <app-status-pill [tone]="getStatusTone(expense.status)">{{ expense.status }}</app-status-pill>
               </header>
 
               <div class="expense-amount-row">

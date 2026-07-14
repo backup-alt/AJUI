@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -112,11 +112,11 @@ import { OtpInputComponent } from '../../../shared/components';
           </p>
 
           <div class="otp-wrap">
-            <agb-otp-input
+            <app-otp-input
               [length]="6"
               [(digits)]="otpDigits"
               (digitsChange)="onOtpChange($event)"
-            ></agb-otp-input>
+            ></app-otp-input>
           </div>
 
           @if (errorMessage()) {
@@ -229,7 +229,7 @@ import { OtpInputComponent } from '../../../shared/components';
     .resend-btn:disabled { color: #94a3b8; cursor: not-allowed; }
   `],
 })
-export class LoginWithOtpPage implements OnInit {
+export class LoginWithOtpPage implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);

@@ -5,7 +5,7 @@ import { NgIf, NgSwitch, NgSwitchCase } from '@angular/common';
 export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
 @Component({
-  selector: 'agb-status-pill',
+  selector: 'app-status-pill',
   standalone: true,
   imports: [IonIcon, NgIf, NgSwitch, NgSwitchCase],
   template: `

@@ -47,7 +47,7 @@ import { StatusPillComponent } from '../../../shared/components';
                 {{ material()!.site }} - {{ material()!.projectName }}
               </p>
             </div>
-            <agb-status-pill [tone]="getStatusTone(material()!.status)">{{ material()!.status }}</agb-status-pill>
+            <app-status-pill [tone]="getStatusTone(material()!.status)">{{ material()!.status }}</app-status-pill>
           </div>
 
           <div class="card">

@@ -62,10 +62,10 @@ import {
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      <agb-page-header
+      <app-page-header
         title="Your sites"
         subtitle="Tap a site to view its full material inventory or switch to it."
-      ></agb-page-header>
+      ></app-page-header>
 
       @if (isLoading() && sites().length === 0) {
         @for (i of [1, 2]; track i) {
@@ -76,13 +76,13 @@ import {
           </div>
         }
       } @else if (sites().length === 0) {
-        <agb-empty-state
+        <app-empty-state
           icon="alert-circle-outline"
           iconBg="rgba(245, 158, 11, 0.14)"
           iconColor="#b45309"
           title="No sites assigned"
           message="You haven't been assigned to a site yet. Please contact your admin."
-        ></agb-empty-state>
+        ></app-empty-state>
       } @else {
         <div class="cards">
           @for (site of sites(); track site.id) {
@@ -132,9 +132,9 @@ import {
                     <ion-icon name="layers-outline"></ion-icon>
                   </span>
                   <div>
-                    <agb-status-pill [tone]="getStatusTone(site.status)">
+                    <app-status-pill [tone]="getStatusTone(site.status)">
                       {{ site.status || 'Active' }}
-                    </agb-status-pill>
+                    </app-status-pill>
                   </div>
                 </div>
               </div>
@@ -185,17 +185,17 @@ import {
                 </div>
               }
             } @else if (drawerMaterials().length === 0) {
-              <agb-empty-state
+              <app-empty-state
                 icon="cube-outline"
                 title="No materials yet"
                 message="This site has no materials recorded."
-              ></agb-empty-state>
+              ></app-empty-state>
             } @else {
               @for (m of drawerMaterials(); track m._id) {
                 <article class="material-card">
                   <header class="m-head">
                     <h3 class="m-name">{{ m.name }}</h3>
-                    <agb-status-pill [tone]="getMaterialTone(m.status)">{{ m.status }}</agb-status-pill>
+                    <app-status-pill [tone]="getMaterialTone(m.status)">{{ m.status }}</app-status-pill>
                   </header>
                   <div class="m-stats">
                     <div class="m-stat">

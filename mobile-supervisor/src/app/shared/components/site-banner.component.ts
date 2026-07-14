@@ -3,7 +3,7 @@ import { IonIcon } from '@ionic/angular/standalone';
 import { NgIf } from '@angular/common';
 
 @Component({
-  selector: 'agb-site-banner',
+  selector: 'app-site-banner',
   standalone: true,
   imports: [IonIcon, NgIf],
   template: `

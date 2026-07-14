@@ -58,7 +58,7 @@ import { OtpInputComponent } from '../../../shared/components';
           We sent a one-time code to your email to verify this invite.
         </p>
 
-        <agb-otp-input [(digits)]="otpDigits" [length]="6"></agb-otp-input>
+        <app-otp-input [(digits)]="otpDigits" [length]="6"></app-otp-input>
 
         <ion-button
           expand="block"

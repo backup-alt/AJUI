@@ -3,7 +3,7 @@ import { IonIcon } from '@ionic/angular/standalone';
 import { NgIf } from '@angular/common';
 
 @Component({
-  selector: 'agb-empty-state',
+  selector: 'app-empty-state',
   standalone: true,
   imports: [IonIcon, NgIf],
   template: `

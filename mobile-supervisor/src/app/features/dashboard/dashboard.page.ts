@@ -97,38 +97,38 @@ import {
         <div class="content-stack">
           <!-- Stats grid -->
           <div class="stats-grid">
-            <agb-stat-card
+            <app-stat-card
               icon="location-outline"
               iconBg="rgba(0, 34, 99, 0.10)"
               iconColor="#002263"
               [value]="dashboard()?.counts?.sites || 0"
               label="Active sites"
               (click)="navigateTo('/tabs/sites')"
-            ></agb-stat-card>
-            <agb-stat-card
+            ></app-stat-card>
+            <app-stat-card
               icon="checkmark-done-circle-outline"
               iconBg="rgba(245, 158, 11, 0.14)"
               iconColor="#b45309"
               [value]="dashboard()?.counts?.pendingApprovals || 0"
               label="Pending approvals"
               (click)="navigateTo('/tabs/approvals')"
-            ></agb-stat-card>
-            <agb-stat-card
+            ></app-stat-card>
+            <app-stat-card
               icon="cube-outline"
               iconBg="rgba(220, 38, 38, 0.10)"
               iconColor="#b91c1c"
               [value]="dashboard()?.counts?.pendingMaterials || 0"
               label="Material requests"
               (click)="navigateTo('/tabs/materials')"
-            ></agb-stat-card>
-            <agb-stat-card
+            ></app-stat-card>
+            <app-stat-card
               icon="people-outline"
               iconBg="rgba(14, 165, 233, 0.12)"
               iconColor="#0369a1"
               [value]="dashboard()?.counts?.pendingLabour || 0"
               label="Labour entries"
               (click)="navigateTo('/tabs/labour')"
-            ></agb-stat-card>
+            ></app-stat-card>
           </div>
 
           <!-- Today's expense -->
@@ -168,21 +168,21 @@ import {
                 </div>
               }
             } @else if (pendingApprovals().length === 0) {
-              <agb-empty-state
+              <app-empty-state
                 icon="checkmark-done-circle-outline"
                 iconBg="rgba(22, 163, 74, 0.14)"
                 iconColor="#15803d"
                 title="All caught up"
                 message="No pending approvals. Your work is in great shape."
-              ></agb-empty-state>
+              ></app-empty-state>
             } @else {
               @for (approval of pendingApprovals().slice(0, 4); track approval.approvalId) {
                 <button class="approval-card" (click)="navigateToApproval(approval)">
                   <div class="approval-top">
-                    <agb-status-pill [tone]="getTone(approval.type)" [icon]="getTypeIcon(approval.type)">
+                    <app-status-pill [tone]="getTone(approval.type)" [icon]="getTypeIcon(approval.type)">
                       {{ approval.type | titlecase }}
-                    </agb-status-pill>
-                    <agb-status-pill tone="warning">Pending</agb-status-pill>
+                    </app-status-pill>
+                    <app-status-pill tone="warning">Pending</app-status-pill>
                   </div>
                   <h3 class="approval-title">{{ approval.title }}</h3>
                   <div class="approval-meta">
@@ -214,11 +214,11 @@ import {
             </div>
 
             @if (sites().length === 0) {
-              <agb-empty-state
+              <app-empty-state
                 icon="location-outline"
                 title="No active sites"
                 message="You have not been assigned to any site yet. Please contact your admin."
-              ></agb-empty-state>
+              ></app-empty-state>
             } @else {
               @for (site of sites().slice(0, 3); track site.id) {
                 <button class="site-card" (click)="navigateTo('/tabs/sites')">
@@ -239,7 +239,7 @@ import {
                       }
                     </p>
                   </div>
-                  <agb-status-pill [tone]="getSiteTone(site.status)">{{ site.status || 'Active' }}</agb-status-pill>
+                  <app-status-pill [tone]="getSiteTone(site.status)">{{ site.status || 'Active' }}</app-status-pill>
                 </button>
               }
             }

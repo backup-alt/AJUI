@@ -65,12 +65,12 @@ IonRefresher,
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      <agb-page-header
+      <app-page-header
         title="Materials"
         subtitle="Live inventory across your assigned sites."
       >
         <span actions class="count-chip">{{ filteredMaterials().length }} item{{ filteredMaterials().length === 1 ? '' : 's' }}</span>
-      </agb-page-header>
+      </app-page-header>
 
       <div class="filter-stack">
         <ion-searchbar
@@ -104,13 +104,13 @@ IonRefresher,
             </div>
           }
         } @else if (filteredMaterials().length === 0) {
-          <agb-empty-state
+          <app-empty-state
             icon="cube-outline"
             [title]="searchQuery || statusFilter ? 'No matches' : 'No materials yet'"
             [message]="searchQuery || statusFilter
               ? 'No materials match your filters. Try clearing them.'
               : 'Create a material request to get started.'"
-          ></agb-empty-state>
+          ></app-empty-state>
         } @else {
           @for (material of filteredMaterials(); track material.materialId) {
             <button class="material-card" (click)="viewMaterial(material)">
@@ -125,7 +125,7 @@ IonRefresher,
                     {{ material.site }} - {{ material.projectName }}
                   </p>
                 </div>
-                <agb-status-pill [tone]="getStatusTone(material.status)">{{ material.status }}</agb-status-pill>
+                <app-status-pill [tone]="getStatusTone(material.status)">{{ material.status }}</app-status-pill>
               </header>
 
               <div class="material-stats">

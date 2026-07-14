@@ -3,7 +3,7 @@ import { IonIcon } from '@ionic/angular/standalone';
 import { NgIf } from '@angular/common';
 
 @Component({
-  selector: 'agb-page-header',
+  selector: 'app-page-header',
   standalone: true,
   imports: [IonIcon, NgIf],
   template: `

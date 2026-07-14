@@ -4,7 +4,7 @@ import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'agb-otp-input',
+  selector: 'app-otp-input',
   standalone: true,
   imports: [IonIcon, IonInput, NgIf, NgFor, FormsModule],
   template: `

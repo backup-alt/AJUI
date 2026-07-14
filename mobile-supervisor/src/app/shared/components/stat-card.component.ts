@@ -3,7 +3,7 @@ import { IonIcon } from '@ionic/angular/standalone';
 import { NgIf } from '@angular/common';
 
 @Component({
-  selector: 'agb-stat-card',
+  selector: 'app-stat-card',
   standalone: true,
   imports: [IonIcon, NgIf],
   template: `

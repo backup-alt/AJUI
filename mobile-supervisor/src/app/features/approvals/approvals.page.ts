@@ -68,23 +68,23 @@ import {
             </div>
           }
         } @else if (filteredApprovals().length === 0) {
-          <agb-empty-state
+          <app-empty-state
             [icon]="statusFilter === 'pending' ? 'checkmark-done-circle-outline' : 'document-text-outline'"
             [iconBg]="statusFilter === 'pending' ? 'rgba(22, 163, 74, 0.14)' : 'rgba(14, 165, 233, 0.12)'"
             [iconColor]="statusFilter === 'pending' ? '#15803d' : '#0369a1'"
             [title]="emptyTitle()"
             [message]="emptyMessage()"
-          ></agb-empty-state>
+          ></app-empty-state>
         } @else {
           @for (approval of filteredApprovals(); track approval._id || approval.approvalId) {
             <button class="approval-card" (click)="viewApproval(approval)">
               <header class="approval-head">
-                <agb-status-pill [tone]="getTypeTone(approval.type)" [icon]="getTypeIcon(approval.type)">
+                <app-status-pill [tone]="getTypeTone(approval.type)" [icon]="getTypeIcon(approval.type)">
                   {{ approval.type | titlecase }}
-                </agb-status-pill>
-                <agb-status-pill [tone]="getStatusTone(approval.status || 'Pending')">
+                </app-status-pill>
+                <app-status-pill [tone]="getStatusTone(approval.status || 'Pending')">
                   {{ approval.status || 'Pending' }}
-                </agb-status-pill>
+                </app-status-pill>
               </header>
 
               <h3 class="approval-title">{{ approval.title }}</h3>

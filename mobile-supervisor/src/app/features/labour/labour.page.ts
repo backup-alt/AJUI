@@ -77,11 +77,11 @@ interface Employee {
               </div>
             }
           } @else if (filteredEmployees().length === 0) {
-            <agb-empty-state
+            <app-empty-state
               icon="people-outline"
               title="No employees yet"
               message="Log a worker's first attendance to start tracking them."
-            ></agb-empty-state>
+            ></app-empty-state>
           } @else {
             @for (emp of filteredEmployees(); track emp.name) {
               <article class="emp-card">
@@ -157,11 +157,11 @@ interface Employee {
               </div>
             }
           } @else if (filteredLabour().length === 0) {
-            <agb-empty-state
+            <app-empty-state
               icon="time-outline"
               title="No attendance records"
               message="Log today's attendance to get started."
-            ></agb-empty-state>
+            ></app-empty-state>
           } @else {
             @for (entry of filteredLabour(); track entry.labourId) {
               <button class="labour-card" (click)="viewLabour(entry)">
@@ -173,7 +173,7 @@ interface Employee {
                       {{ entry.site }} - {{ entry.projectName }}
                     </p>
                   </div>
-                  <agb-status-pill [tone]="getStatusTone(entry.status)">{{ entry.status }}</agb-status-pill>
+                  <app-status-pill [tone]="getStatusTone(entry.status)">{{ entry.status }}</app-status-pill>
                 </header>
 
                 <div class="labour-stats">
