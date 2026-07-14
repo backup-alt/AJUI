@@ -28,7 +28,10 @@ jobs:
       - name: Backend tests
         run: cd backend && npm test
         env:
+          NODE_ENV: test
           MONGODB_TEST_URI: mongodb://localhost:27017/ajui_test
+          JWT_ACCESS_SECRET: test_access_secret_minimum_16_chars_long
+          JWT_REFRESH_SECRET: test_refresh_secret_minimum_16_chars_long
 
   mobile:
     runs-on: ubuntu-latest
