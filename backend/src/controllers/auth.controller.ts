@@ -109,6 +109,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     res.json({
       user: result.user,
       accessToken: result.tokens.accessToken,
+      refreshToken: result.tokens.refreshToken,
       expiresAt: result.tokens.expiresAt,
     });
   } catch (err) {
@@ -131,7 +132,11 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     });
 
     res.cookie(cookieName, tokens.refreshToken, refreshCookie);
-    res.json({ accessToken: tokens.accessToken, expiresAt: tokens.expiresAt });
+    res.json({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt,
+    });
   } catch (err) {
     next(err);
   }
@@ -540,6 +545,7 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
         projectIds: managedProjectIds.map((id) => id.toString()),
       },
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       expiresAt: tokens.expiresAt,
     });
   } catch (err) {
@@ -1103,6 +1109,7 @@ export async function employeeSignup(
         managedProjectIds: (user.managedProjectIds || []).map((id) => id.toString()),
       },
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       expiresAt: tokens.expiresAt,
     });
   } catch (err) {
@@ -1217,6 +1224,7 @@ export async function verifySupervisorLoginOtp(
         supervisorProfileId: user.supervisorProfileId?.toString(),
       },
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       expiresAt: tokens.expiresAt,
     });
   } catch (err) {

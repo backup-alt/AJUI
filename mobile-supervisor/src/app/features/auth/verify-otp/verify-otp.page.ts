@@ -6,24 +6,22 @@ import {
   IonTitle,
   IonButton,
   IonIcon,
-  IonInput,
-  IonItem,
   IonSpinner,
   IonBackButton,
   IonButtons,
   ToastController,
 } from '@ionic/angular/standalone';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
   mailOutline,
   arrowForwardOutline,
   checkmarkCircleOutline,
-  timeOutline,
   chevronBackOutline,
+  shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../../core/services/auth.service';
+import { OtpInputComponent } from '../../../shared/components';
 
 @Component({
   selector: 'app-verify-otp',
@@ -35,12 +33,10 @@ import { AuthService } from '../../../core/services/auth.service';
     IonTitle,
     IonButton,
     IonIcon,
-    IonInput,
-    IonItem,
     IonSpinner,
     IonBackButton,
     IonButtons,
-    FormsModule,
+    OtpInputComponent,
   ],
   template: `
     <ion-header class="agb-header">
@@ -55,26 +51,14 @@ import { AuthService } from '../../../core/services/auth.service';
     <ion-content class="content">
       <div class="container">
         <div class="icon-circle">
-          <ion-icon name="mail-outline"></ion-icon>
+          <ion-icon name="shield-checkmark-outline"></ion-icon>
         </div>
         <h1 class="title">Enter the 6-digit code</h1>
         <p class="subtitle">
-          We sent a code to your registered email to verify this invite.
+          We sent a one-time code to your email to verify this invite.
         </p>
 
-        <div class="otp-inputs">
-          @for (i of [0,1,2,3,4,5]; track i) {
-            <ion-input
-              type="text"
-              inputmode="numeric"
-              maxlength="1"
-              class="otp-digit"
-              [(ngModel)]="otpDigits[i]"
-              (input)="onOtpInput($event, i)"
-              (keydown)="onOtpKeyDown($event, i)"
-            ></ion-input>
-          }
-        </div>
+        <agb-otp-input [(digits)]="otpDigits" [length]="6"></agb-otp-input>
 
         <ion-button
           expand="block"
@@ -86,7 +70,7 @@ import { AuthService } from '../../../core/services/auth.service';
             <ion-spinner name="crescent"></ion-spinner>
           } @else {
             <ion-icon name="checkmark-circle-outline" slot="end"></ion-icon>
-            <span>Verify & Continue</span>
+            <span>Verify &amp; continue</span>
           }
         </ion-button>
 
@@ -100,7 +84,7 @@ import { AuthService } from '../../../core/services/auth.service';
             @if (resendCooldown() > 0) {
               Resend in {{ resendCooldown() }}s
             } @else {
-              Resend
+              Resend code
             }
           </button>
         </div>
@@ -108,85 +92,33 @@ import { AuthService } from '../../../core/services/auth.service';
     </ion-content>
   `,
   styles: [`
-    .agb-header {
-      --background: var(--agb-white);
-      --border-color: var(--agb-light-gray);
-    }
-    .content { --background: #f8f9fa; }
-    .container {
-      max-width: 420px;
-      margin: 0 auto;
-      padding: 32px 24px;
-      text-align: center;
-    }
+    .agb-header { --background: var(--agb-white); --border-color: var(--agb-light-gray); }
+    .content { --background: #f8f9fb; }
+    .container { max-width: 440px; margin: 0 auto; padding: 32px 20px; text-align: center; }
     .icon-circle {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 20px;
-      border-radius: 8px;
-      background: rgba(0, 34, 99, 0.08);
-      color: #002263;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: 72px; height: 72px; margin: 0 auto 18px; border-radius: 22px;
+      background: linear-gradient(135deg, rgba(0, 34, 99, 0.10), rgba(0, 34, 99, 0.04));
+      color: #002263; display: flex; align-items: center; justify-content: center;
     }
-    .icon-circle ion-icon { font-size: 40px; }
-    .title {
-      font-size: 22px;
-      font-weight: 700;
-      color: #002263;
-      margin: 0 0 8px;
-    }
-    .subtitle {
-      font-size: 14px;
-      color: #6c757d;
-      margin: 0 0 24px;
-    }
-    .otp-inputs {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      margin: 8px 0 24px;
-    }
-    .otp-digit {
-      width: 48px;
-      height: 56px;
-      text-align: center;
-      font-size: 24px;
-      font-weight: 700;
-      background: #ffffff;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      --padding-start: 0;
-      --padding-end: 0;
-    }
-    .otp-digit:focus-within { border-color: #002263; }
+    .icon-circle ion-icon { font-size: 32px; }
+    .title { font-size: 24px; font-weight: 700; color: #0f172a; margin: 0 0 6px; letter-spacing: -0.3px; }
+    .subtitle { font-size: 14px; color: #64748b; margin: 0 0 24px; line-height: 1.5; }
+    agb-otp-input { display: block; margin: 0 0 24px; }
     .primary-btn {
-      --background: #002263;
-      --color: #ffffff;
-      --border-radius: 8px;
-      font-weight: 600;
-      height: 48px;
+      --background: #002263; --color: #ffffff; --border-radius: 14px;
+      font-weight: 700; height: 52px;
     }
     .primary-btn:hover { --background: #001a4d; }
     .resend-row {
-      margin-top: 16px;
-      font-size: 13px;
-      color: #6c757d;
-      display: flex;
-      gap: 6px;
-      justify-content: center;
+      margin-top: 20px; font-size: 13px; color: #64748b;
+      display: flex; gap: 6px; justify-content: center; align-items: center;
     }
     .link-btn {
-      background: transparent;
-      border: 0;
-      padding: 0;
-      color: #002263;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: underline;
+      background: transparent; border: 0; padding: 0;
+      color: #002263; font-weight: 700; cursor: pointer; font-family: inherit;
     }
-    .link-btn:disabled { color: #9ca3af; text-decoration: none; cursor: default; }
+    .link-btn:disabled { color: #94a3b8; cursor: default; }
+    .link-btn:not(:disabled):hover { text-decoration: underline; }
   `],
 })
 export class VerifyOtpPage implements OnInit {
@@ -206,31 +138,14 @@ export class VerifyOtpPage implements OnInit {
       mailOutline,
       arrowForwardOutline,
       checkmarkCircleOutline,
-      timeOutline,
       chevronBackOutline,
+      shieldCheckmarkOutline,
     });
     this.token = this.route.snapshot.queryParamMap.get('token') || '';
   }
 
   isComplete(): boolean {
     return this.otpDigits.every((d) => d && d.length === 1);
-  }
-
-  onOtpInput(event: Event, index: number): void {
-    const input = event.target as HTMLInputElement;
-    const value = input.value.replace(/\D/g, '').slice(0, 1);
-    this.otpDigits[index] = value;
-    if (value && index < 5) {
-      const next = input.nextElementSibling as HTMLInputElement | null;
-      next?.focus();
-    }
-  }
-
-  onOtpKeyDown(event: KeyboardEvent, index: number): void {
-    if (event.key === 'Backspace' && !this.otpDigits[index] && index > 0) {
-      const prev = (event.target as HTMLInputElement).previousElementSibling as HTMLInputElement | null;
-      prev?.focus();
-    }
   }
 
   async verify(): Promise<void> {
@@ -263,7 +178,7 @@ export class VerifyOtpPage implements OnInit {
       next: async () => {
         this.startCooldown(30);
         const toast = await this.toastCtrl.create({
-          message: 'Code resent',
+          message: 'Code resent to your email',
           duration: 2000,
           position: 'top',
           color: 'success',

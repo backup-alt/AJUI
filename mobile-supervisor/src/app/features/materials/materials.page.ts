@@ -1,21 +1,14 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import {
   IonContent,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonSearchbar,
   IonSegment,
   IonSegmentButton,
-  IonList,
-  IonItem,
   IonLabel,
   IonBadge,
   IonFab,
   IonFabButton,
   IonIcon,
-  IonCard,
-  IonCardContent,
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
@@ -32,10 +25,17 @@ import {
   timeOutline,
   checkmarkCircleOutline,
   closeCircleOutline,
+  chevronForwardOutline,
+  businessOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
 import { DatePipe } from '@angular/common';
+import {
+  PageHeaderComponent,
+  EmptyStateComponent,
+  StatusPillComponent,
+} from '../../shared/components';
 
 @Component({
   selector: 'app-materials',
@@ -43,9 +43,6 @@ import { DatePipe } from '@angular/common';
   imports: [
     FormsModule,
     IonContent,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
     IonSearchbar,
     IonSegment,
     IonSegmentButton,
@@ -54,119 +51,116 @@ import { DatePipe } from '@angular/common';
     IonFab,
     IonFabButton,
     IonIcon,
-    IonCard,
-    IonCardContent,
     IonSkeletonText,
-    IonRefresher,
-    IonRefresherContent,
-    IonButtons,
-    IonButton,
-    DatePipe,
+IonRefresher,
+  IonRefresherContent,
+  DatePipe,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    StatusPillComponent,
   ],
   template: `
-    <ion-header class="agb-header">
-      <ion-toolbar>
-        <ion-title>Materials</ion-title>
-        <ion-buttons slot="end">
-          <ion-button>
-            <ion-icon name="filter-outline"></ion-icon>
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-      <ion-toolbar>
-        <ion-searchbar placeholder="Search materials..." [(ngModel)]="searchQuery" (ionInput)="filterMaterials()"></ion-searchbar>
-      </ion-toolbar>
-      <ion-toolbar>
-        <ion-segment [(ngModel)]="statusFilter" (ionChange)="filterMaterials()" [value]="''">
-          <ion-segment-button [value]="''">
-            <ion-label>All</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="Pending">
-            <ion-label>Pending</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="Approved">
-            <ion-label>Approved</ion-label>
-          </ion-segment-button>
-        </ion-segment>
-      </ion-toolbar>
-    </ion-header>
-
     <ion-content class="materials-content">
       <ion-refresher slot="fixed" (ionRefresh)="refreshMaterials($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      @if (isLoading() && materials().length === 0) {
-        @for (i of [1,2,3,4]; track i) {
-          <ion-card class="material-card skeleton">
-            <ion-card-content>
+      <agb-page-header
+        title="Materials"
+        subtitle="Live inventory across your assigned sites."
+      >
+        <span actions class="count-chip">{{ filteredMaterials().length }} item{{ filteredMaterials().length === 1 ? '' : 's' }}</span>
+      </agb-page-header>
+
+      <div class="filter-stack">
+        <ion-searchbar
+          placeholder="Search by material, site, vendor"
+          [(ngModel)]="searchQuery"
+          (ionInput)="filterMaterials()"
+          class="search"
+        ></ion-searchbar>
+        <div class="seg-wrap">
+          <ion-segment [(ngModel)]="statusFilter" (ionChange)="filterMaterials()" [value]="''">
+            <ion-segment-button [value]="''">
+              <ion-label>All</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="Pending">
+              <ion-label>Pending</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="Approved">
+              <ion-label>Approved</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </div>
+      </div>
+
+      <div class="cards">
+        @if (isLoading() && materials().length === 0) {
+          @for (i of [1,2,3]; track i) {
+            <div class="skeleton-card">
               <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
               <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
               <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-            </ion-card-content>
-          </ion-card>
-        }
-      } @else if (filteredMaterials().length === 0) {
-        <div class="empty-state">
-          <ion-icon name="cube-outline"></ion-icon>
-          <h3>No Materials Found</h3>
-          <p>
-            @if (searchQuery || statusFilter) {
-              No materials match your filters
-            } @else {
-              Create a material request to get started
-            }
-          </p>
-        </div>
-      } @else {
-        @for (material of filteredMaterials(); track material.materialId) {
-          <ion-card class="material-card" (click)="viewMaterial(material)">
-            <ion-card-content>
-              <div class="material-header">
+            </div>
+          }
+        } @else if (filteredMaterials().length === 0) {
+          <agb-empty-state
+            icon="cube-outline"
+            [title]="searchQuery || statusFilter ? 'No matches' : 'No materials yet'"
+            [message]="searchQuery || statusFilter
+              ? 'No materials match your filters. Try clearing them.'
+              : 'Create a material request to get started.'"
+          ></agb-empty-state>
+        } @else {
+          @for (material of filteredMaterials(); track material.materialId) {
+            <button class="material-card" (click)="viewMaterial(material)">
+              <header class="material-head">
+                <span class="material-tile">
+                  <ion-icon name="cube-outline"></ion-icon>
+                </span>
                 <div class="material-info">
                   <h3 class="material-name">{{ material.name }}</h3>
-                  <p class="material-site">{{ material.site }} • {{ material.projectName }}</p>
+                  <p class="material-site">
+                    <ion-icon name="business-outline"></ion-icon>
+                    {{ material.site }} - {{ material.projectName }}
+                  </p>
                 </div>
-                <ion-badge [color]="getStatusColor(material.status)">
-                  {{ material.status }}
-                </ion-badge>
-              </div>
+                <agb-status-pill [tone]="getStatusTone(material.status)">{{ material.status }}</agb-status-pill>
+              </header>
 
-              <div class="material-details">
-                <div class="detail-item">
-                  <span class="detail-label">Quantity</span>
-                  <span class="detail-value">{{ material.requestedQuantity }} {{ material.unit }}</span>
+              <div class="material-stats">
+                <div class="stat">
+                  <div class="stat-label">Requested</div>
+                  <div class="stat-value">{{ material.requestedQuantity }} {{ material.unit }}</div>
                 </div>
                 @if (material.approvedQuantity > 0) {
-                  <div class="detail-item">
-                    <span class="detail-label">Approved</span>
-                    <span class="detail-value approved">{{ material.approvedQuantity }} {{ material.unit }}</span>
+                  <div class="stat highlight">
+                    <div class="stat-label">Approved</div>
+                    <div class="stat-value">{{ material.approvedQuantity }} {{ material.unit }}</div>
                   </div>
                 }
-                @if (material.vendor) {
-                  <div class="detail-item full-width">
-                    <span class="detail-label">Vendor</span>
-                    <span class="detail-value">{{ material.vendor }}</span>
+                @if (material.remainingStock !== undefined) {
+                  <div class="stat">
+                    <div class="stat-label">On site</div>
+                    <div class="stat-value">{{ material.remainingStock }} {{ material.unit }}</div>
                   </div>
                 }
               </div>
 
-              <div class="material-footer">
+              <footer class="material-footer">
                 <div class="material-date">
                   <ion-icon name="time-outline"></ion-icon>
                   {{ material.requestDate | date:'MMM d, yyyy' }}
                 </div>
-                @if (material.status === 'Pending') {
-                  <ion-badge class="action-badge" color="warning">
-                    <ion-icon name="time-outline"></ion-icon>
-                    Awaiting Approval
-                  </ion-badge>
-                }
-              </div>
-            </ion-card-content>
-          </ion-card>
+                <span class="view-link">
+                  View
+                  <ion-icon name="chevron-forward-outline"></ion-icon>
+                </span>
+              </footer>
+            </button>
+          }
         }
-      }
+      </div>
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
         <ion-fab-button (click)="createMaterial()">
@@ -176,119 +170,79 @@ import { DatePipe } from '@angular/common';
     </ion-content>
   `,
   styles: [`
-    .agb-header {
-      --background: var(--agb-white);
+    .materials-content { --background: #f5f6f8; }
+    .count-chip {
+      display: inline-flex; align-items: center;
+      background: rgba(0, 34, 99, 0.08);
+      color: #002263;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
     }
-    .materials-content {
-      --background: var(--agb-off-white);
-    }
+    .filter-stack { padding: 0 16px 8px; }
+    .search { --background: #ffffff; padding: 0; }
+    .seg-wrap { padding: 4px 4px 8px; }
+
+    .cards { padding: 8px 16px 96px; }
     .material-card {
-      margin: 12px 16px;
-      transition: all var(--agb-transition-fast);
+      width: 100%;
+      text-align: left;
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 20px;
+      padding: 16px;
+      margin-bottom: 10px;
+      box-shadow: var(--agb-shadow-2xs);
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
     }
-    .material-card:active {
-      transform: scale(0.98);
+    .material-card:active { transform: scale(0.99); }
+    .material-card:hover { box-shadow: var(--agb-shadow-sm); }
+
+    .material-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .material-tile {
+      width: 44px; height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.10), rgba(220, 38, 38, 0.04));
+      color: #b91c1c;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
     }
-    .material-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    .material-name {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--agb-navy);
-      margin: 0 0 4px;
-    }
-    .material-site {
-      font-size: 13px;
-      color: var(--agb-gray);
-      margin: 0;
-    }
-    .material-details {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 12px;
+    .material-tile ion-icon { font-size: 20px; }
+    .material-info { flex: 1; min-width: 0; }
+    .material-name { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
+    .material-site { font-size: 12px; color: #64748b; margin: 0; display: inline-flex; align-items: center; gap: 4px; }
+    .material-site ion-icon { font-size: 12px; }
+
+    .material-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 14px;
       padding: 12px;
-      background: var(--agb-off-white);
-      border-radius: var(--agb-radius-md);
+      margin-bottom: 12px;
     }
-    .detail-item {
-      display: flex;
-      flex-direction: column;
+    .stat { text-align: center; }
+    .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
+    .stat-value { font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+    .stat.highlight .stat-value { color: #16a34a; }
+
+    .material-footer { display: flex; align-items: center; justify-content: space-between; }
+    .material-date { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #64748b; }
+    .material-date ion-icon { font-size: 13px; }
+    .view-link { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: #002263; }
+    .view-link ion-icon { font-size: 14px; }
+
+    .skeleton-card {
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 10px;
     }
-    .detail-item.full-width {
-      grid-column: span 2;
-    }
-    .detail-label {
-      font-size: 11px;
-      color: var(--agb-gray);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 2px;
-    }
-    .detail-value {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--agb-navy);
-    }
-    .detail-value.approved {
-      color: var(--agb-success);
-    }
-    .material-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .material-date {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      color: var(--agb-gray);
-    }
-    .material-date ion-icon {
-      font-size: 14px;
-    }
-    .action-badge {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 11px;
-    }
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 64px 32px;
-      text-align: center;
-    }
-    .empty-state ion-icon {
-      font-size: 64px;
-      color: var(--agb-light-gray);
-      margin-bottom: 16px;
-    }
-    .empty-state h3 {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--agb-navy);
-      margin: 0 0 8px;
-    }
-    .empty-state p {
-      font-size: 14px;
-      color: var(--agb-gray);
-      margin: 0;
-    }
-    .skeleton {
-      margin: 12px 16px;
-    }
-    ion-fab-button {
-      --background: var(--agb-primary);
-      --color: var(--agb-white);
-    }
+    ion-fab-button { --background: #002263; --color: #ffffff; }
   `],
 })
 export class MaterialsPage implements OnInit, OnDestroy {
@@ -302,7 +256,10 @@ export class MaterialsPage implements OnInit, OnDestroy {
   statusFilter: MaterialStatus | '' = '';
 
   async ngOnInit(): Promise<void> {
-    addIcons({ addOutline, cubeOutline, filterOutline, timeOutline, checkmarkCircleOutline, closeCircleOutline });
+    addIcons({
+      addOutline, cubeOutline, filterOutline, timeOutline, checkmarkCircleOutline,
+      closeCircleOutline, chevronForwardOutline, businessOutline,
+    });
     await this.loadMaterials();
 
     if (typeof window !== 'undefined') {
@@ -324,8 +281,13 @@ export class MaterialsPage implements OnInit, OnDestroy {
     this.isLoading.set(true);
     try {
       const projectId = this.supervisor.selectedProjectId();
+      const siteId = this.supervisor.selectedSiteId();
       this.supervisor
-        .getMaterials({ projectId: projectId ?? undefined, limit: 100 })
+        .getMaterials({
+          projectId: projectId ?? undefined,
+          siteId: siteId ?? undefined,
+          limit: 100,
+        })
         .subscribe({
           next: (response) => {
             this.materials.set(response.materials || []);
@@ -352,7 +314,6 @@ export class MaterialsPage implements OnInit, OnDestroy {
 
   filterMaterials(): void {
     let filtered = this.materials();
-
     if (this.searchQuery) {
       const query = this.searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -363,11 +324,9 @@ export class MaterialsPage implements OnInit, OnDestroy {
           m.vendor?.toLowerCase().includes(query)
       );
     }
-
     if (this.statusFilter) {
       filtered = filtered.filter((m) => m.status === this.statusFilter);
     }
-
     this.filteredMaterials.set(filtered);
   }
 
@@ -379,21 +338,12 @@ export class MaterialsPage implements OnInit, OnDestroy {
     this.router.navigate(['/tabs/materials/create']);
   }
 
-  getStatusColor(status: MaterialStatus): string {
+  getStatusTone(status: MaterialStatus): 'success' | 'warning' | 'danger' | 'neutral' {
     switch (status) {
       case 'Pending': return 'warning';
       case 'Approved': return 'success';
       case 'Rejected': return 'danger';
-      default: return 'medium';
+      default: return 'neutral';
     }
   }
-
-  /**
-   * Total material count for the header. Falls back to the array length when
-   * the backend omits the pagination object.
-   */
-  totalCount = (): number => {
-    const total = (this.materials() || []).length;
-    return total;
-  };
 }

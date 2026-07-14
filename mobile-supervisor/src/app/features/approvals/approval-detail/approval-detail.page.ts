@@ -95,7 +95,7 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
           <div class="info-block">
             <div class="info-row">
               <span class="info-label">Project</span>
-              <span class="info-value">{{ approval()?.projectName || '—' }}</span>
+              <span class="info-value">{{ approval()?.projectName || '-' }}</span>
             </div>
             @if (approval()?.site) {
               <div class="info-row">

@@ -89,7 +89,7 @@ import { Expense } from '../../../shared/models';
               <h2 class="desc">{{ expense()!.description }}</h2>
               <p class="site">
                 <ion-icon name="location-outline"></ion-icon>
-                {{ expense()!.site || 'General' }} · {{ expense()!.projectName || 'N/A' }}
+                {{ expense()!.site || 'General' }} - {{ expense()!.projectName || 'N/A' }}
               </p>
             </div>
             <ion-badge [color]="getStatusColor(expense()!.status)">

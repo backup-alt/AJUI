@@ -84,7 +84,7 @@ export async function getAssignedSites(req: Request, res: Response, next: NextFu
 export async function getActionableApprovals(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    const approvals = await mobileService.getActionableApprovals(userId);
+    const approvals = await mobileService.getActionableApprovals(userId, "all");
     res.json({ approvals });
   } catch (e) { next(e); }
 }
@@ -125,6 +125,7 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
   try {
     const userId = requireSupervisor(req);
     const result = await mobileService.listMaterialsForSupervisor(userId, {
+      projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       page: req.query.page ? Number(req.query.page) : 1,
@@ -149,6 +150,8 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
     const { Site } = await import("../models/Site.js");
     const { generateId } = await import("../services/id-generator.service.js");
     const { Approval } = await import("../models/Approval.js");
+
+    await mobileService.ensureSupervisorSiteAccess(userId, req.body.projectId, req.body.siteId);
 
     const project = await Project.findById(req.body.projectId).lean();
     if (!project) throw new AppError(404, "Project not found");
@@ -207,6 +210,7 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
   try {
     const userId = requireSupervisor(req);
     const result = await mobileService.listLabourForSupervisor(userId, {
+      projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       page: req.query.page ? Number(req.query.page) : 1,
@@ -232,6 +236,8 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
     const { generateId } = await import("../services/id-generator.service.js");
     const { Approval } = await import("../models/Approval.js");
     const { Labour } = await import("../models/Labour.js");
+
+    await mobileService.ensureSupervisorSiteAccess(userId, req.body.projectId, req.body.siteId);
 
     const project = await Project.findById(req.body.projectId).lean();
     if (!project) throw new AppError(404, "Project not found");
@@ -297,6 +303,7 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
   try {
     const userId = requireSupervisor(req);
     const result = await mobileService.listExpensesForSupervisor(userId, {
+      projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       type: req.query.type as string | undefined,
@@ -323,6 +330,8 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
     const { generateId } = await import("../services/id-generator.service.js");
     const { Approval } = await import("../models/Approval.js");
     const { Expense } = await import("../models/Expense.js");
+
+    await mobileService.ensureSupervisorSiteAccess(userId, req.body.projectId, req.body.siteId);
 
     let projectName: string | undefined;
     let clientId: Types.ObjectId | undefined;

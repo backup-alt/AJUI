@@ -6,6 +6,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { firstValueFrom, from, of, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { ApiService } from './api.service';
+import { SupervisorService } from './supervisor.service';
 import {
   LoginResponse,
   QRInvitePayload,
@@ -24,6 +25,7 @@ export interface QrScanResult {
 export class AuthService {
   private api = inject(ApiService);
   private router = inject(Router);
+  private supervisorService = inject(SupervisorService);
 
   readonly currentUser = signal<User | null>(null);
   readonly isAuthenticated = signal<boolean>(false);
@@ -119,11 +121,31 @@ export class AuthService {
     return this.api.post<LoginResponse>('/auth/supervisor/signup', request).pipe(
       tap((response) => {
         void this.saveAuthData(response);
+        void this.initAfterLogin();
       })
     );
   }
 
-  /** Request an OTP for an existing supervisor. */
+  /**
+   * Supervisor accounts CANNOT use password login via /auth/login (the backend
+   * explicitly blocks supervisors). They MUST use the OTP flow:
+   * 1. requestLoginOtp(identifier) sends OTP to email/phone
+   * 2. verifyLoginOtp(identifier, otp) verifies and logs in
+   * This method is kept for non-supervisor accounts (admin, accountant etc.)
+   */
+  loginWithPassword(email: string, password: string) {
+    return this.api.post<LoginResponse>('/auth/login', { identifier: email, password }).pipe(
+      tap((response) => {
+        void this.saveAuthData(response);
+        void this.initAfterLogin();
+      })
+    );
+  }
+
+  /**
+   * Request an OTP for a supervisor to log in.
+   * The OTP is sent to the email or phone associated with the account.
+   */
   requestLoginOtp(identifier: string) {
     return this.api.post<{ success: boolean; message?: string }>(
       '/auth/supervisor/request-otp',
@@ -131,7 +153,10 @@ export class AuthService {
     );
   }
 
-  /** Verify the OTP and log in. */
+  /**
+   * Verify the OTP and log in. This is the ONLY way supervisors can log in
+   * (backend blocks password-based login for supervisors).
+   */
   verifyLoginOtp(identifier: string, otp: string) {
     return this.api.post<LoginResponse>('/auth/supervisor/verify-otp-login', {
       identifier,
@@ -139,11 +164,12 @@ export class AuthService {
     }).pipe(
       tap((response) => {
         void this.saveAuthData(response);
+        void this.initAfterLogin();
       })
     );
   }
 
-  /** Forgot password — triggers a reset email. */
+  /** Forgot password - triggers a reset email. */
   forgotPassword(email: string) {
     return this.api.post<{ success: boolean; message?: string }>(
       '/auth/forgot-password',
@@ -162,10 +188,45 @@ export class AuthService {
     await this.api.setAccessToken(response.accessToken);
     await this.api.setUserId(response.user.id);
     await this.api.setUserRole(response.user.role);
+    if (response.refreshToken) {
+      await this.api.setRefreshToken(response.refreshToken);
+    }
     await Preferences.set({ key: 'currentUser', value: JSON.stringify(response.user) });
 
     this.currentUser.set(response.user);
     this.isAuthenticated.set(true);
+  }
+
+  /**
+   * Called after a successful login/signup to load the supervisor's profile
+   * and auto-select the first assigned site. The dashboard page also calls
+   * this on init so the site is always loaded on app start.
+   */
+  async initAfterLogin(): Promise<void> {
+    try {
+      const response = await firstValueFrom(
+        this.api.get<{
+          sites: Array<{ id: string; name: string; projectId?: string; projectName?: string }>;
+        }>('/mobile/supervisor/sites')
+      );
+
+      const sites = response.sites || [];
+      if (sites.length === 0) {
+        await this.supervisorService.clearSiteSelection();
+        return;
+      }
+
+      const currentSiteId = this.supervisorService.selectedSiteId();
+      const selected = sites.find((site) => site.id === currentSiteId) || sites[0];
+      await this.supervisorService.setSelectedSite(
+        selected.id,
+        selected.projectId || '',
+        selected.projectName || '',
+        selected.name
+      );
+    } catch (err) {
+      console.warn('[Auth] initAfterLogin failed - site may not be auto-selected', err);
+    }
   }
 
   async logout(): Promise<void> {

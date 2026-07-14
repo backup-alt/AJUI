@@ -1,32 +1,34 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-  IonCard, IonCardContent, IonBadge, IonItem, IonLabel, IonList,
-  IonInput, IonButton, IonSpinner
+  IonBadge, IonItem, IonInput, IonButton, IonSpinner, IonIcon,
 } from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Material } from '../../../shared/models';
+import { DatePipe } from '@angular/common';
+import { StatusPillComponent } from '../../../shared/components';
 
 @Component({
   selector: 'app-material-detail',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, DatePipe,
+    FormsModule, DatePipe,
     IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-    IonCard, IonCardContent, IonBadge, IonItem, IonLabel, IonList,
-    IonInput, IonButton, IonSpinner
+    IonBadge, IonItem, IonInput, IonButton, IonSpinner, IonIcon,
+    StatusPillComponent,
   ],
   template: `
-    <ion-header>
+    <ion-header class="agb-header">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/materials"></ion-back-button>
+          <ion-back-button default-href="/tabs/materials" color="primary"></ion-back-button>
         </ion-buttons>
-        <ion-title>Material Details</ion-title>
+        <ion-title>Material</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="detail-content">
@@ -36,128 +38,178 @@ import { Material } from '../../../shared/models';
         <div class="empty-state"><p>Material not found.</p></div>
       } @else {
         <div class="detail-container">
-          <div class="head">
-            <h2 class="material-name">{{ material()!.name }}</h2>
-            <ion-badge [color]="getStatusColor(material()!.status)">{{ material()!.status }}</ion-badge>
+          <div class="hero">
+            <span class="hero-tile"><ion-icon name="cube-outline"></ion-icon></span>
+            <div class="hero-body">
+              <h2 class="material-name">{{ material()!.name }}</h2>
+              <p class="meta">
+                <ion-icon name="business-outline"></ion-icon>
+                {{ material()!.site }} - {{ material()!.projectName }}
+              </p>
+            </div>
+            <agb-status-pill [tone]="getStatusTone(material()!.status)">{{ material()!.status }}</agb-status-pill>
           </div>
-          <p class="meta">{{ material()!.site }} • {{ material()!.projectName }}</p>
 
-          <ion-card>
-            <ion-card-content>
-              <ion-list lines="none">
-                <ion-item>
-                  <ion-label>
-                    <p>Requested</p>
-                    <h3>{{ material()!.requestedQuantity }} {{ material()!.unit }}</h3>
-                  </ion-label>
-                </ion-item>
-                @if (material()!.approvedQuantity) {
-                  <ion-item>
-                    <ion-label>
-                      <p>Approved</p>
-                      <h3>{{ material()!.approvedQuantity }} {{ material()!.unit }}</h3>
-                    </ion-label>
-                  </ion-item>
-                }
-                @if (material()!.vendor) {
-                  <ion-item>
-                    <ion-label>
-                      <p>Vendor</p>
-                      <h3>{{ material()!.vendor }}</h3>
-                    </ion-label>
-                  </ion-item>
-                }
-                @if (material()!.notes) {
-                  <ion-item>
-                    <ion-label>
-                      <p>Notes</p>
-                      <h3>{{ material()!.notes }}</h3>
-                    </ion-label>
-                  </ion-item>
-                }
-                <ion-item>
-                  <ion-label>
-                    <p>Request Date</p>
-                    <h3>{{ material()!.requestDate | date:'MMM d, yyyy' }}</h3>
-                  </ion-label>
-                </ion-item>
-              </ion-list>
-            </ion-card-content>
-          </ion-card>
-
-          <ion-card class="stock-card">
-            <ion-card-content>
-              <h3 class="stock-title">Update Stock</h3>
-              <p class="stock-hint">Track purchased and consumed quantities. Remaining is calculated automatically.</p>
-
-              <div class="stock-current">
-                <div class="stock-stat">
-                  <span class="stat-label">Purchased</span>
-                  <span class="stat-val">{{ material()!.purchasedQuantity }} {{ material()!.unit }}</span>
-                </div>
-                <div class="stock-stat">
-                  <span class="stat-label">Consumed</span>
-                  <span class="stat-val">{{ material()!.consumedQuantity }} {{ material()!.unit }}</span>
-                </div>
-                <div class="stock-stat highlight">
-                  <span class="stat-label">Remaining</span>
-                  <span class="stat-val">{{ material()!.remainingStock }} {{ material()!.unit }}</span>
-                </div>
+          <div class="card">
+            <h3 class="card-title">Request details</h3>
+            <div class="kv-list">
+              <div class="kv">
+                <span class="kv-label">Requested</span>
+                <span class="kv-value">{{ material()!.requestedQuantity }} {{ material()!.unit }}</span>
               </div>
+              @if (material()!.approvedQuantity) {
+                <div class="kv">
+                  <span class="kv-label">Approved</span>
+                  <span class="kv-value">{{ material()!.approvedQuantity }} {{ material()!.unit }}</span>
+                </div>
+              }
+              @if (material()!.vendor) {
+                <div class="kv">
+                  <span class="kv-label">Vendor</span>
+                  <span class="kv-value">{{ material()!.vendor }}</span>
+                </div>
+              }
+              <div class="kv">
+                <span class="kv-label">Request date</span>
+                <span class="kv-value">{{ material()!.requestDate | date:'MMM d, yyyy' }}</span>
+              </div>
+              @if (material()!.notes) {
+                <div class="kv">
+                  <span class="kv-label">Notes</span>
+                  <span class="kv-value">{{ material()!.notes }}</span>
+                </div>
+              }
+            </div>
+          </div>
 
-              <ion-item class="stock-input">
-                <ion-label position="stacked">Purchased Quantity</ion-label>
-                <ion-input
-                  type="number"
-                  placeholder="0"
-                  [(ngModel)]="purchasedInput"
-                  [clearInput]="true"
-                ></ion-input>
-              </ion-item>
+          <div class="card">
+            <h3 class="card-title">Live stock</h3>
+            <p class="card-sub">Track purchased and consumed quantities. Remaining is calculated automatically.</p>
+            <div class="stock-grid">
+              <div class="stock-stat">
+                <div class="stat-label">Purchased</div>
+                <div class="stat-val">{{ material()!.purchasedQuantity }} {{ material()!.unit }}</div>
+              </div>
+              <div class="stock-stat">
+                <div class="stat-label">Consumed</div>
+                <div class="stat-val">{{ material()!.consumedQuantity }} {{ material()!.unit }}</div>
+              </div>
+              <div class="stock-stat highlight">
+                <div class="stat-label">Remaining</div>
+                <div class="stat-val">{{ material()!.remainingStock }} {{ material()!.unit }}</div>
+              </div>
+            </div>
 
-              <ion-item class="stock-input">
-                <ion-label position="stacked">Consumed Quantity</ion-label>
-                <ion-input
-                  type="number"
-                  placeholder="0"
-                  [(ngModel)]="consumedInput"
-                  [clearInput]="true"
-                ></ion-input>
-              </ion-item>
+            <div class="form-field">
+              <label class="form-label">Purchased quantity</label>
+              <ion-input
+                type="number"
+                placeholder="0"
+                [(ngModel)]="purchasedInput"
+                [clearInput]="true"
+              ></ion-input>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Consumed quantity</label>
+              <ion-input
+                type="number"
+                placeholder="0"
+                [(ngModel)]="consumedInput"
+                [clearInput]="true"
+              ></ion-input>
+            </div>
 
-              <ion-button
-                expand="block"
-                class="save-btn"
-                [disabled]="saving()"
-                (click)="saveStock()"
-              >
-                {{ saving() ? 'Saving…' : 'Save Stock' }}
-              </ion-button>
-            </ion-card-content>
-          </ion-card>
+            <ion-button
+              expand="block"
+              class="primary-btn"
+              [disabled]="saving()"
+              (click)="saveStock()"
+            >
+              @if (saving()) {
+                <ion-spinner name="crescent"></ion-spinner>
+              } @else {
+                <ion-icon name="checkmark-circle-outline" slot="end"></ion-icon>
+                <span>Save stock</span>
+              }
+            </ion-button>
+          </div>
         </div>
       }
     </ion-content>
   `,
   styles: [`
-    .detail-content { --background: #f9fafb; }
-    .detail-container { padding: 16px; }
+    .agb-header { --background: var(--agb-white); --border-color: var(--agb-light-gray); }
+    .detail-content { --background: #f5f6f8; }
+    .detail-container { padding: 16px; max-width: 560px; margin: 0 auto; }
+
     .loading-wrap { display: flex; justify-content: center; padding: 40px; }
-    .empty-state { text-align: center; padding: 40px; color: #6b7280; }
-    .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
-    .material-name { font-size: 22px; font-weight: 700; color: #002263; margin: 0; }
-    .meta { font-size: 12px; color: #6b7280; margin: 0 0 16px; text-transform: uppercase; letter-spacing: 0.3px; }
-    ion-card { margin: 0 0 12px; border: 1px solid #e5e7eb; box-shadow: none; border-radius: 8px; }
-    .stock-title { font-size: 16px; font-weight: 600; color: #002263; margin: 0 0 4px; }
-    .stock-hint { font-size: 12px; color: #6b7280; margin: 0 0 14px; }
-    .stock-current { display: flex; gap: 8px; margin-bottom: 16px; }
-    .stock-stat { flex: 1; background: #f3f4f6; padding: 10px 8px; border-radius: 8px; text-align: center; }
-    .stock-stat.highlight { background: #fffbeb; border: 1px solid #c9a227; }
-    .stock-stat .stat-label { display: block; font-size: 10px; color: #6b7280; text-transform: uppercase; margin-bottom: 2px; }
-    .stock-stat .stat-val { display: block; font-size: 14px; font-weight: 700; color: #002263; }
-    .stock-stat.highlight .stat-val { color: #c9a227; }
-    .stock-input { --background: #fff; --border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 12px; }
-    .save-btn { --background: #002263; --color: #fff; --border-radius: 8px; margin-top: 8px; font-weight: 600; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+
+    .hero {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 20px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--agb-shadow-2xs);
+    }
+    .hero-tile {
+      width: 44px; height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.10), rgba(220, 38, 38, 0.04));
+      color: #b91c1c;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .hero-tile ion-icon { font-size: 20px; }
+    .hero-body { flex: 1; min-width: 0; }
+    .material-name { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 4px; letter-spacing: -0.2px; }
+    .meta { font-size: 12px; color: #64748b; margin: 0; display: inline-flex; align-items: center; gap: 4px; }
+    .meta ion-icon { font-size: 12px; }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 20px;
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      box-shadow: var(--agb-shadow-2xs);
+    }
+    .card-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 4px; }
+    .card-sub { font-size: 13px; color: #64748b; margin: 0 0 14px; line-height: 1.5; }
+
+    .kv-list { display: flex; flex-direction: column; gap: 8px; }
+    .kv {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-radius: 12px;
+    }
+    .kv-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; }
+    .kv-value { font-size: 14px; font-weight: 600; color: #0f172a; text-align: right; }
+
+    .stock-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    .stock-stat {
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+    }
+    .stock-stat .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
+    .stock-stat .stat-val { font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 4px; }
+    .stock-stat.highlight { background: #fffbeb; border-color: rgba(201, 162, 39, 0.30); }
+    .stock-stat.highlight .stat-val { color: #a8861f; }
+
+    .form-field { margin-bottom: 12px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin: 0 4px 6px; }
+
+    .primary-btn {
+      --background: #002263; --color: #ffffff; --border-radius: 14px;
+      font-weight: 700; height: 50px; margin-top: 4px;
+    }
+    .primary-btn:hover { --background: #001a4d; }
   `],
 })
 export class MaterialDetailPage implements OnInit {
@@ -173,6 +225,7 @@ export class MaterialDetailPage implements OnInit {
   consumedInput: number | null = null;
 
   ngOnInit() {
+    addIcons({ cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline });
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.loading.set(false);
@@ -192,7 +245,7 @@ export class MaterialDetailPage implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.showToast('Failed to load material', true);
+        void this.showToast('Failed to load material', true);
       },
     });
   }
@@ -208,16 +261,16 @@ export class MaterialDetailPage implements OnInit {
       next: (res: { material: Material }) => {
         this.material.set(res.material);
         this.saving.set(false);
-        this.showToast('Stock updated', false);
+        void this.showToast('Stock updated', false);
       },
       error: () => {
         this.saving.set(false);
-        this.showToast('Failed to update stock', true);
+        void this.showToast('Failed to update stock', true);
       },
     });
   }
 
-  getStatusColor(status: string): string {
+  getStatusTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
     if (status === 'Pending') return 'warning';
     if (status === 'Approved') return 'success';
     return 'danger';
@@ -230,6 +283,6 @@ export class MaterialDetailPage implements OnInit {
       position: 'bottom',
       color: isError ? 'danger' : 'success',
     });
-    t.present();
+    await t.present();
   }
 }

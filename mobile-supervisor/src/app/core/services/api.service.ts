@@ -197,7 +197,7 @@ export class ApiService {
   }
 
   /**
-   * Same as refreshAccessToken but never throws "No refresh token" — returns empty string instead.
+   * Same as refreshAccessToken but never throws "No refresh token" - returns empty string instead.
    * This is the version the auth interceptor uses, so a missing refresh token simply
    * triggers logout rather than an opaque error.
    */
@@ -216,13 +216,16 @@ export class ApiService {
       return '';
     }
 
-    const data = (await response.json()) as { accessToken?: string };
+    const data = (await response.json()) as { accessToken?: string; refreshToken?: string };
     if (!data.accessToken) {
       await this.clearTokens();
       return '';
     }
 
     await this.setAccessToken(data.accessToken);
+    if (data.refreshToken) {
+      await this.setRefreshToken(data.refreshToken);
+    }
     return data.accessToken;
   }
 }

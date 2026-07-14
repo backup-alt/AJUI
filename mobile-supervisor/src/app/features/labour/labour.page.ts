@@ -1,17 +1,24 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import {
-  IonContent, IonHeader, IonToolbar, IonTitle, IonSearchbar,
-  IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
+  IonContent, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
   IonFab, IonFabButton, IonIcon, IonBadge, IonSkeletonText,
-  IonRefresher, IonRefresherContent, IonItem, IonInput, IonButton,
+  IonRefresher, IonRefresherContent, IonInput, IonButton,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
-import { addOutline, peopleOutline, timeOutline, personAddOutline, checkmarkOutline } from 'ionicons/icons';
+import {
+  addOutline, peopleOutline, timeOutline, personAddOutline, checkmarkOutline,
+  chevronForwardOutline, businessOutline, briefcaseOutline, ribbonOutline,
+  addCircleOutline,
+} from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Labour, LabourStatus } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
+import {
+  EmptyStateComponent,
+  StatusPillComponent,
+} from '../../shared/components';
 
 const DEFAULT_LABOUR_TYPES = ['Mason', 'Helper', 'Electrician', 'Plumber', 'Civil'];
 
@@ -26,83 +33,82 @@ interface Employee {
   selector: 'app-labour',
   standalone: true,
   imports: [
-    IonContent, IonHeader, IonToolbar, IonTitle, IonSearchbar,
-    IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
+    IonContent, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
     IonFab, IonFabButton, IonIcon, IonBadge, IonSkeletonText,
     IonRefresher, IonRefresherContent, FormsModule, DatePipe, CurrencyPipe,
-    IonInput, IonButton,
+    IonInput, IonButton, EmptyStateComponent, StatusPillComponent,
   ],
   template: `
-    <ion-header class="agb-header">
-      <ion-toolbar><ion-title>Labour</ion-title></ion-toolbar>
-      <ion-toolbar>
-        <ion-searchbar placeholder="Search..." [(ngModel)]="searchQuery" (ionInput)="onSearch()"></ion-searchbar>
-      </ion-toolbar>
-      <ion-toolbar>
-        <ion-segment [(ngModel)]="activeTab" (ionChange)="onTabChange()" [value]="'employees'">
-          <ion-segment-button value="employees"><ion-label>Employees</ion-label></ion-segment-button>
-          <ion-segment-button value="attendance"><ion-label>Attendance</ion-label></ion-segment-button>
-        </ion-segment>
-      </ion-toolbar>
-    </ion-header>
-
     <ion-content class="labour-content">
       <ion-refresher slot="fixed" (ionRefresh)="refreshAll($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
+      <div class="page-head">
+        <h1>Labour</h1>
+        <p>Manage your workers and daily attendance.</p>
+      </div>
+
+      <div class="filter-stack">
+        <ion-searchbar
+          [placeholder]="activeTab === 'employees' ? 'Search employees' : 'Search attendance'"
+          [(ngModel)]="searchQuery"
+          (ionInput)="onSearch()"
+        ></ion-searchbar>
+        <div class="seg-wrap">
+          <ion-segment [(ngModel)]="activeTab" (ionChange)="onTabChange()" [value]="'employees'">
+            <ion-segment-button value="employees">
+              <ion-label>Employees</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="attendance">
+              <ion-label>Attendance</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </div>
+      </div>
+
       @if (activeTab === 'employees') {
-        @if (isLoading() && employees().length === 0) {
-          @for (i of [1,2,3]; track i) {
-            <ion-card class="skeleton">
-              <ion-card-content>
+        <div class="cards">
+          @if (isLoading() && employees().length === 0) {
+            @for (i of [1,2,3]; track i) {
+              <div class="skeleton-card">
                 <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
                 <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-              </ion-card-content>
-            </ion-card>
-          }
-        } @else if (filteredEmployees().length === 0) {
-          <div class="empty-state">
-            <ion-icon name="people-outline"></ion-icon>
-            <h3>No Employees</h3>
-            <p>Add employees to track their attendance</p>
-          </div>
-        } @else {
-          @for (emp of filteredEmployees(); track emp.name) {
-            <ion-card class="emp-card">
-              <ion-card-content>
-                <div class="emp-header">
+              </div>
+            }
+          } @else if (filteredEmployees().length === 0) {
+            <agb-empty-state
+              icon="people-outline"
+              title="No employees yet"
+              message="Log a worker's first attendance to start tracking them."
+            ></agb-empty-state>
+          } @else {
+            @for (emp of filteredEmployees(); track emp.name) {
+              <article class="emp-card">
+                <header class="emp-head">
+                  <span class="emp-tile">
+                    <ion-icon name="briefcase-outline"></ion-icon>
+                  </span>
                   <div class="emp-info">
                     <h3 class="emp-name">{{ emp.name }}</h3>
-                    <p class="emp-meta">{{ emp.entryCount }} entries</p>
+                    <p class="emp-meta">
+                      <ion-icon name="ribbon-outline"></ion-icon>
+                      {{ emp.entryCount }} {{ emp.entryCount === 1 ? 'entry' : 'entries' }}
+                    </p>
                   </div>
-                </div>
+                </header>
                 <div class="emp-types">
                   @for (type of emp.labourTypes; track type) {
                     <span class="type-chip">{{ type }}</span>
                   }
-                  @if (addingTypeFor() === emp.name) {
-                    <div class="add-type-form">
-                      <ion-input
-                        placeholder="Type name"
-                        [(ngModel)]="newLabourType"
-                        (keydown.enter)="addLabourType(emp.name)"
-                        style="width: 100px; font-size: 12px;"
-                      ></ion-input>
-                      <ion-button size="small" (click)="addLabourType(emp.name)" [disabled]="!newLabourType.trim()">
-                        <ion-icon name="checkmark-outline"></ion-icon>
-                      </ion-button>
-                    </div>
+                  @if (emp.labourTypes.length === 0) {
+                    <span class="type-chip neutral">No categories yet</span>
                   }
-                  <button class="type-add-btn" (click)="startAddType(emp.name)">
-                    <ion-icon name="add-outline"></ion-icon>
-                    Add type
-                  </button>
                 </div>
-              </ion-card-content>
-            </ion-card>
+              </article>
+            }
           }
-        }
+        </div>
 
         <ion-fab slot="fixed" vertical="bottom" horizontal="end">
           <ion-fab-button (click)="showAddEmployee = true">
@@ -113,92 +119,96 @@ interface Employee {
         @if (showAddEmployee) {
           <div class="modal-backdrop" (click)="showAddEmployee = false"></div>
           <div class="add-emp-modal">
+            <div class="modal-tile">
+              <ion-icon name="person-add-outline"></ion-icon>
+            </div>
             <h3>How new employees are tracked</h3>
-            <p class="explainer">
-              In AGB, employees aren't a separate list — they're tracked as
+            <p>
+              In AGB, employees are tracked as
               <strong>labour entries</strong> by party name and category.
             </p>
-            <p class="explainer">
+            <p>
               To add a new employee, log their first day's attendance using the
-              <strong>Log Attendance</strong> button. They'll automatically appear
-              in the Employees tab once their first entry is recorded.
+              <strong>Log attendance</strong> button. They'll appear here once recorded.
             </p>
             <div class="modal-actions">
-              <ion-button fill="outline" (click)="showAddEmployee = false">Got it</ion-button>
-              <ion-button (click)="logFirstAttendance()">
-                Log First Attendance
-              </ion-button>
+              <button class="btn ghost" (click)="showAddEmployee = false">Got it</button>
+              <button class="btn primary" (click)="logFirstAttendance()">Log first attendance</button>
             </div>
           </div>
         }
       }
 
       @if (activeTab === 'attendance') {
-        <ion-toolbar class="filter-bar">
+        <div class="filter-bar">
           <ion-segment [(ngModel)]="statusFilter" (ionChange)="filterLabour()" [value]="''">
             <ion-segment-button [value]="''"><ion-label>All</ion-label></ion-segment-button>
             <ion-segment-button value="Pending"><ion-label>Pending</ion-label></ion-segment-button>
             <ion-segment-button value="Approved"><ion-label>Approved</ion-label></ion-segment-button>
           </ion-segment>
-        </ion-toolbar>
+        </div>
 
-        @if (isLoading() && labour().length === 0) {
-          @for (i of [1,2,3]; track i) {
-            <ion-card class="skeleton">
-              <ion-card-content>
+        <div class="cards">
+          @if (isLoading() && labour().length === 0) {
+            @for (i of [1,2,3]; track i) {
+              <div class="skeleton-card">
                 <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
                 <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-              </ion-card-content>
-            </ion-card>
-          }
-        } @else if (filteredLabour().length === 0) {
-          <div class="empty-state">
-            <ion-icon name="time-outline"></ion-icon>
-            <h3>No Attendance Records</h3>
-            <p>Log today's attendance to get started</p>
-          </div>
-        } @else {
-          @for (entry of filteredLabour(); track entry.labourId) {
-            <ion-card class="labour-card" (click)="viewLabour(entry)">
-              <ion-card-content>
-                <div class="labour-header">
+              </div>
+            }
+          } @else if (filteredLabour().length === 0) {
+            <agb-empty-state
+              icon="time-outline"
+              title="No attendance records"
+              message="Log today's attendance to get started."
+            ></agb-empty-state>
+          } @else {
+            @for (entry of filteredLabour(); track entry.labourId) {
+              <button class="labour-card" (click)="viewLabour(entry)">
+                <header class="labour-head">
                   <div class="labour-info">
                     <h3 class="labour-party">{{ entry.partyName }}</h3>
-                    <p class="labour-site">{{ entry.site }} &bull; {{ entry.projectName }}</p>
+                    <p class="labour-site">
+                      <ion-icon name="business-outline"></ion-icon>
+                      {{ entry.site }} - {{ entry.projectName }}
+                    </p>
                   </div>
-                  <ion-badge [color]="getStatusColor(entry.status)">{{ entry.status }}</ion-badge>
-                </div>
+                  <agb-status-pill [tone]="getStatusTone(entry.status)">{{ entry.status }}</agb-status-pill>
+                </header>
+
                 <div class="labour-stats">
                   <div class="stat">
-                    <span class="stat-value">{{ entry.presentCount }}</span>
-                    <span class="stat-label">Present</span>
+                    <div class="stat-value">{{ entry.presentCount }}</div>
+                    <div class="stat-label">Present</div>
                   </div>
                   <div class="stat">
-                    <span class="stat-value">{{ entry.presentDays }}</span>
-                    <span class="stat-label">Days</span>
+                    <div class="stat-value">{{ entry.presentDays }}</div>
+                    <div class="stat-label">Days</div>
                   </div>
                   <div class="stat">
-                    <span class="stat-value">{{ entry.dailyWage | currency:'INR':'symbol':'1.0-0' }}</span>
-                    <span class="stat-label">Daily Wage</span>
+                    <div class="stat-value">{{ entry.dailyWage | currency:'INR':'symbol':'1.0-0' }}</div>
+                    <div class="stat-label">Daily wage</div>
                   </div>
                   <div class="stat">
-                    <span class="stat-value">{{ entry.shift }}</span>
-                    <span class="stat-label">Shift</span>
+                    <div class="stat-value">{{ entry.shift }}</div>
+                    <div class="stat-label">Shift</div>
                   </div>
                 </div>
-                <div class="labour-footer">
+
+                <footer class="labour-footer">
                   <div class="labour-date">
                     <ion-icon name="time-outline"></ion-icon>
                     {{ entry.attendanceDate | date:'MMM d, yyyy' }}
                   </div>
-                  @if (entry.paymentMode) {
-                    <ion-badge fill="outline">{{ entry.paymentMode }}</ion-badge>
-                  }
-                </div>
-              </ion-card-content>
-            </ion-card>
+                  <span class="view-link">
+                    View
+                    <ion-icon name="chevron-forward-outline"></ion-icon>
+                  </span>
+                </footer>
+              </button>
+            }
           }
-        }
+        </div>
 
         <ion-fab slot="fixed" vertical="bottom" horizontal="end">
           <ion-fab-button (click)="createLabour()">
@@ -209,42 +219,136 @@ interface Employee {
     </ion-content>
   `,
   styles: [`
-    .agb-header { --background: var(--agb-white); }
-    .labour-content { --background: var(--agb-off-white); }
-    .filter-bar { --background: var(--agb-white); padding: 0 16px; }
-    .skeleton { margin: 12px 16px; }
-    .empty-state { display: flex; flex-direction: column; align-items: center; padding: 64px 32px; text-align: center; }
-    .empty-state ion-icon { font-size: 64px; color: var(--agb-light-gray); margin-bottom: 16px; }
-    .empty-state h3 { font-size: 18px; font-weight: 600; color: var(--agb-navy); margin: 0 0 8px; }
-    .empty-state p { font-size: 14px; color: var(--agb-gray); margin: 0; }
-    .emp-card { margin: 12px 16px; }
-    .emp-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-    .emp-name { font-size: 16px; font-weight: 600; color: var(--agb-navy); margin: 0 0 3px; }
-    .emp-meta { font-size: 12px; color: var(--agb-gray); margin: 0; }
-    .emp-types { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-    .type-chip { font-size: 11px; padding: 3px 8px; background: var(--agb-off-white); border: 1px solid #e5e7eb; border-radius: 20px; color: var(--agb-dark-gray); cursor: pointer; }
-    .type-chip.selected { background: #fffbeb; border-color: #c9a227; color: #c9a227; font-weight: 600; }
-    .type-add-btn { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 3px 8px; background: none; border: 1px dashed #d1d5db; border-radius: 20px; color: #6b7280; cursor: pointer; }
-    .add-type-form { display: inline-flex; align-items: center; gap: 4px; }
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100; }
-    .add-emp-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 320px; background: #fff; border-radius: 12px; padding: 20px; z-index: 101; box-shadow: 0 16px 40px rgba(0,0,0,0.2); }
-    .add-emp-modal h3 { font-size: 16px; font-weight: 700; color: var(--agb-navy); margin: 0 0 16px; }
-    .emp-name-input { --background: #f9fafb; --border-radius: 8px; --padding-start: 12px; margin-bottom: 16px; }
-    .default-label { display: block; font-size: 12px; font-weight: 600; color: var(--agb-dark-gray); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
-    .type-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    .labour-card { margin: 12px 16px; transition: all var(--agb-transition-fast); }
-    .labour-card:active { transform: scale(0.98); }
-    .labour-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-    .labour-party { font-size: 16px; font-weight: 600; color: var(--agb-navy); margin: 0 0 4px; }
-    .labour-site { font-size: 13px; color: var(--agb-gray); margin: 0; }
-    .labour-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; padding: 12px; background: var(--agb-off-white); border-radius: var(--agb-radius-md); }
+    .labour-content { --background: #f5f6f8; }
+
+    .page-head { padding: 16px 16px 0; }
+    .page-head h1 { font-size: 22px; font-weight: 700; color: #0f172a; margin: 0 0 2px; letter-spacing: -0.2px; }
+    .page-head p { font-size: 13px; color: #64748b; margin: 0 0 12px; }
+
+    .filter-stack { padding: 0 16px 8px; }
+    .seg-wrap { padding: 4px 4px 8px; }
+    .filter-bar { padding: 0 16px 4px; }
+
+    .cards { padding: 4px 16px 96px; }
+    .emp-card {
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      box-shadow: var(--agb-shadow-2xs);
+    }
+    .emp-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .emp-tile {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(14, 165, 233, 0.04));
+      color: #0369a1;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .emp-tile ion-icon { font-size: 18px; }
+    .emp-info { flex: 1; min-width: 0; }
+    .emp-name { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
+    .emp-meta { font-size: 12px; color: #64748b; margin: 0; display: inline-flex; align-items: center; gap: 4px; }
+    .emp-meta ion-icon { font-size: 12px; }
+    .emp-types { display: flex; flex-wrap: wrap; gap: 6px; }
+    .type-chip {
+      font-size: 11px;
+      padding: 4px 10px;
+      background: rgba(201, 162, 39, 0.10);
+      border: 1px solid rgba(201, 162, 39, 0.20);
+      color: #a8861f;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .type-chip.neutral { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
+
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.50); z-index: 100; backdrop-filter: blur(2px); }
+    .add-emp-modal {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: calc(100% - 32px); max-width: 360px;
+      background: #ffffff; border-radius: 22px; padding: 22px 20px;
+      z-index: 101;
+      box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.30);
+      text-align: center;
+    }
+    .modal-tile {
+      width: 56px; height: 56px;
+      margin: 0 auto 14px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(14, 165, 233, 0.04));
+      color: #0369a1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-tile ion-icon { font-size: 26px; }
+    .add-emp-modal h3 { font-size: 17px; font-weight: 700; color: #0f172a; margin: 0 0 12px; }
+    .add-emp-modal p { font-size: 13px; color: #475569; margin: 0 0 10px; line-height: 1.55; text-align: left; }
+    .add-emp-modal p strong { color: #0f172a; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .btn {
+      flex: 1; min-width: 0;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      border: 0;
+      transition: filter var(--agb-transition-fast);
+    }
+    .btn.ghost { background: #f1f5f9; color: #002263; border: 1px solid #e2e8f0; }
+    .btn.primary { background: #002263; color: #ffffff; }
+
+    .skeleton-card {
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 10px;
+    }
+
+    /* Labour attendance card */
+    .labour-card {
+      width: 100%;
+      text-align: left;
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 20px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      box-shadow: var(--agb-shadow-2xs);
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
+    }
+    .labour-card:active { transform: scale(0.99); }
+    .labour-card:hover { box-shadow: var(--agb-shadow-sm); }
+    .labour-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .labour-info { flex: 1; min-width: 0; }
+    .labour-party { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
+    .labour-site { font-size: 12px; color: #64748b; margin: 0; display: inline-flex; align-items: center; gap: 4px; }
+    .labour-site ion-icon { font-size: 12px; }
+
+    .labour-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 12px;
+      padding: 10px 8px;
+      margin-bottom: 10px;
+    }
     .stat { text-align: center; }
-    .stat-value { font-size: 16px; font-weight: 700; color: var(--agb-navy); display: block; }
-    .stat-label { font-size: 10px; color: var(--agb-gray); text-transform: uppercase; }
-    .labour-footer { display: flex; justify-content: space-between; align-items: center; }
-    .labour-date { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--agb-gray); }
-    ion-fab-button { --background: var(--agb-primary); --color: var(--agb-white); }
+    .stat-value { font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.1; }
+    .stat-label { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 3px; }
+
+    .labour-footer { display: flex; align-items: center; justify-content: space-between; }
+    .labour-date { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #64748b; }
+    .labour-date ion-icon { font-size: 13px; }
+    .view-link { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: #002263; }
+    .view-link ion-icon { font-size: 14px; }
+
+    ion-fab-button { --background: #002263; --color: #ffffff; }
   `],
 })
 export class LabourPage implements OnInit, OnDestroy {
@@ -291,11 +395,12 @@ export class LabourPage implements OnInit, OnDestroy {
   newEmployeeName = '';
   newEmployeeTypes: string[] = [];
   defaultTypes = DEFAULT_LABOUR_TYPES;
-  addingTypeFor = signal<string | null>(null);
-  newLabourType = '';
 
   async ngOnInit(): Promise<void> {
-    addIcons({ addOutline, peopleOutline, timeOutline, personAddOutline, checkmarkOutline });
+    addIcons({
+      addOutline, peopleOutline, timeOutline, personAddOutline, checkmarkOutline,
+      chevronForwardOutline, businessOutline, briefcaseOutline, ribbonOutline, addCircleOutline,
+    });
     await this.loadLabour();
 
     if (typeof window !== 'undefined') {
@@ -327,11 +432,13 @@ export class LabourPage implements OnInit, OnDestroy {
         .subscribe({
           next: (r) => {
             this.labour.set(r.labour || []);
+            this.filterLabour();
             this.isLoading.set(false);
           },
           error: (err) => {
             console.error('[Labour] failed to load', err);
             this.labour.set([]);
+            this.filterLabour();
             this.isLoading.set(false);
           },
         });
@@ -346,8 +453,14 @@ export class LabourPage implements OnInit, OnDestroy {
     (event.target as HTMLIonRefresherElement).complete();
   }
 
-  onTabChange() { this.searchQuery = ''; }
-  onSearch() { /* handled by computed */ }
+  onTabChange() {
+    this.searchQuery = '';
+    this.filterLabour();
+  }
+
+  onSearch() {
+    if (this.activeTab === 'attendance') this.filterLabour();
+  }
 
   filterLabour(): void {
     let filtered = this.labour();
@@ -365,37 +478,15 @@ export class LabourPage implements OnInit, OnDestroy {
     else this.newEmployeeTypes.push(t);
   }
 
-  /** The "Add Employee" UI explains how the employee list works and routes
-   * the user to the labour-create page so they can log a first attendance. */
   logFirstAttendance(): void {
     this.showAddEmployee = false;
     this.createLabour();
   }
 
-  startAddType(empName: string) {
-    // The "add type" UI is hidden in the template (only the "Add type" button
-    // opens the inline form). For now, persisting custom types per-employee is
-    // not yet supported — the types are derived from past labour entries.
-    this.addingTypeFor.set(empName);
-    this.newLabourType = '';
-  }
-
-  addLabourType(empName: string) {
-    if (!this.newLabourType.trim()) return;
-    // Note: custom types are derived on the backend from laborTypes[].name —
-    // we do not persist them per-employee client-side.
-    const emp = this.employees().find((e) => e.name === empName);
-    if (emp && !emp.labourTypes.includes(this.newLabourType.trim())) {
-      emp.labourTypes.push(this.newLabourType.trim());
-    }
-    this.addingTypeFor.set(null);
-    this.newLabourType = '';
-  }
-
   viewLabour(entry: Labour): void { this.router.navigate(['/tabs/labour', entry._id]); }
   createLabour(): void { this.router.navigate(['/tabs/labour/create']); }
 
-  getStatusColor(status: LabourStatus): string {
-    return status === 'Pending' ? 'warning' : status === 'Approved' ? 'success' : 'danger';
+  getStatusTone(status: LabourStatus): 'success' | 'warning' | 'danger' | 'neutral' {
+    return status === 'Pending' ? 'warning' : status === 'Approved' ? 'success' : status === 'Rejected' ? 'danger' : 'neutral';
   }
 }

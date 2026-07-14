@@ -11,6 +11,187 @@ import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
 
+type SupervisorAccess = {
+  user: Awaited<ReturnType<typeof User.findById>>;
+  profile: Record<string, any> | null;
+  projectIds: Types.ObjectId[];
+  siteIds: Types.ObjectId[];
+  siteNames: string[];
+};
+
+function toObjectId(value: unknown): Types.ObjectId | null {
+  if (!value) return null;
+  if (value instanceof Types.ObjectId) return value;
+  const str = String(value);
+  return Types.ObjectId.isValid(str) ? new Types.ObjectId(str) : null;
+}
+
+function uniqueObjectIds(values: Array<Types.ObjectId | null | undefined>): Types.ObjectId[] {
+  const seen = new Set<string>();
+  const ids: Types.ObjectId[] = [];
+  for (const value of values) {
+    if (!value) continue;
+    const key = value.toString();
+    if (!seen.has(key)) {
+      seen.add(key);
+      ids.push(value);
+    }
+  }
+  return ids;
+}
+
+function uniqueStrings(values: Array<string | undefined | null>): string[] {
+  const seen = new Set<string>();
+  const list: string[] = [];
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      list.push(trimmed);
+    }
+  }
+  return list;
+}
+
+function hasObjectId(ids: Types.ObjectId[], value: Types.ObjectId): boolean {
+  const key = value.toString();
+  return ids.some((id) => id.toString() === key);
+}
+
+async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
+  const user = await User.findById(userId);
+  if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
+
+  const profile = user.supervisorProfileId
+    ? await Supervisor.findById(user.supervisorProfileId).lean()
+    : await Supervisor.findOne({ userId: user._id }).lean();
+  const profileRecord = profile as Record<string, any> | null;
+
+  const projectIds = uniqueObjectIds([
+    ...(user.managedProjectIds || []).map(toObjectId),
+    toObjectId(profileRecord?.assignedProjectId),
+  ]);
+
+  const assignedSiteIds = [
+    ...((profileRecord?.assignedSiteIds || []) as unknown[]),
+    profileRecord?.assignedSiteId,
+  ];
+  const explicitSiteIds = uniqueObjectIds(assignedSiteIds.map(toObjectId));
+  const assignedSiteNameFallback = uniqueStrings(
+    ((profileRecord?.assignedSites || []) as unknown[])
+      .filter((value) => typeof value === "string" && !Types.ObjectId.isValid(value))
+      .map((value) => String(value))
+  );
+
+  let scopedSites: Array<{ _id: Types.ObjectId; name: string; projectIds?: Types.ObjectId[] }> = [];
+  if (explicitSiteIds.length > 0) {
+    scopedSites = await Site.find({ _id: { $in: explicitSiteIds } })
+      .select("_id name projectIds")
+      .lean();
+  } else if (projectIds.length > 0) {
+    scopedSites = await Site.find({ projectIds: { $in: projectIds } })
+      .select("_id name projectIds")
+      .lean();
+  } else if (assignedSiteNameFallback.length > 0) {
+    scopedSites = await Site.find({ name: { $in: assignedSiteNameFallback } })
+      .select("_id name projectIds")
+      .lean();
+  }
+
+  for (const site of scopedSites) {
+    for (const pid of site.projectIds || []) {
+      projectIds.push(new Types.ObjectId(pid));
+    }
+  }
+
+  const siteIds = explicitSiteIds.length > 0
+    ? explicitSiteIds
+    : uniqueObjectIds(scopedSites.map((site) => toObjectId(site._id)));
+
+  return {
+    user,
+    profile: profileRecord,
+    projectIds: uniqueObjectIds(projectIds),
+    siteIds,
+    siteNames: uniqueStrings([
+      ...scopedSites.map((site) => site.name),
+      ...assignedSiteNameFallback,
+    ]),
+  };
+}
+
+async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) {
+  if (!siteId) {
+    if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
+    const or: Record<string, unknown>[] = [];
+    if (access.siteIds.length > 0) or.push({ siteId: { $in: access.siteIds } });
+    if (access.siteNames.length > 0) or.push({ site: { $in: access.siteNames } });
+    return { $or: or };
+  }
+
+  const requestedSiteId = toObjectId(siteId);
+  if (!requestedSiteId) throw new AppError(400, "Invalid site id");
+
+  const site = await Site.findById(requestedSiteId).select("_id name projectIds").lean();
+  if (!site) throw new AppError(404, "Site not found");
+
+  const assignedBySite = access.siteIds.length === 0 || hasObjectId(access.siteIds, requestedSiteId);
+  const assignedByProject =
+    access.projectIds.length === 0 ||
+    (site.projectIds || []).some((projectId) => hasObjectId(access.projectIds, projectId));
+
+  if (!assignedBySite || !assignedByProject) {
+    throw new AppError(403, "Not assigned to this site");
+  }
+
+  return { $or: [{ siteId: requestedSiteId }, { site: site.name }] };
+}
+
+async function buildScopedEntityQuery(
+  userId: string,
+  filters: { projectId?: string; siteId?: string; status?: string; type?: string } = {}
+) {
+  const access = await getSupervisorAccess(userId);
+  const query: Record<string, unknown> = {};
+
+  if (filters.projectId) {
+    const requestedProjectId = toObjectId(filters.projectId);
+    if (!requestedProjectId) throw new AppError(400, "Invalid project id");
+    if (!hasObjectId(access.projectIds, requestedProjectId)) {
+      throw new AppError(403, "Not assigned to this project");
+    }
+    query.projectId = requestedProjectId;
+  } else if (access.projectIds.length > 0) {
+    query.projectId = { $in: access.projectIds };
+  }
+
+  const siteScope = await getSiteScopeForFilter(access, filters.siteId);
+  if (siteScope) Object.assign(query, siteScope);
+  if (filters.status) query.status = filters.status;
+  if (filters.type) query.type = filters.type;
+
+  return { access, query };
+}
+
+function approvalScopeQuery(access: SupervisorAccess, status?: "Pending" | "Approved" | "Rejected") {
+  const query: Record<string, unknown> = {};
+  if (access.projectIds.length > 0) query.projectId = { $in: access.projectIds };
+  if (access.siteNames.length > 0) query.site = { $in: access.siteNames };
+  if (status) query.status = status;
+  return query;
+}
+
+export async function ensureSupervisorSiteAccess(
+  userId: string,
+  projectId?: string,
+  siteId?: string
+) {
+  const { access } = await buildScopedEntityQuery(userId, { projectId, siteId });
+  return access;
+}
+
 export async function getSupervisorByUserId(userId: string) {
   const user = await User.findById(userId);
   if (!user) throw new AppError(404, "User not found");
@@ -63,14 +244,11 @@ export async function updateSupervisorProfile(
 }
 
 export async function getAssignedProjects(userId: string) {
-  const user = await User.findById(userId);
-  if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
+  const access = await getSupervisorAccess(userId);
+  if (access.projectIds.length === 0) return [];
 
   const projects = await Project.find({
-    $or: [
-      { _id: { $in: user.managedProjectIds || [] } },
-      { supervisorId: user.supervisorProfileId },
-    ],
+    _id: { $in: access.projectIds },
     status: { $ne: "Completed" },
   })
     .sort({ lastActivityAt: -1 })
@@ -96,19 +274,36 @@ export async function getAssignedProjects(userId: string) {
 }
 
 export async function getAssignedSites(userId: string) {
+  const access = await getSupervisorAccess(userId);
   const projects = await getAssignedProjects(userId);
-  const projectIds = projects.map((p) => p.id);
+  const projectIds = access.projectIds.map((id) => id.toString());
   const projectIdToName = new Map<string, string>();
   for (const p of projects) projectIdToName.set(p.id, p.name);
 
-  const sites = await Site.find({ projectIds: { $in: projectIds.map((id) => new Types.ObjectId(id)) } })
+  const siteQuery: Record<string, unknown> = access.siteIds.length > 0
+    ? { _id: { $in: access.siteIds } }
+    : { projectIds: { $in: access.projectIds } };
+
+  const sites = await Site.find(siteQuery)
     .sort({ createdAt: -1 })
     .lean();
 
   const today = new Date().toISOString().slice(0, 10);
 
   const labourStats = await Labour.aggregate([
-    { $match: { projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) } } },
+    {
+      $match: {
+        projectId: { $in: access.projectIds },
+        ...(access.siteIds.length > 0 || access.siteNames.length > 0
+          ? {
+              $or: [
+                ...(access.siteIds.length > 0 ? [{ siteId: { $in: access.siteIds } }] : []),
+                ...(access.siteNames.length > 0 ? [{ site: { $in: access.siteNames } }] : []),
+              ],
+            }
+          : {}),
+      },
+    },
     {
       $group: {
         _id: { site: "$site", projectId: "$projectId" },
@@ -159,26 +354,20 @@ export async function getAssignedSites(userId: string) {
   });
 }
 
-export async function getActionableApprovals(userId: string) {
-  const user = await User.findById(userId);
-  if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
-
-  const projects = await Project.find({
-    $or: [
-      { _id: { $in: user.managedProjectIds || [] } },
-      { supervisorId: user.supervisorProfileId },
-    ],
-  }).lean();
-  const projectIds = projects.map((p) => p._id);
-
-  const approvals = await Approval.find({
-    projectId: { $in: projectIds },
-    status: "Pending",
-  })
+export async function getActionableApprovals(
+  userId: string,
+  status: "Pending" | "Approved" | "Rejected" | "all" = "Pending"
+) {
+  const access = await getSupervisorAccess(userId);
+  const approvals = await Approval.find(
+    approvalScopeQuery(access, status === "all" ? undefined : status)
+  )
     .sort({ submittedAt: -1 })
+    .limit(status === "all" ? 100 : 50)
     .lean();
 
   return approvals.map((a) => ({
+    _id: a._id.toString(),
     approvalId: a.approvalId,
     type: a.type,
     title: a.title,
@@ -187,6 +376,7 @@ export async function getActionableApprovals(userId: string) {
     site: a.site,
     amount: a.amount,
     submittedAt: a.submittedAt,
+    status: a.status,
     sourceCollection: a.sourceCollection,
     sourceId: a.sourceId,
   }));
@@ -292,38 +482,40 @@ export async function getSupervisorProjectsDetailed(userId: string) {
 }
 
 export async function getSupervisorProjectDetail(userId: string, projectId: string) {
-  const user = await User.findById(userId);
-  if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
+  const access = await getSupervisorAccess(userId);
+  const requestedProjectId = toObjectId(projectId);
+  if (!requestedProjectId) throw new AppError(400, "Invalid project id");
 
-  const project = await Project.findById(projectId).lean();
+  const project = await Project.findById(requestedProjectId).lean();
   if (!project) throw new AppError(404, "Project not found");
 
-  const isAssigned =
-    (user.managedProjectIds || []).some((id) => id.toString() === projectId) ||
-    (user.supervisorProfileId && project.supervisorId?.toString() === user.supervisorProfileId.toString());
-
-  if (!isAssigned) throw new AppError(403, "Not assigned to this project");
+  if (!hasObjectId(access.projectIds, requestedProjectId)) {
+    throw new AppError(403, "Not assigned to this project");
+  }
 
   return project;
 }
 
 export async function getSupervisorProjectApprovals(userId: string, projectId: string) {
   await getSupervisorProjectDetail(userId, projectId);
+  const access = await getSupervisorAccess(userId);
 
   const approvals = await Approval.find({
+    ...approvalScopeQuery(access, "Pending"),
     projectId: new Types.ObjectId(projectId),
-    status: "Pending",
   })
     .sort({ submittedAt: -1 })
     .lean();
 
   return approvals.map((a) => ({
+    _id: a._id.toString(),
     approvalId: a.approvalId,
     type: a.type,
     title: a.title,
     site: a.site,
     amount: a.amount,
     submittedAt: a.submittedAt,
+    status: a.status,
     sourceCollection: a.sourceCollection,
   }));
 }
@@ -336,12 +528,9 @@ async function getProjectIdStrings(userId: string): Promise<string[]> {
 
 export async function listMaterialsForSupervisor(
   userId: string,
-  filters: { siteId?: string; status?: string; page?: number; limit?: number }
+  filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
 ) {
-  const projectIds = await getProjectIdStrings(userId);
-  const query: Record<string, unknown> = { projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) } };
-  if (filters.siteId) query.siteId = new Types.ObjectId(filters.siteId);
-  if (filters.status) query.status = filters.status;
+  const { query } = await buildScopedEntityQuery(userId, filters);
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
@@ -382,12 +571,9 @@ export async function listMaterialsForSupervisor(
 
 export async function listLabourForSupervisor(
   userId: string,
-  filters: { siteId?: string; status?: string; page?: number; limit?: number }
+  filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
 ) {
-  const projectIds = await getProjectIdStrings(userId);
-  const query: Record<string, unknown> = { projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) } };
-  if (filters.siteId) query.siteId = new Types.ObjectId(filters.siteId);
-  if (filters.status) query.status = filters.status;
+  const { query } = await buildScopedEntityQuery(userId, filters);
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
@@ -423,13 +609,9 @@ export async function listLabourForSupervisor(
 
 export async function listExpensesForSupervisor(
   userId: string,
-  filters: { siteId?: string; status?: string; type?: string; page?: number; limit?: number }
+  filters: { projectId?: string; siteId?: string; status?: string; type?: string; page?: number; limit?: number }
 ) {
-  const projectIds = await getProjectIdStrings(userId);
-  const query: Record<string, unknown> = { projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) } };
-  if (filters.siteId) query.siteId = new Types.ObjectId(filters.siteId);
-  if (filters.status) query.status = filters.status;
-  if (filters.type) query.type = filters.type;
+  const { query } = await buildScopedEntityQuery(userId, filters);
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
@@ -464,11 +646,8 @@ export async function listExpensesForSupervisor(
 }
 
 export async function getMaterialDetailForSupervisor(userId: string, materialId: string) {
-  const projectIds = await getProjectIdStrings(userId);
-  const material = await Material.findOne({
-    _id: materialId,
-    projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) },
-  }).lean();
+  const { query } = await buildScopedEntityQuery(userId);
+  const material = await Material.findOne({ ...query, _id: materialId }).lean();
   if (!material) throw new AppError(404, "Material not found or not accessible");
   return material;
 }
@@ -478,11 +657,8 @@ export async function updateMaterialStockForSupervisor(
   materialId: string,
   updates: { purchasedQuantity?: number; consumedQuantity?: number }
 ) {
-  const projectIds = await getProjectIdStrings(userId);
-  const material = await Material.findOne({
-    _id: materialId,
-    projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) },
-  });
+  const { query } = await buildScopedEntityQuery(userId);
+  const material = await Material.findOne({ ...query, _id: materialId });
   if (!material) throw new AppError(404, "Material not found or not accessible");
   if (updates.purchasedQuantity !== undefined) material.purchasedQuantity = updates.purchasedQuantity;
   if (updates.consumedQuantity !== undefined) material.consumedQuantity = updates.consumedQuantity;
@@ -491,21 +667,15 @@ export async function updateMaterialStockForSupervisor(
 }
 
 export async function getLabourDetailForSupervisor(userId: string, labourId: string) {
-  const projectIds = await getProjectIdStrings(userId);
-  const labour = await Labour.findOne({
-    _id: labourId,
-    projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) },
-  }).lean();
+  const { query } = await buildScopedEntityQuery(userId);
+  const labour = await Labour.findOne({ ...query, _id: labourId }).lean();
   if (!labour) throw new AppError(404, "Labour entry not found or not accessible");
   return labour;
 }
 
 export async function getExpenseDetailForSupervisor(userId: string, expenseId: string) {
-  const projectIds = await getProjectIdStrings(userId);
-  const expense = await Expense.findOne({
-    _id: expenseId,
-    projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) },
-  }).lean();
+  const { query } = await buildScopedEntityQuery(userId);
+  const expense = await Expense.findOne({ ...query, _id: expenseId }).lean();
   if (!expense) throw new AppError(404, "Expense not found or not accessible");
   return expense;
 }
@@ -515,11 +685,8 @@ export async function takeApprovalActionForSupervisor(
   approvalId: string,
   action: { action: "approve" | "reject"; comment?: string }
 ) {
-  const projectIds = await getProjectIdStrings(userId);
-  const approval = await Approval.findOne({
-    _id: approvalId,
-    projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) },
-  });
+  const access = await getSupervisorAccess(userId);
+  const approval = await Approval.findOne({ ...approvalScopeQuery(access), _id: approvalId });
   if (!approval) throw new AppError(404, "Approval not found or not accessible");
   if (approval.status !== "Pending") throw new AppError(400, "Approval is not pending");
 
@@ -557,11 +724,8 @@ export async function takeApprovalActionForSupervisor(
 }
 
 export async function getApprovalDetailForSupervisor(userId: string, approvalId: string) {
-  const projectIds = await getProjectIdStrings(userId);
-  const approval = await Approval.findOne({
-    _id: approvalId,
-    projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) },
-  }).lean();
+  const access = await getSupervisorAccess(userId);
+  const approval = await Approval.findOne({ ...approvalScopeQuery(access), _id: approvalId }).lean();
   if (!approval) throw new AppError(404, "Approval not found or not accessible");
   return approval;
 }

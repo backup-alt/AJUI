@@ -87,7 +87,7 @@ import { Labour } from '../../../shared/models';
           </div>
           <p class="site">
             <ion-icon name="location-outline"></ion-icon>
-            {{ labour()!.site }} · {{ labour()!.projectName }}
+            {{ labour()!.site }} - {{ labour()!.projectName }}
           </p>
 
           <ion-card>
@@ -193,7 +193,7 @@ import { Labour } from '../../../shared/models';
                     <span class="type-chip">
                       <strong>{{ t.name }}</strong>
                       <span class="type-meta">
-                        {{ t.staffCount || 0 }} · {{ t.dailyWage | currency: 'INR': 'symbol': '1.0-0' }}/day
+                        {{ t.staffCount || 0 }} - {{ t.dailyWage | currency: 'INR': 'symbol': '1.0-0' }}/day
                       </span>
                     </span>
                   }

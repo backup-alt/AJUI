@@ -41,10 +41,12 @@ import {
   checkmarkDoneCircleOutline,
   checkmarkDoneCircleSharp,
   personCircleOutline,
+  personCircleSharp,
   settingsOutline,
   logOutOutline,
   chevronDownOutline,
   notificationsOutline,
+  notificationsSharp,
   businessOutline,
   logOutSharp,
   shieldCheckmarkOutline,
@@ -53,10 +55,13 @@ import {
   locationSharp,
   appsOutline,
   gridOutline,
+  checkmarkOutline,
+  sunnyOutline,
+  moonOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
-import { Site, Project } from '../../shared/models';
+import { Site } from '../../shared/models';
 
 @Component({
   selector: 'app-shell',
@@ -83,29 +88,25 @@ import { Site, Project } from '../../shared/models';
     RouterLinkActive,
   ],
   template: `
-    <ion-menu content-id="main-content" type="overlay">
-      <ion-header>
-        <ion-toolbar class="agb-toolbar">
-          <div class="brand-wrap">
-            <div class="brand-logo-wrap">
-              <img src="assets/logo.png" alt="AGB" class="brand-logo-img" />
-            </div>
-            <div class="brand-text">
-              <div class="brand-title">Annai Golden Builders</div>
-              <div class="brand-sub">Supervisor Portal</div>
-            </div>
+    <ion-menu content-id="main-content" type="overlay" class="agb-menu">
+      <ion-header class="agb-menu-header">
+        <div class="menu-brand">
+          <div class="menu-brand-logo">
+            <img src="assets/logo.png" alt="AGB" />
           </div>
-        </ion-toolbar>
+          <div class="menu-brand-text">
+            <div class="menu-brand-name">Annai Golden Builders</div>
+            <div class="menu-brand-sub">Supervisor Portal</div>
+          </div>
+        </div>
       </ion-header>
 
-      <ion-content>
+      <ion-content class="menu-content">
         @if (currentUser()) {
           <div class="user-card">
             <div class="user-avatar-wrap">
-              <div class="user-avatar">
-                {{ userInitials() }}
-              </div>
-              <div class="online-indicator"></div>
+              <div class="user-avatar">{{ userInitials() }}</div>
+              <span class="online-indicator"></span>
             </div>
             <div class="user-info">
               <div class="user-name">{{ currentUser()?.name }}</div>
@@ -120,6 +121,7 @@ import { Site, Project } from '../../shared/models';
           </div>
         }
 
+        <div class="menu-section-label">Workspace</div>
         <ion-list lines="none" class="menu-list">
           <ion-item routerLink="/tabs/dashboard" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/dashboard') ? 'home-sharp' : 'home-outline'" slot="start"></ion-icon>
@@ -127,7 +129,7 @@ import { Site, Project } from '../../shared/models';
           </ion-item>
           <ion-item routerLink="/tabs/sites" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/sites') ? 'location-sharp' : 'location-outline'" slot="start"></ion-icon>
-            <ion-label>My Sites</ion-label>
+            <ion-label>My sites</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/materials" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/materials') ? 'cube-sharp' : 'cube-outline'" slot="start"></ion-icon>
@@ -150,30 +152,35 @@ import { Site, Project } from '../../shared/models';
           </ion-item>
         </ion-list>
 
-        <div class="menu-divider"></div>
-
-        <ion-list lines="none" class="menu-list menu-secondary">
+        <div class="menu-section-label">Account</div>
+        <ion-list lines="none" class="menu-list">
           <ion-item routerLink="/tabs/profile" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/profile') ? 'person-circle' : 'person-circle-outline'" slot="start"></ion-icon>
+            <ion-icon [name]="isActiveRoute('/tabs/profile') ? 'person-circle-sharp' : 'person-circle-outline'" slot="start"></ion-icon>
             <ion-label>Profile</ion-label>
           </ion-item>
-          <ion-item button detail="false" class="logout-item" (click)="logout()">
-            <ion-icon name="log-out-outline" slot="start"></ion-icon>
-            <ion-label>Logout</ion-label>
+          <ion-item button detail="false" class="theme-toggle" (click)="toggleTheme()">
+            <ion-icon [name]="isDark() ? 'sunny-outline' : 'moon-outline'" slot="start"></ion-icon>
+            <ion-label>{{ isDark() ? 'Light mode' : 'Dark mode' }}</ion-label>
           </ion-item>
         </ion-list>
 
+        <div class="menu-spacer"></div>
+
         <div class="menu-footer">
-          <div class="menu-footer-content">
+          <ion-item button detail="false" class="logout-item" (click)="logout()">
+            <ion-icon [name]="isLoggingOut() ? 'log-out-sharp' : 'log-out-outline'" slot="start"></ion-icon>
+            <ion-label>Sign out</ion-label>
+          </ion-item>
+          <div class="menu-footer-meta">
             <ion-icon name="shield-checkmark-outline"></ion-icon>
-            <span>AGB Supervisor v1.0</span>
+            <span>AGB Supervisor - v1.0</span>
           </div>
         </div>
       </ion-content>
     </ion-menu>
 
     <div class="ion-page" id="main-content">
-      <ion-header class="agb-header">
+      <ion-header class="agb-app-header">
         <ion-toolbar>
           <ion-buttons slot="start">
             <ion-menu-button color="primary"></ion-menu-button>
@@ -181,9 +188,9 @@ import { Site, Project } from '../../shared/models';
 
           <ion-title>
             <button class="site-selector" (click)="toggleSitePopover($event)">
-              <ion-icon name="location-outline" slot="start"></ion-icon>
-              <span class="site-name">{{ selectedSiteName() || 'Select Site' }}</span>
-              <ion-icon name="chevron-down-outline" slot="end"></ion-icon>
+              <span class="site-icon"><ion-icon name="location-outline"></ion-icon></span>
+              <span class="site-name">{{ selectedSiteName() || 'Select site' }}</span>
+              <span class="site-chev"><ion-icon name="chevron-down-outline"></ion-icon></span>
             </button>
           </ion-title>
 
@@ -191,7 +198,7 @@ import { Site, Project } from '../../shared/models';
             <ion-button class="notification-btn">
               <ion-icon name="notifications-outline"></ion-icon>
               @if (pendingApprovalCount() > 0) {
-                <span class="notification-badge"></span>
+                <span class="notification-badge">{{ pendingApprovalCount() }}</span>
               }
             </ion-button>
           </ion-buttons>
@@ -205,16 +212,24 @@ import { Site, Project } from '../../shared/models';
           <ion-content>
             <ion-list lines="none">
               <ion-list-header class="popover-header">
-                <ion-label>Select Site</ion-label>
+                <ion-label>Switch site</ion-label>
               </ion-list-header>
               @if (isLoadingSites()) {
                 <ion-item>
-                  <ion-spinner name="crescent"></ion-spinner>
+                  <ion-spinner name="crescent" slot="start"></ion-spinner>
+                  <ion-label>Loading sites...</ion-label>
                 </ion-item>
               } @else {
                 @for (site of sites(); track site.id) {
-                  <ion-item button detail (click)="selectSite(site)" [class.selected-site]="site.id === selectedSiteId()">
-                    <ion-icon name="location-outline" slot="start" color="primary"></ion-icon>
+                  <ion-item
+                    button
+                    detail
+                    (click)="selectSite(site)"
+                    [class.selected-site]="site.id === selectedSiteId()"
+                  >
+                    <span class="site-tile-icon" slot="start">
+                      <ion-icon name="location-outline"></ion-icon>
+                    </span>
                     <ion-label>
                       <h3>{{ site.name }}</h3>
                       <p>Site ID: {{ site.siteId }}</p>
@@ -228,6 +243,7 @@ import { Site, Project } from '../../shared/models';
                   <div class="empty-sites">
                     <ion-icon name="location-outline"></ion-icon>
                     <p>No sites assigned</p>
+                    <span>Contact your admin to be assigned</span>
                   </div>
                 }
               }
@@ -238,68 +254,55 @@ import { Site, Project } from '../../shared/models';
     </div>
   `,
   styles: [`
-    /* Toolbar with gradient */
-    .agb-toolbar {
-      --background: linear-gradient(135deg, #002263 0%, #003380 100%);
-      --color: #ffffff;
-      --border-color: transparent;
+    /* Menu header */
+    .agb-menu-header {
+      background: var(--agb-gradient-hero);
+      color: #ffffff;
+      padding: 20px 18px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
     }
-    .brand-wrap {
+    .menu-brand {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 12px 4px;
     }
-    .brand-logo-wrap {
+    .menu-brand-logo {
       width: 44px;
       height: 44px;
-      background: rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(6px);
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
+      flex-shrink: 0;
     }
-    .brand-logo-img {
-      width: 36px;
-      height: 36px;
-      object-fit: contain;
-    }
-    .brand-text {
-      display: flex;
-      flex-direction: column;
-    }
-    .brand-title {
-      font-weight: 700;
-      font-size: 14px;
-      color: #ffffff;
-      line-height: 1.2;
-    }
-    .brand-sub {
-      font-size: 10px;
-      color: rgba(255, 255, 255, 0.7);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 500;
-    }
+    .menu-brand-logo img { width: 28px; height: 28px; object-fit: contain; }
+    .menu-brand-text { line-height: 1.2; }
+    .menu-brand-name { font-size: 14px; font-weight: 700; }
+    .menu-brand-sub { font-size: 10px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
 
-    /* User Card */
+    .menu-content { --background: #f8fafc; --padding-top: 0; }
+
+    /* User card */
     .user-card {
       margin: 16px;
       padding: 16px;
-      background: linear-gradient(135deg, #002263 0%, #003380 100%);
+      background: #002263;
       color: #ffffff;
+      border-radius: 18px;
       display: flex;
       align-items: center;
       gap: 14px;
+      box-shadow: 0 12px 28px -14px rgba(0, 34, 99, 0.50);
     }
-    .user-avatar-wrap {
-      position: relative;
-    }
+    .user-avatar-wrap { position: relative; }
     .user-avatar {
       width: 48px;
       height: 48px;
-      background: #c9a227;
-      color: #ffffff;
+      background: linear-gradient(135deg, #c9a227 0%, #d4b45a 100%);
+      color: #1f2937;
+      border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -308,175 +311,180 @@ import { Site, Project } from '../../shared/models';
     }
     .online-indicator {
       position: absolute;
-      bottom: 2px;
-      right: 2px;
+      bottom: -2px;
+      right: -2px;
       width: 12px;
       height: 12px;
       background: #22c55e;
       border: 2px solid #002263;
+      border-radius: 50%;
     }
-    .user-name {
-      font-weight: 700;
-      font-size: 15px;
-      color: #ffffff;
-      line-height: 1.3;
-    }
-    .user-role {
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.75);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-name { font-weight: 700; font-size: 15px; line-height: 1.2; }
+    .user-role { font-size: 11px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
     .user-project {
       display: flex;
       align-items: center;
       gap: 4px;
-      margin-top: 4px;
+      margin-top: 6px;
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.7);
+      opacity: 0.85;
     }
-    .user-project ion-icon {
-      font-size: 12px;
+    .user-project ion-icon { font-size: 12px; color: #c9a227; }
+
+    /* Section labels */
+    .menu-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 12px 22px 6px;
     }
 
-    /* Menu List */
-    .menu-list {
-      padding: 0;
-      background: transparent;
-    }
+    .menu-list { background: transparent; padding: 0 12px; }
     .menu-list ion-item {
       --background: transparent;
-      --color: #111827;
-      --border-radius: 0 !important;
-      --inner-border-radius: 0 !important;
-      --padding-start: 20px;
-      --padding-end: 20px;
+      --color: #0f172a;
+      --border-radius: 12px;
+      --inner-border-radius: 12px;
+      --padding-start: 14px;
+      --padding-end: 14px;
       --min-height: 48px;
       font-size: 14px;
-      font-weight: 500;
-      border-bottom: 1px solid #f1f3f5;
+      font-weight: 600;
+      margin: 2px 0;
+      border-bottom: none;
+    }
+    .menu-list ion-item ion-icon { font-size: 20px; color: #475569; margin-right: 12px; }
+    .menu-list ion-item.selected {
+      --background: var(--agb-gradient-primary);
+      --color: #ffffff;
+      box-shadow: 0 6px 16px -8px rgba(0, 34, 99, 0.50);
+    }
+    .menu-list ion-item.selected ion-icon { color: #ffffff; }
+
+    .menu-spacer { flex: 1; min-height: 24px; }
+
+    .menu-footer { padding: 12px 12px 24px; }
+    .menu-footer ion-item {
+      --background: transparent;
+      --color: #dc2626;
+      --border-radius: 12px;
+      --inner-border-radius: 12px;
+      --padding-start: 14px;
+      --padding-end: 14px;
+      --min-height: 48px;
+      font-weight: 600;
       margin: 0;
     }
-    .menu-list ion-item ion-icon {
-      font-size: 20px;
-      color: #002263;
-      margin-right: 12px;
-    }
-    .menu-list ion-item.selected {
-      --background: #002263;
-      --color: #ffffff;
-    }
-    .menu-list ion-item.selected ion-icon {
-      color: #ffffff;
-    }
-    .menu-divider {
-      height: 1px;
-      background: #e5e7eb;
-      margin: 8px 0;
-    }
-    .menu-secondary {
-      opacity: 1;
-    }
-    .logout-item {
-      --color: #dc3545;
-    }
-    .logout-item ion-icon {
-      color: #dc3545;
-    }
-
-    /* Menu Footer */
-    .menu-footer {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 16px;
-      border-top: 1px solid #e5e7eb;
-    }
-    .menu-footer-content {
+    .menu-footer ion-item ion-icon { color: #dc2626; font-size: 20px; }
+    .menu-footer-meta {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
       font-size: 10px;
-      color: #6b7280;
-      text-transform: uppercase;
+      color: #94a3b8;
+      margin-top: 14px;
       letter-spacing: 0.5px;
+      text-transform: uppercase;
     }
-    .menu-footer-content ion-icon {
-      font-size: 12px;
-    }
+    .menu-footer-meta ion-icon { font-size: 12px; }
 
-    /* Main Header */
-    .agb-header {
+    /* Top header */
+    .agb-app-header {
       --background: #ffffff;
-      --border-color: #e5e7eb;
+      --border-color: transparent;
     }
     .site-selector {
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: #f5f6f8;
-      border: 1px solid #d1d5db;
-      padding: 8px 12px;
+      gap: 10px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      padding: 6px 10px 6px 6px;
+      border-radius: 14px;
       cursor: pointer;
-      max-width: 220px;
+      max-width: 240px;
+      transition: background var(--agb-transition-fast), border-color var(--agb-transition-fast);
+      font-family: inherit;
     }
-    .site-selector:hover {
-      background: #e5e7eb;
-    }
-    .site-selector ion-icon {
+    .site-selector:hover { background: #e2e8f0; }
+    .site-selector:active { transform: scale(0.985); }
+    .site-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background: rgba(0, 34, 99, 0.10);
       color: #002263;
-      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
+    .site-icon ion-icon { font-size: 16px; }
     .site-name {
-      font-weight: 600;
+      font-weight: 700;
       font-size: 13px;
-      color: #111827;
+      color: #0f172a;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 150px;
+      max-width: 160px;
     }
-    .notification-btn {
-      position: relative;
-    }
+    .site-chev ion-icon { color: #64748b; font-size: 16px; }
+
+    .notification-btn { position: relative; --padding-end: 8px; }
+    .notification-btn ion-icon { font-size: 22px; color: #475569; }
     .notification-badge {
       position: absolute;
       top: 8px;
       right: 8px;
-      width: 8px;
-      height: 8px;
-      background: #dc3545;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      background: #dc2626;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1.5px solid #ffffff;
     }
 
     /* Popover */
     .popover-header {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
-      color: #6b7280;
+      color: #64748b;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.6px;
+      --background: transparent;
     }
-    .selected-site {
-      --background: #f5f6f8;
+    .site-tile-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: rgba(0, 34, 99, 0.08);
+      color: #002263;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
+    .site-tile-icon ion-icon { font-size: 18px; }
     .empty-sites {
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 32px 16px;
-      color: #9ca3af;
+      color: #94a3b8;
+      text-align: center;
     }
-    .empty-sites ion-icon {
-      font-size: 36px;
-      margin-bottom: 8px;
-      opacity: 0.6;
-    }
-    .empty-sites p {
-      font-size: 13px;
-      margin: 0;
-    }
+    .empty-sites ion-icon { font-size: 40px; margin-bottom: 8px; opacity: 0.6; }
+    .empty-sites p { font-size: 14px; font-weight: 600; color: #475569; margin: 0; }
+    .empty-sites span { font-size: 12px; color: #94a3b8; margin-top: 4px; }
   `],
 })
 export class ShellComponent implements OnInit, OnDestroy {
@@ -484,7 +492,6 @@ export class ShellComponent implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
-  private platform = inject(Platform);
 
   currentUser = signal<{ name: string; email: string } | null>(null);
   sites = signal<Site[]>([]);
@@ -493,6 +500,8 @@ export class ShellComponent implements OnInit, OnDestroy {
   isSitePopoverOpen = signal(false);
   isLoadingSites = signal(false);
   pendingApprovalCount = signal(0);
+  isDark = signal<boolean>(document.documentElement.classList.contains('dark'));
+  isLoggingOut = signal(false);
   siteCount = computed(() => this.sites().length);
 
   userInitials = computed(() => {
@@ -508,29 +517,12 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      homeOutline,
-      homeSharp,
-      cubeOutline,
-      cubeSharp,
-      peopleOutline,
-      peopleSharp,
-      walletOutline,
-      walletSharp,
-      checkmarkDoneCircleOutline,
-      checkmarkDoneCircleSharp,
-      personCircleOutline,
-      settingsOutline,
-      logOutOutline,
-      logOutSharp,
-      chevronDownOutline,
-      notificationsOutline,
-      businessOutline,
-      constructOutline,
-      shieldCheckmarkOutline,
-      locationOutline,
-      locationSharp,
-      appsOutline,
-      gridOutline,
+      homeOutline, homeSharp, cubeOutline, cubeSharp, peopleOutline, peopleSharp,
+      walletOutline, walletSharp, checkmarkDoneCircleOutline, checkmarkDoneCircleSharp,
+      personCircleOutline, personCircleSharp, settingsOutline, logOutOutline,
+      chevronDownOutline, notificationsOutline, notificationsSharp, businessOutline,
+      constructOutline, shieldCheckmarkOutline, locationOutline, locationSharp,
+      appsOutline, gridOutline, checkmarkOutline, sunnyOutline, moonOutline, logOutSharp,
     });
 
     this.currentUser.set(this.auth.currentUser());
@@ -540,18 +532,35 @@ export class ShellComponent implements OnInit, OnDestroy {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('agb:approvals-changed', this.handleApprovalsChanged);
+      window.addEventListener('agb:theme-changed', this.handleThemeChanged);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:approvals-changed', this.handleApprovalsChanged);
+      window.removeEventListener('agb:theme-changed', this.handleThemeChanged);
     }
   }
 
   private handleApprovalsChanged = (): void => {
     void this.refreshPendingCount();
   };
+
+  private handleThemeChanged = (): void => {
+    this.isDark.set(document.documentElement.classList.contains('dark'));
+  };
+
+  toggleTheme(): void {
+    const next = !this.isDark();
+    document.documentElement.classList.toggle('dark', next);
+    try {
+      localStorage.setItem('agb:theme', next ? 'dark' : 'light');
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new CustomEvent('agb:theme-changed'));
+  }
 
   private async refreshPendingCount(): Promise<void> {
     this.supervisor.getApprovals().subscribe({
@@ -613,16 +622,16 @@ export class ShellComponent implements OnInit, OnDestroy {
       site.name
     );
     this.closeSitePopover();
+    window.dispatchEvent(new CustomEvent('agb:site-changed', { detail: site.id }));
   }
 
   async logout(): Promise<void> {
-    await this.auth.logout();
-    const toast = await this.toastCtrl.create({
-      message: 'Logged out successfully',
-      duration: 2000,
-      position: 'top',
-      color: 'success',
-    });
-    await toast.present();
+    if (this.isLoggingOut()) return;
+    this.isLoggingOut.set(true);
+    try {
+      await this.auth.logout();
+    } finally {
+      this.isLoggingOut.set(false);
+    }
   }
 }

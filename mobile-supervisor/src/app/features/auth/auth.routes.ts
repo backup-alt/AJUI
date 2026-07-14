@@ -11,14 +11,29 @@ export const AUTH_ROUTES: Routes = [
     loadComponent: () => import('./login/login.page').then((m) => m.LoginPage),
   },
   {
+    path: 'password-login',
+    loadComponent: () =>
+      import('./password-login/password-login.page').then((m) => m.PasswordLoginPage),
+  },
+  {
+    path: 'login-with-otp',
+    loadComponent: () =>
+      import('./login-with-otp/login-with-otp.page').then((m) => m.LoginWithOtpPage),
+  },
+  {
+    path: 'forgot-password',
+    loadComponent: () =>
+      import('./forgot-password/forgot-password.page').then((m) => m.ForgotPasswordPage),
+  },
+  {
+    path: 'reset-password',
+    loadComponent: () =>
+      import('./reset-password/reset-password.page').then((m) => m.ResetPasswordPage),
+  },
+  {
     path: 'qr-scanner',
     loadComponent: () =>
       import('./qr-scanner/qr-scanner.page').then((m) => m.QrScannerPage),
-  },
-  {
-    path: 'otp-login',
-    loadComponent: () =>
-      import('./otp-login/otp-login.page').then((m) => m.OtpLoginPage),
   },
   {
     path: 'manual-token',

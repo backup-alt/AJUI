@@ -22,7 +22,15 @@ import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
-import { locationOutline, walletOutline, checkmarkCircleOutline } from 'ionicons/icons';
+import {
+  alertCircleOutline,
+  cartOutline,
+  cashOutline,
+  checkmarkCircleOutline,
+  locationOutline,
+  walletOutline,
+  warningOutline,
+} from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 
 @Component({
@@ -185,7 +193,7 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
           @if (expenseType() === 'Purchase' && expense.amount && expense.amount > currentBalance()!) {
             <div class="block-notice">
               <ion-icon name="alert-circle-outline"></ion-icon>
-              Cannot submit — amount exceeds available balance
+              Cannot submit - amount exceeds available balance
             </div>
           }
 
@@ -266,7 +274,15 @@ export class ExpenseCreatePage implements OnInit {
   currentBalance = signal<number | null>(null);
 
   async ngOnInit(): Promise<void> {
-    addIcons({ locationOutline, walletOutline, checkmarkCircleOutline });
+    addIcons({
+      alertCircleOutline,
+      cartOutline,
+      cashOutline,
+      checkmarkCircleOutline,
+      locationOutline,
+      walletOutline,
+      warningOutline,
+    });
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
@@ -352,7 +368,7 @@ export class ExpenseCreatePage implements OnInit {
     // Hard block: Purchase exceeding balance
     if (this.expenseType() === 'Purchase' && this.expense.amount! > this.currentBalance()!) {
       const toast = await this.toastCtrl.create({
-        message: 'Cannot submit — amount exceeds available balance',
+        message: 'Cannot submit - amount exceeds available balance',
         duration: 3000,
         color: 'danger',
         position: 'top',

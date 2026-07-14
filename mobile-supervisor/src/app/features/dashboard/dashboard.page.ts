@@ -1,11 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import {
   IonContent,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardSubtitle,
-  IonCardContent,
   IonIcon,
   IonBadge,
   IonSkeletonText,
@@ -31,21 +26,27 @@ import {
   cashOutline,
   layersOutline,
   documentTextOutline,
+  chevronForwardOutline,
+  trendingUpOutline,
+  calendarOutline,
+  trendingDownOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
-import { DashboardData, Project, Site, ApprovalSummary } from '../../shared/models';
-import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
+import { AuthService } from '../../core/services/auth.service';
+import { DashboardData, Site, ApprovalSummary } from '../../shared/models';
+import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe, NgClass } from '@angular/common';
+import {
+  PageHeaderComponent,
+  StatCardComponent,
+  StatusPillComponent,
+  EmptyStateComponent,
+} from '../../shared/components';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [
     IonContent,
-    IonCard,
-    IonCardHeader,
-    IonCardTitle,
-    IonCardSubtitle,
-    IonCardContent,
     IonIcon,
     IonBadge,
     IonSkeletonText,
@@ -57,6 +58,11 @@ import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/com
     DatePipe,
     CurrencyPipe,
     TitleCasePipe,
+    NgClass,
+    PageHeaderComponent,
+    StatCardComponent,
+    StatusPillComponent,
+    EmptyStateComponent,
   ],
   template: `
     <ion-content class="dashboard-content">
@@ -65,81 +71,76 @@ import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/com
       </ion-refresher>
 
       <div class="dashboard-container">
-        <!-- Greeting Header -->
-        <div class="greeting-bar">
-          <div class="greeting-text">
-            <h1 class="greeting-title">{{ greeting() }},</h1>
-            <p class="greeting-name">{{ userName() }}</p>
-            <p class="greeting-subtitle">{{ currentDate }}</p>
+        <!-- Hero greeting -->
+        <div class="hero">
+          <div class="hero-content">
+            <div class="greeting">
+              <span class="greeting-pre">{{ greeting() }},</span>
+              <h1 class="greeting-name">{{ userName() }}</h1>
+            </div>
+            <div class="hero-meta">
+              <span class="meta-item">
+                <ion-icon name="calendar-outline"></ion-icon>
+                {{ currentDate }}
+              </span>
+              @if (currentSiteName()) {
+                <span class="meta-divider"></span>
+                <span class="meta-item">
+                  <ion-icon name="location-outline"></ion-icon>
+                  {{ currentSiteName() }}
+                </span>
+              }
+            </div>
           </div>
         </div>
 
-        <!-- Site Strip (current site) -->
-        @if (currentSiteName()) {
-          <div class="site-strip">
-            <ion-icon name="location-outline"></ion-icon>
-            <div class="site-strip-info">
-              <div class="site-strip-label">Active Site</div>
-              <div class="site-strip-value">{{ currentSiteName() }}</div>
-            </div>
-          </div>
-        }
-
-        <!-- Stats Grid -->
-        <div class="stats-section">
-          <div class="section-heading">
-            <h2 class="section-title">Overview</h2>
-          </div>
+        <div class="content-stack">
+          <!-- Stats grid -->
           <div class="stats-grid">
-            <div class="stat-card" (click)="navigateTo('/tabs/sites')">
-              <div class="stat-icon stat-icon-navy">
-                <ion-icon name="location-outline"></ion-icon>
-              </div>
-              <div class="stat-content">
-                <span class="stat-value">{{ dashboard()?.counts?.sites || 0 }}</span>
-                <span class="stat-label">Active Sites</span>
-              </div>
-            </div>
-
-            <div class="stat-card" (click)="navigateTo('/tabs/approvals')">
-              <div class="stat-icon stat-icon-warning">
-                <ion-icon name="checkmark-done-circle-outline"></ion-icon>
-              </div>
-              <div class="stat-content">
-                <span class="stat-value">{{ dashboard()?.counts?.pendingApprovals || 0 }}</span>
-                <span class="stat-label">Pending Approvals</span>
-              </div>
-            </div>
-
-            <div class="stat-card" (click)="navigateTo('/tabs/materials')">
-              <div class="stat-icon stat-icon-danger">
-                <ion-icon name="cube-outline"></ion-icon>
-              </div>
-              <div class="stat-content">
-                <span class="stat-value">{{ dashboard()?.counts?.pendingMaterials || 0 }}</span>
-                <span class="stat-label">Material Requests</span>
-              </div>
-            </div>
-
-            <div class="stat-card" (click)="navigateTo('/tabs/labour')">
-              <div class="stat-icon stat-icon-info">
-                <ion-icon name="people-outline"></ion-icon>
-              </div>
-              <div class="stat-content">
-                <span class="stat-value">{{ dashboard()?.counts?.pendingLabour || 0 }}</span>
-                <span class="stat-label">Labour Entries</span>
-              </div>
-            </div>
+            <agb-stat-card
+              icon="location-outline"
+              iconBg="rgba(0, 34, 99, 0.10)"
+              iconColor="#002263"
+              [value]="dashboard()?.counts?.sites || 0"
+              label="Active sites"
+              (click)="navigateTo('/tabs/sites')"
+            ></agb-stat-card>
+            <agb-stat-card
+              icon="checkmark-done-circle-outline"
+              iconBg="rgba(245, 158, 11, 0.14)"
+              iconColor="#b45309"
+              [value]="dashboard()?.counts?.pendingApprovals || 0"
+              label="Pending approvals"
+              (click)="navigateTo('/tabs/approvals')"
+            ></agb-stat-card>
+            <agb-stat-card
+              icon="cube-outline"
+              iconBg="rgba(220, 38, 38, 0.10)"
+              iconColor="#b91c1c"
+              [value]="dashboard()?.counts?.pendingMaterials || 0"
+              label="Material requests"
+              (click)="navigateTo('/tabs/materials')"
+            ></agb-stat-card>
+            <agb-stat-card
+              icon="people-outline"
+              iconBg="rgba(14, 165, 233, 0.12)"
+              iconColor="#0369a1"
+              [value]="dashboard()?.counts?.pendingLabour || 0"
+              label="Labour entries"
+              (click)="navigateTo('/tabs/labour')"
+            ></agb-stat-card>
           </div>
-        </div>
 
-        <!-- Today's Expense (sharp card) -->
-        <div class="expense-block">
-          <div class="expense-row">
+          <!-- Today's expense -->
+          <div class="expense-card" (click)="navigateTo('/tabs/expenses')">
             <div class="expense-left">
-              <div class="expense-label">Today's Expenses</div>
+              <div class="expense-label">Today's expenses</div>
               <div class="expense-amount">
                 {{ dashboard()?.todayExpense?.total | currency:'INR':'symbol':'1.0-0' }}
+              </div>
+              <div class="expense-trend">
+                <ion-icon name="trending-up-outline"></ion-icon>
+                <span>Live from site ledger</span>
               </div>
             </div>
             <div class="expense-right">
@@ -147,427 +148,275 @@ import { DecimalPipe, DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/com
               <div class="expense-count-label">Transactions</div>
             </div>
           </div>
-        </div>
 
-        <!-- Pending Approvals -->
-        <div class="section-block">
-          <div class="section-heading">
-            <h2 class="section-title">Pending Approvals</h2>
-            <ion-button fill="clear" size="small" (click)="navigateTo('/tabs/approvals')">
-              View All
-              <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
-            </ion-button>
-          </div>
-
-          @if (isLoading()) {
-            @for (i of [1, 2, 3]; track i) {
-              <div class="approval-card skeleton-card">
-                <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
-                <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-              </div>
-            }
-          } @else if (pendingApprovals().length === 0) {
-            <div class="empty-state">
-              <ion-icon name="checkmark-circle-outline"></ion-icon>
-              <p>No pending approvals. All caught up.</p>
+          <!-- Pending approvals -->
+          <div class="section">
+            <div class="section-head">
+              <h2 class="section-title">Pending approvals</h2>
+              <button class="section-link" (click)="navigateTo('/tabs/approvals')">
+                View all
+                <ion-icon name="chevron-forward-outline"></ion-icon>
+              </button>
             </div>
-          } @else {
-            @for (approval of pendingApprovals().slice(0, 5); track approval.approvalId) {
-              <div class="approval-card" (click)="navigateToApproval(approval)">
-                <div class="approval-top">
-                  <div class="approval-type" [class]="approval.type">
-                    {{ approval.type | titlecase }}
+
+            @if (isLoading()) {
+              @for (i of [1, 2]; track i) {
+                <div class="approval-card skeleton">
+                  <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
+                  <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+                  <ion-skeleton-text animated style="width: 80%; height: 12px; margin-top: 10px;"></ion-skeleton-text>
+                </div>
+              }
+            } @else if (pendingApprovals().length === 0) {
+              <agb-empty-state
+                icon="checkmark-done-circle-outline"
+                iconBg="rgba(22, 163, 74, 0.14)"
+                iconColor="#15803d"
+                title="All caught up"
+                message="No pending approvals. Your work is in great shape."
+              ></agb-empty-state>
+            } @else {
+              @for (approval of pendingApprovals().slice(0, 4); track approval.approvalId) {
+                <button class="approval-card" (click)="navigateToApproval(approval)">
+                  <div class="approval-top">
+                    <agb-status-pill [tone]="getTone(approval.type)" [icon]="getTypeIcon(approval.type)">
+                      {{ approval.type | titlecase }}
+                    </agb-status-pill>
+                    <agb-status-pill tone="warning">Pending</agb-status-pill>
                   </div>
-                  <ion-badge [color]="getStatusColor(approval.status)">
-                    {{ approval.status }}
-                  </ion-badge>
-                </div>
-                <h3 class="approval-title">{{ approval.title }}</h3>
-                <div class="approval-meta">
-                  <span class="meta-item">
-                    <ion-icon name="business-outline"></ion-icon>
-                    {{ approval.projectName }}
-                  </span>
-                  @if (approval.amount) {
-                    <span class="amount">{{ approval.amount | currency:'INR':'symbol':'1.0-0' }}</span>
-                  }
-                </div>
-                <div class="approval-time">
-                  <ion-icon name="time-outline"></ion-icon>
-                  {{ approval.submittedAt | date:'MMM d, h:mm a' }}
-                </div>
-              </div>
-            }
-          }
-        </div>
-
-        <!-- Active Sites shortcut -->
-        <div class="section-block">
-          <div class="section-heading">
-            <h2 class="section-title">Your Active Sites</h2>
-            <ion-button fill="clear" size="small" (click)="navigateTo('/tabs/sites')">
-              View All
-              <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
-            </ion-button>
-          </div>
-
-          @if (sites().length === 0) {
-            <div class="empty-state">
-              <ion-icon name="location-outline"></ion-icon>
-              <p>No active sites assigned.</p>
-            </div>
-          } @else {
-            @for (site of sites().slice(0, 3); track site.id) {
-              <div class="site-card" (click)="navigateTo('/tabs/sites')">
-                <div class="site-row">
-                  <div class="site-info">
-                    <h3 class="site-name">{{ site.name }}</h3>
-                    @if (site.employeeCount !== undefined || site.daysActive !== undefined) {
-                      <p class="site-stats">
-                        @if (site.employeeCount !== undefined) {
-                          <span>{{ site.employeeCount }} worker{{ site.employeeCount !== 1 ? 's' : '' }}</span>
-                        }
-                        @if (site.employeeCount !== undefined && site.daysActive !== undefined) {
-                          <span class="stat-sep">·</span>
-                        }
-                        @if (site.daysActive !== undefined) {
-                          <span>{{ site.daysActive }} day{{ site.daysActive !== 1 ? 's' : '' }} active</span>
-                        }
-                      </p>
+                  <h3 class="approval-title">{{ approval.title }}</h3>
+                  <div class="approval-meta">
+                    <span class="meta-item">
+                      <ion-icon name="business-outline"></ion-icon>
+                      {{ approval.projectName }}
+                    </span>
+                    @if (approval.amount) {
+                      <span class="amount">{{ approval.amount | currency:'INR':'symbol':'1.0-0' }}</span>
                     }
                   </div>
-                  <ion-badge [color]="getSiteStatusColor(site.status)">
-                    {{ site.status }}
-                  </ion-badge>
-                </div>
-              </div>
+                  <div class="approval-time">
+                    <ion-icon name="time-outline"></ion-icon>
+                    {{ approval.submittedAt | date:'MMM d, h:mm a' }}
+                  </div>
+                </button>
+              }
             }
-          }
-        </div>
+          </div>
 
-        <div class="bottom-spacer"></div>
+          <!-- Active sites -->
+          <div class="section">
+            <div class="section-head">
+              <h2 class="section-title">Your active sites</h2>
+              <button class="section-link" (click)="navigateTo('/tabs/sites')">
+                View all
+                <ion-icon name="chevron-forward-outline"></ion-icon>
+              </button>
+            </div>
+
+            @if (sites().length === 0) {
+              <agb-empty-state
+                icon="location-outline"
+                title="No active sites"
+                message="You have not been assigned to any site yet. Please contact your admin."
+              ></agb-empty-state>
+            } @else {
+              @for (site of sites().slice(0, 3); track site.id) {
+                <button class="site-card" (click)="navigateTo('/tabs/sites')">
+                  <span class="site-tile-icon">
+                    <ion-icon name="construct-outline"></ion-icon>
+                  </span>
+                  <div class="site-info">
+                    <h3 class="site-name">{{ site.name }}</h3>
+                    <p class="site-stats">
+                      @if (site.employeeCount !== undefined) {
+                        <span>{{ site.employeeCount }} worker{{ site.employeeCount !== 1 ? 's' : '' }}</span>
+                      }
+                      @if (site.employeeCount !== undefined && site.daysActive !== undefined) {
+                        <span class="dot">-</span>
+                      }
+                      @if (site.daysActive !== undefined) {
+                        <span>{{ site.daysActive }} day{{ site.daysActive !== 1 ? 's' : '' }} active</span>
+                      }
+                    </p>
+                  </div>
+                  <agb-status-pill [tone]="getSiteTone(site.status)">{{ site.status || 'Active' }}</agb-status-pill>
+                </button>
+              }
+            }
+          </div>
+
+          <div class="bottom-spacer"></div>
+        </div>
       </div>
     </ion-content>
   `,
   styles: [`
-    .dashboard-content {
-      --background: #f5f6f8;
-    }
-    .dashboard-container {
-      padding: 0;
+    .dashboard-content { --background: #f5f6f8; }
+    .dashboard-container { padding: 0; }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      background: var(--agb-gradient-hero);
+      color: #ffffff;
+      padding: 32px 20px 56px;
+      overflow: hidden;
     }
 
-    /* Greeting bar */
-    .greeting-bar {
-      background: linear-gradient(135deg, #002263 0%, #003380 100%);
-      color: #ffffff;
-      padding: 18px 16px 22px;
-    }
-    .greeting-text {
-      display: flex;
-      flex-direction: column;
-    }
-    .greeting-title {
-      font-size: 14px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.7);
-      margin: 0 0 2px;
+    .hero-content { position: relative; }
+    .greeting { margin-bottom: 16px; }
+    .greeting-pre {
+      display: block;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.78);
+      letter-spacing: 0.4px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      font-weight: 600;
     }
     .greeting-name {
-      font-size: 22px;
-      font-weight: 700;
-      color: #ffffff;
-      margin: 0 0 4px;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      margin: 4px 0 0;
     }
-    .greeting-subtitle {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.7);
-      margin: 0;
-    }
-
-    /* Active site strip */
-    .site-strip {
+    .hero-meta {
       display: flex;
       align-items: center;
-      gap: 12px;
-      background: #ffffff;
-      border-bottom: 1px solid #e5e7eb;
-      padding: 12px 16px;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
     }
-    .site-strip ion-icon {
-      font-size: 20px;
-      color: #c9a227;
-    }
-    .site-strip-info {
-      flex: 1;
-    }
-    .site-strip-label {
-      font-size: 10px;
-      font-weight: 700;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .site-strip-value {
-      font-size: 15px;
-      font-weight: 600;
-      color: #111827;
+    .hero-meta ion-icon { font-size: 14px; color: #c9a227; }
+    .meta-item { display: inline-flex; align-items: center; gap: 4px; }
+    .meta-divider { width: 4px; height: 4px; background: rgba(255, 255, 255, 0.4); border-radius: 50%; }
+
+    .content-stack { padding: 0 16px; margin-top: -32px; position: relative; z-index: 2; }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
     }
 
-    /* Stats */
-    .stats-section {
-      padding: 16px;
-    }
-    .section-heading {
+    /* Expense card */
+    .expense-card {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
+      background: var(--agb-gradient-primary);
+      color: #ffffff;
+      border-radius: 20px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 12px 28px -12px rgba(0, 34, 99, 0.45);
+      cursor: pointer;
+      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
+    }
+    .expense-card:active { transform: scale(0.99); }
+    .expense-card:hover { box-shadow: 0 16px 32px -12px rgba(0, 34, 99, 0.55); }
+    .expense-label { font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
+    .expense-amount { font-size: 28px; font-weight: 800; line-height: 1.1; margin-top: 4px; }
+    .expense-trend {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; opacity: 0.8; margin-top: 6px;
+    }
+    .expense-trend ion-icon { font-size: 14px; color: #c9a227; }
+    .expense-right { text-align: right; }
+    .expense-count { font-size: 28px; font-weight: 800; color: #c9a227; line-height: 1.1; }
+    .expense-count-label { font-size: 10px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+    /* Section */
+    .section { margin-top: 8px; margin-bottom: 8px; }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 4px 10px;
     }
     .section-title {
       font-size: 16px;
       font-weight: 700;
-      color: #111827;
+      color: #0f172a;
       margin: 0;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
+      letter-spacing: -0.1px;
     }
-    .section-block {
-      padding: 0 16px 16px;
+    .section-link {
+      display: inline-flex; align-items: center; gap: 2px;
+      background: transparent; border: 0; padding: 0;
+      color: #002263; font-weight: 600; font-size: 12px; cursor: pointer;
+      font-family: inherit;
     }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-    .stat-card {
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-      padding: 14px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .stat-card:active {
-      background: #f9fafb;
-    }
-    .stat-icon {
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .stat-icon ion-icon {
-      font-size: 22px;
-    }
-    .stat-icon-navy { background: rgba(0, 34, 99, 0.08); color: #002263; }
-    .stat-icon-warning { background: rgba(217, 119, 6, 0.1); color: #d97706; }
-    .stat-icon-danger { background: rgba(220, 53, 69, 0.08); color: #dc3545; }
-    .stat-icon-info { background: rgba(13, 202, 240, 0.1); color: #0891b2; }
-    .stat-content {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-    .stat-value {
-      font-size: 22px;
-      font-weight: 700;
-      color: #111827;
-      line-height: 1;
-    }
-    .stat-label {
-      font-size: 11px;
-      color: #6b7280;
-      margin-top: 4px;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-
-    /* Expense block */
-    .expense-block {
-      margin: 0 16px 16px;
-      background: linear-gradient(135deg, #002263 0%, #003380 100%);
-      padding: 16px;
-      border: 1px solid #002263;
-    }
-    .expense-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .expense-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.7);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
-    .expense-amount {
-      font-size: 26px;
-      font-weight: 700;
-      color: #ffffff;
-      line-height: 1;
-    }
-    .expense-right {
-      text-align: right;
-    }
-    .expense-count {
-      font-size: 26px;
-      font-weight: 700;
-      color: #c9a227;
-      line-height: 1;
-    }
-    .expense-count-label {
-      font-size: 10px;
-      color: rgba(255, 255, 255, 0.7);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-top: 4px;
-    }
+    .section-link ion-icon { font-size: 14px; }
+    .section-link:hover { text-decoration: underline; }
 
     /* Approval card */
     .approval-card {
+      width: 100%;
+      text-align: left;
       background: #ffffff;
-      border: 1px solid #e5e7eb;
+      border: 1px solid #eef0f3;
+      border-radius: 18px;
       padding: 14px 16px;
       margin-bottom: 8px;
+      box-shadow: var(--agb-shadow-2xs);
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
     }
-    .approval-card:active {
-      background: #f9fafb;
-    }
-    .approval-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-    .approval-type {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 3px 8px;
-      background: #f1f3f5;
-      color: #374151;
-    }
-    .approval-type.material { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
-    .approval-type.labour { background: rgba(13, 202, 240, 0.1); color: #0891b2; }
-    .approval-type.expense { background: rgba(217, 119, 6, 0.1); color: #d97706; }
-    .approval-type.payment { background: rgba(25, 135, 84, 0.1); color: #198754; }
-    .approval-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #111827;
-      margin: 0 0 6px;
-    }
+    .approval-card:active { transform: scale(0.99); }
+    .approval-card:hover { box-shadow: var(--agb-shadow-sm); }
+    .approval-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .approval-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 6px; }
     .approval-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
       margin-bottom: 6px;
     }
-    .meta-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      color: #6b7280;
-    }
-    .meta-item ion-icon {
-      font-size: 13px;
-    }
-    .amount {
-      font-size: 14px;
-      font-weight: 700;
-      color: #002263;
-    }
-    .approval-time {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 11px;
-      color: #9ca3af;
-    }
-    .approval-time ion-icon {
-      font-size: 12px;
-    }
+    .meta-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #64748b; }
+    .meta-item ion-icon { font-size: 13px; }
+    .amount { font-size: 14px; font-weight: 700; color: #002263; }
+    .approval-time { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #94a3b8; }
+    .approval-time ion-icon { font-size: 12px; }
 
     /* Site card */
     .site-card {
+      width: 100%;
+      text-align: left;
+      display: flex; align-items: center; gap: 12px;
       background: #ffffff;
-      border: 1px solid #e5e7eb;
+      border: 1px solid #eef0f3;
+      border-radius: 18px;
       padding: 14px 16px;
       margin-bottom: 8px;
+      box-shadow: var(--agb-shadow-2xs);
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
     }
-    .site-card:active {
-      background: #f9fafb;
+    .site-card:active { transform: scale(0.99); }
+    .site-card:hover { box-shadow: var(--agb-shadow-sm); }
+    .site-tile-icon {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: rgba(201, 162, 39, 0.14);
+      color: #a8861f;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
     }
-    .site-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .site-info {
-      flex: 1;
-      min-width: 0;
-    }
-    .site-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: #111827;
-      margin: 0 0 4px;
-    }
-    .site-meta {
-      font-size: 11px;
-      color: #6b7280;
-      margin: 0;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-    .site-stats {
-      font-size: 11px;
-      color: #c9a227;
-      margin: 3px 0 0;
-      font-weight: 500;
-    }
-    .stat-sep {
-      margin: 0 3px;
-    }
+    .site-tile-icon ion-icon { font-size: 20px; }
+    .site-info { flex: 1; min-width: 0; }
+    .site-name { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
+    .site-stats { font-size: 12px; color: #64748b; margin: 0; }
+    .site-stats .dot { margin: 0 4px; color: #cbd5e1; }
 
-    /* Empty state */
-    .empty-state {
-      text-align: center;
-      padding: 32px 16px;
-      color: #6b7280;
-      background: #ffffff;
-      border: 1px dashed #d1d5db;
-    }
-    .empty-state ion-icon {
-      font-size: 36px;
-      color: #9ca3af;
-      margin-bottom: 8px;
-    }
-    .empty-state p {
-      font-size: 13px;
-      margin: 0;
-    }
-    .skeleton-card {
-      padding: 14px 16px;
-      margin-bottom: 8px;
-    }
-    .bottom-spacer {
-      height: 24px;
-    }
+    .bottom-spacer { height: 32px; }
   `],
 })
 export class DashboardPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
+  private auth = inject(AuthService);
   private router = inject(Router);
 
   dashboard = signal<DashboardData | null>(null);
@@ -578,34 +427,26 @@ export class DashboardPage implements OnInit, OnDestroy {
   userName = signal<string>('Supervisor');
 
   get currentDate(): string {
-    return new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+    return new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
   }
 
   greeting(): string {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      businessOutline,
-      cubeOutline,
-      peopleOutline,
-      walletOutline,
-      checkmarkDoneCircleOutline,
-      arrowForwardOutline,
-      timeOutline,
-      alertCircleOutline,
-      checkmarkCircleOutline,
-      locationOutline,
-      constructOutline,
-      cashOutline,
-      layersOutline,
-      documentTextOutline,
+      businessOutline, cubeOutline, peopleOutline, walletOutline,
+      checkmarkDoneCircleOutline, arrowForwardOutline, timeOutline, alertCircleOutline,
+      checkmarkCircleOutline, locationOutline, constructOutline, cashOutline,
+      layersOutline, documentTextOutline, chevronForwardOutline, trendingUpOutline,
+      calendarOutline, trendingDownOutline,
     });
 
+    await this.auth.initAfterLogin();
     await this.loadDashboard();
 
     if (typeof window !== 'undefined') {
@@ -636,7 +477,6 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   async loadDashboard(): Promise<void> {
     this.isLoading.set(true);
-
     try {
       this.supervisor.getDashboard().subscribe({
         next: (response) => {
@@ -649,7 +489,6 @@ export class DashboardPage implements OnInit, OnDestroy {
           this.isLoading.set(false);
         },
       });
-
       await this.loadUserAndSites();
     } catch (error) {
       console.error('Failed to load dashboard:', error);
@@ -689,31 +528,42 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.router.navigate(['/tabs/approvals', approval.approvalId]);
   }
 
-  async selectSite(site: Site): Promise<void> {
-    await this.supervisor.setSelectedSite(
-      site.id,
-      site.projectId || '',
-      site.projectName || site.name,
-      site.name
-    );
-    this.currentSiteName.set(site.name);
-  }
-
-  getStatusColor(status?: string): string {
-    switch (status) {
-      case 'Pending': return 'warning';
-      case 'Approved': return 'success';
-      case 'Rejected': return 'danger';
-      default: return 'medium';
+  getTypeTone(type: string): 'info' | 'warning' | 'danger' | 'success' | 'neutral' {
+    switch (type) {
+      case 'material': return 'danger';
+      case 'labour': return 'info';
+      case 'expense': return 'warning';
+      case 'payment': return 'success';
+      default: return 'neutral';
     }
   }
 
-  getSiteStatusColor(status?: string): string {
+  getTone(type: string): 'success' | 'warning' | 'danger' | 'neutral' {
+    switch (type) {
+      case 'material': return 'warning';
+      case 'labour': return 'neutral';
+      case 'expense': return 'danger';
+      case 'payment': return 'success';
+      default: return 'neutral';
+    }
+  }
+
+  getTypeIcon(type: string): string {
+    switch (type) {
+      case 'material': return 'cube-outline';
+      case 'labour': return 'people-outline';
+      case 'expense': return 'wallet-outline';
+      case 'payment': return 'card-outline';
+      default: return 'checkmark-done-circle-outline';
+    }
+  }
+
+  getSiteTone(status?: string): 'success' | 'warning' | 'info' | 'neutral' {
     switch (status) {
       case 'Active': return 'success';
       case 'On Hold': return 'warning';
-      case 'Completed': return 'primary';
-      default: return 'medium';
+      case 'Completed': return 'info';
+      default: return 'neutral';
     }
   }
 }

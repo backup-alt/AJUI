@@ -6,6 +6,7 @@ export interface User {
   role: 'admin' | 'project_manager' | 'accountant' | 'supervisor' | 'client';
   status: 'active' | 'inactive' | 'pending';
   managedProjectIds?: string[];
+  supervisorProfileId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +33,7 @@ export interface AuthTokens {
 export interface LoginResponse {
   user: User;
   accessToken: string;
+  refreshToken?: string;
   expiresAt: string;
 }
 
@@ -68,5 +70,6 @@ export interface SignupRequest {
 
 export interface RefreshTokenResponse {
   accessToken: string;
+  refreshToken?: string;
   expiresAt: string;
 }

@@ -1,5 +1,5 @@
 :root {
-  /* AGB Brand Colors - Exact match to web app */
+  /* AGB Brand Colors - exact match to web app */
   --agb-navy: #002263;
   --agb-navy-dark: #001a4d;
   --agb-navy-light: #003380;
@@ -23,14 +23,14 @@
   --agb-secondary: var(--agb-gold);
   --agb-secondary-contrast: #2a230a;
   --agb-secondary-rgb: 201, 162, 39;
-  --agb-success: #198754;
+  --agb-success: #16a34a;
   --agb-success-contrast: #ffffff;
-  --agb-warning: #ffc107;
-  --agb-warning-contrast: #212529;
-  --agb-danger: #dc3545;
+  --agb-warning: #f59e0b;
+  --agb-warning-contrast: #1f2937;
+  --agb-danger: #dc2626;
   --agb-danger-contrast: #ffffff;
-  --agb-info: #0dcaf0;
-  --agb-info-contrast: #212529;
+  --agb-info: #0ea5e9;
+  --agb-info-contrast: #ffffff;
 
   /* Gradients */
   --agb-gradient-primary: linear-gradient(135deg, var(--agb-navy) 0%, var(--agb-navy-light) 100%);
@@ -38,33 +38,45 @@
   --agb-gradient-primary-soft: linear-gradient(135deg, rgba(0, 34, 99, 0.08) 0%, rgba(0, 51, 128, 0.04) 100%);
   --agb-gradient-gold-soft: linear-gradient(135deg, rgba(201, 162, 39, 0.12) 0%, rgba(212, 180, 90, 0.06) 100%);
   --agb-gradient-card: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  /* Hero - solid AGB Navy for a premium solid look */
+  --agb-gradient-hero: #002263;
 
-  /* Spacing Scale */
+  /* Spacing Scale (4px base) */
+  --agb-space-2xs: 2px;
   --agb-space-xs: 4px;
   --agb-space-sm: 8px;
-  --agb-space-md: 16px;
-  --agb-space-lg: 24px;
-  --agb-space-xl: 32px;
-  --agb-space-2xl: 48px;
+  --agb-space-md: 12px;
+  --agb-space-lg: 16px;
+  --agb-space-xl: 20px;
+  --agb-space-2xl: 24px;
+  --agb-space-3xl: 32px;
+  --agb-space-4xl: 40px;
+  --agb-space-5xl: 56px;
 
-  /* Unified Radius (always 8px) */
-  --agb-radius-sm: 8px;
-  --agb-radius-md: 8px;
-  --agb-radius-lg: 8px;
-  --agb-radius-xl: 8px;
+  /* Radius scale - soft modern: 10 / 14 / 20 */
+  --agb-radius-xs: 8px;
+  --agb-radius-sm: 10px;
+  --agb-radius-md: 14px;
+  --agb-radius-lg: 20px;
+  --agb-radius-xl: 28px;
+  --agb-radius-pill: 999px;
 
-  /* Shadows */
-  --agb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --agb-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --agb-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
-  --agb-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.12);
-  --agb-shadow-gold: 0 4px 14px rgba(201, 162, 39, 0.25);
-  --agb-shadow-primary: 0 4px 14px rgba(0, 34, 99, 0.15);
+  /* Shadows - premium, multi-layer */
+  --agb-shadow-2xs: 0 1px 1px rgba(15, 23, 42, 0.04);
+  --agb-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --agb-shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --agb-shadow-md: 0 6px 16px -4px rgba(15, 23, 42, 0.10), 0 2px 6px -2px rgba(15, 23, 42, 0.05);
+  --agb-shadow-lg: 0 12px 32px -8px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+  --agb-shadow-xl: 0 24px 60px -12px rgba(15, 23, 42, 0.18), 0 8px 24px -6px rgba(15, 23, 42, 0.08);
+  --agb-shadow-gold: 0 8px 24px -6px rgba(201, 162, 39, 0.35);
+  --agb-shadow-primary: 0 8px 24px -6px rgba(0, 34, 99, 0.35);
+  --agb-focus-ring: 0 0 0 4px rgba(0, 34, 99, 0.14);
 
   /* Typography */
   --agb-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --agb-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
+  --agb-text-2xs: 10px;
   --agb-text-xs: 11px;
   --agb-text-sm: 13px;
   --agb-text-base: 15px;
@@ -72,16 +84,24 @@
   --agb-text-xl: 20px;
   --agb-text-2xl: 24px;
   --agb-text-3xl: 30px;
+  --agb-text-4xl: 36px;
 
   --agb-font-normal: 400;
   --agb-font-medium: 500;
   --agb-font-semibold: 600;
   --agb-font-bold: 700;
+  --agb-font-extrabold: 800;
+
+  --agb-leading-tight: 1.2;
+  --agb-leading-snug: 1.35;
+  --agb-leading-normal: 1.5;
+  --agb-leading-relaxed: 1.65;
 
   /* Transitions */
   --agb-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --agb-transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --agb-transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --agb-transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Z-Index */
   --agb-z-dropdown: 100;
@@ -93,16 +113,26 @@
   --agb-z-toast: 700;
   --agb-z-tooltip: 800;
 
-  /* Ionic Overrides */
+  /* Ionic overrides */
   --ion-color-primary: var(--agb-primary);
   --ion-color-primary-rgb: var(--agb-primary-rgb);
   --ion-color-primary-contrast: var(--agb-primary-contrast);
+  --ion-color-primary-shade: var(--agb-navy-dark);
+  --ion-color-primary-tint: var(--agb-navy-light);
   --ion-color-secondary: var(--agb-secondary);
   --ion-color-secondary-rgb: var(--agb-secondary-rgb);
   --ion-color-secondary-contrast: var(--agb-secondary-contrast);
+  --ion-color-secondary-shade: var(--agb-gold-dark);
+  --ion-color-secondary-tint: var(--agb-gold-light);
   --ion-color-success: var(--agb-success);
+  --ion-color-success-rgb: 22, 163, 74;
+  --ion-color-success-contrast: var(--agb-success-contrast);
   --ion-color-warning: var(--agb-warning);
+  --ion-color-warning-rgb: 245, 158, 11;
+  --ion-color-warning-contrast: var(--agb-warning-contrast);
   --ion-color-danger: var(--agb-danger);
+  --ion-color-danger-rgb: 220, 38, 38;
+  --ion-color-danger-contrast: var(--agb-danger-contrast);
   --ion-color-light: var(--agb-off-white);
   --ion-color-dark: var(--agb-black);
   --ion-background-color: var(--agb-white);
@@ -113,7 +143,7 @@
   --ion-tab-bar-background: var(--agb-white);
   --ion-tab-bar-border-color: var(--agb-light-gray);
 
-  /* Custom AGB */
+  /* App-level */
   --agb-header-height: 56px;
   --agb-tab-bar-height: 64px;
   --agb-safe-top: env(safe-area-inset-top);

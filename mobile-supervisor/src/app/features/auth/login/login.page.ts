@@ -3,349 +3,399 @@ import {
   IonContent,
   IonButton,
   IonIcon,
-  IonInput,
-  IonItem,
   IonSpinner,
   ToastController,
-  ModalController,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
 import {
   qrCodeOutline,
-  personOutline,
-  lockClosedOutline,
-  arrowForwardOutline,
-  shieldCheckmarkOutline,
   mailOutline,
-  timeOutline,
-  keyOutline,
+  shieldCheckmarkOutline,
+  chevronForwardOutline,
+  constructOutline,
+  sparklesOutline,
+  callOutline,
+  locationOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [
-    IonContent,
-    IonButton,
-    IonIcon,
-    IonInput,
-    IonItem,
-    IonSpinner,
-    FormsModule,
-  ],
+  imports: [IonContent, IonButton, IonIcon, IonSpinner],
   template: `
     <ion-content class="login-content">
-      <div class="login-container">
-        <div class="login-header-bg">
-          <div class="header-content">
-            <div class="logo-container">
-              <img src="assets/logo.png" alt="AGB Logo" class="brand-logo" />
+      <div class="login-shell">
+        <div class="hero">
+          <div class="brand">
+            <div class="brand-logo">
+              <img src="assets/logo.png" alt="AGB" />
             </div>
-            <div class="brand-text">
-              <h1 class="brand-name">Annai Golden Builders</h1>
-              <p class="brand-tagline">Supervisor Portal</p>
+            <div class="brand-meta">
+              <span class="brand-name">Annai Golden Builders</span>
+              <span class="brand-tag">Supervisor Portal</span>
             </div>
           </div>
-          <div class="header-shape shape-1"></div>
-          <div class="header-shape shape-2"></div>
+          <div class="hero-content">
+            <h1 class="hero-title">Welcome back, builder.</h1>
+            <p class="hero-sub">
+              Sign in to manage your sites, materials, labour and expenses in one place.
+            </p>
+            <div class="hero-bullets">
+              <div class="bullet">
+                <span class="bullet-icon"><ion-icon name="location-outline"></ion-icon></span>
+                <span>Track every site in real time</span>
+              </div>
+              <div class="bullet">
+                <span class="bullet-icon"><ion-icon name="construct-outline"></ion-icon></span>
+                <span>Materials, labour and expenses synced</span>
+              </div>
+              <div class="bullet">
+                <span class="bullet-icon"><ion-icon name="sparkles-outline"></ion-icon></span>
+                <span>Approvals updated instantly</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="login-card">
-          <div class="card-header">
-            <h2 class="card-title">Welcome</h2>
-            <p class="card-subtitle">
-              Choose how you'd like to sign in to your supervisor account.
-            </p>
-          </div>
+        <div class="card-stack">
+          <div class="auth-card">
+            <div class="card-eyebrow">
+              <span class="dot"></span>
+              <span>Sign in</span>
+            </div>
+            <h2 class="card-title">Choose how to sign in</h2>
+            <p class="card-sub">Pick the option that fits the way you were onboarded.</p>
 
-          <div class="actions">
-            <ion-button
-              expand="block"
-              class="primary-btn"
+            <button
+              class="action-tile primary"
+              type="button"
+              (click)="goToQR()"
               [disabled]="isLoading()"
-              (click)="scanQRCode()"
             >
-              @if (isLoading()) {
-                <ion-spinner name="crescent"></ion-spinner>
-              } @else {
-                <ion-icon name="qr-code-outline" slot="start"></ion-icon>
-                <span>Scan QR Code</span>
-                <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
-              }
-            </ion-button>
+              <span class="tile-icon">
+                <ion-icon name="qr-code-outline"></ion-icon>
+              </span>
+              <span class="tile-body">
+                <span class="tile-title">Sign in with QR</span>
+                <span class="tile-sub">Scan the invite QR from your admin</span>
+              </span>
+              <span class="tile-chev"><ion-icon name="chevron-forward-outline"></ion-icon></span>
+            </button>
 
-            <ion-button
-              expand="block"
-              class="secondary-btn"
+<button
+              class="action-tile"
+              type="button"
+              (click)="goToLogin()"
               [disabled]="isLoading()"
-              (click)="openOtpLogin()"
             >
-              <ion-icon name="key-outline" slot="start"></ion-icon>
-              <span>Sign in with OTP</span>
-            </ion-button>
+              <span class="tile-icon tile-icon-soft">
+                <ion-icon name="mail-outline"></ion-icon>
+              </span>
+              <span class="tile-body">
+                <span class="tile-title">Log in with OTP</span>
+                <span class="tile-sub">Get a code to your email or phone</span>
+              </span>
+              <span class="tile-chev"><ion-icon name="chevron-forward-outline"></ion-icon></span>
+            </button>
 
             <div class="divider">
               <span>or</span>
             </div>
 
-            <ion-button
-              expand="block"
-              fill="clear"
-              class="text-btn"
-              [disabled]="isLoading()"
-              (click)="openManualToken()"
-            >
-              Use invite token
-            </ion-button>
+            <button class="link-action" type="button" (click)="openManualToken()">
+              Enter invite token manually
+            </button>
           </div>
 
-          <p class="email-hint">
-            <ion-icon name="mail-outline"></ion-icon>
-            Or open the invite link from your email to start.
-          </p>
-        </div>
+          <div class="invite-hint">
+            <span class="hint-icon"><ion-icon name="call-outline"></ion-icon></span>
+            <div>
+              <strong>You can also log in by clicking the invite link in your email.</strong>
+              <span>Just tap <em>Create Account</em> from the email and the app will open with your details pre-filled.</span>
+            </div>
+          </div>
 
-        <div class="security-note">
-          <ion-icon name="shield-checkmark-outline"></ion-icon>
-          <span>Secure supervisor access only</span>
-        </div>
-
-        <div class="login-footer">
-          <p class="footer-text">Internal use only. AGB (Annai Golden Builders)</p>
+          <div class="trust">
+            <ion-icon name="shield-checkmark-outline"></ion-icon>
+            <span>Secure supervisor access - AGB internal</span>
+          </div>
         </div>
       </div>
     </ion-content>
   `,
   styles: [`
     .login-content {
-      --background: #f8f9fa;
+      --background: #f5f6f8;
     }
-    .login-container {
+    .login-shell {
       min-height: 100%;
       display: flex;
       flex-direction: column;
     }
 
-    .login-header-bg {
-      background: linear-gradient(135deg, #002263 0%, #003380 50%, #004d99 100%);
-      padding: 40px 24px 60px;
+    /* Hero */
+    .hero {
       position: relative;
+      background: #002263;
+      color: #ffffff;
+      padding: 56px 24px 110px;
       overflow: hidden;
     }
-    .header-content {
+
+    .brand {
       position: relative;
-      z-index: 2;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      text-align: center;
+      gap: 12px;
+      margin-bottom: 28px;
     }
-    .logo-container {
-      width: 80px;
-      height: 80px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(10px);
+    .brand-logo {
+      width: 48px;
+      height: 48px;
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 16px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(8px);
     }
-    .brand-logo {
-      width: 56px;
-      height: 56px;
-      object-fit: contain;
-    }
-    .brand-text {
-      text-align: center;
-    }
-    .brand-name {
-      font-size: 22px;
-      font-weight: 700;
-      color: #ffffff;
-      margin: 0 0 4px;
-      letter-spacing: 0.3px;
-    }
-    .brand-tagline {
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.8);
-      margin: 0;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      font-weight: 500;
-    }
-    .header-shape {
-      position: absolute;
-      border-radius: 50%;
-      opacity: 0.1;
-    }
-    .shape-1 {
-      width: 200px;
-      height: 200px;
-      background: #c9a227;
-      top: -80px;
-      right: -60px;
-    }
-    .shape-2 {
-      width: 150px;
-      height: 150px;
-      background: #ffffff;
-      bottom: -50px;
-      left: -40px;
-    }
+    .brand-logo img { width: 32px; height: 32px; object-fit: contain; }
+    .brand-meta { display: flex; flex-direction: column; line-height: 1.2; }
+    .brand-name { font-weight: 700; font-size: 14px; }
+    .brand-tag { font-size: 10px; opacity: 0.75; letter-spacing: 0.6px; text-transform: uppercase; }
 
-    .login-card {
-      background: #ffffff;
-      margin: -30px 16px 16px;
-      border-radius: 8px;
-      padding: 28px 24px;
-      box-shadow: 0 4px 24px rgba(0, 34, 99, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
-      position: relative;
-      z-index: 3;
+    .hero-content { position: relative; }
+    .hero-title {
+      font-size: 30px;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      margin: 0 0 12px;
     }
-    .card-header {
-      margin-bottom: 24px;
-    }
-    .card-title {
-      font-size: 24px;
-      font-weight: 700;
-      color: #002263;
-      margin: 0 0 6px;
-    }
-    .card-subtitle {
+    .hero-sub {
       font-size: 14px;
-      color: #6c757d;
-      margin: 0;
+      line-height: 1.55;
+      opacity: 0.85;
+      margin: 0 0 24px;
+      max-width: 360px;
+    }
+    .hero-bullets { display: flex; flex-direction: column; gap: 10px; }
+    .bullet {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.92);
+    }
+    .bullet-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .bullet-icon ion-icon { font-size: 14px; color: #c9a227; }
+
+    /* Card */
+    .card-stack {
+      margin: -70px 16px 24px;
+      position: relative;
+      z-index: 2;
+    }
+    .auth-card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 24px 20px;
+      box-shadow: 0 18px 48px -16px rgba(15, 23, 42, 0.20);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+    }
+    .card-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #16a34a; }
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0 0 4px;
+      letter-spacing: -0.2px;
+    }
+    .card-sub {
+      font-size: 13px;
+      color: #64748b;
+      margin: 0 0 20px;
+      line-height: 1.5;
     }
 
-    .actions {
+    .action-tile {
       display: flex;
-      flex-direction: column;
-      gap: 12px;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      padding: 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      text-align: left;
+      cursor: pointer;
+      margin-bottom: 12px;
+      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast), background var(--agb-transition-fast);
+      font-family: inherit;
     }
-    .primary-btn,
-    .secondary-btn,
-    .text-btn {
-      height: 52px;
-      font-weight: 600;
-      font-size: 16px;
-      --border-radius: 8px;
+    .action-tile:hover { background: #f1f5f9; }
+    .action-tile:active { transform: scale(0.99); }
+    .action-tile.primary {
+      background: var(--agb-gradient-primary);
+      border-color: transparent;
+      color: #ffffff;
+      box-shadow: 0 10px 24px -10px rgba(0, 34, 99, 0.55);
     }
-    .primary-btn {
-      --background: #002263;
-      --color: #ffffff;
-      --box-shadow: 0 4px 14px rgba(0, 34, 99, 0.3);
+    .action-tile.primary:hover {
+      background: #001a4d;
     }
-    .primary-btn:hover { --background: #001a4d; }
-    .secondary-btn {
-      --background: #ffffff;
-      --color: #002263;
-      --border-color: #002263;
-      --border-style: solid;
-      --border-width: 2px;
+    .tile-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
-    .secondary-btn:hover { --background: rgba(0, 34, 99, 0.04); }
-    .text-btn {
-      --color: #002263;
-      font-weight: 500;
+    .tile-icon.soft, .tile-icon-soft {
+      background: rgba(0, 34, 99, 0.08);
+      color: #002263;
     }
+    .tile-icon ion-icon { font-size: 22px; }
+    .tile-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .tile-title { font-size: 15px; font-weight: 700; }
+    .tile-sub { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+    .tile-chev { color: inherit; opacity: 0.6; display: flex; align-items: center; }
+    .tile-chev ion-icon { font-size: 20px; }
 
     .divider {
       display: flex;
       align-items: center;
-      gap: 16px;
-      margin: 4px 0;
+      gap: 12px;
+      margin: 4px 0 8px;
     }
     .divider::before,
     .divider::after {
       content: '';
       flex: 1;
       height: 1px;
-      background: #e9ecef;
+      background: #e2e8f0;
     }
     .divider span {
-      font-size: 12px;
-      color: #adb5bd;
-      font-weight: 500;
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 1px;
     }
 
-    .email-hint {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: #6c757d;
-      margin: 16px 0 0;
-      padding: 12px;
-      background: #f8f9fa;
-      border-radius: 8px;
-    }
-    .email-hint ion-icon {
+    .link-action {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      padding: 10px 0;
       color: #002263;
-      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
     }
+    .link-action:hover { text-decoration: underline; }
 
-    .security-note {
+    .invite-hint {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 18px;
+      box-shadow: var(--agb-shadow-2xs);
+    }
+    .hint-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background: rgba(0, 34, 99, 0.08);
+      color: #002263;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      padding: 16px;
-      color: #adb5bd;
+      flex-shrink: 0;
+    }
+    .hint-icon ion-icon { font-size: 18px; }
+    .invite-hint strong { display: block; font-size: 13px; color: #0f172a; }
+    .invite-hint span {
+      display: block;
       font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+      line-height: 1.5;
     }
-    .security-note ion-icon {
-      font-size: 14px;
-    }
+    .invite-hint em { font-style: normal; color: #002263; font-weight: 600; }
 
-    .login-footer {
-      text-align: center;
-      padding: 0 24px 32px;
-    }
-    .footer-text {
+    .trust {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 20px;
       font-size: 11px;
-      color: #adb5bd;
-      margin: 0;
-      letter-spacing: 0.5px;
+      color: #94a3b8;
+      letter-spacing: 0.4px;
     }
+    .trust ion-icon { font-size: 14px; }
   `],
 })
 export class LoginPage implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
-  private modalCtrl = inject(ModalController);
 
   isLoading = signal(false);
 
   async ngOnInit(): Promise<void> {
     addIcons({
       qrCodeOutline,
-      personOutline,
-      lockClosedOutline,
-      arrowForwardOutline,
-      shieldCheckmarkOutline,
       mailOutline,
-      timeOutline,
-      keyOutline,
+      shieldCheckmarkOutline,
+      chevronForwardOutline,
+      constructOutline,
+      sparklesOutline,
+      callOutline,
+      locationOutline,
     });
   }
 
-  async scanQRCode(): Promise<void> {
+  goToQR(): void {
     this.router.navigate(['/auth/qr-scanner']);
   }
 
-  async openOtpLogin(): Promise<void> {
-    this.router.navigate(['/auth/otp-login']);
+  goToLogin(): void {
+    this.router.navigate(['/auth/login-with-otp']);
   }
 
-  async openManualToken(): Promise<void> {
+  openManualToken(): void {
     this.router.navigate(['/auth/manual-token']);
   }
 }
