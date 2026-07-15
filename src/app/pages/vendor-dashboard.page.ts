@@ -1,4 +1,4 @@
-import { CommonModule } from "@angular/common";
+import { CommonModule, CurrencyPipe } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { Vendor, ErpDataService, Site } from "../data/erp-data.service";
@@ -13,7 +13,7 @@ type VendorSite = Site & { materialEntryCount: number; materialNames: string[] }
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
+  imports: [CommonModule, CurrencyPipe, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="vendors"></agb-enterprise-sidebar>
@@ -172,11 +172,11 @@ type VendorSite = Site & { materialEntryCount: number; materialNames: string[] }
                     <tr>
                       <th>Material</th>
                       <th>Unit</th>
-                      <th>Requested</th>
-                      <th>Approved</th>
-                      <th>Purchased</th>
-                      <th>Consumed</th>
-                      <th>PO Number</th>
+                      <th>Purchase Date</th>
+                      <th>Issued Amount</th>
+                      <th>Given Amount</th>
+                      <th>Payment Type</th>
+                      <th>Delivered On</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -185,11 +185,11 @@ type VendorSite = Site & { materialEntryCount: number; materialNames: string[] }
                       <tr>
                         <td><strong>{{ row.name }}</strong></td>
                         <td>{{ row.unit }}</td>
-                        <td>{{ row.requested }}</td>
-                        <td>{{ row.approved }}</td>
-                        <td>{{ row.purchased }}</td>
-                        <td>{{ row.consumed }}</td>
-                        <td>{{ row.poNumber }}</td>
+                        <td>{{ row.purchasedDate || '-' }}</td>
+                        <td>{{ row.issuedAmount || 0 | currency:'INR' }}</td>
+                        <td>{{ row.givenAmount || 0 | currency:'INR' }}</td>
+                        <td>{{ row.paymentType || '-' }}</td>
+                        <td>{{ row.deliveredOn || '-' }}</td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
                       </tr>
                     }
@@ -372,13 +372,12 @@ export class VendorDashboardPage {
   readonly loadingSites = signal(false);
   readonly loadingMaterials = signal(false);
 
-  // Vendor-specific sites with full details
+  // Vendor-specific sites with full details - derived from materials
   readonly vendorSites = computed(() => {
     const vendor = this.selectedVendor();
     if (!vendor) return [] as VendorSite[];
 
-    // Get all sites that have materials from this vendor
-    const materialSites = new Map<string, { count: number; materialNames: string[] }>();
+    const materialSites = new Map<string, { count: number; materialNames: string[]; status?: string }>();
     for (const m of this.data.materials()) {
       if (m.vendor === vendor.name && m.site) {
         const existing = materialSites.get(m.site) || { count: 0, materialNames: [] };
@@ -390,23 +389,20 @@ export class VendorDashboardPage {
       }
     }
 
-    // Merge with actual Site objects from the sites signal
-    const allSites = this.data.getSiteEntities();
     const vendorSiteNames = Array.from(materialSites.keys());
 
-    // Get full Site objects for sites that have materials from this vendor
-    const vendorSites = allSites
-      .filter((site) => vendorSiteNames.includes(site.name))
-      .map((site) => {
-        const info = materialSites.get(site.name) || { count: 0, materialNames: [] };
-        return {
-          ...site,
-          materialEntryCount: info.count,
-          materialNames: info.materialNames,
-        } as VendorSite;
-      });
+    // Create Site objects directly from material data
+    const vendorSites: VendorSite[] = vendorSiteNames
+      .map((siteName) => ({
+        id: siteName,
+        name: siteName,
+        status: "Active" as const,
+        materialEntryCount: materialSites.get(siteName)!.count,
+        materialNames: materialSites.get(siteName)!.materialNames,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
-return vendorSites.sort((a, b) => a.name.localeCompare(b.name));
+    return vendorSites;
   });
 
   readonly siteMaterials = computed(() => {

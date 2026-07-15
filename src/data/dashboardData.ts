@@ -49,6 +49,11 @@ export type MaterialRow = {
   vendor: string;
   poNumber: string;
   status: ApprovalStatus;
+  purchasedDate?: string;
+  issuedAmount?: number;
+  givenAmount?: number;
+  paymentType?: "Cash" | "NEFT" | "Bank Transfer" | "UPI" | "Cheque";
+  deliveredOn?: string;
 };
 
 export type LabourRow = {
@@ -219,6 +224,11 @@ export const materials: MaterialRow[] = [
     vendor: "Sri Devi Traders",
     poNumber: "PO-1041",
     status: "Approved",
+    purchasedDate: "2026-05-15",
+    issuedAmount: 85000,
+    givenAmount: 80000,
+    paymentType: "NEFT",
+    deliveredOn: "2026-05-18",
   },
   {
     id: "MAT-451",
@@ -233,6 +243,11 @@ export const materials: MaterialRow[] = [
     vendor: "KMS Agencies",
     poNumber: "Pending",
     status: "Pending",
+    purchasedDate: undefined,
+    issuedAmount: 0,
+    givenAmount: 0,
+    paymentType: undefined,
+    deliveredOn: undefined,
   },
   {
     id: "MAT-452",
@@ -247,6 +262,11 @@ export const materials: MaterialRow[] = [
     vendor: "Amman Steel",
     poNumber: "PO-1045",
     status: "Approved",
+    purchasedDate: "2026-05-20",
+    issuedAmount: 165000,
+    givenAmount: 160000,
+    paymentType: "UPI",
+    deliveredOn: "2026-05-22",
   },
   {
     id: "MAT-453",
@@ -261,6 +281,11 @@ export const materials: MaterialRow[] = [
     vendor: "Thirumalai Blue Metals",
     poNumber: "PO-1050",
     status: "Approved",
+    purchasedDate: "2026-05-25",
+    issuedAmount: 48000,
+    givenAmount: 45000,
+    paymentType: "Cash",
+    deliveredOn: "2026-05-26",
   },
 ];
 
