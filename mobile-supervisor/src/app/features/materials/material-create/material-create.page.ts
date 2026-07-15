@@ -16,6 +16,7 @@ import {
   IonTextarea,
   IonIcon,
   IonSpinner,
+  IonCheckbox,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +24,8 @@ import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import { locationOutline, cubeOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
+import { CustomFieldsService } from '../../../core/services/custom-fields.service';
+import { CustomField } from '../../../shared/models';
 
 @Component({
   selector: 'app-material-create',
@@ -44,6 +47,7 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
     IonTextarea,
     IonIcon,
     IonSpinner,
+    IonCheckbox,
     FormsModule,
   ],
   template: `
@@ -79,15 +83,14 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
         }
 
         <ion-list lines="none" class="form-list">
-            <ion-item class="form-item">
-              <ion-label position="stacked">Material Name *</ion-label>
-              <ion-input
-                placeholder="e.g., Cement 53 Grade"
-                [(ngModel)]="material.name"
-                (ionBlur)="suggestRemainingFromExisting()"
-                [clearInput]="true"
-              ></ion-input>
-            </ion-item>
+          <ion-item class="form-item">
+            <ion-label position="stacked">Material Name *</ion-label>
+            <ion-input
+              placeholder="e.g., Cement 53 Grade"
+              [(ngModel)]="material.name"
+              [clearInput]="true"
+            ></ion-input>
+          </ion-item>
 
           <div class="form-row">
             <ion-item class="form-item form-item-half">
@@ -119,17 +122,7 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
           </div>
 
           <ion-item class="form-item">
-            <ion-label position="stacked">Initial Stock on Site (Optional)</ion-label>
-            <ion-input
-              type="number"
-              placeholder="0"
-              [(ngModel)]="material.remainingStock"
-              [clearInput]="true"
-            ></ion-input>
-          </ion-item>
-
-          <ion-item class="form-item">
-            <ion-label position="stacked">Vendor (Optional)</ion-label>
+            <ion-label position="stacked">Vendor Name</ion-label>
             <ion-input
               placeholder="Enter vendor name"
               [(ngModel)]="material.vendor"
@@ -138,10 +131,11 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
           </ion-item>
 
           <ion-item class="form-item">
-            <ion-label position="stacked">PO Number (Optional)</ion-label>
+            <ion-label position="stacked">Remaining Stock</ion-label>
             <ion-input
-              placeholder="Enter PO number"
-              [(ngModel)]="material.poNumber"
+              type="number"
+              placeholder="0"
+              [(ngModel)]="material.remainingStock"
               [clearInput]="true"
             ></ion-input>
           </ion-item>
@@ -155,6 +149,42 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
               [autoGrow]="true"
             ></ion-textarea>
           </ion-item>
+
+          @if (customFields().length > 0) {
+            <div class="custom-fields-section">
+              <div class="custom-fields-header">Additional Fields</div>
+              @for (field of customFields(); track field.id) {
+                <ion-item class="form-item custom-field-item">
+                  <ion-label position="stacked">{{ field.label }}@if (field.fieldType === 'number' || field.fieldType === 'text' || field.fieldType === 'date') { * }</ion-label>
+                  @if (field.fieldType === 'boolean') {
+                    <ion-checkbox
+                      [checked]="customFieldValues()[field.key] === true"
+                      (ionChange)="setCustomFieldValue(field.key, $event.detail.checked)"
+                    ></ion-checkbox>
+                  } @else if (field.fieldType === 'date') {
+                    <ion-input
+                      type="date"
+                      [value]="customFieldValues()[field.key] || ''"
+                      (ionChange)="setCustomFieldValue(field.key, $event.detail.value ?? null)"
+                    ></ion-input>
+                  } @else if (field.fieldType === 'number') {
+                    <ion-input
+                      type="number"
+                      placeholder="0"
+                      [value]="customFieldValues()[field.key] || ''"
+                      (ionChange)="setCustomFieldValueAsNumber(field.key, $event.detail.value)"
+                    ></ion-input>
+                  } @else {
+                    <ion-input
+                      placeholder="Enter {{ field.label.toLowerCase() }}"
+                      [value]="customFieldValues()[field.key] || ''"
+                      (ionChange)="setCustomFieldValue(field.key, $event.detail.value ?? null)"
+                    ></ion-input>
+                  }
+                </ion-item>
+              }
+            </div>
+          }
         </ion-list>
 
         <div class="form-actions">
@@ -269,6 +299,20 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
     .form-row .form-item:last-of-type {
       border-right: none;
     }
+    .custom-fields-section {
+      margin-top: 24px;
+    }
+    .custom-fields-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .custom-field-item {
+      border-top: 1px solid #e5e7eb;
+    }
     .form-actions {
       padding: 20px 0;
     }
@@ -276,6 +320,7 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
 })
 export class MaterialCreatePage implements OnInit {
   private supervisor = inject(SupervisorService);
+  private customFieldsService = inject(CustomFieldsService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
 
@@ -285,7 +330,6 @@ export class MaterialCreatePage implements OnInit {
     remainingStock: null as number | null,
     unit: '',
     vendor: '',
-    poNumber: '',
     notes: '',
   };
 
@@ -293,6 +337,8 @@ export class MaterialCreatePage implements OnInit {
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
+  customFields = signal<CustomField[]>([]);
+  customFieldValues = signal<Record<string, string | number | boolean | null>>({});
 
   async ngOnInit(): Promise<void> {
     addIcons({ locationOutline, cubeOutline });
@@ -300,29 +346,34 @@ export class MaterialCreatePage implements OnInit {
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
+    await this.loadCustomFields();
   }
 
-  /**
-   * If the user has entered a material name, and an existing material with the
-   * same name+site is in the supervisor's list, pre-fill `remainingStock` with
-   * that material's current remaining stock.
-   */
-  async suggestRemainingFromExisting(): Promise<void> {
-    const name = (this.material.name || '').trim();
-    if (!name) return;
+  async loadCustomFields(): Promise<void> {
     const siteId = this.selectedSiteId();
     if (!siteId) return;
-    this.supervisor.getMaterials({ siteId, limit: 200 }).subscribe({
-      next: (res) => {
-        const match = (res.materials || []).find(
-          (m) => m.name.trim().toLowerCase() === name.toLowerCase()
-        );
-        if (match && match.remainingStock !== undefined) {
-          this.material.remainingStock = match.remainingStock;
-        }
-      },
-      error: () => undefined,
-    });
+    try {
+      const fields = await this.customFieldsService.listForEntity('materials', siteId);
+      this.customFields.set(fields);
+      const values: Record<string, string | number | boolean | null> = {};
+      for (const f of fields) {
+        values[f.key] = f.value ?? null;
+      }
+      this.customFieldValues.set(values);
+    } catch (err) {
+      console.warn('[MaterialCreate] failed to load custom fields', err);
+    }
+  }
+
+  setCustomFieldValue(key: string, value: string | number | boolean | null): void {
+    this.customFieldValues.update((prev) => ({ ...prev, [key]: value }));
+  }
+
+  setCustomFieldValueAsNumber(key: string, raw: string | null | undefined): void {
+    this.customFieldValues.update((prev) => ({
+      ...prev,
+      [key]: raw ? Number(raw) : null,
+    }));
   }
 
   isValid(): boolean {
@@ -366,19 +417,40 @@ export class MaterialCreatePage implements OnInit {
     this.isSubmitting.set(true);
 
     const remainingStock = this.material.remainingStock;
-    const payload = {
+    const customValues = this.customFieldValues();
+    const hasCustomValues = Object.values(customValues).some((v) => v !== null && v !== '');
+
+    const payload: {
+      projectId: string;
+      siteId: string;
+      site: string;
+      name: string;
+      unit: string;
+      requestedQuantity: number;
+      remainingStock?: number;
+      vendor?: string;
+      requestDate: string;
+      notes?: string;
+      customFields?: Record<string, string | number | boolean | null>;
+    } = {
       projectId,
       siteId,
       site: siteName,
       name: this.material.name.trim(),
       unit: this.material.unit,
       requestedQuantity: this.material.requestedQuantity || 0,
-      ...(remainingStock !== null && remainingStock >= 0 ? { remainingStock } : {}),
       vendor: this.material.vendor || undefined,
-      poNumber: this.material.poNumber || undefined,
       requestDate: new Date().toISOString().slice(0, 10),
       notes: this.material.notes || undefined,
     };
+
+    if (remainingStock !== null && remainingStock >= 0) {
+      payload.remainingStock = remainingStock;
+    }
+
+    if (hasCustomValues) {
+      payload.customFields = customValues;
+    }
 
     this.supervisor.createMaterial(payload).subscribe({
       next: async () => {

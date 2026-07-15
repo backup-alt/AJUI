@@ -22,11 +22,21 @@ export interface Material {
   approvalDate?: string;
   status: MaterialStatus;
   notes?: string;
+  customFields?: Record<string, string | number | boolean | null>;
   createdBy?: string;
   approvedBy?: string;
   approvedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CustomField {
+  id: string;
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+  fieldType: 'text' | 'number' | 'date' | 'boolean';
+  order: number;
 }
 
 export interface CreateMaterialRequest {
@@ -42,6 +52,7 @@ export interface CreateMaterialRequest {
   poNumber?: string;
   requestDate: string;
   notes?: string;
+  customFields?: Record<string, string | number | boolean | null>;
 }
 
 export interface MaterialsListResponse {

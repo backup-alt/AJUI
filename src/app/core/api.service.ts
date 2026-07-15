@@ -817,6 +817,53 @@ export class ApiService {
     );
   }
 
+  // =================== CUSTOM FIELDS ===================
+  listCustomFields(params: {
+    entityType: string;
+    entityId: string;
+  }): Observable<{ fields: any[] }> {
+    const q = new URLSearchParams();
+    q.set("entityType", params.entityType);
+    q.set("entityId", params.entityId);
+    return this.http.get<{ fields: any[] }>(`${this.baseUrl}/custom-fields?${q.toString()}`, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  createCustomField(payload: {
+    entityType: string;
+    entityId: string;
+    key: string;
+    label: string;
+    value?: string | number | boolean | null;
+    fieldType: "text" | "number" | "date" | "boolean";
+    order?: number;
+  }): Observable<{ field: any }> {
+    return this.http.post<{ field: any }>(`${this.baseUrl}/custom-fields`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  updateCustomField(
+    id: string,
+    patch: {
+      label?: string;
+      value?: string | number | boolean | null;
+      fieldType?: "text" | "number" | "date" | "boolean";
+      order?: number;
+    }
+  ): Observable<{ field: any }> {
+    return this.http.patch<{ field: any }>(`${this.baseUrl}/custom-fields/${id}`, patch, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  deleteCustomField(id: string): Observable<{ success: boolean }> {
+    return this.http.delete<{ success: boolean }>(`${this.baseUrl}/custom-fields/${id}`, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
   // =================== HELPERS ===================
   private authHeaders(): HttpHeaders {
     const token = this.accessTokenSignal();

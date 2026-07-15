@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, signal } from "@angular/core";
+import { Injectable, computed, effect, inject, signal } from "@angular/core";
 import {
   expenses,
   labour,
@@ -12,6 +12,8 @@ import {
   type Project,
   type ProjectStatus,
 } from "../../data/dashboardData";
+import { CustomFieldsService } from "../core/custom-fields.service";
+import type { CustomField as ApiCustomField } from "../core/custom-fields.service";
 
 export type ClientStatus = "Active" | "On Hold" | "Completed";
 
@@ -111,6 +113,7 @@ export type ErpSettings = {
 
 @Injectable({ providedIn: "root" })
 export class ErpDataService {
+  private readonly customFieldsService = inject(CustomFieldsService);
   private readonly recoveredTablePresentationState = this.recoverTablePresentationState();
 
   readonly clients = signal<Client[]>(
@@ -1213,6 +1216,76 @@ export class ErpDataService {
       [module]: (fields[module] ?? []).map((customField) => (customField.key === field.key ? { ...customField, afterKey } : customField)),
     }));
     return { ...field, afterKey };
+  }
+
+  /**
+   * Persist a custom field to the backend (MongoDB) so that supervisors
+   * will see it in their mobile form. If the backend call fails the local
+   * cache is still updated so the admin can see the column in the table.
+   */
+  async persistCustomField(
+    module: SharedModuleKey,
+    label: string,
+    siteId: string | null,
+    fieldType: "text" | "number" | "date" | "boolean" = "text"
+  ): Promise<SharedTableField | null> {
+    if (!siteId) {
+      return null;
+    }
+    const entityType = this.entityTypeForModule(module);
+    const key = this.fieldKey(label, this.customFieldsFor(module));
+    try {
+      const result = await new Promise<{ field: ApiCustomField }>((resolve, reject) => {
+        this.customFieldsService
+          .create({
+            entityType,
+            entityId: siteId,
+            key,
+            label,
+            value: null,
+            fieldType,
+            order: 0,
+          })
+          .subscribe({ next: resolve, error: reject });
+      });
+      return { key: result.field.key, label: result.field.label };
+    } catch (err) {
+      console.warn(`[ErpData] failed to persist custom field to backend`, err);
+      return null;
+    }
+  }
+
+  private entityTypeForModule(module: SharedModuleKey): "clients" | "projects" | "materials" | "labour" | "expenses" | "payments" | "vendors" | "subcontractors" {
+    switch (module) {
+      case "clients": return "clients";
+      case "materials": return "materials";
+      case "labour": return "labour";
+      case "expenses":
+      case "generalExpenses": return "expenses";
+      case "payments": return "payments";
+      case "vendors": return "vendors";
+      case "subcontractors": return "subcontractors";
+      default: return "materials";
+    }
+  }
+
+  sites(): { id: string; name: string }[] {
+    const seen = new Set<string>();
+    const list: { id: string; name: string }[] = [];
+    const push = (id: unknown, name: unknown) => {
+      if (!id) return;
+      const key = String(id);
+      if (seen.has(key)) return;
+      seen.add(key);
+      list.push({ id: key, name: String(name || key) });
+    };
+    for (const project of this.projects()) {
+      for (const site of project.sites ?? []) push(site, site);
+    }
+    for (const row of this.materials()) push(row["site"], row["site"]);
+    for (const row of this.labour()) push(row["site"], row["site"]);
+    for (const row of this.expenses()) push(row["site"], row["site"]);
+    return list;
   }
 
   composeTableColumns(base: SharedTableField[], custom: SharedTableField[]): SharedTableField[] {

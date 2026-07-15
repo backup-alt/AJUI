@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, HostListener, computed, inject, sig
 import { Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
-import { ErpDataService, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
+import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import { mapClient, mapProject, mapSite, mapVendor, mapSupervisor, mapMaterial, mapLabour, mapExpense, mapPayment, mapSubcontractor } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -877,6 +877,23 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     <span>Field Name</span>
                     <input [value]="newFieldLabel()" (input)="newFieldLabel.set($any($event.target).value)" placeholder="Example: Verified By" />
                   </label>
+                  <label>
+                    <span>Field Type</span>
+                    <select [value]="newFieldType()" (change)="newFieldType.set($any($event.target).value)">
+                      <option value="text">Text</option>
+                      <option value="number">Number</option>
+                      <option value="date">Date</option>
+                      <option value="boolean">Yes / No</option>
+                    </select>
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" [checked]="newFieldAskSupervisor()" (change)="newFieldAskSupervisor.set($any($event.target).checked)" />
+                    <span>Ask supervisor to fill this when creating a request</span>
+                  </label>
+                  <p class="hint" *ngIf="newFieldAskSupervisor()">
+                    The field will be saved to MongoDB and appear in the supervisor's mobile form
+                    for the {{ activeSiteFilter() === 'All' ? 'currently selected site' : 'selected site' }}.
+                  </p>
                 </div>
                 <div class="dialog-actions">
                   <button type="button" class="secondary-action" (click)="fieldDialogOpen.set(false)">Cancel</button>
@@ -980,6 +997,30 @@ const siteMaterialDetailFields: FieldSchema[] = [
       cursor: pointer;
       font-size: 12px;
     }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #1a2540;
+      cursor: pointer;
+      grid-column: span 2;
+    }
+    .checkbox-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .hint {
+      grid-column: span 2;
+      font-size: 12px;
+      color: #4a5578;
+      background: #f3f6ff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border-left: 3px solid #2c5cff;
+      margin: 0;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -1018,6 +1059,8 @@ export class UniversalDashboardPage {
   readonly draftRow = signal<TableRow>({});
   readonly newFieldLabel = signal("");
   readonly newFieldAfterKey = signal<string | null>(null);
+  readonly newFieldType = signal<"text" | "number" | "date" | "boolean">("text");
+  readonly newFieldAskSupervisor = signal(true);
   readonly openSelectKey = signal("");
   readonly openFilterKey = signal("");
   readonly selectCustomValue = signal("");
@@ -2108,10 +2151,12 @@ export class UniversalDashboardPage {
     event?.stopPropagation();
     this.newFieldLabel.set("");
     this.newFieldAfterKey.set(afterKey ?? null);
+    this.newFieldType.set("text");
+    this.newFieldAskSupervisor.set(true);
     this.fieldDialogOpen.set(true);
   }
 
-  saveField(event: Event) {
+  async saveField(event: Event) {
     event.preventDefault();
     const label = this.newFieldLabel().trim();
     if (!label) return;
@@ -2120,9 +2165,30 @@ export class UniversalDashboardPage {
       return;
     }
     const module = this.activeModule();
+    const fieldType = this.newFieldType();
+    const askSupervisor = this.newFieldAskSupervisor();
     this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
+    if (askSupervisor) {
+      const siteId = this.resolveEntityIdForModule(module);
+      if (siteId) {
+        try {
+          await this.data.persistCustomField(module, label, siteId, fieldType);
+        } catch (err) {
+          console.warn("[UniversalDashboard] failed to persist custom field", err);
+        }
+      } else {
+        window.alert("Select a specific site first to enable supervisor input for this field.");
+      }
+    }
     this.newFieldAfterKey.set(null);
     this.fieldDialogOpen.set(false);
+  }
+
+  private resolveEntityIdForModule(module: SharedModuleKey): string | null {
+    const activeSite = this.activeSiteFilter();
+    if (activeSite && activeSite !== "All") return activeSite;
+    const sites = this.data.sites();
+    return sites[0]?.id ?? null;
   }
 
   private isGeneratedClientIdField(label: string): boolean {

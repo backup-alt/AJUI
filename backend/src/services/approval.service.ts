@@ -281,7 +281,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             staffCount: doc.presentCount,
             dailyWage: doc.dailyWage,
             shift: doc.shift,
-            overtimeHours: doc.overtimeHours,
+            overtimeHours: doc.overtime,
             lateFine: doc.lateFine,
             submittedBy: doc.submittedBy,
           };
@@ -294,7 +294,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             transactionType: doc.transactionType,
             description: doc.description,
             amount: doc.amount,
-            paidBy: doc.paidBy,
+            paidBy: doc.amountPaidBy,
             reference: doc.reference,
             submittedBy: doc.submittedBy,
           };

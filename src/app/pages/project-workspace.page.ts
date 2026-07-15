@@ -840,6 +840,23 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     <span>Field Name</span>
                     <input [value]="newFieldLabel()" (input)="newFieldLabel.set($any($event.target).value)" placeholder="Example: Bill Checked By" />
                   </label>
+                  <label>
+                    <span>Field Type</span>
+                    <select [value]="newFieldType()" (change)="newFieldType.set($any($event.target).value)">
+                      <option value="text">Text</option>
+                      <option value="number">Number</option>
+                      <option value="date">Date</option>
+                      <option value="boolean">Yes / No</option>
+                    </select>
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" [checked]="newFieldAskSupervisor()" (change)="newFieldAskSupervisor.set($any($event.target).checked)" />
+                    <span>Ask supervisor to fill this when creating a request</span>
+                  </label>
+                  <p class="hint" *ngIf="newFieldAskSupervisor()">
+                    The field will be saved to MongoDB and appear in the supervisor's mobile form
+                    for the {{ activeSiteFilter() === 'All' ? 'currently selected site' : 'selected site' }}.
+                  </p>
                 </div>
                 <div class="dialog-actions">
                   <button type="button" class="secondary-action" (click)="fieldDialogOpen.set(false)">Cancel</button>
@@ -962,6 +979,8 @@ export class ProjectWorkspacePage {
   readonly fieldDialogOpen = signal(false);
   readonly newFieldLabel = signal("");
   readonly newFieldAfterKey = signal<string | null>(null);
+  readonly newFieldType = signal<"text" | "number" | "date" | "boolean">("text");
+  readonly newFieldAskSupervisor = signal(true);
   readonly draftRow = signal<TableRow>({});
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
@@ -1709,10 +1728,12 @@ export class ProjectWorkspacePage {
     event?.stopPropagation();
     this.newFieldLabel.set("");
     this.newFieldAfterKey.set(afterKey ?? null);
+    this.newFieldType.set("text");
+    this.newFieldAskSupervisor.set(true);
     this.fieldDialogOpen.set(true);
   }
 
-  saveField(event: Event) {
+  async saveField(event: Event) {
     event.preventDefault();
     const label = this.newFieldLabel().trim();
     if (!label) return;
@@ -1721,9 +1742,30 @@ export class ProjectWorkspacePage {
       return;
     }
     const section = this.activeSection();
+    const fieldType = this.newFieldType();
+    const askSupervisor = this.newFieldAskSupervisor();
     this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
+    if (askSupervisor) {
+      const siteId = this.resolveEntityIdForSection(section);
+      if (siteId) {
+        try {
+          await this.data.persistCustomField(section, label, siteId, fieldType);
+        } catch (err) {
+          console.warn("[ProjectWorkspace] failed to persist custom field", err);
+        }
+      } else {
+        window.alert("Select a specific site first to enable supervisor input for this field.");
+      }
+    }
     this.newFieldAfterKey.set(null);
     this.fieldDialogOpen.set(false);
+  }
+
+  private resolveEntityIdForSection(section: ModuleKey): string | null {
+    const activeSite = this.activeSiteFilter();
+    if (activeSite && activeSite !== "All") return activeSite;
+    const sites = this.data.sites();
+    return sites[0]?.id ?? null;
   }
 
   private isGeneratedClientIdField(label: string): boolean {
