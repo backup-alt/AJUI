@@ -4,7 +4,6 @@ import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { Vendor, ErpDataService } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
-import { MaterialsService } from "../core/materials.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
@@ -38,6 +37,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
         <ion-content class="erp-page">
           <main class="client-landing">
             @if (!selectedVendor()) {
+              <!-- Vendor list view -->
               <section class="client-grid">
                 <article class="client-card add-client-card" role="button" tabindex="0" (click)="showVendorForm.set(true)" (keydown.enter)="showVendorForm.set(true)">
                   <div class="add-client-icon">
@@ -47,81 +47,113 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                   <p>Create a vendor profile to track material purchases, GST, and payment history.</p>
                 </article>
 
-                <article
-                  *ngFor="let vendor of vendors(); trackBy: trackVendor"
-                  class="client-card"
-                  role="button"
-                  tabindex="0"
-                  (click)="openVendor(vendor)"
-                  (keydown.enter)="openVendor(vendor)"
-                >
-                  <div class="client-card-body">
-                    <div class="card-head">
-                      <div class="identity">
-                        <div class="avatar-block vendor-avatar">{{ vendorInitials(vendor.name) }}</div>
-                        <div>
-                          <h3>{{ vendor.name }}</h3>
-                          <p><ion-icon name="call-outline"></ion-icon>{{ vendor.phone }}</p>
+                @for (vendor of vendors(); track vendor.id) {
+                  <article
+                    class="client-card"
+                    role="button"
+                    tabindex="0"
+                    (click)="openVendor(vendor)"
+                    (keydown.enter)="openVendor(vendor)"
+                  >
+                    <div class="client-card-body">
+                      <div class="card-head">
+                        <div class="identity">
+                          <div class="avatar-block vendor-avatar">{{ vendorInitials(vendor.name) }}</div>
+                          <div>
+                            <h3>{{ vendor.name }}</h3>
+                            <p><ion-icon name="call-outline"></ion-icon>{{ vendor.phone }}</p>
+                          </div>
+                        </div>
+                        <span class="material-type-badge">{{ vendor.materialType }}</span>
+                      </div>
+
+                      <p class="address"><ion-icon name="location-outline"></ion-icon>{{ vendor.address }}</p>
+
+                      <div class="ledger-box">
+                        <div class="ledger-row">
+                          <span>GST Number</span>
+                          <strong class="gst-number">{{ vendor.gst }}</strong>
                         </div>
                       </div>
-                      <span class="material-type-badge">{{ vendor.materialType }}</span>
                     </div>
 
-                    <p class="address"><ion-icon name="location-outline"></ion-icon>{{ vendor.address }}</p>
-
-                    <div class="ledger-box">
-                      <div class="ledger-row">
-                        <span>GST Number</span>
-                        <strong class="gst-number">{{ vendor.gst }}</strong>
+                    <div class="client-card-footer">
+                      <span>View Sites</span>
+                      <div class="client-card-footer-actions">
+                        <button type="button" class="client-edit-action" aria-label="Edit vendor" title="Edit Vendor" (click)="editVendor(vendor, $event)">
+                          <strong>Edit Vendor</strong>
+                        </button>
                       </div>
                     </div>
-                  </div>
+                  </article>
+                }
 
-                  <div class="client-card-footer">
-                    <span>View Sites</span>
-                    <div class="client-card-footer-actions">
-                      <button type="button" class="client-edit-action" aria-label="Edit vendor" title="Edit Vendor" (click)="editVendor(vendor, $event)">
-                        <strong>Edit Vendor</strong>
-                      </button>
-                    </div>
+                @if (vendors().length === 0) {
+                  <div class="empty-state">
+                    <p>No vendors found. Add a vendor to get started.</p>
                   </div>
-                </article>
+                }
               </section>
             } @else if (!selectedSite()) {
+              <!-- Site list view for selected vendor -->
               <section class="vendor-breadcrumb">
                 <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
                 <h2>{{ selectedVendor()!.name }} – Sites</h2>
               </section>
+
+              @if (loadingSites()) {
+                <div class="loading-indicator">
+                  <span class="spinner-inline"></span>
+                  <span>Loading sites…</span>
+                </div>
+              }
+
               <section class="client-grid">
-                <article
-                  *ngFor="let site of vendorSites(); trackBy: trackSite"
-                  class="client-card"
-                  role="button"
-                  tabindex="0"
-                  (click)="openSite(site)"
-                  (keydown.enter)="openSite(site)"
-                >
-                  <div class="client-card-body">
-                    <div class="card-head">
-                      <div class="identity">
-                        <ion-icon name="location-outline" class="site-icon"></ion-icon>
-                        <div>
-                          <h3>{{ site }}</h3>
-                          <p>{{ siteMaterialsCount(site) }} material entries</p>
+                @for (site of vendorSites(); track site) {
+                  <article
+                    class="client-card site-card"
+                    role="button"
+                    tabindex="0"
+                    (click)="openSite(site)"
+                    (keydown.enter)="openSite(site)"
+                  >
+                    <div class="client-card-body">
+                      <div class="card-head">
+                        <div class="identity">
+                          <div class="avatar-block site-avatar">
+                            <ion-icon name="location-outline"></ion-icon>
+                          </div>
+                          <div>
+                            <h3>{{ site }}</h3>
+                            <p>{{ siteMaterialCount(site) }} material entries</p>
+                          </div>
                         </div>
+                        <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
                       </div>
                     </div>
+                  </article>
+                }
+
+                @if (vendorSites().length === 0 && !loadingSites()) {
+                  <div class="empty-state">
+                    <p>No sites with material purchases for this vendor.</p>
                   </div>
-                </article>
-                <div *ngIf="vendorSites().length === 0" class="empty-state">
-                  <p>No sites with material purchases for this vendor.</p>
-                </div>
+                }
               </section>
             } @else {
+              <!-- Material purchase table for selected site -->
               <section class="vendor-breadcrumb">
                 <button type="button" class="back-btn" (click)="backToSites()">&larr; {{ selectedVendor()!.name }}</button>
                 <h2>{{ selectedVendor()!.name }} – {{ selectedSite() }}</h2>
               </section>
+
+              @if (loadingMaterials()) {
+                <div class="loading-indicator">
+                  <span class="spinner-inline"></span>
+                  <span>Loading materials…</span>
+                </div>
+              }
+
               <section class="table-wrap operations-table approvals-table">
                 <table>
                   <thead>
@@ -137,19 +169,23 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let row of siteMaterials(); trackBy: trackMaterial">
-                      <td><strong>{{ row.name }}</strong></td>
-                      <td>{{ row.unit }}</td>
-                      <td>{{ row.requested }}</td>
-                      <td>{{ row.approved }}</td>
-                      <td>{{ row.purchased }}</td>
-                      <td>{{ row.consumed }}</td>
-                      <td>{{ row.poNumber }}</td>
-                      <td><span class="approval-status-pill">{{ row.status }}</span></td>
-                    </tr>
-                    <tr *ngIf="siteMaterials().length === 0">
-                      <td class="empty-row" colspan="8"><span>No material purchases recorded for this site.</span></td>
-                    </tr>
+                    @for (row of siteMaterials(); track row.id) {
+                      <tr>
+                        <td><strong>{{ row.name }}</strong></td>
+                        <td>{{ row.unit }}</td>
+                        <td>{{ row.requested }}</td>
+                        <td>{{ row.approved }}</td>
+                        <td>{{ row.purchased }}</td>
+                        <td>{{ row.consumed }}</td>
+                        <td>{{ row.poNumber }}</td>
+                        <td><span class="approval-status-pill">{{ row.status }}</span></td>
+                      </tr>
+                    }
+                    @if (siteMaterials().length === 0 && !loadingMaterials()) {
+                      <tr>
+                        <td class="empty-row" colspan="8"><span>No material purchases recorded for this site.</span></td>
+                      </tr>
+                    }
                   </tbody>
                 </table>
               </section>
@@ -228,6 +264,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
       align-items: center;
       gap: 12px;
       padding: 12px 0;
+      flex-wrap: wrap;
     }
     .vendor-breadcrumb h2 {
       margin: 0;
@@ -245,15 +282,64 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
       color: #1e293b;
     }
     .back-btn:hover { background: #e2e8f0; }
-    .site-icon {
-      font-size: 24px;
-      color: #2c5cff;
+    .site-avatar {
+      background: linear-gradient(135deg, #002263, #1a4499) !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 18px;
+    }
+    .site-card {
+      cursor: pointer;
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+    .site-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    }
+    .arrow-icon {
+      font-size: 20px;
+      color: #94a3b8;
+    }
+    .loading-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px;
+      color: #64748b;
+      font-size: 14px;
+    }
+    .spinner-inline {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #cbd5e1;
+      border-top-color: #2c5cff;
+      border-radius: 50%;
+      animation: vd-spin 0.8s linear infinite;
     }
     .empty-state {
       grid-column: 1 / -1;
       text-align: center;
-      padding: 32px;
-      color: #64748b;
+      padding: 48px 24px;
+      color: #94a3b8;
+    }
+    .empty-state p {
+      margin: 0;
+      font-size: 15px;
+    }
+    @media (max-width: 640px) {
+      .vendor-breadcrumb {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .vendor-breadcrumb h2 {
+        font-size: 18px;
+      }
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -261,42 +347,45 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 export class VendorDashboardPage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
-  private readonly materialsService = inject(MaterialsService);
+
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
   readonly vendors = this.data.vendors;
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
 
-  constructor() {
-    this.materialsService.getAll();
-    this.refreshFromBackend();
-  }
-
   readonly selectedVendor = signal<Vendor | null>(null);
   readonly selectedSite = signal<string | null>(null);
+  readonly loadingSites = signal(false);
+  readonly loadingMaterials = signal(false);
 
   readonly vendorSites = computed(() => {
     const vendor = this.selectedVendor();
     if (!vendor) return [] as string[];
-    const set = new Set<string>();
+    const siteSet = new Set<string>();
     for (const m of this.data.materials()) {
-      if (m.vendor === vendor.name && m.site) set.add(m.site);
+      if (m.vendor === vendor.name && m.site) {
+        siteSet.add(m.site);
+      }
     }
-    return Array.from(set).sort();
+    return Array.from(siteSet).sort();
   });
 
   readonly siteMaterials = computed(() => {
     const vendor = this.selectedVendor();
     const site = this.selectedSite();
     if (!vendor || !site) return [] as MaterialRow[];
-    return this.data.materials().filter((m) => m.vendor === vendor.name && m.site === site);
+    return this.data.materials().filter(
+      (m) => m.vendor === vendor.name && m.site === site
+    );
   });
 
-  siteMaterialsCount(site: string): number {
+  siteMaterialCount(site: string): number {
     const vendor = this.selectedVendor();
     if (!vendor) return 0;
-    return this.data.materials().filter((m) => m.vendor === vendor.name && m.site === site).length;
+    return this.data.materials().filter(
+      (m) => m.vendor === vendor.name && m.site === site
+    ).length;
   }
 
   openVendor(vendor: Vendor) {
@@ -315,14 +404,6 @@ export class VendorDashboardPage {
 
   backToSites() {
     this.selectedSite.set(null);
-  }
-
-  trackSite(_: number, site: string) {
-    return site;
-  }
-
-  trackMaterial(_: number, row: MaterialRow) {
-    return row.id;
   }
 
   refreshFromBackend() {
@@ -361,8 +442,33 @@ export class VendorDashboardPage {
 
   createVendor(value: VendorFormValue) {
     if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
-    this.data.addVendor(value);
-    this.showVendorForm.set(false);
+
+    const payload = {
+      vendorName: value.name,
+      materialType: value.materialType,
+      phoneNumber: value.phone,
+      address: value.address,
+      gstNumber: value.gst,
+    };
+
+    this.api.createVendor(payload).subscribe({
+      next: (res: any) => {
+        const newVendor: Vendor = {
+          id: res.vendorId || res._id || res.id,
+          name: value.name,
+          materialType: value.materialType,
+          phone: value.phone,
+          address: value.address,
+          gst: value.gst,
+        };
+        this.data.addVendor(newVendor);
+        this.showVendorForm.set(false);
+      },
+      error: (err) => {
+        console.error("Failed to create vendor on backend", err);
+        this.showVendorForm.set(false);
+      },
+    });
   }
 
   editVendor(vendor: Vendor, event: Event) {
@@ -388,8 +494,41 @@ export class VendorDashboardPage {
   updateVendor(value: VendorFormValue) {
     const vendor = this.editingVendor();
     if (!vendor || !value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
-    this.data.updateVendor(vendor.id, value);
-    this.closeVendorForm();
+
+    const payload = {
+      vendorName: value.name,
+      materialType: value.materialType,
+      phoneNumber: value.phone,
+      address: value.address,
+      gstNumber: value.gst,
+    };
+
+    this.api.patchVendor(vendor.id, payload).subscribe({
+      next: () => {
+        this.data.updateVendor(vendor.id, value);
+        this.closeVendorForm();
+      },
+      error: (err) => {
+        console.error("Failed to update vendor on backend", err);
+        this.closeVendorForm();
+      },
+    });
+  }
+
+  deleteVendor(vendorId: string) {
+    if (!confirm("Delete this vendor?")) return;
+    this.api.deleteVendor(vendorId).subscribe({
+      next: () => {
+        this.data.deleteVendor(vendorId);
+        if (this.selectedVendor()?.id === vendorId) {
+          this.selectedVendor.set(null);
+          this.selectedSite.set(null);
+        }
+      },
+      error: (err) => {
+        console.error("Failed to delete vendor on backend", err);
+      },
+    });
   }
 
   trackVendor(_: number, vendor: Vendor) {
