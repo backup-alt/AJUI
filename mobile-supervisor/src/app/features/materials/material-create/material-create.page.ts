@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonHeader,
@@ -26,6 +27,7 @@ import { locationOutline, cubeOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { CustomFieldsService } from '../../../core/services/custom-fields.service';
 import { CustomField } from '../../../shared/models';
+import { Vendor } from '../../../shared/models';
 
 @Component({
   selector: 'app-material-create',
@@ -123,11 +125,11 @@ import { CustomField } from '../../../shared/models';
 
           <ion-item class="form-item">
             <ion-label position="stacked">Vendor Name</ion-label>
-            <ion-input
-              placeholder="Enter vendor name"
-              [(ngModel)]="material.vendor"
-              [clearInput]="true"
-            ></ion-input>
+            <ion-select placeholder="Select vendor" [(ngModel)]="material.vendor" interface="popover">
+              @for (v of vendors(); track v._id) {
+                <ion-select-option [value]="v.name">{{ v.name }}</ion-select-option>
+              }
+            </ion-select>
           </ion-item>
 
           <ion-item class="form-item">
@@ -339,6 +341,7 @@ export class MaterialCreatePage implements OnInit {
   siteProjectId = signal<string | null>(null);
   customFields = signal<CustomField[]>([]);
   customFieldValues = signal<Record<string, string | number | boolean | null>>({});
+  vendors = signal<Vendor[]>([]);
 
   async ngOnInit(): Promise<void> {
     addIcons({ locationOutline, cubeOutline });
@@ -346,7 +349,16 @@ export class MaterialCreatePage implements OnInit {
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
-    await this.loadCustomFields();
+    await Promise.all([this.loadCustomFields(), this.loadVendors()]);
+  }
+
+  async loadVendors(): Promise<void> {
+    try {
+      const res = await firstValueFrom(this.supervisor.getVendors({ limit: 200 }));
+      this.vendors.set(res.items || []);
+    } catch (err) {
+      console.warn('[MaterialCreate] failed to load vendors', err);
+    }
   }
 
   async loadCustomFields(): Promise<void> {

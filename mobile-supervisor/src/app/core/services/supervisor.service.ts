@@ -16,6 +16,7 @@ import {
   ApprovalActionRequest,
   Site,
   SitesResponse,
+  Vendor,
 } from '../../shared/models';
 
 export interface SiteSelection {
@@ -146,7 +147,6 @@ export class SupervisorService {
     return this.api.post<{ expense: Expense }>('/supervisor/expenses', request);
   }
 
-  // ---------------- Site Selection ----------------
   async setSelectedSite(
     siteId: string,
     projectId: string,
@@ -185,5 +185,16 @@ export class SupervisorService {
   async clearSiteSelection(): Promise<void> {
     this._selection.set(null);
     await this.api.clearSiteSelection();
+  }
+
+  // ---------------- Vendors ----------------
+  getVendors(filters?: {
+    materialType?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.api.get<{ items: Vendor[]; total: number; page: number; limit: number; pages: number }>('/supervisor/vendors', filters);
   }
 }

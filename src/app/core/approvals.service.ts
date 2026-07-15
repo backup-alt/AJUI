@@ -140,6 +140,8 @@ interface RawApprovalItem {
   poNumber?: string;
   requestDate?: string;
   submittedBy?: string;
+  clientName?: string;
+  supervisorName?: string;
   attendanceDate?: string;
   staffName?: string;
   labourTypes?: string;
@@ -195,13 +197,14 @@ export class ApprovalsService {
       case "material":
         return {
           ...base,
+          client: a.clientName || "",
           module: "materials" as const,
           materialName: a.materialName || a.title?.replace(/^Material:\s*/i, "") || "",
           unit: a.unit || "",
           requestedQuantity: a.requestedQuantity || 0,
           approvedQuantity: a.approvedQuantity || 0,
           vendor: a.vendor || "",
-          supervisor: "",
+          supervisor: a.supervisorName || "",
           requestDate: a.requestDate || "",
           poNumber: a.poNumber || "",
         } as MaterialApprovalRow;

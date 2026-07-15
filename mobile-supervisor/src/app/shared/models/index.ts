@@ -3,6 +3,7 @@ export * from './project.model';
 export * from './material.model';
 export * from './expense.model';
 export * from './approval.model';
+export * from './vendor.model';
 
 // Export payment types separately to avoid conflict with labour.PaymentMode
 export {

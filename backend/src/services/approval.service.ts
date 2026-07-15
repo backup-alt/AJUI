@@ -215,15 +215,18 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
       if (sourceCollection === "Material") {
         const doc = await (await import("../models/Material.js")).Material.findById(sourceId).lean();
         if (doc) {
+          const d = doc as any;
           sourceData = {
-            materialName: doc.name,
-            unit: doc.unit,
-            requestedQuantity: doc.requestedQuantity,
-            approvedQuantity: doc.approvedQuantity,
-            vendor: doc.vendor,
-            poNumber: doc.poNumber,
-            requestDate: doc.requestDate,
-            submittedBy: doc.createdBy,
+            materialName: d.name,
+            unit: d.unit,
+            requestedQuantity: d.requestedQuantity,
+            approvedQuantity: d.approvedQuantity,
+            vendor: d.vendor,
+            poNumber: d.poNumber,
+            requestDate: d.requestDate || (d.createdAt ? new Date(d.createdAt).toISOString().slice(0,10) : new Date().toISOString().slice(0,10)),
+            submittedBy: d.createdBy,
+            clientName: d.clientName,
+            supervisorName: d.supervisorName,
           };
         }
       } else if (sourceCollection === "Labour") {

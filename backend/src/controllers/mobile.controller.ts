@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
 import { AppError } from "../middleware/errorHandler.js";
 import * as mobileService from "../services/supervisor-mobile.service.js";
+import * as vendorService from "../services/vendor.service.js";
 import * as deviceService from "../services/device-token.service.js";
 
 function requireSupervisor(req: Request): string {
@@ -150,11 +151,15 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
     const { Site } = await import("../models/Site.js");
     const { generateId } = await import("../services/id-generator.service.js");
     const { Approval } = await import("../models/Approval.js");
+    const { User } = await import("../models/User.js");
 
     await mobileService.ensureSupervisorSiteAccess(userId, req.body.projectId, req.body.siteId);
 
     const project = await Project.findById(req.body.projectId).lean();
     if (!project) throw new AppError(404, "Project not found");
+
+    const supervisor = await User.findById(userId).select("name").lean();
+    const supervisorName = supervisor?.name || "";
 
     let siteName = req.body.site;
     if (req.body.siteId) {
@@ -165,6 +170,7 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
     const materialId = await generateId("MAT");
     const initialStock =
       typeof req.body.remainingStock === "number" ? req.body.remainingStock : 0;
+    const requestDate = req.body.requestDate || new Date().toISOString().slice(0, 10);
     const material = await (await import("../models/Material.js")).Material.create({
       ...req.body,
       materialId,
@@ -176,6 +182,8 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
       consumedQuantity: 0,
       status: "Pending",
       createdBy: userId,
+      supervisorName,
+      requestDate,
     });
 
     await Approval.create({
@@ -383,6 +391,22 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
     }
 
     res.status(201).json({ expense });
+  } catch (e) { next(e); }
+}
+
+// =================== VENDORS (mobile) ===================
+export async function listVendorsForSupervisor(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    // Supervisors can view all vendors (no project scoping needed)
+    const result = await vendorService.listVendors({
+      materialType: req.query.materialType as string | undefined,
+      status: req.query.status as string | undefined,
+      search: req.query.search as string | undefined,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 50,
+    });
+    res.json(result);
   } catch (e) { next(e); }
 }
 

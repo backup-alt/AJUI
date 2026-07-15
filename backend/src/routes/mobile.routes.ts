@@ -58,4 +58,7 @@ router.post("/supervisor/device/register", validate(registerDeviceSchema), ctrl.
 router.post("/supervisor/device/unregister", validate(unregisterDeviceSchema), ctrl.unregisterDevice);
 router.get("/supervisor/devices", ctrl.getMyDevices);
 
+// Vendors
+router.get("/supervisor/vendors", ctrl.listVendorsForSupervisor);
+
 export default router;
