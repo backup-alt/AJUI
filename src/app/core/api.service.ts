@@ -253,6 +253,11 @@ export class ApiService {
       catchError(this.handleError)
     );
   }
+  createVendor(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/vendors`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
 
   // =================== SUBCONTRACTORS ===================
   deleteSubcontractor(id: string): Observable<any> {
