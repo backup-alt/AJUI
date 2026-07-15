@@ -46,7 +46,7 @@ export class MaterialsService {
   private mapMaterial = (row: any): MaterialRow => ({
     id: row.materialId || row._id || row.id,
     projectId: row.projectId,
-    site: row.siteId,
+    site: row.site || row.siteId,
     name: row.name,
     unit: row.unit,
     requested: row.requested,
