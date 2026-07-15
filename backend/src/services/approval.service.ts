@@ -59,32 +59,37 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
   let projectId: Types.ObjectId | undefined;
   switch (approval.sourceCollection) {
     case "materials":
+    case "Material":
       await Material.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const mat = await Material.findById(approval.sourceId).lean();
       projectId = mat?.projectId;
       break;
     case "labour":
+    case "Labour":
       await Labour.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const lab = await Labour.findById(approval.sourceId).lean();
       projectId = lab?.projectId;
       break;
     case "expenses":
+    case "Expense":
       await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const exp = await Expense.findById(approval.sourceId).lean();
       projectId = exp?.projectId;
       break;
     case "payments":
+    case "Payment":
       await Payment.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const pay = await Payment.findById(approval.sourceId).lean();
       projectId = pay?.projectId;
       break;
     case "subcontractors":
+    case "Subcontractor":
       await Subcontractor.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const sub = await Subcontractor.findById(approval.sourceId).lean();
       projectId = sub?.projectId;
       break;
     default:
-      throw new AppError(400, "Unknown source collection");
+      throw new AppError(400, `Unknown source collection: ${approval.sourceCollection}`);
   }
 
   approval.status = "Approved";
@@ -148,18 +153,23 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
 
   switch (approval.sourceCollection) {
     case "materials":
+    case "Material":
       await Material.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
     case "labour":
+    case "Labour":
       await Labour.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
     case "expenses":
+    case "Expense":
       await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
     case "payments":
+    case "Payment":
       await Payment.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
     case "subcontractors":
+    case "Subcontractor":
       await Subcontractor.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
   }
