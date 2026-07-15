@@ -7,9 +7,16 @@ import { ApiService } from "../core/api.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
+import { formatMoney } from "../shared/format";
 
 // Extended Site type for vendor sites with additional computed properties
-type VendorSite = Site & { materialEntryCount: number; materialNames: string[] };
+type VendorSite = Site & {
+  materialEntryCount: number;
+  materialNames: string[];
+  totalIssued: number;
+  totalGiven: number;
+  materialCount: number;
+};
 
 @Component({
   standalone: true,
@@ -129,12 +136,22 @@ type VendorSite = Site & { materialEntryCount: number; materialNames: string[] }
                           <div>
                             <h3>{{ site.name }}</h3>
                             <p class="site-meta">
-                              <span class="meta-item">{{ site.materialEntryCount }} material entries</span>
-                              <span class="meta-item">{{ site.materialNames.length }} materials</span>
+                              <span class="meta-item">{{ site.materialEntryCount }} entries</span>
+                              <span class="meta-item">{{ site.materialCount }} types</span>
                             </p>
                           </div>
                         </div>
                         <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
+                      </div>
+                      <div class="ledger-box">
+                        <div class="ledger-row">
+                          <span>Purchase Value</span>
+                          <strong>{{ formatMoney(site.totalIssued) }}</strong>
+                        </div>
+                        <div class="ledger-row">
+                          <span>Amount Paid</span>
+                          <strong>{{ formatMoney(site.totalGiven) }}</strong>
+                        </div>
                       </div>
                       <div class="site-card-footer">
                         <span class="site-status" [class.active]="site.status === 'Active'" [class.on-hold]="site.status === 'On Hold'" [class.completed]="site.status === 'Completed'">
@@ -359,6 +376,7 @@ type VendorSite = Site & { materialEntryCount: number; materialNames: string[] }
 export class VendorDashboardPage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
+  readonly formatMoney = formatMoney;
 
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
@@ -377,11 +395,13 @@ export class VendorDashboardPage {
     const vendor = this.selectedVendor();
     if (!vendor) return [] as VendorSite[];
 
-    const materialSites = new Map<string, { count: number; materialNames: string[]; status?: string }>();
+    const materialSites = new Map<string, { count: number; materialNames: string[]; totalIssued: number; totalGiven: number }>();
     for (const m of this.data.materials()) {
       if (m.vendor === vendor.name && m.site) {
-        const existing = materialSites.get(m.site) || { count: 0, materialNames: [] };
+        const existing = materialSites.get(m.site) || { count: 0, materialNames: [], totalIssued: 0, totalGiven: 0 };
         existing.count++;
+        existing.totalIssued += m.issuedAmount || 0;
+        existing.totalGiven += m.givenAmount || 0;
         if (!existing.materialNames.includes(m.name)) {
           existing.materialNames.push(m.name);
         }
@@ -399,6 +419,9 @@ export class VendorDashboardPage {
         status: "Active" as const,
         materialEntryCount: materialSites.get(siteName)!.count,
         materialNames: materialSites.get(siteName)!.materialNames,
+        totalIssued: materialSites.get(siteName)!.totalIssued,
+        totalGiven: materialSites.get(siteName)!.totalGiven,
+        materialCount: materialSites.get(siteName)!.materialNames.length,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 

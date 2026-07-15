@@ -38,6 +38,11 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: "quotations",
+    loadComponent: () => import("./pages/quotation.page").then((m) => m.QuotationPage),
+    canActivate: [authGuard],
+  },
+  {
     path: "projects",
     loadComponent: () => import("./pages/projects-directory.page").then((m) => m.ProjectsDirectoryPage),
     canActivate: [authGuard],
@@ -54,6 +59,7 @@ export const routes: Routes = [
     children: [
       { path: "", pathMatch: "full", redirectTo: "account" },
       { path: "account", loadComponent: () => import("./pages/settings/settings-account.component").then((m) => m.SettingsAccountComponent) },
+      { path: "company", loadComponent: () => import("./pages/settings/settings-company.component").then((m) => m.SettingsCompanyComponent) },
       { path: "notifications", loadComponent: () => import("./pages/settings/settings-notifications.component").then((m) => m.SettingsNotificationsComponent) },
       { path: "roles", loadComponent: () => import("./pages/settings/settings-roles.component").then((m) => m.SettingsRolesComponent) },
       { path: "roles/employee/:id", loadComponent: () => import("./pages/settings/settings-employee-detail.component").then((m) => m.SettingsEmployeeDetailComponent) },

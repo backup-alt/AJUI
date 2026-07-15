@@ -180,6 +180,7 @@ export class EnterpriseSidebarComponent {
       { key: "dashboard", label: "Dashboard", icon: "grid-outline", route: ["/dashboard"] },
       { key: "clients", label: "Clients", icon: "people-outline", route: ["/clients"] },
       { key: "vendors", label: "Vendors", icon: "storefront-outline", route: ["/vendors"] },
+      { key: "quotations", label: "Quotations", icon: "document-text-outline", route: ["/quotations"] },
       { key: "projects", label: "Project list", icon: "folder-open-outline", route: ["/projects"] },
       { key: "approvals", label: "Pending Approvals", icon: "checkmark-done-outline", route: ["/approvals"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
