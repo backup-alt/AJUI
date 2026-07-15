@@ -1064,6 +1064,12 @@ export class ErpDataService {
     for (const row of this.materials()) push(row["site"], row["site"]);
     for (const row of this.labour()) push(row["site"], row["site"]);
     for (const row of this.expenses()) push(row["site"], row["site"]);
+    
+    // Also include sites from backend (siteEntities signal)
+    for (const site of this.siteEntities()) {
+      push(site.id, site.name);
+    }
+    
     return list;
   }
 
