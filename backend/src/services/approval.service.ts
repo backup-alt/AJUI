@@ -96,12 +96,26 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
     await recomputeProjectTotals(projectId);
   }
 
-  // Send push notification to project supervisors (non-blocking best-effort)
+  // Send push notification to project supervisors and owner (non-blocking best-effort)
   try {
-    const { notifyProjectSupervisors } = await import("./device-token.service.js");
+    const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
     if (projectId) {
       await notifyProjectSupervisors(
         projectId,
+        `${approval.title} - Approved`,
+        `Your ${approval.type} request has been approved`,
+        {
+          approvalId: approval.approvalId,
+          type: approval.type,
+          status: "Approved",
+          projectId: approval.projectId?.toString() || "",
+        }
+      );
+    }
+    // Notify the owner who submitted the request
+    if (approval.owner) {
+      await notifyUserOfApproval(
+        approval.owner,
         `${approval.title} - Approved`,
         `Your ${approval.type} request has been approved`,
         {
@@ -155,9 +169,9 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
   approval.reviewedAt = new Date();
   await approval.save();
 
-  // Send push notification to project supervisors
+  // Send push notification to project supervisors and owner
   try {
-    const { notifyProjectSupervisors } = await import("./device-token.service.js");
+    const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
     await notifyProjectSupervisors(
       approval.projectId || "",
       `${approval.title} - Rejected`,
@@ -169,6 +183,20 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
         projectId: approval.projectId?.toString() || "",
       }
     );
+    // Notify the owner who submitted the request
+    if (approval.owner) {
+      await notifyUserOfApproval(
+        approval.owner,
+        `${approval.title} - Rejected`,
+        `Your ${approval.type} request has been rejected`,
+        {
+          approvalId: approval.approvalId,
+          type: approval.type,
+          status: "Rejected",
+          projectId: approval.projectId?.toString() || "",
+        }
+      );
+    }
   } catch (err) {
     console.warn("[Notification] Failed to send rejection notification:", err);
   }

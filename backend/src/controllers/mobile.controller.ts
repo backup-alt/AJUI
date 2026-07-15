@@ -198,6 +198,7 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
       sourceCollection: "Material",
       sourceId: material._id,
       status: "Pending",
+      owner: userId,
     });
 
     res.status(201).json({ material });
@@ -304,6 +305,7 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
       sourceCollection: "Labour",
       sourceId: labour._id,
       status: "Pending",
+      owner: userId,
     });
 
     res.status(201).json({ labour });
@@ -387,6 +389,7 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
         sourceCollection: "Expense",
         sourceId: expense._id,
         status: "Pending",
+        owner: userId,
       });
     }
 
