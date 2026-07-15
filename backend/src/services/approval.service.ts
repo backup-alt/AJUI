@@ -245,7 +245,67 @@ export async function listApprovals(filter: {
     Approval.find(query).sort({ submittedAt: -1 }).skip(skip).limit(filter.limit).lean(),
     Approval.countDocuments(query),
   ]);
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+
+  const enriched = await Promise.all(items.map((item) => enrichApprovalWithSource(item)));
+  return { items: enriched, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+}
+
+async function enrichApprovalWithSource(approval: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const sourceCollection = approval.sourceCollection as string;
+  const sourceId = approval.sourceId as Types.ObjectId | undefined;
+
+  let sourceData: Record<string, unknown> | null = null;
+  if (sourceId && sourceCollection) {
+    try {
+      if (sourceCollection === "Material") {
+        const doc = await (await import("../models/Material.js")).Material.findById(sourceId).lean();
+        if (doc) {
+          sourceData = {
+            materialName: doc.name,
+            unit: doc.unit,
+            requestedQuantity: doc.requestedQuantity,
+            approvedQuantity: doc.approvedQuantity,
+            vendor: doc.vendor,
+            poNumber: doc.poNumber,
+            requestDate: doc.requestDate,
+            submittedBy: doc.createdBy,
+          };
+        }
+      } else if (sourceCollection === "Labour") {
+        const doc = await (await import("../models/Labour.js")).Labour.findById(sourceId).lean();
+        if (doc) {
+          sourceData = {
+            attendanceDate: doc.attendanceDate,
+            staffName: doc.partyName,
+            labourTypes: doc.category,
+            staffCount: doc.presentCount,
+            dailyWage: doc.dailyWage,
+            shift: doc.shift,
+            overtimeHours: doc.overtimeHours,
+            lateFine: doc.lateFine,
+            submittedBy: doc.submittedBy,
+          };
+        }
+      } else if (sourceCollection === "Expense") {
+        const doc = await (await import("../models/Expense.js")).Expense.findById(sourceId).lean();
+        if (doc) {
+          sourceData = {
+            expenseDate: doc.date,
+            transactionType: doc.transactionType,
+            description: doc.description,
+            amount: doc.amount,
+            paidBy: doc.paidBy,
+            reference: doc.reference,
+            submittedBy: doc.submittedBy,
+          };
+        }
+      }
+    } catch {
+      // source document not found - skip enrichment
+    }
+  }
+
+  return { ...approval, ...sourceData };
 }
 
 export async function getApprovalById(id: string) {

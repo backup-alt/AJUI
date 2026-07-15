@@ -208,13 +208,18 @@ export class AuthService {
       );
 
       const sites = response.sites || [];
-      if (sites.length === 0) {
-        await this.supervisorService.clearSiteSelection();
+
+      // Only auto-select if no site is currently selected (preserve previous choice)
+      const currentSiteId = this.supervisorService.selectedSiteId();
+      if (currentSiteId && sites.some((s) => s.id === currentSiteId)) {
         return;
       }
 
-      const currentSiteId = this.supervisorService.selectedSiteId();
-      const selected = sites.find((site) => site.id === currentSiteId) || sites[0];
+      if (sites.length === 0) {
+        return;
+      }
+
+      const selected = sites[0];
       await this.supervisorService.setSelectedSite(
         selected.id,
         selected.projectId || '',

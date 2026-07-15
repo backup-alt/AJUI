@@ -1,11 +1,11 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
-import type { Project } from "../../data/dashboardData";
-import { ErpDataService, type SharedModuleKey, type SharedTableRow } from "../data/erp-data.service";
+import { firstValueFrom } from "rxjs";
+import { ErpDataService, type SharedModuleKey } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { formatMoney } from "../shared/format";
+import { ApprovalsService } from "../core/approvals.service";
 
 type ApprovalField = "status" | "approvalStatus";
 
@@ -23,8 +23,8 @@ type ApprovalBaseRow = {
 type MaterialApprovalRow = ApprovalBaseRow & {
   materialName: string;
   unit: string;
-  requestedQuantity: string;
-  approvedQuantity: string;
+  requestedQuantity: number;
+  approvedQuantity: number;
   vendor: string;
   supervisor: string;
   requestDate: string;
@@ -35,7 +35,7 @@ type LabourApprovalRow = ApprovalBaseRow & {
   attendanceDate: string;
   staffName: string;
   labourTypes: string;
-  staffCount: string;
+  staffCount: number;
   shift: string;
   overtime: string;
   lateFine: string;
@@ -46,7 +46,7 @@ type ExpenseApprovalRow = ApprovalBaseRow & {
   expenseDate: string;
   transactionType: string;
   description: string;
-  amount: string;
+  amount: number;
   supervisor: string;
   reference: string;
 };
@@ -56,14 +56,14 @@ type GeneralExpenseApprovalRow = ApprovalBaseRow & {
   department: string;
   category: string;
   description: string;
-  amount: string;
+  amount: number;
   paidBy: string;
   reference: string;
 };
 
 type PaymentApprovalRow = ApprovalBaseRow & {
   paymentDate: string;
-  amount: string;
+  amount: number;
   mode: string;
   transactionReference: string;
   receiptNumber: string;
@@ -73,9 +73,9 @@ type PaymentApprovalRow = ApprovalBaseRow & {
 type SubcontractApprovalRow = ApprovalBaseRow & {
   subcontractorName: string;
   workPackage: string;
-  contractValue: string;
-  advancePaid: string;
-  balance: string;
+  contractValue: number;
+  advancePaid: number;
+  balance: number;
   supervisor: string;
   dueDate: string;
   paymentStatus: string;
@@ -440,6 +440,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 })
 export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
+  private readonly approvalsService = inject(ApprovalsService);
 
   readonly showMaterial = signal(false);
   readonly showLabour = signal(false);
@@ -447,33 +448,61 @@ export class PendingApprovalsPage implements OnInit {
   readonly showGeneralExpense = signal(false);
   readonly showPayment = signal(false);
   readonly showSubcontract = signal(false);
+  readonly isLoading = signal(false);
+  readonly loadError = signal(false);
 
-  ngOnInit() {
+  private _materialRows = signal<MaterialApprovalRow[]>([]);
+  private _labourRows = signal<LabourApprovalRow[]>([]);
+  private _siteExpenseRows = signal<ExpenseApprovalRow[]>([]);
+  private _generalExpenseRows = signal<GeneralExpenseApprovalRow[]>([]);
+  private _paymentRows = signal<PaymentApprovalRow[]>([]);
+  private _subcontractRows = signal<SubcontractApprovalRow[]>([]);
+
+  async ngOnInit() {
     this.showMaterial.set(true);
     this.showLabour.set(true);
     this.showSiteExpense.set(true);
     this.showGeneralExpense.set(true);
     this.showPayment.set(true);
     this.showSubcontract.set(true);
+    await this.refreshApprovals();
+  }
+
+  async refreshApprovals(): Promise<void> {
+    this.isLoading.set(true);
+    this.loadError.set(false);
+    try {
+      const all = await this.approvalsService.fetchApprovals({ status: "Pending", limit: 100 });
+      this._materialRows.set(all.filter((r) => r.module === "materials") as MaterialApprovalRow[]);
+      this._labourRows.set(all.filter((r) => r.module === "labour") as LabourApprovalRow[]);
+      this._siteExpenseRows.set(all.filter((r) => r.module === "expenses") as ExpenseApprovalRow[]);
+      this._generalExpenseRows.set(all.filter((r) => r.module === "generalExpenses") as GeneralExpenseApprovalRow[]);
+      this._paymentRows.set(all.filter((r) => r.module === "payments") as PaymentApprovalRow[]);
+      this._subcontractRows.set(all.filter((r) => r.module === "subcontractors") as SubcontractApprovalRow[]);
+    } catch {
+      this.loadError.set(true);
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   readonly materialApprovals = computed(() =>
-    this.showMaterial() ? this.materialRows().filter((row) => this.isPending(row.status)) : []
+    this.showMaterial() ? this._materialRows().filter((row) => this.isPending(row.status)) : []
   );
   readonly labourApprovals = computed(() =>
-    this.showLabour() ? this.labourRows().filter((row) => this.isPending(row.status)) : []
+    this.showLabour() ? this._labourRows().filter((row) => this.isPending(row.status)) : []
   );
   readonly siteExpenseApprovals = computed(() =>
-    this.showSiteExpense() ? this.siteExpenseRows().filter((row) => this.isPending(row.status)) : []
+    this.showSiteExpense() ? this._siteExpenseRows().filter((row) => this.isPending(row.status)) : []
   );
   readonly generalExpenseApprovals = computed(() =>
-    this.showGeneralExpense() ? this.generalExpenseRows().filter((row) => this.isPending(row.status)) : []
+    this.showGeneralExpense() ? this._generalExpenseRows().filter((row) => this.isPending(row.status)) : []
   );
   readonly paymentApprovals = computed(() =>
-    this.showPayment() ? this.paymentRows().filter((row) => this.isPending(row.status)) : []
+    this.showPayment() ? this._paymentRows().filter((row) => this.isPending(row.status)) : []
   );
   readonly subcontractApprovals = computed(() =>
-    this.showSubcontract() ? this.subcontractRows().filter((row) => this.isPending(row.status)) : []
+    this.showSubcontract() ? this._subcontractRows().filter((row) => this.isPending(row.status)) : []
   );
 
   pendingTotal(): number {
@@ -516,39 +545,47 @@ export class PendingApprovalsPage implements OnInit {
       currentVendor,
       ...this.data.vendors().map((vendor) => vendor.name),
       ...this.data.materials().map((material) => material.vendor),
+      ...this._materialRows().map((r) => r.vendor).filter(Boolean),
     ]);
   }
 
   updateApprovalCell(row: ApprovalBaseRow, key: string, value: string) {
-    this.data.updateSharedRowCell(row.rowId, key, value);
+    if (row.module === "materials") {
+      this._materialRows.update((rows) =>
+        rows.map((r) => r.rowId === row.rowId ? Object.assign({}, r, { [key]: value }) : r)
+      );
+    }
   }
 
   approve(row: ApprovalBaseRow) {
-    this.applyApproval(row, "Approved");
+    void this.applyApproval(row, "Approved");
   }
 
   decline(row: ApprovalBaseRow) {
-    this.applyApproval(row, "Declined");
+    void this.applyApproval(row, "Rejected");
   }
 
-  private applyApproval(row: ApprovalBaseRow, status: "Approved" | "Declined") {
-    this.data.updateSharedRowCell(row.rowId, row.field, status);
-    if (!this.data.settings().singleApprovalForSiteExpenseMaterials) return;
-
-    if (row.module === "materials" && row.sourceExpenseRowId) {
-      this.data.updateSharedRowCell(row.sourceExpenseRowId, "approvalStatus", status);
-      return;
+  private async applyApproval(row: ApprovalBaseRow, status: "Approved" | "Rejected"): Promise<void> {
+    try {
+      if (status === "Approved") {
+        await firstValueFrom(this.approvalsService.approve(row.rowId));
+      } else {
+        await firstValueFrom(this.approvalsService.reject(row.rowId));
+      }
+      this.removeRowFromLists(row.rowId);
+      window.alert(`Approval ${status.toLowerCase()} successfully.`);
+    } catch (e) {
+      window.alert("Failed to process approval. Please try again.");
     }
+  }
 
-    if (row.module === "expenses") {
-      this.data
-        .tableRowsFor("materials", [])
-        .filter((material) => String(material["sourceExpenseRowId"] || "") === row.rowId)
-        .forEach((material) => {
-          const linkedMaterialId = String(material["__rowId"] || "");
-          if (linkedMaterialId) this.data.updateSharedRowCell(linkedMaterialId, "status", status);
-        });
-    }
+  private removeRowFromLists(rowId: string) {
+    this._materialRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
+    this._labourRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
+    this._siteExpenseRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
+    this._generalExpenseRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
+    this._paymentRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
+    this._subcontractRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
   }
 
   private allPendingRows(): ApprovalBaseRow[] {
@@ -562,259 +599,8 @@ export class PendingApprovalsPage implements OnInit {
     ];
   }
 
-  private materialRows(): MaterialApprovalRow[] {
-    const rows = this.data.materials().map((row) => {
-      const project = this.projectById(row.projectId);
-      return {
-        __rowId: `material:${row.id}`,
-        __projectId: row.projectId,
-        client: project?.client ?? "",
-        project: project?.name ?? row.projectId,
-        projectId: row.projectId,
-        site: row.site,
-        materialName: row.name,
-        unit: row.unit,
-        requestedQuantity: String(row.requested),
-        approvedQuantity: String(row.approved),
-        requestDate: "2026-06-05",
-        vendor: row.vendor,
-        poNumber: row.poNumber,
-        supervisor: project?.supervisor ?? "",
-        status: row.status,
-      };
-    });
-    return this.data.tableRowsFor("materials", rows).map((row) => {
-      const project = this.projectForRow(row);
-      return {
-        rowId: String(row["__rowId"] || ""),
-        module: "materials",
-        field: "status",
-        client: String(row["client"] || project?.client || ""),
-        project: String(row["project"] || project?.name || row["projectId"] || row["__projectId"] || ""),
-        site: String(row["site"] || ""),
-        status: this.normalizeApprovalStatus(row["status"]),
-        sourceExpenseRowId: String(row["sourceExpenseRowId"] || ""),
-        materialName: String(row["materialName"] || row["name"] || "Material"),
-        unit: String(row["unit"] || ""),
-        requestedQuantity: String(row["requestedQuantity"] || ""),
-        approvedQuantity: String(row["approvedQuantity"] || ""),
-        vendor: String(row["vendor"] || ""),
-        supervisor: String(row["supervisor"] || project?.supervisor || ""),
-        requestDate: String(row["requestDate"] || row["date"] || ""),
-        poNumber: String(row["poNumber"] || ""),
-      };
-    });
-  }
-
-  private labourRows(): LabourApprovalRow[] {
-    const rows = this.data.labour().map((row) => {
-      const project = this.projectById(row.projectId);
-      return {
-        __rowId: `labour:${row.id}`,
-        __projectId: row.projectId,
-        client: project?.client ?? "",
-        project: project?.name ?? row.projectId,
-        projectId: row.projectId,
-        site: row.site,
-        attendanceDate: "2026-06-05",
-        staffName: row.party,
-        labourTypes: row.notes || `${row.category}: ${row.presentCount}`,
-        staffCount: String(row.presentCount),
-        shift: "1",
-        overtime: String(row.overtime),
-        lateFine: formatMoney(row.lateFine),
-        submittedBy: row.paymentMode,
-        status: row.status,
-      };
-    });
-    return this.data.tableRowsFor("labour", rows).map((row) => ({
-      rowId: String(row["__rowId"] || ""),
-      module: "labour",
-      field: "status",
-      client: String(row["client"] || ""),
-      project: String(row["project"] || row["projectId"] || row["__projectId"] || ""),
-      site: String(row["site"] || ""),
-      status: this.normalizeApprovalStatus(row["status"]),
-      attendanceDate: String(row["attendanceDate"] || row["date"] || ""),
-      staffName: String(row["staffName"] || row["labourName"] || ""),
-      labourTypes: String(row["labourTypes"] || row["notes"] || ""),
-      staffCount: String(row["staffCount"] || row["presentUnits"] || ""),
-      shift: String(row["shift"] || ""),
-      overtime: String(row["overtime"] || ""),
-      lateFine: String(row["lateFine"] || ""),
-      submittedBy: String(row["submittedBy"] || row["paymentMode"] || ""),
-    }));
-  }
-
-  private siteExpenseRows(): ExpenseApprovalRow[] {
-    const rows = this.data
-      .expenses()
-      .filter((row) => row.type === "Site Expense")
-      .map((row) => {
-        const project = this.projectById(row.projectId);
-        return {
-          __rowId: `expense:${row.id}`,
-          __projectId: row.projectId,
-          client: project?.client ?? "",
-          project: project?.name ?? row.projectId,
-          projectId: row.projectId,
-          site: row.site,
-          expenseDate: row.date,
-          transactionType: "Site Expense",
-          description: row.description,
-          amount: formatMoney(row.spent),
-          supervisor: row.supervisor,
-          reference: row.reference,
-          approvalStatus: row.status,
-        };
-      });
-    return this.data.tableRowsFor("expenses", rows).map((row) => ({
-      rowId: String(row["__rowId"] || ""),
-      module: "expenses",
-      field: "approvalStatus",
-      client: String(row["client"] || ""),
-      project: String(row["project"] || row["projectId"] || row["__projectId"] || ""),
-      site: String(row["site"] || ""),
-      status: this.normalizeApprovalStatus(row["approvalStatus"] || row["status"]),
-      expenseDate: String(row["expenseDate"] || row["date"] || ""),
-      transactionType: String(row["transactionType"] || "Site Expense"),
-      description: String(row["description"] || ""),
-      amount: String(row["amount"] || ""),
-      supervisor: String(row["supervisor"] || ""),
-      reference: String(row["reference"] || ""),
-    }));
-  }
-
-  private generalExpenseRows(): GeneralExpenseApprovalRow[] {
-    const rows = this.data
-      .expenses()
-      .filter((row) => row.type === "General Expense")
-      .map((row) => ({
-        __rowId: `general-expense:${row.id}`,
-        client: "Company",
-        project: "Head Office",
-        site: "Office",
-        expenseDate: row.date,
-        department: "Head Office",
-        category: "Office",
-        description: row.description,
-        amount: formatMoney(row.spent),
-        paidBy: row.supervisor,
-        reference: row.reference,
-        approvalStatus: row.status,
-      }));
-    return this.data.tableRowsFor("generalExpenses", rows).map((row) => ({
-      rowId: String(row["__rowId"] || ""),
-      module: "generalExpenses",
-      field: "approvalStatus",
-      client: String(row["client"] || "Company"),
-      project: String(row["project"] || "Head Office"),
-      site: String(row["site"] || "Office"),
-      status: this.normalizeApprovalStatus(row["approvalStatus"] || row["status"]),
-      expenseDate: String(row["expenseDate"] || row["date"] || ""),
-      department: String(row["department"] || ""),
-      category: String(row["category"] || ""),
-      description: String(row["description"] || ""),
-      amount: String(row["amount"] || ""),
-      paidBy: String(row["paidBy"] || row["supervisor"] || ""),
-      reference: String(row["reference"] || ""),
-    }));
-  }
-
-  private paymentRows(): PaymentApprovalRow[] {
-    const rows = this.data.payments().map((row) => {
-      const project = this.projectById(row.projectId);
-      return {
-        __rowId: `payment:${row.id}`,
-        __projectId: row.projectId,
-        client: project?.client ?? "",
-        project: project?.name ?? row.projectId,
-        projectId: row.projectId,
-        paymentDate: row.date,
-        amount: formatMoney(row.amount),
-        mode: row.mode,
-        transactionReference: row.reference,
-        receiptNumber: row.receipt,
-        collectedBy: row.collectedBy,
-        approvalStatus: row.status,
-      };
-    });
-    return this.data.tableRowsFor("payments", rows).map((row) => ({
-      rowId: String(row["__rowId"] || ""),
-      module: "payments",
-      field: "approvalStatus",
-      client: String(row["client"] || ""),
-      project: String(row["project"] || row["projectId"] || row["__projectId"] || ""),
-      site: String(row["site"] || ""),
-      status: this.normalizeApprovalStatus(row["approvalStatus"] || row["status"]),
-      paymentDate: String(row["paymentDate"] || row["date"] || ""),
-      amount: String(row["amount"] || ""),
-      mode: String(row["mode"] || ""),
-      transactionReference: String(row["transactionReference"] || row["reference"] || ""),
-      receiptNumber: String(row["receiptNumber"] || row["receipt"] || ""),
-      collectedBy: String(row["collectedBy"] || ""),
-    }));
-  }
-
-  private subcontractRows(): SubcontractApprovalRow[] {
-    const rows = this.data.subcontractors().map((row) => {
-      const project = this.projectById(row.projectId);
-      return {
-        __rowId: `subcontractor:${row.id}`,
-        __projectId: row.projectId,
-        client: project?.client ?? "",
-        project: project?.name ?? row.projectId,
-        projectId: row.projectId,
-        site: row.site,
-        subcontractorName: row.name,
-        workPackage: row.workPackage,
-        contractValue: formatMoney(row.contractValue),
-        advancePaid: formatMoney(row.advancePaid),
-        balance: formatMoney(row.contractValue - row.advancePaid),
-        supervisor: row.supervisor,
-        dueDate: row.dueDate,
-        approvalStatus: row.approvalStatus,
-        paymentStatus: row.paymentStatus,
-      };
-    });
-    return this.data.tableRowsFor("subcontractors", rows).map((row) => ({
-      rowId: String(row["__rowId"] || ""),
-      module: "subcontractors",
-      field: "approvalStatus",
-      client: String(row["client"] || ""),
-      project: String(row["project"] || row["projectId"] || row["__projectId"] || ""),
-      site: String(row["site"] || ""),
-      status: this.normalizeApprovalStatus(row["approvalStatus"] || row["status"]),
-      subcontractorName: String(row["subcontractorName"] || row["name"] || ""),
-      workPackage: String(row["workPackage"] || ""),
-      contractValue: String(row["contractValue"] || ""),
-      advancePaid: String(row["advancePaid"] || ""),
-      balance: String(row["balance"] || ""),
-      supervisor: String(row["supervisor"] || ""),
-      dueDate: String(row["dueDate"] || ""),
-      paymentStatus: String(row["paymentStatus"] || ""),
-    }));
-  }
-
-  private projectForRow(row: SharedTableRow): Project | undefined {
-    const projectId = String(row["projectId"] || row["__projectId"] || "");
-    return this.projectById(projectId) ?? this.data.projects().find((project) => project.name === row["project"]);
-  }
-
-  private projectById(projectId: string): Project | undefined {
-    return this.data.projectById(projectId);
-  }
-
   private isPending(value: string): boolean {
     return value.toLowerCase() === "pending";
-  }
-
-  private normalizeApprovalStatus(value: unknown): string {
-    const normalized = String(value || "Pending").trim().toLowerCase();
-    if (!normalized || normalized === "pending") return "Pending";
-    if (normalized === "approve" || normalized === "approved") return "Approved";
-    if (normalized === "decline" || normalized === "declined" || normalized === "rejected") return "Declined";
-    return String(value);
   }
 
   private sortedUnique(values: string[]): string[] {

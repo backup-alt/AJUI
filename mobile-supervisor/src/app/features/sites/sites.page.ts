@@ -396,6 +396,7 @@ export class SitesPage implements OnInit {
 
   sites = signal<Site[]>([]);
   isLoading = signal(true);
+  loadError = signal(false);
   activeSiteId = computed(() => this.supervisor.selectedSiteId());
 
   drawerOpen = signal(false);
@@ -414,6 +415,7 @@ export class SitesPage implements OnInit {
 
   async loadSites(): Promise<void> {
     this.isLoading.set(true);
+    this.loadError.set(false);
     try {
       this.supervisor.getSites().subscribe({
         next: (res) => {
@@ -423,11 +425,14 @@ export class SitesPage implements OnInit {
         error: (err) => {
           console.error('[Sites] failed to load', err);
           this.sites.set([]);
+          this.loadError.set(true);
           this.isLoading.set(false);
         },
       });
     } catch (e) {
       console.error(e);
+      this.sites.set([]);
+      this.loadError.set(true);
       this.isLoading.set(false);
     }
   }
