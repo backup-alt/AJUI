@@ -49,6 +49,7 @@ export type MaterialRow = {
   vendor: string;
   poNumber: string;
   status: ApprovalStatus;
+  requestDate?: string;
   purchasedDate?: string;
   issuedAmount?: number;
   givenAmount?: number;
