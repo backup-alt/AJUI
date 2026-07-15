@@ -240,7 +240,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
   let sourceData: Record<string, unknown> | null = null;
   if (sourceId && sourceCollection) {
     try {
-      if (sourceCollection === "Material") {
+      if (sourceCollection === "Material" || sourceCollection === "materials") {
         const doc = await (await import("../models/Material.js")).Material.findById(sourceId).lean();
         if (doc) {
           const d = doc as any;
@@ -257,7 +257,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             supervisorName: d.supervisorName,
           };
         }
-      } else if (sourceCollection === "Labour") {
+      } else if (sourceCollection === "Labour" || sourceCollection === "labour") {
         const doc = await (await import("../models/Labour.js")).Labour.findById(sourceId).lean();
         if (doc) {
           sourceData = {
@@ -272,7 +272,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             submittedBy: doc.submittedBy,
           };
         }
-      } else if (sourceCollection === "Expense") {
+      } else if (sourceCollection === "Expense" || sourceCollection === "expenses") {
         const doc = await (await import("../models/Expense.js")).Expense.findById(sourceId).lean();
         if (doc) {
           sourceData = {
