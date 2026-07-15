@@ -742,6 +742,11 @@ function numberToWords(num: number): string {
       .editor-header { display: none; }
       .quotation-document { border: none; border-radius: 0; padding: 20px; box-shadow: none; }
       .btn-add-row, .btn-add-col, .remove-row-btn, .add-col-inline, .back-link, .editor-actions { display: none !important; }
+      ion-menu, ion-split-pane, ion-sidebar { display: none !important; }
+      ion-content { --background: transparent !important; }
+      .ion-page, .ion-page > div { display: block !important; visibility: visible !important; }
+      .ion-page { position: static !important; width: 100% !important; height: auto !important; }
+      #main-content { display: block !important; width: 100% !important; }
     }
     @media (max-width: 768px) {
       .quotation-page { padding: 16px; }
