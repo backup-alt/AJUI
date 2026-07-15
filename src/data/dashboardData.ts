@@ -57,6 +57,51 @@ export type MaterialRow = {
   deliveredOn?: string;
 };
 
+export type QuotationRow = {
+  id: string;
+  sno: number;
+  description: string;
+  unit: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  isCustom?: boolean;
+};
+
+export type Quotation = {
+  id: string;
+  quotationNumber: string;
+  date: string;
+  companyName: string;
+  companyAddress: string;
+  state: string;
+  gstin: string;
+  clientName: string;
+  clientAddress: string;
+  clientState: string;
+  clientGstin: string;
+  items: QuotationRow[];
+  customColumns: string[];
+  subtotal: number;
+  cgstPercent: number;
+  sgstPercent: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  roundOff: number;
+  totalAmount: number;
+  amountInWords: string;
+  status: "Draft" | "Sent" | "Accepted" | "Rejected";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CompanyProfile = {
+  name: string;
+  address: string;
+  state: string;
+  gstin: string;
+};
+
 export type LabourRow = {
   id: string;
   projectId: string;

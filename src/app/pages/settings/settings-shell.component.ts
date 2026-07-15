@@ -249,6 +249,7 @@ export class SettingsShellComponent {
     {
       label: "Management",
       items: [
+        { id: "company", label: "Company Profile", subtitle: "Company details for quotations", icon: this.icons.doc, route: "/settings/company" },
         { id: "roles", label: "Roles and Employees", subtitle: "Team access and permissions", icon: this.icons.people, route: "/settings/roles" },
         { id: "sites", label: "Sites Directory", subtitle: "All sites and their activity", icon: this.icons.pin, route: "/settings/sites" },
         { id: "access-schedule", label: "Access Schedule", subtitle: "Restrict access windows", icon: this.icons.clock, route: "/settings/access-schedule" },

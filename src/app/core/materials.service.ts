@@ -56,6 +56,11 @@ export class MaterialsService {
     vendor: row.vendor,
     poNumber: row.poNumber,
     status: row.status,
+    purchasedDate: row.purchasedDate,
+    issuedAmount: row.issuedAmount,
+    givenAmount: row.givenAmount,
+    paymentType: row.paymentType,
+    deliveredOn: row.deliveredOn,
   });
 
   private readState(): MaterialRow[] {

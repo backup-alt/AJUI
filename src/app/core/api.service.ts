@@ -259,6 +259,34 @@ export class ApiService {
     );
   }
 
+  // =================== QUOTATIONS ===================
+  deleteQuotation(id: string): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/quotations/${id}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  patchQuotation(id: string, payload: any): Observable<any> {
+    return this.http.patch(`${this.baseUrl}/quotations/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  createQuotation(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/quotations`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  listQuotations(params?: { page?: number; limit?: number; search?: string }): Observable<PaginatedResponse<any>> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/quotations${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== SUBCONTRACTORS ===================
   deleteSubcontractor(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/subcontractors/${id}`, { headers: this.authHeaders() }).pipe(

@@ -11,6 +11,9 @@ import {
   type PaymentRow,
   type Project,
   type ProjectStatus,
+  type Quotation,
+  type QuotationRow,
+  type CompanyProfile,
 } from "../../data/dashboardData";
 import { CustomFieldsService } from "../core/custom-fields.service";
 import { MaterialsService } from "../core/materials.service";
@@ -366,6 +369,17 @@ export class ErpDataService {
     this.normalizeSettings(this.readState<Partial<ErpSettings>>("settings", this.defaultSettings())),
   );
 
+  readonly companyProfile = signal<CompanyProfile>(
+    this.readState<CompanyProfile>("companyProfile", {
+      name: "Annai Golden Builders",
+      address: "",
+      state: "Tamil Nadu",
+      gstin: "",
+    }),
+  );
+
+  readonly quotations = signal<Quotation[]>(this.readState<Quotation[]>("quotations", []));
+
   constructor() {
     effect(() => this.writeState("clients", this.clients()));
     effect(() => this.writeState("projects", this.projects()));
@@ -386,6 +400,8 @@ export class ErpDataService {
     effect(() => this.writeState("projectActivity", this.projectActivity()));
     effect(() => this.writeState("settings", this.settings()));
     effect(() => this.writeState("appUsers", this.users()));
+    effect(() => this.writeState("companyProfile", this.companyProfile()));
+    effect(() => this.writeState("quotations", this.quotations()));
   }
 
   addUser(user: Omit<AppUser, "id" | "createdAt"> & { id?: string; createdAt?: string }): AppUser {
@@ -1430,5 +1446,44 @@ export class ErpDataService {
     let index = 2;
     while (existing.has(`${candidate}-${index}`)) index += 1;
     return `${candidate}-${index}`;
+  }
+
+  updateCompanyProfile(patch: Partial<CompanyProfile>) {
+    this.companyProfile.update((profile) => ({ ...profile, ...patch }));
+  }
+
+  addQuotation(input: Omit<Quotation, "id" | "quotationNumber" | "createdAt" | "updatedAt">): Quotation {
+    const nextNumber =
+      Math.max(
+        0,
+        ...this.quotations()
+          .map((q) => Number(q.quotationNumber.replace(/\D/g, "")))
+          .filter((value) => Number.isFinite(value)),
+      ) + 1;
+    const quotation: Quotation = {
+      id: `QUO-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      quotationNumber: `QUO-${String(nextNumber).padStart(4, "0")}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...input,
+    };
+    this.quotations.update((quotations) => [quotation, ...quotations]);
+    return quotation;
+  }
+
+  updateQuotation(quotationId: string, patch: Partial<Omit<Quotation, "id" | "quotationNumber" | "createdAt">>) {
+    this.quotations.update((quotations) =>
+      quotations.map((q) =>
+        q.id !== quotationId ? q : { ...q, ...patch, updatedAt: new Date().toISOString() }
+      ),
+    );
+  }
+
+  deleteQuotation(quotationId: string) {
+    this.quotations.update((quotations) => quotations.filter((q) => q.id !== quotationId));
+  }
+
+  quotationById(quotationId: string): Quotation | undefined {
+    return this.quotations().find((q) => q.id === quotationId);
   }
 }
