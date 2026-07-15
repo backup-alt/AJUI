@@ -191,52 +191,7 @@ export async function listApprovals(filter: {
   else query.status = "Pending";
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  // Determine allowed approval types based on user's requestPermissions or fallback to role template
-  let allowedTypes: ApprovalType[] | null = null;
-
-  if (filter.userId) {
-    const { User } = await import("../models/User.js");
-    const user = await User.findById(filter.userId).select("requestPermissions role").lean();
-    if (user) {
-      const perms = user.requestPermissions;
-      if (perms) {
-        const typeMap: Record<string, ApprovalType> = {
-          canApproveMaterial: "material",
-          canApproveLabour: "labour",
-          canApproveExpense: "expense",
-          canApproveGeneral: "expense",
-          canApprovePayment: "payment",
-          canApproveSubcontract: "subcontract",
-        };
-        allowedTypes = [];
-        for (const [key, type] of Object.entries(typeMap)) {
-          if (perms[key as keyof typeof perms]) {
-            allowedTypes.push(type);
-          }
-        }
-      }
-    }
-  }
-
-  if (!allowedTypes && filter.userRole && filter.userRole !== "admin") {
-    const { AccessTemplate } = await import("../models/AccessTemplate.js");
-    const template = await AccessTemplate.findOne({ role: filter.userRole }).lean();
-    if (template) {
-      allowedTypes = [];
-      for (const [key, value] of Object.entries(template.approvalTypes || {})) {
-        if (value.canApprove) {
-          allowedTypes.push(key as ApprovalType);
-        }
-      }
-    }
-  }
-
-  if (allowedTypes && allowedTypes.length > 0) {
-    query.type = { $in: allowedTypes };
-  } else if (allowedTypes && allowedTypes.length === 0) {
-    return { items: [], total: 0, page: filter.page, limit: filter.limit, pages: 0 };
-  }
-
+  // No permission-based type filtering – all roles can see all approval types
   if (filter.type) query.type = filter.type;
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
 
@@ -319,51 +274,7 @@ export async function getApprovalCount(filter: { projectId?: string; type?: Appr
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  let allowedTypes: ApprovalType[] | null = null;
-
-  if (filter.userId) {
-    const { User } = await import("../models/User.js");
-    const user = await User.findById(filter.userId).select("requestPermissions role").lean();
-    if (user) {
-      const perms = user.requestPermissions;
-      if (perms) {
-        const typeMap: Record<string, ApprovalType> = {
-          canApproveMaterial: "material",
-          canApproveLabour: "labour",
-          canApproveExpense: "expense",
-          canApproveGeneral: "expense",
-          canApprovePayment: "payment",
-          canApproveSubcontract: "subcontract",
-        };
-        allowedTypes = [];
-        for (const [key, type] of Object.entries(typeMap)) {
-          if (perms[key as keyof typeof perms]) {
-            allowedTypes.push(type);
-          }
-        }
-      }
-    }
-  }
-
-  if (!allowedTypes && filter.userRole && filter.userRole !== "admin") {
-    const { AccessTemplate } = await import("../models/AccessTemplate.js");
-    const template = await AccessTemplate.findOne({ role: filter.userRole }).lean();
-    if (template) {
-      allowedTypes = [];
-      for (const [key, value] of Object.entries(template.approvalTypes || {})) {
-        if (value.canApprove) {
-          allowedTypes.push(key as ApprovalType);
-        }
-      }
-    }
-  }
-
-  if (allowedTypes && allowedTypes.length > 0) {
-    query.type = { $in: allowedTypes };
-  } else if (allowedTypes && allowedTypes.length === 0) {
-    return { total: 0, byType: [] };
-  }
-
+  // No permission-based type filtering – all roles can see all approval types
   if (filter.type) query.type = filter.type;
 
   const [total, byType] = await Promise.all([
