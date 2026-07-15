@@ -7,6 +7,9 @@ import {
 import { bootstrapApplication } from "@angular/platform-browser";
 import { provideIonicAngular } from "@ionic/angular/standalone";
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
+import { APP_INITIALIZER, ApplicationConfig } from "@angular/core";
+import { toObservable } from "@angular/core/rxjs-interop";
+import { firstValueFrom, filter, take } from "rxjs";
 import { addIcons } from "ionicons";
 import {
   addOutline,
@@ -39,6 +42,32 @@ import {
 import { AppComponent } from "./app/app.component";
 import { routes } from "./app/app.routes";
 import { authInterceptor } from "./app/core/auth.interceptor";
+import { ApiService } from "./app/core/api.service";
+import { ErpDataService } from "./app/data/erp-data.service";
+import { WorkspaceHydrationService } from "./app/core/workspace-hydration.service";
+
+export function initializeApp(
+  api: ApiService,
+  erp: ErpDataService,
+  hydration: WorkspaceHydrationService
+): () => Promise<void> {
+  return async () => {
+    // Signals are already populated from localStorage synchronously.
+    if (api.isAuthenticated()) {
+      // If we have no projects yet, trigger a full backend hydration.
+      if (erp.projects().length === 0) {
+        hydration.hydrateFromBackend();
+        // Wait until the projects signal emits a non‑empty array.
+        await firstValueFrom(
+          toObservable(erp.projects).pipe(
+            filter((projects) => projects.length > 0),
+            take(1)
+          )
+        );
+      }
+    }
+  };
+}
 
 addIcons({
   "add-outline": addOutline,
@@ -78,5 +107,11 @@ bootstrapApplication(AppComponent, {
       withHashLocation(),
     ),
     provideHttpClient(withInterceptors([authInterceptor])),
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initializeApp,
+      deps: [ApiService, ErpDataService, WorkspaceHydrationService],
+      multi: true,
+    },
   ],
 }).catch((error) => console.error(error));
