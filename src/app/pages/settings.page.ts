@@ -592,25 +592,6 @@ export interface ActiveInviteDisplay {
                 </div>
               </article>
 
-              <article class="settings-card">
-                <div>
-                  <span>Appearance</span>
-                  <h2>Workspace Theme</h2>
-                  <p>Use a calm professional palette in light mode and a purpose-built navy dark mode.</p>
-                </div>
-                <div class="settings-mode-row">
-                  <button type="button" class="active">Light</button>
-                  <button type="button">Dark</button>
-                  <button type="button">System</button>
-                </div>
-                <div class="settings-theme-chip">
-                  <span aria-hidden="true"></span>
-                  <div>
-                    <strong>Primary accent</strong>
-                    <small>#002263</small>
-                  </div>
-                </div>
-              </article>
             </section>
           </main>
         </ion-content>

@@ -972,6 +972,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
   flex-wrap: wrap;
 }
 
@@ -980,6 +982,7 @@
   margin-left: auto;
   font-size: 12px;
   white-space: nowrap;
+  text-align: right;
 }
 
 .settings-w11-status-dot {

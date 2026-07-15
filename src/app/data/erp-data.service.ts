@@ -570,6 +570,7 @@ export class ErpDataService {
     };
 
     this.clients.update((clients) => [client, ...clients]);
+    this.writeState("clients", this.clients());
     return client;
   }
 
@@ -604,6 +605,7 @@ export class ErpDataService {
           : project,
       ),
     );
+    this.writeState("clients", this.clients());
   }
 
   deleteClient(clientId: string) {
@@ -617,6 +619,8 @@ export class ErpDataService {
     this.expenses.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
     this.payments.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
     this.subcontractors.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
+    this.writeState("clients", this.clients());
+    this.writeState("projects", this.projects());
   }
 
   addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string }): Vendor {
@@ -636,6 +640,7 @@ export class ErpDataService {
       gst: input.gst,
     };
     this.vendors.update((vendors) => [vendor, ...vendors]);
+    this.writeState("vendors", this.vendors());
     return vendor;
   }
 
@@ -643,10 +648,12 @@ export class ErpDataService {
     this.vendors.update((vendors) =>
       vendors.map((v) => (v.id !== vendorId ? v : { ...v, ...patch })),
     );
+    this.writeState("vendors", this.vendors());
   }
 
   deleteVendor(vendorId: string) {
     this.vendors.update((vendors) => vendors.filter((v) => v.id !== vendorId));
+    this.writeState("vendors", this.vendors());
   }
 
   createDefaultProject(client: Client): Project {

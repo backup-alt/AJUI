@@ -1,7 +1,8 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { Vendor, ErpDataService } from "../data/erp-data.service";
+import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -35,55 +36,123 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 
         <ion-content class="erp-page">
           <main class="client-landing">
-            <section class="client-grid">
-              <article class="client-card add-client-card" role="button" tabindex="0" (click)="showVendorForm.set(true)" (keydown.enter)="showVendorForm.set(true)">
-                <div class="add-client-icon">
-                  <ion-icon name="add-outline"></ion-icon>
-                </div>
-                <h3>Add New Vendor</h3>
-                <p>Create a vendor profile to track material purchases, GST, and payment history.</p>
-              </article>
+            @if (!selectedVendor()) {
+              <section class="client-grid">
+                <article class="client-card add-client-card" role="button" tabindex="0" (click)="showVendorForm.set(true)" (keydown.enter)="showVendorForm.set(true)">
+                  <div class="add-client-icon">
+                    <ion-icon name="add-outline"></ion-icon>
+                  </div>
+                  <h3>Add New Vendor</h3>
+                  <p>Create a vendor profile to track material purchases, GST, and payment history.</p>
+                </article>
 
-              <article
-                *ngFor="let vendor of vendors(); trackBy: trackVendor"
-                class="client-card"
-                role="button"
-                tabindex="0"
-                (click)="editVendor(vendor, $event)"
-                (keydown.enter)="editVendor(vendor, $event)"
-              >
-                <div class="client-card-body">
-                  <div class="card-head">
-                    <div class="identity">
-                      <div class="avatar-block vendor-avatar">{{ vendorInitials(vendor.name) }}</div>
-                      <div>
-                        <h3>{{ vendor.name }}</h3>
-                        <p><ion-icon name="call-outline"></ion-icon>{{ vendor.phone }}</p>
+                <article
+                  *ngFor="let vendor of vendors(); trackBy: trackVendor"
+                  class="client-card"
+                  role="button"
+                  tabindex="0"
+                  (click)="openVendor(vendor)"
+                  (keydown.enter)="openVendor(vendor)"
+                >
+                  <div class="client-card-body">
+                    <div class="card-head">
+                      <div class="identity">
+                        <div class="avatar-block vendor-avatar">{{ vendorInitials(vendor.name) }}</div>
+                        <div>
+                          <h3>{{ vendor.name }}</h3>
+                          <p><ion-icon name="call-outline"></ion-icon>{{ vendor.phone }}</p>
+                        </div>
+                      </div>
+                      <span class="material-type-badge">{{ vendor.materialType }}</span>
+                    </div>
+
+                    <p class="address"><ion-icon name="location-outline"></ion-icon>{{ vendor.address }}</p>
+
+                    <div class="ledger-box">
+                      <div class="ledger-row">
+                        <span>GST Number</span>
+                        <strong class="gst-number">{{ vendor.gst }}</strong>
                       </div>
                     </div>
-                    <span class="material-type-badge">{{ vendor.materialType }}</span>
                   </div>
 
-                  <p class="address"><ion-icon name="location-outline"></ion-icon>{{ vendor.address }}</p>
-
-                  <div class="ledger-box">
-                    <div class="ledger-row">
-                      <span>GST Number</span>
-                      <strong class="gst-number">{{ vendor.gst }}</strong>
+                  <div class="client-card-footer">
+                    <span>View Sites</span>
+                    <div class="client-card-footer-actions">
+                      <button type="button" class="client-edit-action" aria-label="Edit vendor" title="Edit Vendor" (click)="editVendor(vendor, $event)">
+                        <strong>Edit Vendor</strong>
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                <div class="client-card-footer">
-                  <span>Edit Vendor</span>
-                  <div class="client-card-footer-actions">
-                    <button type="button" class="client-edit-action" aria-label="Edit vendor" title="Edit Vendor" (click)="editVendor(vendor, $event)">
-                      <strong>Edit Vendor</strong>
-                    </button>
+                </article>
+              </section>
+            } @else if (!selectedSite()) {
+              <section class="vendor-breadcrumb">
+                <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
+                <h2>{{ selectedVendor()!.name }} – Sites</h2>
+              </section>
+              <section class="client-grid">
+                <article
+                  *ngFor="let site of vendorSites(); trackBy: trackSite"
+                  class="client-card"
+                  role="button"
+                  tabindex="0"
+                  (click)="openSite(site)"
+                  (keydown.enter)="openSite(site)"
+                >
+                  <div class="client-card-body">
+                    <div class="card-head">
+                      <div class="identity">
+                        <ion-icon name="location-outline" class="site-icon"></ion-icon>
+                        <div>
+                          <h3>{{ site }}</h3>
+                          <p>{{ siteMaterialsCount(site) }} material entries</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                </article>
+                <div *ngIf="vendorSites().length === 0" class="empty-state">
+                  <p>No sites with material purchases for this vendor.</p>
                 </div>
-              </article>
-            </section>
+              </section>
+            } @else {
+              <section class="vendor-breadcrumb">
+                <button type="button" class="back-btn" (click)="backToSites()">&larr; {{ selectedVendor()!.name }}</button>
+                <h2>{{ selectedVendor()!.name }} – {{ selectedSite() }}</h2>
+              </section>
+              <section class="table-wrap operations-table approvals-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Material</th>
+                      <th>Unit</th>
+                      <th>Requested</th>
+                      <th>Approved</th>
+                      <th>Purchased</th>
+                      <th>Consumed</th>
+                      <th>PO Number</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of siteMaterials(); trackBy: trackMaterial">
+                      <td><strong>{{ row.name }}</strong></td>
+                      <td>{{ row.unit }}</td>
+                      <td>{{ row.requested }}</td>
+                      <td>{{ row.approved }}</td>
+                      <td>{{ row.purchased }}</td>
+                      <td>{{ row.consumed }}</td>
+                      <td>{{ row.poNumber }}</td>
+                      <td><span class="approval-status-pill">{{ row.status }}</span></td>
+                    </tr>
+                    <tr *ngIf="siteMaterials().length === 0">
+                      <td class="empty-row" colspan="8"><span>No material purchases recorded for this site.</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+            }
           </main>
         </ion-content>
 
@@ -153,6 +222,38 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
     .vendor-avatar {
       background: linear-gradient(135deg, #5c3d00, #b86310) !important;
     }
+    .vendor-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+    }
+    .vendor-breadcrumb h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .back-btn {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #1e293b;
+    }
+    .back-btn:hover { background: #e2e8f0; }
+    .site-icon {
+      font-size: 24px;
+      color: #2c5cff;
+    }
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 32px;
+      color: #64748b;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -164,6 +265,58 @@ export class VendorDashboardPage {
   readonly vendors = this.data.vendors;
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
+
+  readonly selectedVendor = signal<Vendor | null>(null);
+  readonly selectedSite = signal<string | null>(null);
+
+  readonly vendorSites = computed(() => {
+    const vendor = this.selectedVendor();
+    if (!vendor) return [] as string[];
+    const set = new Set<string>();
+    for (const m of this.data.materials()) {
+      if (m.vendor === vendor.name && m.site) set.add(m.site);
+    }
+    return Array.from(set).sort();
+  });
+
+  readonly siteMaterials = computed(() => {
+    const vendor = this.selectedVendor();
+    const site = this.selectedSite();
+    if (!vendor || !site) return [] as MaterialRow[];
+    return this.data.materials().filter((m) => m.vendor === vendor.name && m.site === site);
+  });
+
+  siteMaterialsCount(site: string): number {
+    const vendor = this.selectedVendor();
+    if (!vendor) return 0;
+    return this.data.materials().filter((m) => m.vendor === vendor.name && m.site === site).length;
+  }
+
+  openVendor(vendor: Vendor) {
+    this.selectedVendor.set(vendor);
+    this.selectedSite.set(null);
+  }
+
+  openSite(site: string) {
+    this.selectedSite.set(site);
+  }
+
+  backToVendors() {
+    this.selectedVendor.set(null);
+    this.selectedSite.set(null);
+  }
+
+  backToSites() {
+    this.selectedSite.set(null);
+  }
+
+  trackSite(_: number, site: string) {
+    return site;
+  }
+
+  trackMaterial(_: number, row: MaterialRow) {
+    return row.id;
+  }
 
   refreshFromBackend() {
     if (this.refreshing()) return;
