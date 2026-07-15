@@ -1,5 +1,5 @@
 import { Injectable, inject } from "@angular/core";
-import { forkJoin } from "rxjs";
+import { forkJoin, firstValueFrom } from "rxjs";
 import { ErpDataService } from "../data/erp-data.service";
 import {
   mapClient,
@@ -20,63 +20,47 @@ export class WorkspaceHydrationService {
   private readonly api = inject(ApiService);
   private readonly erp = inject(ErpDataService);
 
-  hydrateFromBackend(): void {
+  async hydrateFromBackend(): Promise<void> {
     this.clearWorkspaceData();
 
-    forkJoin({
-      clients: this.api.listClients({ limit: 100 }),
-      projects: this.api.listProjects({ limit: 100 }),
-    }).subscribe({
-      next: ({ clients, projects }) => {
-        const mappedProjects = (projects.items || []).map(mapProject);
-        const projectIds = new Set(mappedProjects.map((project: any) => String(project.id)));
-        const businessIdToProjectId = new Map(
-          mappedProjects.map((project: any) => [String(project.projectId || project.id), String(project.id)])
-        );
-        const mappedClients = (clients.items || []).map(mapClient).map((client) => ({
-          ...client,
-          projectIds: (client.projectIds || [])
-            .map((projectId) => businessIdToProjectId.get(String(projectId)) || String(projectId))
-            .filter((projectId) => projectIds.has(projectId)),
-        }));
+    // Load clients and projects first (they're interdependent)
+    const [{ clients, projects }, sites, vendors, supervisors, materials, labour, expenses, payments, subcontractors] = await Promise.all([
+      firstValueFrom(forkJoin({
+        clients: this.api.listClients({ limit: 100 }),
+        projects: this.api.listProjects({ limit: 100 }),
+      })),
+      firstValueFrom(this.api.listSites()),
+      firstValueFrom(this.api.listVendors({ limit: 100 })),
+      firstValueFrom(this.api.listSupervisors()),
+      firstValueFrom(this.api.listMaterials({ limit: 100 })),
+      firstValueFrom(this.api.listLabour({ limit: 100 })),
+      firstValueFrom(this.api.listExpenses({ limit: 100 })),
+      firstValueFrom(this.api.listPayments({ limit: 100 })),
+      firstValueFrom(this.api.listSubcontractors({ limit: 100 })),
+    ]);
 
-        this.setSignalAndStorage("projects", mappedProjects, this.erp.projects);
-        this.setSignalAndStorage("clients", mappedClients, this.erp.clients);
-      },
-      error: () => {},
-    });
-    this.api.listSites().subscribe({
-      next: (res: any) => this.writeState("sites", (res.items || res.sites || []).map(mapSite)),
-      error: () => {},
-    });
-    this.api.listVendors({ limit: 100 }).subscribe({
-      next: (res) => this.setSignalAndStorage("vendors", (res.items || []).map(mapVendor), this.erp.vendors),
-      error: () => {},
-    });
-    this.api.listSupervisors().subscribe({
-      next: (res: any) => this.setSignalAndStorage("supervisors", (res.items || res.supervisors || []).map(mapSupervisor), this.erp.supervisors),
-      error: () => {},
-    });
-    this.api.listMaterials({ limit: 100 }).subscribe({
-      next: (res) => this.setSignalAndStorage("materials", (res.items || []).map(mapMaterial), this.erp.materials),
-      error: () => {},
-    });
-    this.api.listLabour({ limit: 100 }).subscribe({
-      next: (res) => this.setSignalAndStorage("labour", (res.items || []).map(mapLabour), this.erp.labour),
-      error: () => {},
-    });
-    this.api.listExpenses({ limit: 100 }).subscribe({
-      next: (res) => this.setSignalAndStorage("expenses", (res.items || []).map(mapExpense), this.erp.expenses),
-      error: () => {},
-    });
-    this.api.listPayments({ limit: 100 }).subscribe({
-      next: (res) => this.setSignalAndStorage("payments", (res.items || []).map(mapPayment), this.erp.payments),
-      error: () => {},
-    });
-    this.api.listSubcontractors({ limit: 100 }).subscribe({
-      next: (res) => this.setSignalAndStorage("subcontractors", (res.items || []).map(mapSubcontractor), this.erp.subcontractors),
-      error: () => {},
-    });
+    const mappedProjects = (projects.items || []).map(mapProject);
+    const projectIds = new Set(mappedProjects.map((p: any) => String(p.id)));
+    const businessIdToProjectId = new Map(
+      mappedProjects.map((p: any) => [String(p.projectId || p.id), String(p.id)])
+    );
+    const mappedClients = (clients.items || []).map(mapClient).map((client) => ({
+      ...client,
+      projectIds: (client.projectIds || [])
+        .map((pid) => businessIdToProjectId.get(String(pid)) || String(pid))
+        .filter((pid) => projectIds.has(pid)),
+    }));
+
+    this.setSignalAndStorage("projects", mappedProjects, this.erp.projects);
+    this.setSignalAndStorage("clients", mappedClients, this.erp.clients);
+    this.writeState("sites", (sites.items || []).map(mapSite));
+    this.setSignalAndStorage("vendors", (vendors.items || []).map(mapVendor), this.erp.vendors);
+    this.setSignalAndStorage("supervisors", (supervisors.items || []).map(mapSupervisor), this.erp.supervisors);
+    this.setSignalAndStorage("materials", (materials.items || []).map(mapMaterial), this.erp.materials);
+    this.setSignalAndStorage("labour", (labour.items || []).map(mapLabour), this.erp.labour);
+    this.setSignalAndStorage("expenses", (expenses.items || []).map(mapExpense), this.erp.expenses);
+    this.setSignalAndStorage("payments", (payments.items || []).map(mapPayment), this.erp.payments);
+    this.setSignalAndStorage("subcontractors", (subcontractors.items || []).map(mapSubcontractor), this.erp.subcontractors);
   }
 
   private clearWorkspaceData(): void {

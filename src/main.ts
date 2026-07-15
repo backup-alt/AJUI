@@ -7,9 +7,7 @@ import {
 import { bootstrapApplication } from "@angular/platform-browser";
 import { provideIonicAngular } from "@ionic/angular/standalone";
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
-import { APP_INITIALIZER, ApplicationConfig } from "@angular/core";
-import { toObservable } from "@angular/core/rxjs-interop";
-import { firstValueFrom, filter, take } from "rxjs";
+import { APP_INITIALIZER } from "@angular/core";
 import { addIcons } from "ionicons";
 import {
   addOutline,
@@ -52,18 +50,9 @@ export function initializeApp(
   hydration: WorkspaceHydrationService
 ): () => Promise<void> {
   return async () => {
-    // Signals are already populated from localStorage synchronously.
     if (api.isAuthenticated()) {
-      // If we have no projects yet, trigger a full backend hydration.
       if (erp.projects().length === 0) {
-        hydration.hydrateFromBackend();
-        // Wait until the projects signal emits a non‑empty array.
-        await firstValueFrom(
-          toObservable(erp.projects).pipe(
-            filter((projects) => projects.length > 0),
-            take(1)
-          )
-        );
+        await hydration.hydrateFromBackend();
       }
     }
   };
