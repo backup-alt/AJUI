@@ -57,37 +57,45 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
   };
 
   let projectId: Types.ObjectId | undefined;
+  let generatedPoNumber: string | undefined;
   switch (approval.sourceCollection) {
     case "materials":
-    case "Material":
-      await Material.updateOne({ _id: approval.sourceId }, sourceUpdate);
+    case "Material": {
+      const poNumber = await generateId("PO");
+      generatedPoNumber = poNumber;
+      await Material.updateOne({ _id: approval.sourceId }, { ...sourceUpdate, poNumber });
       const mat = await Material.findById(approval.sourceId).lean();
       projectId = mat?.projectId;
       break;
+    }
     case "labour":
-    case "Labour":
+    case "Labour": {
       await Labour.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const lab = await Labour.findById(approval.sourceId).lean();
       projectId = lab?.projectId;
       break;
+    }
     case "expenses":
-    case "Expense":
+    case "Expense": {
       await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const exp = await Expense.findById(approval.sourceId).lean();
       projectId = exp?.projectId;
       break;
+    }
     case "payments":
-    case "Payment":
+    case "Payment": {
       await Payment.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const pay = await Payment.findById(approval.sourceId).lean();
       projectId = pay?.projectId;
       break;
+    }
     case "subcontractors":
-    case "Subcontractor":
+    case "Subcontractor": {
       await Subcontractor.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const sub = await Subcontractor.findById(approval.sourceId).lean();
       projectId = sub?.projectId;
       break;
+    }
     default:
       throw new AppError(400, `Unknown source collection: ${approval.sourceCollection}`);
   }
@@ -95,6 +103,9 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
   approval.status = "Approved";
   approval.reviewedBy = reviewer;
   approval.reviewedAt = new Date();
+  if (generatedPoNumber) {
+    approval.poNumber = generatedPoNumber;
+  }
   await approval.save();
 
   if (projectId) {
@@ -153,25 +164,30 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
 
   switch (approval.sourceCollection) {
     case "materials":
-    case "Material":
+    case "Material": {
       await Material.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
     case "labour":
-    case "Labour":
+    case "Labour": {
       await Labour.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
     case "expenses":
-    case "Expense":
+    case "Expense": {
       await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
     case "payments":
-    case "Payment":
+    case "Payment": {
       await Payment.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
     case "subcontractors":
-    case "Subcontractor":
+    case "Subcontractor": {
       await Subcontractor.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
   }
 
   approval.status = "Rejected";
@@ -246,8 +262,11 @@ export async function listApprovals(filter: {
 async function enrichApprovalWithSource(approval: Record<string, unknown>): Promise<Record<string, unknown>> {
   const sourceCollection = approval.sourceCollection as string;
   const sourceId = approval.sourceId as Types.ObjectId | undefined;
+  const owner = approval.owner as string | undefined;
 
   let sourceData: Record<string, unknown> | null = null;
+  let supervisorName: string | undefined;
+
   if (sourceId && sourceCollection) {
     try {
       if (sourceCollection === "Material" || sourceCollection === "materials") {
@@ -301,7 +320,17 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
     }
   }
 
-  return { ...approval, ...sourceData };
+  if (owner && !supervisorName) {
+    try {
+      const { User } = await import("../models/User.js");
+      const user = await User.findById(owner).select("name").lean();
+      supervisorName = user?.name;
+    } catch {
+      // user lookup failed, skip
+    }
+  }
+
+  return { ...approval, ...sourceData, supervisorName: supervisorName || sourceData?.["supervisorName"] };
 }
 
 export async function getApprovalById(id: string) {

@@ -16,6 +16,7 @@ export interface IApproval extends Document {
   detail?: string;
   submittedAt: Date;
   status: ApprovalStatus;
+  poNumber?: string;
   sourceCollection: string;
   sourceId: Types.ObjectId;
   reviewedBy?: string;
@@ -51,6 +52,7 @@ const approvalSchema = new Schema<IApproval>(
     sourceId: { type: Schema.Types.ObjectId, required: true, index: true },
     reviewedBy: { type: String },
     reviewedAt: { type: Date },
+    poNumber: { type: String, trim: true },
   },
   { timestamps: true }
 );

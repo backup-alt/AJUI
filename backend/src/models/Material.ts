@@ -27,6 +27,7 @@ export interface IMaterial extends Document {
   notes?: string;
   customFields?: Record<string, string | number | boolean | null>;
   createdBy?: string;
+  supervisorName?: string;
   approvedBy?: string;
   approvedAt?: Date;
   createdAt: Date;
@@ -61,6 +62,7 @@ const materialSchema = new Schema<IMaterial>(
       index: true,
     },
     createdBy: { type: String },
+    supervisorName: { type: String, trim: true },
     approvedBy: { type: String },
     approvedAt: { type: Date },
     notes: { type: String, trim: true, maxlength: 2000 },

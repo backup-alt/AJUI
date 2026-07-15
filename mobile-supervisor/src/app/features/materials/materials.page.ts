@@ -143,6 +143,14 @@ import {
                 }
               </div>
 
+              @if (material.poNumber) {
+                <div class="material-po">
+                  <ion-icon name="document-text-outline"></ion-icon>
+                  <span class="po-label">PO Number</span>
+                  <span class="po-value">{{ material.poNumber }}</span>
+                </div>
+              }
+
               <footer class="material-footer">
                 <div class="material-date">
                   <ion-icon name="time-outline"></ion-icon>
@@ -224,6 +232,21 @@ import {
     .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
     .stat-value { font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 2px; }
     .stat.highlight .stat-value { color: #16a34a; }
+
+    .material-po {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(22, 163, 74, 0.08);
+      border: 1px solid rgba(22, 163, 74, 0.2);
+      color: #15803d;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+    .material-po ion-icon { font-size: 13px; }
+    .material-po .po-label { font-weight: 500; opacity: 0.8; }
+    .material-po .po-value { font-weight: 700; }
 
     .material-footer { display: flex; align-items: center; justify-content: space-between; }
     .material-date { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #64748b; }
