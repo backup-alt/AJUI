@@ -2123,7 +2123,7 @@ export class ProjectWorkspacePage {
   private buildInitialRows(projectId: string): Record<ModuleKey, TableRow[]> {
     const currentProject = this.data.projectById(projectId);
     const currentClient = this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === currentProject?.client);
-    const materials = this.materialsService.materials().filter((row) => row.projectId === projectId).map((row) => ({
+    const materials = this.data.materials().filter((row) => row.projectId === projectId).map((row) => ({
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
       projectId: row.projectId,
@@ -2132,7 +2132,7 @@ export class ProjectWorkspacePage {
       unit: row.unit,
       requestedQuantity: formatNumber(row.requested),
       approvedQuantity: formatNumber(row.approved),
-      requestDate: "2026-06-05",
+      requestDate: row.requestDate || "2026-06-05",
       vendor: row.vendor,
       poNumber: row.poNumber,
       remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,

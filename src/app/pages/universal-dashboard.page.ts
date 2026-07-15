@@ -2509,7 +2509,7 @@ export class UniversalDashboardPage {
     const clientName = (projectId: string) => projectById(projectId)?.client ?? "";
     const clientId = (projectId: string) => this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
 
-    const materials = this.materialsService.materials().map((row) => ({
+    const materials = this.data.materials().map((row) => ({
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
       client: clientName(row.projectId),

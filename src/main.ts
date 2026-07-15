@@ -51,7 +51,8 @@ export function initializeApp(
 ): () => Promise<void> {
   return async () => {
     if (api.isAuthenticated()) {
-      if (erp.projects().length === 0) {
+      if (erp.projects().length === 0 || erp.materials().length === 0) {
+        try { localStorage.removeItem("agb-erp:materials"); } catch {}
         await hydration.hydrateFromBackend();
       }
     }
