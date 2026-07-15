@@ -4,6 +4,7 @@ import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { Vendor, ErpDataService } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
+import { MaterialsService } from "../core/materials.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
@@ -260,11 +261,17 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 export class VendorDashboardPage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
+  private readonly materialsService = inject(MaterialsService);
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
   readonly vendors = this.data.vendors;
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
+
+  constructor() {
+    this.materialsService.getAll();
+    this.refreshFromBackend();
+  }
 
   readonly selectedVendor = signal<Vendor | null>(null);
   readonly selectedSite = signal<string | null>(null);

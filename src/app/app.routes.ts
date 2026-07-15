@@ -55,7 +55,6 @@ export const routes: Routes = [
       { path: "", pathMatch: "full", redirectTo: "account" },
       { path: "account", loadComponent: () => import("./pages/settings/settings-account.component").then((m) => m.SettingsAccountComponent) },
       { path: "notifications", loadComponent: () => import("./pages/settings/settings-notifications.component").then((m) => m.SettingsNotificationsComponent) },
-      { path: "appearance", loadComponent: () => import("./pages/settings/settings-appearance.component").then((m) => m.SettingsAppearanceComponent) },
       { path: "roles", loadComponent: () => import("./pages/settings/settings-roles.component").then((m) => m.SettingsRolesComponent) },
       { path: "roles/employee/:id", loadComponent: () => import("./pages/settings/settings-employee-detail.component").then((m) => m.SettingsEmployeeDetailComponent) },
       { path: "sites", loadComponent: () => import("./pages/settings/settings-sites.component").then((m) => m.SettingsSitesComponent) },

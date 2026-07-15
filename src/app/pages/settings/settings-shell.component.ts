@@ -244,7 +244,6 @@ export class SettingsShellComponent {
       items: [
         { id: "account", label: "Account", subtitle: "Profile and password", icon: this.icons.user, route: "/settings/account" },
         { id: "notifications", label: "General Settings", subtitle: "Approvals and notifications", icon: this.icons.bell, route: "/settings/notifications" },
-        { id: "appearance", label: "Appearance", subtitle: "Theme and display", icon: this.icons.palette, route: "/settings/appearance" },
       ],
     },
     {

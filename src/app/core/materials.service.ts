@@ -12,9 +12,12 @@ export class MaterialsService {
   getAll(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string }) {
     this.api.listMaterials({ ...params, limit: 100 }).subscribe({
       next: (r) => {
-        const items = (r.items || []).map(this.mapMaterial);
-        this.materials.set(items);
-        this.persist(items);
+        const backendItems = (r.items || []).map(this.mapMaterial);
+        const localItems = this.materials();
+        const backendIds = new Set(backendItems.map((i) => i.id));
+        const merged = [...backendItems, ...localItems.filter((i) => !backendIds.has(i.id))];
+        this.materials.set(merged);
+        this.persist(merged);
       },
       error: () => {
         this.materials.set(this.readState());
@@ -27,10 +30,13 @@ export class MaterialsService {
     return new Promise<MaterialRow[]>((resolve) => {
       this.api.listMaterials({ limit: 100 }).subscribe({
         next: (r) => {
-          const items = (r.items || []).map(this.mapMaterial);
-          this.materials.set(items);
-          this.persist(items);
-          resolve(items);
+          const backendItems = (r.items || []).map(this.mapMaterial);
+          const localItems = this.materials();
+          const backendIds = new Set(backendItems.map((i) => i.id));
+          const merged = [...backendItems, ...localItems.filter((i) => !backendIds.has(i.id))];
+          this.materials.set(merged);
+          this.persist(merged);
+          resolve(merged);
         },
         error: () => resolve(this.materials()),
       });
