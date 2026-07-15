@@ -1,12 +1,15 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
-import { Vendor, ErpDataService } from "../data/erp-data.service";
+import { Vendor, ErpDataService, Site } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
+
+// Extended Site type for vendor sites with additional computed properties
+type VendorSite = Site & { materialEntryCount: number; materialNames: string[] };
 
 @Component({
   standalone: true,
@@ -109,7 +112,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
               }
 
               <section class="client-grid">
-                @for (site of vendorSites(); track site) {
+                @for (site of vendorSites(); track site.id) {
                   <article
                     class="client-card site-card"
                     role="button"
@@ -124,11 +127,19 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                             <ion-icon name="location-outline"></ion-icon>
                           </div>
                           <div>
-                            <h3>{{ site }}</h3>
-                            <p>{{ siteMaterialCount(site) }} material entries</p>
+                            <h3>{{ site.name }}</h3>
+                            <p class="site-meta">
+                              <span class="meta-item">{{ site.materialEntryCount }} material entries</span>
+                              <span class="meta-item">{{ site.materialNames.length }} materials</span>
+                            </p>
                           </div>
                         </div>
                         <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
+                      </div>
+                      <div class="site-card-footer">
+                        <span class="site-status" [class.active]="site.status === 'Active'" [class.on-hold]="site.status === 'On Hold'" [class.completed]="site.status === 'Completed'">
+                          {{ site.status || 'Active' }}
+                        </span>
                       </div>
                     </div>
                   </article>
@@ -136,6 +147,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 
                 @if (vendorSites().length === 0 && !loadingSites()) {
                   <div class="empty-state">
+                    <ion-icon name="location-off-outline"></ion-icon>
                     <p>No sites with material purchases for this vendor.</p>
                   </div>
                 }
@@ -144,7 +156,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
               <!-- Material purchase table for selected site -->
               <section class="vendor-breadcrumb">
                 <button type="button" class="back-btn" (click)="backToSites()">&larr; {{ selectedVendor()!.name }}</button>
-                <h2>{{ selectedVendor()!.name }} – {{ selectedSite() }}</h2>
+                <h2>{{ selectedVendor()!.name }} – {{ selectedSite()!.name }}</h2>
               </section>
 
               @if (loadingMaterials()) {
@@ -351,24 +363,50 @@ export class VendorDashboardPage {
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
   readonly vendors = this.data.vendors;
+  readonly sites = this.data.getSiteEntities();
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
 
   readonly selectedVendor = signal<Vendor | null>(null);
-  readonly selectedSite = signal<string | null>(null);
+  readonly selectedSite = signal<Site | null>(null);
   readonly loadingSites = signal(false);
   readonly loadingMaterials = signal(false);
 
+  // Vendor-specific sites with full details
   readonly vendorSites = computed(() => {
     const vendor = this.selectedVendor();
-    if (!vendor) return [] as string[];
-    const siteSet = new Set<string>();
+    if (!vendor) return [] as VendorSite[];
+
+    // Get all sites that have materials from this vendor
+    const materialSites = new Map<string, { count: number; materialNames: string[] }>();
     for (const m of this.data.materials()) {
       if (m.vendor === vendor.name && m.site) {
-        siteSet.add(m.site);
+        const existing = materialSites.get(m.site) || { count: 0, materialNames: [] };
+        existing.count++;
+        if (!existing.materialNames.includes(m.name)) {
+          existing.materialNames.push(m.name);
+        }
+        materialSites.set(m.site, existing);
       }
     }
-    return Array.from(siteSet).sort();
+
+    // Merge with actual Site objects from the sites signal
+    const allSites = this.data.getSiteEntities();
+    const vendorSiteNames = Array.from(materialSites.keys());
+
+    // Get full Site objects for sites that have materials from this vendor
+    const vendorSites = allSites
+      .filter((site) => vendorSiteNames.includes(site.name))
+      .map((site) => {
+        const info = materialSites.get(site.name) || { count: 0, materialNames: [] };
+        return {
+          ...site,
+          materialEntryCount: info.count,
+          materialNames: info.materialNames,
+        } as VendorSite;
+      });
+
+return vendorSites.sort((a, b) => a.name.localeCompare(b.name));
   });
 
   readonly siteMaterials = computed(() => {
@@ -376,15 +414,15 @@ export class VendorDashboardPage {
     const site = this.selectedSite();
     if (!vendor || !site) return [] as MaterialRow[];
     return this.data.materials().filter(
-      (m) => m.vendor === vendor.name && m.site === site
+      (m) => m.vendor === vendor.name && m.site === site.name
     );
   });
 
-  siteMaterialCount(site: string): number {
+  siteMaterialCount(siteName: string): number {
     const vendor = this.selectedVendor();
     if (!vendor) return 0;
     return this.data.materials().filter(
-      (m) => m.vendor === vendor.name && m.site === site
+      (m) => m.vendor === vendor.name && m.site === siteName
     ).length;
   }
 
@@ -393,7 +431,7 @@ export class VendorDashboardPage {
     this.selectedSite.set(null);
   }
 
-  openSite(site: string) {
+  openSite(site: Site) {
     this.selectedSite.set(site);
   }
 

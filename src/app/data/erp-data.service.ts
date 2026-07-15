@@ -70,6 +70,15 @@ export type Subcontractor = {
   _id?: string;
 };
 
+export type Site = {
+  id: string;
+  name: string;
+  status: "Active" | "On Hold" | "Completed";
+  projectId?: string;
+  materialEntryCount?: number;
+  materialNames?: string[];
+};
+
 export type AppUser = {
   id: string;
   name: string;
@@ -318,6 +327,10 @@ export class ErpDataService {
     ]),
   );
 
+  readonly siteEntities = signal<Site[]>(
+    this.readState<Site[]>("sites", []),
+  );
+
   readonly reports = signal([
     "Payment Collection Report",
     "Expense Report",
@@ -363,6 +376,7 @@ export class ErpDataService {
     effect(() => this.writeState("vendors", this.vendors()));
     effect(() => this.writeState("supervisors", this.supervisors()));
     effect(() => this.writeState("subcontractors", this.subcontractors()));
+    effect(() => this.writeState("sites", this.siteEntities()));
     effect(() => this.writeState("customTableFields", this.customTableFields()));
     effect(() => this.writeState("customTableRows", this.customTableRows()));
     effect(() => this.writeState("tableCellEdits", this.tableCellEdits()));
@@ -1051,6 +1065,14 @@ export class ErpDataService {
     for (const row of this.labour()) push(row["site"], row["site"]);
     for (const row of this.expenses()) push(row["site"], row["site"]);
     return list;
+  }
+
+  getSiteEntities(): Site[] {
+    return this.siteEntities().map((site) => ({
+      ...site,
+      status: site.status || "Active",
+      projectId: site.projectId || "",
+    }));
   }
 
   composeTableColumns(base: SharedTableField[], custom: SharedTableField[]): SharedTableField[] {

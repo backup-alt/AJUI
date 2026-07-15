@@ -3,6 +3,7 @@ import { Material } from "../models/Material.js";
 import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
 import { Vendor } from "../models/Vendor.js";
+import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { createApproval } from "./approval.service.js";
@@ -26,9 +27,19 @@ async function populateRefs(input: CreateMaterialInput) {
   return { project, client, vendor };
 }
 
+async function resolveSiteName(site?: string, siteId?: string): Promise<string | undefined> {
+  if (site) return site;
+  if (siteId) {
+    const siteDoc = await Site.findById(siteId).lean();
+    return siteDoc?.name;
+  }
+  return undefined;
+}
+
 export async function createMaterial(input: CreateMaterialInput) {
   const { project, client, vendor } = await populateRefs(input);
   const materialId = await generateId("MAT");
+  const siteName = await resolveSiteName(input.site, input.siteId);
   const material = await Material.create({
     materialId,
     projectId: project._id,
@@ -36,7 +47,7 @@ export async function createMaterial(input: CreateMaterialInput) {
     clientId: client._id,
     clientName: client.name,
     siteId: input.siteId ? new Types.ObjectId(input.siteId) : undefined,
-    site: input.site,
+    site: siteName,
     name: input.name,
     unit: input.unit,
     requestedQuantity: input.requestedQuantity,
@@ -60,7 +71,7 @@ export async function createMaterial(input: CreateMaterialInput) {
     sourceId: material._id,
     projectId: project._id,
     projectName: project.name,
-    site: input.site,
+    site: siteName,
     amount: input.requestedQuantity,
     detail: `${input.requestedQuantity} ${input.unit} of ${input.name}`,
   });
@@ -102,7 +113,11 @@ export async function getMaterialById(id: string) {
 
 export async function updateMaterial(id: string, patch: Partial<CreateMaterialInput>) {
   const update: Record<string, unknown> = { ...patch };
-  if (patch.siteId) update.siteId = new Types.ObjectId(patch.siteId);
+  if (patch.siteId) {
+    update.siteId = new Types.ObjectId(patch.siteId);
+    const site = await Site.findById(patch.siteId).lean();
+    if (site) update.site = site.name;
+  }
   if (patch.vendorId) update.vendorId = new Types.ObjectId(patch.vendorId);
 
   const material = await Material.findByIdAndUpdate(id, update, { new: true });

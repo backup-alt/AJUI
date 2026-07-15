@@ -15,7 +15,16 @@ import { AppError } from "../middleware/errorHandler.js";
 // =================== MATERIALS ===================
 export async function createMaterial(req: Request, res: Response, next: NextFunction) {
   try {
-    const material = await materialService.createMaterial(req.body);
+    const { Site } = await import("../models/Site.js");
+    const body = { ...req.body };
+
+    // Resolve site name from siteId if provided
+    if (body.siteId) {
+      const site = await Site.findById(body.siteId).lean();
+      if (site) body.site = site.name;
+    }
+
+    const material = await materialService.createMaterial(body);
     res.status(201).json({ material });
   } catch (e) { next(e); }
 }
@@ -46,7 +55,15 @@ export async function getMaterial(req: Request, res: Response, next: NextFunctio
 
 export async function updateMaterial(req: Request, res: Response, next: NextFunction) {
   try {
-    const material = await materialService.updateMaterial(req.params.id, req.body);
+    const { Site } = await import("../models/Site.js");
+    const body = { ...req.body };
+
+    if (body.siteId) {
+      const site = await Site.findById(body.siteId).lean();
+      if (site) body.site = site.name;
+    }
+
+    const material = await materialService.updateMaterial(req.params.id, body);
     res.json({ material });
   } catch (e) { next(e); }
 }
