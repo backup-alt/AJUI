@@ -185,7 +185,7 @@ export class ApprovalsService {
 
   private mapToRow(a: RawApprovalItem): AnyApprovalRow {
     const base = {
-      rowId: a._id,
+      rowId: a.approvalId,
       client: "",
       project: a.projectName || "",
       site: a.site || "",
