@@ -424,6 +424,6 @@ export class PendingApprovalsPage implements OnInit {
   }
 
   private sortedUnique(values: string[]): string[] {
-    return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((first, second) => first.localeCompare(second));
+    return [...new Set(values.filter(Boolean).map((value) => (value || "").trim()))].sort((first, second) => first.localeCompare(second));
   }
 }

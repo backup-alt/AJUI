@@ -2958,7 +2958,7 @@ export class UniversalDashboardPage {
   }
 
   private materialPurchaseSummaryForVendor(vendorName: string): string {
-    const rows = this.materialsService.materials().filter((row) => row.vendor.toLowerCase() === vendorName.toLowerCase());
+    const rows = this.materialsService.materials().filter((row) => (row.vendor || "").toLowerCase() === vendorName.toLowerCase());
     const purchased = rows.reduce((sum, row) => sum + row.purchased, 0);
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
   }
