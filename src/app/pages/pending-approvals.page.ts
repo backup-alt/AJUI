@@ -6,6 +6,7 @@ import { ErpDataService, type SharedModuleKey } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ApprovalsService } from "../core/approvals.service";
+import { MaterialsService } from "../core/materials.service";
 
 type ApprovalField = "status" | "approvalStatus";
 
@@ -441,6 +442,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
   private readonly approvalsService = inject(ApprovalsService);
+  private readonly materialsService = inject(MaterialsService);
 
   readonly showMaterial = signal(false);
   readonly showLabour = signal(false);
@@ -544,7 +546,7 @@ export class PendingApprovalsPage implements OnInit {
     return this.sortedUnique([
       currentVendor,
       ...this.data.vendors().map((vendor) => vendor.name),
-      ...this.data.materials().map((material) => material.vendor),
+      ...this.materialsService.materials().map((material) => material.vendor),
       ...this._materialRows().map((r) => r.vendor).filter(Boolean),
     ]);
   }

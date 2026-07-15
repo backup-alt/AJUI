@@ -13,6 +13,7 @@ import {
   type ProjectStatus,
 } from "../../data/dashboardData";
 import { CustomFieldsService } from "../core/custom-fields.service";
+import { MaterialsService } from "../core/materials.service";
 import type { CustomField as ApiCustomField } from "../core/custom-fields.service";
 
 export type ClientStatus = "Active" | "On Hold" | "Completed";
@@ -114,7 +115,15 @@ export type ErpSettings = {
 @Injectable({ providedIn: "root" })
 export class ErpDataService {
   private readonly customFieldsService = inject(CustomFieldsService);
+  private readonly materialsService = inject(MaterialsService);
   private readonly recoveredTablePresentationState = this.recoverTablePresentationState();
+
+  private readonly _syncMaterials = effect(() => {
+    const rows = this.materialsService.materials();
+    if (rows && rows.length) {
+      this.materials.set(rows);
+    }
+  });
 
   readonly clients = signal<Client[]>(
     this.readState<Client[]>("clients", [
@@ -345,7 +354,6 @@ export class ErpDataService {
   );
 
   constructor() {
-    this.ensureMeenakshiSampleProject();
     effect(() => this.writeState("clients", this.clients()));
     effect(() => this.writeState("projects", this.projects()));
     effect(() => this.writeState("materials", this.materials()));
@@ -393,218 +401,6 @@ export class ErpDataService {
 
   deleteUser(userId: string) {
     this.users.update((list) => list.filter((u) => u.id !== userId));
-  }
-
-  private ensureMeenakshiSampleProject() {
-    const sampleProjectId = "AB-1040";
-    const client = this.clients().find((row) => row.name === "Meenakshi Raman");
-    if (!client) return;
-
-    if (!this.projects().some((project) => project.id === sampleProjectId)) {
-      this.projects.update((projectRows) => [
-        {
-          id: sampleProjectId,
-          name: "Meenakshi Full Scope Sample",
-          client: client.name,
-          mobile: client.mobile,
-          address: client.address,
-          supervisor: client.supervisor,
-          sites: ["VVD", "Main Site", "Finishing"],
-          status: "Active",
-          startDate: "2026-06-08",
-          totalValue: 9390000,
-          advanceAmount: 1000000,
-          receivedAmount: 2250000,
-          materialSpend: 1425000,
-          labourPayable: 386400,
-          expenseBalance: 20000,
-          completion: 27,
-        },
-        ...projectRows,
-      ]);
-    }
-
-    const projectRows = this.projects();
-    this.clients.update((clientRows) =>
-      clientRows.map((row) => {
-        if (row.id !== client.id) return row;
-        const validProjectIds = row.projectIds.filter((projectId) => {
-          const project = projectRows.find((projectRow) => projectRow.id === projectId);
-          return !project || project.client === row.name;
-        });
-        return { ...row, projectIds: [...new Set([sampleProjectId, ...validProjectIds])] };
-      }),
-    );
-
-    if (!this.materials().some((row) => row.projectId === sampleProjectId)) {
-      this.materials.update((rows) => [
-        {
-          id: "MAT-900",
-          projectId: sampleProjectId,
-          site: "VVD",
-          name: "Cement",
-          unit: "Bag",
-          requested: 260,
-          approved: 240,
-          purchased: 220,
-          consumed: 136,
-          vendor: "KMS Agencies",
-          poNumber: "PO-2091",
-          status: "Approved",
-        },
-        {
-          id: "MAT-901",
-          projectId: sampleProjectId,
-          site: "Main Site",
-          name: "Bricks",
-          unit: "Nos",
-          requested: 18000,
-          approved: 15000,
-          purchased: 12000,
-          consumed: 8400,
-          vendor: "Sri Devi Traders",
-          poNumber: "PO-2092",
-          status: "Pending",
-        },
-        {
-          id: "MAT-902",
-          projectId: sampleProjectId,
-          site: "Finishing",
-          name: "Steel Rod",
-          unit: "Kg",
-          requested: 3200,
-          approved: 2800,
-          purchased: 2400,
-          consumed: 1180,
-          vendor: "Amman Steel",
-          poNumber: "PO-2093",
-          status: "Approved",
-        },
-        ...rows,
-      ]);
-    }
-
-    if (!this.labour().some((row) => row.projectId === sampleProjectId)) {
-      this.labour.update((rows) => [
-        {
-          id: "LAB-900",
-          projectId: sampleProjectId,
-          site: "VVD",
-          party: "Balu Mason Team",
-          category: "Mason",
-          dailyWage: 950,
-          presentDays: 6,
-          absentDays: 1,
-          presentCount: 7,
-          overtime: 3,
-          lateFine: 0,
-          shift: "Day",
-          notes: "Mason - 4, Helper - 3",
-          paymentMode: "NEFT",
-          status: "Approved",
-        },
-        {
-          id: "LAB-901",
-          projectId: sampleProjectId,
-          site: "Main Site",
-          party: "Ravi Electrical Crew",
-          category: "Electrician",
-          dailyWage: 1150,
-          presentDays: 5,
-          absentDays: 1,
-          presentCount: 4,
-          overtime: 2,
-          lateFine: 150,
-          shift: "Day",
-          notes: "Electrician - 3, Helper - 1",
-          paymentMode: "Cash",
-          status: "Pending",
-        },
-        ...rows,
-      ]);
-    }
-
-    if (!this.expenses().some((row) => row.projectId === sampleProjectId)) {
-      this.expenses.update((rows) => [
-        {
-          id: "EXP-900",
-          projectId: sampleProjectId,
-          site: "VVD",
-          supervisor: client.supervisor,
-          date: "2026-06-08",
-          description: "Petrol 1 L and site measuring tape",
-          type: "Site Expense",
-          received: 20000,
-          spent: 108,
-          reference: "VVD-001",
-          status: "Approved",
-        },
-        {
-          id: "EXP-901",
-          projectId: sampleProjectId,
-          site: "VVD",
-          supervisor: client.supervisor,
-          date: "2026-06-08",
-          description: "Hammer and brush set",
-          type: "Site Expense",
-          received: 0,
-          spent: 520,
-          reference: "VVD-002",
-          status: "Pending",
-        },
-        {
-          id: "EXP-902",
-          projectId: sampleProjectId,
-          site: "Main Site",
-          supervisor: client.supervisor,
-          date: "2026-06-07",
-          description: "Safety gloves and site drinking water",
-          type: "Site Expense",
-          received: 15000,
-          spent: 2400,
-          reference: "MAIN-014",
-          status: "Approved",
-        },
-        ...rows,
-      ]);
-    }
-
-    if (!this.payments().some((row) => row.projectId === sampleProjectId)) {
-      this.payments.update((rows) => [
-        {
-          id: "PAY-900",
-          projectId: sampleProjectId,
-          date: "2026-06-08",
-          amount: 1000000,
-          mode: "NEFT",
-          receipt: "RCT-2201",
-          reference: "UTR 99081234",
-          collectedBy: "Anitha",
-          status: "Approved",
-        },
-        ...rows,
-      ]);
-    }
-
-    if (!this.subcontractors().some((row) => row.projectId === sampleProjectId)) {
-      this.subcontractors.update((rows) => [
-        {
-          id: "SUB-900",
-          projectId: sampleProjectId,
-          site: "Finishing",
-          name: "Sri Balaji Electricals",
-          workPackage: "Conduit, wiring, DB dressing, and final testing",
-          contractValue: 620000,
-          advancePaid: 125000,
-          startDate: "2026-06-10",
-          dueDate: "2026-08-05",
-          supervisor: client.supervisor,
-          approvalStatus: "Approved",
-          paymentStatus: "Part Paid",
-        },
-        ...rows,
-      ]);
-    }
   }
 
   private ensureLargeDemoDataset() {
@@ -688,44 +484,6 @@ export class ErpDataService {
     );
 
     const seededProjects = this.projects();
-    const materialNames = [
-      ["Cement", "Bag", "KMS Agencies"],
-      ["Bricks", "Nos", "Sri Devi Traders"],
-      ["Steel Rod", "Kg", "Amman Steel"],
-      ["M-Sand", "Load", "Thirumalai Blue Metals"],
-      ["Blue Metal", "Load", "Thirumalai Blue Metals"],
-      ["PVC Pipe", "Piece", "Ganesh Plumbing"],
-      ["Electrical Wire", "Bundle", "Sri Balaji Electricals"],
-      ["Paint Primer", "Tin", "Sri Devi Traders"],
-    ];
-
-    if (!this.materials().some((row) => row.id.startsWith("DEMO-MAT-"))) {
-      this.materials.update((rows) => [
-        ...Array.from({ length: 50 }, (_, index): MaterialRow => {
-          const project = seededProjects[index % seededProjects.length];
-          const item = materialNames[index % materialNames.length];
-          const requested = 80 + index * 13;
-          const approved = Math.max(20, requested - (index % 7) * 5);
-          const purchased = Math.max(0, approved - (index % 5) * 3);
-          const consumed = Math.max(0, purchased - (index % 6) * 2);
-          return {
-            id: `DEMO-MAT-${String(index + 1).padStart(3, "0")}`,
-            projectId: project.id,
-            site: project.sites[index % project.sites.length],
-            name: item[0],
-            unit: item[1],
-            requested,
-            approved,
-            purchased,
-            consumed,
-            vendor: item[2],
-            poNumber: `PO-${3000 + index}`,
-            status: index % 5 === 0 ? "Pending" : "Approved",
-          };
-        }),
-        ...rows,
-      ]);
-    }
 
     const labourParties = ["Velu Mason Party", "Babu Labour Team", "Ravi Electrical Crew", "Ganesh Plumbing", "Selvam Civil Works"];
     const labourTypes = ["Mason", "Helper", "Electrician", "Plumber", "Civil"];

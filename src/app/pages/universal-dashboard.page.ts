@@ -4,6 +4,7 @@ import { Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
+import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
 import { mapClient, mapProject, mapSite, mapVendor, mapSupervisor, mapMaterial, mapLabour, mapExpense, mapPayment, mapSubcontractor } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -1026,6 +1027,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 })
 export class UniversalDashboardPage {
   readonly data = inject(ErpDataService);
+  readonly materialsService = inject(MaterialsService);
   readonly api = inject(ApiService);
   readonly router = inject(Router);
   readonly modules = dashboardModules;
@@ -2507,7 +2509,7 @@ export class UniversalDashboardPage {
     const clientName = (projectId: string) => projectById(projectId)?.client ?? "";
     const clientId = (projectId: string) => this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
 
-    const materials = this.data.materials().map((row) => ({
+    const materials = this.materialsService.materials().map((row) => ({
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
       client: clientName(row.projectId),
@@ -2956,7 +2958,7 @@ export class UniversalDashboardPage {
   }
 
   private materialPurchaseSummaryForVendor(vendorName: string): string {
-    const rows = this.data.materials().filter((row) => row.vendor.toLowerCase() === vendorName.toLowerCase());
+    const rows = this.materialsService.materials().filter((row) => row.vendor.toLowerCase() === vendorName.toLowerCase());
     const purchased = rows.reduce((sum, row) => sum + row.purchased, 0);
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
   }
@@ -2964,14 +2966,14 @@ export class UniversalDashboardPage {
   private vendorNameOptions(): string[] {
     return this.sortedUnique([
       ...this.data.vendors().map((vendor) => vendor.name),
-      ...this.data.materials().map((material) => material.vendor),
+      ...this.materialsService.materials().map((material) => material.vendor),
       ...this.rowsFor("materials").map((row) => String(row["vendor"] || "")),
     ]);
   }
 
   private materialNameOptions(): string[] {
     return this.sortedUnique([
-      ...this.data.materials().map((material) => material.name),
+      ...this.materialsService.materials().map((material) => material.name),
       ...this.rowsFor("materials").map((row) => String(row["materialName"] || row["name"] || "")),
     ]);
   }

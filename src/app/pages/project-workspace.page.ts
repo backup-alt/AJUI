@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import type { Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
+import { MaterialsService } from "../core/materials.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
@@ -948,6 +949,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 })
 export class ProjectWorkspacePage {
   readonly data = inject(ErpDataService);
+  readonly materialsService = inject(MaterialsService);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
   readonly paramMap = toSignal(this.route.paramMap, { initialValue: this.route.snapshot.paramMap });
@@ -2121,7 +2123,7 @@ export class ProjectWorkspacePage {
   private buildInitialRows(projectId: string): Record<ModuleKey, TableRow[]> {
     const currentProject = this.data.projectById(projectId);
     const currentClient = this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === currentProject?.client);
-    const materials = this.data.materialsForProject(projectId).map((row) => ({
+    const materials = this.materialsService.materials().filter((row) => row.projectId === projectId).map((row) => ({
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
       projectId: row.projectId,
@@ -2455,8 +2457,9 @@ export class ProjectWorkspacePage {
   }
 
   private materialPurchaseSummaryForVendor(vendorName: string, projectId: string): string {
-    const rows = this.data
-      .materialsForProject(projectId)
+    const rows = this.materialsService
+      .materials()
+      .filter((row) => row.projectId === projectId)
       .filter((row) => row.vendor.toLowerCase() === vendorName.toLowerCase());
     const purchased = rows.reduce((sum, row) => sum + row.purchased, 0);
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
@@ -2466,7 +2469,7 @@ export class ProjectWorkspacePage {
     return [
       ...new Set([
         ...this.data.vendors().map((vendor) => vendor.name),
-        ...this.data.materials().map((material) => material.vendor),
+        ...this.materialsService.materials().map((material) => material.vendor),
         ...this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row)).map((row) => String(row["vendor"] || "")),
       ].map((value) => value.trim()).filter(Boolean)),
     ].sort((first, second) => first.localeCompare(second));
@@ -2475,7 +2478,7 @@ export class ProjectWorkspacePage {
   private materialNameOptions(): string[] {
     return [
       ...new Set([
-        ...this.data.materials().map((material) => material.name),
+        ...this.materialsService.materials().map((material) => material.name),
         ...this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row)).map((row) => String(row["materialName"] || row["name"] || "")),
       ].map((value) => value.trim()).filter(Boolean)),
     ].sort((first, second) => first.localeCompare(second));

@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component } from "@angular/core";
+import { ChangeDetectionStrategy, Component, OnInit, inject } from "@angular/core";
 import { RouterOutlet } from "@angular/router";
 import { IonApp } from "@ionic/angular/standalone";
+import { MaterialsService } from "./core/materials.service";
 
 @Component({
   selector: "app-root",
@@ -13,4 +14,10 @@ import { IonApp } from "@ionic/angular/standalone";
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppComponent {}
+export class AppComponent implements OnInit {
+  private readonly materialsService = inject(MaterialsService);
+
+  ngOnInit(): void {
+    void this.materialsService.refresh();
+  }
+}
