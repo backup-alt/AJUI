@@ -43,7 +43,7 @@ export class NotificationService {
     try {
       const token = this.fcmToken();
       if (token) {
-        await this.api.post('/mobile/supervisor/device/unregister', { fcmToken: token });
+        await this.api.post('/supervisor/device/unregister', { fcmToken: token });
       }
       await PushNotifications.removeAllListeners();
       await PushNotifications.unregister();
@@ -67,7 +67,7 @@ export class NotificationService {
       this.fcmToken.set(token.value);
       try {
         const deviceId = await this.getDeviceId();
-        await this.api.post('/mobile/supervisor/device/register', {
+        await this.api.post('/supervisor/device/register', {
           fcmToken: token.value,
           platform: this.getPlatform(),
           deviceId,

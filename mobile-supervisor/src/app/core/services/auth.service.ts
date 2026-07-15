@@ -204,7 +204,7 @@ export class AuthService {
       const response = await firstValueFrom(
         this.api.get<{
           sites: Array<{ id: string; name: string; projectId?: string; projectName?: string }>;
-        }>('/mobile/supervisor/sites')
+        }>('/supervisor/sites')
       );
 
       const sites = response.sites || [];
@@ -252,11 +252,11 @@ export class AuthService {
   }
 
   getProfile() {
-    return this.api.get<{ user: User; profile: unknown }>('/mobile/supervisor/profile');
+    return this.api.get<{ user: User; profile: unknown }>('/supervisor/profile');
   }
 
   updateProfile(data: { name?: string; email?: string; phone?: string; address?: string }) {
-    return this.api.patch<unknown>('/mobile/supervisor/profile', data);
+    return this.api.patch<unknown>('/supervisor/profile', data);
   }
 
   changePassword(currentPassword: string, newPassword: string) {

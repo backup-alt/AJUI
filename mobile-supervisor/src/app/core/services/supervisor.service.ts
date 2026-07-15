@@ -45,31 +45,31 @@ export class SupervisorService {
 
   // ---------------- Profile ----------------
   getProfile() {
-    return this.api.get<{ user: unknown; profile: unknown }>('/mobile/supervisor/profile');
+    return this.api.get<{ user: unknown; profile: unknown }>('/supervisor/profile');
   }
 
   // ---------------- Dashboard ----------------
   getDashboard() {
-    return this.api.get<{ dashboard: DashboardData }>('/mobile/supervisor/dashboard');
+    return this.api.get<{ dashboard: DashboardData }>('/supervisor/dashboard');
   }
 
   // ---------------- Sites ----------------
   getSites() {
-    return this.api.get<SitesResponse>('/mobile/supervisor/sites');
+    return this.api.get<SitesResponse>('/supervisor/sites');
   }
 
   // ---------------- Approvals ----------------
   getApprovals() {
-    return this.api.get<ApprovalsListResponse>('/mobile/supervisor/approvals');
+    return this.api.get<ApprovalsListResponse>('/supervisor/approvals');
   }
 
   getApprovalDetail(approvalId: string) {
-    return this.api.get<{ approval: Approval }>(`/mobile/supervisor/approvals/${approvalId}`);
+    return this.api.get<{ approval: Approval }>(`/supervisor/approvals/${approvalId}`);
   }
 
   takeApprovalAction(approvalId: string, action: ApprovalActionRequest) {
     return this.api.patch<{ approval: Approval }>(
-      `/mobile/supervisor/approvals/${approvalId}`,
+      `/supervisor/approvals/${approvalId}`,
       action
     );
   }
@@ -82,15 +82,15 @@ export class SupervisorService {
     page?: number;
     limit?: number;
   }) {
-    return this.api.get<MaterialsListResponse>('/mobile/supervisor/materials', filters);
+    return this.api.get<MaterialsListResponse>('/supervisor/materials', filters);
   }
 
   getMaterialDetail(materialId: string) {
-    return this.api.get<{ material: Material }>(`/mobile/supervisor/materials/${materialId}`);
+    return this.api.get<{ material: Material }>(`/supervisor/materials/${materialId}`);
   }
 
   createMaterial(request: CreateMaterialRequest) {
-    return this.api.post<{ material: Material }>('/mobile/supervisor/materials', request);
+    return this.api.post<{ material: Material }>('/supervisor/materials', request);
   }
 
   updateMaterialStock(
@@ -98,7 +98,7 @@ export class SupervisorService {
     updates: { purchasedQuantity?: number; consumedQuantity?: number }
   ) {
     return this.api.patch<{ material: Material }>(
-      `/mobile/supervisor/materials/${materialId}/stock`,
+      `/supervisor/materials/${materialId}/stock`,
       updates
     );
   }
@@ -113,15 +113,15 @@ export class SupervisorService {
     page?: number;
     limit?: number;
   }) {
-    return this.api.get<LabourListResponse>('/mobile/supervisor/labour', filters);
+    return this.api.get<LabourListResponse>('/supervisor/labour', filters);
   }
 
   getLabourDetail(labourId: string) {
-    return this.api.get<{ labour: Labour }>(`/mobile/supervisor/labour/${labourId}`);
+    return this.api.get<{ labour: Labour }>(`/supervisor/labour/${labourId}`);
   }
 
   createLabour(request: CreateLabourRequest) {
-    return this.api.post<{ labour: Labour }>('/mobile/supervisor/labour', request);
+    return this.api.post<{ labour: Labour }>('/supervisor/labour', request);
   }
 
   // ---------------- Expenses ----------------
@@ -135,15 +135,15 @@ export class SupervisorService {
     page?: number;
     limit?: number;
   }) {
-    return this.api.get<ExpenseListResponse>('/mobile/supervisor/expenses', filters);
+    return this.api.get<ExpenseListResponse>('/supervisor/expenses', filters);
   }
 
   getExpenseDetail(expenseId: string) {
-    return this.api.get<{ expense: Expense }>(`/mobile/supervisor/expenses/${expenseId}`);
+    return this.api.get<{ expense: Expense }>(`/supervisor/expenses/${expenseId}`);
   }
 
   createExpense(request: CreateExpenseRequest) {
-    return this.api.post<{ expense: Expense }>('/mobile/supervisor/expenses', request);
+    return this.api.post<{ expense: Expense }>('/supervisor/expenses', request);
   }
 
   // ---------------- Site Selection ----------------
