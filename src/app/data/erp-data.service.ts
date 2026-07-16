@@ -205,7 +205,7 @@ export class ErpDataService {
   readonly projects = signal<Project[]>(this.readState<Project[]>("projects", projects));
   readonly materials = signal<MaterialRow[]>(this.readState<MaterialRow[]>("materials", materials));
   readonly labour = signal<LabourRow[]>(this.readState<LabourRow[]>("labour", labour));
-  readonly expenses = signal<ExpenseRow[]>(this.readState<ExpenseRow[]>("expenses", expenses));
+  readonly expenses = signal<ExpenseRow[]>(this.readState<ExpenseRow[]>("expenses", []));
   readonly payments = signal<PaymentRow[]>(this.readState<PaymentRow[]>("payments", payments));
   readonly vendors = signal<Vendor[]>(
     this.readState<Vendor[]>("vendors", [

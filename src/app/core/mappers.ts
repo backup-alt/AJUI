@@ -155,11 +155,15 @@ export function mapLabour(l: any): any {
 }
 
 export function mapExpense(e: any): any {
+  const amount = Number(e.amount) || 0;
+  const uiType: "Site Expense" | "General Expense" =
+    e.type === "site" ? "Site Expense" : "General Expense";
   return {
     _id: e._id,
     id: e.expenseId,
     expenseId: e.expenseId,
-    type: e.type,
+    type: uiType,
+    rawType: e.type,
     projectId: e.projectId,
     projectName: e.projectName,
     clientId: e.clientId,
@@ -167,7 +171,9 @@ export function mapExpense(e: any): any {
     site: e.site,
     supervisor: e.supervisor,
     transactionType: e.transactionType,
-    amount: e.amount,
+    amount,
+    spent: amount,
+    received: 0,
     siteMaterialBalance: e.siteMaterialBalance,
     reference: e.reference,
     runningBalance: e.runningBalance,
@@ -177,6 +183,14 @@ export function mapExpense(e: any): any {
     date: e.date,
     description: e.description,
     status: e.status,
+    isSiteMaterial: e.isSiteMaterial,
+    materialName: e.materialName,
+    materialUnit: e.materialUnit,
+    materialQuantity: e.materialQuantity,
+    materialVendor: e.materialVendor,
+    submittedBy: e.submittedBy,
+    approvedBy: e.approvedBy,
+    approvedAt: e.approvedAt,
   };
 }
 
