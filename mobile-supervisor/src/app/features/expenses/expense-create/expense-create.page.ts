@@ -100,8 +100,9 @@ import { Vendor } from '../../../shared/models';
               </div>
             </div>
             <ion-button expand="block" [disabled]="!expenseType()" (click)="goToStep2()">
-            Continue
-          </ion-button>
+              Continue
+            </ion-button>
+          </div>
         }
 
         @if (step() === 2) {
