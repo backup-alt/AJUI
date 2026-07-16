@@ -161,7 +161,7 @@ interface RawApprovalItem {
   paidBy?: string;
   reference?: string;
   isSiteMaterial?: boolean;
-  materialName?: string;
+  siteMaterialName?: string;
   materialUnit?: string;
   materialQuantity?: number;
   materialVendor?: string;
