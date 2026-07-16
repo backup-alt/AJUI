@@ -158,6 +158,7 @@ export function mapExpense(e: any): any {
   const amount = Number(e.amount) || 0;
   const uiType: "Site Expense" | "General Expense" =
     e.type === "site" ? "Site Expense" : "General Expense";
+  const isCashAdded = e.transactionType === "Cash Added";
   return {
     _id: e._id,
     id: e.expenseId,
@@ -173,7 +174,9 @@ export function mapExpense(e: any): any {
     transactionType: e.transactionType,
     amount,
     spent: amount,
+    cashIssued: isCashAdded ? amount : 0,
     received: 0,
+    openingBalance: isCashAdded ? (Number(e.runningBalance) || amount) : 0,
     siteMaterialBalance: e.siteMaterialBalance,
     reference: e.reference,
     runningBalance: e.runningBalance,

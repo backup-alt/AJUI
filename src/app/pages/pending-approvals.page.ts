@@ -7,6 +7,8 @@ import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ApprovalsService } from "../core/approvals.service";
 import { MaterialsService } from "../core/materials.service";
+import { ApiService } from "../core/api.service";
+import { mapExpense } from "../core/mappers";
 
 type ApprovalField = "status" | "approvalStatus";
 
@@ -237,6 +239,7 @@ export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
   private readonly approvalsService = inject(ApprovalsService);
   private readonly materialsService = inject(MaterialsService);
+  private readonly api = inject(ApiService);
 
   readonly showMaterial = signal(false);
   readonly showLabour = signal(false);
@@ -337,6 +340,7 @@ export class PendingApprovalsPage implements OnInit {
     try {
       if (status === "Approved") {
         await firstValueFrom(this.approvalsService.approve(row.rowId));
+        await this.refreshExpensesFromBackend();
       } else {
         await firstValueFrom(this.approvalsService.reject(row.rowId));
       }
@@ -344,6 +348,16 @@ export class PendingApprovalsPage implements OnInit {
       window.alert(`Approval ${status.toLowerCase()} successfully.`);
     } catch (e) {
       window.alert("Failed to process approval. Please try again.");
+    }
+  }
+
+  private async refreshExpensesFromBackend(): Promise<void> {
+    try {
+      const result = await firstValueFrom(this.api.listExpenses({ limit: 200 }));
+      const mapped = (result.items || []).map(mapExpense);
+      this.data.setExpenses(mapped);
+    } catch (e) {
+      console.warn("[PendingApprovals] Failed to refresh expenses", e);
     }
   }
 

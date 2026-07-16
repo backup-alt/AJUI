@@ -791,6 +791,11 @@ export class ErpDataService {
     this.touchProject(projectId);
   }
 
+  setExpenses(rows: ExpenseRow[]) {
+    this.expenses.set(rows);
+    this.writeState("expenses", rows);
+  }
+
   updateSettings(patch: Partial<ErpSettings>) {
     this.settings.update((settings) => ({ ...settings, ...patch }));
   }
