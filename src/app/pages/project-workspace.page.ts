@@ -2547,7 +2547,7 @@ export class ProjectWorkspacePage {
   }
 
   private labourTypesFromRow(row: { category: string; notes: string; presentCount: number; dailyWage?: number }): string {
-    const notes = row.notes.trim();
+    const notes = (row.notes || '').trim();
     if (this.staffCountFromLabourTypes(notes)) return notes;
     return `${row.category}: ${row.presentCount}`;
   }
