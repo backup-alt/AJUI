@@ -1,4 +1,4 @@
-import { CommonModule, CurrencyPipe } from "@angular/common";
+import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { Vendor, ErpDataService, Site } from "../data/erp-data.service";
@@ -20,7 +20,7 @@ type VendorSite = Site & {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, CurrencyPipe, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
+  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="vendors"></agb-enterprise-sidebar>
@@ -171,10 +171,13 @@ type VendorSite = Site & {
               </section>
             } @else {
               <!-- Material purchase table for selected site -->
-              <section class="vendor-breadcrumb">
-                <button type="button" class="back-btn" (click)="backToSites()">&larr; {{ selectedVendor()!.name }}</button>
-                <h2>{{ selectedVendor()!.name }} – {{ selectedSite()!.name }}</h2>
-              </section>
+              <nav class="breadcrumb" aria-label="Breadcrumb">
+                <button type="button" class="breadcrumb-link" (click)="backToVendors()">Vendors</button>
+                <span class="breadcrumb-sep">›</span>
+                <button type="button" class="breadcrumb-link" (click)="backToSites()">{{ selectedVendor()!.name }}</button>
+                <span class="breadcrumb-sep">›</span>
+                <span class="breadcrumb-current">{{ selectedSite()!.name }}</span>
+              </nav>
 
               @if (loadingMaterials()) {
                 <div class="loading-indicator">
@@ -183,36 +186,169 @@ type VendorSite = Site & {
                 </div>
               }
 
-              <section class="table-wrap operations-table approvals-table">
+              <div class="table-controls">
+                <div class="search-box">
+                  <ion-icon name="search-outline"></ion-icon>
+                  <input
+                    type="text"
+                    [value]="materialSearchQuery()"
+                    (input)="materialSearchQuery.set($any($event.target).value)"
+                    placeholder="Search by material, unit, payment type, or status..."
+                  />
+                  @if (materialSearchQuery()) {
+                    <button type="button" class="clear-search" (click)="materialSearchQuery.set('')">×</button>
+                  }
+                </div>
+                <div class="table-actions">
+                  <button type="button" class="btn-add-row" (click)="addMaterialRow()">
+                    <ion-icon name="add-circle-outline"></ion-icon>
+                    Add Row
+                  </button>
+                  <button type="button" class="btn-add-col" (click)="showAddColumnInput.set(true)">
+                    <ion-icon name="add-outline"></ion-icon>
+                    Add Field
+                  </button>
+                  @if (showAddColumnInput()) {
+                    <div class="add-col-inline">
+                      <input
+                        type="text"
+                        [value]="newColumnName()"
+                        (input)="newColumnName.set($any($event.target).value)"
+                        placeholder="Column name"
+                        class="col-name-input"
+                      />
+                      <button type="button" class="btn-confirm" (click)="addCustomColumn()">Add</button>
+                      <button type="button" class="btn-cancel" (click)="showAddColumnInput.set(false); newColumnName.set('')">Cancel</button>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <section class="table-wrap materials-table">
                 <table>
                   <thead>
                     <tr>
-                      <th>Material</th>
-                      <th>Unit</th>
-                      <th>Purchase Date</th>
-                      <th>Issued Amount</th>
-                      <th>Given Amount</th>
-                      <th>Payment Type</th>
-                      <th>Delivered On</th>
-                      <th>Status</th>
+                      <th class="col-sno">S.No</th>
+                      <th class="col-material">Material</th>
+                      <th class="col-qty">Qty</th>
+                      <th class="col-unit">Unit</th>
+                      <th class="col-date">Purchase Date</th>
+                      <th class="col-amount">Issued Amt</th>
+                      <th class="col-amount">Given Amt</th>
+                      <th class="col-payment">Payment Type</th>
+                      <th class="col-date">Delivered On</th>
+                      @for (col of customColumns(); track col) {
+                        <th class="col-custom">
+                          {{ col }}
+                          <button type="button" class="remove-col-btn" (click)="removeCustomColumn(col)">×</button>
+                        </th>
+                      }
+                      <th class="col-status">Status</th>
+                      <th class="col-action">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    @for (row of siteMaterials(); track row.id) {
-                      <tr>
-                        <td><strong>{{ row.name }}</strong></td>
-                        <td>{{ row.unit }}</td>
-                        <td>{{ row.purchasedDate || '-' }}</td>
-                        <td>{{ row.issuedAmount || 0 | currency:'INR' }}</td>
-                        <td>{{ row.givenAmount || 0 | currency:'INR' }}</td>
-                        <td>{{ row.paymentType || '-' }}</td>
-                        <td>{{ row.deliveredOn || '-' }}</td>
-                        <td><span class="approval-status-pill">{{ row.status }}</span></td>
+                    @for (row of filteredSiteMaterials(); track row.id; let i = $index) {
+                      <tr [class.editing]="editingRowId() === row.id">
+                        <td class="col-sno">{{ i + 1 }}</td>
+                        <td class="col-material">
+                          @if (editingRowId() === row.id) {
+                            <input type="text" [value]="row.name" (blur)="updateField(row, 'name', $any($event.target).value)" class="table-input" />
+                          } @else {
+                            <strong>{{ row.name || '-' }}</strong>
+                          }
+                        </td>
+                        <td class="col-qty">
+                          @if (editingRowId() === row.id) {
+                            <input type="number" [value]="row.quantity" (blur)="updateField(row, 'quantity', +$any($event.target).value)" class="table-input" min="0" />
+                          } @else {
+                            {{ row.quantity || 0 }}
+                          }
+                        </td>
+                        <td class="col-unit">
+                          @if (editingRowId() === row.id) {
+                            <input type="text" [value]="row.unit" (blur)="updateField(row, 'unit', $any($event.target).value)" class="table-input" />
+                          } @else {
+                            {{ row.unit || '-' }}
+                          }
+                        </td>
+                        <td class="col-date">
+                          @if (editingRowId() === row.id) {
+                            <input type="date" [value]="row.purchasedDate" (blur)="updateField(row, 'purchasedDate', $any($event.target).value)" class="table-input" />
+                          } @else {
+                            {{ row.purchasedDate || '-' }}
+                          }
+                        </td>
+                        <td class="col-amount">
+                          @if (editingRowId() === row.id) {
+                            <input type="number" [value]="row.issuedAmount" (blur)="updateField(row, 'issuedAmount', +$any($event.target).value)" class="table-input" min="0" />
+                          } @else {
+                            {{ formatMoney(row.issuedAmount || 0) }}
+                          }
+                        </td>
+                        <td class="col-amount">
+                          @if (editingRowId() === row.id) {
+                            <input type="number" [value]="row.givenAmount" (blur)="updateField(row, 'givenAmount', +$any($event.target).value)" class="table-input" min="0" />
+                          } @else {
+                            {{ formatMoney(row.givenAmount || 0) }}
+                          }
+                        </td>
+                        <td class="col-payment">
+                          @if (editingRowId() === row.id) {
+                            <select [value]="row.paymentType" (blur)="updateField(row, 'paymentType', $any($event.target).value)" class="table-input">
+                              <option value="">Select</option>
+                              <option value="Cash">Cash</option>
+                              <option value="NEFT">NEFT</option>
+                              <option value="Bank Transfer">Bank Transfer</option>
+                              <option value="UPI">UPI</option>
+                              <option value="Cheque">Cheque</option>
+                            </select>
+                          } @else {
+                            {{ row.paymentType || '-' }}
+                          }
+                        </td>
+                        <td class="col-date">
+                          @if (editingRowId() === row.id) {
+                            <input type="date" [value]="row.deliveredOn" (blur)="updateField(row, 'deliveredOn', $any($event.target).value)" class="table-input" />
+                          } @else {
+                            {{ row.deliveredOn || '-' }}
+                          }
+                        </td>
+                        @for (col of customColumns(); track col) {
+                          <td class="col-custom">
+                            @if (editingRowId() === row.id) {
+                              <input type="text" [value]="row[col]" (blur)="updateField(row, col, $any($event.target).value)" class="table-input" />
+                            } @else {
+                              {{ row[col] || '-' }}
+                            }
+                          </td>
+                        }
+                        <td class="col-status">
+                          @if (editingRowId() === row.id) {
+                            <select [value]="row.status" (blur)="updateField(row, 'status', $any($event.target).value)" class="table-input">
+                              <option value="Pending">Pending</option>
+                              <option value="Approved">Approved</option>
+                              <option value="Rejected">Rejected</option>
+                            </select>
+                          } @else {
+                            <span class="status-badge" [class]="row.status.toLowerCase()">{{ row.status || 'Pending' }}</span>
+                          }
+                        </td>
+                        <td class="col-action">
+                          @if (editingRowId() === row.id) {
+                            <button type="button" class="btn-save" (click)="saveRow(row)">Save</button>
+                          } @else {
+                            <button type="button" class="btn-edit" (click)="editRow(row)">Edit</button>
+                            <button type="button" class="btn-delete" (click)="deleteRow(row.id)">Delete</button>
+                          }
+                        </td>
                       </tr>
                     }
-                    @if (siteMaterials().length === 0 && !loadingMaterials()) {
+                    @if (filteredSiteMaterials().length === 0 && !loadingMaterials()) {
                       <tr>
-                        <td class="empty-row" colspan="8"><span>No material purchases recorded for this site.</span></td>
+                        <td class="empty-row" [attr.colspan]="8 + customColumns().length">
+                          <span>{{ materialSearchQuery() ? 'No materials match your search.' : 'No material purchases recorded for this site.' }}</span>
+                        </td>
                       </tr>
                     }
                   </tbody>
@@ -370,6 +506,246 @@ type VendorSite = Site & {
         font-size: 18px;
       }
     }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 0;
+      flex-wrap: wrap;
+    }
+    .breadcrumb-link {
+      background: none;
+      border: none;
+      color: #2c5cff;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 0;
+    }
+    .breadcrumb-link:hover { text-decoration: underline; }
+    .breadcrumb-sep {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .breadcrumb-current {
+      color: #1e293b;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .table-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 12px;
+      flex: 1;
+      max-width: 400px;
+    }
+    .search-box ion-icon {
+      color: #94a3b8;
+      font-size: 18px;
+    }
+    .search-box input {
+      border: none;
+      outline: none;
+      flex: 1;
+      font-size: 14px;
+      color: #1e293b;
+      background: transparent;
+    }
+    .search-box input::placeholder { color: #94a3b8; }
+    .clear-search {
+      background: #f1f5f9;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+    }
+    .table-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn-add-row, .btn-add-col {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      cursor: pointer;
+    }
+    .btn-add-row:hover, .btn-add-col:hover {
+      background: #eef2ff;
+      border-color: #2c5cff;
+      color: #2c5cff;
+    }
+    .add-col-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .col-name-input {
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .btn-confirm {
+      padding: 7px 12px;
+      background: #2c5cff;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-cancel {
+      padding: 7px 12px;
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .materials-table {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .materials-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .materials-table th {
+      background: #f8fafc;
+      color: #475569;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 12px 10px;
+      text-align: left;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .materials-table td {
+      padding: 10px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 13px;
+      color: #1e293b;
+      vertical-align: middle;
+    }
+    .materials-table tr:last-child td { border-bottom: none; }
+    .materials-table tr:hover td { background: #fafbfc; }
+    .materials-table tr.editing td { background: #f0f9ff; }
+    .col-sno { width: 50px; text-align: center; }
+    .col-material { min-width: 120px; }
+    .col-qty { width: 80px; text-align: right; }
+    .col-unit { width: 80px; }
+    .col-date { width: 120px; }
+    .col-amount { width: 110px; text-align: right; }
+    .col-payment { width: 120px; }
+    .col-custom { min-width: 100px; }
+    .col-status { width: 100px; }
+    .col-action { width: 120px; text-align: center; }
+    .table-input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #1e293b;
+      background: #fff;
+    }
+    .table-input:focus {
+      outline: none;
+      border-color: #2c5cff;
+      box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.1);
+    }
+    .table-input[type="number"] { text-align: right; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-badge.approved { background: #dcfce7; color: #15803d; }
+    .status-badge.pending { background: #fef9c3; color: #854d0e; }
+    .status-badge.rejected { background: #fee2e2; color: #dc2626; }
+    .remove-col-btn {
+      margin-left: 4px;
+      background: #fee2e2;
+      color: #dc2626;
+      border: none;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+    }
+    .btn-edit, .btn-save, .btn-delete {
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-edit {
+      background: #eef2ff;
+      color: #2c5cff;
+      margin-right: 4px;
+    }
+    .btn-edit:hover { background: #dde4ff; }
+    .btn-save {
+      background: #22c55e;
+      color: #fff;
+      margin-right: 4px;
+    }
+    .btn-save:hover { background: #16a34a; }
+    .btn-delete {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+    .btn-delete:hover { background: #fecaca; }
+    .empty-row {
+      text-align: center;
+      padding: 32px;
+      color: #94a3b8;
+    }
+    @media (max-width: 768px) {
+      .table-controls { flex-direction: column; align-items: stretch; }
+      .search-box { max-width: none; }
+      .table-actions { justify-content: flex-start; }
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -389,6 +765,20 @@ export class VendorDashboardPage {
   readonly selectedSite = signal<Site | null>(null);
   readonly loadingSites = signal(false);
   readonly loadingMaterials = signal(false);
+
+  readonly materialSearchQuery = signal("");
+  readonly editingRowId = signal<string | null>(null);
+  readonly showAddColumnInput = signal(false);
+  readonly newColumnName = signal("");
+
+  private readonly vendorSiteCustomColumnsKey = computed(() => {
+    const vendor = this.selectedVendor();
+    const site = this.selectedSite();
+    if (!vendor || !site) return "";
+    return `vendor-site-custom-cols:${vendor.name}:${site.name}`;
+  });
+
+  readonly customColumns = signal<string[]>(this.loadCustomColumns());
 
   // Vendor-specific sites with full details - derived from materials
   readonly vendorSites = computed(() => {
@@ -437,6 +827,18 @@ export class VendorDashboardPage {
     );
   });
 
+  readonly filteredSiteMaterials = computed(() => {
+    const query = this.materialSearchQuery().toLowerCase().trim();
+    const materials = this.siteMaterials();
+    if (!query) return materials;
+    return materials.filter(m =>
+      m.name?.toLowerCase().includes(query) ||
+      m.unit?.toLowerCase().includes(query) ||
+      m.paymentType?.toLowerCase().includes(query) ||
+      m.status?.toLowerCase().includes(query)
+    );
+  });
+
   siteMaterialCount(siteName: string): number {
     const vendor = this.selectedVendor();
     if (!vendor) return 0;
@@ -461,6 +863,82 @@ export class VendorDashboardPage {
 
   backToSites() {
     this.selectedSite.set(null);
+  }
+
+  loadCustomColumns(): string[] {
+    const key = this.vendorSiteCustomColumnsKey();
+    if (!key) return [];
+    try {
+      const stored = localStorage.getItem(`agb-erp:${key}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  saveCustomColumns() {
+    const key = this.vendorSiteCustomColumnsKey();
+    if (!key) return;
+    localStorage.setItem(`agb-erp:${key}`, JSON.stringify(this.customColumns()));
+  }
+
+  addMaterialRow() {
+    const vendor = this.selectedVendor();
+    const site = this.selectedSite();
+    if (!vendor || !site) return;
+    const newMaterial = this.data.addMaterial({
+      projectId: "",
+      site: site.name,
+      name: "",
+      unit: "",
+      requested: 0,
+      approved: 0,
+      purchased: 0,
+      consumed: 0,
+      quantity: 0,
+      vendor: vendor.name,
+      poNumber: "Pending",
+      status: "Pending",
+      purchasedDate: new Date().toISOString().slice(0, 10),
+      issuedAmount: 0,
+      givenAmount: 0,
+      paymentType: "Cash",
+      deliveredOn: "",
+    });
+    this.editingRowId.set(newMaterial.id);
+  }
+
+  editRow(row: MaterialRow) {
+    this.editingRowId.set(row.id);
+  }
+
+  saveRow(row: MaterialRow) {
+    this.editingRowId.set(null);
+  }
+
+  deleteRow(materialId: string) {
+    if (!confirm("Delete this material entry?")) return;
+    this.data.deleteMaterial(materialId);
+  }
+
+  updateField(row: MaterialRow, field: string, value: any) {
+    const patch: Partial<MaterialRow> = { [field]: value };
+    this.data.updateMaterial(row.id, patch);
+  }
+
+  addCustomColumn() {
+    const name = this.newColumnName().trim();
+    if (!name) return;
+    if (this.customColumns().includes(name)) return;
+    this.customColumns.update(cols => [...cols, name]);
+    this.newColumnName.set("");
+    this.showAddColumnInput.set(false);
+    this.saveCustomColumns();
+  }
+
+  removeCustomColumn(colName: string) {
+    this.customColumns.update(cols => cols.filter(c => c !== colName));
+    this.saveCustomColumns();
   }
 
   refreshFromBackend() {

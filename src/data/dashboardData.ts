@@ -46,6 +46,7 @@ export type MaterialRow = {
   approved: number;
   purchased: number;
   consumed: number;
+  quantity: number;
   vendor: string;
   poNumber: string;
   status: ApprovalStatus;
@@ -55,6 +56,7 @@ export type MaterialRow = {
   givenAmount?: number;
   paymentType?: "Cash" | "NEFT" | "Bank Transfer" | "UPI" | "Cheque";
   deliveredOn?: string;
+  [key: string]: any;
 };
 
 export type QuotationRow = {
@@ -267,6 +269,7 @@ export const materials: MaterialRow[] = [
     approved: 10000,
     purchased: 10000,
     consumed: 7250,
+    quantity: 10000,
     vendor: "Sri Devi Traders",
     poNumber: "PO-1041",
     status: "Approved",
@@ -286,6 +289,7 @@ export const materials: MaterialRow[] = [
     approved: 0,
     purchased: 0,
     consumed: 0,
+    quantity: 0,
     vendor: "KMS Agencies",
     poNumber: "Pending",
     status: "Pending",
@@ -305,6 +309,7 @@ export const materials: MaterialRow[] = [
     approved: 2200,
     purchased: 2200,
     consumed: 1310,
+    quantity: 2200,
     vendor: "Amman Steel",
     poNumber: "PO-1045",
     status: "Approved",
@@ -324,6 +329,7 @@ export const materials: MaterialRow[] = [
     approved: 6,
     purchased: 6,
     consumed: 4,
+    quantity: 6,
     vendor: "Thirumalai Blue Metals",
     poNumber: "PO-1050",
     status: "Approved",

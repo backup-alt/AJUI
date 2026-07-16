@@ -381,8 +381,33 @@ export class ErpDataService {
   readonly quotations = signal<Quotation[]>(this.readState<Quotation[]>("quotations", []));
 
   constructor() {
-    // NOTE: localStorage persistence removed - all data now flows through MongoDB only
-    // Data is loaded from backend via WorkspaceHydrationService before use
+    effect(() => this.writeState("clients", this.clients()));
+    effect(() => this.writeState("projects", this.projects()));
+    effect(() => this.writeState("materials", this.materials()));
+    effect(() => this.writeState("labour", this.labour()));
+    effect(() => this.writeState("expenses", this.expenses()));
+    effect(() => this.writeState("payments", this.payments()));
+    effect(() => this.writeState("vendors", this.vendors()));
+    effect(() => this.writeState("supervisors", this.supervisors()));
+    effect(() => this.writeState("subcontractors", this.subcontractors()));
+    effect(() => this.writeState("sites", this.siteEntities()));
+    effect(() => this.writeState("customTableFields", this.customTableFields()));
+    effect(() => this.writeState("customTableRows", this.customTableRows()));
+    effect(() => this.writeState("tableCellEdits", this.tableCellEdits()));
+    effect(() => this.writeState("hiddenTableRows", this.hiddenTableRows()));
+    effect(() => this.writeState("hiddenTableFields", this.hiddenTableFields()));
+    effect(() => this.writeState("expenseOpeningBalances", this.expenseOpeningBalances()));
+    effect(() => this.writeState("projectActivity", this.projectActivity()));
+    effect(() => this.writeState("settings", this.settings()));
+    effect(() => this.writeState("appUsers", this.users()));
+    effect(() => this.writeState("companyProfile", this.companyProfile()));
+    effect(() => this.writeState("quotations", this.quotations()));
+    effect(() => {
+      const rows = this.materials();
+      if (rows && rows.length) {
+        this.materialsService.materials.set(rows);
+      }
+    });
   }
 
   addUser(user: Omit<AppUser, "id" | "createdAt"> & { id?: string; createdAt?: string }): AppUser {
@@ -665,6 +690,45 @@ export class ErpDataService {
   deleteVendor(vendorId: string) {
     this.vendors.update((vendors) => vendors.filter((v) => v.id !== vendorId));
     this.writeState("vendors", this.vendors());
+  }
+
+  addMaterial(input: Omit<MaterialRow, "id">): MaterialRow {
+    const material: MaterialRow = {
+      id: `MAT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      projectId: input.projectId || "",
+      site: input.site || "",
+      name: input.name || "",
+      unit: input.unit || "",
+      requested: input.requested ?? 0,
+      approved: input.approved ?? 0,
+      purchased: input.purchased ?? 0,
+      consumed: input.consumed ?? 0,
+      quantity: input.quantity ?? 0,
+      vendor: input.vendor || "",
+      poNumber: input.poNumber || "",
+      status: input.status || "Pending",
+      requestDate: input.requestDate,
+      purchasedDate: input.purchasedDate,
+      issuedAmount: input.issuedAmount,
+      givenAmount: input.givenAmount,
+      paymentType: input.paymentType,
+      deliveredOn: input.deliveredOn,
+    };
+    this.materials.update((materials) => [material, ...materials]);
+    this.writeState("materials", this.materials());
+    return material;
+  }
+
+  updateMaterial(materialId: string, patch: Partial<MaterialRow>) {
+    this.materials.update((materials) =>
+      materials.map((m) => (m.id !== materialId ? m : { ...m, ...patch })),
+    );
+    this.writeState("materials", this.materials());
+  }
+
+  deleteMaterial(materialId: string) {
+    this.materials.update((materials) => materials.filter((m) => m.id !== materialId));
+    this.writeState("materials", this.materials());
   }
 
   createDefaultProject(client: Client): Project {
