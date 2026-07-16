@@ -21,14 +21,15 @@ export interface CustomField {
   value: string | number | boolean | null;
   fieldType: CustomFieldType;
   order: number;
+  askSupervisor: boolean;
 }
 
 @Injectable({ providedIn: "root" })
 export class CustomFieldsService {
   private api = inject(ApiService);
 
-  list(entityType: CustomFieldEntityType, entityId: string): Observable<{ fields: CustomField[] }> {
-    return this.api.listCustomFields({ entityType, entityId });
+  list(entityType: CustomFieldEntityType, entityId: string, supervisorOnly = false): Observable<{ fields: CustomField[] }> {
+    return this.api.listCustomFields({ entityType, entityId, supervisorOnly });
   }
 
   create(input: {
@@ -39,6 +40,7 @@ export class CustomFieldsService {
     value?: string | number | boolean | null;
     fieldType: CustomFieldType;
     order?: number;
+    askSupervisor?: boolean;
   }): Observable<{ field: CustomField }> {
     return this.api.createCustomField(input);
   }
@@ -50,6 +52,7 @@ export class CustomFieldsService {
       value?: string | number | boolean | null;
       fieldType?: CustomFieldType;
       order?: number;
+      askSupervisor?: boolean;
     }
   ): Observable<{ field: CustomField }> {
     return this.api.updateCustomField(id, patch);

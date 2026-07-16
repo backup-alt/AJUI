@@ -99,27 +99,7 @@ import { Vendor } from '../../../shared/models';
                 <span>Record a purchase expense (goes through approval, checks balance)</span>
               </div>
             </div>
-            <div class="type-card" [class.selected]="expenseType() === 'Cash Added'" (click)="selectType('Cash Added')">
-              <div class="type-icon type-icon-gold">
-                <ion-icon name="cash-outline"></ion-icon>
-              </div>
-              <div class="type-info">
-                <strong>Cash Added</strong>
-                <span>Add cash to site (goes through approval)</span>
-              </div>
-            </div>
-            <div class="type-card" [class.selected]="expenseType() === 'Site Material'" (click)="selectType('Site Material')">
-              <div class="type-icon type-icon-green">
-                <ion-icon name="cube-outline"></ion-icon>
-              </div>
-              <div class="type-info">
-                <strong>Site Material</strong>
-                <span>Request materials for site (creates material record on approval)</span>
-              </div>
-            </div>
-          </div>
-
-          <ion-button expand="block" [disabled]="!expenseType()" (click)="goToStep2()">
+            <ion-button expand="block" [disabled]="!expenseType()" (click)="goToStep2()">
             Continue
           </ion-button>
         }
@@ -332,7 +312,7 @@ export class ExpenseCreatePage implements OnInit {
   };
 
   step = signal(1);
-  expenseType = signal<'Purchase' | 'Cash Added' | 'Site Material' | ''>('');
+  expenseType = signal<'Purchase' | 'Site Material' | ''>('');
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
@@ -358,14 +338,14 @@ export class ExpenseCreatePage implements OnInit {
     await this.loadVendors();
   }
 
-  selectType(type: 'Purchase' | 'Cash Added' | 'Site Material') {
+  selectType(type: 'Purchase' | 'Site Material') {
     this.expenseType.set(type);
   }
 
   getTitle(): string {
     if (this.step() === 1) return 'Log Expense';
     switch (this.expenseType()) {
-      case 'Cash Added': return 'Cash Added';
+      case 'Site Material': return 'Site Material';
       case 'Site Material': return 'Site Material';
       default: return 'Purchase Expense';
     }
@@ -373,7 +353,7 @@ export class ExpenseCreatePage implements OnInit {
 
   getSubmitLabel(): string {
     switch (this.expenseType()) {
-      case 'Cash Added': return 'Submit Cash Added';
+      case 'Site Material': return 'Submit Site Material';
       case 'Site Material': return 'Submit Site Material';
       default: return 'Submit Purchase';
     }
@@ -489,7 +469,7 @@ export class ExpenseCreatePage implements OnInit {
       projectId,
       siteId,
       site: siteName,
-      transactionType: isSiteMaterial ? 'Site Material' : (this.expenseType() === 'Cash Added' ? 'Cash Added' : this.expense.transactionType),
+      transactionType: isSiteMaterial ? 'Site Material' : this.expense.transactionType,
       reference: this.expense.reference || undefined,
       amountPaidBy: this.expense.amountPaidBy || undefined,
       amount: this.expense.amount || 0,
@@ -507,7 +487,7 @@ export class ExpenseCreatePage implements OnInit {
       next: async () => {
         this.isSubmitting.set(false);
         const toast = await this.toastCtrl.create({
-          message: this.expenseType() === 'Cash Added' ? 'Cash Added submitted for approval' :
+          message: this.expenseType() === 'Site Material' ? 'Site Material submitted for approval' :
                    this.expenseType() === 'Site Material' ? 'Site Material submitted for approval' : 'Expense submitted for approval',
           duration: 2500,
           color: 'success',
@@ -529,3 +509,4 @@ export class ExpenseCreatePage implements OnInit {
     });
   }
 }
+

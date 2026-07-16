@@ -224,9 +224,11 @@ export async function createCustomField(req: Request, res: Response, next: NextF
 
 export async function listCustomFields(req: Request, res: Response, next: NextFunction) {
   try {
+    const includeSupervisorOnly = req.query.supervisorOnly === "true";
     const fields = await customFieldService.listCustomFields(
       req.query.entityType as never,
-      req.query.entityId as string
+      req.query.entityId as string,
+      includeSupervisorOnly
     );
     res.json({ fields });
   } catch (e) { next(e); }

@@ -37,6 +37,7 @@ export interface CustomField {
   value: string | number | boolean | null;
   fieldType: 'text' | 'number' | 'date' | 'boolean';
   order: number;
+  askSupervisor: boolean;
 }
 
 export interface CreateMaterialRequest {

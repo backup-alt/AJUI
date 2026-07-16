@@ -25,6 +25,7 @@ export class CustomFieldsService {
       this.api.get<{ fields: CustomField[] }>('/custom-fields', {
         entityType,
         entityId,
+        supervisorOnly: 'true',
       })
     );
     return response.fields || [];

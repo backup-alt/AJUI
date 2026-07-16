@@ -2089,7 +2089,7 @@ export class UniversalDashboardPage {
     return this.activeModule() === "expenses" && column.key === "amount" ? "Total Amount" : column.label;
   }
 
-  saveRecord(event: Event) {
+  async saveRecord(event: Event) {
     event.preventDefault();
     const module = this.activeModule();
     const row = { ...this.draftRow() };
@@ -2105,6 +2105,57 @@ export class UniversalDashboardPage {
     } else {
       const preparedRow = this.withGeneratedReferences(module === "expenses" ? this.normalizedExpenseInputRow(row) : row);
       if (module === "expenses") this.ensureExpenseOpeningForInput(preparedRow);
+
+      const isCashAdded = module === "expenses" && preparedRow["transactionType"] === "Cash Added";
+
+      if (isCashAdded) {
+        const projectId = String(preparedRow["projectId"] || preparedRow["__projectId"] || "");
+        const site = String(preparedRow["site"] || "");
+        const date = String(preparedRow["expenseDate"] || new Date().toISOString().slice(0, 10));
+        const description = String(preparedRow["description"] || "Cash Added");
+        const amount = Math.abs(Number(preparedRow["amount"]) || 0);
+        const reference = String(preparedRow["reference"] || "");
+
+        if (!projectId) {
+          console.warn("[UniversalDashboard] Cannot save Cash Added: no project selected");
+          return;
+        }
+
+        try {
+          const result = await new Promise<{ expense: any }>((resolve, reject) => {
+            this.api.createExpense({
+              type: "site",
+              projectId,
+              siteId: undefined,
+              site: site || undefined,
+              transactionType: "Cash Added",
+              amount,
+              date,
+              description,
+              reference: reference || undefined,
+              submittedBy: "admin",
+            }).subscribe({ next: resolve, error: reject });
+          });
+
+          const apiExpense = result.expense;
+          const savedRow = this.data.addCustomRow(module, {
+            ...preparedRow,
+            __rowId: `expense:${apiExpense._id}`,
+            __projectId: projectId,
+            projectId,
+            expenseScope: "Site",
+            runningBalance: apiExpense.runningBalance,
+            id: apiExpense.expenseId,
+            status: "Approved",
+          });
+          this.recordDialogOpen.set(false);
+          return;
+        } catch (err) {
+          console.error("[UniversalDashboard] Failed to create Cash Added expense", err);
+          return;
+        }
+      }
+
       const savedRow = this.data.addCustomRow(module, preparedRow);
       if (module === "expenses") this.createMaterialFromSiteExpense(savedRow);
     }
@@ -2183,7 +2234,7 @@ export class UniversalDashboardPage {
       const siteId = this.resolveEntityIdForModule(module);
       if (siteId) {
         try {
-          await this.data.persistCustomField(module, label, siteId, fieldType);
+          await this.data.persistCustomField(module, label, siteId, fieldType, askSupervisor);
         } catch (err) {
           console.warn("[UniversalDashboard] failed to persist custom field", err);
         }

@@ -381,27 +381,8 @@ export class ErpDataService {
   readonly quotations = signal<Quotation[]>(this.readState<Quotation[]>("quotations", []));
 
   constructor() {
-    effect(() => this.writeState("clients", this.clients()));
-    effect(() => this.writeState("projects", this.projects()));
-    effect(() => this.writeState("materials", this.materials()));
-    effect(() => this.writeState("labour", this.labour()));
-    effect(() => this.writeState("expenses", this.expenses()));
-    effect(() => this.writeState("payments", this.payments()));
-    effect(() => this.writeState("vendors", this.vendors()));
-    effect(() => this.writeState("supervisors", this.supervisors()));
-    effect(() => this.writeState("subcontractors", this.subcontractors()));
-    effect(() => this.writeState("sites", this.siteEntities()));
-    effect(() => this.writeState("customTableFields", this.customTableFields()));
-    effect(() => this.writeState("customTableRows", this.customTableRows()));
-    effect(() => this.writeState("tableCellEdits", this.tableCellEdits()));
-    effect(() => this.writeState("hiddenTableRows", this.hiddenTableRows()));
-    effect(() => this.writeState("hiddenTableFields", this.hiddenTableFields()));
-    effect(() => this.writeState("expenseOpeningBalances", this.expenseOpeningBalances()));
-    effect(() => this.writeState("projectActivity", this.projectActivity()));
-    effect(() => this.writeState("settings", this.settings()));
-    effect(() => this.writeState("appUsers", this.users()));
-    effect(() => this.writeState("companyProfile", this.companyProfile()));
-    effect(() => this.writeState("quotations", this.quotations()));
+    // NOTE: localStorage persistence removed - all data now flows through MongoDB only
+    // Data is loaded from backend via WorkspaceHydrationService before use
   }
 
   addUser(user: Omit<AppUser, "id" | "createdAt"> & { id?: string; createdAt?: string }): AppUser {
@@ -1022,7 +1003,8 @@ export class ErpDataService {
     module: SharedModuleKey,
     label: string,
     siteId: string | null,
-    fieldType: "text" | "number" | "date" | "boolean" = "text"
+    fieldType: "text" | "number" | "date" | "boolean" = "text",
+    askSupervisor = true
   ): Promise<SharedTableField | null> {
     if (!siteId) {
       return null;
@@ -1040,6 +1022,7 @@ export class ErpDataService {
             value: null,
             fieldType,
             order: 0,
+            askSupervisor,
           })
           .subscribe({ next: resolve, error: reject });
       });
