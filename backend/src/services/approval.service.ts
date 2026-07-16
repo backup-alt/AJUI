@@ -365,8 +365,6 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             transactionType: doc.transactionType,
             description: doc.description,
             amount: doc.amount,
-            paidBy: doc.amountPaidBy,
-            reference: doc.reference,
             submittedBy: doc.submittedBy,
             clientName: doc.clientName,
             supervisorName: doc.supervisor,

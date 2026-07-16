@@ -151,7 +151,7 @@ export class SupervisorService {
     expenseId: string,
     payload: { data: string; mimeType: string; fileName?: string }
   ) {
-    return this.api.post<UploadReceiptResponse>(
+    return this.api.post<{ expense: Expense }>(
       `/supervisor/expenses/${expenseId}/receipt`,
       payload
     );

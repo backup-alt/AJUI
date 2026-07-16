@@ -118,10 +118,6 @@ export const createExpenseSchema = z.object({
       { message: "projectId is required for site expenses", path: ["projectId"] }
     )
     .refine(
-      (data) => data.type !== "general" || !!data.category,
-      { message: "category is required for general expenses", path: ["category"] }
-    )
-    .refine(
       (data) => data.type !== "site" || !!data.transactionType,
       { message: "transactionType is required for site expenses", path: ["transactionType"] }
     ),

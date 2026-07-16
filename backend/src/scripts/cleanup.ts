@@ -1,8 +1,13 @@
 import mongoose from "mongoose";
-import { config } from "../config/index.js";
 import { Expense } from "../models/Expense.js";
 import { Approval } from "../models/Approval.js";
 import { generatePoNumberForSite } from "../services/po-number.service.js";
+
+const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL;
+if (!MONGODB_URI) {
+  console.error("MONGODB_URI or DATABASE_URL env var is required");
+  process.exit(1);
+}
 
 const LEGACY_TO_NEW: Record<string, "Purchase" | "Cash Added"> = {
   "Cash Added": "Cash Added",
@@ -18,7 +23,7 @@ const LEGACY_TO_NEW: Record<string, "Purchase" | "Cash Added"> = {
 
 async function migrate() {
   console.log("Connecting to MongoDB...");
-  await mongoose.connect(config.database.uri);
+  await mongoose.connect(MONGODB_URI);
   console.log("Connected.\n");
 
   const expenseResult = await Expense.updateMany(
