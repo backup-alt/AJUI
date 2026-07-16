@@ -12,7 +12,8 @@ export type IdPrefix =
   | "SUP"
   | "SUB"
   | "APR"
-  | "RPT";
+  | "RPT"
+  | "PO";
 
 export async function generateId(prefix: IdPrefix, padding = 3): Promise<string> {
   const result = await Counter.findByIdAndUpdate(

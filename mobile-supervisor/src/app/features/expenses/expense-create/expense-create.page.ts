@@ -26,11 +26,13 @@ import {
   cartOutline,
   cashOutline,
   checkmarkCircleOutline,
+  cubeOutline,
   locationOutline,
   walletOutline,
   warningOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
+import { Vendor } from '../../../shared/models';
 
 @Component({
   selector: 'app-expense-create',
@@ -60,7 +62,7 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
         <ion-buttons slot="start">
           <ion-back-button [defaultHref]="step() === 1 ? '/tabs/expenses' : undefined" (click)="step() === 2 ? step.set(1) : null"></ion-back-button>
         </ion-buttons>
-        <ion-title>{{ step() === 1 ? 'Log Expense' : expenseType() === 'Cash Added' ? 'Cash Added' : 'Purchase Expense' }}</ion-title>
+        <ion-title>{{ getTitle() }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -97,20 +99,10 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
                 <span>Record a purchase expense (goes through approval, checks balance)</span>
               </div>
             </div>
-            <div class="type-card" [class.selected]="expenseType() === 'Cash Added'" (click)="selectType('Cash Added')">
-              <div class="type-icon type-icon-gold">
-                <ion-icon name="cash-outline"></ion-icon>
-              </div>
-              <div class="type-info">
-                <strong>Cash Added</strong>
-                <span>Add cash to site (goes through approval)</span>
-              </div>
-            </div>
+            <ion-button expand="block" [disabled]="!expenseType()" (click)="goToStep2()">
+              Continue
+            </ion-button>
           </div>
-
-          <ion-button expand="block" [disabled]="!expenseType()" (click)="goToStep2()">
-            Continue
-          </ion-button>
         }
 
         @if (step() === 2) {
@@ -130,6 +122,57 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
           }
 
           <ion-list lines="none" class="form-list">
+            @if (expenseType() === 'Site Material') {
+              <ion-item class="form-item">
+                <ion-label position="stacked">Material Name *</ion-label>
+                <ion-input
+                  placeholder="e.g., Cement, Sand, Bricks"
+                  [(ngModel)]="expense.materialName"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item">
+                <ion-label position="stacked">Unit *</ion-label>
+                <ion-select
+                  placeholder="Select Unit"
+                  [(ngModel)]="expense.materialUnit"
+                  interface="popover"
+                >
+                  <ion-select-option value="kg">Kilograms (kg)</ion-select-option>
+                  <ion-select-option value="bags">Bags</ion-select-option>
+                  <ion-select-option value="tons">Tons</ion-select-option>
+                  <ion-select-option value="cubic meters">Cubic Meters (m³)</ion-select-option>
+                  <ion-select-option value="pieces">Pieces</ion-select-option>
+                  <ion-select-option value="units">Units</ion-select-option>
+                  <ion-select-option value="liters">Liters</ion-select-option>
+                </ion-select>
+              </ion-item>
+
+              <ion-item class="form-item">
+                <ion-label position="stacked">Quantity *</ion-label>
+                <ion-input
+                  type="number"
+                  placeholder="0"
+                  [(ngModel)]="expense.materialQuantity"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item">
+                <ion-label position="stacked">Vendor</ion-label>
+                <ion-select
+                  placeholder="Select Vendor"
+                  [(ngModel)]="expense.materialVendorId"
+                  interface="popover"
+                >
+                  @for (vendor of vendors(); track vendor._id) {
+                    <ion-select-option [value]="vendor._id">{{ vendor.name }}</ion-select-option>
+                  }
+                </ion-select>
+              </ion-item>
+            }
+
             <ion-item class="form-item">
               <ion-label position="stacked">Description *</ion-label>
               <ion-input
@@ -205,7 +248,7 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
                 <ion-spinner name="crescent" slot="start"></ion-spinner>
                 Submitting...
               } @else {
-                {{ expenseType() === 'Cash Added' ? 'Submit Cash Added' : 'Submit Purchase' }}
+                {{ getSubmitLabel() }}
               }
             </ion-button>
           </div>
@@ -232,6 +275,7 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
     .type-icon { width: 44px; height: 44px; background: rgba(0, 34, 99, 0.08); color: #002263; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .type-icon ion-icon { font-size: 22px; }
     .type-icon.type-icon-gold { background: rgba(201, 162, 39, 0.12); color: #c9a227; }
+    .type-icon.type-icon-green { background: rgba(16, 185, 129, 0.12); color: #10b981; }
     .type-info { display: flex; flex-direction: column; gap: 2px; }
     .type-info strong { font-size: 14px; font-weight: 600; color: #111827; }
     .type-info span { font-size: 12px; color: #6b7280; }
@@ -261,15 +305,21 @@ export class ExpenseCreatePage implements OnInit {
     reference: '',
     amountPaidBy: '',
     notes: '',
+    materialName: '',
+    materialUnit: '',
+    materialQuantity: null as number | null,
+    materialVendorId: '',
+    materialVendor: '',
   };
 
   step = signal(1);
-  expenseType = signal<'Purchase' | 'Cash Added' | ''>('');
+  expenseType = signal<'Purchase' | 'Site Material' | ''>('');
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
   currentBalance = signal<number | null>(null);
+  vendors = signal<Vendor[]>([]);
 
   async ngOnInit(): Promise<void> {
     addIcons({
@@ -277,6 +327,7 @@ export class ExpenseCreatePage implements OnInit {
       cartOutline,
       cashOutline,
       checkmarkCircleOutline,
+      cubeOutline,
       locationOutline,
       walletOutline,
       warningOutline,
@@ -285,10 +336,35 @@ export class ExpenseCreatePage implements OnInit {
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
+    await this.loadVendors();
   }
 
-  selectType(type: 'Purchase' | 'Cash Added') {
+  selectType(type: 'Purchase' | 'Site Material') {
     this.expenseType.set(type);
+  }
+
+  getTitle(): string {
+    if (this.step() === 1) return 'Log Expense';
+    switch (this.expenseType()) {
+      case 'Site Material': return 'Site Material';
+      case 'Site Material': return 'Site Material';
+      default: return 'Purchase Expense';
+    }
+  }
+
+  getSubmitLabel(): string {
+    switch (this.expenseType()) {
+      case 'Site Material': return 'Submit Site Material';
+      case 'Site Material': return 'Submit Site Material';
+      default: return 'Submit Purchase';
+    }
+  }
+
+  async loadVendors() {
+    this.supervisor.getVendors({ limit: 100 }).subscribe({
+      next: (res) => this.vendors.set(res.items || []),
+      error: () => this.vendors.set([]),
+    });
   }
 
   async goToStep2() {
@@ -328,6 +404,15 @@ export class ExpenseCreatePage implements OnInit {
   }
 
   isValid(): boolean {
+    if (this.expenseType() === 'Site Material') {
+      return !!(
+        this.expense.materialName &&
+        this.expense.materialUnit &&
+        this.expense.materialQuantity &&
+        this.expense.description &&
+        this.expense.amount
+      );
+    }
     if (this.expenseType() === 'Purchase') {
       return !!(this.expense.description && this.expense.amount && this.expense.transactionType);
     }
@@ -377,24 +462,34 @@ export class ExpenseCreatePage implements OnInit {
 
     this.isSubmitting.set(true);
 
-    const payload = {
-      type: 'site' as const,
+    const isSiteMaterial = this.expenseType() === 'Site Material';
+    const selectedVendor = this.vendors().find(v => v._id === this.expense.materialVendorId);
+
+    const payload: any = {
+      type: 'site',
       projectId,
       siteId,
       site: siteName,
-      transactionType: this.expenseType() === 'Cash Added' ? 'Cash Added' : this.expense.transactionType,
+      transactionType: isSiteMaterial ? 'Site Material' : this.expense.transactionType,
       reference: this.expense.reference || undefined,
       amountPaidBy: this.expense.amountPaidBy || undefined,
       amount: this.expense.amount || 0,
       date: new Date().toISOString().slice(0, 10),
       description: this.expense.description,
+      isSiteMaterial,
+      materialName: isSiteMaterial ? this.expense.materialName : undefined,
+      materialUnit: isSiteMaterial ? this.expense.materialUnit : undefined,
+      materialQuantity: isSiteMaterial ? this.expense.materialQuantity : undefined,
+      materialVendor: selectedVendor?.name || this.expense.materialVendor || undefined,
+      materialVendorId: isSiteMaterial ? this.expense.materialVendorId : undefined,
     };
 
     this.supervisor.createExpense(payload).subscribe({
       next: async () => {
         this.isSubmitting.set(false);
         const toast = await this.toastCtrl.create({
-          message: this.expenseType() === 'Cash Added' ? 'Cash Added submitted for approval' : 'Expense submitted for approval',
+          message: this.expenseType() === 'Site Material' ? 'Site Material submitted for approval' :
+                   this.expenseType() === 'Site Material' ? 'Site Material submitted for approval' : 'Expense submitted for approval',
           duration: 2500,
           color: 'success',
           position: 'top',
@@ -415,3 +510,4 @@ export class ExpenseCreatePage implements OnInit {
     });
   }
 }
+

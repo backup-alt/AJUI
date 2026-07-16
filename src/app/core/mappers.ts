@@ -112,11 +112,11 @@ export function mapMaterial(m: any): any {
     site: m.site,
     name: m.name,
     unit: m.unit,
-    requestedQuantity: m.requestedQuantity,
-    approvedQuantity: m.approvedQuantity,
-    purchasedQuantity: m.purchasedQuantity,
-    consumedQuantity: m.consumedQuantity,
-    remainingStock: m.remainingStock,
+    requested: m.requestedQuantity ?? 0,
+    approved: m.approvedQuantity ?? 0,
+    purchased: m.purchasedQuantity ?? 0,
+    consumed: m.consumedQuantity ?? 0,
+    remainingStock: m.remainingStock ?? Math.max(0, (m.purchasedQuantity ?? 0) - (m.consumedQuantity ?? 0)),
     vendor: m.vendor,
     vendorId: m.vendorId,
     poNumber: m.poNumber,
@@ -155,11 +155,16 @@ export function mapLabour(l: any): any {
 }
 
 export function mapExpense(e: any): any {
+  const amount = Number(e.amount) || 0;
+  const uiType: "Site Expense" | "General Expense" =
+    e.type === "site" ? "Site Expense" : "General Expense";
+  const isCashAdded = e.transactionType === "Cash Added";
   return {
     _id: e._id,
     id: e.expenseId,
     expenseId: e.expenseId,
-    type: e.type,
+    type: uiType,
+    rawType: e.type,
     projectId: e.projectId,
     projectName: e.projectName,
     clientId: e.clientId,
@@ -167,7 +172,11 @@ export function mapExpense(e: any): any {
     site: e.site,
     supervisor: e.supervisor,
     transactionType: e.transactionType,
-    amount: e.amount,
+    amount,
+    spent: amount,
+    cashIssued: isCashAdded ? amount : 0,
+    received: 0,
+    openingBalance: isCashAdded ? (Number(e.runningBalance) || amount) : 0,
     siteMaterialBalance: e.siteMaterialBalance,
     reference: e.reference,
     runningBalance: e.runningBalance,
@@ -177,6 +186,14 @@ export function mapExpense(e: any): any {
     date: e.date,
     description: e.description,
     status: e.status,
+    isSiteMaterial: e.isSiteMaterial,
+    materialName: e.materialName,
+    materialUnit: e.materialUnit,
+    materialQuantity: e.materialQuantity,
+    materialVendor: e.materialVendor,
+    submittedBy: e.submittedBy,
+    approvedBy: e.approvedBy,
+    approvedAt: e.approvedAt,
   };
 }
 

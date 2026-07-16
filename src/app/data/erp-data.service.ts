@@ -205,7 +205,7 @@ export class ErpDataService {
   readonly projects = signal<Project[]>(this.readState<Project[]>("projects", projects));
   readonly materials = signal<MaterialRow[]>(this.readState<MaterialRow[]>("materials", materials));
   readonly labour = signal<LabourRow[]>(this.readState<LabourRow[]>("labour", labour));
-  readonly expenses = signal<ExpenseRow[]>(this.readState<ExpenseRow[]>("expenses", expenses));
+  readonly expenses = signal<ExpenseRow[]>(this.readState<ExpenseRow[]>("expenses", []));
   readonly payments = signal<PaymentRow[]>(this.readState<PaymentRow[]>("payments", payments));
   readonly vendors = signal<Vendor[]>(
     this.readState<Vendor[]>("vendors", [
@@ -707,6 +707,7 @@ export class ErpDataService {
       vendor: input.vendor || "",
       poNumber: input.poNumber || "",
       status: input.status || "Pending",
+      requestDate: input.requestDate,
       purchasedDate: input.purchasedDate,
       issuedAmount: input.issuedAmount,
       givenAmount: input.givenAmount,
@@ -714,6 +715,7 @@ export class ErpDataService {
       deliveredOn: input.deliveredOn,
     };
     this.materials.update((materials) => [material, ...materials]);
+    this.writeState("materials", this.materials());
     return material;
   }
 
@@ -721,10 +723,12 @@ export class ErpDataService {
     this.materials.update((materials) =>
       materials.map((m) => (m.id !== materialId ? m : { ...m, ...patch })),
     );
+    this.writeState("materials", this.materials());
   }
 
   deleteMaterial(materialId: string) {
     this.materials.update((materials) => materials.filter((m) => m.id !== materialId));
+    this.writeState("materials", this.materials());
   }
 
   createDefaultProject(client: Client): Project {
@@ -849,6 +853,11 @@ export class ErpDataService {
     const key = this.expenseOpeningBalanceKey(projectId, siteName);
     this.expenseOpeningBalances.update((balances) => ({ ...balances, [key]: amount }));
     this.touchProject(projectId);
+  }
+
+  setExpenses(rows: ExpenseRow[]) {
+    this.expenses.set(rows);
+    this.writeState("expenses", rows);
   }
 
   updateSettings(patch: Partial<ErpSettings>) {
@@ -1063,7 +1072,8 @@ export class ErpDataService {
     module: SharedModuleKey,
     label: string,
     siteId: string | null,
-    fieldType: "text" | "number" | "date" | "boolean" = "text"
+    fieldType: "text" | "number" | "date" | "boolean" = "text",
+    askSupervisor = true
   ): Promise<SharedTableField | null> {
     if (!siteId) {
       return null;
@@ -1081,6 +1091,7 @@ export class ErpDataService {
             value: null,
             fieldType,
             order: 0,
+            askSupervisor,
           })
           .subscribe({ next: resolve, error: reject });
       });

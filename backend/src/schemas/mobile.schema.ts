@@ -86,6 +86,13 @@ export const createExpenseMobileSchema = z.object({
     amount: z.coerce.number().nonnegative(),
     date: z.string().min(1),
     description: z.string().trim().min(1).max(500),
+    isSiteMaterial: z.boolean().optional(),
+    materialName: z.string().trim().optional(),
+    materialUnit: z.string().trim().optional(),
+    materialQuantity: z.coerce.number().nonnegative().optional(),
+    materialVendor: z.string().trim().optional(),
+    materialVendorId: objectIdSchema.optional(),
+    customFields: z.record(z.unknown()).optional(),
   }),
 });
 

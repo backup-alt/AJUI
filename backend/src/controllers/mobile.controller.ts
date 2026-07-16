@@ -195,9 +195,10 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
       site: material.site,
       amount: material.requestedQuantity,
       detail: `${material.requestedQuantity} ${material.unit} requested`,
-      sourceCollection: "Material",
+      sourceCollection: "materials",
       sourceId: material._id,
       status: "Pending",
+      owner: userId,
     });
 
     res.status(201).json({ material });
@@ -301,9 +302,10 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
       site: labour.site,
       amount: totalAmount,
       detail: `${req.body.category || "Labour"} - ${labour.partyName}`,
-      sourceCollection: "Labour",
+      sourceCollection: "labour",
       sourceId: labour._id,
       status: "Pending",
+      owner: userId,
     });
 
     res.status(201).json({ labour });
@@ -374,19 +376,25 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
       submittedBy: userId,
     });
 
-    if (req.body.type === "site" || req.body.transactionType === "Cash Added") {
+    const isSiteMaterialExpense = req.body.isSiteMaterial === true || req.body.transactionType === "Site Material";
+    if (req.body.type === "site" || req.body.transactionType === "Cash Added" || isSiteMaterialExpense) {
       await Approval.create({
         approvalId: await generateId("APR"),
         type: "expense",
-        title: `Site Expense: ${expense.description}`,
+        title: isSiteMaterialExpense
+          ? `Site Material: ${expense.materialName || expense.description}`
+          : `Site Expense: ${expense.description}`,
         projectId: expense.projectId,
         projectName: expense.projectName,
         site: expense.site,
         amount: expense.amount,
-        detail: `${expense.transactionType || "Expense"} - ${expense.description}`,
-        sourceCollection: "Expense",
+        detail: isSiteMaterialExpense
+          ? `Material: ${expense.materialName} - Qty: ${expense.materialQuantity} ${expense.materialUnit}`
+          : `${expense.transactionType || "Expense"} - ${expense.description}`,
+        sourceCollection: "expenses",
         sourceId: expense._id,
         status: "Pending",
+        owner: userId,
       });
     }
 

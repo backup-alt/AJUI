@@ -362,7 +362,7 @@ export class LoginPage {
     this.successMessage.set(null);
 
     this.api.login(this.loginEmail, this.loginPassword).subscribe({
-      next: (res) => {
+      next: async (res) => {
         try {
           Object.keys(localStorage).forEach((k) => {
             if (k.startsWith("agb-erp:")) localStorage.removeItem(k);
@@ -377,8 +377,12 @@ export class LoginPage {
           this.sessionRole.set(this.formatRole(role));
         } catch {}
 
-        this.hydration.hydrateFromBackend();
-        void this.router.navigateByUrl(this.safeReturnUrl());
+        try {
+          await this.hydration.hydrateFromBackend();
+        } catch (e) {
+          console.error("Failed to load workspace data from backend", e);
+        }
+        await this.router.navigateByUrl(this.safeReturnUrl());
       },
       error: (err) => {
         this.loading.set(false);

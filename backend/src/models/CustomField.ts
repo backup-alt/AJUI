@@ -21,6 +21,7 @@ export interface ICustomField extends Document {
   value: string | number | boolean | null;
   fieldType: CustomFieldType;
   order: number;
+  askSupervisor: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +53,7 @@ const customFieldSchema = new Schema<ICustomField>(
       default: "text",
     },
     order: { type: Number, default: 0, index: true },
+    askSupervisor: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

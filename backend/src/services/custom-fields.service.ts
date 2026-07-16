@@ -11,6 +11,7 @@ export async function createCustomField(input: CreateCustomFieldInput) {
     existing.label = input.label;
     existing.fieldType = input.fieldType;
     existing.order = input.order;
+    existing.askSupervisor = input.askSupervisor ?? false;
     await existing.save();
     return existing.toObject();
   }
@@ -23,15 +24,20 @@ export async function createCustomField(input: CreateCustomFieldInput) {
     value: input.value ?? null,
     fieldType: input.fieldType,
     order: input.order,
+    askSupervisor: input.askSupervisor ?? false,
   });
   return field.toObject();
 }
 
-export async function listCustomFields(entityType: CustomFieldEntityType, entityId: string) {
-  const fields = await CustomField.find({
+export async function listCustomFields(entityType: CustomFieldEntityType, entityId: string, includeSupervisorOnly = false) {
+  const query: Record<string, unknown> = {
     entityType,
     entityId: new Types.ObjectId(entityId),
-  })
+  };
+  if (includeSupervisorOnly) {
+    query.askSupervisor = true;
+  }
+  const fields = await CustomField.find(query)
     .sort({ order: 1, createdAt: 1 })
     .lean();
 
@@ -42,6 +48,7 @@ export async function listCustomFields(entityType: CustomFieldEntityType, entity
     value: f.value,
     fieldType: f.fieldType,
     order: f.order,
+    askSupervisor: f.askSupervisor,
   }));
 }
 

@@ -472,6 +472,25 @@ export class ApiService {
     );
   }
 
+  createExpense(payload: {
+    type: "site" | "general";
+    projectId?: string;
+    siteId?: string;
+    site?: string;
+    transactionType?: string;
+    amount: number;
+    date: string;
+    description: string;
+    reference?: string;
+    amountPaidBy?: string;
+    submittedBy?: string;
+    customFields?: Record<string, unknown>;
+  }): Observable<{ expense: any }> {
+    return this.http.post<{ expense: any }>(`${this.baseUrl}/expenses`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
   // =================== PAYMENTS ===================
   listPayments(params?: { projectId?: string; clientId?: string; status?: string; mode?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
@@ -483,6 +502,22 @@ export class ApiService {
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/payments${query}`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
     );
+  }
+
+  createPayment(payload: {
+    projectId: string;
+    clientId: string;
+    date: string;
+    amount: number;
+    mode: "Cash" | "Bank Transfer" | "Cheque" | "UPI" | "NEFT";
+    receiptNumber?: string;
+    transactionReference?: string;
+    collectedBy: string;
+    notes?: string;
+  }): Observable<{ payment: any }> {
+    return this.http.post<{ payment: any }>(`${this.baseUrl}/payments`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
   }
 
   // =================== SUBCONTRACTORS ===================
@@ -854,10 +889,12 @@ export class ApiService {
   listCustomFields(params: {
     entityType: string;
     entityId: string;
+    supervisorOnly?: boolean;
   }): Observable<{ fields: any[] }> {
     const q = new URLSearchParams();
     q.set("entityType", params.entityType);
     q.set("entityId", params.entityId);
+    if (params.supervisorOnly) q.set("supervisorOnly", "true");
     return this.http.get<{ fields: any[] }>(`${this.baseUrl}/custom-fields?${q.toString()}`, {
       headers: this.authHeaders(),
     }).pipe(catchError(this.handleError));
@@ -871,6 +908,7 @@ export class ApiService {
     value?: string | number | boolean | null;
     fieldType: "text" | "number" | "date" | "boolean";
     order?: number;
+    askSupervisor?: boolean;
   }): Observable<{ field: any }> {
     return this.http.post<{ field: any }>(`${this.baseUrl}/custom-fields`, payload, {
       headers: this.authHeaders(),
@@ -884,6 +922,7 @@ export class ApiService {
       value?: string | number | boolean | null;
       fieldType?: "text" | "number" | "date" | "boolean";
       order?: number;
+      askSupervisor?: boolean;
     }
   ): Observable<{ field: any }> {
     return this.http.patch<{ field: any }>(`${this.baseUrl}/custom-fields/${id}`, patch, {

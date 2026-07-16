@@ -146,6 +146,7 @@ export const createCustomFieldSchema = z.object({
     value: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
     fieldType: customFieldTypeSchema.default("text"),
     order: z.coerce.number().int().min(0).default(0),
+    askSupervisor: z.boolean().default(false),
   }),
 });
 
@@ -154,6 +155,7 @@ export const updateCustomFieldSchema = z.object({
     label: z.string().trim().min(1).max(200).optional(),
     value: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
     order: z.coerce.number().int().min(0).optional(),
+    askSupervisor: z.boolean().optional(),
   }),
   params: idSchema,
 });
@@ -171,6 +173,7 @@ export const getCustomFieldsSchema = z.object({
       "subcontractors",
     ]),
     entityId: z.string().regex(/^[a-f0-9]{24}$/i),
+    supervisorOnly: z.enum(["true", "false"]).optional().default("false"),
   }),
 });
 

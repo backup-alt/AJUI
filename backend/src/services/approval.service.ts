@@ -57,51 +57,108 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
   };
 
   let projectId: Types.ObjectId | undefined;
+  let generatedPoNumber: string | undefined;
   switch (approval.sourceCollection) {
     case "materials":
-      await Material.updateOne({ _id: approval.sourceId }, sourceUpdate);
+    case "Material": {
+      const poNumber = await generateId("PO");
+      generatedPoNumber = poNumber;
+      await Material.updateOne({ _id: approval.sourceId }, { ...sourceUpdate, poNumber });
       const mat = await Material.findById(approval.sourceId).lean();
       projectId = mat?.projectId;
       break;
+    }
     case "labour":
+    case "Labour": {
       await Labour.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const lab = await Labour.findById(approval.sourceId).lean();
       projectId = lab?.projectId;
       break;
+    }
     case "expenses":
+    case "Expense": {
       await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const exp = await Expense.findById(approval.sourceId).lean();
       projectId = exp?.projectId;
+      if (exp?.isSiteMaterial) {
+        const materialId = await generateId("MAT");
+        await (await import("../models/Material.js")).Material.create({
+          materialId,
+          projectId: exp.projectId,
+          projectName: exp.projectName,
+          clientId: exp.clientId,
+          clientName: exp.clientName,
+          siteId: exp.siteId,
+          site: exp.site,
+          name: exp.materialName || exp.description,
+          unit: exp.materialUnit || "units",
+          requestedQuantity: exp.materialQuantity || 1,
+          approvedQuantity: exp.materialQuantity || 1,
+          purchasedQuantity: 0,
+          consumedQuantity: 0,
+          remainingStock: exp.materialQuantity || 1,
+          vendor: exp.materialVendor,
+          vendorId: exp.materialVendorId,
+          status: "Approved",
+          approvedBy: reviewer,
+          approvedAt: new Date(),
+          requestDate: exp.date,
+          createdBy: exp.submittedBy,
+          supervisorName: exp.supervisor,
+        });
+      }
       break;
+    }
     case "payments":
+    case "Payment": {
       await Payment.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const pay = await Payment.findById(approval.sourceId).lean();
       projectId = pay?.projectId;
       break;
+    }
     case "subcontractors":
+    case "Subcontractor": {
       await Subcontractor.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const sub = await Subcontractor.findById(approval.sourceId).lean();
       projectId = sub?.projectId;
       break;
+    }
     default:
-      throw new AppError(400, "Unknown source collection");
+      throw new AppError(400, `Unknown source collection: ${approval.sourceCollection}`);
   }
 
   approval.status = "Approved";
   approval.reviewedBy = reviewer;
   approval.reviewedAt = new Date();
+  if (generatedPoNumber) {
+    approval.poNumber = generatedPoNumber;
+  }
   await approval.save();
 
   if (projectId) {
     await recomputeProjectTotals(projectId);
   }
 
-  // Send push notification to project supervisors (non-blocking best-effort)
+  // Send push notification to project supervisors and owner (non-blocking best-effort)
   try {
-    const { notifyProjectSupervisors } = await import("./device-token.service.js");
+    const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
     if (projectId) {
       await notifyProjectSupervisors(
         projectId,
+        `${approval.title} - Approved`,
+        `Your ${approval.type} request has been approved`,
+        {
+          approvalId: approval.approvalId,
+          type: approval.type,
+          status: "Approved",
+          projectId: approval.projectId?.toString() || "",
+        }
+      );
+    }
+    // Notify the owner who submitted the request
+    if (approval.owner) {
+      await notifyUserOfApproval(
+        approval.owner,
         `${approval.title} - Approved`,
         `Your ${approval.type} request has been approved`,
         {
@@ -134,20 +191,30 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
 
   switch (approval.sourceCollection) {
     case "materials":
+    case "Material": {
       await Material.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
     case "labour":
+    case "Labour": {
       await Labour.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
     case "expenses":
+    case "Expense": {
       await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
     case "payments":
+    case "Payment": {
       await Payment.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
     case "subcontractors":
+    case "Subcontractor": {
       await Subcontractor.updateOne({ _id: approval.sourceId }, sourceUpdate);
       break;
+    }
   }
 
   approval.status = "Rejected";
@@ -155,9 +222,9 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
   approval.reviewedAt = new Date();
   await approval.save();
 
-  // Send push notification to project supervisors
+  // Send push notification to project supervisors and owner
   try {
-    const { notifyProjectSupervisors } = await import("./device-token.service.js");
+    const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
     await notifyProjectSupervisors(
       approval.projectId || "",
       `${approval.title} - Rejected`,
@@ -169,6 +236,20 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
         projectId: approval.projectId?.toString() || "",
       }
     );
+    // Notify the owner who submitted the request
+    if (approval.owner) {
+      await notifyUserOfApproval(
+        approval.owner,
+        `${approval.title} - Rejected`,
+        `Your ${approval.type} request has been rejected`,
+        {
+          approvalId: approval.approvalId,
+          type: approval.type,
+          status: "Rejected",
+          projectId: approval.projectId?.toString() || "",
+        }
+      );
+    }
   } catch (err) {
     console.warn("[Notification] Failed to send rejection notification:", err);
   }
@@ -208,11 +289,14 @@ export async function listApprovals(filter: {
 async function enrichApprovalWithSource(approval: Record<string, unknown>): Promise<Record<string, unknown>> {
   const sourceCollection = approval.sourceCollection as string;
   const sourceId = approval.sourceId as Types.ObjectId | undefined;
+  const owner = approval.owner as string | undefined;
 
   let sourceData: Record<string, unknown> | null = null;
+  let supervisorName: string | undefined;
+
   if (sourceId && sourceCollection) {
     try {
-      if (sourceCollection === "Material") {
+      if (sourceCollection === "Material" || sourceCollection === "materials") {
         const doc = await (await import("../models/Material.js")).Material.findById(sourceId).lean();
         if (doc) {
           const d = doc as any;
@@ -229,7 +313,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             supervisorName: d.supervisorName,
           };
         }
-      } else if (sourceCollection === "Labour") {
+      } else if (sourceCollection === "Labour" || sourceCollection === "labour") {
         const doc = await (await import("../models/Labour.js")).Labour.findById(sourceId).lean();
         if (doc) {
           sourceData = {
@@ -244,7 +328,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             submittedBy: doc.submittedBy,
           };
         }
-      } else if (sourceCollection === "Expense") {
+      } else if (sourceCollection === "Expense" || sourceCollection === "expenses") {
         const doc = await (await import("../models/Expense.js")).Expense.findById(sourceId).lean();
         if (doc) {
           sourceData = {
@@ -255,6 +339,13 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             paidBy: doc.amountPaidBy,
             reference: doc.reference,
             submittedBy: doc.submittedBy,
+            clientName: doc.clientName,
+            supervisorName: doc.supervisor,
+            isSiteMaterial: doc.isSiteMaterial,
+            siteMaterialName: doc.materialName,
+            materialUnit: doc.materialUnit,
+            materialQuantity: doc.materialQuantity,
+            materialVendor: doc.materialVendor,
           };
         }
       }
@@ -263,7 +354,17 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
     }
   }
 
-  return { ...approval, ...sourceData };
+  if (owner && !supervisorName) {
+    try {
+      const { User } = await import("../models/User.js");
+      const user = await User.findById(owner).select("name").lean();
+      supervisorName = user?.name;
+    } catch {
+      // user lookup failed, skip
+    }
+  }
+
+  return { ...approval, ...sourceData, supervisorName: supervisorName || sourceData?.["supervisorName"] };
 }
 
 export async function getApprovalById(id: string) {

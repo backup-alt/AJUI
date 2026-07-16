@@ -43,6 +43,9 @@ export async function createExpense(input: CreateExpenseInput) {
     runningBalance = await computeRunningBalance(project._id, input.site, input.amount, input.date);
   }
 
+  const isCashAdded = input.transactionType === "Cash Added";
+  const status = isCashAdded ? "Approved" : "Pending";
+
   const expense = await Expense.create({
     expenseId,
     type: input.type,
@@ -64,19 +67,23 @@ export async function createExpense(input: CreateExpenseInput) {
     date: input.date,
     description: input.description,
     submittedBy: input.submittedBy,
+    customFields: input.customFields,
+    status,
   });
 
-  await createApproval({
-    type: "expense",
-    title: `${input.type === "site" ? "Site" : "General"}: ${input.description.slice(0, 50)}`,
-    sourceCollection: "expenses",
-    sourceId: expense._id,
-    projectId: project?._id,
-    projectName: project?.name,
-    site: input.site,
-    amount: input.amount,
-    detail: input.description,
-  });
+  if (!isCashAdded) {
+    await createApproval({
+      type: "expense",
+      title: `${input.type === "site" ? "Site" : "General"}: ${input.description.slice(0, 50)}`,
+      sourceCollection: "expenses",
+      sourceId: expense._id,
+      projectId: project?._id,
+      projectName: project?.name,
+      site: input.site,
+      amount: input.amount,
+      detail: input.description,
+    });
+  }
 
   return expense.toObject();
 }

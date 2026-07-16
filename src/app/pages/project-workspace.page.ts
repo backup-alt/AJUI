@@ -6,6 +6,7 @@ import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import type { Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
+import { ApiService } from "../core/api.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
@@ -949,6 +950,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 })
 export class ProjectWorkspacePage {
   readonly data = inject(ErpDataService);
+  readonly api = inject(ApiService);
   readonly materialsService = inject(MaterialsService);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
@@ -1602,9 +1604,15 @@ export class ProjectWorkspacePage {
 
   recordFormColumns(): FieldSchema[] {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
+    const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor", "reference"]);
     return this.columnsFor(this.activeSection()).filter((column) => {
       if (this.activeSection() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
-      if (this.activeSection() === "expenses" && column.key === "siteMaterial" && this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Purchase")) !== "Purchase") {
+      const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
+      if (this.activeSection() === "expenses" && isCashAdded && !cashAddedFields.has(column.key)) return false;
+      if (this.activeSection() === "expenses" && column.key === "siteMaterial" && this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) !== "Purchase") {
+        return false;
+      }
+      if (this.activeSection() === "expenses" && (column.key === "materialName" || column.key === "unit" || column.key === "requestedQuantity" || column.key === "approvedQuantity" || column.key === "vendor")) {
         return false;
       }
       return !this.isReadonlyColumn(column.key);
@@ -1643,13 +1651,67 @@ export class ProjectWorkspacePage {
     return this.activeSection() === "expenses" && column.key === "amount" ? "Total Amount" : column.label;
   }
 
-  saveRecord(event: Event) {
+  async saveRecord(event: Event) {
     event.preventDefault();
     const section = this.activeSection();
     const currentProject = this.project();
     const selectedSite = this.activeSiteFilter();
     const draft = section === "expenses" ? this.normalizedExpenseInputRow(this.draftRow()) : this.draftRow();
     if (section === "expenses") this.ensureExpenseOpeningForInput(draft);
+
+    const isCashAdded = section === "expenses" && draft["transactionType"] === "Cash Added";
+
+    if (isCashAdded) {
+      const siteId = this.resolveEntityIdForSection(section);
+      const site = String(draft["site"] || selectedSite || "");
+      const date = String(draft["expenseDate"] || new Date().toISOString().slice(0, 10));
+      const description = String(draft["description"] || "Cash Added");
+      const amount = Math.abs(Number(draft["amount"]) || 0);
+      const reference = String(draft["reference"] || "");
+
+      if (!this.projectId()) {
+        console.warn("[ProjectWorkspace] Cannot save Cash Added: no project selected");
+        return;
+      }
+
+      try {
+        const result = await new Promise<{ expense: any }>((resolve, reject) => {
+          this.api.createExpense({
+            type: "site",
+            projectId: this.projectId(),
+            siteId: siteId || undefined,
+            site: site || undefined,
+            transactionType: "Cash Added",
+            amount,
+            date,
+            description,
+            reference: reference || undefined,
+            submittedBy: "admin",
+          }).subscribe({ next: resolve, error: reject });
+        });
+
+        const apiExpense = result.expense;
+        const savedRow = this.data.addCustomRow(section, {
+          ...draft,
+          __rowId: `expense:${apiExpense._id}`,
+          __projectId: this.projectId(),
+          projectId: this.projectId(),
+          clientId: this.clientId(),
+          client: currentProject?.client ?? "",
+          project: currentProject?.name ?? "",
+          expenseScope: "Site",
+          runningBalance: apiExpense.runningBalance,
+          id: apiExpense.expenseId,
+          status: "Approved",
+        });
+        this.recordDialogOpen.set(false);
+        return;
+      } catch (err) {
+        console.error("[ProjectWorkspace] Failed to create Cash Added expense", err);
+        return;
+      }
+    }
+
     const savedRow = this.data.addCustomRow(section, {
       ...draft,
       ...(this.isSiteAware(section) && selectedSite !== "All" ? { site: this.draftRow()["site"] || selectedSite } : {}),
@@ -1751,7 +1813,7 @@ export class ProjectWorkspacePage {
       const siteId = this.resolveEntityIdForSection(section);
       if (siteId) {
         try {
-          await this.data.persistCustomField(section, label, siteId, fieldType);
+          await this.data.persistCustomField(section, label, siteId, fieldType, askSupervisor);
         } catch (err) {
           console.warn("[ProjectWorkspace] failed to persist custom field", err);
         }
@@ -2123,7 +2185,7 @@ export class ProjectWorkspacePage {
   private buildInitialRows(projectId: string): Record<ModuleKey, TableRow[]> {
     const currentProject = this.data.projectById(projectId);
     const currentClient = this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === currentProject?.client);
-    const materials = this.materialsService.materials().filter((row) => row.projectId === projectId).map((row) => ({
+    const materials = this.data.materials().filter((row) => row.projectId === projectId).map((row) => ({
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
       projectId: row.projectId,
@@ -2132,7 +2194,7 @@ export class ProjectWorkspacePage {
       unit: row.unit,
       requestedQuantity: formatNumber(row.requested),
       approvedQuantity: formatNumber(row.approved),
-      requestDate: "2026-06-05",
+      requestDate: row.requestDate || "2026-06-05",
       vendor: row.vendor,
       poNumber: row.poNumber,
       remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
@@ -2321,7 +2383,7 @@ export class ProjectWorkspacePage {
       },
       expenses: {
         expenseDate: today,
-        transactionType: "Purchase",
+        transactionType: "Cash Added",
         description: "",
         amount: "0",
         siteMaterial: "No",
@@ -2460,7 +2522,7 @@ export class ProjectWorkspacePage {
     const rows = this.materialsService
       .materials()
       .filter((row) => row.projectId === projectId)
-      .filter((row) => row.vendor.toLowerCase() === vendorName.toLowerCase());
+      .filter((row) => (row.vendor || "").toLowerCase() === vendorName.toLowerCase());
     const purchased = rows.reduce((sum, row) => sum + row.purchased, 0);
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
   }
@@ -2485,7 +2547,7 @@ export class ProjectWorkspacePage {
   }
 
   private labourTypesFromRow(row: { category: string; notes: string; presentCount: number; dailyWage?: number }): string {
-    const notes = row.notes.trim();
+    const notes = (row.notes || '').trim();
     if (this.staffCountFromLabourTypes(notes)) return notes;
     return `${row.category}: ${row.presentCount}`;
   }

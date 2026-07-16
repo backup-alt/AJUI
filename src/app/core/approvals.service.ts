@@ -55,6 +55,11 @@ export interface ExpenseApprovalRow {
   reference: string;
   status: string;
   sourceId: string;
+  isSiteMaterial?: boolean;
+  materialName?: string;
+  materialUnit?: string;
+  materialQuantity?: number;
+  materialVendor?: string;
 }
 
 export interface GeneralExpenseApprovalRow {
@@ -155,6 +160,11 @@ interface RawApprovalItem {
   description?: string;
   paidBy?: string;
   reference?: string;
+  isSiteMaterial?: boolean;
+  siteMaterialName?: string;
+  materialUnit?: string;
+  materialQuantity?: number;
+  materialVendor?: string;
 }
 
 @Injectable({ providedIn: "root" })
@@ -185,7 +195,7 @@ export class ApprovalsService {
 
   private mapToRow(a: RawApprovalItem): AnyApprovalRow {
     const base = {
-      rowId: a._id,
+      rowId: a.approvalId,
       client: "",
       project: a.projectName || "",
       site: a.site || "",
@@ -224,17 +234,23 @@ export class ApprovalsService {
         } as LabourApprovalRow;
 
       case "expense": {
-        const isSiteExpense = a.sourceCollection === "Expense";
+        const isSiteExpense = a.sourceCollection === "expenses" || a.sourceCollection === "Expense";
         if (isSiteExpense) {
           return {
             ...base,
+            client: a.clientName || "",
             module: "expenses" as const,
             expenseDate: a.expenseDate || "",
             transactionType: a.transactionType || "",
             description: a.description || "",
             amount: a.amount || 0,
-            supervisor: "",
+            supervisor: a.supervisorName || "",
             reference: a.reference || "",
+            isSiteMaterial: a.isSiteMaterial,
+            materialName: a.siteMaterialName,
+            materialUnit: a.materialUnit,
+            materialQuantity: a.materialQuantity,
+            materialVendor: a.materialVendor,
           } as ExpenseApprovalRow;
         }
         return {

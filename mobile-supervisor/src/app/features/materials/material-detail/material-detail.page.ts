@@ -69,6 +69,12 @@ import { StatusPillComponent } from '../../../shared/components';
                   <span class="kv-value">{{ material()!.vendor }}</span>
                 </div>
               }
+              @if (material()!.poNumber) {
+                <div class="kv">
+                  <span class="kv-label">PO Number</span>
+                  <span class="kv-value po-value">{{ material()!.poNumber }}</span>
+                </div>
+              }
               <div class="kv">
                 <span class="kv-label">Request date</span>
                 <span class="kv-value">{{ material()!.requestDate | date:'MMM d, yyyy' }}</span>
@@ -188,6 +194,13 @@ import { StatusPillComponent } from '../../../shared/components';
     }
     .kv-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; }
     .kv-value { font-size: 14px; font-weight: 600; color: #0f172a; text-align: right; }
+    .kv-value.po-value {
+      color: #15803d;
+      background: rgba(22, 163, 74, 0.10);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
 
     .stock-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
     .stock-stat {

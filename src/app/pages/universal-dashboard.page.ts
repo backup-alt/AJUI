@@ -2010,12 +2010,21 @@ export class UniversalDashboardPage {
 
   recordFormColumns(): FieldSchema[] {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
+    const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor", "reference"]);
     return this.columnsForActive().filter((column) => {
       if (this.activeModule() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
+      const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
+      if (this.activeModule() === "expenses" && isCashAdded && !cashAddedFields.has(column.key)) return false;
       if (
         this.activeModule() === "expenses" &&
         column.key === "siteMaterial" &&
-        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Purchase")) !== "Purchase"
+        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) !== "Purchase"
+      ) {
+        return false;
+      }
+      if (
+        this.activeModule() === "expenses" &&
+        (column.key === "materialName" || column.key === "unit" || column.key === "requestedQuantity" || column.key === "approvedQuantity" || column.key === "vendor")
       ) {
         return false;
       }
@@ -2080,7 +2089,7 @@ export class UniversalDashboardPage {
     return this.activeModule() === "expenses" && column.key === "amount" ? "Total Amount" : column.label;
   }
 
-  saveRecord(event: Event) {
+  async saveRecord(event: Event) {
     event.preventDefault();
     const module = this.activeModule();
     const row = { ...this.draftRow() };
@@ -2096,6 +2105,57 @@ export class UniversalDashboardPage {
     } else {
       const preparedRow = this.withGeneratedReferences(module === "expenses" ? this.normalizedExpenseInputRow(row) : row);
       if (module === "expenses") this.ensureExpenseOpeningForInput(preparedRow);
+
+      const isCashAdded = module === "expenses" && preparedRow["transactionType"] === "Cash Added";
+
+      if (isCashAdded) {
+        const projectId = String(preparedRow["projectId"] || preparedRow["__projectId"] || "");
+        const site = String(preparedRow["site"] || "");
+        const date = String(preparedRow["expenseDate"] || new Date().toISOString().slice(0, 10));
+        const description = String(preparedRow["description"] || "Cash Added");
+        const amount = Math.abs(Number(preparedRow["amount"]) || 0);
+        const reference = String(preparedRow["reference"] || "");
+
+        if (!projectId) {
+          console.warn("[UniversalDashboard] Cannot save Cash Added: no project selected");
+          return;
+        }
+
+        try {
+          const result = await new Promise<{ expense: any }>((resolve, reject) => {
+            this.api.createExpense({
+              type: "site",
+              projectId,
+              siteId: undefined,
+              site: site || undefined,
+              transactionType: "Cash Added",
+              amount,
+              date,
+              description,
+              reference: reference || undefined,
+              submittedBy: "admin",
+            }).subscribe({ next: resolve, error: reject });
+          });
+
+          const apiExpense = result.expense;
+          const savedRow = this.data.addCustomRow(module, {
+            ...preparedRow,
+            __rowId: `expense:${apiExpense._id}`,
+            __projectId: projectId,
+            projectId,
+            expenseScope: "Site",
+            runningBalance: apiExpense.runningBalance,
+            id: apiExpense.expenseId,
+            status: "Approved",
+          });
+          this.recordDialogOpen.set(false);
+          return;
+        } catch (err) {
+          console.error("[UniversalDashboard] Failed to create Cash Added expense", err);
+          return;
+        }
+      }
+
       const savedRow = this.data.addCustomRow(module, preparedRow);
       if (module === "expenses") this.createMaterialFromSiteExpense(savedRow);
     }
@@ -2174,7 +2234,7 @@ export class UniversalDashboardPage {
       const siteId = this.resolveEntityIdForModule(module);
       if (siteId) {
         try {
-          await this.data.persistCustomField(module, label, siteId, fieldType);
+          await this.data.persistCustomField(module, label, siteId, fieldType, askSupervisor);
         } catch (err) {
           console.warn("[UniversalDashboard] failed to persist custom field", err);
         }
@@ -2509,7 +2569,7 @@ export class UniversalDashboardPage {
     const clientName = (projectId: string) => projectById(projectId)?.client ?? "";
     const clientId = (projectId: string) => this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
 
-    const materials = this.materialsService.materials().map((row) => ({
+    const materials = this.data.materials().map((row) => ({
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
       client: clientName(row.projectId),
@@ -2760,7 +2820,7 @@ export class UniversalDashboardPage {
         project: "",
         site: "",
         expenseDate: today,
-        transactionType: "Purchase",
+        transactionType: "Cash Added",
         description: "",
         amount: "0",
         siteMaterial: "No",
@@ -2958,7 +3018,7 @@ export class UniversalDashboardPage {
   }
 
   private materialPurchaseSummaryForVendor(vendorName: string): string {
-    const rows = this.materialsService.materials().filter((row) => row.vendor.toLowerCase() === vendorName.toLowerCase());
+    const rows = this.materialsService.materials().filter((row) => (row.vendor || "").toLowerCase() === vendorName.toLowerCase());
     const purchased = rows.reduce((sum, row) => sum + row.purchased, 0);
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
   }
@@ -2979,7 +3039,7 @@ export class UniversalDashboardPage {
   }
 
   private labourTypesFromRow(row: { category: string; notes: string; presentCount: number; dailyWage?: number }): string {
-    const notes = row.notes.trim();
+    const notes = (row.notes || '').trim();
     if (this.staffCountFromLabourTypes(notes)) return notes;
     return `${row.category}: ${row.presentCount}`;
   }

@@ -63,7 +63,7 @@ export async function recomputeProjectTotals(projectObjectId: Types.ObjectId): P
       },
     ]),
     Expense.aggregate([
-      { $match: { projectId: projectObjectId, type: "site", status: "Approved" } },
+      { $match: { projectId: projectObjectId, type: "site", status: "Approved", transactionType: { $ne: "Cash Added" } } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
   ]);

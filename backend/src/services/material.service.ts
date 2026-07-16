@@ -102,6 +102,19 @@ export async function listMaterials(filter: {
     Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
     Material.countDocuments(query),
   ]);
+
+  // Resolve site names for items that have siteId but site field is ObjectId or missing
+  const siteIds = [...new Set(items.map(m => m.siteId?.toString()).filter(Boolean))];
+  if (siteIds.length > 0) {
+    const sites = await Site.find({ _id: { $in: siteIds.map(id => new Types.ObjectId(id)) } }).lean();
+    const siteNameMap = new Map(sites.map(s => [s._id.toString(), s.name]));
+    items.forEach(item => {
+      if (item.siteId && (!item.site || typeof item.site === "object")) {
+        item.site = siteNameMap.get(item.siteId.toString()) || item.site;
+      }
+    });
+  }
+
   return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }
 

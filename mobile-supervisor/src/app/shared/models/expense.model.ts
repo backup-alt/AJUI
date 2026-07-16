@@ -42,6 +42,13 @@ export interface CreateExpenseRequest {
   description: string;
   amountPaidBy?: string;
   site?: string;
+  isSiteMaterial?: boolean;
+  materialName?: string;
+  materialUnit?: string;
+  materialQuantity?: number;
+  materialVendor?: string;
+  materialVendorId?: string;
+  customFields?: Record<string, unknown>;
 }
 
 export interface ExpenseListResponse {
