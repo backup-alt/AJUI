@@ -68,7 +68,7 @@ const sectionConfigs: SectionConfig[] = [
     key: "expenses",
     label: "Expenses",
     title: "Site Expense Ledger",
-    description: "Supervisor cash ledger and site expense fields with bill reference and approval status.",
+    description: "Supervisor cash ledger and site expense fields with PO number, receipt, and approval status.",
     columns: [
       { key: "expenseDate", label: "Expense Date", type: "date" },
       { key: "transactionType", label: "Transaction Type" },
@@ -78,7 +78,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "runningBalance", label: "Balance" },
       { key: "site", label: "Site" },
       { key: "supervisor", label: "Supervisor" },
-      { key: "reference", label: "Bill / Reference" },
+      { key: "poNumber", label: "PO Number" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
   },
@@ -319,7 +319,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded()"
+                    *ngIf="!tableViewExpanded() && (selectedRowCount() > 0 || !isNoCreateSection())"
                     [title]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
                     [attr.aria-label]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
@@ -2789,6 +2789,11 @@ export class ProjectWorkspacePage {
 
   private normalizeYesNo(value: unknown): string {
     return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
+  }
+
+  private isNoCreateSection(): boolean {
+    const s = this.activeSection();
+    return s === "expenses" || s === "materials";
   }
 
   private ensureExpenseOpeningForInput(row: TableRow) {

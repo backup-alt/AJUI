@@ -129,7 +129,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "siteMaterial", label: "Site Material" },
       { key: "runningBalance", label: "Balance" },
       { key: "supervisor", label: "Supervisor" },
-      { key: "reference", label: "Bill / Reference" },
+      { key: "poNumber", label: "PO Number" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
     filters: [
@@ -146,18 +146,11 @@ const dashboardModules: ModuleConfig[] = [
     description: "Office expenses not tied to a site, such as admin purchases, courier, printing, and overhead payments.",
     columns: [
       { key: "expenseDate", label: "Expense Date" },
-      { key: "department", label: "Department / Office" },
       { key: "description", label: "Description" },
-      { key: "category", label: "Category" },
       { key: "amount", label: "Amount" },
-      { key: "paidBy", label: "Paid By" },
-      { key: "reference", label: "Bill / Reference" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
     filters: [
-      { key: "department", label: "Department" },
-      { key: "category", label: "Category" },
-      { key: "paidBy", label: "Paid By" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
   },
@@ -368,7 +361,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded()"
+                    *ngIf="!tableViewExpanded() && (selectedRowCount() > 0 || !isNoCreateModule())"
                     [title]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
                     [attr.aria-label]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
@@ -2010,7 +2003,7 @@ export class UniversalDashboardPage {
 
   recordFormColumns(): FieldSchema[] {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
-    const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor", "reference"]);
+    const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor"]);
     return this.columnsForActive().filter((column) => {
       if (this.activeModule() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
       const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
@@ -2114,7 +2107,6 @@ export class UniversalDashboardPage {
         const date = String(preparedRow["expenseDate"] || new Date().toISOString().slice(0, 10));
         const description = String(preparedRow["description"] || "Cash Added");
         const amount = Math.abs(Number(preparedRow["amount"]) || 0);
-        const reference = String(preparedRow["reference"] || "");
 
         if (!projectId) {
           console.warn("[UniversalDashboard] Cannot save Cash Added: no project selected");
@@ -2132,7 +2124,6 @@ export class UniversalDashboardPage {
               amount,
               date,
               description,
-              reference: reference || undefined,
               submittedBy: "admin",
             }).subscribe({ next: resolve, error: reject });
           });
@@ -3200,6 +3191,11 @@ export class UniversalDashboardPage {
     return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
   }
 
+  private isNoCreateModule(): boolean {
+    const m = this.activeModule();
+    return m === "expenses" || m === "materials" || m === "generalExpenses";
+  }
+
   private ensureExpenseOpeningForInput(row: TableRow) {
     const project =
       this.data.projectById(String(row["projectId"] || row["__projectId"] || "")) ??
@@ -3213,14 +3209,19 @@ export class UniversalDashboardPage {
     const normalizedSite = site.trim().toLowerCase();
     if (!normalizedSite) return 0;
     const rows = this.rowsFor("expenses");
-    const match = rows.find((row) => {
+    const cashAddedRows = rows.filter((row) => {
       const rowProjectId = String(row["projectId"] || row["__projectId"] || "");
       const rowProjectName = String(row["project"] || "");
       const rowSite = String(row["site"] || "").trim().toLowerCase();
       const sameProject = projectId ? rowProjectId === projectId : rowProjectName === projectName;
-      return sameProject && rowSite === normalizedSite && this.moneyNumber(row["openingBalance"]);
+      return sameProject && rowSite === normalizedSite &&
+        this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Cash Added";
     });
-    return match ? this.moneyNumber(match["openingBalance"]) : 0;
+    if (cashAddedRows.length === 0) return 0;
+    const earliest = cashAddedRows.reduce((prev, curr) =>
+      this.expenseRowSortValue(prev) < this.expenseRowSortValue(curr) ? prev : curr
+    );
+    return Math.abs(this.moneyNumber(earliest["amount"]));
   }
 
   private expenseCashIssuedOpeningForGroup(projectId: string, projectName: string, site: string): number {
@@ -3233,10 +3234,11 @@ export class UniversalDashboardPage {
         const rowSite = String(row["site"] || "").trim().toLowerCase();
         const sameProject = projectId ? rowProjectId === projectId : rowProjectName === projectName;
         return sameProject && rowSite === normalizedSite;
-      })
-      .sort((first, second) => this.expenseRowSortValue(first).localeCompare(this.expenseRowSortValue(second)));
-    const openingRow = rows.find((row) => this.moneyNumber(row["cashIssued"]) || this.moneyNumber(row["received"]));
-    return openingRow ? this.moneyNumber(openingRow["cashIssued"]) || this.moneyNumber(openingRow["received"]) : 0;
+      });
+    const cashAddedRows = rows.filter((row) =>
+      this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Cash Added"
+    );
+    return cashAddedRows.reduce((sum, row) => sum + Math.abs(this.moneyNumber(row["amount"])), 0);
   }
 
   private isPrimaryExpenseSite(project: { sites: string[] } | undefined, site: string): boolean {

@@ -92,18 +92,6 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'approvals',
-        loadComponent: () =>
-          import('./features/approvals/approvals.page').then((m) => m.ApprovalsPage),
-      },
-      {
-        path: 'approvals/:id',
-        loadComponent: () =>
-          import('./features/approvals/approval-detail/approval-detail.page').then(
-            (m) => m.ApprovalDetailPage
-          ),
-      },
-      {
         path: 'profile',
         loadComponent: () =>
           import('./features/profile/profile.page').then((m) => m.ProfilePage),

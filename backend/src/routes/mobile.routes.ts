@@ -9,6 +9,7 @@ import {
   createMaterialMobileSchema,
   createLabourMobileSchema,
   createExpenseMobileSchema,
+  uploadExpenseReceiptMobileSchema,
   approvalActionSchema,
   updateMaterialStockSchema,
 } from "../schemas/mobile.schema.js";
@@ -52,6 +53,7 @@ router.post("/supervisor/labour", validate(createLabourMobileSchema), ctrl.creat
 router.get("/supervisor/expenses", ctrl.listExpenses);
 router.get("/supervisor/expenses/:id", ctrl.getExpense);
 router.post("/supervisor/expenses", validate(createExpenseMobileSchema), ctrl.createExpense);
+router.post("/supervisor/expenses/:id/receipt", validate(uploadExpenseReceiptMobileSchema), ctrl.uploadExpenseReceipt);
 
 // Devices (push notifications)
 router.post("/supervisor/device/register", validate(registerDeviceSchema), ctrl.registerDevice);

@@ -9,6 +9,8 @@ import { generateId } from "./id-generator.service.js";
 import { recomputeProjectTotals } from "./financial.service.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { generatePoNumberForSite } from "./po-number.service.js";
+import { recomputeSiteLedger } from "./expense.service.js";
 
 export interface CreateApprovalParams {
   type: ApprovalType;
@@ -61,10 +63,14 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
   switch (approval.sourceCollection) {
     case "materials":
     case "Material": {
-      const poNumber = await generateId("PO");
+      const mat = await Material.findById(approval.sourceId).lean();
+      const poNumber = await generatePoNumberForSite(
+        mat?.siteId ? String(mat.siteId) : undefined,
+        mat?.site,
+        mat?.projectId ? String(mat.projectId) : undefined
+      );
       generatedPoNumber = poNumber;
       await Material.updateOne({ _id: approval.sourceId }, { ...sourceUpdate, poNumber });
-      const mat = await Material.findById(approval.sourceId).lean();
       projectId = mat?.projectId;
       break;
     }
@@ -77,8 +83,31 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
     }
     case "expenses":
     case "Expense": {
-      await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const exp = await Expense.findById(approval.sourceId).lean();
+      // For Purchase expenses the workflow is: admin approval generates a PO
+      // number but the expense itself stays "Pending" until the supervisor
+      // uploads a receipt. Cash Added is auto-approved on creation, so
+      // nothing more is needed here.
+      if (exp?.transactionType === "Purchase") {
+        const poNumber = await generatePoNumberForSite(
+          exp.siteId ? String(exp.siteId) : undefined,
+          exp.site,
+          exp.projectId ? String(exp.projectId) : undefined
+        );
+        generatedPoNumber = poNumber;
+        // Keep status Pending so the supervisor still has to upload a
+        // receipt. The approval record itself becomes "Approved" below.
+        await Expense.updateOne(
+          { _id: approval.sourceId },
+          {
+            approvedBy: reviewer,
+            approvedAt: new Date(),
+            poNumber,
+          }
+        );
+      } else {
+        await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
+      }
       projectId = exp?.projectId;
       if (exp?.isSiteMaterial) {
         const materialId = await generateId("MAT");

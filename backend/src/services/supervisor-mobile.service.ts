@@ -452,15 +452,16 @@ export async function getSupervisorDashboard(userId: string) {
     Material.countDocuments({ ...entityScope, status: "Pending" }),
     Labour.countDocuments({ ...entityScope, status: "Pending" }),
     Expense.countDocuments({ ...siteExpenseScope, status: "Pending" }),
-    Expense.aggregate([
-      {
-        $match: {
-          ...siteExpenseScope,
-          date: today,
+Expense.aggregate([
+        {
+          $match: {
+            ...siteExpenseScope,
+            date: today,
+            transactionType: { $ne: "Cash Added" },
+          },
         },
-      },
-      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
-    ]),
+        { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
+      ]),
   ]);
 
   return {

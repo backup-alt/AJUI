@@ -15,6 +15,7 @@ import {
   IonSelectOption,
   IonIcon,
   IonSpinner,
+  IonToggle,
   ToastController,
 } from '@ionic/angular/standalone';
 import { CurrencyPipe } from '@angular/common';
@@ -53,6 +54,7 @@ import { Vendor } from '../../../shared/models';
     IonSelectOption,
     IonIcon,
     IonSpinner,
+    IonToggle,
     FormsModule,
     CurrencyPipe,
   ],
@@ -99,10 +101,19 @@ import { Vendor } from '../../../shared/models';
                 <span>Record a purchase expense (goes through approval, checks balance)</span>
               </div>
             </div>
-            <ion-button expand="block" [disabled]="!expenseType()" (click)="goToStep2()">
-              Continue
-            </ion-button>
+            <div class="type-card" [class.selected]="expenseType() === 'Cash Added'" (click)="selectType('Cash Added')">
+              <div class="type-icon type-icon-green">
+                <ion-icon name="cash-outline"></ion-icon>
+              </div>
+              <div class="type-info">
+                <strong>Cash Added</strong>
+                <span>Add cash to project site (auto-approved immediately)</span>
+              </div>
+            </div>
           </div>
+          <ion-button expand="block" [disabled]="!expenseType()" (click)="goToStep2()">
+            Continue
+          </ion-button>
         }
 
         @if (step() === 2) {
@@ -122,7 +133,19 @@ import { Vendor } from '../../../shared/models';
           }
 
           <ion-list lines="none" class="form-list">
-            @if (expenseType() === 'Site Material') {
+            @if (expenseType() === 'Purchase') {
+              <ion-item class="form-item">
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-label">Site Material?</div>
+                    <div class="toggle-sub">Is this a site material purchase?</div>
+                  </div>
+                  <ion-toggle [(ngModel)]="isSiteMaterial" (ionChange)="onSiteMaterialToggle()"></ion-toggle>
+                </div>
+              </ion-item>
+            }
+
+            @if (expenseType() === 'Purchase' && isSiteMaterial) {
               <ion-item class="form-item">
                 <ion-label position="stacked">Material Name *</ion-label>
                 <ion-input
@@ -171,67 +194,63 @@ import { Vendor } from '../../../shared/models';
                   }
                 </ion-select>
               </ion-item>
-            }
 
-            <ion-item class="form-item">
-              <ion-label position="stacked">Description *</ion-label>
-              <ion-input
-                placeholder="e.g., Sand delivery"
-                [(ngModel)]="expense.description"
-                [clearInput]="true"
-              ></ion-input>
-            </ion-item>
-
-            <ion-item class="form-item">
-              <ion-label position="stacked">Amount (INR) *</ion-label>
-              <ion-input
-                type="number"
-                placeholder="0"
-                [(ngModel)]="expense.amount"
-                (ionInput)="onAmountChange()"
-                [clearInput]="true"
-              ></ion-input>
-            </ion-item>
-
-            @if (expenseType() === 'Purchase') {
-              <ion-item class="form-item">
-                <ion-label position="stacked">Transaction Type *</ion-label>
-                <ion-select
-                  placeholder="Select Type"
-                  [(ngModel)]="expense.transactionType"
-                  interface="popover"
-                >
-                  <ion-select-option value="Material">Material</ion-select-option>
-                  <ion-select-option value="Labour">Labour</ion-select-option>
-                  <ion-select-option value="Transport">Transport</ion-select-option>
-                  <ion-select-option value="Equipment">Equipment</ion-select-option>
-                  <ion-select-option value="Food">Food & Refreshments</ion-select-option>
-                  <ion-select-option value="Fuel">Fuel</ion-select-option>
-                  <ion-select-option value="Other">Other</ion-select-option>
-                </ion-select>
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Remaining Stock</ion-label>
+                <ion-input
+                  type="number"
+                  placeholder="0"
+                  [(ngModel)]="expense.remainingStock"
+                  [clearInput]="true"
+                ></ion-input>
               </ion-item>
             }
 
-            <ion-item class="form-item">
-              <ion-label position="stacked">Reference / Bill No.</ion-label>
-              <ion-input
-                placeholder="Optional"
-                [(ngModel)]="expense.reference"
-                [clearInput]="true"
-              ></ion-input>
-            </ion-item>
+            @if (expenseType() === 'Purchase' && !isSiteMaterial) {
+              <ion-item class="form-item">
+                <ion-label position="stacked">Description *</ion-label>
+                <ion-input
+                  placeholder="e.g., Sand delivery"
+                  [(ngModel)]="expense.description"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
 
-            <ion-item class="form-item form-item-last">
-              <ion-label position="stacked">Amount Paid By</ion-label>
-              <ion-input
-                placeholder="e.g., Cash, Bank, Personal"
-                [(ngModel)]="expense.amountPaidBy"
-                [clearInput]="true"
-              ></ion-input>
-            </ion-item>
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Amount (INR) *</ion-label>
+                <ion-input
+                  type="number"
+                  placeholder="0"
+                  [(ngModel)]="expense.amount"
+                  (ionInput)="onAmountChange()"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+            }
+
+            @if (expenseType() === 'Cash Added') {
+              <ion-item class="form-item">
+                <ion-label position="stacked">Description *</ion-label>
+                <ion-input
+                  placeholder="e.g., Cash deposit by supervisor"
+                  [(ngModel)]="expense.description"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Amount (INR) *</ion-label>
+                <ion-input
+                  type="number"
+                  placeholder="0"
+                  [(ngModel)]="expense.amount"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+            }
           </ion-list>
 
-          @if (expenseType() === 'Purchase' && expense.amount && expense.amount > currentBalance()!) {
+          @if (expenseType() === 'Purchase' && !isSiteMaterial && expense.amount && expense.amount > currentBalance()!) {
             <div class="block-notice">
               <ion-icon name="alert-circle-outline"></ion-icon>
               Cannot submit - amount exceeds available balance
@@ -241,7 +260,7 @@ import { Vendor } from '../../../shared/models';
           <div class="form-actions">
             <ion-button
               expand="block"
-              [disabled]="!isValid() || isSubmitting() || (expenseType() === 'Purchase' && expense.amount! > currentBalance()!)"
+              [disabled]="!isValid() || isSubmitting() || (expenseType() === 'Purchase' && !isSiteMaterial && expense.amount! > currentBalance()!)"
               (click)="submit()"
             >
               @if (isSubmitting()) {
@@ -290,6 +309,10 @@ import { Vendor } from '../../../shared/models';
     .form-list { background: transparent; padding: 0; }
     .form-item { --background: #ffffff; --border-radius: 0 !important; --inner-border-radius: 0 !important; --padding-start: 14px; --padding-end: 14px; --min-height: 64px; border: 1px solid #e5e7eb; border-bottom: none; margin-bottom: 0; }
     .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 0; }
+    .toggle-info { display: flex; flex-direction: column; gap: 2px; }
+    .toggle-label { font-size: 14px; font-weight: 600; color: #111827; }
+    .toggle-sub { font-size: 12px; color: #6b7280; }
     .form-actions { padding: 20px 0; }
   `],
 })
@@ -301,19 +324,17 @@ export class ExpenseCreatePage implements OnInit {
   expense = {
     description: '',
     amount: null as number | null,
-    transactionType: '',
-    reference: '',
-    amountPaidBy: '',
-    notes: '',
     materialName: '',
     materialUnit: '',
     materialQuantity: null as number | null,
     materialVendorId: '',
     materialVendor: '',
+    remainingStock: null as number | null,
   };
 
+  isSiteMaterial = false;
   step = signal(1);
-  expenseType = signal<'Purchase' | 'Site Material' | ''>('');
+  expenseType = signal<'Purchase' | 'Cash Added' | ''>('');
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
@@ -339,25 +360,17 @@ export class ExpenseCreatePage implements OnInit {
     await this.loadVendors();
   }
 
-  selectType(type: 'Purchase' | 'Site Material') {
+  selectType(type: 'Purchase' | 'Cash Added') {
     this.expenseType.set(type);
   }
 
   getTitle(): string {
     if (this.step() === 1) return 'Log Expense';
-    switch (this.expenseType()) {
-      case 'Site Material': return 'Site Material';
-      case 'Site Material': return 'Site Material';
-      default: return 'Purchase Expense';
-    }
+    return this.expenseType() === 'Cash Added' ? 'Cash Added' : 'Purchase Expense';
   }
 
   getSubmitLabel(): string {
-    switch (this.expenseType()) {
-      case 'Site Material': return 'Submit Site Material';
-      case 'Site Material': return 'Submit Site Material';
-      default: return 'Submit Purchase';
-    }
+    return this.expenseType() === 'Cash Added' ? 'Add Cash' : 'Submit Purchase';
   }
 
   async loadVendors() {
@@ -400,11 +413,22 @@ export class ExpenseCreatePage implements OnInit {
   }
 
   onAmountChange() {
-    // Trigger reactivity
+  }
+
+  onSiteMaterialToggle() {
+    if (!this.isSiteMaterial) {
+      this.expense.description = '';
+      this.expense.materialName = '';
+      this.expense.materialUnit = '';
+      this.expense.materialQuantity = null;
+      this.expense.materialVendorId = '';
+      this.expense.materialVendor = '';
+      this.expense.remainingStock = null;
+    }
   }
 
   isValid(): boolean {
-    if (this.expenseType() === 'Site Material') {
+    if (this.expenseType() === 'Purchase' && this.isSiteMaterial) {
       return !!(
         this.expense.materialName &&
         this.expense.materialUnit &&
@@ -413,10 +437,13 @@ export class ExpenseCreatePage implements OnInit {
         this.expense.amount
       );
     }
-    if (this.expenseType() === 'Purchase') {
-      return !!(this.expense.description && this.expense.amount && this.expense.transactionType);
+    if (this.expenseType() === 'Purchase' && !this.isSiteMaterial) {
+      return !!(this.expense.description && this.expense.amount);
     }
-    return !!(this.expense.description && this.expense.amount);
+    if (this.expenseType() === 'Cash Added') {
+      return !!(this.expense.description && this.expense.amount);
+    }
+    return false;
   }
 
   async submit(): Promise<void> {
@@ -448,8 +475,7 @@ export class ExpenseCreatePage implements OnInit {
       return;
     }
 
-    // Hard block: Purchase exceeding balance
-    if (this.expenseType() === 'Purchase' && this.expense.amount! > this.currentBalance()!) {
+    if (this.expenseType() === 'Purchase' && !this.isSiteMaterial && this.expense.amount! > this.currentBalance()!) {
       const toast = await this.toastCtrl.create({
         message: 'Cannot submit - amount exceeds available balance',
         duration: 3000,
@@ -462,34 +488,38 @@ export class ExpenseCreatePage implements OnInit {
 
     this.isSubmitting.set(true);
 
-    const isSiteMaterial = this.expenseType() === 'Site Material';
     const selectedVendor = this.vendors().find(v => v._id === this.expense.materialVendorId);
+    const isCashAdded = this.expenseType() === 'Cash Added';
 
     const payload: any = {
       type: 'site',
       projectId,
       siteId,
       site: siteName,
-      transactionType: isSiteMaterial ? 'Site Material' : this.expense.transactionType,
-      reference: this.expense.reference || undefined,
-      amountPaidBy: this.expense.amountPaidBy || undefined,
+      transactionType: isCashAdded ? 'Cash Added' : 'Purchase',
       amount: this.expense.amount || 0,
       date: new Date().toISOString().slice(0, 10),
       description: this.expense.description,
-      isSiteMaterial,
-      materialName: isSiteMaterial ? this.expense.materialName : undefined,
-      materialUnit: isSiteMaterial ? this.expense.materialUnit : undefined,
-      materialQuantity: isSiteMaterial ? this.expense.materialQuantity : undefined,
-      materialVendor: selectedVendor?.name || this.expense.materialVendor || undefined,
-      materialVendorId: isSiteMaterial ? this.expense.materialVendorId : undefined,
     };
+
+    if (!isCashAdded) {
+      if (this.isSiteMaterial) {
+        payload.isSiteMaterial = true;
+        payload.transactionType = 'Purchase';
+        payload.materialName = this.expense.materialName;
+        payload.materialUnit = this.expense.materialUnit;
+        payload.materialQuantity = this.expense.materialQuantity;
+        payload.materialVendor = selectedVendor?.name || this.expense.materialVendor || undefined;
+        payload.materialVendorId = this.expense.materialVendorId || undefined;
+        payload.remainingStock = this.expense.remainingStock ?? this.expense.materialQuantity ?? 0;
+      }
+    }
 
     this.supervisor.createExpense(payload).subscribe({
       next: async () => {
         this.isSubmitting.set(false);
         const toast = await this.toastCtrl.create({
-          message: this.expenseType() === 'Site Material' ? 'Site Material submitted for approval' :
-                   this.expenseType() === 'Site Material' ? 'Site Material submitted for approval' : 'Expense submitted for approval',
+          message: isCashAdded ? 'Cash added successfully' : 'Purchase submitted for approval',
           duration: 2500,
           color: 'success',
           position: 'top',
@@ -510,4 +540,3 @@ export class ExpenseCreatePage implements OnInit {
     });
   }
 }
-

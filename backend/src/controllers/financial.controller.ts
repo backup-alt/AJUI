@@ -186,6 +186,17 @@ export async function updateExpense(req: Request, res: Response, next: NextFunct
   } catch (e) { next(e); }
 }
 
+export async function uploadExpenseReceipt(req: Request, res: Response, next: NextFunction) {
+  try {
+    const expense = await expenseService.uploadExpenseReceipt(req.params.id, {
+      data: req.body.data,
+      mimeType: req.body.mimeType,
+      fileName: req.body.fileName,
+    });
+    res.json({ expense });
+  } catch (e) { next(e); }
+}
+
 export async function deleteExpense(req: Request, res: Response, next: NextFunction) {
   try {
     await expenseService.deleteExpense(req.params.id);

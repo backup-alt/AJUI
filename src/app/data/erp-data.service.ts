@@ -552,31 +552,6 @@ export class ErpDataService {
       ]);
     }
 
-    const expenseDescriptions = ["Petrol and water cans", "Brush and hammer set", "Safety gloves", "Site transport", "Office print and courier", "Temporary lighting", "Tea and labour refreshments"];
-    if (!this.expenses().some((row) => row.id.startsWith("DEMO-EXP-"))) {
-      this.expenses.update((rows) => [
-        ...Array.from({ length: 50 }, (_, index): ExpenseRow => {
-          const project = seededProjects[index % seededProjects.length];
-          const received = index % 10 === 0 ? 15000 + index * 120 : 0;
-          const spent = 180 + (index % 11) * 265;
-          return {
-            id: `DEMO-EXP-${String(index + 1).padStart(3, "0")}`,
-            projectId: project.id,
-            site: project.sites[(index + 2) % project.sites.length],
-            supervisor: project.supervisor,
-            date: `2026-06-${String(1 + (index % 26)).padStart(2, "0")}`,
-            description: expenseDescriptions[index % expenseDescriptions.length],
-            type: index % 8 === 0 ? "General Expense" : "Site Expense",
-            received,
-            spent,
-            reference: `EXP-${4200 + index}`,
-            status: index % 6 === 0 ? "Pending" : "Approved",
-          };
-        }),
-        ...rows,
-      ]);
-    }
-
     this.writeState(seedKey, true);
   }
 
