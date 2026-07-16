@@ -740,13 +740,41 @@ function numberToWords(num: number): string {
     @media print {
       .quotation-page { padding: 0; }
       .editor-header { display: none; }
-      .quotation-document { border: none; border-radius: 0; padding: 20px; box-shadow: none; }
-      .btn-add-row, .btn-add-col, .remove-row-btn, .add-col-inline, .back-link, .editor-actions { display: none !important; }
-      ion-menu, ion-split-pane, ion-sidebar { display: none !important; }
+      .quotation-document {
+        border: 2px solid #1e293b;
+        border-radius: 0;
+        padding: 24px;
+        box-shadow: none;
+        max-width: 100%;
+        margin: 0;
+      }
+      .btn-add-row, .btn-add-col, .remove-row-btn, .add-col-inline, .back-link, .editor-actions,
+      .action-btn, .btn-edit, .btn-save, .btn-delete, .table-actions, .btn-confirm, .btn-cancel { display: none !important; }
+      .col-action { display: none !important; }
+      ion-menu, ion-split-pane, ion-sidebar, ion-header, ion-toolbar { display: none !important; }
       ion-content { --background: transparent !important; }
       .ion-page, .ion-page > div { display: block !important; visibility: visible !important; }
       .ion-page { position: static !important; width: 100% !important; height: auto !important; }
       #main-content { display: block !important; width: 100% !important; }
+      input[type="text"],
+      input[type="number"],
+      input[type="date"],
+      select,
+      textarea {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        font-size: inherit !important;
+        color: inherit !important;
+        width: 100% !important;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      input[type="number"] { -moz-appearance: textfield; }
+      select { appearance: none; -webkit-appearance: none; }
+      @page { size: A4; margin: 15mm; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
     @media (max-width: 768px) {
       .quotation-page { padding: 16px; }

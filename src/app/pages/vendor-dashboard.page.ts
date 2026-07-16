@@ -460,11 +460,19 @@ type VendorSite = Site & {
     }
     .site-card {
       cursor: pointer;
-      transition: transform 180ms ease, box-shadow 180ms ease;
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+      min-height: 312px;
+      overflow: hidden;
+      flex-direction: column;
+      border: 1px solid #dfe6ef;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
     }
     .site-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+      border-color: rgba(212, 180, 90, 0.62);
+      box-shadow: 0 20px 42px rgba(15, 23, 42, 0.1);
     }
     .arrow-icon {
       font-size: 20px;
@@ -986,21 +994,25 @@ export class VendorDashboardPage {
       gstNumber: value.gst,
     };
 
+    const localVendor: Vendor = {
+      id: `VEN-${Date.now()}`,
+      name: value.name,
+      materialType: value.materialType,
+      phone: value.phone,
+      address: value.address,
+      gst: value.gst,
+    };
+
     this.api.createVendor(payload).subscribe({
       next: (res: any) => {
-        const newVendor: Vendor = {
-          id: res.vendorId || res._id || res.id,
-          name: value.name,
-          materialType: value.materialType,
-          phone: value.phone,
-          address: value.address,
-          gst: value.gst,
-        };
-        this.data.addVendor(newVendor);
+        const vendorId = res.vendorId || res._id || res.id;
+        const vendor = { ...localVendor, id: vendorId };
+        this.data.addVendor(vendor);
         this.showVendorForm.set(false);
       },
       error: (err) => {
-        console.error("Failed to create vendor on backend", err);
+        console.error("Failed to create vendor on backend, creating locally:", err);
+        this.data.addVendor(localVendor);
         this.showVendorForm.set(false);
       },
     });

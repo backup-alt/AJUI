@@ -2183,6 +2183,7 @@ export class ProjectWorkspacePage {
   }
 
   private buildInitialRows(projectId: string): Record<ModuleKey, TableRow[]> {
+    void this.data.vendors();
     const currentProject = this.data.projectById(projectId);
     const currentClient = this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === currentProject?.client);
     const materials = this.data.materials().filter((row) => row.projectId === projectId).map((row) => ({
