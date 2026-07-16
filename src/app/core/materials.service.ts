@@ -53,6 +53,7 @@ export class MaterialsService {
     approved: row.approved,
     purchased: row.purchased,
     consumed: row.consumed,
+    quantity: row.quantity ?? 0,
     vendor: row.vendor,
     poNumber: row.poNumber,
     status: row.status,

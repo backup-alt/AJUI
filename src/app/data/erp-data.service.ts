@@ -402,6 +402,12 @@ export class ErpDataService {
     effect(() => this.writeState("appUsers", this.users()));
     effect(() => this.writeState("companyProfile", this.companyProfile()));
     effect(() => this.writeState("quotations", this.quotations()));
+    effect(() => {
+      const rows = this.materials();
+      if (rows && rows.length) {
+        this.materialsService.materials.set(rows);
+      }
+    });
   }
 
   addUser(user: Omit<AppUser, "id" | "createdAt"> & { id?: string; createdAt?: string }): AppUser {
@@ -684,6 +690,41 @@ export class ErpDataService {
   deleteVendor(vendorId: string) {
     this.vendors.update((vendors) => vendors.filter((v) => v.id !== vendorId));
     this.writeState("vendors", this.vendors());
+  }
+
+  addMaterial(input: Omit<MaterialRow, "id">): MaterialRow {
+    const material: MaterialRow = {
+      id: `MAT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      projectId: input.projectId || "",
+      site: input.site || "",
+      name: input.name || "",
+      unit: input.unit || "",
+      requested: input.requested ?? 0,
+      approved: input.approved ?? 0,
+      purchased: input.purchased ?? 0,
+      consumed: input.consumed ?? 0,
+      quantity: input.quantity ?? 0,
+      vendor: input.vendor || "",
+      poNumber: input.poNumber || "",
+      status: input.status || "Pending",
+      purchasedDate: input.purchasedDate,
+      issuedAmount: input.issuedAmount,
+      givenAmount: input.givenAmount,
+      paymentType: input.paymentType,
+      deliveredOn: input.deliveredOn,
+    };
+    this.materials.update((materials) => [material, ...materials]);
+    return material;
+  }
+
+  updateMaterial(materialId: string, patch: Partial<MaterialRow>) {
+    this.materials.update((materials) =>
+      materials.map((m) => (m.id !== materialId ? m : { ...m, ...patch })),
+    );
+  }
+
+  deleteMaterial(materialId: string) {
+    this.materials.update((materials) => materials.filter((m) => m.id !== materialId));
   }
 
   createDefaultProject(client: Client): Project {
