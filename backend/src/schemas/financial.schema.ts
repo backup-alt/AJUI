@@ -102,6 +102,13 @@ export const expenseBaseSchema = z.object({
   date: z.string().min(1),
   description: z.string().trim().min(1).max(500),
   submittedBy: z.string().trim().optional(),
+  isSiteMaterial: z.boolean().optional(),
+  materialName: z.string().trim().optional(),
+  materialUnit: z.string().trim().optional(),
+  materialQuantity: z.coerce.number().nonnegative().optional(),
+  materialVendor: z.string().trim().optional(),
+  materialVendorId: objectIdSchema.optional(),
+  customFields: z.record(z.unknown()).optional(),
 });
 
 export const createExpenseSchema = z.object({

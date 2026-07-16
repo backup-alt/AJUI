@@ -50,6 +50,11 @@ type ExpenseApprovalRow = ApprovalBaseRow & {
   amount: number;
   supervisor: string;
   reference: string;
+  isSiteMaterial?: boolean;
+  materialName?: string;
+  materialUnit?: string;
+  materialQuantity?: number;
+  materialVendor?: string;
 };
 
 type SubcontractApprovalRow = ApprovalBaseRow & {
@@ -219,59 +224,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 
 
 
-              @if (showSubcontract()) {
-              <section class="operations-workbench approvals-workbench approval-section">
-                <div class="module-toolbar table-first-toolbar">
-                  <div>
-                    <h2>Subcontracts</h2>
-                    <p>Review subcontractor work packages with contract, advance, balance, and supervisor context.</p>
-                  </div>
-                  <span class="approval-count-pill">{{ subcontractApprovals().length }} pending</span>
-                </div>
-                <div class="table-wrap operations-table approvals-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Client</th>
-                        <th>Project</th>
-                        <th>Site</th>
-                        <th>Subcontractor</th>
-                        <th>Work Package</th>
-                        <th>Contract</th>
-                        <th>Advance</th>
-                        <th>Balance</th>
-                        <th>Supervisor</th>
-                        <th>Due Date</th>
-                        <th>Payment</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let row of subcontractApprovals()">
-                        <td>{{ row.client || "-" }}</td>
-                        <td>{{ row.project || "-" }}</td>
-                        <td>{{ row.site || "-" }}</td>
-                        <td><strong>{{ row.subcontractorName || "-" }}</strong></td>
-                        <td>{{ row.workPackage || "-" }}</td>
-                        <td>{{ row.contractValue || "-" }}</td>
-                        <td>{{ row.advancePaid || "-" }}</td>
-                        <td>{{ row.balance || "-" }}</td>
-                        <td>{{ row.supervisor || "-" }}</td>
-                        <td>{{ row.dueDate || "-" }}</td>
-                        <td>{{ row.paymentStatus || "-" }}</td>
-                        <td><span class="approval-status-pill">{{ row.status }}</span></td>
-                        <td class="approval-actions">
-                          <button type="button" class="approve-action" (click)="approve(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>Approve</button>
-                          <button type="button" class="decline-action" (click)="decline(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>Decline</button>
-                        </td>
-                      </tr>
-                      <tr *ngIf="subcontractApprovals().length === 0"><td class="empty-row" colspan="13"><span>No pending subcontract approvals.</span></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-              }
+              
             </div>
           </main>
         </ion-content>
@@ -288,19 +241,16 @@ export class PendingApprovalsPage implements OnInit {
   readonly showMaterial = signal(false);
   readonly showLabour = signal(false);
   readonly showSiteExpense = signal(false);
-  readonly showSubcontract = signal(false);
   readonly isLoading = signal(false);
   readonly loadError = signal(false);
 
   private _materialRows = signal<MaterialApprovalRow[]>([]);
   private _labourRows = signal<LabourApprovalRow[]>([]);
   private _siteExpenseRows = signal<ExpenseApprovalRow[]>([]);
-  private _subcontractRows = signal<SubcontractApprovalRow[]>([]);
 
   async ngOnInit() {
     this.showMaterial.set(true);
     this.showSiteExpense.set(true);
-    this.showSubcontract.set(true);
     await this.refreshApprovals();
   }
 
@@ -312,7 +262,6 @@ export class PendingApprovalsPage implements OnInit {
       this._materialRows.set(all.filter((r) => r.module === "materials") as MaterialApprovalRow[]);
       this._labourRows.set(all.filter((r) => r.module === "labour") as LabourApprovalRow[]);
       this._siteExpenseRows.set(all.filter((r) => r.module === "expenses") as ExpenseApprovalRow[]);
-      this._subcontractRows.set(all.filter((r) => r.module === "subcontractors") as SubcontractApprovalRow[]);
     } catch {
       this.loadError.set(true);
     } finally {
@@ -328,9 +277,6 @@ export class PendingApprovalsPage implements OnInit {
   );
   readonly siteExpenseApprovals = computed(() =>
     this.showSiteExpense() ? this._siteExpenseRows().filter((row) => this.isPending(row.status)) : []
-  );
-  readonly subcontractApprovals = computed(() =>
-    this.showSubcontract() ? this._subcontractRows().filter((row) => this.isPending(row.status)) : []
   );
 
   pendingTotal(): number {
@@ -350,7 +296,6 @@ export class PendingApprovalsPage implements OnInit {
       case "material": this.showMaterial.update(v => !v); break;
       case "labour": this.showLabour.update(v => !v); break;
       case "site_expense": this.showSiteExpense.update(v => !v); break;
-      case "subcontract": this.showSubcontract.update(v => !v); break;
     }
   }
 
@@ -359,7 +304,6 @@ export class PendingApprovalsPage implements OnInit {
       case "material": return this.showMaterial();
       case "labour": return this.showLabour();
       case "site_expense": return this.showSiteExpense();
-      case "subcontract": return this.showSubcontract();
       default: return true;
     }
   }
@@ -407,7 +351,6 @@ export class PendingApprovalsPage implements OnInit {
     this._materialRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
     this._labourRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
     this._siteExpenseRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
-    this._subcontractRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
   }
 
   private allPendingRows(): ApprovalBaseRow[] {
@@ -415,7 +358,6 @@ export class PendingApprovalsPage implements OnInit {
       ...this.materialApprovals(),
       ...this.labourApprovals(),
       ...this.siteExpenseApprovals(),
-      ...this.subcontractApprovals(),
     ];
   }
 

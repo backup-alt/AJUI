@@ -2010,12 +2010,21 @@ export class UniversalDashboardPage {
 
   recordFormColumns(): FieldSchema[] {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
+    const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor", "reference"]);
     return this.columnsForActive().filter((column) => {
       if (this.activeModule() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
+      const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
+      if (this.activeModule() === "expenses" && isCashAdded && !cashAddedFields.has(column.key)) return false;
       if (
         this.activeModule() === "expenses" &&
         column.key === "siteMaterial" &&
-        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Purchase")) !== "Purchase"
+        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) !== "Purchase"
+      ) {
+        return false;
+      }
+      if (
+        this.activeModule() === "expenses" &&
+        (column.key === "materialName" || column.key === "unit" || column.key === "requestedQuantity" || column.key === "approvedQuantity" || column.key === "vendor")
       ) {
         return false;
       }
@@ -2760,7 +2769,7 @@ export class UniversalDashboardPage {
         project: "",
         site: "",
         expenseDate: today,
-        transactionType: "Purchase",
+        transactionType: "Cash Added",
         description: "",
         amount: "0",
         siteMaterial: "No",

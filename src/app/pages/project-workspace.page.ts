@@ -1602,9 +1602,15 @@ export class ProjectWorkspacePage {
 
   recordFormColumns(): FieldSchema[] {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
+    const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor", "reference"]);
     return this.columnsFor(this.activeSection()).filter((column) => {
       if (this.activeSection() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
-      if (this.activeSection() === "expenses" && column.key === "siteMaterial" && this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Purchase")) !== "Purchase") {
+      const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
+      if (this.activeSection() === "expenses" && isCashAdded && !cashAddedFields.has(column.key)) return false;
+      if (this.activeSection() === "expenses" && column.key === "siteMaterial" && this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) !== "Purchase") {
+        return false;
+      }
+      if (this.activeSection() === "expenses" && (column.key === "materialName" || column.key === "unit" || column.key === "requestedQuantity" || column.key === "approvedQuantity" || column.key === "vendor")) {
         return false;
       }
       return !this.isReadonlyColumn(column.key);
@@ -2321,7 +2327,7 @@ export class ProjectWorkspacePage {
       },
       expenses: {
         expenseDate: today,
-        transactionType: "Purchase",
+        transactionType: "Cash Added",
         description: "",
         amount: "0",
         siteMaterial: "No",

@@ -80,6 +80,33 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
       await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
       const exp = await Expense.findById(approval.sourceId).lean();
       projectId = exp?.projectId;
+      if (exp?.isSiteMaterial) {
+        const materialId = await generateId("MAT");
+        await (await import("../models/Material.js")).Material.create({
+          materialId,
+          projectId: exp.projectId,
+          projectName: exp.projectName,
+          clientId: exp.clientId,
+          clientName: exp.clientName,
+          siteId: exp.siteId,
+          site: exp.site,
+          name: exp.materialName || exp.description,
+          unit: exp.materialUnit || "units",
+          requestedQuantity: exp.materialQuantity || 1,
+          approvedQuantity: exp.materialQuantity || 1,
+          purchasedQuantity: 0,
+          consumedQuantity: 0,
+          remainingStock: exp.materialQuantity || 1,
+          vendor: exp.materialVendor,
+          vendorId: exp.materialVendorId,
+          status: "Approved",
+          approvedBy: reviewer,
+          approvedAt: new Date(),
+          requestDate: exp.date,
+          createdBy: exp.submittedBy,
+          supervisorName: exp.supervisor,
+        });
+      }
       break;
     }
     case "payments":
@@ -312,6 +339,13 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             paidBy: doc.amountPaidBy,
             reference: doc.reference,
             submittedBy: doc.submittedBy,
+            clientName: doc.clientName,
+            supervisorName: doc.supervisor,
+            isSiteMaterial: doc.isSiteMaterial,
+            siteMaterialName: doc.materialName,
+            materialUnit: doc.materialUnit,
+            materialQuantity: doc.materialQuantity,
+            materialVendor: doc.materialVendor,
           };
         }
       }
