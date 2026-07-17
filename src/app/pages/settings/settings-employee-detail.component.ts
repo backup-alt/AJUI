@@ -18,6 +18,10 @@ interface Employee {
   lastLoginAt: string;
   createdAt: string;
   projectIds: string[];
+  // Supervisor-specific fields
+  assignedSiteIds?: string[];
+  assignedSites?: string[];
+  assignedProjectIds?: string[];
 }
 
 interface ApprovalRight {
@@ -112,6 +116,37 @@ interface ActivityEntry {
               </dl>
             </div>
           </section>
+
+          @if (employee()!.role === 'Supervisor') {
+            <section class="settings-w11-card">
+              <div class="settings-w11-card-head">
+                <div>
+                  <h2>Assigned Sites</h2>
+                  <p>Sites that this supervisor is assigned to.</p>
+                </div>
+                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="showSitePicker.set(true)">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  Add Site
+                </button>
+              </div>
+              <div class="settings-w11-card-body">
+                @if (employee()!.assignedSites && employee()!.assignedSites!.length > 0) {
+                  <div class="settings-w11-site-list">
+                    @for (site of employee()!.assignedSites; track site) {
+                      <div class="settings-w11-site-chip">
+                        <span>{{ site }}</span>
+                        <button type="button" class="settings-w11-chip-remove" (click)="removeSupervisorSite(site)" title="Remove site">
+                          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <p class="settings-w11-empty-hint">No sites assigned yet.</p>
+                }
+              </div>
+            </section>
+          }
         }
 
         <!-- PERMISSIONS TAB -->
@@ -193,6 +228,33 @@ interface ActivityEntry {
             </div>
           </section>
         }
+
+        @if (showSitePicker()) {
+          <div class="settings-w11-picker-overlay" (click)="showSitePicker.set(false)">
+            <div class="settings-w11-picker-modal" (click)="$event.stopPropagation()">
+              <div class="settings-w11-picker-head">
+                <h3>Assign Site</h3>
+                <button type="button" class="settings-w11-chip-remove" (click)="showSitePicker.set(false)">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+              <div class="settings-w11-picker-body">
+                @if (availableSitesForSupervisor().length === 0) {
+                  <p class="settings-w11-empty-hint">No sites available to assign.</p>
+                } @else {
+                  <div class="settings-w11-site-list">
+                    @for (site of availableSitesForSupervisor(); track site.id) {
+                      <button type="button" class="settings-w11-site-option" (click)="selectSiteToAssign(site)">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h12M2 8h12M2 11h7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                        {{ site.name }}
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
       </div>
     }
   `,
@@ -204,6 +266,66 @@ interface ActivityEntry {
       border-radius: 12px;
       background: #fef3c7;
       color: #92400e;
+    }
+    .settings-w11-picker-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .settings-w11-picker-modal {
+      background: #fff;
+      border-radius: 12px;
+      width: 380px;
+      max-width: 90vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .settings-w11-picker-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .settings-w11-picker-head h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .settings-w11-picker-body {
+      padding: 12px;
+      overflow-y: auto;
+    }
+    .settings-w11-site-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 12px;
+      border: none;
+      background: none;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 14px;
+      color: #374151;
+      transition: background 0.15s;
+    }
+    .settings-w11-site-option:hover {
+      background: #f3f4f6;
+    }
+    .settings-w11-site-option svg {
+      width: 16px;
+      height: 16px;
+      color: #9ca3af;
+      flex-shrink: 0;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -228,6 +350,9 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly canViewReports = signal(true);
   readonly permSaving = signal(false);
 
+  // Site picker for supervisors
+  readonly showSitePicker = signal(false);
+
   // Activity
   readonly activity = signal<ActivityEntry[]>([]);
 
@@ -242,6 +367,27 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       .map((pid) => projects.find((p) => p.id === pid || String(p.id) === pid)?.name || pid)
       .filter(Boolean);
   });
+
+  readonly availableSitesForSupervisor = computed<Array<{ id: string; name: string }>>(() => {
+    const emp = this.employee();
+    if (!emp || emp.role !== "Supervisor") return [];
+    const assignedSiteIds = new Set(emp.assignedSiteIds || []);
+    const allSites = this.erp.siteEntities();
+    return allSites
+      .filter((s) => !assignedSiteIds.has(String(s.id)))
+      .map((s) => ({ id: String(s.id), name: s.name }));
+  });
+
+  selectSiteToAssign(site: { id: string; name: string }) {
+    const emp = this.employee();
+    if (!emp || emp.role !== "Supervisor") return;
+
+    const currentSiteIds = emp.assignedSiteIds || [];
+    if (currentSiteIds.includes(site.id)) return;
+
+    this.addSupervisorSite(site.id);
+    this.showSitePicker.set(false);
+  }
 
   readonly approvalTypes = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },
@@ -267,6 +413,8 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   private loadEmployee(id: string) {
     this.loading.set(true);
+
+    // Try loading as regular employee first
     this.api.getEmployee(id).subscribe({
       next: (res) => {
         const row: any = res?.employee || res;
@@ -285,10 +433,94 @@ export class SettingsEmployeeDetailComponent implements OnInit {
         this.loadPermissions(id);
         this.loadActivity(id);
       },
+      error: (err) => {
+        // If regular employee not found, try loading as supervisor
+        if (err?.status === 404) {
+          this.loadSupervisor(id);
+        } else {
+          this.employee.set(null);
+          this.loading.set(false);
+        }
+      },
+    });
+  }
+
+  private loadSupervisor(id: string) {
+    this.api.getSupervisor(id).subscribe({
+      next: (res) => {
+        const row = res?.supervisor;
+        if (!row) {
+          this.employee.set(null);
+          this.loading.set(false);
+          return;
+        }
+        this.employee.set({
+          id: row._id ? String(row._id) : id,
+          name: row.name || "—",
+          email: row.email || "",
+          phone: row.phone || "",
+          role: "Supervisor",
+          status: (row.status === "Active" ? "active" : row.status === "On Leave" ? "on_leave" : "inactive") as Status,
+          lastLoginAt: "",
+          createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : "",
+          projectIds: row.assignedProjectIds ? row.assignedProjectIds.map((pid: any) => String(pid)) : [],
+          assignedSiteIds: row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [],
+          assignedSites: row.assignedSites || [],
+          assignedProjectIds: row.assignedProjects ? row.assignedProjects.map((pid: any) => String(pid)) : [],
+        });
+        this.loading.set(false);
+        // Supervisors don't have permissions like regular employees
+        this.loadActivity(id);
+      },
       error: () => {
         this.employee.set(null);
         this.loading.set(false);
       },
+    });
+  }
+
+  addSupervisorSite(siteId: string) {
+    const emp = this.employee();
+    if (!emp || emp.role !== "Supervisor") return;
+
+    const currentSiteIds = emp.assignedSiteIds || [];
+    if (currentSiteIds.includes(siteId)) return;
+
+    const newSiteIds = [...currentSiteIds, siteId];
+    this.api.updateSupervisor(emp.id, { assignedSiteIds: newSiteIds }).subscribe({
+      next: (res) => {
+        const row = res?.supervisor;
+        if (row) {
+          this.employee.update((e) => e ? {
+            ...e,
+            assignedSiteIds: row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [],
+            assignedSites: row.assignedSites || [],
+          } : e);
+        }
+      },
+      error: (err) => console.warn("[EmployeeDetail] updateSupervisor failed:", err?.message ?? err),
+    });
+  }
+
+  removeSupervisorSite(siteId: string) {
+    const emp = this.employee();
+    if (!emp || emp.role !== "Supervisor") return;
+
+    const currentSiteIds = emp.assignedSiteIds || [];
+    const newSiteIds = currentSiteIds.filter((sid) => sid !== siteId);
+
+    this.api.updateSupervisor(emp.id, { assignedSiteIds: newSiteIds }).subscribe({
+      next: (res) => {
+        const row = res?.supervisor;
+        if (row) {
+          this.employee.update((e) => e ? {
+            ...e,
+            assignedSiteIds: row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [],
+            assignedSites: row.assignedSites || [],
+          } : e);
+        }
+      },
+      error: (err) => console.warn("[EmployeeDetail] updateSupervisor failed:", err?.message ?? err),
     });
   }
 

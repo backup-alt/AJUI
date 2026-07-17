@@ -292,9 +292,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       <input
                         type="number"
                         class="site-opening-balance"
-                        [value]="siteDraftOpeningBalance()"
-                        (input)="siteDraftOpeningBalance.set($any($event.target).valueAsNumber || 0)"
-                        placeholder="Opening balence"
+                        [value]="siteDraftOpeningBalance() ?? ''"
+                        (input)="onSiteOpeningBalanceInput($any($event.target))"
+                        placeholder="Opening Balance"
                         min="0"
                       />
                       <button type="submit" class="site-confirm" aria-label="Add site">
@@ -997,7 +997,7 @@ export class ProjectWorkspacePage {
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
   readonly siteDraftName = signal("");
-  readonly siteDraftOpeningBalance = signal(0);
+  readonly siteDraftOpeningBalance = signal<number | null>(null);
   readonly openSelectKey = signal("");
   readonly selectCustomValue = signal("");
   readonly labourTypeDialogOpen = signal(false);
@@ -1779,7 +1779,7 @@ export class ProjectWorkspacePage {
 
   openSiteDraft() {
     this.siteDraftName.set("");
-    this.siteDraftOpeningBalance.set(0);
+    this.siteDraftOpeningBalance.set(null);
     this.siteDraftOpen.set(true);
   }
 
@@ -1789,11 +1789,16 @@ export class ProjectWorkspacePage {
     if (!site) return;
     const openingBalance = this.siteDraftOpeningBalance();
     this.data.addSiteToProject(this.projectId(), site);
-    if (openingBalance > 0) {
+    if (openingBalance != null && openingBalance > 0) {
       this.data.setExpenseOpeningBalance(this.projectId(), site, openingBalance);
     }
     this.activeSite.set(site);
     this.siteDraftOpen.set(false);
+  }
+
+  onSiteOpeningBalanceInput(target: HTMLInputElement) {
+    const val = target.valueAsNumber;
+    this.siteDraftOpeningBalance.set(isNaN(val) ? null : val);
   }
 
   deleteSite(site: string, event: Event) {

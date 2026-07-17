@@ -477,6 +477,18 @@ export class ApiService {
     );
   }
 
+  getSupervisor(id: string): Observable<{ supervisor: any }> {
+    return this.http.get<{ supervisor: any }>(`${this.baseUrl}/supervisors/${id}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  updateSupervisor(id: string, patch: any): Observable<{ supervisor: any }> {
+    return this.http.patch<{ supervisor: any }>(`${this.baseUrl}/supervisors/${id}`, patch, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== MATERIALS ===================
   listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";

@@ -807,11 +807,6 @@ export class ErpDataService {
     this.projects.update((projectRows) =>
       projectRows.map((project) => {
         if (project.id !== projectId) return project;
-        const alreadyExists = project.sites.some((site) => site.toLowerCase() === cleanName.toLowerCase());
-        if (alreadyExists) {
-          updatedProject = project;
-          return project;
-        }
         updatedProject = { ...project, sites: [...project.sites, cleanName] };
         return updatedProject;
       }),
