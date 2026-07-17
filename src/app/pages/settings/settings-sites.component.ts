@@ -230,10 +230,11 @@ export class SettingsSitesComponent implements OnInit {
             daysActive: typeof row.daysActive === "number" ? row.daysActive : undefined,
           };
         });
-        // Merge: local first, then remote (dedup by name)
+        // Merge: local first, then remote (dedup by id)
         const merged = [...localSites];
+        const localIds = new Set(localSites.map((s) => s.id));
         for (const r of remoteItems) {
-          if (!merged.some((m) => m.name === r.name)) merged.push(r);
+          if (!localIds.has(r.id)) merged.push(r);
         }
         this.sites.set(merged);
       },
@@ -256,29 +257,20 @@ export class SettingsSitesComponent implements OnInit {
     const projects = this.erp.projects();
     const users = this.erp.users();
     const supervisors = this.erp.supervisors();
-    const seen = new Set<string>();
     const out: Site[] = [];
     let counter = 1;
     for (const p of projects) {
       for (const siteName of p.sites || []) {
-        const key = siteName.toLowerCase();
-        if (seen.has(key)) {
-          const existing = out.find((s) => s.name.toLowerCase() === key);
-          if (existing && !existing.projectNames.includes(p.name)) {
-            existing.projectNames.push(p.name);
-          }
-          continue;
-        }
-        seen.add(key);
+        const siteKey = `${p.id}:${siteName}`.toLowerCase();
         const totalDays = this.computeTotalDays(p.startDate, undefined);
         const siteSupervisors = supervisors.filter(
-          (s: any) => (s.site || "").toLowerCase() === key
+          (s: any) => (s.site || "").toLowerCase() === siteKey
         ).length;
         const siteEmployees = users.filter(
-          (u: any) => (u.site || "").toLowerCase() === key
+          (u: any) => (u.site || "").toLowerCase() === siteKey
         ).length;
         out.push({
-          id: `local-site-${counter++}`,
+          id: `${p.id}-${siteName}`.toLowerCase().replace(/\s+/g, "-"),
           siteId: `SIT-${String(counter).padStart(3, "0")}`,
           name: siteName,
           status: (p.status === "Completed" ? "Completed" : p.status === "On Hold" ? "On Hold" : "Active") as SiteStatus,
@@ -290,6 +282,7 @@ export class SettingsSitesComponent implements OnInit {
           daysActive: totalDays,
           employeeCount: siteEmployees,
         });
+        counter++;
       }
     }
     return out;

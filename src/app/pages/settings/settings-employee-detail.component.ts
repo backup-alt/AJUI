@@ -408,7 +408,22 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get("id") || "";
+    this.loadSitesForSupervisor();
     this.loadEmployee(id);
+  }
+
+  private loadSitesForSupervisor() {
+    this.api.listSitesAdmin().subscribe({
+      next: (res) => {
+        this.erp.siteEntities.update(() => (res?.sites || []).map((s: any) => ({
+          id: String(s._id || s.id),
+          name: s.name || "Unnamed Site",
+          status: s.status || "Active",
+          projectId: s.projectId || "",
+        })));
+      },
+      error: () => {},
+    });
   }
 
   private loadEmployee(id: string) {
@@ -454,6 +469,18 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           this.loading.set(false);
           return;
         }
+
+        const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
+        let assignedSites = row.assignedSites || [];
+
+        if (assignedSiteIds.length > 0 && assignedSites.length === 0) {
+          const siteEntities = this.erp.siteEntities();
+          assignedSites = assignedSiteIds
+            .map((siteId: string) => siteEntities.find((s: any) => String(s.id) === siteId || String(s._id) === siteId))
+            .filter(Boolean)
+            .map((s: any) => s.name);
+        }
+
         this.employee.set({
           id: row._id ? String(row._id) : id,
           name: row.name || "—",
@@ -464,12 +491,11 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           lastLoginAt: "",
           createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : "",
           projectIds: row.assignedProjectIds ? row.assignedProjectIds.map((pid: any) => String(pid)) : [],
-          assignedSiteIds: row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [],
-          assignedSites: row.assignedSites || [],
+          assignedSiteIds,
+          assignedSites,
           assignedProjectIds: row.assignedProjects ? row.assignedProjects.map((pid: any) => String(pid)) : [],
         });
         this.loading.set(false);
-        // Supervisors don't have permissions like regular employees
         this.loadActivity(id);
       },
       error: () => {
