@@ -365,6 +365,7 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
     }
 
     const expenseId = await generateId("EXP");
+    const isCashAdded = req.body.transactionType === "Cash Added";
     const expense = await Expense.create({
       ...req.body,
       expenseId,
@@ -372,12 +373,13 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
       clientId,
       clientName,
       site: siteName,
-      status: "Pending",
+      status: isCashAdded ? "Approved" : "Pending",
       submittedBy: userId,
     });
 
-    const isSiteMaterialExpense = req.body.isSiteMaterial === true || req.body.transactionType === "Site Material";
-    if (req.body.type === "site" || req.body.transactionType === "Cash Added" || isSiteMaterialExpense) {
+    const isSiteMaterialExpense = req.body.isSiteMaterial === true;
+    // Only Purchase (site materials) needs admin approval; Cash Added is auto-approved
+    if (req.body.type === "site" && !isCashAdded) {
       await Approval.create({
         approvalId: await generateId("APR"),
         type: "expense",
@@ -398,7 +400,30 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
       });
     }
 
+    if (isCashAdded && expense.projectId && expense.site) {
+      const { recomputeSiteLedger } = await import("../services/expense.service.js");
+      await recomputeSiteLedger(expense.projectId, expense.site);
+    }
+
     res.status(201).json({ expense });
+  } catch (e) { next(e); }
+}
+
+export async function uploadExpenseReceipt(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const { Expense } = await import("../models/Expense.js");
+    const expense = await Expense.findById(req.params.id).lean();
+    if (!expense) throw new AppError(404, "Expense not found");
+    const { Project } = await import("../models/Project.js");
+    await mobileService.ensureSupervisorSiteAccess(userId, expense.projectId?.toString(), expense.siteId?.toString());
+    const { uploadExpenseReceipt } = await import("../services/expense.service.js");
+    const updated = await uploadExpenseReceipt(req.params.id, {
+      data: req.body.data,
+      mimeType: req.body.mimeType,
+      fileName: req.body.fileName,
+    });
+    res.json({ expense: updated });
   } catch (e) { next(e); }
 }
 

@@ -147,6 +147,16 @@ export class SupervisorService {
     return this.api.post<{ expense: Expense }>('/supervisor/expenses', request);
   }
 
+  uploadReceipt(
+    expenseId: string,
+    payload: { data: string; mimeType: string; fileName?: string }
+  ) {
+    return this.api.post<{ expense: Expense }>(
+      `/supervisor/expenses/${expenseId}/receipt`,
+      payload
+    );
+  }
+
   async setSelectedSite(
     siteId: string,
     projectId: string,

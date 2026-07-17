@@ -17,6 +17,7 @@ import dashboardRoutes from "./routes/dashboard.routes.js";
 import mobileRoutes from "./routes/mobile.routes.js";
 import rbacRoutes from "./routes/rbac.routes.js";
 import vendorExtraRoutes from "./routes/vendor-extra.routes.js";
+import quotationRoutes from "./routes/quotation.routes.js";
 import { ensureDefaultPermissions } from "./models/RolePermission.js";
 
 export function createApp(): express.Application {
@@ -146,6 +147,7 @@ export function createApp(): express.Application {
   app.use("/api", mobileRoutes);
   app.use("/api", rbacRoutes);
   app.use("/api", vendorExtraRoutes);
+  app.use("/api", quotationRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

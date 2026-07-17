@@ -37,8 +37,6 @@ import {
   peopleSharp,
   walletOutline,
   walletSharp,
-  checkmarkDoneCircleOutline,
-  checkmarkDoneCircleSharp,
   personCircleOutline,
   personCircleSharp,
   settingsOutline,
@@ -55,8 +53,6 @@ import {
   appsOutline,
   gridOutline,
   checkmarkOutline,
-  sunnyOutline,
-  moonOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
@@ -142,13 +138,6 @@ import { Site } from '../../shared/models';
             <ion-icon [name]="isActiveRoute('/tabs/expenses') ? 'wallet-sharp' : 'wallet-outline'" slot="start"></ion-icon>
             <ion-label>Expenses</ion-label>
           </ion-item>
-          <ion-item routerLink="/tabs/approvals" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/approvals') ? 'checkmark-done-circle-sharp' : 'checkmark-done-circle-outline'" slot="start"></ion-icon>
-            <ion-label>Approvals</ion-label>
-            @if (pendingApprovalCount() > 0) {
-              <ion-badge slot="end" color="warning">{{ pendingApprovalCount() }}</ion-badge>
-            }
-          </ion-item>
         </ion-list>
 
         <div class="menu-section-label">Account</div>
@@ -156,10 +145,6 @@ import { Site } from '../../shared/models';
           <ion-item routerLink="/tabs/profile" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/profile') ? 'person-circle-sharp' : 'person-circle-outline'" slot="start"></ion-icon>
             <ion-label>Profile</ion-label>
-          </ion-item>
-          <ion-item button detail="false" class="theme-toggle" (click)="toggleTheme()">
-            <ion-icon [name]="isDark() ? 'sunny-outline' : 'moon-outline'" slot="start"></ion-icon>
-            <ion-label>{{ isDark() ? 'Light mode' : 'Dark mode' }}</ion-label>
           </ion-item>
         </ion-list>
 
@@ -196,9 +181,6 @@ import { Site } from '../../shared/models';
           <ion-buttons slot="end">
             <ion-button class="notification-btn">
               <ion-icon name="notifications-outline"></ion-icon>
-              @if (pendingApprovalCount() > 0) {
-                <span class="notification-badge">{{ pendingApprovalCount() }}</span>
-              }
             </ion-button>
           </ion-buttons>
         </ion-toolbar>
@@ -504,7 +486,7 @@ import { Site } from '../../shared/models';
     .empty-sites span { font-size: 12px; color: #94a3b8; margin-top: 4px; }
   `],
 })
-export class ShellComponent implements OnInit, OnDestroy {
+export class ShellComponent implements OnInit {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
@@ -516,8 +498,6 @@ export class ShellComponent implements OnInit, OnDestroy {
   selectedSiteName = signal<string | null>(null);
   isSitePopoverOpen = signal(false);
   isLoadingSites = signal(false);
-  pendingApprovalCount = signal(0);
-  isDark = signal<boolean>(document.documentElement.classList.contains('dark'));
   isLoggingOut = signal(false);
   siteCount = computed(() => this.sites().length);
 
@@ -535,60 +515,16 @@ export class ShellComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     addIcons({
       homeOutline, homeSharp, cubeOutline, cubeSharp, peopleOutline, peopleSharp,
-      walletOutline, walletSharp, checkmarkDoneCircleOutline, checkmarkDoneCircleSharp,
+      walletOutline, walletSharp,
       personCircleOutline, personCircleSharp, settingsOutline, logOutOutline,
       chevronDownOutline, notificationsOutline, notificationsSharp, businessOutline,
       constructOutline, shieldCheckmarkOutline, locationOutline, locationSharp,
-      appsOutline, gridOutline, checkmarkOutline, sunnyOutline, moonOutline, logOutSharp,
+      appsOutline, gridOutline, checkmarkOutline, logOutSharp,
     });
 
     this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
     await this.loadSites();
-    await this.refreshPendingCount();
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('agb:approvals-changed', this.handleApprovalsChanged);
-      window.addEventListener('agb:theme-changed', this.handleThemeChanged);
-    }
-  }
-
-  ngOnDestroy(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:approvals-changed', this.handleApprovalsChanged);
-      window.removeEventListener('agb:theme-changed', this.handleThemeChanged);
-    }
-  }
-
-  private handleApprovalsChanged = (): void => {
-    void this.refreshPendingCount();
-  };
-
-  private handleThemeChanged = (): void => {
-    this.isDark.set(document.documentElement.classList.contains('dark'));
-  };
-
-  toggleTheme(): void {
-    const next = !this.isDark();
-    document.documentElement.classList.toggle('dark', next);
-    try {
-      localStorage.setItem('agb:theme', next ? 'dark' : 'light');
-    } catch {
-      // ignore
-    }
-    window.dispatchEvent(new CustomEvent('agb:theme-changed'));
-  }
-
-  private async refreshPendingCount(): Promise<void> {
-    this.supervisor.getApprovals().subscribe({
-      next: (res) => {
-        const pending = (res.approvals || []).filter(
-          (a) => !a.status || a.status === 'Pending'
-        ).length;
-        this.pendingApprovalCount.set(pending);
-      },
-      error: () => this.pendingApprovalCount.set(0),
-    });
   }
 
   async loadSites(): Promise<void> {

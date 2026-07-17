@@ -127,16 +127,6 @@ import {
                 >
                   {{ expense.amount | currency:'INR':'symbol':'1.0-0' }}
                 </div>
-                @if (expense.reference || expense.amountPaidBy) {
-                  <div class="expense-tags">
-                    @if (expense.reference) {
-                      <span class="tag">Ref: {{ expense.reference }}</span>
-                    }
-                    @if (expense.amountPaidBy) {
-                      <span class="tag">By: {{ expense.amountPaidBy }}</span>
-                    }
-                  </div>
-                }
               </div>
 
               <footer class="expense-footer">

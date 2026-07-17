@@ -92,12 +92,11 @@ export const expenseBaseSchema = z.object({
   site: z.string().trim().optional(),
   supervisor: z.string().trim().optional(),
   supervisorId: objectIdSchema.optional(),
-  transactionType: z.string().trim().optional(),
+  transactionType: z.enum(["Purchase", "Cash Added"]).optional(),
   siteMaterialBalance: z.coerce.number().optional(),
-  reference: z.string().trim().optional(),
-  department: z.string().trim().optional(),
-  category: z.string().trim().optional(),
-  amountPaidBy: z.string().trim().optional(),
+  receiptImage: z.string().optional(),
+  receiptImageMimeType: z.string().optional(),
+  receiptImageName: z.string().optional(),
   amount: z.coerce.number().nonnegative(),
   date: z.string().min(1),
   description: z.string().trim().min(1).max(500),
@@ -108,22 +107,34 @@ export const expenseBaseSchema = z.object({
   materialQuantity: z.coerce.number().nonnegative().optional(),
   materialVendor: z.string().trim().optional(),
   materialVendorId: objectIdSchema.optional(),
+  materialRemainingStock: z.coerce.number().nonnegative().optional(),
   customFields: z.record(z.unknown()).optional(),
 });
 
 export const createExpenseSchema = z.object({
-  body: expenseBaseSchema.refine(
-    (data) => data.type !== "site" || !!data.projectId,
-    { message: "projectId is required for site expenses", path: ["projectId"] }
-  ).refine(
-    (data) => data.type !== "general" || !!data.category,
-    { message: "category is required for general expenses", path: ["category"] }
-  ),
+  body: expenseBaseSchema
+    .refine(
+      (data) => data.type !== "site" || !!data.projectId,
+      { message: "projectId is required for site expenses", path: ["projectId"] }
+    )
+    .refine(
+      (data) => data.type !== "site" || !!data.transactionType,
+      { message: "transactionType is required for site expenses", path: ["transactionType"] }
+    ),
 });
 
 export const updateExpenseSchema = z.object({
   body: expenseBaseSchema.partial(),
   params: z.object({ id: objectIdSchema }),
+});
+
+export const uploadExpenseReceiptSchema = z.object({
+  params: z.object({ id: objectIdSchema }),
+  body: z.object({
+    data: z.string().min(20, "Receipt data is required"),
+    mimeType: z.string().min(1).max(120),
+    fileName: z.string().max(200).optional(),
+  }),
 });
 
 export const listExpensesSchema = z.object({

@@ -17,6 +17,7 @@ import {
 } from "../../data/dashboardData";
 import { CustomFieldsService } from "../core/custom-fields.service";
 import { MaterialsService } from "../core/materials.service";
+import { ApiService } from "../core/api.service";
 import type { CustomField as ApiCustomField } from "../core/custom-fields.service";
 
 export type ClientStatus = "Active" | "On Hold" | "Completed";
@@ -131,6 +132,7 @@ export type ErpSettings = {
 export class ErpDataService {
   private readonly customFieldsService = inject(CustomFieldsService);
   private readonly materialsService = inject(MaterialsService);
+  private readonly api = inject(ApiService);
   private readonly recoveredTablePresentationState = this.recoverTablePresentationState();
 
   private readonly _syncMaterials = effect(() => {
@@ -562,31 +564,6 @@ export class ErpDataService {
             notes: `${primary} - ${primaryCount}, Helper - ${helpers}`,
             paymentMode: index % 3 === 0 ? "Cash" : "NEFT",
             status: index % 4 === 0 ? "Pending" : "Approved",
-          };
-        }),
-        ...rows,
-      ]);
-    }
-
-    const expenseDescriptions = ["Petrol and water cans", "Brush and hammer set", "Safety gloves", "Site transport", "Office print and courier", "Temporary lighting", "Tea and labour refreshments"];
-    if (!this.expenses().some((row) => row.id.startsWith("DEMO-EXP-"))) {
-      this.expenses.update((rows) => [
-        ...Array.from({ length: 50 }, (_, index): ExpenseRow => {
-          const project = seededProjects[index % seededProjects.length];
-          const received = index % 10 === 0 ? 15000 + index * 120 : 0;
-          const spent = 180 + (index % 11) * 265;
-          return {
-            id: `DEMO-EXP-${String(index + 1).padStart(3, "0")}`,
-            projectId: project.id,
-            site: project.sites[(index + 2) % project.sites.length],
-            supervisor: project.supervisor,
-            date: `2026-06-${String(1 + (index % 26)).padStart(2, "0")}`,
-            description: expenseDescriptions[index % expenseDescriptions.length],
-            type: index % 8 === 0 ? "General Expense" : "Site Expense",
-            received,
-            spent,
-            reference: `EXP-${4200 + index}`,
-            status: index % 6 === 0 ? "Pending" : "Approved",
           };
         }),
         ...rows,
@@ -1545,6 +1522,18 @@ export class ErpDataService {
       ...input,
     };
     this.quotations.update((quotations) => [quotation, ...quotations]);
+
+    this.api.createQuotation(quotation).subscribe({
+      next: (res) => {
+        if (res?.quotation?._id) {
+          this.quotations.update((qs) =>
+            qs.map((q) => q.id === quotation.id ? { ...q, id: res.quotation._id } : q)
+          );
+        }
+      },
+      error: (err) => console.warn("[ERP] createQuotation failed:", err?.message ?? err),
+    });
+
     return quotation;
   }
 
@@ -1554,10 +1543,18 @@ export class ErpDataService {
         q.id !== quotationId ? q : { ...q, ...patch, updatedAt: new Date().toISOString() }
       ),
     );
+
+    this.api.patchQuotation(quotationId, patch).subscribe({
+      error: (err) => console.warn("[ERP] patchQuotation failed:", err?.message ?? err),
+    });
   }
 
   deleteQuotation(quotationId: string) {
     this.quotations.update((quotations) => quotations.filter((q) => q.id !== quotationId));
+
+    this.api.deleteQuotation(quotationId).subscribe({
+      error: (err) => console.warn("[ERP] deleteQuotation failed:", err?.message ?? err),
+    });
   }
 
   quotationById(quotationId: string): Quotation | undefined {

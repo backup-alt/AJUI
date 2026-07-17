@@ -12,6 +12,7 @@ export interface ISite extends Document {
   startDate?: string;
   targetEndDate?: string;
   projectIds: Types.ObjectId[];
+  openingBalance: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +31,7 @@ const siteSchema = new Schema<ISite>(
     startDate: { type: String },
     targetEndDate: { type: String },
     projectIds: [{ type: Schema.Types.ObjectId, ref: "Project" }],
+    openingBalance: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

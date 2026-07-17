@@ -68,7 +68,7 @@ const sectionConfigs: SectionConfig[] = [
     key: "expenses",
     label: "Expenses",
     title: "Site Expense Ledger",
-    description: "Supervisor cash ledger and site expense fields with bill reference and approval status.",
+    description: "Supervisor cash ledger and site expense fields with PO number, receipt, and approval status.",
     columns: [
       { key: "expenseDate", label: "Expense Date", type: "date" },
       { key: "transactionType", label: "Transaction Type" },
@@ -78,7 +78,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "runningBalance", label: "Balance" },
       { key: "site", label: "Site" },
       { key: "supervisor", label: "Supervisor" },
-      { key: "reference", label: "Bill / Reference" },
+      { key: "poNumber", label: "PO Number" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
   },
@@ -289,6 +289,14 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         (input)="siteDraftName.set($any($event.target).value)"
                         placeholder="New site"
                       />
+                      <input
+                        type="number"
+                        class="site-opening-balance"
+                        [value]="siteDraftOpeningBalance()"
+                        (input)="siteDraftOpeningBalance.set($any($event.target).valueAsNumber || 0)"
+                        placeholder="Opening Balance"
+                        min="0"
+                      />
                       <button type="submit" class="site-confirm" aria-label="Add site">
                         <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                           <path d="m5 12 4 4L19 6" />
@@ -319,7 +327,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded()"
+                    *ngIf="!tableViewExpanded() && (selectedRowCount() > 0 || !isNoCreateSection())"
                     [title]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
                     [attr.aria-label]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
@@ -989,6 +997,7 @@ export class ProjectWorkspacePage {
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
   readonly siteDraftName = signal("");
+  readonly siteDraftOpeningBalance = signal(0);
   readonly openSelectKey = signal("");
   readonly selectCustomValue = signal("");
   readonly labourTypeDialogOpen = signal(false);
@@ -1770,6 +1779,7 @@ export class ProjectWorkspacePage {
 
   openSiteDraft() {
     this.siteDraftName.set("");
+    this.siteDraftOpeningBalance.set(0);
     this.siteDraftOpen.set(true);
   }
 
@@ -1777,7 +1787,11 @@ export class ProjectWorkspacePage {
     event.preventDefault();
     const site = this.siteDraftName().trim();
     if (!site) return;
+    const openingBalance = this.siteDraftOpeningBalance();
     this.data.addSiteToProject(this.projectId(), site);
+    if (openingBalance > 0) {
+      this.data.setExpenseOpeningBalance(this.projectId(), site, openingBalance);
+    }
     this.activeSite.set(site);
     this.siteDraftOpen.set(false);
   }
@@ -2790,6 +2804,11 @@ export class ProjectWorkspacePage {
 
   private normalizeYesNo(value: unknown): string {
     return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
+  }
+
+  isNoCreateSection(): boolean {
+    const s = this.activeSection();
+    return s === "expenses" || s === "materials";
   }
 
   private ensureExpenseOpeningForInput(row: TableRow) {

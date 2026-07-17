@@ -79,10 +79,7 @@ export const createExpenseMobileSchema = z.object({
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
     site: z.string().trim().optional(),
-    transactionType: z.string().trim().optional(),
-    reference: z.string().trim().optional(),
-    category: z.string().trim().optional(),
-    amountPaidBy: z.string().trim().optional(),
+    transactionType: z.enum(["Purchase", "Cash Added"]).optional(),
     amount: z.coerce.number().nonnegative(),
     date: z.string().min(1),
     description: z.string().trim().min(1).max(500),
@@ -93,6 +90,15 @@ export const createExpenseMobileSchema = z.object({
     materialVendor: z.string().trim().optional(),
     materialVendorId: objectIdSchema.optional(),
     customFields: z.record(z.unknown()).optional(),
+  }),
+});
+
+export const uploadExpenseReceiptMobileSchema = z.object({
+  params: z.object({ id: objectIdSchema }),
+  body: z.object({
+    data: z.string().min(20),
+    mimeType: z.string().min(1).max(120),
+    fileName: z.string().max(200).optional(),
   }),
 });
 

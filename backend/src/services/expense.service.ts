@@ -4,25 +4,94 @@ import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
-import { createApproval } from "./approval.service.js";
 import { CreateExpenseInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { generatePoNumberForSite } from "./po-number.service.js";
 
-async function computeRunningBalance(
+const ALLOWED_TRANSACTION_TYPES = ["Purchase", "Cash Added"] as const;
+type AllowedTransactionType = (typeof ALLOWED_TRANSACTION_TYPES)[number];
+
+function isCashAdded(input: CreateExpenseInput): boolean {
+  return input.transactionType === "Cash Added";
+}
+
+/**
+ * Latest approved running balance for the given (projectId, site) pair.
+ * Used as the basis for computing the next balance when a new transaction
+ * lands. Falls back to 0 if there is no prior record.
+ */
+async function getLatestRunningBalance(
   projectId: Types.ObjectId,
-  site: string,
-  newAmount: number,
-  date: string
+  site: string
 ): Promise<number> {
   const last = await Expense.findOne({
     projectId,
     site,
     type: "site",
-    date: { $lte: date },
+    status: "Approved",
   })
-    .sort({ date: -1, createdAt: -1 })
+    .sort({ date: -1, createdAt: -1, _id: -1 })
     .lean();
-  return (last?.runningBalance ?? 0) + newAmount;
+  return Number(last?.runningBalance ?? 0);
+}
+
+/**
+ * Recompute the running balance for every approved site expense of a single
+ * (projectId, site) pair in chronological order. The opening balance is the
+ * earliest Cash Added record for that site (if any), otherwise 0. Each row
+ * is then assigned `previous + signedAmount`, clamped at 0.
+ */
+export async function recomputeSiteLedger(
+  projectId: Types.ObjectId,
+  site: string
+): Promise<void> {
+  const expenses = await Expense.find({
+    projectId,
+    site,
+    type: "site",
+    status: "Approved",
+  })
+    .sort({ date: 1, createdAt: 1, _id: 1 })
+    .lean();
+
+  const earliestCashAdded = expenses.find(
+    (row) => row.transactionType === "Cash Added"
+  );
+  let running = Number(earliestCashAdded?.amount ?? 0);
+
+  for (const row of expenses) {
+    const amount = Number(row.amount) || 0;
+    if (row._id.toString() === earliestCashAdded?._id.toString()) {
+      running = amount;
+    } else if (row.transactionType === "Cash Added") {
+      running += amount;
+    } else {
+      running = Math.max(0, running - amount);
+    }
+    if (Number(row.runningBalance ?? 0) !== running) {
+      await Expense.updateOne({ _id: row._id }, { $set: { runningBalance: running } });
+    }
+  }
+}
+
+/**
+ * Recompute every (projectId, site) pair that has approved site expenses.
+ * This is the single source of truth for balances shown in both the web
+ * and mobile apps.
+ */
+export async function recomputeAllSiteLedgers(): Promise<void> {
+  const groups = await Expense.aggregate<{ _id: { projectId: Types.ObjectId; site: string } }>([
+    { $match: { type: "site", status: "Approved" } },
+    {
+      $group: {
+        _id: { projectId: "$projectId", site: "$site" },
+      },
+    },
+  ]);
+  for (const group of groups) {
+    if (!group?._id?.projectId || !group?._id?.site) continue;
+    await recomputeSiteLedger(group._id.projectId, group._id.site);
+  }
 }
 
 export async function createExpense(input: CreateExpenseInput) {
@@ -38,13 +107,18 @@ export async function createExpense(input: CreateExpenseInput) {
   }
 
   const expenseId = await generateId("EXP");
-  let runningBalance = 0;
-  if (input.type === "site" && project && input.site) {
-    runningBalance = await computeRunningBalance(project._id, input.site, input.amount, input.date);
-  }
+  const isCash = isCashAdded(input);
+  const status = isCash ? "Approved" : "Pending";
 
-  const isCashAdded = input.transactionType === "Cash Added";
-  const status = isCashAdded ? "Approved" : "Pending";
+  // Compute the running balance eagerly for Cash Added (which is auto-approved
+  // on creation). For Purchase we let recomputeSiteLedger catch up after the
+  // admin approves the request and uploads a PO number.
+  let runningBalance = 0;
+  if (input.type === "site" && project && input.site && isCash) {
+    const previous = await getLatestRunningBalance(project._id, input.site);
+    const amount = Number(input.amount) || 0;
+    runningBalance = previous + amount;
+  }
 
   const expense = await Expense.create({
     expenseId,
@@ -59,31 +133,24 @@ export async function createExpense(input: CreateExpenseInput) {
     transactionType: input.transactionType,
     amount: input.amount,
     siteMaterialBalance: input.siteMaterialBalance,
-    reference: input.reference,
     runningBalance,
-    department: input.department,
-    category: input.category,
-    amountPaidBy: input.amountPaidBy,
     date: input.date,
     description: input.description,
     submittedBy: input.submittedBy,
+    isSiteMaterial: input.isSiteMaterial,
+    materialName: input.materialName,
+    materialUnit: input.materialUnit,
+    materialQuantity: input.materialQuantity,
+    materialVendor: input.materialVendor,
+    materialVendorId: input.materialVendorId
+      ? new Types.ObjectId(input.materialVendorId)
+      : undefined,
+    materialRemainingStock: input.materialRemainingStock,
     customFields: input.customFields,
     status,
+    approvedBy: isCash ? input.submittedBy : undefined,
+    approvedAt: isCash ? new Date() : undefined,
   });
-
-  if (!isCashAdded) {
-    await createApproval({
-      type: "expense",
-      title: `${input.type === "site" ? "Site" : "General"}: ${input.description.slice(0, 50)}`,
-      sourceCollection: "expenses",
-      sourceId: expense._id,
-      projectId: project?._id,
-      projectName: project?.name,
-      site: input.site,
-      amount: input.amount,
-      detail: input.description,
-    });
-  }
 
   return expense.toObject();
 }
@@ -136,6 +203,33 @@ export async function updateExpense(id: string, patch: Partial<CreateExpenseInpu
   return expense.toObject();
 }
 
+export async function uploadExpenseReceipt(
+  id: string,
+  payload: { data: string; mimeType: string; fileName?: string }
+) {
+  const expense = await Expense.findById(id);
+  if (!expense) throw new AppError(404, "Expense not found");
+  if (expense.status !== "Pending" && expense.status !== "Approved") {
+    throw new AppError(400, "Receipt upload is not allowed for this expense");
+  }
+  if (!expense.poNumber) {
+    throw new AppError(400, "PO number must be generated before the receipt can be uploaded");
+  }
+  expense.receiptImage = payload.data;
+  expense.receiptImageMimeType = payload.mimeType;
+  expense.receiptImageName = payload.fileName;
+  expense.receiptUploadedAt = new Date();
+  // Receipt upload marks the purchase as fully completed.
+  expense.status = "Approved";
+  await expense.save();
+
+  if (expense.type === "site" && expense.projectId && expense.site) {
+    await recomputeSiteLedger(expense.projectId, expense.site);
+  }
+
+  return expense.toObject();
+}
+
 export async function deleteExpense(id: string) {
   const result = await Expense.deleteOne({ _id: id });
   if (result.deletedCount === 0) throw new AppError(404, "Expense not found");
@@ -154,4 +248,30 @@ export async function getPendingExpenses(scopeProjectIds?: ProjectScopeIds) {
   const query: Record<string, unknown> = { status: "Pending" };
   applyProjectScope(query, "projectId", scopeProjectIds);
   return Expense.find(query).sort({ createdAt: -1 }).lean();
+}
+
+/**
+ * Site-level balance summary: opening (earliest Cash Added or 0), total
+ * cash added, total spent, and current balance. Values are derived from
+ * actual approved transactions only.
+ */
+export async function getSiteBalanceSummary(projectId: string, site: string) {
+  const pid = new Types.ObjectId(projectId);
+  const [rows, earliest] = await Promise.all([
+    Expense.find({ projectId: pid, site, type: "site", status: "Approved" })
+      .sort({ date: 1, createdAt: 1, _id: 1 })
+      .lean(),
+    Expense.findOne({ projectId: pid, site, type: "site", status: "Approved", transactionType: "Cash Added" })
+      .sort({ date: 1, createdAt: 1, _id: 1 })
+      .lean(),
+  ]);
+  const cashAdded = rows
+    .filter((r) => r.transactionType === "Cash Added")
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const spent = rows
+    .filter((r) => r.transactionType !== "Cash Added")
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const opening = Number(earliest?.amount ?? 0);
+  const current = Math.max(0, cashAdded - spent);
+  return { opening, cashAdded, spent, current };
 }

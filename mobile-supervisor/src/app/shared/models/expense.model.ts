@@ -1,5 +1,4 @@
 export type ExpenseStatus = 'Pending' | 'Approved' | 'Rejected';
-export type TransactionType = 'Material' | 'Labour' | 'Transport' | 'Equipment' | 'Other' | 'Food' | 'Fuel' | 'Cash Added' | 'Purchase';
 
 export interface Expense {
   _id: string;
@@ -11,14 +10,14 @@ export interface Expense {
   site?: string;
   supervisor?: string;
   supervisorId?: string;
-  transactionType?: TransactionType;
+  transactionType?: 'Purchase' | 'Cash Added';
   amount: number;
   siteMaterialBalance?: number;
-  reference?: string;
+  poNumber?: string;
+  receiptImage?: string;
+  receiptImageMimeType?: string;
+  receiptImageName?: string;
   runningBalance: number;
-  department?: string;
-  category?: string;
-  amountPaidBy?: string;
   date: string;
   description: string;
   status: ExpenseStatus;
@@ -26,7 +25,6 @@ export interface Expense {
   submittedBy?: string;
   approvedBy?: string;
   approvedAt?: string;
-  receiptUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,10 +35,8 @@ export interface CreateExpenseRequest {
   siteId: string;
   transactionType?: string;
   amount: number;
-  reference?: string;
   date: string;
   description: string;
-  amountPaidBy?: string;
   site?: string;
   isSiteMaterial?: boolean;
   materialName?: string;
@@ -48,6 +44,7 @@ export interface CreateExpenseRequest {
   materialQuantity?: number;
   materialVendor?: string;
   materialVendorId?: string;
+  remainingStock?: number;
   customFields?: Record<string, unknown>;
 }
 
@@ -73,4 +70,8 @@ export interface ExpenseFilters {
   dateTo?: string;
   page?: number;
   limit?: number;
+}
+
+export interface UploadReceiptResponse {
+  expense: Expense;
 }

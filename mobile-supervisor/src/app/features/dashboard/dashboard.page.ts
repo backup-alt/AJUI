@@ -13,15 +13,11 @@ import {
   cubeOutline,
   peopleOutline,
   walletOutline,
-  checkmarkDoneCircleOutline,
   arrowForwardOutline,
   timeOutline,
-  alertCircleOutline,
-  checkmarkCircleOutline,
   locationOutline,
   constructOutline,
   cashOutline,
-  layersOutline,
   documentTextOutline,
   chevronForwardOutline,
   trendingUpOutline,
@@ -30,7 +26,7 @@ import {
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { AuthService } from '../../core/services/auth.service';
-import { DashboardData, Site, ApprovalSummary } from '../../shared/models';
+import { DashboardData, Site } from '../../shared/models';
 import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
 import {
   StatCardComponent,
@@ -96,14 +92,6 @@ import {
               (click)="navigateTo('/tabs/sites')"
             ></app-stat-card>
             <app-stat-card
-              icon="checkmark-done-circle-outline"
-              iconBg="rgba(245, 158, 11, 0.14)"
-              iconColor="#b45309"
-              [value]="dashboard()?.counts?.pendingApprovals || 0"
-              label="Pending approvals"
-              (click)="navigateTo('/tabs/approvals')"
-            ></app-stat-card>
-            <app-stat-card
               icon="cube-outline"
               iconBg="rgba(220, 38, 38, 0.10)"
               iconColor="#b91c1c"
@@ -137,60 +125,6 @@ import {
               <div class="expense-count">{{ dashboard()?.todayExpense?.count || 0 }}</div>
               <div class="expense-count-label">Transactions</div>
             </div>
-          </div>
-
-          <!-- Pending approvals -->
-          <div class="section">
-            <div class="section-head">
-              <h2 class="section-title">Pending approvals</h2>
-              <button class="section-link" (click)="navigateTo('/tabs/approvals')">
-                View all
-                <ion-icon name="chevron-forward-outline"></ion-icon>
-              </button>
-            </div>
-
-            @if (isLoading()) {
-              @for (i of [1, 2]; track i) {
-                <div class="approval-card skeleton">
-                  <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
-                  <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-                  <ion-skeleton-text animated style="width: 80%; height: 12px; margin-top: 10px;"></ion-skeleton-text>
-                </div>
-              }
-            } @else if (pendingApprovals().length === 0) {
-              <app-empty-state
-                icon="checkmark-done-circle-outline"
-                iconBg="rgba(22, 163, 74, 0.14)"
-                iconColor="#15803d"
-                title="All caught up"
-                message="No pending approvals. Your work is in great shape."
-              ></app-empty-state>
-            } @else {
-              @for (approval of pendingApprovals().slice(0, 4); track approval.approvalId) {
-                <button class="approval-card" (click)="navigateToApproval(approval)">
-                  <div class="approval-top">
-                    <app-status-pill [tone]="getTone(approval.type)" [icon]="getTypeIcon(approval.type)">
-                      {{ approval.type | titlecase }}
-                    </app-status-pill>
-                    <app-status-pill tone="warning">Pending</app-status-pill>
-                  </div>
-                  <h3 class="approval-title">{{ approval.title }}</h3>
-                  <div class="approval-meta">
-                    <span class="meta-item">
-                      <ion-icon name="business-outline"></ion-icon>
-                      {{ approval.projectName }}
-                    </span>
-                    @if (approval.amount) {
-                      <span class="amount">{{ approval.amount | currency:'INR':'symbol':'1.0-0' }}</span>
-                    }
-                  </div>
-                  <div class="approval-time">
-                    <ion-icon name="time-outline"></ion-icon>
-                    {{ approval.submittedAt | date:'MMM d, h:mm a' }}
-                  </div>
-                </button>
-              }
-            }
           </div>
 
           <!-- Active sites -->
@@ -411,8 +345,6 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   dashboard = signal<DashboardData | null>(null);
   sites = signal<Site[]>([]);
-  pendingApprovals = signal<ApprovalSummary[]>([]);
-  isLoading = signal(true);
   currentSiteName = signal<string | null>(null);
   userName = signal<string>('Supervisor');
 
@@ -430,9 +362,9 @@ export class DashboardPage implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     addIcons({
       businessOutline, cubeOutline, peopleOutline, walletOutline,
-      checkmarkDoneCircleOutline, arrowForwardOutline, timeOutline, alertCircleOutline,
-      checkmarkCircleOutline, locationOutline, constructOutline, cashOutline,
-      layersOutline, documentTextOutline, chevronForwardOutline, trendingUpOutline,
+      arrowForwardOutline, timeOutline,
+      locationOutline, constructOutline, cashOutline,
+      documentTextOutline, chevronForwardOutline, trendingUpOutline,
       calendarOutline, trendingDownOutline,
     });
 
@@ -441,22 +373,16 @@ export class DashboardPage implements OnInit, OnDestroy {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('agb:site-changed', this.handleSiteChange);
-      window.addEventListener('agb:approvals-changed', this.handleApprovalsChanged);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:site-changed', this.handleSiteChange);
-      window.removeEventListener('agb:approvals-changed', this.handleApprovalsChanged);
     }
   }
 
   private handleSiteChange = (): void => {
-    void this.loadDashboard();
-  };
-
-  private handleApprovalsChanged = (): void => {
     void this.loadDashboard();
   };
 
@@ -466,23 +392,18 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   async loadDashboard(): Promise<void> {
-    this.isLoading.set(true);
     try {
       this.supervisor.getDashboard().subscribe({
         next: (response) => {
           this.dashboard.set(response.dashboard);
-          this.pendingApprovals.set(response.dashboard.pendingApprovals || []);
-          this.isLoading.set(false);
         },
         error: (err) => {
           console.error('[Dashboard] failed to load', err);
-          this.isLoading.set(false);
         },
       });
       await this.loadUserAndSites();
     } catch (error) {
       console.error('Failed to load dashboard:', error);
-      this.isLoading.set(false);
     }
   }
 
@@ -512,40 +433,6 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   navigateTo(path: string): void {
     this.router.navigate([path]);
-  }
-
-  navigateToApproval(approval: ApprovalSummary): void {
-    this.router.navigate(['/tabs/approvals', approval.approvalId]);
-  }
-
-  getTypeTone(type: string): 'info' | 'warning' | 'danger' | 'success' | 'neutral' {
-    switch (type) {
-      case 'material': return 'danger';
-      case 'labour': return 'info';
-      case 'expense': return 'warning';
-      case 'payment': return 'success';
-      default: return 'neutral';
-    }
-  }
-
-  getTone(type: string): 'success' | 'warning' | 'danger' | 'neutral' {
-    switch (type) {
-      case 'material': return 'warning';
-      case 'labour': return 'neutral';
-      case 'expense': return 'danger';
-      case 'payment': return 'success';
-      default: return 'neutral';
-    }
-  }
-
-  getTypeIcon(type: string): string {
-    switch (type) {
-      case 'material': return 'cube-outline';
-      case 'labour': return 'people-outline';
-      case 'expense': return 'wallet-outline';
-      case 'payment': return 'card-outline';
-      default: return 'checkmark-done-circle-outline';
-    }
   }
 
   getSiteTone(status?: string): 'success' | 'warning' | 'info' | 'neutral' {

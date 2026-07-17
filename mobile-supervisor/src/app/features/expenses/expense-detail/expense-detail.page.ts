@@ -16,7 +16,9 @@ import {
   IonList,
   IonSpinner,
   IonIcon,
+  IonButton,
   ToastController,
+  ActionSheetController,
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
@@ -30,6 +32,8 @@ import {
   calendarOutline,
   documentTextOutline,
   cardOutline,
+  cloudUploadOutline,
+  checkmarkCircleOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Expense } from '../../../shared/models';
@@ -54,6 +58,7 @@ import { Expense } from '../../../shared/models';
     IonList,
     IonSpinner,
     IonIcon,
+    IonButton,
     DatePipe,
     CurrencyPipe,
     TitleCasePipe,
@@ -110,6 +115,36 @@ import { Expense } from '../../../shared/models';
             </div>
           </div>
 
+          @if (expense()!.poNumber) {
+            <div class="po-number-block">
+              <div class="po-label">PO Number</div>
+              <div class="po-value">{{ expense()!.poNumber }}</div>
+            </div>
+          }
+
+          @if (canUploadReceipt()) {
+            <div class="upload-receipt-card">
+              <div class="upload-receipt-info">
+                <ion-icon name="cloud-upload-outline" color="primary"></ion-icon>
+                <div>
+                  <div class="upload-title">Receipt Required</div>
+                  <div class="upload-sub">Upload the bill/receipt to complete this purchase</div>
+                </div>
+              </div>
+              <ion-button size="small" (click)="triggerFileInput()">
+                <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
+                Upload Receipt
+              </ion-button>
+              <input
+                #fileInput
+                type="file"
+                accept="image/*,.pdf"
+                style="display: none"
+                (change)="onFileSelected($event)"
+              />
+            </div>
+          }
+
           <ion-card>
             <ion-card-content>
               <ion-list lines="none">
@@ -120,30 +155,25 @@ import { Expense } from '../../../shared/models';
                     <h3>{{ expense()!.date | date: 'EEE, MMM d, y' }}</h3>
                   </ion-label>
                 </ion-item>
-                @if (expense()!.transactionType && isPurchase()) {
-                  <ion-item>
-                    <ion-icon name="card-outline" slot="start" color="primary"></ion-icon>
-                    <ion-label>
-                      <p>Category</p>
-                      <h3>{{ expense()!.transactionType }}</h3>
-                    </ion-label>
-                  </ion-item>
-                }
-                @if (expense()!.reference) {
+                @if (expense()!.receiptImage) {
                   <ion-item>
                     <ion-icon name="document-text-outline" slot="start" color="primary"></ion-icon>
                     <ion-label>
-                      <p>Reference</p>
-                      <h3>{{ expense()!.reference }}</h3>
+                      <p>Receipt / Bill</p>
+                      <h3>
+                        <a [href]="receiptDataUrl()" target="_blank" rel="noopener">
+                          {{ expense()!.receiptImageName || 'Receipt' }}
+                        </a>
+                      </h3>
                     </ion-label>
                   </ion-item>
                 }
-                @if (expense()!.amountPaidBy) {
+                @if (expense()!.approvedAt) {
                   <ion-item>
-                    <ion-icon name="wallet-outline" slot="start" color="primary"></ion-icon>
+                    <ion-icon name="checkmark-circle-outline" slot="start" color="success"></ion-icon>
                     <ion-label>
-                      <p>Paid By</p>
-                      <h3>{{ expense()!.amountPaidBy }}</h3>
+                      <p>Approved</p>
+                      <h3>{{ expense()!.approvedAt | date: 'MMM d, y, h:mm a' }}</h3>
                     </ion-label>
                   </ion-item>
                 }
@@ -264,6 +294,34 @@ import { Expense } from '../../../shared/models';
     ion-item h3 { font-size: 14px; font-weight: 500; color: #111827; margin: 2px 0 0; }
     ion-item p { font-size: 11px; color: #6b7280; margin: 0; text-transform: uppercase; letter-spacing: 0.3px; }
     .notes { font-size: 14px; color: #111827; margin: 0; line-height: 1.5; }
+    .po-number-block {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-left: 3px solid #002263;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .po-label { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+    .po-value { font-size: 16px; font-weight: 700; color: #002263; }
+    .upload-receipt-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-left: 3px solid #d97706;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .upload-receipt-info { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .upload-receipt-info ion-icon { font-size: 24px; }
+    .upload-title { font-size: 14px; font-weight: 600; color: #111827; }
+    .upload-sub { font-size: 12px; color: #6b7280; }
   `],
 })
 export class ExpenseDetailPage implements OnInit {
@@ -271,9 +329,11 @@ export class ExpenseDetailPage implements OnInit {
   private router = inject(Router);
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
+  private actionSheetCtrl = inject(ActionSheetController);
 
   expense = signal<Expense | null>(null);
   loading = signal(true);
+  uploading = signal(false);
 
   isCashAdded = computed(() => this.expense()?.transactionType === 'Cash Added');
   isPurchase = computed(() =>
@@ -286,6 +346,23 @@ export class ExpenseDetailPage implements OnInit {
     return this.expense()!.transactionType || 'Purchase';
   });
 
+  canUploadReceipt = computed(() => {
+    const exp = this.expense();
+    if (!exp) return false;
+    return (
+      exp.transactionType !== 'Cash Added' &&
+      !!exp.poNumber &&
+      !exp.receiptImage
+    );
+  });
+
+  receiptDataUrl = computed(() => {
+    const exp = this.expense();
+    if (!exp?.receiptImage) return '#';
+    const mimeType = exp.receiptImageMimeType || 'image/jpeg';
+    return `data:${mimeType};base64,${exp.receiptImage}`;
+  });
+
   async ngOnInit(): Promise<void> {
     addIcons({
       locationOutline,
@@ -296,8 +373,61 @@ export class ExpenseDetailPage implements OnInit {
       calendarOutline,
       documentTextOutline,
       cardOutline,
+      cloudUploadOutline,
+      checkmarkCircleOutline,
     });
     await this.load();
+  }
+
+  triggerFileInput(): void {
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fileInput?.click();
+  }
+
+  async onFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(',')[1];
+      await this.uploadReceipt(file.type, file.name, base64);
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  }
+
+  private async uploadReceipt(mimeType: string, fileName: string, base64Data: string): Promise<void> {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (!id) return;
+
+    this.uploading.set(true);
+    this.supervisor.uploadReceipt(id, {
+      data: base64Data,
+      mimeType,
+      fileName,
+    }).subscribe({
+      next: (res) => {
+        this.expense.set(res.expense);
+        this.uploading.set(false);
+        this.showToast('Receipt uploaded successfully', 'success');
+      },
+      error: (err) => {
+        this.uploading.set(false);
+        this.showToast(err?.error?.message || 'Failed to upload receipt', 'danger');
+      },
+    });
+  }
+
+  private async showToast(message: string, color: string): Promise<void> {
+    const toast = await this.toastCtrl.create({
+      message,
+      duration: 3000,
+      color,
+      position: 'top',
+    });
+    await toast.present();
   }
 
   getStatusColor(status: string): string {

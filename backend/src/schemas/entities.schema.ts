@@ -47,6 +47,7 @@ export const createSiteSchema = z.object({
     startDate: z.string().optional(),
     targetEndDate: z.string().optional(),
     projectIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).optional(),
+    openingBalance: z.coerce.number().nonnegative().default(0),
   }),
 });
 
@@ -59,6 +60,7 @@ export const updateSiteSchema = z.object({
     startDate: z.string().optional(),
     targetEndDate: z.string().optional(),
     projectIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).optional(),
+    openingBalance: z.coerce.number().nonnegative().optional(),
   }),
   params: idSchema,
 });
