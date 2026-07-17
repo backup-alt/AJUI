@@ -113,6 +113,7 @@ export const createSupervisorSchema = z.object({
     role: z.string().trim().default("Site Supervisor"),
     assignedProject: z.string().trim().optional(),
     assignedProjectId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
+    assignedProjectIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).optional(),
     assignedSite: z.string().trim().optional(),
     assignedSiteId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
     assignedSites: z.array(z.string().trim().min(1)).optional(),

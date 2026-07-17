@@ -294,7 +294,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         class="site-opening-balance"
                         [value]="siteDraftOpeningBalance()"
                         (input)="siteDraftOpeningBalance.set($any($event.target).valueAsNumber || 0)"
-                        placeholder="Opening Balance"
+                        placeholder="Opening balence"
                         min="0"
                       />
                       <button type="submit" class="site-confirm" aria-label="Add site">

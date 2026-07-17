@@ -90,12 +90,17 @@ async function backfillAssignedSites(
 export async function createSupervisor(input: CreateSupervisorInput) {
   const supervisorId = await generateId("SUP");
   const siteAssignment = await normalizeSiteAssignment(input);
+
+  const assignedProjectIds = uniqueObjectIds([
+    toObjectId(input.assignedProjectId),
+    ...(input.assignedProjectIds || []).map(toObjectId),
+  ]);
+
   const supervisor = await Supervisor.create({
     ...input,
     supervisorId,
-    assignedProjectId: input.assignedProjectId
-      ? new Types.ObjectId(input.assignedProjectId)
-      : undefined,
+    assignedProjectId: assignedProjectIds[0],
+    assignedProjects: assignedProjectIds,
     ...siteAssignment,
   });
   await backfillAssignedSites(supervisor._id, supervisor.name, siteAssignment.assignedSiteIds);
@@ -112,13 +117,13 @@ export async function listSupervisors(filter: { status?: string; search?: string
       { email: { $regex: filter.search, $options: "i" } },
     ];
   }
-  applyProjectScope(query, "assignedProjectId", filter.scopeProjectIds);
+  applyProjectScope(query, "assignedProjects", filter.scopeProjectIds);
   return Supervisor.find(query).sort({ createdAt: -1 }).lean();
 }
 
 export async function getSupervisorById(id: string, scopeProjectIds?: ProjectScopeIds) {
   const query: Record<string, unknown> = { _id: id };
-  applyProjectScope(query, "assignedProjectId", scopeProjectIds);
+  applyProjectScope(query, "assignedProjects", scopeProjectIds);
   const supervisor = await Supervisor.findOne(query).lean();
   if (!supervisor) throw new AppError(404, "Supervisor not found");
   return supervisor;
@@ -127,8 +132,18 @@ export async function getSupervisorById(id: string, scopeProjectIds?: ProjectSco
 export async function updateSupervisor(id: string, patch: UpdateSupervisorInput, scopeProjectIds?: ProjectScopeIds) {
   await getSupervisorById(id, scopeProjectIds);
   const updateData: Record<string, unknown> = { ...patch };
+
   if (patch.assignedProjectId) {
     updateData.assignedProjectId = new Types.ObjectId(patch.assignedProjectId);
+  }
+  if (patch.assignedProjectIds) {
+    const projectIds = patch.assignedProjectIds
+      .map((pid) => toObjectId(pid))
+      .filter((id): id is Types.ObjectId => id !== undefined);
+    updateData.assignedProjects = projectIds;
+    if (projectIds.length > 0 && !patch.assignedProjectId) {
+      updateData.assignedProjectId = projectIds[0];
+    }
   }
 
   const shouldNormalizeSites = ["assignedSite", "assignedSites", "assignedSiteId", "assignedSiteIds"].some((key) =>

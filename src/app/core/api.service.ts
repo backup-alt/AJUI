@@ -433,6 +433,12 @@ export class ApiService {
     );
   }
 
+  createSite(payload: { name: string; projectIds?: string[]; openingBalance?: number; status?: string }): Observable<{ site: any }> {
+    return this.http.post<{ site: any }>(`${this.baseUrl}/sites`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   listSitesAdmin(): Observable<{ sites: any[] }> {
     return this.http.get<{ sites: any[] }>(`${this.baseUrl}/admin/sites`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)

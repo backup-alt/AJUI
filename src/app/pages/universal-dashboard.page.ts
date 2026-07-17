@@ -19,7 +19,6 @@ type DashboardModule =
   | "generalExpenses"
   | "payments"
   | "vendors"
-  | "supervisors"
   | "subcontractors"
   | "reports";
 type TableRow = SharedTableRow;
@@ -194,29 +193,6 @@ const dashboardModules: ModuleConfig[] = [
     filters: [
       { key: "materialType", label: "Material Type" },
       { key: "vendorName", label: "Vendor" },
-    ],
-  },
-  {
-    key: "supervisors",
-    label: "Supervisors",
-    title: "Supervisor Master List",
-    description: "Company supervisor records with assignment, cash limits, advances, approval authority, and status.",
-    columns: [
-      { key: "supervisorName", label: "Supervisor Name" },
-      { key: "phoneNumber", label: "Phone Number" },
-      { key: "role", label: "Role" },
-      { key: "assignedProject", label: "Assigned Project" },
-      { key: "assignedSite", label: "Assigned Site" },
-      { key: "cashLimit", label: "Cash Limit" },
-      { key: "activeAdvances", label: "Active Advances" },
-      { key: "approvalAuthority", label: "Approval Authority" },
-      { key: "status", label: "Status" },
-    ],
-    filters: [
-      { key: "role", label: "Role" },
-      { key: "assignedProject", label: "Project" },
-      { key: "assignedSite", label: "Site" },
-      { key: "status", label: "Status" },
     ],
   },
   {
@@ -1616,11 +1592,11 @@ export class UniversalDashboardPage {
   }
 
   isUniversalSiteAware(module: DashboardModule): boolean {
-    return module === "materials" || module === "labour" || module === "expenses" || module === "supervisors" || module === "subcontractors";
+    return module === "materials" || module === "labour" || module === "expenses" || module === "subcontractors";
   }
 
   siteFieldForModule(module: DashboardModule): string {
-    return module === "supervisors" ? "assignedSite" : "site";
+    return "site";
   }
 
   universalSiteOptions(): string[] {
@@ -2725,7 +2701,7 @@ export class UniversalDashboardPage {
       exportFormat,
     }));
 
-    return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, reports };
+    return { materials, clients, labour, expenses, generalExpenses, payments, vendors, subcontractors, reports };
   }
 
   private rowsFor(module: DashboardModule): TableRow[] {
@@ -2751,7 +2727,6 @@ export class UniversalDashboardPage {
     if (key === "approvalStatus") return ["Pending", "Approved", "Declined"];
     if (key === "status") {
       if (module === "clients") return ["Active", "On Hold", "Completed"];
-      if (module === "supervisors") return ["Active", "On Leave", "Inactive"];
       if (module === "reports") return ["Ready", "Scheduled", "Archived"];
       return ["Pending", "Approved", "Declined"];
     }
@@ -2848,17 +2823,6 @@ export class UniversalDashboardPage {
         phoneNumber: "",
         address: "",
         gstNumber: "",
-      },
-      supervisors: {
-        supervisorName: "",
-        phoneNumber: "",
-        role: "",
-        assignedProject: "",
-        assignedSite: "",
-        cashLimit: "0",
-        activeAdvances: "0",
-        approvalAuthority: "",
-        status: "Active",
       },
       subcontractors: {
         client: "",

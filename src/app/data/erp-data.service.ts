@@ -382,6 +382,7 @@ export class ErpDataService {
     this.readState<Record<SharedModuleKey, string[]>>("hiddenTableFields", this.emptyHiddenFieldMap()),
   );
   readonly expenseOpeningBalances = signal<Record<string, number>>(this.readState<Record<string, number>>("expenseOpeningBalances", {}));
+  readonly siteKeys = signal<Record<string, string>>(this.readState<Record<string, string>>("siteKeys", {}));
   readonly projectActivity = signal<Record<string, number>>(this.readState<Record<string, number>>("projectActivity", {}));
   readonly settings = signal<ErpSettings>(
     this.normalizeSettings(this.readState<Partial<ErpSettings>>("settings", this.defaultSettings())),
@@ -415,6 +416,7 @@ export class ErpDataService {
     effect(() => this.writeState("hiddenTableRows", this.hiddenTableRows()));
     effect(() => this.writeState("hiddenTableFields", this.hiddenTableFields()));
     effect(() => this.writeState("expenseOpeningBalances", this.expenseOpeningBalances()));
+    effect(() => this.writeState("siteKeys", this.siteKeys()));
     effect(() => this.writeState("projectActivity", this.projectActivity()));
     effect(() => this.writeState("settings", this.settings()));
     effect(() => this.writeState("appUsers", this.users()));
@@ -797,7 +799,7 @@ export class ErpDataService {
     return project;
   }
 
-  addSiteToProject(projectId: string, siteName: string): Project | undefined {
+  addSiteToProject(projectId: string, siteName: string, openingBalance: number = 0): Project | undefined {
     const cleanName = siteName.trim();
     if (!cleanName) return undefined;
     let updatedProject: Project | undefined;
@@ -815,7 +817,19 @@ export class ErpDataService {
       }),
     );
 
-    if (updatedProject) this.touchProject(projectId);
+    if (updatedProject) {
+      this.api.createSite({ name: cleanName, projectIds: [projectId], openingBalance }).subscribe({
+        next: (res) => {
+          if (res?.site?._id) {
+            const siteKey = this.siteKeyFor(projectId, cleanName);
+            this.siteKeys.update((keys) => ({ ...keys, [siteKey]: res.site!._id }));
+          }
+        },
+        error: (err) => console.warn("[ERP] createSite failed:", err?.message ?? err),
+      });
+
+      this.touchProject(projectId);
+    }
     return updatedProject;
   }
 
@@ -835,10 +849,15 @@ export class ErpDataService {
     );
 
     if (updatedProject) {
-      const key = this.expenseOpeningBalanceKey(projectId, cleanName);
+      const balanceKey = this.expenseOpeningBalanceKey(projectId, cleanName);
+      const siteKey = this.siteKeyFor(projectId, cleanName);
       this.expenseOpeningBalances.update((balances) => {
-        const { [key]: _removed, ...nextBalances } = balances;
+        const { [balanceKey]: _removed, ...nextBalances } = balances;
         return nextBalances;
+      });
+      this.siteKeys.update((keys) => {
+        const { [siteKey]: _removed, ...nextKeys } = keys;
+        return nextKeys;
       });
     }
 
@@ -1437,7 +1456,16 @@ export class ErpDataService {
     return true;
   }
 
+  private siteKeyFor(projectId: string, siteName: string): string {
+    return `${projectId}::${siteName.trim().toLowerCase() || "project"}`;
+  }
+
   private expenseOpeningBalanceKey(projectId: string, siteName: string): string {
+    const siteKey = this.siteKeyFor(projectId, siteName);
+    const siteId = this.siteKeys()[siteKey];
+    if (siteId) {
+      return `${projectId}::site::${siteId}`;
+    }
     return `${projectId}::${siteName.trim().toLowerCase() || "project"}`;
   }
 
