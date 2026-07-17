@@ -376,8 +376,14 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const allIds = new Set([...assignedSiteIds, ...assignedSitesStr]);
     const allSites = this.erp.siteEntities();
     return allSites
-      .filter((s) => !allIds.has(String(s.id)) && !allIds.has(String(s._id)))
-      .map((s) => ({ id: String(s.id || s._id), name: s.name }));
+      .filter((s) => {
+        const siteAny = s as any;
+        return !allIds.has(String(s.id)) && !allIds.has(String(siteAny._id));
+      })
+      .map((s) => {
+        const siteAny = s as any;
+        return { id: String(s.id || siteAny._id || ""), name: s.name };
+      });
   });
 
   readonly supervisorAssignedSiteNames = computed<Array<{ id: string; name: string }>>(() => {
@@ -391,12 +397,15 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const siteEntities = this.erp.siteEntities();
     return uniqueIds
       .map(id => {
-        const site = siteEntities.find(s =>
-          String(s.id) === id ||
-          String(s._id) === id ||
-          String(s.siteId) === id
-        );
-        return site ? { id: String(site.id || site._id), name: site.name } : null;
+        const site = siteEntities.find(s => {
+          const siteAny = s as any;
+          return String(s.id) === id ||
+            String(siteAny._id) === id ||
+            String(siteAny.siteId) === id;
+        });
+        if (!site) return null;
+        const siteAny = site as any;
+        return { id: String(site.id || siteAny._id || ""), name: site.name };
       })
       .filter((item): item is { id: string; name: string } => item !== null);
   });
