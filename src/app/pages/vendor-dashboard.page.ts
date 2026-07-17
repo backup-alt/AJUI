@@ -69,15 +69,14 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                     <div class="client-card-body">
                       <div class="card-head">
                         <div class="identity">
-                          <div class="avatar-block vendor-avatar">{{ vendorInitials(vendor.name) }}</div>
+                          <div class="avatar-block">{{ vendorInitials(vendor.name) }}</div>
                           <div class="identity-text">
                             <h3>{{ vendor.name }}</h3>
                             <p><ion-icon name="call-outline"></ion-icon>{{ vendor.phone }}</p>
                           </div>
                         </div>
                         <div class="head-meta">
-                          <span class="material-type-badge">{{ vendor.materialType }}</span>
-                          <span class="vendor-status-pill" [class.is-active]="vendor.status !== 'Not Active'" [class.is-inactive]="vendor.status === 'Not Active'">
+                          <span class="status-pill" [class.is-active]="vendor.status !== 'Not Active'" [class.is-inactive]="vendor.status === 'Not Active'">
                             <ion-icon [name]="vendor.status === 'Not Active' ? 'pause-circle-outline' : 'checkmark-circle-outline'"></ion-icon>
                             {{ vendor.status || 'Active' }}
                           </span>
@@ -87,6 +86,10 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                       <p class="address"><ion-icon name="location-outline"></ion-icon>{{ vendor.address }}</p>
 
                       <div class="ledger-box">
+                        <div class="ledger-row strong">
+                          <span>Material Type</span>
+                          <strong>{{ vendor.materialType }}</strong>
+                        </div>
                         <div class="ledger-row">
                           <span>GST Number</span>
                           <strong class="gst-number">{{ vendor.gst }}</strong>
@@ -140,21 +143,21 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                     (keydown.enter)="openSite(site)"
                   >
                     <div class="client-card-body">
-                      <div class="card-head">
-                        <div class="identity">
-                          <div class="avatar-block site-avatar">
-                            <ion-icon name="location-outline"></ion-icon>
+<div class="card-head">
+                          <div class="identity">
+                            <div class="avatar-block">
+                              <ion-icon name="location-outline"></ion-icon>
+                            </div>
+                            <div class="identity-text">
+                              <h3>{{ site.name }}</h3>
+                              <p class="site-meta">
+                                <span class="meta-item">{{ site.materialEntryCount }} entries</span>
+                                <span class="meta-item">{{ site.materialCount }} types</span>
+                              </p>
+                            </div>
                           </div>
-                          <div class="identity-text">
-                            <h3>{{ site.name }}</h3>
-                            <p class="site-meta">
-                              <span class="meta-item">{{ site.materialEntryCount }} entries</span>
-                              <span class="meta-item">{{ site.materialCount }} types</span>
-                            </p>
-                          </div>
+                          <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
                         </div>
-                        <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
-                      </div>
                       <div class="ledger-box">
                         <div class="ledger-row">
                           <span>Purchase Value</span>
@@ -432,102 +435,15 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       cursor: pointer;
       font-size: 12px;
     }
-    .vendor-card {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      min-height: 360px;
-      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
-      border: 1px solid #dfe6ef;
-      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-    }
-    .vendor-card:hover {
-      transform: translateY(-3px);
-      border-color: rgba(184, 99, 16, 0.5);
-      box-shadow: 0 22px 44px rgba(15, 23, 42, 0.14);
-    }
-    .vendor-card.is-inactive {
-      opacity: 0.78;
-      background: linear-gradient(180deg, #fafbfd 0%, #f4f6fa 100%);
-    }
     .vendor-card .card-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid #eef1f6;
-      margin-bottom: 14px;
-    }
-    .vendor-card .identity {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-      flex: 1 1 auto;
-    }
-    .vendor-card .identity-text {
-      min-width: 0;
-      flex: 1 1 auto;
-    }
-    .vendor-card .identity-text h3 {
-      margin: 0;
-      color: #0f172a;
-      font-size: 18px;
-      font-weight: 700;
-      line-height: 1.25;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .vendor-card .identity-text p {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin: 4px 0 0;
-      color: #64748b;
-      font-size: 13px;
-    }
-    .vendor-card .identity-text p ion-icon {
-      color: #94a3b8;
-      font-size: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5eaf1;
+      margin-bottom: 12px;
     }
     .vendor-card .head-meta {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 6px;
       flex: 0 0 auto;
     }
-    .vendor-card .address {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin: 0 0 14px;
-      color: #475569;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-    .vendor-card .address ion-icon {
-      margin-top: 2px;
-      color: #94a3b8;
-      font-size: 16px;
-      flex: 0 0 auto;
-    }
-    .material-type-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #eef3ff 0%, #e0eaff 100%);
-      color: #002263;
-      font-size: 11px;
-      font-weight: 700;
-      border: 1px solid #c7d9f5;
-      letter-spacing: 0.02em;
-    }
-    .vendor-status-pill {
+    .status-pill {
       display: inline-flex;
       align-items: center;
       gap: 4px;
@@ -539,13 +455,13 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       border: 1px solid transparent;
       transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
     }
-    .vendor-status-pill ion-icon { font-size: 13px; }
-    .vendor-status-pill.is-active {
+    .status-pill ion-icon { font-size: 13px; }
+    .status-pill.is-active {
       background: rgba(16, 185, 129, 0.12);
       color: #047857;
       border-color: rgba(16, 185, 129, 0.32);
     }
-    .vendor-status-pill.is-inactive {
+    .status-pill.is-inactive {
       background: rgba(239, 68, 68, 0.12);
       color: #b91c1c;
       border-color: rgba(239, 68, 68, 0.3);
@@ -555,98 +471,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       font-size: 12px;
       letter-spacing: 0.5px;
       color: #475569;
-    }
-    .vendor-avatar {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #5c3d00 0%, #b86310 100%);
-      color: #fff;
-      font-size: 16px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      box-shadow: 0 6px 14px rgba(184, 99, 16, 0.28);
-      flex: 0 0 auto;
-    }
-    .vendor-card .client-card-body {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      padding: 20px 20px 14px;
-    }
-    .vendor-card .ledger-box {
-      margin-top: auto;
-      padding: 12px 14px;
-      border-radius: 10px;
-      background: #f7faff;
-      border: 1px solid #e3ebf5;
-    }
-    .vendor-card .ledger-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13px;
-      color: #475569;
-    }
-    .vendor-card .ledger-row + .ledger-row {
-      margin-top: 6px;
-    }
-    .vendor-card .ledger-row strong {
-      color: #0f172a;
-      font-weight: 700;
-    }
-    .vendor-card .client-card-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 16px;
-      border-top: 1px solid #eef1f6;
-      background: #fbfcfe;
-    }
-    .vendor-card .footer-label {
-      color: #475569;
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .client-card-footer-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .client-edit-action {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: 999px;
-      border: 1px solid rgba(184, 99, 16, 0.32);
-      background: linear-gradient(135deg, #b86310 0%, #d97a18 100%);
-      color: #ffffff;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      cursor: pointer;
-      box-shadow: 0 6px 14px rgba(184, 99, 16, 0.32);
-      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
-    }
-    .client-edit-action:hover {
-      transform: translateY(-1px);
-      background: linear-gradient(135deg, #c66f15 0%, #e88a1d 100%);
-      box-shadow: 0 10px 22px rgba(184, 99, 16, 0.42);
-    }
-    .client-edit-action:active {
-      transform: translateY(0);
-      box-shadow: 0 4px 10px rgba(184, 99, 16, 0.32);
-    }
-    .client-edit-action ion-icon {
-      font-size: 15px;
-    }
-    .client-edit-action strong {
-      color: #fff;
     }
     .vendor-breadcrumb {
       display: flex;
@@ -671,39 +495,45 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       color: #1e293b;
     }
     .back-btn:hover { background: #e2e8f0; }
+    .client-card-footer-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .client-edit-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+    .client-edit-action:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+      color: #1e293b;
+    }
+    .client-edit-action ion-icon { font-size: 15px; }
+    .vendor-card .client-card-body {
+      padding: 18px 20px 14px;
+    }
     .site-avatar {
       display: flex;
       align-items: center;
       justify-content: center;
       width: 44px;
       height: 44px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #002263 0%, #1a4499 100%);
-      color: #fff;
+      border-radius: 8px;
+      background: #f3f5f8;
+      color: #0b1020;
       font-size: 18px;
-      box-shadow: 0 6px 14px rgba(26, 68, 153, 0.28);
       flex: 0 0 auto;
-    }
-    .site-card {
-      cursor: pointer;
-      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-      min-height: 320px;
-      height: 320px;
-      overflow: hidden;
-      flex-direction: column;
-      border: 1px solid #dfe6ef;
-      border-radius: 14px;
-      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
-      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-      display: flex;
-    }
-    .site-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(26, 68, 153, 0.4);
-      box-shadow: 0 20px 42px rgba(15, 23, 42, 0.12);
-    }
-    .site-card.is-inactive {
-      opacity: 0.7;
     }
     .site-card .card-head {
       display: flex;
@@ -1211,6 +1041,7 @@ export class VendorDashboardPage {
             gst: v.gstNumber || v.gst,
             status,
             _id: v._id,
+            siteIds: v.siteIds || [],
           } as Vendor;
         });
         this.vendors.set(mapped);
@@ -1429,6 +1260,7 @@ export class VendorDashboardPage {
       address: value.address,
       gstNumber: value.gst,
       status: statusValue,
+      siteIds: value.siteIds || [],
     };
 
     const tempId = `VEN-LOCAL-${Date.now()}`;
@@ -1473,6 +1305,7 @@ export class VendorDashboardPage {
       address: vendor.address,
       gst: vendor.gst,
       status: vendor.status === "Not Active" ? "Not Active" : "Active",
+      siteIds: (vendor as any).siteIds || [],
     };
   }
 
@@ -1489,6 +1322,7 @@ export class VendorDashboardPage {
       address: value.address,
       gstNumber: value.gst,
       status: statusValue,
+      siteIds: value.siteIds || [],
     };
 
     this.vendors.update((list) => list.map((v) => (v.id === vendor.id ? { ...v, ...value, status: statusValue } : v)));

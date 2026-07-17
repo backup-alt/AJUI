@@ -2,12 +2,15 @@ import { Quotation, IQuotation } from "../models/Quotation.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 export async function createQuotation(input: Partial<IQuotation> & { quotationNumber: string }) {
-  const quotation = await Quotation.create(input);
+  const existing = await Quotation.findOne({ quotationNumber: input.quotationNumber }).lean();
+  if (existing) throw new AppError(409, `Quotation ${input.quotationNumber} already exists`);
+  const quotation = await Quotation.create({ ...input, archived: false });
   return quotation.toObject();
 }
 
-export async function listQuotations(filter: { search?: string; status?: string; page?: number; limit?: number } = {}) {
+export async function listQuotations(filter: { search?: string; status?: string; page?: number; limit?: number; includeArchived?: boolean } = {}) {
   const query: Record<string, unknown> = {};
+  if (!filter.includeArchived) query.archived = false;
   if (filter.status) query.status = filter.status;
   if (filter.search) {
     query.$or = [
@@ -42,7 +45,7 @@ export async function updateQuotation(id: string, patch: Partial<IQuotation>) {
 }
 
 export async function deleteQuotation(id: string) {
-  const result = await Quotation.findByIdAndDelete(id);
+  const result = await Quotation.findByIdAndUpdate(id, { archived: true }, { new: true });
   if (!result) throw new AppError(404, "Quotation not found");
 }
 

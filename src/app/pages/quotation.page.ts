@@ -1,13 +1,15 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal, computed } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney } from "../shared/format";
 import type { Quotation, QuotationRow } from "../../data/dashboardData";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 const INDIAN_STATES = [
   "Tamil Nadu", "Kerala", "Karnataka", "Andhra Pradesh", "Telangana",
@@ -123,8 +125,9 @@ function numberToWords(num: number): string {
                   </button>
                   <div class="editor-actions">
                     <button type="button" class="btn-outline" (click)="exportToExcel()">Export Excel</button>
-                    <button type="button" class="btn-outline" (click)="exportToPDF()">Export PDF</button>
-                    <button type="button" class="btn-primary" (click)="saveQuotation()">Save Quotation</button>
+                    <button type="button" class="btn-outline" (click)="exportToPDF()" [disabled]="savingPdf()">Export PDF</button>
+                    <button type="button" class="btn-secondary" (click)="saveQuotation('Draft')" [disabled]="savingQuote()">Save as Draft</button>
+                    <button type="button" class="btn-primary" (click)="saveQuotation('Sent')" [disabled]="savingQuote()">Save & Send</button>
                   </div>
                 </div>
 
@@ -339,6 +342,20 @@ function numberToWords(num: number): string {
       cursor: pointer;
     }
     .btn-outline:hover { background: #eef2ff; }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      background: #fff;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-secondary:hover { background: #f8fafc; border-color: #94a3b8; }
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -796,6 +813,8 @@ export class QuotationPage {
   readonly editingQuotation = signal(false);
   readonly showAddColumnInput = signal(false);
   readonly newColumnName = signal("");
+  readonly savingPdf = signal(false);
+  readonly savingQuote = signal(false);
 
   readonly editingQuoteId = signal<string | null>(null);
   readonly quotationRows = signal<QuotationRow[]>([]);
@@ -841,6 +860,39 @@ export class QuotationPage {
   );
 
   readonly amountInWords = computed(() => numberToWords(Math.round(this.totalAmount())));
+
+  constructor() {
+    this.loadQuotationsFromBackend();
+  }
+
+  private loadQuotationsFromBackend() {
+    this.api.listQuotations({ limit: 100 }).subscribe({
+      next: (res) => {
+        const items = (res.items || []).map((q: any) => ({
+          id: q._id,
+          quotationNumber: q.quotationNumber,
+          date: q.date,
+          clientName: q.clientName,
+          clientAddress: q.clientAddress,
+          clientState: q.clientState,
+          clientGstin: q.clientGstin,
+          items: q.items || [],
+          customColumns: q.customColumns || [],
+          subtotal: q.subtotal || 0,
+          cgstPercent: q.cgstPercent || 9,
+          sgstPercent: q.sgstPercent || 9,
+          cgstAmount: q.cgstAmount || 0,
+          sgstAmount: q.sgstAmount || 0,
+          roundOff: q.roundOff || 0,
+          totalAmount: q.totalAmount || 0,
+          amountInWords: q.amountInWords || "",
+          status: q.status || "Draft",
+        }));
+        this.data.quotations.set(items as any);
+      },
+      error: () => {},
+    });
+  }
 
   startNewQuotation() {
     this.editingQuoteId.set(null);
@@ -923,11 +975,13 @@ export class QuotationPage {
     this.quotationRows.update(rows => [...rows]);
   }
 
-  saveQuotation() {
+  async saveQuotation(status: "Draft" | "Sent") {
     if (this.quotationRows().length === 0) {
       alert("Please add at least one item.");
       return;
     }
+
+    this.savingQuote.set(true);
 
     const quotationData = {
       quotationNumber: this.currentQuoteNumber(),
@@ -950,35 +1004,74 @@ export class QuotationPage {
       roundOff: this.roundOff,
       totalAmount: this.totalAmount(),
       amountInWords: this.amountInWords(),
-      status: "Draft" as const,
+      status,
     };
 
     const existingId = this.editingQuoteId();
-    if (existingId) {
-      this.data.updateQuotation(existingId, quotationData);
-    } else {
-      this.data.addQuotation(quotationData);
+
+    try {
+      if (existingId) {
+        await this.api.patchQuotation(existingId, quotationData).toPromise();
+        this.data.updateQuotation(existingId, quotationData as any);
+        this.editingQuoteId.set(null);
+      } else {
+        const created = await this.api.createQuotation(quotationData).toPromise();
+        this.data.addQuotation(quotationData as any);
+        this.editingQuoteId.set(null);
+      }
+      this.editingQuotation.set(false);
+      this.loadQuotationsFromBackend();
+    } catch (err: any) {
+      alert("Failed to save quotation: " + (err?.message || "Unknown error"));
+    } finally {
+      this.savingQuote.set(false);
     }
-
-    this.api.createQuotation(quotationData).subscribe({
-      next: () => {},
-      error: () => {},
-    });
-
-    this.cancelEdit();
   }
 
   deleteQuotation(id: string) {
     if (!confirm("Delete this quotation?")) return;
-    this.data.deleteQuotation(id);
     this.api.deleteQuotation(id).subscribe({
-      next: () => {},
-      error: () => {},
+      next: () => {
+        this.data.deleteQuotation(id);
+        this.loadQuotationsFromBackend();
+      },
+      error: (err: any) => {
+        alert("Failed to delete quotation: " + (err?.message || "Unknown error"));
+      },
     });
   }
 
-  exportToPDF() {
-    window.print();
+  async exportToPDF() {
+    const el = document.getElementById("quotation-print-area");
+    if (!el) return;
+    this.savingPdf.set(true);
+    try {
+      el.style.width = "794px";
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+      el.style.width = "";
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      pdf.save(`quotation-${this.currentQuoteNumber()}.pdf`);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      this.savingPdf.set(false);
+    }
   }
 
   exportToExcel() {

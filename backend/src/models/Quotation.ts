@@ -34,6 +34,7 @@ export interface IQuotation extends Document {
   totalAmount: number;
   amountInWords: string;
   status: QuotationStatus;
+  archived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -78,6 +79,7 @@ const quotationSchema = new Schema<IQuotation>(
       default: "Draft",
       index: true,
     },
+    archived: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );

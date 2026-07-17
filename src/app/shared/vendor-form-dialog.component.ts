@@ -1,7 +1,8 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from "@angular/core";
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, inject, signal } from "@angular/core";
 import { IonIcon } from "@ionic/angular/standalone";
 import { FormsModule } from "@angular/forms";
+import { ApiService } from "../core/api.service";
 import type { VendorStatus } from "../data/erp-data.service";
 
 export type VendorFormValue = {
@@ -11,7 +12,10 @@ export type VendorFormValue = {
   address: string;
   gst: string;
   status: VendorStatus;
+  siteIds: string[];
 };
+
+type SiteOption = { _id: string; name: string; siteId: string };
 
 @Component({
   selector: "agb-vendor-form-dialog",
@@ -53,6 +57,34 @@ export type VendorFormValue = {
             <textarea name="address" required rows="3" [value]="initialValue?.address || ''" placeholder="Door no, street, area, city"></textarea>
           </label>
           <label class="span-2">
+            <span>Assign Sites <em class="req">*</em></span>
+            <div class="site-dropdown" [class.open]="siteDropdownOpen">
+              <button type="button" class="site-trigger" (click)="siteDropdownOpen = !siteDropdownOpen">
+                <span>{{ selectedLabel }}</span>
+                <ion-icon [name]="siteDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+              </button>
+              @if (siteDropdownOpen) {
+                <div class="site-panel">
+                  @if (loadingSites()) {
+                    <p class="site-msg">Loading sites...</p>
+                  } @else if (siteOptions().length === 0) {
+                    <p class="site-msg">No sites found.</p>
+                  } @else {
+                    @for (site of siteOptions(); track site._id) {
+                      <label class="site-opt">
+                        <input type="checkbox" [checked]="isSelected(site._id)" (change)="toggle(site._id, $any($event.target).checked)" />
+                        <span>{{ site.name }}</span>
+                      </label>
+                    }
+                  }
+                </div>
+              }
+            </div>
+            @if (siteError()) {
+              <p class="field-error">{{ siteError() }}</p>
+            }
+          </label>
+          <label class="span-2">
             <span>Status</span>
             <select name="status" required [(ngModel)]="statusValue" class="form-select">
               <option value="Active">Active</option>
@@ -68,9 +100,39 @@ export type VendorFormValue = {
       </section>
     </div>
   `,
+  styles: [`
+    .site-dropdown { position: relative; width: 100%; }
+    .site-trigger {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; padding: 9px 12px;
+      border: 1px solid #cbd5e1; border-radius: 6px;
+      background: #fff; cursor: pointer;
+      font-size: 14px; color: #1e293b; text-align: left;
+    }
+    .site-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .site-dropdown.open .site-trigger {
+      border-color: #2c5cff;
+      box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.1);
+    }
+    .site-panel {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12); z-index: 100;
+      max-height: 220px; overflow-y: auto; padding: 6px 0;
+    }
+    .site-opt {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; cursor: pointer; font-size: 14px; color: #1e293b;
+    }
+    .site-opt:hover { background: #f8fafc; }
+    .site-opt input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+    .site-msg { padding: 12px 14px; color: #64748b; font-size: 13px; margin: 0; }
+    .req { color: #dc2626; }
+    .field-error { color: #dc2626; font-size: 12px; margin: 4px 0 0; }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class VendorFormDialogComponent {
+export class VendorFormDialogComponent implements OnInit {
   @Input() eyebrow = "Vendor Setup";
   @Input() title = "Add New Vendor";
   @Input() description = "Create the vendor record to track material purchases, PO numbers, and payment history.";
@@ -79,17 +141,65 @@ export class VendorFormDialogComponent {
   @Output() cancel = new EventEmitter<void>();
   @Output() create = new EventEmitter<VendorFormValue>();
 
+  private readonly api = inject(ApiService);
+
   statusValue: VendorStatus = "Active";
+  readonly siteOptions = signal<SiteOption[]>([]);
+  readonly loadingSites = signal(false);
+  readonly siteError = signal<string | null>(null);
+  private selectedSiteIds = new Set<string>();
+  siteDropdownOpen = false;
 
   ngOnInit() {
     this.statusValue = this.initialValue?.status ?? "Active";
+    if (this.initialValue?.siteIds?.length) {
+      this.initialValue.siteIds.forEach((id) => this.selectedSiteIds.add(id));
+    }
+    this.loadSites();
+  }
+
+  private loadSites() {
+    this.loadingSites.set(true);
+    this.api.listSitesAdmin().subscribe({
+      next: (res) => {
+        this.siteOptions.set(res.sites || []);
+        this.loadingSites.set(false);
+      },
+      error: () => {
+        this.siteError.set("Failed to load sites");
+        this.loadingSites.set(false);
+      },
+    });
+  }
+
+  isSelected(id: string): boolean {
+    return this.selectedSiteIds.has(id);
+  }
+
+  toggle(id: string, checked: boolean) {
+    if (checked) this.selectedSiteIds.add(id);
+    else this.selectedSiteIds.delete(id);
+    this.siteError.set(null);
+  }
+
+  get selectedLabel(): string {
+    if (this.selectedSiteIds.size === 0) return "Select sites...";
+    const names = Array.from(this.selectedSiteIds)
+      .map((id) => this.siteOptions().find((s) => s._id === id)?.name)
+      .filter(Boolean);
+    if (names.length === 0) return "Select sites...";
+    if (names.length === 1) return names[0]!;
+    return `${names.length} sites selected`;
   }
 
   submit(event: Event) {
     event.preventDefault();
+    if (this.selectedSiteIds.size === 0) {
+      this.siteError.set("Please assign at least one site");
+      return;
+    }
     const form = event.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
-
     this.create.emit({
       name: String(formData.get("name") ?? "").trim(),
       materialType: String(formData.get("materialType") ?? "").trim(),
@@ -97,6 +207,7 @@ export class VendorFormDialogComponent {
       address: String(formData.get("address") ?? "").trim(),
       gst: String(formData.get("gst") ?? "").trim(),
       status: (String(formData.get("status") ?? "Active") === "Not Active" ? "Not Active" : "Active") as VendorStatus,
+      siteIds: Array.from(this.selectedSiteIds),
     });
   }
 }
