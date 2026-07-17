@@ -372,15 +372,21 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor") return [];
     const assignedSiteIds = new Set((emp.assignedSiteIds || []).map(id => String(id)));
+    const assignedSitesValues = (emp.assignedSites || []).map(s => String(s).trim()).filter(Boolean);
     const assignedSiteNames = new Set(
-      (emp.assignedSites || []).map(s => String(s).trim().toLowerCase()).filter(Boolean)
+      assignedSitesValues.filter(v => !/^[a-f0-9]{24}$/i.test(v)).map(v => v.toLowerCase())
     );
-    const allIds = new Set([...assignedSiteIds]);
+    const isValidOid = (v: string) => /^[a-f0-9]{24}$/i.test(v);
     const allSites = this.erp.siteEntities();
     return allSites
       .filter((s) => {
         const siteAny = s as any;
-        const isAssignedById = allIds.has(String(s.id)) || allIds.has(String(siteAny._id));
+        const siteIdStr = String(s.id);
+        const siteIdAny = String(siteAny._id);
+        const isAssignedById =
+          assignedSiteIds.has(siteIdStr) ||
+          assignedSiteIds.has(siteIdAny) ||
+          assignedSitesValues.some(v => isValidOid(v) && (v === siteIdStr || v === siteIdAny));
         const isAssignedByName = s.name && assignedSiteNames.has(s.name.toLowerCase());
         return !isAssignedById && !isAssignedByName;
       })
@@ -394,13 +400,11 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor") return [];
     const allAssignedIds = (emp.assignedSiteIds || []).map(id => String(id));
-    const allAssignedNames = (emp.assignedSites || []).map(s => String(s).trim()).filter(Boolean);
     const uniqueIds = [...new Set(allAssignedIds)];
-    const uniqueNames = [...new Set(allAssignedNames.map(n => n.toLowerCase()))];
     const siteEntities = this.erp.siteEntities();
     const matched: Array<{ id: string; name: string }> = [];
 
-    // Match by ObjectId/_id/siteId first
+    // Match by ObjectId/_id/siteId from assignedSiteIds
     for (const id of uniqueIds) {
       const site = siteEntities.find(s => {
         const siteAny = s as any;
@@ -413,17 +417,27 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       matched.push({ id: String(site.id || siteAny._id || ""), name: site.name });
     }
 
-    // Match by name (for sites stored as name strings)
+    // For each value in assignedSites, try resolving as ObjectId first, then as name
+    const assignedSitesValues = (emp.assignedSites || []).map(s => String(s).trim()).filter(Boolean);
     const matchedIds = new Set(matched.map(m => m.id));
-    for (const nameLower of uniqueNames) {
-      // Skip if already matched by ID
-      const alreadyMatched = matched.some(m => m.name.toLowerCase() === nameLower);
-      if (alreadyMatched) continue;
-      const site = siteEntities.find(s => s.name && s.name.toLowerCase() === nameLower);
+    for (const value of assignedSitesValues) {
+      let site: any = undefined;
+      // Try as ObjectId/_id/siteId
+      site = siteEntities.find(s => {
+        const siteAny = s as any;
+        return String(s.id) === value ||
+          String(siteAny._id) === value ||
+          String(siteAny.siteId) === value;
+      });
+      // Fall back to name match
+      if (!site) {
+        site = siteEntities.find(s => s.name && s.name.toLowerCase() === value.toLowerCase());
+      }
       if (!site) continue;
       const siteAny = site as any;
       const siteId = String(site.id || siteAny._id || "");
       if (matchedIds.has(siteId)) continue;
+      if (matched.some(m => m.name.toLowerCase() === String(site.name || "").toLowerCase())) continue;
       matched.push({ id: siteId, name: site.name });
     }
 
