@@ -480,23 +480,37 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   private loadSitesAndEmployee(id: string) {
     this.loading.set(true);
 
-    // Load sites first, then load employee
+    // Try the admin endpoint first (returns all sites), fall back to scoped endpoint for non-admin users
     this.api.listSitesAdmin().subscribe({
       next: (res) => {
-        this.erp.siteEntities.update(() => (res?.sites || []).map((s: any) => ({
-          id: String(s._id || s.id),
-          name: s.name || "Unnamed Site",
-          status: s.status || "Active",
-          projectId: s.projectId || "",
-        })));
+        this.populateSiteEntities(res?.sites);
         // Now load the employee after sites are ready
         this.loadEmployeeAfterSites(id);
       },
       error: () => {
-        // Continue loading employee even if sites fail
-        this.loadEmployeeAfterSites(id);
+        // Admin endpoint failed (likely not an admin) - try scoped endpoint
+        this.api.listSites().subscribe({
+          next: (res2: any) => {
+            const sites = res2?.items || res2?.sites || [];
+            this.populateSiteEntities(sites);
+            this.loadEmployeeAfterSites(id);
+          },
+          error: () => {
+            // Both failed - continue anyway, sites may be loaded from cache
+            this.loadEmployeeAfterSites(id);
+          },
+        });
       },
     });
+  }
+
+  private populateSiteEntities(sites: any[]) {
+    this.erp.siteEntities.update(() => (sites || []).map((s: any) => ({
+      id: String(s._id || s.id),
+      name: s.name || "Unnamed Site",
+      status: s.status || "Active",
+      projectId: s.projectId || "",
+    })));
   }
 
   private loadEmployeeAfterSites(id: string) {
@@ -542,22 +556,32 @@ export class SettingsEmployeeDetailComponent implements OnInit {
         }
 
         const assignedSiteIds: string[] = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
-        const assignedSiteIdStrings: string[] = (row.assignedSites || []).map((s: any) => String(s));
-        const allSiteIds = [...new Set([...assignedSiteIds, ...assignedSiteIdStrings])];
+        // assignedSites from the backend may contain either ObjectId strings or site names (legacy data).
+        // Keep the raw values so the supervisorAssignedSiteNames computed can resolve them later
+        // against siteEntities (which may not have been populated at the time of this call).
+        const assignedSitesRaw: string[] = (row.assignedSites || []).map((s: any) => String(s)).filter(Boolean);
 
-        let assignedSites: string[] = [];
-        if (allSiteIds.length > 0) {
-          const siteEntities = this.erp.siteEntities();
-          assignedSites = allSiteIds
-            .map((siteId: string) => {
-              const site = siteEntities.find((s: any) =>
-                String(s.id) === siteId ||
-                String(s._id) === siteId ||
-                String(s.siteId) === siteId
-              );
-              return site ? site.name : null;
-            })
-            .filter((name): name is string => name !== null);
+        // Try to resolve to names now if siteEntities is available; if not, the computed will handle it.
+        const siteEntities = this.erp.siteEntities();
+        const resolvedAssignedSites: string[] = [];
+        if (siteEntities.length > 0) {
+          for (const raw of assignedSitesRaw) {
+            const matchByName = siteEntities.find((s: any) => s.name && s.name.toLowerCase() === raw.toLowerCase());
+            if (matchByName) {
+              resolvedAssignedSites.push(matchByName.name);
+              continue;
+            }
+            const matchById = siteEntities.find((s: any) => String(s.id) === raw || String(s._id) === raw);
+            if (matchById) {
+              resolvedAssignedSites.push(matchById.name);
+            } else {
+              // Not resolvable - keep as-is (might be a name not in entities yet)
+              resolvedAssignedSites.push(raw);
+            }
+          }
+        } else {
+          // siteEntities not loaded - pass through, the computed will resolve later
+          resolvedAssignedSites.push(...assignedSitesRaw);
         }
 
         this.employee.set({
@@ -571,7 +595,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : "",
           projectIds: row.assignedProjectIds ? row.assignedProjectIds.map((pid: any) => String(pid)) : [],
           assignedSiteIds,
-          assignedSites,
+          assignedSites: resolvedAssignedSites,
           assignedProjectIds: row.assignedProjects ? row.assignedProjects.map((pid: any) => String(pid)) : [],
         });
         this.loading.set(false);
