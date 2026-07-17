@@ -372,13 +372,17 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor") return [];
     const assignedSiteIds = new Set((emp.assignedSiteIds || []).map(id => String(id)));
-    const assignedSitesStr = new Set((emp.assignedSites || []).map(s => String(s)));
-    const allIds = new Set([...assignedSiteIds, ...assignedSitesStr]);
+    const assignedSiteNames = new Set(
+      (emp.assignedSites || []).map(s => String(s).trim().toLowerCase()).filter(Boolean)
+    );
+    const allIds = new Set([...assignedSiteIds]);
     const allSites = this.erp.siteEntities();
     return allSites
       .filter((s) => {
         const siteAny = s as any;
-        return !allIds.has(String(s.id)) && !allIds.has(String(siteAny._id));
+        const isAssignedById = allIds.has(String(s.id)) || allIds.has(String(siteAny._id));
+        const isAssignedByName = s.name && assignedSiteNames.has(s.name.toLowerCase());
+        return !isAssignedById && !isAssignedByName;
       })
       .map((s) => {
         const siteAny = s as any;
@@ -389,25 +393,41 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly supervisorAssignedSiteNames = computed<Array<{ id: string; name: string }>>(() => {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor") return [];
-    const allSiteIds = [
-      ...(emp.assignedSiteIds || []).map(id => String(id)),
-      ...(emp.assignedSites || []).map(s => String(s))
-    ];
-    const uniqueIds = [...new Set(allSiteIds)];
+    const allAssignedIds = (emp.assignedSiteIds || []).map(id => String(id));
+    const allAssignedNames = (emp.assignedSites || []).map(s => String(s).trim()).filter(Boolean);
+    const uniqueIds = [...new Set(allAssignedIds)];
+    const uniqueNames = [...new Set(allAssignedNames.map(n => n.toLowerCase()))];
     const siteEntities = this.erp.siteEntities();
-    return uniqueIds
-      .map(id => {
-        const site = siteEntities.find(s => {
-          const siteAny = s as any;
-          return String(s.id) === id ||
-            String(siteAny._id) === id ||
-            String(siteAny.siteId) === id;
-        });
-        if (!site) return null;
-        const siteAny = site as any;
-        return { id: String(site.id || siteAny._id || ""), name: site.name };
-      })
-      .filter((item): item is { id: string; name: string } => item !== null);
+    const matched: Array<{ id: string; name: string }> = [];
+
+    // Match by ObjectId/_id/siteId first
+    for (const id of uniqueIds) {
+      const site = siteEntities.find(s => {
+        const siteAny = s as any;
+        return String(s.id) === id ||
+          String(siteAny._id) === id ||
+          String(siteAny.siteId) === id;
+      });
+      if (!site) continue;
+      const siteAny = site as any;
+      matched.push({ id: String(site.id || siteAny._id || ""), name: site.name });
+    }
+
+    // Match by name (for sites stored as name strings)
+    const matchedIds = new Set(matched.map(m => m.id));
+    for (const nameLower of uniqueNames) {
+      // Skip if already matched by ID
+      const alreadyMatched = matched.some(m => m.name.toLowerCase() === nameLower);
+      if (alreadyMatched) continue;
+      const site = siteEntities.find(s => s.name && s.name.toLowerCase() === nameLower);
+      if (!site) continue;
+      const siteAny = site as any;
+      const siteId = String(site.id || siteAny._id || "");
+      if (matchedIds.has(siteId)) continue;
+      matched.push({ id: siteId, name: site.name });
+    }
+
+    return matched;
   });
 
   selectSiteToAssign(site: { id: string; name: string }) {
