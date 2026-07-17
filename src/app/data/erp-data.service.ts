@@ -383,6 +383,7 @@ export class ErpDataService {
     this.readState<Record<SharedModuleKey, string[]>>("hiddenTableFields", this.emptyHiddenFieldMap()),
   );
   readonly expenseOpeningBalances = signal<Record<string, number>>(this.readState<Record<string, number>>("expenseOpeningBalances", {}));
+  readonly siteKeys = signal<Record<string, string>>(this.readState<Record<string, string>>("siteKeys", {}));
   readonly projectActivity = signal<Record<string, number>>(this.readState<Record<string, number>>("projectActivity", {}));
   readonly settings = signal<ErpSettings>(
     this.normalizeSettings(this.readState<Partial<ErpSettings>>("settings", this.defaultSettings())),
@@ -416,6 +417,7 @@ export class ErpDataService {
     effect(() => this.writeState("hiddenTableRows", this.hiddenTableRows()));
     effect(() => this.writeState("hiddenTableFields", this.hiddenTableFields()));
     effect(() => this.writeState("expenseOpeningBalances", this.expenseOpeningBalances()));
+    effect(() => this.writeState("siteKeys", this.siteKeys()));
     effect(() => this.writeState("projectActivity", this.projectActivity()));
     effect(() => this.writeState("settings", this.settings()));
     effect(() => this.writeState("appUsers", this.users()));
@@ -798,7 +800,7 @@ export class ErpDataService {
     return project;
   }
 
-  addSiteToProject(projectId: string, siteName: string): Project | undefined {
+  addSiteToProject(projectId: string, siteName: string, openingBalance: number = 0): Project | undefined {
     const cleanName = siteName.trim();
     if (!cleanName) return undefined;
     let updatedProject: Project | undefined;
@@ -806,17 +808,24 @@ export class ErpDataService {
     this.projects.update((projectRows) =>
       projectRows.map((project) => {
         if (project.id !== projectId) return project;
-        const alreadyExists = project.sites.some((site) => site.toLowerCase() === cleanName.toLowerCase());
-        if (alreadyExists) {
-          updatedProject = project;
-          return project;
-        }
         updatedProject = { ...project, sites: [...project.sites, cleanName] };
         return updatedProject;
       }),
     );
 
-    if (updatedProject) this.touchProject(projectId);
+    if (updatedProject) {
+      this.api.createSite({ name: cleanName, projectIds: [projectId], openingBalance }).subscribe({
+        next: (res) => {
+          if (res?.site?._id) {
+            const siteKey = this.siteKeyFor(projectId, cleanName);
+            this.siteKeys.update((keys) => ({ ...keys, [siteKey]: res.site!._id }));
+          }
+        },
+        error: (err) => console.warn("[ERP] createSite failed:", err?.message ?? err),
+      });
+
+      this.touchProject(projectId);
+    }
     return updatedProject;
   }
 
@@ -836,10 +845,15 @@ export class ErpDataService {
     );
 
     if (updatedProject) {
-      const key = this.expenseOpeningBalanceKey(projectId, cleanName);
+      const balanceKey = this.expenseOpeningBalanceKey(projectId, cleanName);
+      const siteKey = this.siteKeyFor(projectId, cleanName);
       this.expenseOpeningBalances.update((balances) => {
-        const { [key]: _removed, ...nextBalances } = balances;
+        const { [balanceKey]: _removed, ...nextBalances } = balances;
         return nextBalances;
+      });
+      this.siteKeys.update((keys) => {
+        const { [siteKey]: _removed, ...nextKeys } = keys;
+        return nextKeys;
       });
     }
 
@@ -1122,25 +1136,67 @@ export class ErpDataService {
   sites(): { id: string; name: string }[] {
     const seen = new Set<string>();
     const list: { id: string; name: string }[] = [];
-    const push = (id: unknown, name: unknown) => {
-      if (!id) return;
-      const key = String(id);
+    const buildKey = (name: string, projectId?: string, index?: number) => {
+      const parts = [projectId || "", name || "", index === undefined || index === null ? "" : String(index)];
+      return parts.join("\u0001");
+    };
+    const push = (id: string, name: string, projectId?: string, index?: number) => {
+      const displayName = (name || id || "").trim();
+      if (!displayName && !id) return;
+      const key = buildKey(displayName, projectId, index);
       if (seen.has(key)) return;
       seen.add(key);
-      list.push({ id: key, name: String(name || key) });
+      list.push({ id: key, name: displayName });
     };
+
     for (const project of this.projects()) {
-      for (const site of project.sites ?? []) push(site, site);
+      const projectId = project.id;
+      const projectSites = project.sites ?? [];
+      projectSites.forEach((site, index) => push(String(site), String(site), projectId, index));
     }
-    for (const row of this.materials()) push(row["site"], row["site"]);
-    for (const row of this.labour()) push(row["site"], row["site"]);
-    for (const row of this.expenses()) push(row["site"], row["site"]);
-    
-    // Also include sites from backend (siteEntities signal)
+
+    const pushRowSite = (rawName: string, projectId?: string, index?: number) => {
+      const name = String(rawName || "").trim();
+      if (!name) return;
+      const match = this.projects().find(
+        (project) => project.id === projectId && (project.sites ?? []).some((s) => s === name)
+      );
+      const matchProjectId = match?.id ?? projectId ?? "";
+      const matchIndex = match
+        ? (match.sites ?? []).findIndex((s) => s === name)
+        : -1;
+      push(name, name, matchProjectId, matchIndex >= 0 ? matchIndex : (index ?? -1));
+    };
+
+    for (const row of this.materials()) {
+      const projectId = String(row["projectId"] || "").trim();
+      pushRowSite(String(row["site"] || "").trim(), projectId);
+    }
+    for (const row of this.labour()) {
+      const projectId = String(row["projectId"] || "").trim();
+      pushRowSite(String(row["site"] || "").trim(), projectId);
+    }
+    for (const row of this.expenses()) {
+      const projectId = String(row["projectId"] || "").trim();
+      pushRowSite(String(row["site"] || "").trim(), projectId);
+    }
+
     for (const site of this.siteEntities()) {
-      push(site.id, site.name);
+      const projectId = (site as { projectId?: string }).projectId;
+      const name = site.name || site.id;
+      if (!name) continue;
+      const match = projectId
+        ? this.projects().find(
+            (project) => project.id === projectId && (project.sites ?? []).some((s) => s === name)
+          )
+        : undefined;
+      const matchProjectId = match?.id ?? projectId ?? "";
+      const matchIndex = match
+        ? (match.sites ?? []).findIndex((s) => s === name)
+        : -1;
+      push(name, name, matchProjectId, matchIndex >= 0 ? matchIndex : undefined);
     }
-    
+
     return list;
   }
 
@@ -1438,7 +1494,16 @@ export class ErpDataService {
     return true;
   }
 
+  private siteKeyFor(projectId: string, siteName: string): string {
+    return `${projectId}::${siteName.trim().toLowerCase() || "project"}`;
+  }
+
   private expenseOpeningBalanceKey(projectId: string, siteName: string): string {
+    const siteKey = this.siteKeyFor(projectId, siteName);
+    const siteId = this.siteKeys()[siteKey];
+    if (siteId) {
+      return `${projectId}::site::${siteId}`;
+    }
     return `${projectId}::${siteName.trim().toLowerCase() || "project"}`;
   }
 

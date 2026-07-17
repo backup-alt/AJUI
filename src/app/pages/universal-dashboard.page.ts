@@ -19,7 +19,6 @@ type DashboardModule =
   | "generalExpenses"
   | "payments"
   | "vendors"
-  | "supervisors"
   | "subcontractors"
   | "reports";
 type TableRow = SharedTableRow;
@@ -76,12 +75,10 @@ const dashboardModules: ModuleConfig[] = [
       { key: "totalProjectValue", label: "Total Project Value" },
       { key: "amountReceived", label: "Amount Received" },
       { key: "pendingBalance", label: "Pending Balance" },
-      { key: "supervisor", label: "Supervisor" },
       { key: "status", label: "Status" },
     ],
     filters: [
       { key: "status", label: "Status" },
-      { key: "supervisor", label: "Supervisor" },
       { key: "projectCount", label: "Project Count" },
     ],
   },
@@ -128,14 +125,12 @@ const dashboardModules: ModuleConfig[] = [
       { key: "amount", label: "Amount" },
       { key: "siteMaterial", label: "Site Material" },
       { key: "runningBalance", label: "Balance" },
-      { key: "supervisor", label: "Supervisor" },
       { key: "poNumber", label: "PO Number" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
     filters: [
       { key: "project", label: "Project" },
       { key: "site", label: "Site" },
-      { key: "supervisor", label: "Supervisor" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
   },
@@ -194,29 +189,6 @@ const dashboardModules: ModuleConfig[] = [
     filters: [
       { key: "materialType", label: "Material Type" },
       { key: "vendorName", label: "Vendor" },
-    ],
-  },
-  {
-    key: "supervisors",
-    label: "Supervisors",
-    title: "Supervisor Master List",
-    description: "Company supervisor records with assignment, cash limits, advances, approval authority, and status.",
-    columns: [
-      { key: "supervisorName", label: "Supervisor Name" },
-      { key: "phoneNumber", label: "Phone Number" },
-      { key: "role", label: "Role" },
-      { key: "assignedProject", label: "Assigned Project" },
-      { key: "assignedSite", label: "Assigned Site" },
-      { key: "cashLimit", label: "Cash Limit" },
-      { key: "activeAdvances", label: "Active Advances" },
-      { key: "approvalAuthority", label: "Approval Authority" },
-      { key: "status", label: "Status" },
-    ],
-    filters: [
-      { key: "role", label: "Role" },
-      { key: "assignedProject", label: "Project" },
-      { key: "assignedSite", label: "Site" },
-      { key: "status", label: "Status" },
     ],
   },
   {
@@ -339,10 +311,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     <button
                       *ngFor="let site of universalSiteOptions()"
                       type="button"
-                      [class.active]="activeSiteFilter() === site"
-                      (click)="selectUniversalSite(site)"
+                      [class.active]="activeSiteFilter() === site.id"
+                      (click)="selectUniversalSite(site.id)"
                     >
-                      {{ site }}
+                      {{ site.name }}
                     </button>
                   </div>
                 </div>
@@ -1578,18 +1550,32 @@ export class UniversalDashboardPage {
     return field.label.toLowerCase().includes("daily wage");
   }
 
-  visibleRows(): TableRow[] {
+visibleRows(): TableRow[] {
     const query = this.searchText().trim().toLowerCase();
     const filters = this.selectedFilters();
     const module = this.activeModule();
     const activeSite = this.activeSiteFilter();
     const dateKey = this.dateFilterKey(module);
     const range = this.dateRange();
+    const siteOptions = this.universalSiteOptions();
+    const activeSiteOption = siteOptions.find((o) => o.id === activeSite);
+    const activeSiteName = activeSiteOption?.name ?? "";
     const rows = this.withComputedRows(module, this.rowsFor(module)).filter((row) => {
-      const matchesSite =
+      const rowSiteName = String(row[this.siteFieldForModule(module)] || "").trim();
+      const rowProjectId = String(row["projectId"] || row["__projectId"] || "").trim();
+      let matchesSite =
         !this.isUniversalSiteAware(module) ||
         activeSite === "All" ||
-        String(row[this.siteFieldForModule(module)] || "").toLowerCase() === activeSite.toLowerCase();
+        rowSiteName.toLowerCase() === activeSiteName.toLowerCase();
+      if (this.isUniversalSiteAware(module) && activeSite !== "All" && rowProjectId && rowSiteName) {
+        const project = this.data.projectById(rowProjectId);
+        const projectSites = project?.sites ?? [];
+        const siteIndex = projectSites.findIndex((s) => s.toLowerCase() === rowSiteName.toLowerCase());
+        if (siteIndex >= 0) {
+          const rowSiteKey = `${rowProjectId}\u0001${rowSiteName}\u0001${siteIndex}`;
+          matchesSite = rowSiteKey === activeSite;
+        }
+      }
       const matchesSearch = !query || Object.values(row).some((value) => String(value).toLowerCase().includes(query));
       const matchesFilters = Object.entries(filters).every(
         ([key, value]) => !value || String(row[key] ?? "").toLowerCase().includes(value.trim().toLowerCase()),
@@ -1616,31 +1602,25 @@ export class UniversalDashboardPage {
   }
 
   isUniversalSiteAware(module: DashboardModule): boolean {
-    return module === "materials" || module === "labour" || module === "expenses" || module === "supervisors" || module === "subcontractors";
+    return module === "materials" || module === "labour" || module === "expenses" || module === "subcontractors";
   }
 
   siteFieldForModule(module: DashboardModule): string {
-    return module === "supervisors" ? "assignedSite" : "site";
+    return "site";
   }
 
-  universalSiteOptions(): string[] {
-    const sites = new Set<string>();
-    for (const project of this.data.projects()) project.sites.forEach((site) => site && sites.add(site));
-    const siteKey = this.siteFieldForModule(this.activeModule());
-    for (const row of this.rowsFor(this.activeModule())) {
-      const site = String(row[siteKey] || "").trim();
-      if (site) sites.add(site);
-    }
-    return [...sites].sort((first, second) => first.localeCompare(second));
+  universalSiteOptions(): { id: string; name: string }[] {
+    return this.data.sites();
   }
 
   activeSiteFilter(): string {
     const site = this.activeSite();
-    return site === "All" || this.universalSiteOptions().includes(site) ? site : "All";
+    const options = this.universalSiteOptions();
+    return site === "All" || options.some((o) => o.id === site) ? site : "All";
   }
 
-  selectUniversalSite(site: string) {
-    this.activeSite.set(site);
+  selectUniversalSite(siteId: string) {
+    this.activeSite.set(siteId);
     this.closeDropdowns();
     this.clearRowSelection();
   }
@@ -2725,7 +2705,7 @@ export class UniversalDashboardPage {
       exportFormat,
     }));
 
-    return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, reports };
+    return { materials, clients, labour, expenses, generalExpenses, payments, vendors, subcontractors, reports };
   }
 
   private rowsFor(module: DashboardModule): TableRow[] {
@@ -2751,7 +2731,6 @@ export class UniversalDashboardPage {
     if (key === "approvalStatus") return ["Pending", "Approved", "Declined"];
     if (key === "status") {
       if (module === "clients") return ["Active", "On Hold", "Completed"];
-      if (module === "supervisors") return ["Active", "On Leave", "Inactive"];
       if (module === "reports") return ["Ready", "Scheduled", "Archived"];
       return ["Pending", "Approved", "Declined"];
     }
@@ -2848,17 +2827,6 @@ export class UniversalDashboardPage {
         phoneNumber: "",
         address: "",
         gstNumber: "",
-      },
-      supervisors: {
-        supervisorName: "",
-        phoneNumber: "",
-        role: "",
-        assignedProject: "",
-        assignedSite: "",
-        cashLimit: "0",
-        activeAdvances: "0",
-        approvalAuthority: "",
-        status: "Active",
       },
       subcontractors: {
         client: "",
