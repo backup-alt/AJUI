@@ -1,6 +1,8 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from "@angular/core";
 import { IonIcon } from "@ionic/angular/standalone";
+import { FormsModule } from "@angular/forms";
+import type { VendorStatus } from "../data/erp-data.service";
 
 export type VendorFormValue = {
   name: string;
@@ -8,12 +10,13 @@ export type VendorFormValue = {
   phone: string;
   address: string;
   gst: string;
+  status: VendorStatus;
 };
 
 @Component({
   selector: "agb-vendor-form-dialog",
   standalone: true,
-  imports: [CommonModule, IonIcon],
+  imports: [CommonModule, FormsModule, IonIcon],
   template: `
     <div class="form-overlay" role="presentation">
       <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="vendor-form-title">
@@ -49,6 +52,13 @@ export type VendorFormValue = {
             <span>Address</span>
             <textarea name="address" required rows="3" [value]="initialValue?.address || ''" placeholder="Door no, street, area, city"></textarea>
           </label>
+          <label class="span-2">
+            <span>Status</span>
+            <select name="status" required [(ngModel)]="statusValue" class="form-select">
+              <option value="Active">Active</option>
+              <option value="Not Active">Not Active</option>
+            </select>
+          </label>
 
           <div class="dialog-actions span-2">
             <button type="button" class="secondary-action" (click)="cancel.emit()">Cancel</button>
@@ -69,6 +79,12 @@ export class VendorFormDialogComponent {
   @Output() cancel = new EventEmitter<void>();
   @Output() create = new EventEmitter<VendorFormValue>();
 
+  statusValue: VendorStatus = "Active";
+
+  ngOnInit() {
+    this.statusValue = this.initialValue?.status ?? "Active";
+  }
+
   submit(event: Event) {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
@@ -80,6 +96,7 @@ export class VendorFormDialogComponent {
       phone: String(formData.get("phone") ?? "").trim(),
       address: String(formData.get("address") ?? "").trim(),
       gst: String(formData.get("gst") ?? "").trim(),
+      status: (String(formData.get("status") ?? "Active") === "Not Active" ? "Not Active" : "Active") as VendorStatus,
     });
   }
 }

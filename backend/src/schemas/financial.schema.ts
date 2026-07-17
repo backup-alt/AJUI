@@ -192,7 +192,7 @@ export const createVendorSchema = z.object({
     address: z.string().trim().min(1).max(500),
     gstNumber: z.string().trim().optional(),
     rating: z.coerce.number().min(0).max(5).default(0),
-    status: z.enum(["Active", "Inactive"]).default("Active"),
+    status: z.enum(["Active", "Inactive", "Not Active"]).default("Active"),
   }),
 });
 
@@ -204,7 +204,7 @@ export const updateVendorSchema = z.object({
 export const listVendorsSchema = z.object({
   query: z.object({
     materialType: z.string().optional(),
-    status: z.enum(["Active", "Inactive"]).optional(),
+    status: z.enum(["Active", "Inactive", "Not Active"]).optional(),
     search: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),

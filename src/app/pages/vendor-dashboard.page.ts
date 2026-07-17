@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
-import { Vendor, ErpDataService, Site } from "../data/erp-data.service";
+import { Vendor, VendorStatus, ErpDataService, Site } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
@@ -9,7 +9,6 @@ import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney } from "../shared/format";
 
-// Extended Site type for vendor sites with additional computed properties
 type VendorSite = Site & {
   materialEntryCount: number;
   materialNames: string[];
@@ -17,6 +16,8 @@ type VendorSite = Site & {
   totalGiven: number;
   materialCount: number;
 };
+
+type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string };
 
 @Component({
   standalone: true,
@@ -47,7 +48,6 @@ type VendorSite = Site & {
         <ion-content class="erp-page">
           <main class="client-landing">
             @if (!selectedVendor()) {
-              <!-- Vendor list view -->
               <section class="client-grid">
                 <article class="client-card add-client-card" role="button" tabindex="0" (click)="showVendorForm.set(true)" (keydown.enter)="showVendorForm.set(true)">
                   <div class="add-client-icon">
@@ -59,7 +59,8 @@ type VendorSite = Site & {
 
                 @for (vendor of vendors(); track vendor.id) {
                   <article
-                    class="client-card"
+                    class="client-card vendor-card"
+                    [class.is-inactive]="vendor.status === 'Not Active'"
                     role="button"
                     tabindex="0"
                     (click)="openVendor(vendor)"
@@ -69,12 +70,18 @@ type VendorSite = Site & {
                       <div class="card-head">
                         <div class="identity">
                           <div class="avatar-block vendor-avatar">{{ vendorInitials(vendor.name) }}</div>
-                          <div>
+                          <div class="identity-text">
                             <h3>{{ vendor.name }}</h3>
                             <p><ion-icon name="call-outline"></ion-icon>{{ vendor.phone }}</p>
                           </div>
                         </div>
-                        <span class="material-type-badge">{{ vendor.materialType }}</span>
+                        <div class="head-meta">
+                          <span class="material-type-badge">{{ vendor.materialType }}</span>
+                          <span class="vendor-status-pill" [class.is-active]="vendor.status !== 'Not Active'" [class.is-inactive]="vendor.status === 'Not Active'">
+                            <ion-icon [name]="vendor.status === 'Not Active' ? 'pause-circle-outline' : 'checkmark-circle-outline'"></ion-icon>
+                            {{ vendor.status || 'Active' }}
+                          </span>
+                        </div>
                       </div>
 
                       <p class="address"><ion-icon name="location-outline"></ion-icon>{{ vendor.address }}</p>
@@ -88,9 +95,10 @@ type VendorSite = Site & {
                     </div>
 
                     <div class="client-card-footer">
-                      <span>View Sites</span>
+                      <span class="footer-label">View Sites</span>
                       <div class="client-card-footer-actions">
                         <button type="button" class="client-edit-action" aria-label="Edit vendor" title="Edit Vendor" (click)="editVendor(vendor, $event)">
+                          <ion-icon name="create-outline"></ion-icon>
                           <strong>Edit Vendor</strong>
                         </button>
                       </div>
@@ -105,10 +113,13 @@ type VendorSite = Site & {
                 }
               </section>
             } @else if (!selectedSite()) {
-              <!-- Site list view for selected vendor -->
               <section class="vendor-breadcrumb">
                 <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
                 <h2>{{ selectedVendor()!.name }} – Sites</h2>
+                <span class="vendor-status-pill" [class.is-active]="selectedVendor()!.status !== 'Not Active'" [class.is-inactive]="selectedVendor()!.status === 'Not Active'">
+                  <ion-icon [name]="selectedVendor()!.status === 'Not Active' ? 'pause-circle-outline' : 'checkmark-circle-outline'"></ion-icon>
+                  {{ selectedVendor()!.status || 'Active' }}
+                </span>
               </section>
 
               @if (loadingSites()) {
@@ -122,6 +133,7 @@ type VendorSite = Site & {
                 @for (site of vendorSites(); track site.id) {
                   <article
                     class="client-card site-card"
+                    [class.is-inactive]="selectedVendor()!.status === 'Not Active'"
                     role="button"
                     tabindex="0"
                     (click)="openSite(site)"
@@ -133,7 +145,7 @@ type VendorSite = Site & {
                           <div class="avatar-block site-avatar">
                             <ion-icon name="location-outline"></ion-icon>
                           </div>
-                          <div>
+                          <div class="identity-text">
                             <h3>{{ site.name }}</h3>
                             <p class="site-meta">
                               <span class="meta-item">{{ site.materialEntryCount }} entries</span>
@@ -157,6 +169,10 @@ type VendorSite = Site & {
                         <span class="site-status" [class.active]="site.status === 'Active'" [class.on-hold]="site.status === 'On Hold'" [class.completed]="site.status === 'Completed'">
                           {{ site.status || 'Active' }}
                         </span>
+                        <span class="vendor-status-pill" [class.is-active]="selectedVendor()!.status !== 'Not Active'" [class.is-inactive]="selectedVendor()!.status === 'Not Active'">
+                          <ion-icon [name]="selectedVendor()!.status === 'Not Active' ? 'pause-circle-outline' : 'checkmark-circle-outline'"></ion-icon>
+                          {{ selectedVendor()!.status || 'Active' }}
+                        </span>
                       </div>
                     </div>
                   </article>
@@ -170,7 +186,6 @@ type VendorSite = Site & {
                 }
               </section>
             } @else {
-              <!-- Material purchase table for selected site -->
               <nav class="breadcrumb" aria-label="Breadcrumb">
                 <button type="button" class="breadcrumb-link" (click)="backToVendors()">Vendors</button>
                 <span class="breadcrumb-sep">›</span>
@@ -237,6 +252,7 @@ type VendorSite = Site & {
                       <th class="col-amount">Given Amt</th>
                       <th class="col-payment">Payment Type</th>
                       <th class="col-date">Delivered On</th>
+                      <th class="col-bill">Bill / Reference</th>
                       @for (col of customColumns(); track col) {
                         <th class="col-custom">
                           {{ col }}
@@ -314,6 +330,18 @@ type VendorSite = Site & {
                             {{ row.deliveredOn || '-' }}
                           }
                         </td>
+                        <td class="col-bill">
+                          @if (billLinkFor(row.id); as link) {
+                            <a class="bill-link" [href]="link.billUrl" target="_blank" rel="noopener noreferrer" [title]="link.billUrl">
+                              <ion-icon name="link-outline"></ion-icon>
+                              <span>{{ link.billLabel || shortLinkLabel(link.billUrl) }}</span>
+                            </a>
+                          } @else if (editingRowId() === row.id) {
+                            <input type="text" [value]="draftBillLink(row.id)" (input)="setDraftBillLink(row.id, $any($event.target).value)" (blur)="commitBillLink(row.id, $any($event.target).value)" placeholder="Paste PCLOUD URL" class="table-input" />
+                          } @else {
+                            <span class="bill-empty">—</span>
+                          }
+                        </td>
                         @for (col of customColumns(); track col) {
                           <td class="col-custom">
                             @if (editingRowId() === row.id) {
@@ -346,7 +374,7 @@ type VendorSite = Site & {
                     }
                     @if (filteredSiteMaterials().length === 0 && !loadingMaterials()) {
                       <tr>
-                        <td class="empty-row" [attr.colspan]="8 + customColumns().length">
+                        <td class="empty-row" [attr.colspan]="9 + customColumns().length">
                           <span>{{ materialSearchQuery() ? 'No materials match your search.' : 'No material purchases recorded for this site.' }}</span>
                         </td>
                       </tr>
@@ -404,25 +432,221 @@ type VendorSite = Site & {
       cursor: pointer;
       font-size: 12px;
     }
+    .vendor-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-height: 360px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+      border: 1px solid #dfe6ef;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    }
+    .vendor-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(184, 99, 16, 0.5);
+      box-shadow: 0 22px 44px rgba(15, 23, 42, 0.14);
+    }
+    .vendor-card.is-inactive {
+      opacity: 0.78;
+      background: linear-gradient(180deg, #fafbfd 0%, #f4f6fa 100%);
+    }
+    .vendor-card .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #eef1f6;
+      margin-bottom: 14px;
+    }
+    .vendor-card .identity {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .vendor-card .identity-text {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .vendor-card .identity-text h3 {
+      margin: 0;
+      color: #0f172a;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .vendor-card .identity-text p {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 4px 0 0;
+      color: #64748b;
+      font-size: 13px;
+    }
+    .vendor-card .identity-text p ion-icon {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .vendor-card .head-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+    .vendor-card .address {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 0 0 14px;
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .vendor-card .address ion-icon {
+      margin-top: 2px;
+      color: #94a3b8;
+      font-size: 16px;
+      flex: 0 0 auto;
+    }
     .material-type-badge {
       display: inline-flex;
       align-items: center;
       padding: 4px 10px;
       border-radius: 999px;
-      background: #eef3ff;
+      background: linear-gradient(135deg, #eef3ff 0%, #e0eaff 100%);
       color: #002263;
       font-size: 11px;
       font-weight: 700;
       border: 1px solid #c7d9f5;
+      letter-spacing: 0.02em;
+    }
+    .vendor-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+      transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+    }
+    .vendor-status-pill ion-icon { font-size: 13px; }
+    .vendor-status-pill.is-active {
+      background: rgba(16, 185, 129, 0.12);
+      color: #047857;
+      border-color: rgba(16, 185, 129, 0.32);
+    }
+    .vendor-status-pill.is-inactive {
+      background: rgba(239, 68, 68, 0.12);
+      color: #b91c1c;
+      border-color: rgba(239, 68, 68, 0.3);
     }
     .gst-number {
-      font-family: monospace;
+      font-family: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
       font-size: 12px;
       letter-spacing: 0.5px;
-      color: #667085;
+      color: #475569;
     }
     .vendor-avatar {
-      background: linear-gradient(135deg, #5c3d00, #b86310) !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #5c3d00 0%, #b86310 100%);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      box-shadow: 0 6px 14px rgba(184, 99, 16, 0.28);
+      flex: 0 0 auto;
+    }
+    .vendor-card .client-card-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      padding: 20px 20px 14px;
+    }
+    .vendor-card .ledger-box {
+      margin-top: auto;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #f7faff;
+      border: 1px solid #e3ebf5;
+    }
+    .vendor-card .ledger-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #475569;
+    }
+    .vendor-card .ledger-row + .ledger-row {
+      margin-top: 6px;
+    }
+    .vendor-card .ledger-row strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .vendor-card .client-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-top: 1px solid #eef1f6;
+      background: #fbfcfe;
+    }
+    .vendor-card .footer-label {
+      color: #475569;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .client-card-footer-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .client-edit-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(184, 99, 16, 0.32);
+      background: linear-gradient(135deg, #b86310 0%, #d97a18 100%);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      box-shadow: 0 6px 14px rgba(184, 99, 16, 0.32);
+      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+    .client-edit-action:hover {
+      transform: translateY(-1px);
+      background: linear-gradient(135deg, #c66f15 0%, #e88a1d 100%);
+      box-shadow: 0 10px 22px rgba(184, 99, 16, 0.42);
+    }
+    .client-edit-action:active {
+      transform: translateY(0);
+      box-shadow: 0 4px 10px rgba(184, 99, 16, 0.32);
+    }
+    .client-edit-action ion-icon {
+      font-size: 15px;
+    }
+    .client-edit-action strong {
+      color: #fff;
     }
     .vendor-breadcrumb {
       display: flex;
@@ -448,35 +672,117 @@ type VendorSite = Site & {
     }
     .back-btn:hover { background: #e2e8f0; }
     .site-avatar {
-      background: linear-gradient(135deg, #002263, #1a4499) !important;
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #002263 0%, #1a4499 100%);
       color: #fff;
       font-size: 18px;
+      box-shadow: 0 6px 14px rgba(26, 68, 153, 0.28);
+      flex: 0 0 auto;
     }
     .site-card {
       cursor: pointer;
       transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-      min-height: 312px;
+      min-height: 320px;
+      height: 320px;
       overflow: hidden;
       flex-direction: column;
       border: 1px solid #dfe6ef;
-      border-radius: 8px;
-      background: #ffffff;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
       box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+      display: flex;
     }
     .site-card:hover {
       transform: translateY(-2px);
-      border-color: rgba(212, 180, 90, 0.62);
-      box-shadow: 0 20px 42px rgba(15, 23, 42, 0.1);
+      border-color: rgba(26, 68, 153, 0.4);
+      box-shadow: 0 20px 42px rgba(15, 23, 42, 0.12);
+    }
+    .site-card.is-inactive {
+      opacity: 0.7;
+    }
+    .site-card .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .site-card .identity {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .site-card .identity-text {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .site-card h3 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .site-card .site-meta {
+      display: flex;
+      gap: 6px;
+      margin: 4px 0 0;
+      flex-wrap: wrap;
+    }
+    .site-card .meta-item {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #4338ca;
+      font-size: 11px;
+      font-weight: 600;
     }
     .arrow-icon {
       font-size: 20px;
       color: #94a3b8;
+    }
+    .site-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid #eef1f6;
+    }
+    .site-status {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      background: rgba(148, 163, 184, 0.18);
+      color: #475569;
+    }
+    .site-status.active {
+      background: rgba(16, 185, 129, 0.14);
+      color: #047857;
+    }
+    .site-status.on-hold {
+      background: rgba(245, 158, 11, 0.16);
+      color: #b45309;
+    }
+    .site-status.completed {
+      background: rgba(59, 130, 246, 0.14);
+      color: #1d4ed8;
     }
     .loading-indicator {
       display: flex;
@@ -676,6 +982,7 @@ type VendorSite = Site & {
     .col-date { width: 120px; }
     .col-amount { width: 110px; text-align: right; }
     .col-payment { width: 120px; }
+    .col-bill { width: 200px; }
     .col-custom { min-width: 100px; }
     .col-status { width: 100px; }
     .col-action { width: 120px; text-align: center; }
@@ -694,6 +1001,37 @@ type VendorSite = Site & {
       box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.1);
     }
     .table-input[type="number"] { text-align: right; }
+    .bill-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid #c7d9f5;
+      max-width: 100%;
+      transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+    .bill-link:hover {
+      background: linear-gradient(135deg, #dbe5ff 0%, #c7d4ff 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(29, 78, 216, 0.18);
+    }
+    .bill-link ion-icon { font-size: 14px; }
+    .bill-link span {
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bill-empty {
+      color: #94a3b8;
+      font-size: 14px;
+    }
     .status-badge {
       display: inline-block;
       padding: 4px 12px;
@@ -764,10 +1102,10 @@ export class VendorDashboardPage {
 
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
-  readonly vendors = this.data.vendors;
-  readonly sites = this.data.getSiteEntities();
+  readonly vendors = signal<Vendor[]>([]);
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
+  private vendorsLoaded = false;
 
   readonly selectedVendor = signal<Vendor | null>(null);
   readonly selectedSite = signal<Site | null>(null);
@@ -779,16 +1117,11 @@ export class VendorDashboardPage {
   readonly showAddColumnInput = signal(false);
   readonly newColumnName = signal("");
 
-  private readonly vendorSiteCustomColumnsKey = computed(() => {
-    const vendor = this.selectedVendor();
-    const site = this.selectedSite();
-    if (!vendor || !site) return "";
-    return `vendor-site-custom-cols:${vendor.name}:${site.name}`;
-  });
+  readonly customColumns = signal<string[]>([]);
+  readonly billLinks = signal<Record<string, BillLinkEntry>>({});
+  readonly draftBillLinks = signal<Record<string, string>>({});
+  private draftLoaded = new Set<string>();
 
-  readonly customColumns = signal<string[]>(this.loadCustomColumns());
-
-  // Vendor-specific sites with full details - derived from materials
   readonly vendorSites = computed(() => {
     const vendor = this.selectedVendor();
     if (!vendor) return [] as VendorSite[];
@@ -809,8 +1142,7 @@ export class VendorDashboardPage {
 
     const vendorSiteNames = Array.from(materialSites.keys());
 
-    // Create Site objects directly from material data
-    const vendorSites: VendorSite[] = vendorSiteNames
+    return vendorSiteNames
       .map((siteName) => ({
         id: siteName,
         name: siteName,
@@ -822,8 +1154,6 @@ export class VendorDashboardPage {
         materialCount: materialSites.get(siteName)!.materialNames.length,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-
-    return vendorSites;
   });
 
   readonly siteMaterials = computed(() => {
@@ -847,12 +1177,53 @@ export class VendorDashboardPage {
     );
   });
 
-  siteMaterialCount(siteName: string): number {
-    const vendor = this.selectedVendor();
-    if (!vendor) return 0;
-    return this.data.materials().filter(
-      (m) => m.vendor === vendor.name && m.site === siteName
-    ).length;
+  constructor() {
+    this.loadVendorsFromBackend();
+    effect(() => {
+      const vendor = this.selectedVendor();
+      const site = this.selectedSite();
+      if (vendor && site) {
+        this.loadCustomColumns(vendor.name, site.name);
+        this.loadBillLinks(vendor.name, site.name);
+      } else {
+        this.customColumns.set([]);
+        this.billLinks.set({});
+        this.draftBillLinks.set({});
+        this.draftLoaded.clear();
+      }
+    });
+  }
+
+  private loadVendorsFromBackend() {
+    if (this.refreshing()) return;
+    this.refreshing.set(true);
+    this.refreshMessage.set("Loading vendors from backend…");
+    this.api.listVendors({ limit: 100 }).subscribe({
+      next: (r) => {
+        const mapped = (r.items || []).map((v: any) => {
+          const status: VendorStatus = v.status === "Not Active" ? "Not Active" : "Active";
+          return {
+            id: v.vendorId || v._id,
+            name: v.name || v.vendorName,
+            materialType: v.materialType,
+            phone: v.phone || v.phoneNumber,
+            address: v.address,
+            gst: v.gstNumber || v.gst,
+            status,
+            _id: v._id,
+          } as Vendor;
+        });
+        this.vendors.set(mapped);
+        this.vendorsLoaded = true;
+        this.refreshing.set(false);
+        this.refreshMessage.set(null);
+      },
+      error: (e) => {
+        this.refreshing.set(false);
+        this.refreshMessage.set("Failed to load vendors: " + (e?.message || "unknown"));
+        setTimeout(() => this.refreshMessage.set(null), 4000);
+      },
+    });
   }
 
   openVendor(vendor: Vendor) {
@@ -873,21 +1244,95 @@ export class VendorDashboardPage {
     this.selectedSite.set(null);
   }
 
-  loadCustomColumns(): string[] {
-    const key = this.vendorSiteCustomColumnsKey();
-    if (!key) return [];
+  private loadCustomColumns(vendorName: string, siteName: string) {
+    this.api.listVendorCustomColumns(vendorName, siteName).subscribe({
+      next: (res) => {
+        const cols = (res.items || []).map((c: any) => c.label as string);
+        this.customColumns.set(cols);
+      },
+      error: () => this.customColumns.set([]),
+    });
+  }
+
+  private loadBillLinks(vendorName: string, siteName: string) {
+    this.api.listMaterialBillLinks(vendorName, siteName).subscribe({
+      next: (res) => {
+        const map: Record<string, BillLinkEntry> = {};
+        for (const it of (res.items || []) as Array<{ materialId: string; billUrl: string; billLabel?: string }>) {
+          map[it.materialId] = { materialId: it.materialId, billUrl: it.billUrl, billLabel: it.billLabel };
+        }
+        this.billLinks.set(map);
+      },
+      error: () => this.billLinks.set({}),
+    });
+  }
+
+  billLinkFor(materialId: string): BillLinkEntry | undefined {
+    return this.billLinks()[materialId];
+  }
+
+  draftBillLink(materialId: string): string {
+    return this.draftBillLinks()[materialId] ?? "";
+  }
+
+  setDraftBillLink(materialId: string, value: string) {
+    this.draftBillLinks.update((state) => ({ ...state, [materialId]: value }));
+  }
+
+  shortLinkLabel(url: string): string {
     try {
-      const stored = localStorage.getItem(`agb-erp:${key}`);
-      return stored ? JSON.parse(stored) : [];
+      const u = new URL(url);
+      return u.hostname.replace(/^www\./, "");
     } catch {
-      return [];
+      return url.length > 24 ? url.slice(0, 24) + "…" : url;
     }
   }
 
-  saveCustomColumns() {
-    const key = this.vendorSiteCustomColumnsKey();
-    if (!key) return;
-    localStorage.setItem(`agb-erp:${key}`, JSON.stringify(this.customColumns()));
+  commitBillLink(materialId: string, value: string) {
+    const vendor = this.selectedVendor();
+    const site = this.selectedSite();
+    if (!vendor || !site) return;
+    const trimmed = value.trim();
+    const existing = this.billLinks()[materialId];
+    if (!trimmed) {
+      if (existing) {
+        this.api.removeMaterialBillLink(vendor.name, site.name, materialId).subscribe({
+          next: () => {
+            this.billLinks.update((state) => {
+              const next = { ...state };
+              delete next[materialId];
+              return next;
+            });
+          },
+        });
+      }
+      this.draftBillLinks.update((state) => {
+        const next = { ...state };
+        delete next[materialId];
+        return next;
+      });
+      return;
+    }
+    this.api.upsertMaterialBillLink({
+      vendorName: vendor.name,
+      siteName: site.name,
+      materialId,
+      billUrl: trimmed,
+    }).subscribe({
+      next: (res) => {
+        const link = res.link;
+        this.billLinks.update((state) => ({
+          ...state,
+          [materialId]: { materialId, billUrl: link.billUrl, billLabel: link.billLabel },
+        }));
+        this.draftBillLinks.update((state) => {
+          const next = { ...state };
+          delete next[materialId];
+          return next;
+        });
+      },
+      error: () => {},
+    });
   }
 
   addMaterialRow() {
@@ -937,46 +1382,35 @@ export class VendorDashboardPage {
   addCustomColumn() {
     const name = this.newColumnName().trim();
     if (!name) return;
+    const vendor = this.selectedVendor();
+    const site = this.selectedSite();
+    if (!vendor || !site) return;
     if (this.customColumns().includes(name)) return;
+    const columnKey = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `col-${Date.now()}`;
     this.customColumns.update(cols => [...cols, name]);
     this.newColumnName.set("");
     this.showAddColumnInput.set(false);
-    this.saveCustomColumns();
+    this.api.addVendorCustomColumn({
+      vendorName: vendor.name,
+      siteName: site.name,
+      columnKey,
+      label: name,
+    }).subscribe({ error: () => {} });
   }
 
   removeCustomColumn(colName: string) {
+    const vendor = this.selectedVendor();
+    const site = this.selectedSite();
+    if (!vendor || !site) return;
+    const columnKey = colName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     this.customColumns.update(cols => cols.filter(c => c !== colName));
-    this.saveCustomColumns();
+    if (columnKey) {
+      this.api.removeVendorCustomColumn(vendor.name, site.name, columnKey).subscribe({ error: () => {} });
+    }
   }
 
   refreshFromBackend() {
-    if (this.refreshing()) return;
-    this.refreshing.set(true);
-    this.refreshMessage.set("Refreshing vendors from backend…");
-    this.api.listVendors({ limit: 100 }).subscribe({
-      next: (r) => {
-        try {
-          const mapped = (r.items || []).map((v: any) => ({
-            id: v.vendorId || v._id,
-            name: v.vendorName || v.name,
-            materialType: v.materialType,
-            phone: v.phoneNumber || v.phone,
-            address: v.address,
-            gst: v.gstNumber || v.gst,
-          }));
-          this.data.vendors.set(mapped);
-          localStorage.setItem("agb-erp:vendors", JSON.stringify(mapped));
-        } catch {}
-        this.refreshing.set(false);
-        this.refreshMessage.set(`Synced ${r.total} vendors`);
-        setTimeout(() => this.refreshMessage.set(null), 2500);
-      },
-      error: (e) => {
-        this.refreshing.set(false);
-        this.refreshMessage.set("Sync failed: " + (e?.message || "unknown"));
-        setTimeout(() => this.refreshMessage.set(null), 4000);
-      },
-    });
+    this.loadVendorsFromBackend();
   }
 
   vendorInitials(name: string): string {
@@ -986,34 +1420,37 @@ export class VendorDashboardPage {
   createVendor(value: VendorFormValue) {
     if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
 
+    const statusValue: VendorStatus = value.status === "Not Active" ? "Not Active" : "Active";
+
     const payload = {
-      vendorName: value.name,
+      name: value.name,
       materialType: value.materialType,
-      phoneNumber: value.phone,
+      phone: value.phone,
       address: value.address,
       gstNumber: value.gst,
+      status: statusValue,
     };
 
-    const localVendor: Vendor = {
-      id: `VEN-${Date.now()}`,
+    const tempId = `VEN-LOCAL-${Date.now()}`;
+    const optimisticVendor: Vendor = {
+      id: tempId,
       name: value.name,
       materialType: value.materialType,
       phone: value.phone,
       address: value.address,
       gst: value.gst,
+      status: statusValue,
     };
+    this.vendors.update((list) => [optimisticVendor, ...list]);
+    this.showVendorForm.set(false);
 
     this.api.createVendor(payload).subscribe({
       next: (res: any) => {
-        const vendorId = res.vendorId || res._id || res.id;
-        const vendor = { ...localVendor, id: vendorId };
-        this.data.addVendor(vendor);
-        this.showVendorForm.set(false);
+        const vendorId = res.vendorId || res._id || res.id || tempId;
+        this.vendors.update((list) => list.map((v) => (v.id === tempId ? { ...v, id: vendorId, _id: res._id } : v)));
       },
       error: (err) => {
-        console.error("Failed to create vendor on backend, creating locally:", err);
-        this.data.addVendor(localVendor);
-        this.showVendorForm.set(false);
+        console.error("Failed to create vendor on backend", err);
       },
     });
   }
@@ -1035,6 +1472,7 @@ export class VendorDashboardPage {
       phone: vendor.phone,
       address: vendor.address,
       gst: vendor.gst,
+      status: vendor.status === "Not Active" ? "Not Active" : "Active",
     };
   }
 
@@ -1042,36 +1480,38 @@ export class VendorDashboardPage {
     const vendor = this.editingVendor();
     if (!vendor || !value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
 
+    const statusValue: VendorStatus = value.status === "Not Active" ? "Not Active" : "Active";
+
     const payload = {
-      vendorName: value.name,
+      name: value.name,
       materialType: value.materialType,
-      phoneNumber: value.phone,
+      phone: value.phone,
       address: value.address,
       gstNumber: value.gst,
+      status: statusValue,
     };
 
+    this.vendors.update((list) => list.map((v) => (v.id === vendor.id ? { ...v, ...value, status: statusValue } : v)));
+    const refreshed = this.vendors().find((v) => v.id === vendor.id);
+    if (refreshed) this.selectedVendor.set(refreshed);
+    this.closeVendorForm();
+
     this.api.patchVendor(vendor.id, payload).subscribe({
-      next: () => {
-        this.data.updateVendor(vendor.id, value);
-        this.closeVendorForm();
-      },
+      next: () => {},
       error: (err) => {
         console.error("Failed to update vendor on backend", err);
-        this.closeVendorForm();
       },
     });
   }
 
   deleteVendor(vendorId: string) {
     if (!confirm("Delete this vendor?")) return;
+    this.vendors.update((list) => list.filter((v) => v.id !== vendorId));
+    if (this.selectedVendor()?.id === vendorId) {
+      this.selectedVendor.set(null);
+      this.selectedSite.set(null);
+    }
     this.api.deleteVendor(vendorId).subscribe({
-      next: () => {
-        this.data.deleteVendor(vendorId);
-        if (this.selectedVendor()?.id === vendorId) {
-          this.selectedVendor.set(null);
-          this.selectedSite.set(null);
-        }
-      },
       error: (err) => {
         console.error("Failed to delete vendor on backend", err);
       },

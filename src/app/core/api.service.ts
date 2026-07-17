@@ -259,6 +259,44 @@ export class ApiService {
     );
   }
 
+  // =================== VENDOR CUSTOM COLUMNS ===================
+  listVendorCustomColumns(vendorName: string, siteName: string): Observable<{ items: Array<{ columnKey: string; label: string; order: number }> }> {
+    const q = new URLSearchParams({ vendorName, siteName }).toString();
+    return this.http.get<{ items: any[] }>(`${this.baseUrl}/vendor-custom-columns?${q}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  addVendorCustomColumn(payload: { vendorName: string; siteName: string; columnKey: string; label: string; order?: number }): Observable<{ column: any }> {
+    return this.http.post<{ column: any }>(`${this.baseUrl}/vendor-custom-columns`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  removeVendorCustomColumn(vendorName: string, siteName: string, columnKey: string): Observable<any> {
+    const q = new URLSearchParams({ vendorName, siteName, columnKey }).toString();
+    return this.http.delete(`${this.baseUrl}/vendor-custom-columns?${q}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== MATERIAL BILL LINKS ===================
+  listMaterialBillLinks(vendorName: string, siteName: string): Observable<{ items: Array<{ materialId: string; billUrl: string; billLabel?: string }> }> {
+    const q = new URLSearchParams({ vendorName, siteName }).toString();
+    return this.http.get<{ items: any[] }>(`${this.baseUrl}/material-bill-links?${q}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  upsertMaterialBillLink(payload: { vendorName: string; siteName: string; materialId: string; billUrl: string; billLabel?: string }): Observable<{ link: any }> {
+    return this.http.post<{ link: any }>(`${this.baseUrl}/material-bill-links`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  removeMaterialBillLink(vendorName: string, siteName: string, materialId: string): Observable<any> {
+    const q = new URLSearchParams({ vendorName, siteName, materialId }).toString();
+    return this.http.delete(`${this.baseUrl}/material-bill-links?${q}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== QUOTATIONS ===================
   deleteQuotation(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/quotations/${id}`, { headers: this.authHeaders() }).pipe(
