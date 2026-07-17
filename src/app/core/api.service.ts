@@ -205,6 +205,11 @@ export class ApiService {
       catchError(this.handleError)
     );
   }
+  createMaterial(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/materials`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
 
   // =================== LABOUR ===================
   deleteLabour(id: string): Observable<any> {
