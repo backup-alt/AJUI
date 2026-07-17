@@ -56,21 +56,40 @@ async function normalizeSiteAssignment(input: SiteAssignmentInput) {
     ...(input.assignedSiteIds || []).map(toObjectId),
   ]);
 
-  const inputSiteNames = uniqueStrings([
-    input.assignedSite,
-    ...(input.assignedSites || []),
+  // Parse assignedSites to separate ObjectIds from names
+  const assignedSitesInput = input.assignedSites || [];
+  const assignedSiteIdStrings: string[] = [];
+  const assignedSiteNames: string[] = [];
+
+  for (const value of assignedSitesInput) {
+    const trimmed = value?.trim();
+    if (!trimmed) continue;
+    if (Types.ObjectId.isValid(trimmed)) {
+      assignedSiteIdStrings.push(trimmed);
+    } else {
+      assignedSiteNames.push(trimmed);
+    }
+  }
+
+  // Also include any ObjectIds from assignedSiteIdStrings
+  const allAssignedSiteIds = uniqueObjectIds([
+    ...assignedSiteIds,
+    ...assignedSiteIdStrings.map(toObjectId),
   ]);
 
-  const sites = assignedSiteIds.length > 0
-    ? await Site.find({ _id: { $in: assignedSiteIds } }).select("name").lean()
+  const sites = allAssignedSiteIds.length > 0
+    ? await Site.find({ _id: { $in: allAssignedSiteIds } }).select("name").lean()
     : [];
 
+  const siteNamesFromIds = sites.map((site) => site.name);
+
   return {
-    assignedSiteId: assignedSiteIds[0],
-    assignedSiteIds,
+    assignedSiteId: allAssignedSiteIds[0],
+    assignedSiteIds: allAssignedSiteIds,
     assignedSites: uniqueStrings([
-      ...inputSiteNames,
-      ...sites.map((site) => site.name),
+      ...assignedSiteNames,
+      input.assignedSite,
+      ...siteNamesFromIds,
     ]),
   };
 }

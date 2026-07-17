@@ -1135,32 +1135,65 @@ export class ErpDataService {
   sites(): { id: string; name: string }[] {
     const seen = new Set<string>();
     const list: { id: string; name: string }[] = [];
-    const push = (id: string, name: string, projectId?: string) => {
-      if (!id) return;
-      const key = projectId ? `${projectId}:${id}` : id;
+    const buildKey = (name: string, projectId?: string, index?: number) => {
+      const parts = [projectId || "", name || "", index === undefined || index === null ? "" : String(index)];
+      return parts.join("\u0001");
+    };
+    const push = (id: string, name: string, projectId?: string, index?: number) => {
+      const displayName = (name || id || "").trim();
+      if (!displayName && !id) return;
+      const key = buildKey(displayName, projectId, index);
       if (seen.has(key)) return;
       seen.add(key);
-      list.push({ id: key, name: name || id });
+      list.push({ id: key, name: displayName });
     };
+
     for (const project of this.projects()) {
-      for (const site of project.sites ?? []) push(site, site, project.id);
-    }
-    for (const row of this.materials()) {
-      const site = String(row["site"] || "").trim();
-      if (site) push(site, site);
-    }
-    for (const row of this.labour()) {
-      const site = String(row["site"] || "").trim();
-      if (site) push(site, site);
-    }
-    for (const row of this.expenses()) {
-      const site = String(row["site"] || "").trim();
-      if (site) push(site, site);
+      const projectId = project.id;
+      const projectSites = project.sites ?? [];
+      projectSites.forEach((site, index) => push(String(site), String(site), projectId, index));
     }
 
-    // Also include sites from backend (siteEntities signal)
+    const pushRowSite = (rawName: string, projectId?: string, index?: number) => {
+      const name = String(rawName || "").trim();
+      if (!name) return;
+      const match = this.projects().find(
+        (project) => project.id === projectId && (project.sites ?? []).some((s) => s === name)
+      );
+      const matchProjectId = match?.id ?? projectId ?? "";
+      const matchIndex = match
+        ? (match.sites ?? []).findIndex((s) => s === name)
+        : -1;
+      push(name, name, matchProjectId, matchIndex >= 0 ? matchIndex : (index ?? -1));
+    };
+
+    for (const row of this.materials()) {
+      const projectId = String(row["projectId"] || "").trim();
+      pushRowSite(String(row["site"] || "").trim(), projectId);
+    }
+    for (const row of this.labour()) {
+      const projectId = String(row["projectId"] || "").trim();
+      pushRowSite(String(row["site"] || "").trim(), projectId);
+    }
+    for (const row of this.expenses()) {
+      const projectId = String(row["projectId"] || "").trim();
+      pushRowSite(String(row["site"] || "").trim(), projectId);
+    }
+
     for (const site of this.siteEntities()) {
-      push(site.id, site.name);
+      const projectId = (site as { projectId?: string }).projectId;
+      const name = site.name || site.id;
+      if (!name) continue;
+      const match = projectId
+        ? this.projects().find(
+            (project) => project.id === projectId && (project.sites ?? []).some((s) => s === name)
+          )
+        : undefined;
+      const matchProjectId = match?.id ?? projectId ?? "";
+      const matchIndex = match
+        ? (match.sites ?? []).findIndex((s) => s === name)
+        : -1;
+      push(name, name, matchProjectId, matchIndex >= 0 ? matchIndex : undefined);
     }
 
     return list;
