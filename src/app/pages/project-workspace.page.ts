@@ -289,6 +289,14 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         (input)="siteDraftName.set($any($event.target).value)"
                         placeholder="New site"
                       />
+                      <input
+                        type="number"
+                        class="site-opening-balance"
+                        [value]="siteDraftOpeningBalance()"
+                        (input)="siteDraftOpeningBalance.set($any($event.target).valueAsNumber || 0)"
+                        placeholder="Opening Balance"
+                        min="0"
+                      />
                       <button type="submit" class="site-confirm" aria-label="Add site">
                         <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                           <path d="m5 12 4 4L19 6" />
@@ -989,6 +997,7 @@ export class ProjectWorkspacePage {
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
   readonly siteDraftName = signal("");
+  readonly siteDraftOpeningBalance = signal(0);
   readonly openSelectKey = signal("");
   readonly selectCustomValue = signal("");
   readonly labourTypeDialogOpen = signal(false);
@@ -1770,6 +1779,7 @@ export class ProjectWorkspacePage {
 
   openSiteDraft() {
     this.siteDraftName.set("");
+    this.siteDraftOpeningBalance.set(0);
     this.siteDraftOpen.set(true);
   }
 
@@ -1777,7 +1787,11 @@ export class ProjectWorkspacePage {
     event.preventDefault();
     const site = this.siteDraftName().trim();
     if (!site) return;
+    const openingBalance = this.siteDraftOpeningBalance();
     this.data.addSiteToProject(this.projectId(), site);
+    if (openingBalance > 0) {
+      this.data.setExpenseOpeningBalance(this.projectId(), site, openingBalance);
+    }
     this.activeSite.set(site);
     this.siteDraftOpen.set(false);
   }
