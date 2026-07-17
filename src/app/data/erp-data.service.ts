@@ -45,6 +45,7 @@ export type Vendor = {
   gst: string;
   status?: VendorStatus;
   _id?: string;
+  siteIds?: string[];
 };
 
 export type Supervisor = {

@@ -193,11 +193,14 @@ export const createVendorSchema = z.object({
     gstNumber: z.string().trim().optional(),
     rating: z.coerce.number().min(0).max(5).default(0),
     status: z.enum(["Active", "Inactive", "Not Active"]).default("Active"),
+    siteIds: z.array(objectIdSchema).min(1, "At least one site must be assigned"),
   }),
 });
 
 export const updateVendorSchema = z.object({
-  body: createVendorSchema.shape.body.partial(),
+  body: createVendorSchema.shape.body.partial().extend({
+    siteIds: z.array(objectIdSchema).min(1).optional(),
+  }),
   params: z.object({ id: objectIdSchema }),
 });
 

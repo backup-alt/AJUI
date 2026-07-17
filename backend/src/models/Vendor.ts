@@ -16,6 +16,7 @@ export interface IVendor extends Document {
   totalPurchaseValue: number;
   rating: number;
   status: VendorStatus;
+  siteIds: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,7 @@ const vendorSchema = new Schema<IVendor>(
       enum: ["Active", "Inactive", "Not Active"],
       default: "Active",
     },
+    siteIds: [{ type: Schema.Types.ObjectId, ref: "Site", index: true }],
   },
   { timestamps: true }
 );

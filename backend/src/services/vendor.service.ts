@@ -1,13 +1,18 @@
 import { Types } from "mongoose";
 import { Vendor } from "../models/Vendor.js";
+import { Site } from "../models/Site.js";
 import { Material } from "../models/Material.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { CreateVendorInput } from "../schemas/financial.schema.js";
 
-export async function createVendor(input: CreateVendorInput) {
+export async function createVendor(input: CreateVendorInput & { siteIds?: string[] }) {
   const vendorId = await generateId("VEN");
-  const vendor = await Vendor.create({ ...input, vendorId });
+  const { siteIds, ...rest } = input;
+  const vendor = await Vendor.create({ ...rest, vendorId, siteIds: siteIds || [] });
+  if (siteIds?.length) {
+    await Site.updateMany({ _id: { $in: siteIds } }, { $addToSet: { vendorIds: vendor._id } });
+  }
   return vendor.toObject();
 }
 
@@ -43,9 +48,25 @@ export async function getVendorById(id: string) {
   return vendor;
 }
 
-export async function updateVendor(id: string, patch: Partial<CreateVendorInput>) {
-  const vendor = await Vendor.findByIdAndUpdate(id, patch, { new: true });
+export async function updateVendor(id: string, patch: Partial<CreateVendorInput & { siteIds?: string[] }>) {
+  const vendor = await Vendor.findById(id);
   if (!vendor) throw new AppError(404, "Vendor not found");
+
+  const { siteIds, ...rest } = patch;
+  const oldSiteIds = (vendor.siteIds || []).map((s: Types.ObjectId) => s.toString());
+
+  if (siteIds !== undefined) {
+    const added = siteIds.filter((sid: string) => !oldSiteIds.includes(sid));
+    const removed = oldSiteIds.filter((sid: string) => !siteIds.includes(sid));
+    await Promise.all([
+      Site.updateMany({ _id: { $in: added } }, { $addToSet: { vendorIds: vendor._id } }),
+      Site.updateMany({ _id: { $in: removed } }, { $pull: { vendorIds: vendor._id } }),
+    ]);
+    vendor.siteIds = siteIds.map((sid: string) => new Types.ObjectId(sid));
+  }
+
+  Object.assign(vendor, rest);
+  await vendor.save();
   return vendor.toObject();
 }
 
