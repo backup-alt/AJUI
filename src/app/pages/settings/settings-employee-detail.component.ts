@@ -130,12 +130,12 @@ interface ActivityEntry {
                 </button>
               </div>
               <div class="settings-w11-card-body">
-                @if (employee()!.assignedSites && employee()!.assignedSites!.length > 0) {
+                @if (supervisorAssignedSiteNames().length > 0) {
                   <div class="settings-w11-site-list">
-                    @for (site of employee()!.assignedSites; track site) {
+                    @for (site of supervisorAssignedSiteNames(); track site.id) {
                       <div class="settings-w11-site-chip">
-                        <span>{{ site }}</span>
-                        <button type="button" class="settings-w11-chip-remove" (click)="removeSupervisorSite(site)" title="Remove site">
+                        <span>{{ site.name }}</span>
+                        <button type="button" class="settings-w11-chip-remove" (click)="removeSupervisorSite(site.id)" title="Remove site">
                           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                         </button>
                       </div>
@@ -371,11 +371,34 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly availableSitesForSupervisor = computed<Array<{ id: string; name: string }>>(() => {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor") return [];
-    const assignedSiteIds = new Set(emp.assignedSiteIds || []);
+    const assignedSiteIds = new Set((emp.assignedSiteIds || []).map(id => String(id)));
+    const assignedSitesStr = new Set((emp.assignedSites || []).map(s => String(s)));
+    const allIds = new Set([...assignedSiteIds, ...assignedSitesStr]);
     const allSites = this.erp.siteEntities();
     return allSites
-      .filter((s) => !assignedSiteIds.has(String(s.id)))
-      .map((s) => ({ id: String(s.id), name: s.name }));
+      .filter((s) => !allIds.has(String(s.id)) && !allIds.has(String(s._id)))
+      .map((s) => ({ id: String(s.id || s._id), name: s.name }));
+  });
+
+  readonly supervisorAssignedSiteNames = computed<Array<{ id: string; name: string }>>(() => {
+    const emp = this.employee();
+    if (!emp || emp.role !== "Supervisor") return [];
+    const allSiteIds = [
+      ...(emp.assignedSiteIds || []).map(id => String(id)),
+      ...(emp.assignedSites || []).map(s => String(s))
+    ];
+    const uniqueIds = [...new Set(allSiteIds)];
+    const siteEntities = this.erp.siteEntities();
+    return uniqueIds
+      .map(id => {
+        const site = siteEntities.find(s =>
+          String(s.id) === id ||
+          String(s._id) === id ||
+          String(s.siteId) === id
+        );
+        return site ? { id: String(site.id || site._id), name: site.name } : null;
+      })
+      .filter((item): item is { id: string; name: string } => item !== null);
   });
 
   selectSiteToAssign(site: { id: string; name: string }) {
@@ -476,13 +499,19 @@ export class SettingsEmployeeDetailComponent implements OnInit {
         }
 
         const assignedSiteIds: string[] = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
-        let assignedSites: string[] = row.assignedSites || [];
+        const assignedSiteIdStrings: string[] = (row.assignedSites || []).map((s: any) => String(s));
+        const allSiteIds = [...new Set([...assignedSiteIds, ...assignedSiteIdStrings])];
 
-        if (assignedSiteIds.length > 0 && assignedSites.length === 0) {
+        let assignedSites: string[] = [];
+        if (allSiteIds.length > 0) {
           const siteEntities = this.erp.siteEntities();
-          assignedSites = assignedSiteIds
+          assignedSites = allSiteIds
             .map((siteId: string) => {
-              const site = siteEntities.find((s: any) => String(s.id) === siteId || String(s._id) === siteId);
+              const site = siteEntities.find((s: any) =>
+                String(s.id) === siteId ||
+                String(s._id) === siteId ||
+                String(s.siteId) === siteId
+              );
               return site ? site.name : null;
             })
             .filter((name): name is string => name !== null);
@@ -516,19 +545,20 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor") return;
 
-    const currentSiteIds = emp.assignedSiteIds || [];
-    if (currentSiteIds.includes(siteId)) return;
+    const currentIds = [
+      ...(emp.assignedSiteIds || []).map((id: any) => String(id)),
+      ...(emp.assignedSites || []).map((s: any) => String(s))
+    ];
+    if (currentIds.includes(siteId)) return;
 
-    const newSiteIds = [...currentSiteIds, siteId];
+    const newSiteIds = [...new Set([...currentIds, siteId])];
     this.api.updateSupervisor(emp.id, { assignedSiteIds: newSiteIds }).subscribe({
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
-          this.employee.update((e) => e ? {
-            ...e,
-            assignedSiteIds: row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [],
-            assignedSites: row.assignedSites || [],
-          } : e);
+          const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
+          const assignedSites = row.assignedSites ? row.assignedSites.map((s: any) => String(s)) : [];
+          this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
         }
       },
       error: (err) => console.warn("[EmployeeDetail] updateSupervisor failed:", err?.message ?? err),
@@ -539,18 +569,19 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor") return;
 
-    const currentSiteIds = emp.assignedSiteIds || [];
-    const newSiteIds = currentSiteIds.filter((sid) => sid !== siteId);
+    const currentIds = [
+      ...(emp.assignedSiteIds || []).map((id: any) => String(id)),
+      ...(emp.assignedSites || []).map((s: any) => String(s))
+    ];
+    const newSiteIds = currentIds.filter((id) => id !== siteId);
 
     this.api.updateSupervisor(emp.id, { assignedSiteIds: newSiteIds }).subscribe({
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
-          this.employee.update((e) => e ? {
-            ...e,
-            assignedSiteIds: row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [],
-            assignedSites: row.assignedSites || [],
-          } : e);
+          const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
+          const assignedSites = row.assignedSites ? row.assignedSites.map((s: any) => String(s)) : [];
+          this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
         }
       },
       error: (err) => console.warn("[EmployeeDetail] updateSupervisor failed:", err?.message ?? err),
