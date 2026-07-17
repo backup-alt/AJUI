@@ -3191,7 +3191,7 @@ export class UniversalDashboardPage {
     return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
   }
 
-  private isNoCreateModule(): boolean {
+  isNoCreateModule(): boolean {
     const m = this.activeModule();
     return m === "expenses" || m === "materials" || m === "generalExpenses";
   }

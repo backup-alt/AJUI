@@ -2792,7 +2792,7 @@ export class ProjectWorkspacePage {
     return String(value || "").trim().toLowerCase() === "yes" ? "Yes" : "No";
   }
 
-  private isNoCreateSection(): boolean {
+  isNoCreateSection(): boolean {
     const s = this.activeSection();
     return s === "expenses" || s === "materials";
   }

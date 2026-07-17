@@ -486,7 +486,7 @@ import { Site } from '../../shared/models';
     .empty-sites span { font-size: 12px; color: #94a3b8; margin-top: 4px; }
   `],
 })
-export class ShellComponent implements OnInit, OnDestroy {
+export class ShellComponent implements OnInit {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
@@ -525,10 +525,6 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
     await this.loadSites();
-  }
-
-  ngOnDestroy(): void {
-    // No event listeners to clean up
   }
 
   async loadSites(): Promise<void> {

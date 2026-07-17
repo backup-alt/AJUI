@@ -23,7 +23,7 @@ const LEGACY_TO_NEW: Record<string, "Purchase" | "Cash Added"> = {
 
 async function migrate() {
   console.log("Connecting to MongoDB...");
-  await mongoose.connect(MONGODB_URI);
+  await mongoose.connect(MONGODB_URI!);
   console.log("Connected.\n");
 
   const expenseResult = await Expense.updateMany(
