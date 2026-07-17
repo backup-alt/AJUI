@@ -33,6 +33,8 @@ export type Client = {
   _id?: string;
 };
 
+export type VendorStatus = "Active" | "Not Active";
+
 export type Vendor = {
   id: string;
   name: string;
@@ -40,6 +42,7 @@ export type Vendor = {
   phone: string;
   address: string;
   gst: string;
+  status?: VendorStatus;
   _id?: string;
 };
 
@@ -216,6 +219,7 @@ export class ErpDataService {
       phone: "+91 98410 22001",
       address: "Velachery, Chennai",
       gst: "33AABCS1402P1Z8",
+      status: "Active",
     },
     {
       id: "VEN-102",
@@ -224,6 +228,7 @@ export class ErpDataService {
       phone: "+91 98411 40222",
       address: "Guindy, Chennai",
       gst: "33AAKFK9902L1Z4",
+      status: "Active",
     },
     {
       id: "VEN-103",
@@ -232,6 +237,7 @@ export class ErpDataService {
       phone: "+91 99620 88910",
       address: "Ambattur, Chennai",
       gst: "33AABFA8821M1Z2",
+      status: "Active",
     },
     {
       id: "VEN-104",
@@ -240,6 +246,16 @@ export class ErpDataService {
       phone: "+91 94440 70115",
       address: "Poonamallee, Chennai",
       gst: "33AABFT4021K1Z9",
+      status: "Active",
+    },
+    {
+      id: "VEN-105",
+      name: "Ganesh Plumbing",
+      materialType: "Plumbing",
+      phone: "+91 98842 55120",
+      address: "Ambattur Industrial Estate, Chennai",
+      gst: "33AAJFG9120K1Z6",
+      status: "Active",
     },
     ]),
   );
@@ -659,7 +675,7 @@ export class ErpDataService {
     this.writeState("projects", this.projects());
   }
 
-  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string }): Vendor {
+  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus }): Vendor {
     const nextNumber =
       Math.max(
         100,
@@ -674,6 +690,7 @@ export class ErpDataService {
       phone: input.phone,
       address: input.address,
       gst: input.gst,
+      status: input.status ?? "Active",
     };
     this.vendors.update((vendors) => [vendor, ...vendors]);
     this.writeState("vendors", this.vendors());
@@ -685,6 +702,14 @@ export class ErpDataService {
       vendors.map((v) => (v.id !== vendorId ? v : { ...v, ...patch })),
     );
     this.writeState("vendors", this.vendors());
+  }
+
+  setVendorStatus(vendorId: string, status: VendorStatus) {
+    this.updateVendor(vendorId, { status });
+  }
+
+  vendorByName(name: string): Vendor | undefined {
+    return this.vendors().find((v) => v.name === name);
   }
 
   deleteVendor(vendorId: string) {

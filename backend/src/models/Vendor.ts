@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-export type VendorStatus = "Active" | "Inactive";
+export type VendorStatus = "Active" | "Inactive" | "Not Active";
 
 export interface IVendor extends Document {
   _id: Types.ObjectId;
@@ -35,7 +35,7 @@ const vendorSchema = new Schema<IVendor>(
     rating: { type: Number, default: 0, min: 0, max: 5 },
     status: {
       type: String,
-      enum: ["Active", "Inactive"],
+      enum: ["Active", "Inactive", "Not Active"],
       default: "Active",
     },
   },
