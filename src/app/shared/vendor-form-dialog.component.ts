@@ -64,7 +64,7 @@ type SiteOption = { _id: string; name: string; siteId: string };
                 <ion-icon [name]="siteDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
               </button>
               @if (siteDropdownOpen) {
-                <div class="site-panel">
+                <div class="site-panel" (click)="$event.stopPropagation()">
                   @if (loadingSites()) {
                     <p class="site-msg">Loading sites...</p>
                   } @else if (siteOptions().length === 0) {
@@ -72,7 +72,9 @@ type SiteOption = { _id: string; name: string; siteId: string };
                   } @else {
                     @for (site of siteOptions(); track site._id) {
                       <label class="site-opt">
-                        <input type="checkbox" [checked]="isSelected(site._id)" (change)="toggle(site._id, $any($event.target).checked)" />
+                        <input type="checkbox"
+                          [(ngModel)]="selectedSiteIdsArr[site._id]"
+                          (ngModelChange)="onSiteToggle(site._id, $event)" />
                         <span>{{ site.name }}</span>
                       </label>
                     }
@@ -125,7 +127,7 @@ type SiteOption = { _id: string; name: string; siteId: string };
       padding: 8px 14px; cursor: pointer; font-size: 14px; color: #1e293b;
     }
     .site-opt:hover { background: #f8fafc; }
-    .site-opt input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+    .site-opt input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #2c5cff; }
     .site-msg { padding: 12px 14px; color: #64748b; font-size: 13px; margin: 0; }
     .req { color: #dc2626; }
     .field-error { color: #dc2626; font-size: 12px; margin: 4px 0 0; }
@@ -147,14 +149,15 @@ export class VendorFormDialogComponent implements OnInit {
   readonly siteOptions = signal<SiteOption[]>([]);
   readonly loadingSites = signal(false);
   readonly siteError = signal<string | null>(null);
-  private selectedSiteIds = new Set<string>();
+  readonly selectedSiteIds = signal<Set<string>>(new Set());
   siteDropdownOpen = false;
+  selectedSiteIdsArr: Record<string, boolean> = {};
 
   ngOnInit() {
     this.statusValue = this.initialValue?.status ?? "Active";
-    if (this.initialValue?.siteIds?.length) {
-      this.initialValue.siteIds.forEach((id) => this.selectedSiteIds.add(id));
-    }
+    const initial = new Set(this.initialValue?.siteIds || []);
+    this.selectedSiteIds.set(initial);
+    this.rebuildArr();
     this.loadSites();
   }
 
@@ -173,18 +176,30 @@ export class VendorFormDialogComponent implements OnInit {
   }
 
   isSelected(id: string): boolean {
-    return this.selectedSiteIds.has(id);
+    return this.selectedSiteIds().has(id);
   }
 
-  toggle(id: string, checked: boolean) {
-    if (checked) this.selectedSiteIds.add(id);
-    else this.selectedSiteIds.delete(id);
+  onSiteToggle(id: string, checked: boolean) {
+    this.selectedSiteIds.update((set) => {
+      const next = new Set(set);
+      checked ? next.add(id) : next.delete(id);
+      return next;
+    });
+    this.rebuildArr();
     this.siteError.set(null);
   }
 
+  private rebuildArr() {
+    const arr: Record<string, boolean> = {};
+    for (const site of this.siteOptions()) {
+      arr[site._id] = this.selectedSiteIds().has(site._id);
+    }
+    this.selectedSiteIdsArr = arr;
+  }
+
   get selectedLabel(): string {
-    if (this.selectedSiteIds.size === 0) return "Select sites...";
-    const names = Array.from(this.selectedSiteIds)
+    if (this.selectedSiteIds().size === 0) return "Select sites...";
+    const names = Array.from(this.selectedSiteIds())
       .map((id) => this.siteOptions().find((s) => s._id === id)?.name)
       .filter(Boolean);
     if (names.length === 0) return "Select sites...";
@@ -194,7 +209,7 @@ export class VendorFormDialogComponent implements OnInit {
 
   submit(event: Event) {
     event.preventDefault();
-    if (this.selectedSiteIds.size === 0) {
+    if (this.selectedSiteIds().size === 0) {
       this.siteError.set("Please assign at least one site");
       return;
     }
@@ -207,7 +222,7 @@ export class VendorFormDialogComponent implements OnInit {
       address: String(formData.get("address") ?? "").trim(),
       gst: String(formData.get("gst") ?? "").trim(),
       status: (String(formData.get("status") ?? "Active") === "Not Active" ? "Not Active" : "Active") as VendorStatus,
-      siteIds: Array.from(this.selectedSiteIds),
+      siteIds: Array.from(this.selectedSiteIds()),
     });
   }
 }

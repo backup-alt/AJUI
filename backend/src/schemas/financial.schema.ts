@@ -4,7 +4,7 @@ export const objectIdSchema = z.string().regex(/^[a-f0-9]{24}$/i, "Invalid Objec
 
 export const createMaterialSchema = z.object({
   body: z.object({
-    projectId: objectIdSchema,
+    projectId: objectIdSchema.optional().nullable(),
     siteId: objectIdSchema.optional(),
     site: z.string().trim().min(1).max(200),
     name: z.string().trim().min(1).max(200),

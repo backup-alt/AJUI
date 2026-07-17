@@ -4,6 +4,7 @@ import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { Vendor, VendorStatus, ErpDataService, Site } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
+import { MaterialsService } from "../core/materials.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
@@ -272,7 +273,10 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         <td class="col-sno">{{ i + 1 }}</td>
                         <td class="col-material">
                           @if (editingRowId() === row.id) {
-                            <input type="text" [value]="row.name" (blur)="updateField(row, 'name', $any($event.target).value)" class="table-input" />
+                            <input type="text" [value]="row.name" (blur)="updateField(row, 'name', $any($event.target).value)" class="table-input" [class.input-error]="nameError()" placeholder="Material name" />
+                            @if (nameError()) {
+                              <span class="name-error">{{ nameError() }}</span>
+                            }
                           } @else {
                             <strong>{{ row.name || '-' }}</strong>
                           }
@@ -831,6 +835,9 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.1);
     }
     .table-input[type="number"] { text-align: right; }
+    .table-input.input-error { border-color: #dc2626; }
+    .table-input.input-error:focus { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1); }
+    .name-error { display: block; color: #dc2626; font-size: 11px; margin-top: 2px; }
     .bill-link {
       display: inline-flex;
       align-items: center;
@@ -928,6 +935,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
 export class VendorDashboardPage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
+  readonly materialsService = inject(MaterialsService);
   readonly formatMoney = formatMoney;
 
   readonly showVendorForm = signal(false);
@@ -944,6 +952,7 @@ export class VendorDashboardPage {
 
   readonly materialSearchQuery = signal("");
   readonly editingRowId = signal<string | null>(null);
+  readonly nameError = signal<string | null>(null);
   readonly showAddColumnInput = signal(false);
   readonly newColumnName = signal("");
 
@@ -990,7 +999,7 @@ export class VendorDashboardPage {
     const vendor = this.selectedVendor();
     const site = this.selectedSite();
     if (!vendor || !site) return [] as MaterialRow[];
-    return this.data.materials().filter(
+    return this.materialsService.materials().filter(
       (m) => m.vendor === vendor.name && m.site === site.name
     );
   });
@@ -1006,6 +1015,8 @@ export class VendorDashboardPage {
       m.status?.toLowerCase().includes(query)
     );
   });
+
+  private initialLoadDone = false;
 
   constructor() {
     this.loadVendorsFromBackend();
@@ -1027,7 +1038,9 @@ export class VendorDashboardPage {
   private loadVendorsFromBackend() {
     if (this.refreshing()) return;
     this.refreshing.set(true);
-    this.refreshMessage.set("Loading vendors from backend…");
+    if (this.initialLoadDone) {
+      this.refreshMessage.set("Loading vendors from backend…");
+    }
     this.api.listVendors({ limit: 100 }).subscribe({
       next: (r) => {
         const mapped = (r.items || []).map((v: any) => {
@@ -1046,10 +1059,12 @@ export class VendorDashboardPage {
         });
         this.vendors.set(mapped);
         this.vendorsLoaded = true;
+        this.initialLoadDone = true;
         this.refreshing.set(false);
         this.refreshMessage.set(null);
       },
       error: (e) => {
+        this.initialLoadDone = true;
         this.refreshing.set(false);
         this.refreshMessage.set("Failed to load vendors: " + (e?.message || "unknown"));
         setTimeout(() => this.refreshMessage.set(null), 4000);
@@ -1170,7 +1185,7 @@ export class VendorDashboardPage {
     const vendor = this.selectedVendor();
     const site = this.selectedSite();
     if (!vendor || !site) return;
-    const newMaterial = this.data.addMaterial({
+    const payload: Partial<MaterialRow> = {
       projectId: "",
       site: site.name,
       name: "",
@@ -1183,31 +1198,53 @@ export class VendorDashboardPage {
       vendor: vendor.name,
       poNumber: "Pending",
       status: "Pending",
+      requestDate: new Date().toISOString().slice(0, 10),
       purchasedDate: new Date().toISOString().slice(0, 10),
       issuedAmount: 0,
       givenAmount: 0,
       paymentType: "Cash",
       deliveredOn: "",
+    };
+    this.materialsService.createMaterial(payload).subscribe({
+      next: (material) => {
+        this.editingRowId.set(material.id);
+        this.nameError.set(null);
+      },
+      error: (err) => {
+        console.error("Failed to create material row:", err);
+      },
     });
-    this.editingRowId.set(newMaterial.id);
   }
 
   editRow(row: MaterialRow) {
     this.editingRowId.set(row.id);
+    this.nameError.set(null);
   }
 
   saveRow(row: MaterialRow) {
+    if (!row.name?.trim()) {
+      this.nameError.set("Material name is required");
+      return;
+    }
     this.editingRowId.set(null);
+    this.nameError.set(null);
+    this.materialsService.updateMaterial(row.id, row).subscribe({
+      error: (err) => console.error("Failed to save material row:", err),
+    });
   }
 
   deleteRow(materialId: string) {
     if (!confirm("Delete this material entry?")) return;
-    this.data.deleteMaterial(materialId);
+    this.materialsService.removeMaterial(materialId).subscribe({
+      error: (err) => console.error("Failed to delete material row:", err),
+    });
   }
 
   updateField(row: MaterialRow, field: string, value: any) {
     const patch: Partial<MaterialRow> = { [field]: value };
-    this.data.updateMaterial(row.id, patch);
+    this.materialsService.updateMaterial(row.id, patch).subscribe({
+      error: (err) => console.error("Failed to update material field:", err),
+    });
   }
 
   addCustomColumn() {

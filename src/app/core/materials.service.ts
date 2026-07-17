@@ -1,4 +1,5 @@
 import { Injectable, inject, signal } from "@angular/core";
+import { Observable } from "rxjs";
 import { ApiService } from "./api.service";
 import type { MaterialRow } from "../../data/dashboardData";
 
@@ -39,6 +40,71 @@ export class MaterialsService {
           resolve(merged);
         },
         error: () => resolve(this.materials()),
+      });
+    });
+  }
+
+  createMaterial(input: Partial<MaterialRow>): Observable<MaterialRow> {
+    return new Observable((observer) => {
+      this.api.createMaterial(input).subscribe({
+        next: (res: any) => {
+          const material: MaterialRow = {
+            id: res.material?.materialId || res.material?._id || res.materialId || res._id,
+            projectId: input.projectId || "",
+            site: input.site || "",
+            name: input.name || "",
+            unit: input.unit || "",
+            requested: input.requested ?? 0,
+            approved: input.approved ?? 0,
+            purchased: input.purchased ?? 0,
+            consumed: input.consumed ?? 0,
+            quantity: input.quantity ?? 0,
+            vendor: input.vendor || "",
+            poNumber: input.poNumber || "",
+            status: input.status || "Pending",
+            requestDate: input.requestDate,
+            purchasedDate: input.purchasedDate,
+            issuedAmount: input.issuedAmount,
+            givenAmount: input.givenAmount,
+            paymentType: input.paymentType,
+            deliveredOn: input.deliveredOn,
+          };
+          this.materials.update((list) => [material, ...list]);
+          this.persist(this.materials());
+          observer.next(material);
+          observer.complete();
+        },
+        error: (err) => observer.error(err),
+      });
+    });
+  }
+
+  updateMaterial(id: string, patch: Partial<MaterialRow>): Observable<void> {
+    return new Observable((observer) => {
+      this.api.patchMaterial(id, patch).subscribe({
+        next: () => {
+          this.materials.update((list) =>
+            list.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m)),
+          );
+          this.persist(this.materials());
+          observer.next();
+          observer.complete();
+        },
+        error: (err) => observer.error(err),
+      });
+    });
+  }
+
+  removeMaterial(id: string): Observable<void> {
+    return new Observable((observer) => {
+      this.api.deleteMaterial(id).subscribe({
+        next: () => {
+          this.materials.update((list) => list.filter((m) => String(m.id) !== String(id)));
+          this.persist(this.materials());
+          observer.next();
+          observer.complete();
+        },
+        error: (err) => observer.error(err),
       });
     });
   }
