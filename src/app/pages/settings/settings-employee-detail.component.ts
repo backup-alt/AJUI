@@ -408,11 +408,13 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get("id") || "";
-    this.loadSitesForSupervisor();
-    this.loadEmployee(id);
+    this.loadSitesAndEmployee(id);
   }
 
-  private loadSitesForSupervisor() {
+  private loadSitesAndEmployee(id: string) {
+    this.loading.set(true);
+
+    // Load sites first, then load employee
     this.api.listSitesAdmin().subscribe({
       next: (res) => {
         this.erp.siteEntities.update(() => (res?.sites || []).map((s: any) => ({
@@ -421,14 +423,17 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           status: s.status || "Active",
           projectId: s.projectId || "",
         })));
+        // Now load the employee after sites are ready
+        this.loadEmployeeAfterSites(id);
       },
-      error: () => {},
+      error: () => {
+        // Continue loading employee even if sites fail
+        this.loadEmployeeAfterSites(id);
+      },
     });
   }
 
-  private loadEmployee(id: string) {
-    this.loading.set(true);
-
+  private loadEmployeeAfterSites(id: string) {
     // Try loading as regular employee first
     this.api.getEmployee(id).subscribe({
       next: (res) => {
@@ -451,7 +456,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       error: (err) => {
         // If regular employee not found, try loading as supervisor
         if (err?.status === 404) {
-          this.loadSupervisor(id);
+          this.loadSupervisorAfterSites(id);
         } else {
           this.employee.set(null);
           this.loading.set(false);
@@ -460,7 +465,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     });
   }
 
-  private loadSupervisor(id: string) {
+  private loadSupervisorAfterSites(id: string) {
     this.api.getSupervisor(id).subscribe({
       next: (res) => {
         const row = res?.supervisor;
@@ -470,15 +475,17 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           return;
         }
 
-        const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
-        let assignedSites = row.assignedSites || [];
+        const assignedSiteIds: string[] = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
+        let assignedSites: string[] = row.assignedSites || [];
 
         if (assignedSiteIds.length > 0 && assignedSites.length === 0) {
           const siteEntities = this.erp.siteEntities();
           assignedSites = assignedSiteIds
-            .map((siteId: string) => siteEntities.find((s: any) => String(s.id) === siteId || String(s._id) === siteId))
-            .filter(Boolean)
-            .map((s: any) => s.name);
+            .map((siteId: string) => {
+              const site = siteEntities.find((s: any) => String(s.id) === siteId || String(s._id) === siteId);
+              return site ? site.name : null;
+            })
+            .filter((name): name is string => name !== null);
         }
 
         this.employee.set({

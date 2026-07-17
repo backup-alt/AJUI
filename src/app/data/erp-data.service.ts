@@ -1135,25 +1135,34 @@ export class ErpDataService {
   sites(): { id: string; name: string }[] {
     const seen = new Set<string>();
     const list: { id: string; name: string }[] = [];
-    const push = (id: unknown, name: unknown) => {
+    const push = (id: string, name: string, projectId?: string) => {
       if (!id) return;
-      const key = String(id);
+      const key = projectId ? `${projectId}:${id}` : id;
       if (seen.has(key)) return;
       seen.add(key);
-      list.push({ id: key, name: String(name || key) });
+      list.push({ id: key, name: name || id });
     };
     for (const project of this.projects()) {
-      for (const site of project.sites ?? []) push(site, site);
+      for (const site of project.sites ?? []) push(site, site, project.id);
     }
-    for (const row of this.materials()) push(row["site"], row["site"]);
-    for (const row of this.labour()) push(row["site"], row["site"]);
-    for (const row of this.expenses()) push(row["site"], row["site"]);
-    
+    for (const row of this.materials()) {
+      const site = String(row["site"] || "").trim();
+      if (site) push(site, site);
+    }
+    for (const row of this.labour()) {
+      const site = String(row["site"] || "").trim();
+      if (site) push(site, site);
+    }
+    for (const row of this.expenses()) {
+      const site = String(row["site"] || "").trim();
+      if (site) push(site, site);
+    }
+
     // Also include sites from backend (siteEntities signal)
     for (const site of this.siteEntities()) {
       push(site.id, site.name);
     }
-    
+
     return list;
   }
 
