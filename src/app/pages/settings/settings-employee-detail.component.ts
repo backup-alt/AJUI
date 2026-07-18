@@ -645,7 +645,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
    * User _id, then merges assignedSiteIds/assignedSites into the employee signal.
    */
   private loadSupervisorSiteData(userId: string) {
-    this.api.listSupervisors({ limit: 200 }).subscribe({
+    this.api.listSupervisors({ limit: 100 }).subscribe({
       next: (res) => {
         const supervisors: any[] = res?.items || (res as any)?.supervisors || [];
         // Find the supervisor whose userId matches the current employee's User _id
@@ -785,11 +785,14 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       return;
     }
 
-    const newSiteIds = [...this.pendingSiteIds()];
+    const rawSiteIds = [...this.pendingSiteIds()];
+    const newSiteIds = rawSiteIds.filter(id => /^[a-f0-9]{24}$/i.test(id));
+
     this.siteSaving.set(true);
 
     console.log("[EmployeeDetail] Saving site selection:", {
       supervisorId: emp.supervisorId,
+      rawPendingIds: rawSiteIds,
       assignedSiteIds: newSiteIds,
     });
 

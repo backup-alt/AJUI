@@ -403,7 +403,7 @@ export class PendingApprovalsPage implements OnInit {
 
   private async refreshExpensesFromBackend(): Promise<void> {
     try {
-      const result = await firstValueFrom(this.api.listExpenses({ limit: 200 }));
+      const result = await firstValueFrom(this.api.listExpenses({ limit: 100 }));
       const mapped = (result.items || []).map(mapExpense);
       this.data.setExpenses(mapped);
     } catch (e) {

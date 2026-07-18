@@ -963,7 +963,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   }
 
   loadProjects() {
-    this.api.listProjects({ limit: 200 }).subscribe({
+    this.api.listProjects({ limit: 100 }).subscribe({
       next: (res) => {
         const items: { id: string; name: string; client?: string; address?: string; status?: string }[] = [];
         for (const row of res?.items || []) {
