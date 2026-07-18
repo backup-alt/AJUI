@@ -260,6 +260,44 @@ interface ActivityEntry {
     }
   `,
   styles: [`
+    .settings-w11-site-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .settings-w11-site-chip {
+      display: inline-flex;
+      align-items: center;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 4px 8px 4px 12px;
+      font-size: 13px;
+      color: #374151;
+      gap: 6px;
+    }
+    .settings-w11-chip-remove {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: #9ca3af;
+      padding: 0;
+      border-radius: 50%;
+      transition: background 0.2s, color 0.2s;
+    }
+    .settings-w11-chip-remove:hover {
+      background: #e5e7eb;
+      color: #ef4444;
+    }
+    .settings-w11-chip-remove svg {
+      width: 14px;
+      height: 14px;
+    }
     .settings-w11-saving {
       font-size: 12px;
       font-weight: 500;
@@ -379,6 +417,20 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     );
     const isValidOid = (v: string) => /^[a-f0-9]{24}$/i.test(v);
     const allSites = this.erp.siteEntities();
+
+    const annotateProject = (site: any): { id: string; name: string } => {
+      const siteAny = site as any;
+      const idStr = String(siteAny._id || siteAny.id || site.id || "");
+      const projectIds: string[] = siteAny.projectIds || (siteAny.projectId ? [siteAny.projectId] : []);
+      const projects = this.erp.projects();
+      const projectNames = projectIds
+        .map((pid) => projects.find((p) => p.id === pid)?.name)
+        .filter(Boolean) as string[];
+      const baseName = site.name || "Unnamed Site";
+      const displayName = projectNames.length > 0 ? `${baseName} (${projectNames.join(", ")})` : baseName;
+      return { id: idStr, name: displayName };
+    };
+
     return allSites
       .filter((s) => {
         const siteAny = s as any;
@@ -391,10 +443,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
         const isAssignedByName = s.name && assignedSiteNames.has(s.name.toLowerCase());
         return !isAssignedById && !isAssignedByName;
       })
-      .map((s) => {
-        const siteAny = s as any;
-        return { id: String(s.id || siteAny._id || ""), name: s.name };
-      });
+      .map((s) => annotateProject(s));
   });
 
   readonly supervisorAssignedSiteNames = computed<Array<{ id: string; name: string }>>(() => {
