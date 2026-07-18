@@ -438,6 +438,12 @@ export class ApiService {
     );
   }
 
+  createSite(payload: { name: string; projectIds?: string[]; openingBalance?: number; status?: string }): Observable<{ site: any }> {
+    return this.http.post<{ site: any }>(`${this.baseUrl}/sites`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   listSitesAdmin(): Observable<{ sites: any[] }> {
     return this.http.get<{ sites: any[] }>(`${this.baseUrl}/admin/sites`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
@@ -472,6 +478,18 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/supervisors${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getSupervisor(id: string): Observable<{ supervisor: any }> {
+    return this.http.get<{ supervisor: any }>(`${this.baseUrl}/supervisors/${id}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  updateSupervisor(id: string, patch: any): Observable<{ supervisor: any }> {
+    return this.http.patch<{ supervisor: any }>(`${this.baseUrl}/supervisors/${id}`, patch, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
     );
   }

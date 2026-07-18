@@ -5,7 +5,13 @@ type Source = "body" | "query" | "params";
 
 export function validate(schema: ZodSchema, source: Source = "body") {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const result = schema.safeParse({ [source]: req[source] });
+    // Pass the full request shape so schemas that validate multiple
+    // sources (e.g. body + params for PATCH routes) all resolve correctly.
+    const result = schema.safeParse({
+      body: req.body,
+      query: req.query,
+      params: req.params,
+    });
     if (!result.success) {
       res.status(400).json({
         error: "Validation failed",
@@ -13,7 +19,12 @@ export function validate(schema: ZodSchema, source: Source = "body") {
       });
       return;
     }
-    if (source === "body") req.body = result.data.body ?? result.data;
+    // Apply parsed/coerced values back to the request
+    const data = result.data as any;
+    if (data.body) req.body = data.body;
+    if (data.query) (req as any).query = data.query;
+    if (data.params) (req as any).params = data.params;
     next();
   };
 }
+

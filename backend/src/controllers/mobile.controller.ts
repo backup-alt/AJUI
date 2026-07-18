@@ -422,8 +422,27 @@ export async function uploadExpenseReceipt(req: Request, res: Response, next: Ne
       data: req.body.data,
       mimeType: req.body.mimeType,
       fileName: req.body.fileName,
+      givenAmount: req.body.givenAmount,
     });
     res.json({ expense: updated });
+  } catch (e) { next(e); }
+}
+
+export async function uploadMaterialReceipt(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const { Material } = await import("../models/Material.js");
+    const mat = await Material.findById(req.params.id).lean();
+    if (!mat) throw new AppError(404, "Material not found");
+    await mobileService.ensureSupervisorSiteAccess(userId, mat.projectId?.toString(), mat.siteId?.toString());
+    const { uploadMaterialReceipt } = await import("../services/material.service.js");
+    const updated = await uploadMaterialReceipt(req.params.id, {
+      data: req.body.data,
+      mimeType: req.body.mimeType,
+      fileName: req.body.fileName,
+      givenAmount: req.body.givenAmount,
+    });
+    res.json({ material: updated });
   } catch (e) { next(e); }
 }
 

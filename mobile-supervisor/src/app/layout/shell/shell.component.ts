@@ -1,7 +1,6 @@
 import {
   Component,
   OnInit,
-  OnDestroy,
   inject,
   signal,
   computed,
@@ -53,6 +52,8 @@ import {
   appsOutline,
   gridOutline,
   checkmarkOutline,
+  clipboardOutline,
+  clipboardSharp,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
@@ -137,6 +138,10 @@ import { Site } from '../../shared/models';
           <ion-item routerLink="/tabs/expenses" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/expenses') ? 'wallet-sharp' : 'wallet-outline'" slot="start"></ion-icon>
             <ion-label>Expenses</ion-label>
+          </ion-item>
+          <ion-item routerLink="/tabs/requests" routerLinkActive="selected" button detail="false">
+            <ion-icon [name]="isActiveRoute('/tabs/requests') ? 'clipboard-sharp' : 'clipboard-outline'" slot="start"></ion-icon>
+            <ion-label>Requests</ion-label>
           </ion-item>
         </ion-list>
 
@@ -520,6 +525,7 @@ export class ShellComponent implements OnInit {
       chevronDownOutline, notificationsOutline, notificationsSharp, businessOutline,
       constructOutline, shieldCheckmarkOutline, locationOutline, locationSharp,
       appsOutline, gridOutline, checkmarkOutline, logOutSharp,
+      clipboardOutline, clipboardSharp,
     });
 
     this.currentUser.set(this.auth.currentUser());

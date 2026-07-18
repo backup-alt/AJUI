@@ -171,17 +171,21 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
   // Send push notification to project supervisors and owner (non-blocking best-effort)
   try {
     const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
+    const notificationData = {
+      approvalId: approval.approvalId,
+      type: approval.type,
+      status: "Approved",
+      projectId: approval.projectId?.toString() || "",
+      ...(generatedPoNumber && { poNumber: generatedPoNumber }),
+    };
     if (projectId) {
       await notifyProjectSupervisors(
         projectId,
         `${approval.title} - Approved`,
-        `Your ${approval.type} request has been approved`,
-        {
-          approvalId: approval.approvalId,
-          type: approval.type,
-          status: "Approved",
-          projectId: approval.projectId?.toString() || "",
-        }
+        generatedPoNumber
+          ? `Your ${approval.type} request has been approved. PO: ${generatedPoNumber}`
+          : `Your ${approval.type} request has been approved`,
+        notificationData
       );
     }
     // Notify the owner who submitted the request
@@ -189,13 +193,10 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
       await notifyUserOfApproval(
         approval.owner,
         `${approval.title} - Approved`,
-        `Your ${approval.type} request has been approved`,
-        {
-          approvalId: approval.approvalId,
-          type: approval.type,
-          status: "Approved",
-          projectId: approval.projectId?.toString() || "",
-        }
+        generatedPoNumber
+          ? `Your ${approval.type} request has been approved. PO: ${generatedPoNumber}`
+          : `Your ${approval.type} request has been approved`,
+        notificationData
       );
     }
   } catch (err) {
@@ -340,6 +341,8 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             submittedBy: d.createdBy,
             clientName: d.clientName,
             supervisorName: d.supervisorName,
+            issuedAmount: d.issuedAmount,
+            givenAmount: d.givenAmount,
           };
         }
       } else if (sourceCollection === "Labour" || sourceCollection === "labour") {
@@ -373,6 +376,10 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             materialUnit: doc.materialUnit,
             materialQuantity: doc.materialQuantity,
             materialVendor: doc.materialVendor,
+            issuedAmount: doc.issuedAmount,
+            givenAmount: doc.givenAmount,
+            billUrl: doc.billUrl,
+            poNumber: doc.poNumber,
           };
         }
       }

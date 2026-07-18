@@ -40,6 +40,7 @@ router.get("/materials", validate(listMaterialsSchema, "query"), ctrl.listMateri
 router.get("/materials/pending", requireRole("admin", "project_manager"), ctrl.getPendingMaterials);
 router.get("/materials/:id", ctrl.getMaterial);
 router.patch("/materials/:id", validate(updateMaterialSchema), ctrl.updateMaterial);
+router.post("/materials/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadMaterialReceipt);
 router.delete("/materials/:id", requireRole("admin", "project_manager"), ctrl.deleteMaterial);
 
 // =================== LABOUR ===================
@@ -69,6 +70,7 @@ router.get("/expenses/ledger/:projectId/:site", ctrl.getExpenseLedger);
 router.get("/expenses/:id", ctrl.getExpense);
 router.patch("/expenses/:id", validate(updateExpenseSchema), ctrl.updateExpense);
 router.post("/expenses/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadExpenseReceipt);
+router.post("/expenses/:id/received", ctrl.markAsReceived);
 router.delete("/expenses/:id", requireRole("admin", "accountant"), ctrl.deleteExpense);
 
 // =================== PAYMENTS ===================

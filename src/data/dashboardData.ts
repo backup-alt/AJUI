@@ -56,6 +56,7 @@ export type MaterialRow = {
   givenAmount?: number;
   paymentType?: "Cash" | "NEFT" | "Bank Transfer" | "UPI" | "Cheque";
   deliveredOn?: string;
+  billUrl?: string;
   [key: string]: any;
 };
 

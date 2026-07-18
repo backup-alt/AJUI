@@ -1,7 +1,7 @@
 import { Schema, model, Document, Types } from "mongoose";
 
 export type ExpenseType = "site" | "general";
-export type ExpenseStatus = "Pending" | "Approved" | "Rejected";
+export type ExpenseStatus = "Pending" | "Approved" | "Rejected" | "Completed";
 export type ExpenseTransactionType = "Purchase" | "Cash Added";
 
 export interface IExpense extends Document {
@@ -38,6 +38,10 @@ export interface IExpense extends Document {
   materialVendor?: string;
   materialVendorId?: Types.ObjectId;
   materialRemainingStock?: number;
+  issuedAmount?: number;
+  givenAmount?: number;
+  received?: boolean;
+  billUrl?: string;
   customFields?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -66,7 +70,7 @@ const expenseSchema = new Schema<IExpense>(
     description: { type: String, required: true },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected"],
+      enum: ["Pending", "Approved", "Rejected", "Completed"],
       default: "Pending",
       index: true,
     },
@@ -82,6 +86,10 @@ const expenseSchema = new Schema<IExpense>(
     materialVendor: { type: String },
     materialVendorId: { type: Schema.Types.ObjectId, ref: "Vendor" },
     materialRemainingStock: { type: Number },
+    issuedAmount: { type: Number },
+    givenAmount: { type: Number },
+    received: { type: Boolean, default: false },
+    billUrl: { type: String },
     customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }

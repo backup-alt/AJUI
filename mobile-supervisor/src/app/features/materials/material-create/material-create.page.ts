@@ -132,15 +132,27 @@ import { Vendor } from '../../../shared/models';
             </ion-select>
           </ion-item>
 
-          <ion-item class="form-item">
-            <ion-label position="stacked">Remaining Stock</ion-label>
-            <ion-input
-              type="number"
-              placeholder="0"
-              [(ngModel)]="material.remainingStock"
-              [clearInput]="true"
-            ></ion-input>
-          </ion-item>
+          <div class="form-row">
+            <ion-item class="form-item form-item-half">
+              <ion-label position="stacked">Remaining Stock</ion-label>
+              <ion-input
+                type="number"
+                placeholder="0"
+                [(ngModel)]="material.remainingStock"
+                [clearInput]="true"
+              ></ion-input>
+            </ion-item>
+
+            <ion-item class="form-item form-item-half form-item-last">
+              <ion-label position="stacked">Issued Amt (INR) *</ion-label>
+              <ion-input
+                type="number"
+                placeholder="0"
+                [(ngModel)]="material.issuedAmount"
+                [clearInput]="true"
+              ></ion-input>
+            </ion-item>
+          </div>
 
           <ion-item class="form-item">
             <ion-label position="stacked">Notes</ion-label>
@@ -332,6 +344,7 @@ export class MaterialCreatePage implements OnInit {
     remainingStock: null as number | null,
     unit: '',
     vendor: '',
+    issuedAmount: null as number | null,
     notes: '',
   };
 
@@ -393,7 +406,9 @@ export class MaterialCreatePage implements OnInit {
       this.material.name.trim() &&
       this.material.requestedQuantity &&
       this.material.requestedQuantity > 0 &&
-      this.material.unit
+      this.material.unit &&
+      this.material.issuedAmount !== null &&
+      this.material.issuedAmount > 0
     );
   }
 
@@ -441,6 +456,7 @@ export class MaterialCreatePage implements OnInit {
       requestedQuantity: number;
       remainingStock?: number;
       vendor?: string;
+      issuedAmount?: number;
       requestDate: string;
       notes?: string;
       customFields?: Record<string, string | number | boolean | null>;
@@ -452,6 +468,7 @@ export class MaterialCreatePage implements OnInit {
       unit: this.material.unit,
       requestedQuantity: this.material.requestedQuantity || 0,
       vendor: this.material.vendor || undefined,
+      issuedAmount: this.material.issuedAmount || 0,
       requestDate: new Date().toISOString().slice(0, 10),
       notes: this.material.notes || undefined,
     };

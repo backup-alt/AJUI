@@ -93,10 +93,13 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   }
 
   if (role === "supervisor") {
-    const supervisor = await Supervisor.findOne({ userId }).select("assignedProjectId").lean();
-    const projectIds = supervisor?.assignedProjectId
-      ? [new Types.ObjectId(supervisor.assignedProjectId), ...managedProjectIds]
-      : managedProjectIds;
+    const supervisor = await Supervisor.findOne({ userId }).select("assignedProjects assignedProjectId").lean();
+    const supervisorProjectIds = supervisor?.assignedProjects?.length
+      ? supervisor.assignedProjects.map((id) => new Types.ObjectId(id.toString()))
+      : supervisor?.assignedProjectId
+        ? [new Types.ObjectId(supervisor.assignedProjectId)]
+        : [];
+    const projectIds = [...supervisorProjectIds, ...managedProjectIds];
     return uniqueObjectIds(projectIds);
   }
 

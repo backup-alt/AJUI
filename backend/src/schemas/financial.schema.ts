@@ -17,6 +17,8 @@ export const createMaterialSchema = z.object({
     vendorId: objectIdSchema.optional(),
     poNumber: z.string().trim().optional(),
     requestDate: z.string().min(1),
+    issuedAmount: z.coerce.number().nonnegative().optional(),
+    givenAmount: z.coerce.number().nonnegative().optional(),
     createdBy: z.string().trim().optional(),
   }),
 });
@@ -31,7 +33,7 @@ export const listMaterialsSchema = z.object({
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
     vendorId: objectIdSchema.optional(),
-    status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
+    status: z.enum(["Pending", "Approved", "Rejected", "Completed", "Received", "Not Received"]).optional(),
     search: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -108,6 +110,10 @@ export const expenseBaseSchema = z.object({
   materialVendor: z.string().trim().optional(),
   materialVendorId: objectIdSchema.optional(),
   materialRemainingStock: z.coerce.number().nonnegative().optional(),
+  issuedAmount: z.coerce.number().nonnegative().optional(),
+  givenAmount: z.coerce.number().nonnegative().optional(),
+  received: z.boolean().optional(),
+  billUrl: z.string().trim().optional(),
   customFields: z.record(z.unknown()).optional(),
 });
 
@@ -142,7 +148,7 @@ export const listExpensesSchema = z.object({
     type: z.enum(["site", "general"]).optional(),
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
-    status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
+    status: z.enum(["Pending", "Approved", "Rejected", "Completed"]).optional(),
     from: z.string().optional(),
     to: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),

@@ -22,6 +22,7 @@ export interface Expense {
   description: string;
   status: ExpenseStatus;
   notes?: string;
+  issuedAmount?: number;
   submittedBy?: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -45,6 +46,7 @@ export interface CreateExpenseRequest {
   materialVendor?: string;
   materialVendorId?: string;
   remainingStock?: number;
+  issuedAmount?: number;
   customFields?: Record<string, unknown>;
 }
 

@@ -24,20 +24,6 @@ export class AppComponent implements OnInit {
   private zone = inject(NgZone);
 
   async ngOnInit(): Promise<void> {
-    // Apply persisted theme before the first render.
-    try {
-      const stored = localStorage.getItem('agb:theme');
-      if (stored === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else if (stored === 'light') {
-        document.documentElement.classList.remove('dark');
-      } else if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-        document.documentElement.classList.add('dark');
-      }
-    } catch {
-      // ignore
-    }
-
     await this.auth.init();
     if (this.auth.isAuthenticated()) {
       await this.auth.initAfterLogin();

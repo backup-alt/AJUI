@@ -92,6 +92,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'requests',
+        loadComponent: () =>
+          import('./features/requests/requests.page').then(
+            (m) => m.RequestsPage
+          ),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./features/profile/profile.page').then((m) => m.ProfilePage),

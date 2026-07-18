@@ -1,0 +1,9 @@
+@echo off
+echo Building angular app...
+call "C:\Program Files\nodejs\npm.cmd" run build
+echo Syncing capacitor...
+call "C:\Program Files\nodejs\npx.cmd" cap sync android
+echo Building APK...
+cd android
+call gradlew assembleDebug
+echo Done!

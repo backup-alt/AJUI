@@ -1,6 +1,6 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import {
-  IonContent, IonList, IonItem, IonLabel, IonIcon, IonToggle,
+  IonContent, IonIcon, IonToggle,
   AlertController, ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -8,9 +8,9 @@ import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
   personCircleOutline, mailOutline, callOutline, businessOutline,
-  lockClosedOutline, notificationsOutline, moonOutline, helpCircleOutline,
+  lockClosedOutline, notificationsOutline, helpCircleOutline,
   logOutOutline, chevronForwardOutline, shieldCheckmarkOutline,
-  sunnyOutline, informationCircleOutline, documentTextOutline, globeOutline,
+  informationCircleOutline, documentTextOutline, globeOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
@@ -19,7 +19,7 @@ import { NotificationService } from '../../core/services/notification.service';
 @Component({
   selector: 'app-profile',
   standalone: true,
-imports: [
+  imports: [
     IonContent, IonIcon, IonToggle,
     FormsModule,
   ],
@@ -80,19 +80,6 @@ imports: [
             <ion-toggle
               [checked]="pushEnabled"
               (ionChange)="togglePush()"
-            ></ion-toggle>
-          </div>
-          <div class="row-item">
-            <span class="row-tile">
-              <ion-icon [name]="isDark() ? 'sunny-outline' : 'moon-outline'"></ion-icon>
-            </span>
-            <div class="row-content">
-              <div class="row-title">{{ isDark() ? 'Light mode' : 'Dark mode' }}</div>
-              <div class="row-sub">Switch between themes</div>
-            </div>
-            <ion-toggle
-              [checked]="isDark()"
-              (ionChange)="toggleDarkMode()"
             ></ion-toggle>
           </div>
         </section>
@@ -270,7 +257,7 @@ imports: [
     .version-text ion-icon { font-size: 12px; }
   `],
 })
-export class ProfilePage implements OnInit, OnDestroy {
+export class ProfilePage implements OnInit {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
   private alertCtrl = inject(AlertController);
@@ -280,7 +267,6 @@ export class ProfilePage implements OnInit, OnDestroy {
 
   currentUser = signal<{ name: string; email: string; phone: string } | null>(null);
   pushEnabled = false;
-  isDark = signal<boolean>(document.documentElement.classList.contains('dark'));
   version = '1.0.0';
 
   userInitials(): string {
@@ -293,27 +279,14 @@ export class ProfilePage implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     addIcons({
       personCircleOutline, mailOutline, callOutline, businessOutline,
-      lockClosedOutline, notificationsOutline, moonOutline, helpCircleOutline,
+      lockClosedOutline, notificationsOutline, helpCircleOutline,
       logOutOutline, chevronForwardOutline, shieldCheckmarkOutline,
-      sunnyOutline, informationCircleOutline, documentTextOutline, globeOutline,
+      informationCircleOutline, documentTextOutline, globeOutline,
     });
 
     this.currentUser.set(this.auth.currentUser());
     this.pushEnabled = this.notifications.pushEnabled();
-    if (typeof window !== 'undefined') {
-      window.addEventListener('agb:theme-changed', this.handleThemeChanged);
-    }
   }
-
-  ngOnDestroy(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:theme-changed', this.handleThemeChanged);
-    }
-  }
-
-  private handleThemeChanged = (): void => {
-    this.isDark.set(document.documentElement.classList.contains('dark'));
-  };
 
   async togglePush(): Promise<void> {
     if (this.pushEnabled) {
@@ -322,17 +295,6 @@ export class ProfilePage implements OnInit, OnDestroy {
       await this.notifications.disable();
     }
     this.pushEnabled = this.notifications.pushEnabled();
-  }
-
-  toggleDarkMode(): void {
-    const next = !this.isDark();
-    document.documentElement.classList.toggle('dark', next);
-    try {
-      localStorage.setItem('agb:theme', next ? 'dark' : 'light');
-    } catch {
-      // ignore
-    }
-    window.dispatchEvent(new CustomEvent('agb:theme-changed'));
   }
 
   changePassword(): void {

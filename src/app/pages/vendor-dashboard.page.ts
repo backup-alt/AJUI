@@ -386,7 +386,12 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                           }
                         </td>
                         <td class="col-bill">
-                          @if (billLinkFor(row.id); as link) {
+                          @if (row.billUrl) {
+                            <a class="bill-link" [href]="row.billUrl" target="_blank" rel="noopener noreferrer" title="View Bill">
+                              <ion-icon name="link-outline"></ion-icon>
+                              <span>View Bill</span>
+                            </a>
+                          } @else if (billLinkFor(row.id); as link) {
                             <a class="bill-link" [href]="link.billUrl" target="_blank" rel="noopener noreferrer" [title]="link.billUrl">
                               <ion-icon name="link-outline"></ion-icon>
                               <span>{{ link.billLabel || shortLinkLabel(link.billUrl) }}</span>
@@ -409,12 +414,11 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         <td class="col-status">
                           @if (editingRowId() === row.id) {
                             <select [value]="row.status" (blur)="updateField(row, 'status', $any($event.target).value)" class="table-input">
-                              <option value="Pending">Pending</option>
-                              <option value="Approved">Approved</option>
-                              <option value="Rejected">Rejected</option>
+                              <option value="Received">Received</option>
+                              <option value="Not Received">Not Received</option>
                             </select>
                           } @else {
-                            <span class="status-badge" [class]="row.status.toLowerCase()">{{ row.status || 'Pending' }}</span>
+                            <span class="status-badge" [ngClass]="statusBadgeClass(row.status)">{{ row.status || 'Not Received' }}</span>
                           }
                         </td>
                         <td class="col-action">
@@ -924,9 +928,9 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       font-size: 11px;
       font-weight: 600;
     }
-    .status-badge.approved { background: #dcfce7; color: #15803d; }
+    .status-badge.approved, .status-badge.received { background: #dcfce7; color: #15803d; }
     .status-badge.pending { background: #fef9c3; color: #854d0e; }
-    .status-badge.rejected { background: #fee2e2; color: #dc2626; }
+    .status-badge.rejected, .status-badge.not-received { background: #fee2e2; color: #dc2626; }
     .remove-col-btn {
       margin-left: 4px;
       background: #fee2e2;
@@ -993,7 +997,10 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       transform: translateY(-2px);
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
     }
-    .add-site-card.disabled { opacity: 0.5; cursor: not-allowed; }
+.add-site-card.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .add-site-card h3 { color: #2c5cff; }
     .site-picker-list {
       max-height: 360px;
@@ -1020,6 +1027,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     }
     .site-picker-row > div { display: flex; flex-direction: column; gap: 2px; }
     .site-picker-row strong { color: #1a2540; font-size: 14px; }
+    .site-picker-row small { color: #94a3b8; font-size: 11px; }
     .site-picker-row ion-icon { color: #2c5cff; font-size: 22px; }
     .site-msg { padding: 12px 18px; color: #64748b; font-size: 14px; }
   `],
@@ -1033,7 +1041,7 @@ export class VendorDashboardPage {
 
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
-  readonly vendors = signal<Vendor[]>([]);
+  readonly vendors = computed<Vendor[]>(() => this.data.vendors());
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
   private vendorsLoaded = false;
@@ -1080,7 +1088,7 @@ export class VendorDashboardPage {
     if (vendor.siteIds?.length) {
       const allSites = this.data.sites();
       for (const sid of vendor.siteIds) {
-        const s = allSites.find((s) => s.id === sid);
+        const s = allSites.find((s) => s.id === String(sid));
         if (s) siteNamesFromIds.add(s.name);
       }
     }
@@ -1162,7 +1170,7 @@ export class VendorDashboardPage {
             siteIds: v.siteIds || [],
           } as Vendor;
         });
-        this.vendors.set(mapped);
+        this.data.vendors.set(mapped);
         this.vendorsLoaded = true;
         this.initialLoadDone = true;
         this.refreshing.set(false);
@@ -1426,6 +1434,10 @@ export class VendorDashboardPage {
     return name.split(/\s+/).slice(0, 2).map((p) => p[0] || "").join("").toUpperCase() || "V";
   }
 
+  statusBadgeClass(status: string): string {
+    return (status || "not-received").toLowerCase().replace(/\s+/g, "-");
+  }
+
   createVendor(value: VendorFormValue) {
     if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
 
@@ -1450,14 +1462,25 @@ export class VendorDashboardPage {
       address: value.address,
       gst: value.gst,
       status: statusValue,
+      siteIds: value.siteIds || [],
     };
-    this.vendors.update((list) => [optimisticVendor, ...list]);
+    this.data.vendors.update((list) => [optimisticVendor, ...list]);
     this.showVendorForm.set(false);
 
     this.api.createVendor(payload).subscribe({
       next: (res: any) => {
         const vendorId = res.vendorId || res._id || res.id || tempId;
-        this.vendors.update((list) => list.map((v) => (v.id === tempId ? { ...v, id: vendorId, _id: res._id } : v)));
+        const serverSiteIds = Array.isArray(res.siteIds)
+          ? res.siteIds.map((id: any) => String(id))
+          : (value.siteIds || []).map((id) => String(id));
+        this.data.vendors.update((list) =>
+          list.map((v) =>
+            v.id === tempId
+              ? { ...v, id: vendorId, _id: res._id, siteIds: serverSiteIds }
+              : v,
+          ),
+        );
+        this.refreshSiteAssignments();
       },
       error: (err) => {
         console.error("Failed to create vendor on backend", err);
@@ -1503,13 +1526,27 @@ export class VendorDashboardPage {
       siteIds: value.siteIds || [],
     };
 
-    this.vendors.update((list) => list.map((v) => (v.id === vendor.id ? { ...v, ...value, status: statusValue } : v)));
-    const refreshed = this.vendors().find((v) => v.id === vendor.id);
+    this.data.vendors.update((list) =>
+      list.map((v) =>
+        v.id === vendor.id
+          ? { ...v, ...value, status: statusValue, siteIds: value.siteIds || [] }
+          : v,
+      ),
+    );
+    const refreshed = this.data.vendors().find((v) => v.id === vendor.id);
     if (refreshed) this.selectedVendor.set(refreshed);
     this.closeVendorForm();
 
     this.api.patchVendor(vendor.id, payload).subscribe({
-      next: () => {},
+      next: (res: any) => {
+        const serverSiteIds = Array.isArray(res?.siteIds)
+          ? res.siteIds.map((id: any) => String(id))
+          : (value.siteIds || []).map((id) => String(id));
+        this.data.vendors.update((list) =>
+          list.map((v) => (v.id === vendor.id ? { ...v, siteIds: serverSiteIds } : v)),
+        );
+        this.refreshSiteAssignments();
+      },
       error: (err) => {
         console.error("Failed to update vendor on backend", err);
       },
@@ -1518,7 +1555,7 @@ export class VendorDashboardPage {
 
   deleteVendor(vendorId: string) {
     if (!confirm("Delete this vendor?")) return;
-    this.vendors.update((list) => list.filter((v) => v.id !== vendorId));
+    this.data.vendors.update((list) => list.filter((v) => v.id !== vendorId));
     if (this.selectedVendor()?.id === vendorId) {
       this.selectedVendor.set(null);
       this.selectedSite.set(null);
@@ -1532,5 +1569,81 @@ export class VendorDashboardPage {
 
   trackVendor(_: number, vendor: Vendor) {
     return vendor.id;
+  }
+
+  openAddSitePicker() {
+    const vendor = this.selectedVendor();
+    if (!vendor) return;
+    this.showAddSitePicker.set(true);
+    this.loadAvailableSites();
+  }
+
+  closeAddSitePicker() {
+    this.showAddSitePicker.set(false);
+  }
+
+  private loadAvailableSites() {
+    this.loadingAvailableSites.set(true);
+    this.api.listSitesAdmin().subscribe({
+      next: (res) => {
+        const sites = (res.sites || []).map((s: any) => ({
+          _id: String(s._id || s.id),
+          name: s.name,
+          siteId: s.siteId || String(s._id || s.id),
+        }));
+        this.availableSitesCache.set(sites);
+        this.loadingAvailableSites.set(false);
+      },
+      error: () => {
+        this.availableSitesCache.set([]);
+        this.loadingAvailableSites.set(false);
+      },
+    });
+  }
+
+  assignExistingSite(site: { _id: string; name: string; siteId: string }) {
+    const vendor = this.selectedVendor();
+    if (!vendor) return;
+    const current = (vendor.siteIds || []).map((id) => String(id));
+    if (current.includes(site._id)) {
+      this.closeAddSitePicker();
+      return;
+    }
+    const nextSiteIds = [...current, site._id];
+    this.data.vendors.update((list) =>
+      list.map((v) => (v.id === vendor.id ? { ...v, siteIds: nextSiteIds } : v)),
+    );
+    const refreshed = this.data.vendors().find((v) => v.id === vendor.id);
+    if (refreshed) this.selectedVendor.set(refreshed);
+    this.closeAddSitePicker();
+
+    this.api.patchVendor(vendor.id, { siteIds: nextSiteIds }).subscribe({
+      next: (res: any) => {
+        const serverSiteIds = Array.isArray(res?.siteIds)
+          ? res.siteIds.map((id: any) => String(id))
+          : nextSiteIds;
+        this.data.vendors.update((list) =>
+          list.map((v) => (v.id === vendor.id ? { ...v, siteIds: serverSiteIds } : v)),
+        );
+        this.refreshSiteAssignments();
+      },
+      error: (err) => {
+        console.error("Failed to assign site to vendor", err);
+      },
+    });
+  }
+
+  private refreshSiteAssignments() {
+    this.api.listSitesAdmin().subscribe({
+      next: (res) => {
+        const sites = (res.sites || []).map((s: any) => ({
+          _id: String(s._id || s.id),
+          name: s.name,
+          siteId: s.siteId || String(s._id || s.id),
+        }));
+        this.availableSitesCache.set(sites);
+      },
+      error: () => {},
+    });
   }
 }

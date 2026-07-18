@@ -104,6 +104,16 @@ export class SupervisorService {
     );
   }
 
+  uploadMaterialReceipt(
+    materialId: string,
+    payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
+  ) {
+    return this.api.post<{ material: Material }>(
+      `/supervisor/materials/${materialId}/receipt`,
+      payload
+    );
+  }
+
   // ---------------- Labour ----------------
   getLabourEntries(filters?: {
     projectId?: string;
@@ -149,7 +159,7 @@ export class SupervisorService {
 
   uploadReceipt(
     expenseId: string,
-    payload: { data: string; mimeType: string; fileName?: string }
+    payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
   ) {
     return this.api.post<{ expense: Expense }>(
       `/supervisor/expenses/${expenseId}/receipt`,
