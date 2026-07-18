@@ -182,13 +182,65 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   </article>
                 }
 
-                @if (vendorSites().length === 0 && !loadingSites()) {
+                <article
+                  class="client-card add-site-card"
+                  role="button"
+                  tabindex="0"
+                  (click)="openAddSitePicker()"
+                  (keydown.enter)="openAddSitePicker()"
+                  [class.disabled]="availableSitesForVendor().length === 0"
+                >
+                  <div class="add-client-icon">
+                    <ion-icon name="add-outline"></ion-icon>
+                  </div>
+                  <h3>Add Site</h3>
+                  <p>{{ availableSitesForVendor().length === 0 ? 'All sites already assigned' : 'Assign an existing site to this vendor' }}</p>
+                </article>
+
+                @if (vendorSites().length === 0 && !loadingSites() && availableSitesForVendor().length === 0) {
                   <div class="empty-state">
                     <ion-icon name="location-off-outline"></ion-icon>
                     <p>No sites with material purchases for this vendor.</p>
                   </div>
                 }
               </section>
+
+              @if (showAddSitePicker()) {
+                <section class="form-overlay" role="presentation">
+                  <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="add-site-title">
+                    <div class="dialog-head">
+                      <div>
+                        <span>Assign Site</span>
+                        <h2 id="add-site-title">Add existing site to {{ selectedVendor()!.name }}</h2>
+                        <p>Select a site to assign to this vendor. You can pick from sites not already assigned.</p>
+                      </div>
+                      <button type="button" class="icon-button" aria-label="Close site picker" (click)="closeAddSitePicker()">
+                        <ion-icon name="close-outline"></ion-icon>
+                      </button>
+                    </div>
+                    <div class="site-picker-list">
+                      @if (loadingAvailableSites()) {
+                        <p class="site-msg">Loading sites…</p>
+                      } @else if (availableSitesForVendor().length === 0) {
+                        <p class="site-msg">All existing sites are already assigned to this vendor.</p>
+                      } @else {
+                        @for (site of availableSitesForVendor(); track site._id) {
+                          <button type="button" class="site-picker-row" (click)="assignExistingSite(site)">
+                            <div>
+                              <strong>{{ site.name }}</strong>
+                              <small>{{ site.siteId }}</small>
+                            </div>
+                            <ion-icon name="add-circle-outline"></ion-icon>
+                          </button>
+                        }
+                      }
+                    </div>
+                    <div class="dialog-actions">
+                      <button type="button" class="secondary-action" (click)="closeAddSitePicker()">Cancel</button>
+                    </div>
+                  </section>
+                </section>
+              }
             } @else {
               <nav class="breadcrumb" aria-label="Breadcrumb">
                 <button type="button" class="breadcrumb-link" (click)="backToVendors()">Vendors</button>
@@ -934,6 +986,53 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       .search-box { max-width: none; }
       .table-actions { justify-content: flex-start; }
     }
+    .add-site-card {
+      border: 2px dashed #c7d9f5;
+      background: #f8faff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 180px;
+      transition: all 160ms ease;
+    }
+    .add-site-card:hover:not(.disabled) {
+      background: #eef3ff;
+      border-color: #2c5cff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+    .add-site-card.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .add-site-card h3 { color: #2c5cff; }
+    .site-picker-list {
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .site-picker-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 12px 18px;
+      background: #fff;
+      border: 1px solid #e5eaf1;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: background 140ms ease, border-color 140ms ease;
+      text-align: left;
+    }
+    .site-picker-row:hover {
+      background: #f0f6ff;
+      border-color: #2c5cff;
+    }
+    .site-picker-row > div { display: flex; flex-direction: column; gap: 2px; }
+    .site-picker-row small { color: #94a3b8; font-size: 11px; }
+    .site-picker-row ion-icon { color: #2c5cff; font-size: 22px; }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -945,7 +1044,7 @@ export class VendorDashboardPage {
 
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
-  readonly vendors = signal<Vendor[]>([]);
+  readonly vendors = computed<Vendor[]>(() => this.data.vendors());
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
   private vendorsLoaded = false;
@@ -966,6 +1065,10 @@ export class VendorDashboardPage {
   readonly draftBillLinks = signal<Record<string, string>>({});
   private draftLoaded = new Set<string>();
 
+  readonly showAddSitePicker = signal(false);
+  readonly loadingAvailableSites = signal(false);
+  readonly availableSitesCache = signal<{ _id: string; name: string; siteId: string }[]>([]);
+
   readonly vendorSites = computed(() => {
     const vendor = this.selectedVendor();
     if (!vendor) return [] as VendorSite[];
@@ -984,20 +1087,52 @@ export class VendorDashboardPage {
       }
     }
 
+    const assignedSiteIds = new Set((vendor.siteIds || []).map((id) => String(id)));
+    const sitesById = new Map(this.data.siteEntities().map((s) => [String((s as any)._id || s.id), s]));
+
+    for (const siteId of assignedSiteIds) {
+      const site = sitesById.get(siteId);
+      if (site && site.name && !materialSites.has(site.name)) {
+        materialSites.set(site.name, { count: 0, materialNames: [], totalIssued: 0, totalGiven: 0 });
+      }
+    }
+
     const vendorSiteNames = Array.from(materialSites.keys());
 
     return vendorSiteNames
-      .map((siteName) => ({
-        id: siteName,
-        name: siteName,
-        status: "Active" as const,
-        materialEntryCount: materialSites.get(siteName)!.count,
-        materialNames: materialSites.get(siteName)!.materialNames,
-        totalIssued: materialSites.get(siteName)!.totalIssued,
-        totalGiven: materialSites.get(siteName)!.totalGiven,
-        materialCount: materialSites.get(siteName)!.materialNames.length,
-      }))
+      .map((siteName) => {
+        const entry = materialSites.get(siteName)!;
+        const assignedEntry = Array.from(sitesById.entries()).find(([, s]) => s.name === siteName);
+        const siteEntity = assignedEntry ? assignedEntry[1] : undefined;
+        return {
+          id: siteEntity ? (siteEntity as any)._id || siteEntity.id : siteName,
+          name: siteName,
+          status: (siteEntity?.status as any) || "Active",
+          materialEntryCount: entry.count,
+          materialNames: entry.materialNames,
+          totalIssued: entry.totalIssued,
+          totalGiven: entry.totalGiven,
+          materialCount: entry.materialNames.length,
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  readonly availableSitesForVendor = computed(() => {
+    const vendor = this.selectedVendor();
+    if (!vendor) return [] as { _id: string; name: string; siteId: string }[];
+    const assigned = new Set((vendor.siteIds || []).map((id) => String(id)));
+    const fromCache = this.availableSitesCache();
+    if (fromCache.length) {
+      return fromCache.filter((s) => !assigned.has(String(s._id)));
+    }
+    return this.data.siteEntities()
+      .filter((s) => !assigned.has(String((s as any)._id || s.id)))
+      .map((s) => ({
+        _id: String((s as any)._id || s.id),
+        name: s.name,
+        siteId: (s as any).siteId || String((s as any)._id || s.id),
+      }));
   });
 
   readonly siteMaterials = computed(() => {
@@ -1062,7 +1197,7 @@ export class VendorDashboardPage {
             siteIds: v.siteIds || [],
           } as Vendor;
         });
-        this.vendors.set(mapped);
+        this.data.vendors.set(mapped);
         this.vendorsLoaded = true;
         this.initialLoadDone = true;
         this.refreshing.set(false);
@@ -1314,14 +1449,25 @@ export class VendorDashboardPage {
       address: value.address,
       gst: value.gst,
       status: statusValue,
+      siteIds: value.siteIds || [],
     };
-    this.vendors.update((list) => [optimisticVendor, ...list]);
+    this.data.vendors.update((list) => [optimisticVendor, ...list]);
     this.showVendorForm.set(false);
 
     this.api.createVendor(payload).subscribe({
       next: (res: any) => {
         const vendorId = res.vendorId || res._id || res.id || tempId;
-        this.vendors.update((list) => list.map((v) => (v.id === tempId ? { ...v, id: vendorId, _id: res._id } : v)));
+        const serverSiteIds = Array.isArray(res.siteIds)
+          ? res.siteIds.map((id: any) => String(id))
+          : (value.siteIds || []).map((id) => String(id));
+        this.data.vendors.update((list) =>
+          list.map((v) =>
+            v.id === tempId
+              ? { ...v, id: vendorId, _id: res._id, siteIds: serverSiteIds }
+              : v,
+          ),
+        );
+        this.refreshSiteAssignments();
       },
       error: (err) => {
         console.error("Failed to create vendor on backend", err);
@@ -1367,13 +1513,27 @@ export class VendorDashboardPage {
       siteIds: value.siteIds || [],
     };
 
-    this.vendors.update((list) => list.map((v) => (v.id === vendor.id ? { ...v, ...value, status: statusValue } : v)));
-    const refreshed = this.vendors().find((v) => v.id === vendor.id);
+    this.data.vendors.update((list) =>
+      list.map((v) =>
+        v.id === vendor.id
+          ? { ...v, ...value, status: statusValue, siteIds: value.siteIds || [] }
+          : v,
+      ),
+    );
+    const refreshed = this.data.vendors().find((v) => v.id === vendor.id);
     if (refreshed) this.selectedVendor.set(refreshed);
     this.closeVendorForm();
 
     this.api.patchVendor(vendor.id, payload).subscribe({
-      next: () => {},
+      next: (res: any) => {
+        const serverSiteIds = Array.isArray(res?.siteIds)
+          ? res.siteIds.map((id: any) => String(id))
+          : (value.siteIds || []).map((id) => String(id));
+        this.data.vendors.update((list) =>
+          list.map((v) => (v.id === vendor.id ? { ...v, siteIds: serverSiteIds } : v)),
+        );
+        this.refreshSiteAssignments();
+      },
       error: (err) => {
         console.error("Failed to update vendor on backend", err);
       },
@@ -1382,7 +1542,7 @@ export class VendorDashboardPage {
 
   deleteVendor(vendorId: string) {
     if (!confirm("Delete this vendor?")) return;
-    this.vendors.update((list) => list.filter((v) => v.id !== vendorId));
+    this.data.vendors.update((list) => list.filter((v) => v.id !== vendorId));
     if (this.selectedVendor()?.id === vendorId) {
       this.selectedVendor.set(null);
       this.selectedSite.set(null);
@@ -1396,5 +1556,81 @@ export class VendorDashboardPage {
 
   trackVendor(_: number, vendor: Vendor) {
     return vendor.id;
+  }
+
+  openAddSitePicker() {
+    const vendor = this.selectedVendor();
+    if (!vendor) return;
+    this.showAddSitePicker.set(true);
+    this.loadAvailableSites();
+  }
+
+  closeAddSitePicker() {
+    this.showAddSitePicker.set(false);
+  }
+
+  private loadAvailableSites() {
+    this.loadingAvailableSites.set(true);
+    this.api.listSitesAdmin().subscribe({
+      next: (res) => {
+        const sites = (res.sites || []).map((s: any) => ({
+          _id: String(s._id || s.id),
+          name: s.name,
+          siteId: s.siteId || String(s._id || s.id),
+        }));
+        this.availableSitesCache.set(sites);
+        this.loadingAvailableSites.set(false);
+      },
+      error: () => {
+        this.availableSitesCache.set([]);
+        this.loadingAvailableSites.set(false);
+      },
+    });
+  }
+
+  assignExistingSite(site: { _id: string; name: string; siteId: string }) {
+    const vendor = this.selectedVendor();
+    if (!vendor) return;
+    const current = (vendor.siteIds || []).map((id) => String(id));
+    if (current.includes(site._id)) {
+      this.closeAddSitePicker();
+      return;
+    }
+    const nextSiteIds = [...current, site._id];
+    this.data.vendors.update((list) =>
+      list.map((v) => (v.id === vendor.id ? { ...v, siteIds: nextSiteIds } : v)),
+    );
+    const refreshed = this.data.vendors().find((v) => v.id === vendor.id);
+    if (refreshed) this.selectedVendor.set(refreshed);
+    this.closeAddSitePicker();
+
+    this.api.patchVendor(vendor.id, { siteIds: nextSiteIds }).subscribe({
+      next: (res: any) => {
+        const serverSiteIds = Array.isArray(res?.siteIds)
+          ? res.siteIds.map((id: any) => String(id))
+          : nextSiteIds;
+        this.data.vendors.update((list) =>
+          list.map((v) => (v.id === vendor.id ? { ...v, siteIds: serverSiteIds } : v)),
+        );
+        this.refreshSiteAssignments();
+      },
+      error: (err) => {
+        console.error("Failed to assign site to vendor", err);
+      },
+    });
+  }
+
+  private refreshSiteAssignments() {
+    this.api.listSitesAdmin().subscribe({
+      next: (res) => {
+        const sites = (res.sites || []).map((s: any) => ({
+          _id: String(s._id || s.id),
+          name: s.name,
+          siteId: s.siteId || String(s._id || s.id),
+        }));
+        this.availableSitesCache.set(sites);
+      },
+      error: () => {},
+    });
   }
 }

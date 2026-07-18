@@ -80,6 +80,8 @@ export type Subcontractor = {
 
 export type Site = {
   id: string;
+  _id?: string;
+  siteId?: string;
   name: string;
   status: "Active" | "On Hold" | "Completed";
   projectId?: string;
@@ -655,7 +657,7 @@ export class ErpDataService {
     this.writeState("projects", this.projects());
   }
 
-  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus }): Vendor {
+  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus; siteIds?: string[] }): Vendor {
     const nextNumber =
       Math.max(
         100,
@@ -671,6 +673,7 @@ export class ErpDataService {
       address: input.address,
       gst: input.gst,
       status: input.status ?? "Active",
+      siteIds: input.siteIds || [],
     };
     this.vendors.update((vendors) => [vendor, ...vendors]);
     this.writeState("vendors", this.vendors());

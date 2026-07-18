@@ -53,7 +53,7 @@ export class WorkspaceHydrationService {
 
     this.setSignalAndStorage("projects", mappedProjects, this.erp.projects);
     this.setSignalAndStorage("clients", mappedClients, this.erp.clients);
-    this.writeState("sites", (sites.items || []).map(mapSite));
+    this.setSignalAndStorage("sites", (sites.items || []).map(mapSite), this.erp.siteEntities);
     this.setSignalAndStorage("vendors", (vendors.items || []).map(mapVendor), this.erp.vendors);
     this.setSignalAndStorage("supervisors", (supervisors.items || []).map(mapSupervisor), this.erp.supervisors);
     this.setSignalAndStorage("materials", (materials.items || []).map(mapMaterial), this.erp.materials);

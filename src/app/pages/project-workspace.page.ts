@@ -11,6 +11,7 @@ import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
+import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 
 type ModuleKey = Exclude<SharedModuleKey, "clients" | "generalExpenses" | "settings" | "supervisors">;
 type TableRow = SharedTableRow;
@@ -165,6 +166,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
     EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
     ProjectFormDialogComponent,
+    VendorFormDialogComponent,
   ],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
@@ -960,6 +962,17 @@ const siteMaterialDetailFields: FieldSchema[] = [
               (cancel)="closeProjectForm()"
               (create)="saveProject($event)"
             ></agb-project-form-dialog>
+
+            <agb-vendor-form-dialog
+              *ngIf="showVendorDialog()"
+              [eyebrow]="editingInlineVendor() ? 'Vendor Edit' : 'Vendor Setup'"
+              [title]="editingInlineVendor() ? 'Edit Vendor' : 'Add New Vendor'"
+              [description]="editingInlineVendor() ? 'Update vendor contact, material type, GST, and address information.' : 'Create the vendor record to track material purchases and GST.'"
+              [submitLabel]="editingInlineVendor() ? 'Save Changes' : 'Create Vendor'"
+              [initialValue]="editingInlineVendor() ? inlineVendorEditValue() : null"
+              (cancel)="closeVendorDialog()"
+              (create)="editingInlineVendor() ? updateInlineVendor($event) : createInlineVendor($event)"
+            ></agb-vendor-form-dialog>
           </main>
         </ion-content>
       </div>
@@ -999,6 +1012,8 @@ export class ProjectWorkspacePage {
   readonly calendarWeekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   readonly tableViewExpanded = signal(false);
   readonly recordDialogOpen = signal(false);
+  readonly showVendorDialog = signal(false);
+  readonly editingInlineVendor = signal<{ id: string; vendorName: string; materialType: string; phoneNumber: string; address: string; gstNumber: string } | null>(null);
   readonly fieldDialogOpen = signal(false);
   readonly newFieldLabel = signal("");
   readonly newFieldAfterKey = signal<string | null>(null);
@@ -1595,6 +1610,11 @@ export class ProjectWorkspacePage {
   addInlineRow(event?: MouseEvent) {
     this.positionRowToolbar(event);
     const section = this.activeSection();
+    if (section === "vendors") {
+      this.editingInlineVendor.set(null);
+      this.showVendorDialog.set(true);
+      return;
+    }
     const currentProject = this.project();
     const row = this.data.addCustomRow(section, {
       ...this.defaultRowFor(section),
@@ -1612,6 +1632,11 @@ export class ProjectWorkspacePage {
   }
 
   openRecordDialog() {
+    if (this.activeSection() === "vendors") {
+      this.editingInlineVendor.set(null);
+      this.showVendorDialog.set(true);
+      return;
+    }
     const row: TableRow = { ...this.defaultRowFor(this.activeSection()) };
     this.draftRow.set(row);
     for (const column of this.recordFormColumns()) {
@@ -1620,6 +1645,87 @@ export class ProjectWorkspacePage {
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
+  }
+
+  closeVendorDialog() {
+    this.showVendorDialog.set(false);
+    this.editingInlineVendor.set(null);
+  }
+
+  inlineVendorEditValue(): VendorFormValue | null {
+    const v = this.editingInlineVendor();
+    if (!v) return null;
+    return {
+      name: v.vendorName,
+      materialType: v.materialType,
+      phone: v.phoneNumber,
+      address: v.address,
+      gst: v.gstNumber,
+      status: "Active",
+      siteIds: [],
+    };
+  }
+
+  createInlineVendor(value: VendorFormValue) {
+    if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
+    const payload = {
+      name: value.name,
+      materialType: value.materialType,
+      phone: value.phone,
+      address: value.address,
+      gstNumber: value.gst,
+      status: "Active",
+      siteIds: value.siteIds || [],
+    };
+    this.api.createVendor(payload).subscribe({
+      next: () => {
+        this.showVendorDialog.set(false);
+        this.editingInlineVendor.set(null);
+        this.data.addVendor({
+          name: value.name,
+          materialType: value.materialType,
+          phone: value.phone,
+          address: value.address,
+          gst: value.gst,
+          status: "Active",
+          siteIds: value.siteIds || [],
+        });
+      },
+      error: (err) => {
+        console.error("Failed to create vendor", err);
+      },
+    });
+  }
+
+  updateInlineVendor(value: VendorFormValue) {
+    const inline = this.editingInlineVendor();
+    if (!inline) return;
+    const payload = {
+      name: value.name,
+      materialType: value.materialType,
+      phone: value.phone,
+      address: value.address,
+      gstNumber: value.gst,
+      status: "Active",
+      siteIds: value.siteIds || [],
+    };
+    this.api.patchVendor(inline.id, payload).subscribe({
+      next: () => {
+        this.showVendorDialog.set(false);
+        this.editingInlineVendor.set(null);
+        this.data.updateVendor(inline.id, {
+          name: value.name,
+          materialType: value.materialType,
+          phone: value.phone,
+          address: value.address,
+          gst: value.gst,
+          status: "Active",
+        });
+      },
+      error: (err) => {
+        console.error("Failed to update vendor", err);
+      },
+    });
   }
 
   recordFormColumns(): FieldSchema[] {

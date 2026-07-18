@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, OnInit, Output, inject, signal } from "@angular/core";
 import { IonIcon } from "@ionic/angular/standalone";
 import { FormsModule } from "@angular/forms";
 import { ApiService } from "../core/api.service";
@@ -59,7 +59,7 @@ type SiteOption = { _id: string; name: string; siteId: string };
           <label class="span-2">
             <span>Assign Sites <em class="req">*</em></span>
             <div class="site-dropdown" [class.open]="siteDropdownOpen">
-              <button type="button" class="site-trigger" (click)="siteDropdownOpen = !siteDropdownOpen">
+              <button type="button" class="site-trigger" (click)="toggleDropdown()">
                 <span>{{ selectedLabel }}</span>
                 <ion-icon [name]="siteDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
               </button>
@@ -71,8 +71,10 @@ type SiteOption = { _id: string; name: string; siteId: string };
                     <p class="site-msg">No sites found.</p>
                   } @else {
                     @for (site of siteOptions(); track site._id) {
-                      <label class="site-opt">
-                        <input type="checkbox"
+                      <label class="site-opt" (click)="$event.stopPropagation()">
+                        <input
+                          type="checkbox"
+                          [attr.data-site-id]="site._id"
                           [checked]="isSelected(site._id)"
                           (change)="onSiteToggle(site._id, $any($event.target).checked)" />
                         <span>{{ site.name }}</span>
@@ -144,6 +146,7 @@ export class VendorFormDialogComponent implements OnInit {
   @Output() create = new EventEmitter<VendorFormValue>();
 
   private readonly api = inject(ApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   statusValue: VendorStatus = "Active";
   readonly siteOptions = signal<SiteOption[]>([]);
@@ -158,16 +161,23 @@ export class VendorFormDialogComponent implements OnInit {
     this.loadSites();
   }
 
+  toggleDropdown() {
+    this.siteDropdownOpen = !this.siteDropdownOpen;
+    this.cdr.markForCheck();
+  }
+
   private loadSites() {
     this.loadingSites.set(true);
     this.api.listSitesAdmin().subscribe({
       next: (res) => {
         this.siteOptions.set(res.sites || []);
         this.loadingSites.set(false);
+        this.cdr.markForCheck();
       },
       error: () => {
         this.siteError.set("Failed to load sites");
         this.loadingSites.set(false);
+        this.cdr.markForCheck();
       },
     });
   }
@@ -179,17 +189,23 @@ export class VendorFormDialogComponent implements OnInit {
   onSiteToggle(id: string, checked: boolean) {
     this.selectedSiteIds.update((set) => {
       const next = new Set(set);
-      checked ? next.add(id) : next.delete(id);
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
       return next;
     });
     this.siteError.set(null);
+    this.cdr.markForCheck();
   }
 
   get selectedLabel(): string {
-    if (this.selectedSiteIds().size === 0) return "Select sites...";
+    const count = this.selectedSiteIds().size;
+    if (count === 0) return "Select sites...";
     const names = Array.from(this.selectedSiteIds())
       .map((id) => this.siteOptions().find((s) => s._id === id)?.name)
-      .filter(Boolean);
+      .filter(Boolean) as string[];
     if (names.length === 0) return "Select sites...";
     if (names.length === 1) return names[0]!;
     return `${names.length} sites selected`;
@@ -199,6 +215,7 @@ export class VendorFormDialogComponent implements OnInit {
     event.preventDefault();
     if (this.selectedSiteIds().size === 0) {
       this.siteError.set("Please assign at least one site");
+      this.cdr.markForCheck();
       return;
     }
     const form = event.currentTarget as HTMLFormElement;

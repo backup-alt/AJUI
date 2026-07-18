@@ -1,11 +1,13 @@
 import { Injectable, inject, signal } from "@angular/core";
 import { Observable } from "rxjs";
 import { ApiService } from "./api.service";
+import { ErpDataService } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 
 @Injectable({ providedIn: "root" })
 export class MaterialsService {
   private readonly api = inject(ApiService);
+  private readonly data = inject(ErpDataService);
   private readonly storageKey = "agb-erp:materials";
 
   readonly materials = signal<MaterialRow[]>(this.readState());
@@ -19,6 +21,7 @@ export class MaterialsService {
         const merged = [...backendItems, ...localItems.filter((i) => !backendIds.has(i.id))];
         this.materials.set(merged);
         this.persist(merged);
+        this.data.materials.set(merged);
       },
       error: () => {
         this.materials.set(this.readState());
@@ -37,6 +40,7 @@ export class MaterialsService {
           const merged = [...backendItems, ...localItems.filter((i) => !backendIds.has(i.id))];
           this.materials.set(merged);
           this.persist(merged);
+          this.data.materials.set(merged);
           resolve(merged);
         },
         error: () => resolve(this.materials()),
@@ -71,6 +75,7 @@ export class MaterialsService {
           };
           this.materials.update((list) => [material, ...list]);
           this.persist(this.materials());
+          this.data.materials.update((list) => [material, ...list]);
           observer.next(material);
           observer.complete();
         },
@@ -87,6 +92,9 @@ export class MaterialsService {
             list.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m)),
           );
           this.persist(this.materials());
+          this.data.materials.update((list) =>
+            list.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m)),
+          );
           observer.next();
           observer.complete();
         },
@@ -101,6 +109,7 @@ export class MaterialsService {
         next: () => {
           this.materials.update((list) => list.filter((m) => String(m.id) !== String(id)));
           this.persist(this.materials());
+          this.data.materials.update((list) => list.filter((m) => String(m.id) !== String(id)));
           observer.next();
           observer.complete();
         },
