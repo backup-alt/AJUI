@@ -403,6 +403,19 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const uniqueIds = [...new Set(allAssignedIds)];
     const siteEntities = this.erp.siteEntities();
     const matched: Array<{ id: string; name: string }> = [];
+    const matchedIds = new Set<string>();
+    const annotateProject = (site: any): { id: string; name: string } => {
+      const siteAny = site as any;
+      const idStr = String(siteAny._id || siteAny.id || site.id || "");
+      const projectIds: string[] = siteAny.projectIds || (siteAny.projectId ? [siteAny.projectId] : []);
+      const projects = this.erp.projects();
+      const projectNames = projectIds
+        .map((pid) => projects.find((p) => p.id === pid)?.name)
+        .filter(Boolean) as string[];
+      const baseName = site.name || "Unnamed Site";
+      const displayName = projectNames.length > 0 ? `${baseName} (${projectNames.join(", ")})` : baseName;
+      return { id: idStr, name: displayName };
+    };
 
     // Match by ObjectId/_id/siteId from assignedSiteIds
     for (const id of uniqueIds) {
@@ -413,32 +426,32 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           String(siteAny.siteId) === id;
       });
       if (!site) continue;
-      const siteAny = site as any;
-      matched.push({ id: String(site.id || siteAny._id || ""), name: site.name });
+      const annotated = annotateProject(site);
+      if (matchedIds.has(annotated.id)) continue;
+      matchedIds.add(annotated.id);
+      matched.push(annotated);
     }
 
-    // For each value in assignedSites, try resolving as ObjectId first, then as name
+    // For each value in assignedSites, try resolving as ObjectId first, then as name.
+    // When multiple sites share the same name (across projects or duplicates), keep each unique instance.
     const assignedSitesValues = (emp.assignedSites || []).map(s => String(s).trim()).filter(Boolean);
-    const matchedIds = new Set(matched.map(m => m.id));
     for (const value of assignedSitesValues) {
-      let site: any = undefined;
-      // Try as ObjectId/_id/siteId
-      site = siteEntities.find(s => {
+      let candidates: any[] = [];
+      const byId = siteEntities.find(s => {
         const siteAny = s as any;
         return String(s.id) === value ||
           String(siteAny._id) === value ||
           String(siteAny.siteId) === value;
       });
-      // Fall back to name match
-      if (!site) {
-        site = siteEntities.find(s => s.name && s.name.toLowerCase() === value.toLowerCase());
+      if (byId) candidates.push(byId);
+      else candidates = siteEntities.filter(s => s.name && s.name.toLowerCase() === value.toLowerCase());
+
+      for (const site of candidates) {
+        const annotated = annotateProject(site);
+        if (matchedIds.has(annotated.id)) continue;
+        matchedIds.add(annotated.id);
+        matched.push(annotated);
       }
-      if (!site) continue;
-      const siteAny = site as any;
-      const siteId = String(site.id || siteAny._id || "");
-      if (matchedIds.has(siteId)) continue;
-      if (matched.some(m => m.name.toLowerCase() === String(site.name || "").toLowerCase())) continue;
-      matched.push({ id: siteId, name: site.name });
     }
 
     return matched;
@@ -505,12 +518,17 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   }
 
   private populateSiteEntities(sites: any[]) {
-    this.erp.siteEntities.update(() => (sites || []).map((s: any) => ({
-      id: String(s._id || s.id),
-      name: s.name || "Unnamed Site",
-      status: s.status || "Active",
-      projectId: s.projectId || "",
-    })));
+    this.erp.siteEntities.update(() => (sites || []).map((s: any) => {
+      const projectIds = Array.isArray(s.projectIds) ? s.projectIds : (s.projectId ? [s.projectId] : []);
+      return {
+        id: String(s._id || s.id),
+        name: s.name || "Unnamed Site",
+        status: s.status || "Active",
+        projectId: projectIds[0] || "",
+        projectIds,
+        siteId: s.siteId,
+      };
+    }));
   }
 
   private loadEmployeeAfterSites(id: string) {
@@ -545,6 +563,13 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     });
   }
 
+  private toStringId(val: any): string {
+    if (!val) return '';
+    if (typeof val === 'string') return val;
+    if (val.$oid) return val.$oid;
+    return String(val);
+  }
+
   private loadSupervisorAfterSites(id: string) {
     this.api.getSupervisor(id).subscribe({
       next: (res) => {
@@ -555,7 +580,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           return;
         }
 
-        const assignedSiteIds: string[] = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
+        const assignedSiteIds: string[] = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => this.toStringId(sid)) : [];
         // assignedSites from the backend may contain either ObjectId strings or site names (legacy data).
         // Keep the raw values so the supervisorAssignedSiteNames computed can resolve them later
         // against siteEntities (which may not have been populated at the time of this call).
@@ -613,7 +638,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     if (!emp || emp.role !== "Supervisor") return;
 
     const currentIds = [
-      ...(emp.assignedSiteIds || []).map((id: any) => String(id)),
+      ...(emp.assignedSiteIds || []).map((id: any) => this.toStringId(id)),
       ...(emp.assignedSites || []).map((s: any) => String(s))
     ];
     if (currentIds.includes(siteId)) return;
@@ -623,7 +648,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
-          const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
+          const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => this.toStringId(sid)) : [];
           const assignedSites = row.assignedSites ? row.assignedSites.map((s: any) => String(s)) : [];
           this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
         }
@@ -637,7 +662,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     if (!emp || emp.role !== "Supervisor") return;
 
     const currentIds = [
-      ...(emp.assignedSiteIds || []).map((id: any) => String(id)),
+      ...(emp.assignedSiteIds || []).map((id: any) => this.toStringId(id)),
       ...(emp.assignedSites || []).map((s: any) => String(s))
     ];
     const newSiteIds = currentIds.filter((id) => id !== siteId);
@@ -646,7 +671,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
-          const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => String(sid)) : [];
+          const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => this.toStringId(sid)) : [];
           const assignedSites = row.assignedSites ? row.assignedSites.map((s: any) => String(s)) : [];
           this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
         }
