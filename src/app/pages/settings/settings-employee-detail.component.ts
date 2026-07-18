@@ -816,6 +816,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       },
       error: (err) => {
         console.error("[EmployeeDetail] saveSiteSelection FAILED:", err);
+        console.error("[EmployeeDetail] Validation Details:", err?.details);
         this.siteSaving.set(false);
         alert("Failed to update sites. Check browser console for details.");
       },
