@@ -57,6 +57,8 @@ export type MaterialRow = {
   paymentType?: "Cash" | "NEFT" | "Bank Transfer" | "UPI" | "Cheque";
   deliveredOn?: string;
   billUrl?: string;
+  receiptImage?: string;
+  receiptImageMimeType?: string;
   [key: string]: any;
 };
 
@@ -135,6 +137,8 @@ export type ExpenseRow = {
   spent: number;
   reference: string;
   status: ApprovalStatus;
+  billUrl?: string;
+  poNumber?: string;
 };
 
 export type PaymentRow = {

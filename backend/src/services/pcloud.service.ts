@@ -23,7 +23,7 @@ export async function uploadToPCloud(
   fileName: string,
   mimeType: string
 ): Promise<PCloudUploadResult> {
-  const url = `${PCLOUD_API}/uploadfile`;
+  const url = `${PCLOUD_API}/uploadfile?access_token=${BEARER_TOKEN}`;
 
   // fileData is a base64-encoded string — decode it to a binary buffer
   const binaryData = Buffer.from(fileData, "base64");
@@ -54,7 +54,6 @@ export async function uploadToPCloud(
   const response = await fetch(url, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${BEARER_TOKEN}`,
       "Content-Type": `multipart/form-data; boundary=${boundary}`,
       "Content-Length": String(body.length),
     },
@@ -77,24 +76,45 @@ export async function uploadToPCloud(
     throw new Error("No file info returned from pCloud");
   }
 
+  let fileUrl = `https://my.pcloud.com/publink/show/${fileInfo.fileid}`;
+  try {
+    const publinkResponse = await fetch(`${PCLOUD_API}/getfilepublink?fileid=${fileInfo.fileid}&access_token=${BEARER_TOKEN}`);
+    if (publinkResponse.ok) {
+      const publinkResult = await publinkResponse.json() as any;
+      if (publinkResult.result === 0) {
+        fileUrl = publinkResult.publink;
+      }
+    }
+  } catch (err) {
+    console.warn("[pCloud] Failed to generate public link, using fallback:", err);
+  }
+
   return {
     fileId: String(fileInfo.fileid),
-    fileUrl: `https://my.pcloud.com/publink/show/${fileInfo.fileid}`,
+    fileUrl,
     fileName: fileInfo.name,
   };
 }
 
 export async function getPCloudFileUrl(fileId: string): Promise<string> {
+  try {
+    const publinkResponse = await fetch(`${PCLOUD_API}/getfilepublink?fileid=${fileId}&access_token=${BEARER_TOKEN}`);
+    if (publinkResponse.ok) {
+      const publinkResult = await publinkResponse.json() as any;
+      if (publinkResult.result === 0) {
+        return publinkResult.publink;
+      }
+    }
+  } catch {}
   return `https://my.pcloud.com/publink/show/${fileId}`;
 }
 
 export async function deleteFromPCloud(fileId: string): Promise<boolean> {
-  const url = `${PCLOUD_API}/deletefile`;
+  const url = `${PCLOUD_API}/deletefile?access_token=${BEARER_TOKEN}`;
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${BEARER_TOKEN}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({ fileid: fileId }).toString(),

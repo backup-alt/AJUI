@@ -9289,6 +9289,25 @@ body {
   box-shadow: inset 0 0 0 2px rgba(0, 34, 99, 0.22) !important;
 }
 
+.operations-table .bill-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: #eef4ff;
+  color: #002263;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.operations-table .bill-link:hover {
+  background: #dce8ff;
+  color: #001a4d;
+}
+
 .operations-table td.select-cell {
   padding: 6px 8px !important;
 }

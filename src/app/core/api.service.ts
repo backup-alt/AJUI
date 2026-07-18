@@ -419,8 +419,8 @@ export class ApiService {
     );
   }
 
-  approveApproval(id: string): Observable<{ approval: any }> {
-    return this.http.put<{ approval: any }>(`${this.baseUrl}/approvals/${id}/approve`, {}, { headers: this.authHeaders() }).pipe(
+  approveApproval(id: string, payload: any = {}): Observable<{ approval: any }> {
+    return this.http.put<{ approval: any }>(`${this.baseUrl}/approvals/${id}/approve`, payload, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
     );
   }

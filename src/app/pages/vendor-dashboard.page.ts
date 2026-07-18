@@ -387,12 +387,12 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         </td>
                         <td class="col-bill">
                           @if (row.billUrl) {
-                            <a class="bill-link" [href]="row.billUrl" target="_blank" rel="noopener noreferrer" title="View Bill">
+                            <a class="bill-link" [href]="row.billUrl" [attr.target]="isDataUrl(row.billUrl) ? '_self' : '_blank'" [attr.rel]="isDataUrl(row.billUrl) ? null : 'noopener noreferrer'" title="View Bill">
                               <ion-icon name="link-outline"></ion-icon>
                               <span>View Bill</span>
                             </a>
                           } @else if (billLinkFor(row.id); as link) {
-                            <a class="bill-link" [href]="link.billUrl" target="_blank" rel="noopener noreferrer" [title]="link.billUrl">
+                            <a class="bill-link" [href]="link.billUrl" [attr.target]="isDataUrl(link.billUrl) ? '_self' : '_blank'" [attr.rel]="isDataUrl(link.billUrl) ? null : 'noopener noreferrer'" [title]="link.billUrl">
                               <ion-icon name="link-outline"></ion-icon>
                               <span>{{ link.billLabel || shortLinkLabel(link.billUrl) }}</span>
                             </a>
@@ -1236,6 +1236,10 @@ export class VendorDashboardPage {
     this.loadingAvailableSites.set(false);
   }
 
+  reloadAvailableSites() {
+    this.loadAvailableSites();
+  }
+
   assignExistingSite(site: { id: string; name: string }) {
     const vendor = this.selectedVendor();
     if (!vendor) return;
@@ -1294,6 +1298,10 @@ export class VendorDashboardPage {
     } catch {
       return url.length > 24 ? url.slice(0, 24) + "…" : url;
     }
+  }
+
+  isDataUrl(url: string): boolean {
+    return url.startsWith("data:");
   }
 
   commitBillLink(materialId: string, value: string) {

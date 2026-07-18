@@ -228,6 +228,7 @@ export async function uploadExpenseReceipt(
     expense.receiptImage = payload.data;
     expense.receiptImageMimeType = payload.mimeType;
     expense.receiptImageName = payload.fileName;
+    expense.billUrl = `data:${payload.mimeType};base64,${payload.data}`;
   }
 
   if (payload.givenAmount !== undefined) {

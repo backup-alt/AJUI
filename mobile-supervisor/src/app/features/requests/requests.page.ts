@@ -160,14 +160,20 @@ interface RequestItem {
                       </div>
                     }
 
-                    <div class="upload-field">
-                      <ion-label class="upload-field-label">Given Amount (INR) *</ion-label>
-                      <ion-input
-                        type="number"
-                        placeholder="Enter given amount"
-                        [(ngModel)]="givenAmountInput"
-                        class="upload-input"
-                      ></ion-input>
+                    @if (item.type === 'expense') {
+                      <div class="upload-field">
+                        <ion-label class="upload-field-label">Given Amount (INR) *</ion-label>
+                        <ion-input
+                          type="number"
+                          placeholder="Enter given amount"
+                          [(ngModel)]="givenAmountInput"
+                          class="upload-input"
+                        ></ion-input>
+                      </div>
+                    }
+                    
+                    <div class="upload-field" style="margin-bottom: 16px;">
+                      <ion-checkbox [(ngModel)]="isReceivedInput">Received (Materials reached the site)</ion-checkbox>
                     </div>
 
                     <div class="upload-actions">
@@ -182,7 +188,7 @@ interface RequestItem {
                       <ion-button
                         expand="block"
                         size="small"
-                        [disabled]="!canSubmitUpload()"
+                        [disabled]="!canSubmitUpload(item)"
                         (click)="submitUpload(item)"
                       >
                         @if (isUploading()) {
@@ -203,7 +209,7 @@ interface RequestItem {
                       (click)="startUpload(item)"
                     >
                       <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
-                      Upload Bill & Enter Given Amount
+                      {{ item.type === 'expense' ? 'Upload Bill & Enter Given Amount' : 'Upload Bill' }}
                     </ion-button>
                   </div>
                 }
@@ -212,7 +218,7 @@ interface RequestItem {
               @if (activeTab === 'upload' && !item.needsUpload) {
                 <div class="completed-notice">
                   <ion-icon name="checkmark-circle-outline"></ion-icon>
-                  Bill uploaded & Given amount recorded
+                  {{ item.type === 'expense' ? 'Bill uploaded & Given amount recorded' : 'Bill uploaded' }}
                 </div>
               }
             </div>
@@ -403,8 +409,7 @@ export class RequestsPage implements OnInit {
     }
     // Upload tab: only show approved site-material expenses and approved materials that still need upload
     return items.filter(i =>
-      (i.status === 'Approved' || i.status === 'Completed' || i.status === 'Received') &&
-      (i.type === 'material' || i.needsUpload || !i.needsUpload)
+      i.status === 'Approved' && i.needsUpload
     );
   }
 
@@ -413,6 +418,7 @@ export class RequestsPage implements OnInit {
   selectedFileName = signal<string | null>(null);
   selectedFileMimeType = signal<string | null>(null);
   givenAmountInput: number | null = null;
+  isReceivedInput: boolean = false;
   isUploading = signal(false);
 
   get emptyIcon() {
@@ -546,6 +552,7 @@ export class RequestsPage implements OnInit {
   cancelUpload(): void {
     this.uploadingItemId.set(null);
     this.givenAmountInput = null;
+    this.isReceivedInput = false;
     this.selectedFileData.set(null);
     this.selectedFileName.set(null);
     this.selectedFileMimeType.set(null);
@@ -570,25 +577,28 @@ export class RequestsPage implements OnInit {
     input.click();
   }
 
-  canSubmitUpload(): boolean {
-    return !!(
-      this.selectedFileData() &&
-      this.givenAmountInput !== null &&
-      this.givenAmountInput > 0 &&
-      !this.isUploading()
-    );
+  canSubmitUpload(item: RequestItem): boolean {
+    if (!this.selectedFileData() || !this.isReceivedInput || this.isUploading()) {
+      return false;
+    }
+    if (item.type === 'expense') {
+      return this.givenAmountInput !== null && this.givenAmountInput > 0;
+    }
+    return true;
   }
 
   async submitUpload(item: RequestItem): Promise<void> {
-    if (!this.canSubmitUpload()) return;
+    if (!this.canSubmitUpload(item)) return;
     this.isUploading.set(true);
 
-    const payload = {
+    const payload: any = {
       data: this.selectedFileData()!,
       mimeType: this.selectedFileMimeType() || 'image/jpeg',
       fileName: this.selectedFileName() || 'bill.jpg',
-      givenAmount: this.givenAmountInput!,
     };
+    if (item.type === 'expense') {
+      payload.givenAmount = this.givenAmountInput!;
+    }
 
     try {
       if (item.type === 'material') {
@@ -608,7 +618,7 @@ export class RequestsPage implements OnInit {
       }
 
       const toast = await this.toastCtrl.create({
-        message: 'Bill uploaded & Given Amount recorded successfully',
+        message: item.type === 'expense' ? 'Bill uploaded & Given Amount recorded successfully' : 'Bill uploaded successfully',
         duration: 2500,
         color: 'success',
         position: 'top',

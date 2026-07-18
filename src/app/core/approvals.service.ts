@@ -194,8 +194,8 @@ export class ApprovalsService {
     );
   }
 
-  approve(id: string) {
-    return this.api.approveApproval(id);
+  approve(id: string, payload: any = {}) {
+    return this.api.approveApproval(id, payload);
   }
 
   reject(id: string) {

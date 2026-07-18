@@ -141,7 +141,9 @@ export class MaterialsService {
     givenAmount: row.givenAmount,
     paymentType: row.paymentType,
     deliveredOn: row.deliveredOn,
-    billUrl: row.billUrl,
+    billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
+    receiptImage: row.receiptImage,
+    receiptImageMimeType: row.receiptImageMimeType,
   });
 
   private readState(): MaterialRow[] {

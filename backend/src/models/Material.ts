@@ -28,6 +28,9 @@ export interface IMaterial extends Document {
   status: MaterialStatus;
   notes?: string;
   billUrl?: string;
+  receiptImage?: string;
+  receiptImageMimeType?: string;
+  receiptImageName?: string;
   customFields?: Record<string, string | number | boolean | null>;
   createdBy?: string;
   supervisorName?: string;
@@ -72,6 +75,9 @@ const materialSchema = new Schema<IMaterial>(
     approvedAt: { type: Date },
     notes: { type: String, trim: true, maxlength: 2000 },
     billUrl: { type: String, trim: true },
+    receiptImage: { type: String },
+    receiptImageMimeType: { type: String },
+    receiptImageName: { type: String },
     customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
