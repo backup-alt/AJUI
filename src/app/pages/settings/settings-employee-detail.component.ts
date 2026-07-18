@@ -125,9 +125,9 @@ interface ActivityEntry {
                   <h2>Assigned Sites</h2>
                   <p>Sites that this supervisor is assigned to.</p>
                 </div>
-                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="showSitePicker.set(true)">
+                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openSitePicker()">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                  Add Site
+                  Manage Sites
                 </button>
               </div>
               <div class="settings-w11-card-body">
@@ -234,26 +234,36 @@ interface ActivityEntry {
           <div class="settings-w11-picker-overlay" (click)="showSitePicker.set(false)">
             <div class="settings-w11-picker-modal" (click)="$event.stopPropagation()">
               <div class="settings-w11-picker-head">
-                <h3>Assign Site</h3>
+                <h3>Manage Assigned Sites</h3>
                 <button type="button" class="settings-w11-chip-remove" (click)="showSitePicker.set(false)">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </button>
               </div>
               <div class="settings-w11-picker-body">
-                @if (availableSitesForSupervisor().length === 0) {
-                  <p class="settings-w11-empty-hint">No sites available to assign.</p>
+                @if (allSitesForPicker().length === 0) {
+                  <p class="settings-w11-empty-hint">No sites found.</p>
                 } @else {
                   <div class="settings-w11-picker-list">
-                    @for (site of availableSitesForSupervisor(); track site.id) {
-                      <button type="button" class="settings-w11-site-option" (click)="selectSiteToAssign(site)">
-                        <span class="icon-circle">
-                          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    @for (site of allSitesForPicker(); track site.id) {
+                      <label class="settings-w11-site-checkbox" [class.checked]="pendingSiteIds().has(site.id)">
+                        <input type="checkbox" [checked]="pendingSiteIds().has(site.id)" (change)="togglePickerSite(site.id)" />
+                        <span class="cb-box">
+                          @if (pendingSiteIds().has(site.id)) {
+                            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          }
                         </span>
-                        {{ site.name }}
-                      </button>
+                        <span class="cb-label">{{ site.name }}</span>
+                      </label>
                     }
                   </div>
                 }
+              </div>
+              <div class="settings-w11-picker-footer">
+                <span class="settings-w11-picker-count">{{ pendingSiteIds().size }} site(s) selected</span>
+                <div class="settings-w11-picker-actions">
+                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="showSitePicker.set(false)">Cancel</button>
+                  <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="saveSiteSelection()" [disabled]="siteSaving()">{{ siteSaving() ? 'Saving…' : 'Save' }}</button>
+                </div>
               </div>
             </div>
           </div>
@@ -319,74 +329,105 @@ interface ActivityEntry {
     }
     .settings-w11-picker-modal {
       background: #fff;
-      border-radius: 12px;
-      width: 380px;
-      max-width: 90vw;
+      border-radius: 14px;
+      width: 440px;
+      max-width: 92vw;
       max-height: 80vh;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.18);
     }
     .settings-w11-picker-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 20px;
+      padding: 18px 22px;
       border-bottom: 1px solid #e5e7eb;
     }
     .settings-w11-picker-head h3 {
       margin: 0;
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 600;
       color: #111827;
     }
     .settings-w11-picker-body {
-      padding: 12px;
+      padding: 14px 18px;
       overflow-y: auto;
+      flex: 1;
     }
-    .settings-w11-site-option {
+    .settings-w11-picker-footer {
       display: flex;
       align-items: center;
-      gap: 12px;
-      width: 100%;
-      padding: 10px 14px;
-      border: 1px solid transparent;
+      justify-content: space-between;
+      padding: 14px 22px;
+      border-top: 1px solid #e5e7eb;
       background: #f9fafb;
-      border-radius: 8px;
-      cursor: pointer;
-      text-align: left;
-      font-size: 14px;
-      color: #374151;
-      transition: all 0.2s;
+      border-radius: 0 0 14px 14px;
     }
-    .settings-w11-site-option:hover {
-      background: #eef2ff;
-      border-color: #c7d2fe;
-      color: #4f46e5;
+    .settings-w11-picker-count {
+      font-size: 13px;
+      color: #6b7280;
     }
-    .settings-w11-site-option .icon-circle {
+    .settings-w11-picker-actions {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      background: #fff;
-      border-radius: 50%;
-      color: #9ca3af;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-      transition: color 0.2s;
-    }
-    .settings-w11-site-option:hover .icon-circle {
-      color: #4f46e5;
-    }
-    .settings-w11-site-option svg {
-      width: 14px;
-      height: 14px;
+      gap: 8px;
     }
     .settings-w11-picker-list {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
+    }
+    .settings-w11-site-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .settings-w11-site-checkbox:hover {
+      background: #f3f4f6;
+    }
+    .settings-w11-site-checkbox.checked {
+      background: #eef2ff;
+    }
+    .settings-w11-site-checkbox input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .settings-w11-site-checkbox .cb-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #d1d5db;
+      border-radius: 5px;
+      background: #fff;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .settings-w11-site-checkbox.checked .cb-box {
+      background: #4f46e5;
+      border-color: #4f46e5;
+    }
+    .settings-w11-site-checkbox .cb-box svg {
+      width: 14px;
+      height: 14px;
+      color: #fff;
+    }
+    .settings-w11-site-checkbox .cb-label {
+      font-size: 14px;
+      color: #374151;
+      line-height: 1.4;
+    }
+    .settings-w11-site-checkbox.checked .cb-label {
+      color: #312e81;
+      font-weight: 500;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -413,6 +454,8 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   // Site picker for supervisors
   readonly showSitePicker = signal(false);
+  readonly pendingSiteIds = signal<Set<string>>(new Set());
+  readonly siteSaving = signal(false);
 
   // Activity
   readonly activity = signal<ActivityEntry[]>([]);
@@ -429,43 +472,23 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       .filter(Boolean);
   });
 
-  readonly availableSitesForSupervisor = computed<Array<{ id: string; name: string }>>(() => {
-    const emp = this.employee();
-    if (!emp || emp.role !== "Supervisor") return [];
-    const assignedSiteIds = new Set((emp.assignedSiteIds || []).map(id => String(id)));
-    const assignedSitesValues = (emp.assignedSites || []).map(s => String(s).trim()).filter(Boolean);
-    const assignedSiteNames = new Set(
-      assignedSitesValues.filter(v => !/^[a-f0-9]{24}$/i.test(v)).map(v => v.toLowerCase())
-    );
-    const isValidOid = (v: string) => /^[a-f0-9]{24}$/i.test(v);
+  private annotateProject(site: any): { id: string; name: string } {
+    const siteAny = site as any;
+    const idStr = String(siteAny._id || siteAny.id || site.id || "");
+    const projectIds: string[] = siteAny.projectIds || (siteAny.projectId ? [siteAny.projectId] : []);
+    const projects = this.erp.projects();
+    const projectNames = projectIds
+      .map((pid: string) => projects.find((p) => p.id === pid)?.name)
+      .filter(Boolean) as string[];
+    const baseName = site.name || "Unnamed Site";
+    const displayName = projectNames.length > 0 ? `${baseName} (${projectNames.join(", ")})` : baseName;
+    return { id: idStr, name: displayName };
+  }
+
+  /** All sites for the checkbox picker — each with an id and annotated display name */
+  readonly allSitesForPicker = computed<Array<{ id: string; name: string }>>(() => {
     const allSites = this.erp.siteEntities();
-
-    const annotateProject = (site: any): { id: string; name: string } => {
-      const siteAny = site as any;
-      const idStr = String(siteAny._id || siteAny.id || site.id || "");
-      const projectIds: string[] = siteAny.projectIds || (siteAny.projectId ? [siteAny.projectId] : []);
-      const projects = this.erp.projects();
-      const projectNames = projectIds
-        .map((pid) => projects.find((p) => p.id === pid)?.name)
-        .filter(Boolean) as string[];
-      const baseName = site.name || "Unnamed Site";
-      const displayName = projectNames.length > 0 ? `${baseName} (${projectNames.join(", ")})` : baseName;
-      return { id: idStr, name: displayName };
-    };
-
-    return allSites
-      .filter((s) => {
-        const siteAny = s as any;
-        const siteIdStr = String(s.id);
-        const siteIdAny = String(siteAny._id);
-        const isAssignedById =
-          assignedSiteIds.has(siteIdStr) ||
-          assignedSiteIds.has(siteIdAny) ||
-          assignedSitesValues.some(v => isValidOid(v) && (v === siteIdStr || v === siteIdAny));
-        const isAssignedByName = s.name && assignedSiteNames.has(s.name.toLowerCase());
-        return !isAssignedById && !isAssignedByName;
-      })
-      .map((s) => annotateProject(s));
+    return allSites.map((s) => this.annotateProject(s));
   });
 
   readonly supervisorAssignedSiteNames = computed<Array<{ id: string; name: string }>>(() => {
@@ -476,18 +499,6 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const siteEntities = this.erp.siteEntities();
     const matched: Array<{ id: string; name: string }> = [];
     const matchedIds = new Set<string>();
-    const annotateProject = (site: any): { id: string; name: string } => {
-      const siteAny = site as any;
-      const idStr = String(siteAny._id || siteAny.id || site.id || "");
-      const projectIds: string[] = siteAny.projectIds || (siteAny.projectId ? [siteAny.projectId] : []);
-      const projects = this.erp.projects();
-      const projectNames = projectIds
-        .map((pid) => projects.find((p) => p.id === pid)?.name)
-        .filter(Boolean) as string[];
-      const baseName = site.name || "Unnamed Site";
-      const displayName = projectNames.length > 0 ? `${baseName} (${projectNames.join(", ")})` : baseName;
-      return { id: idStr, name: displayName };
-    };
 
     // Match by ObjectId/_id/siteId from assignedSiteIds
     for (const id of uniqueIds) {
@@ -498,14 +509,13 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           String(siteAny.siteId) === id;
       });
       if (!site) continue;
-      const annotated = annotateProject(site);
+      const annotated = this.annotateProject(site);
       if (matchedIds.has(annotated.id)) continue;
       matchedIds.add(annotated.id);
       matched.push(annotated);
     }
 
     // For each value in assignedSites, try resolving as ObjectId first, then as name.
-    // When multiple sites share the same name (across projects or duplicates), keep each unique instance.
     const assignedSitesValues = (emp.assignedSites || []).map(s => String(s).trim()).filter(Boolean);
     for (const value of assignedSitesValues) {
       let candidates: any[] = [];
@@ -519,7 +529,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       else candidates = siteEntities.filter(s => s.name && s.name.toLowerCase() === value.toLowerCase());
 
       for (const site of candidates) {
-        const annotated = annotateProject(site);
+        const annotated = this.annotateProject(site);
         if (matchedIds.has(annotated.id)) continue;
         matchedIds.add(annotated.id);
         matched.push(annotated);
@@ -528,17 +538,6 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
     return matched;
   });
-
-  selectSiteToAssign(site: { id: string; name: string }) {
-    const emp = this.employee();
-    if (!emp || emp.role !== "Supervisor") return;
-
-    const currentSiteIds = emp.assignedSiteIds || [];
-    if (currentSiteIds.includes(site.id)) return;
-
-    this.addSupervisorSite(site.id);
-    this.showSitePicker.set(false);
-  }
 
   readonly approvalTypes = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },
@@ -750,43 +749,77 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     });
   }
 
-  /** Strip UI-annotated display names like "Terrace (T Nagar Premium Villa)" before sending to backend */
-  private cleanAssignedSites(sites: string[]): string[] {
-    // Annotated names have " (Project Name)" appended by the UI — strip them to avoid Zod rejection
-    return sites
-      .map(s => String(s).replace(/\s*\([^)]*\)\s*$/, '').trim())
-      .filter(Boolean);
+  /** Opens the site picker and initializes checkboxes from current assignments */
+  openSitePicker() {
+    const emp = this.employee();
+    if (!emp) return;
+    // Collect all currently assigned site IDs into a Set for the checkboxes
+    const currentIds = new Set(
+      (emp.assignedSiteIds || []).map((id: any) => this.toStringId(id))
+    );
+    this.pendingSiteIds.set(currentIds);
+    this.showSitePicker.set(true);
   }
 
-  addSupervisorSite(siteId: string) {
-    const emp = this.employee();
-    if (!emp || emp.role !== "Supervisor" || !emp.supervisorId) return;
-
-    const currentSiteIds = (emp.assignedSiteIds || []).map((id: any) => this.toStringId(id));
-    if (currentSiteIds.includes(siteId)) return;
-
-    const newSiteIds = [...currentSiteIds, siteId];
-    // Only send clean site names (no "(Project)" annotation) back to the backend
-    const newAssignedSites = this.cleanAssignedSites(
-      (emp.assignedSites || []).map((s: any) => String(s))
-    );
-
-    this.api.updateSupervisor(emp.supervisorId, {
-      assignedSiteIds: newSiteIds,
-      assignedSites: newAssignedSites
-    }).subscribe({
-      next: (res) => {
-        const row = res?.supervisor;
-        if (row) {
-          const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => this.toStringId(sid)) : [];
-          const assignedSites = row.assignedSites ? row.assignedSites.map((s: any) => String(s)) : [];
-          this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
-        }
-      },
-      error: (err) => console.warn("[EmployeeDetail] addSupervisorSite failed:", err?.message ?? err),
+  /** Toggle a site's checked state in the picker */
+  togglePickerSite(siteId: string) {
+    this.pendingSiteIds.update(set => {
+      const next = new Set(set);
+      if (next.has(siteId)) {
+        next.delete(siteId);
+      } else {
+        next.add(siteId);
+      }
+      return next;
     });
   }
 
+  /** Save the full site selection to the backend in one PATCH */
+  saveSiteSelection() {
+    const emp = this.employee();
+    if (!emp || emp.role !== "Supervisor" || !emp.supervisorId) {
+      console.warn("[EmployeeDetail] saveSiteSelection: no supervisor ID found", {
+        role: emp?.role,
+        supervisorId: emp?.supervisorId,
+      });
+      return;
+    }
+
+    const newSiteIds = [...this.pendingSiteIds()];
+    this.siteSaving.set(true);
+
+    console.log("[EmployeeDetail] Saving site selection:", {
+      supervisorId: emp.supervisorId,
+      assignedSiteIds: newSiteIds,
+    });
+
+    this.api.updateSupervisor(emp.supervisorId, {
+      assignedSiteIds: newSiteIds,
+    }).subscribe({
+      next: (res) => {
+        console.log("[EmployeeDetail] Site update response:", res);
+        const row = res?.supervisor;
+        if (row) {
+          const assignedSiteIds = row.assignedSiteIds
+            ? row.assignedSiteIds.map((sid: any) => this.toStringId(sid))
+            : [];
+          const assignedSites = row.assignedSites
+            ? row.assignedSites.map((s: any) => String(s))
+            : [];
+          this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
+        }
+        this.siteSaving.set(false);
+        this.showSitePicker.set(false);
+      },
+      error: (err) => {
+        console.error("[EmployeeDetail] saveSiteSelection FAILED:", err);
+        this.siteSaving.set(false);
+        alert("Failed to update sites. Check browser console for details.");
+      },
+    });
+  }
+
+  /** Remove a single site (convenience from the chip X button) */
   removeSupervisorSite(siteId: string) {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor" || !emp.supervisorId) return;
@@ -794,34 +827,22 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const currentSiteIds = (emp.assignedSiteIds || []).map((id: any) => this.toStringId(id));
     const newSiteIds = currentSiteIds.filter((id) => id !== siteId);
 
-    const siteToRemove = this.erp.siteEntities().find((s: any) => String(s.id || s._id) === siteId);
-    const rawSites = this.cleanAssignedSites(
-      (emp.assignedSites || []).map(s => String(s))
-    );
-
-    let newAssignedSites: string[];
-    if (siteToRemove) {
-      newAssignedSites = rawSites.filter(s =>
-        s !== siteId &&
-        s.toLowerCase() !== siteToRemove.name.toLowerCase()
-      );
-    } else {
-      newAssignedSites = rawSites.filter(s => s !== siteId);
-    }
-
     this.api.updateSupervisor(emp.supervisorId, {
       assignedSiteIds: newSiteIds,
-      assignedSites: newAssignedSites
     }).subscribe({
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
-          const assignedSiteIds = row.assignedSiteIds ? row.assignedSiteIds.map((sid: any) => this.toStringId(sid)) : [];
-          const assignedSites = row.assignedSites ? row.assignedSites.map((s: any) => String(s)) : [];
+          const assignedSiteIds = row.assignedSiteIds
+            ? row.assignedSiteIds.map((sid: any) => this.toStringId(sid))
+            : [];
+          const assignedSites = row.assignedSites
+            ? row.assignedSites.map((s: any) => String(s))
+            : [];
           this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
         }
       },
-      error: (err) => console.warn("[EmployeeDetail] removeSupervisorSite failed:", err?.message ?? err),
+      error: (err) => console.error("[EmployeeDetail] removeSupervisorSite failed:", err),
     });
   }
 
