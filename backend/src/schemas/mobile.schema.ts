@@ -39,6 +39,7 @@ export const createMaterialMobileSchema = z.object({
     vendor: z.string().trim().optional(),
     poNumber: z.string().trim().optional(),
     requestDate: z.string().min(1),
+    issuedAmount: z.coerce.number().nonnegative().optional(),
     notes: z.string().trim().max(2000).optional(),
   }),
 });
@@ -89,6 +90,7 @@ export const createExpenseMobileSchema = z.object({
     materialQuantity: z.coerce.number().nonnegative().optional(),
     materialVendor: z.string().trim().optional(),
     materialVendorId: objectIdSchema.optional(),
+    issuedAmount: z.coerce.number().nonnegative().optional(),
     customFields: z.record(z.unknown()).optional(),
   }),
 });
@@ -99,6 +101,7 @@ export const uploadExpenseReceiptMobileSchema = z.object({
     data: z.string().min(20),
     mimeType: z.string().min(1).max(120),
     fileName: z.string().max(200).optional(),
+    givenAmount: z.coerce.number().nonnegative().optional(),
   }),
 });
 

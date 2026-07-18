@@ -137,8 +137,8 @@ import { Vendor } from '../../../shared/models';
               <ion-item class="form-item">
                 <div class="toggle-row">
                   <div class="toggle-info">
-                    <div class="toggle-label">Site Material?</div>
-                    <div class="toggle-sub">Is this a site material purchase?</div>
+                    <div class="toggle-label">Includes Site Material</div>
+                    <div class="toggle-sub">Does this purchase include site material?</div>
                   </div>
                   <ion-toggle [(ngModel)]="isSiteMaterial" (ionChange)="onSiteMaterialToggle()"></ion-toggle>
                 </div>
@@ -196,11 +196,11 @@ import { Vendor } from '../../../shared/models';
               </ion-item>
 
               <ion-item class="form-item form-item-last">
-                <ion-label position="stacked">Remaining Stock</ion-label>
+                <ion-label position="stacked">Issued Amount (INR) *</ion-label>
                 <ion-input
                   type="number"
                   placeholder="0"
-                  [(ngModel)]="expense.remainingStock"
+                  [(ngModel)]="expense.issuedAmount"
                   [clearInput]="true"
                 ></ion-input>
               </ion-item>
@@ -329,7 +329,7 @@ export class ExpenseCreatePage implements OnInit {
     materialQuantity: null as number | null,
     materialVendorId: '',
     materialVendor: '',
-    remainingStock: null as number | null,
+    issuedAmount: null as number | null,
   };
 
   isSiteMaterial = false;
@@ -423,7 +423,7 @@ export class ExpenseCreatePage implements OnInit {
       this.expense.materialQuantity = null;
       this.expense.materialVendorId = '';
       this.expense.materialVendor = '';
-      this.expense.remainingStock = null;
+      this.expense.issuedAmount = null;
     }
   }
 
@@ -434,7 +434,8 @@ export class ExpenseCreatePage implements OnInit {
         this.expense.materialUnit &&
         this.expense.materialQuantity &&
         this.expense.description &&
-        this.expense.amount
+        this.expense.amount &&
+        this.expense.issuedAmount
       );
     }
     if (this.expenseType() === 'Purchase' && !this.isSiteMaterial) {
@@ -511,7 +512,7 @@ export class ExpenseCreatePage implements OnInit {
         payload.materialQuantity = this.expense.materialQuantity;
         payload.materialVendor = selectedVendor?.name || this.expense.materialVendor || undefined;
         payload.materialVendorId = this.expense.materialVendorId || undefined;
-        payload.remainingStock = this.expense.remainingStock ?? this.expense.materialQuantity ?? 0;
+        payload.issuedAmount = this.expense.issuedAmount;
       }
     }
 

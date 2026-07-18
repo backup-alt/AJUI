@@ -43,6 +43,7 @@ router.get("/supervisor/materials", ctrl.listMaterials);
 router.get("/supervisor/materials/:id", ctrl.getMaterial);
 router.post("/supervisor/materials", validate(createMaterialMobileSchema), ctrl.createMaterial);
 router.patch("/supervisor/materials/:id/stock", validate(updateMaterialStockSchema), ctrl.updateMaterialStock);
+router.post("/supervisor/materials/:id/receipt", validate(uploadExpenseReceiptMobileSchema), ctrl.uploadMaterialReceipt);
 
 // Labour
 router.get("/supervisor/labour", ctrl.listLabour);

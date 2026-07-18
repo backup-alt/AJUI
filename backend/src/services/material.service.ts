@@ -151,7 +151,7 @@ export async function getPendingMaterials(scopeProjectIds?: ProjectScopeIds) {
 
 export async function uploadMaterialReceipt(
   id: string,
-  payload: { data: string; mimeType: string; fileName?: string }
+  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
 ) {
   const material = await Material.findById(id);
   if (!material) throw new AppError(404, "Material not found");
@@ -168,6 +168,11 @@ export async function uploadMaterialReceipt(
   } catch (err) {
     console.warn("[pCloud] Upload failed for material:", err);
     throw new AppError(500, "Failed to upload receipt to pCloud");
+  }
+
+  if (payload.givenAmount !== undefined) {
+    material.givenAmount = payload.givenAmount;
+    material.status = "Received";
   }
 
   await material.save();

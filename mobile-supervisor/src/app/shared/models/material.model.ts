@@ -22,6 +22,7 @@ export interface Material {
   approvalDate?: string;
   status: MaterialStatus;
   notes?: string;
+  issuedAmount?: number;
   customFields?: Record<string, string | number | boolean | null>;
   createdBy?: string;
   approvedBy?: string;
@@ -53,6 +54,7 @@ export interface CreateMaterialRequest {
   poNumber?: string;
   requestDate: string;
   notes?: string;
+  issuedAmount?: number;
   customFields?: Record<string, string | number | boolean | null>;
 }
 

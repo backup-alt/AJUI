@@ -81,6 +81,7 @@ export async function uploadMaterialReceipt(req: Request, res: Response, next: N
       data: req.body.data,
       mimeType: req.body.mimeType,
       fileName: req.body.fileName,
+      givenAmount: req.body.givenAmount,
     });
     res.json({ material });
   } catch (e) { next(e); }

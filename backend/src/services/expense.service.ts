@@ -147,6 +147,7 @@ export async function createExpense(input: CreateExpenseInput) {
       ? new Types.ObjectId(input.materialVendorId)
       : undefined,
     materialRemainingStock: input.materialRemainingStock,
+    issuedAmount: input.issuedAmount,
     customFields: input.customFields,
     status,
     approvedBy: isCash ? input.submittedBy : undefined,
@@ -206,15 +207,12 @@ export async function updateExpense(id: string, patch: Partial<CreateExpenseInpu
 
 export async function uploadExpenseReceipt(
   id: string,
-  payload: { data: string; mimeType: string; fileName?: string }
+  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
 ) {
   const expense = await Expense.findById(id);
   if (!expense) throw new AppError(404, "Expense not found");
-  if (expense.status !== "Pending" && expense.status !== "Approved") {
+  if (expense.status !== "Pending" && expense.status !== "Approved" && expense.status !== "Completed") {
     throw new AppError(400, "Receipt upload is not allowed for this expense");
-  }
-  if (!expense.poNumber) {
-    throw new AppError(400, "PO number must be generated before the receipt can be uploaded");
   }
 
   try {
@@ -230,6 +228,12 @@ export async function uploadExpenseReceipt(
     expense.receiptImage = payload.data;
     expense.receiptImageMimeType = payload.mimeType;
     expense.receiptImageName = payload.fileName;
+  }
+
+  if (payload.givenAmount !== undefined) {
+    expense.givenAmount = payload.givenAmount;
+    expense.received = true;
+    expense.status = "Completed";
   }
 
   expense.receiptUploadedAt = new Date();
