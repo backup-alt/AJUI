@@ -19,6 +19,7 @@ interface Employee {
   createdAt: string;
   projectIds: string[];
   // Supervisor-specific fields
+  supervisorId?: string;
   assignedSiteIds?: string[];
   assignedSites?: string[];
   assignedProjectIds?: string[];
@@ -593,6 +594,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
         this.employee.update((e) => e ? {
           ...e,
+          supervisorId: String(match._id || match.id),
           assignedSiteIds,
           assignedSites: assignedSitesRaw,
           assignedProjectIds: match.assignedProjects
@@ -662,6 +664,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           lastLoginAt: "",
           createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : "",
           projectIds: row.assignedProjectIds ? row.assignedProjectIds.map((pid: any) => String(pid)) : [],
+          supervisorId: row._id ? String(row._id) : id,
           assignedSiteIds,
           assignedSites: resolvedAssignedSites,
           assignedProjectIds: row.assignedProjects ? row.assignedProjects.map((pid: any) => String(pid)) : [],
@@ -678,7 +681,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   addSupervisorSite(siteId: string) {
     const emp = this.employee();
-    if (!emp || emp.role !== "Supervisor") return;
+    if (!emp || emp.role !== "Supervisor" || !emp.supervisorId) return;
 
     const currentIds = [
       ...(emp.assignedSiteIds || []).map((id: any) => this.toStringId(id)),
@@ -687,7 +690,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     if (currentIds.includes(siteId)) return;
 
     const newSiteIds = [...new Set([...currentIds, siteId])];
-    this.api.updateSupervisor(emp.id, { assignedSiteIds: newSiteIds }).subscribe({
+    this.api.updateSupervisor(emp.supervisorId, { assignedSiteIds: newSiteIds }).subscribe({
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
@@ -700,9 +703,14 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     });
   }
 
+  selectSiteToAssign(site: { id: string; name: string }) {
+    this.addSupervisorSite(site.id);
+    this.showSitePicker.set(false);
+  }
+
   removeSupervisorSite(siteId: string) {
     const emp = this.employee();
-    if (!emp || emp.role !== "Supervisor") return;
+    if (!emp || emp.role !== "Supervisor" || !emp.supervisorId) return;
 
     const currentIds = [
       ...(emp.assignedSiteIds || []).map((id: any) => this.toStringId(id)),
@@ -710,7 +718,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     ];
     const newSiteIds = currentIds.filter((id) => id !== siteId);
 
-    this.api.updateSupervisor(emp.id, { assignedSiteIds: newSiteIds }).subscribe({
+    this.api.updateSupervisor(emp.supervisorId, { assignedSiteIds: newSiteIds }).subscribe({
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
