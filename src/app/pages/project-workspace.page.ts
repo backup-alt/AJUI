@@ -42,6 +42,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "requestDate", label: "Request Date", type: "date" },
       { key: "vendor", label: "Vendor" },
       { key: "poNumber", label: "PO Number" },
+      { key: "reference", label: "Bill / Reference" },
       { key: "remainingStock", label: "Remaining Stock" },
       { key: "status", label: "Status" },
     ],
@@ -2376,7 +2377,7 @@ export class ProjectWorkspacePage {
       requestDate: row.requestDate || "2026-06-05",
       vendor: row.vendor,
       poNumber: row.poNumber,
-      billUrl: row.billUrl,
+      billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
       status: row.status,
     }));
