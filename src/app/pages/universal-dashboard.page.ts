@@ -21,6 +21,7 @@ type DashboardModule =
   | "payments"
   | "vendors"
   | "subcontractors"
+  | "inventory"
   | "reports";
 type TableRow = SharedTableRow;
 type FieldSchema = SharedTableField;
@@ -219,6 +220,22 @@ const dashboardModules: ModuleConfig[] = [
       { key: "supervisor", label: "Supervisor" },
       { key: "paymentStatus", label: "Payment Status" },
       { key: "approvalStatus", label: "Approval Status" },
+    ],
+  },
+  {
+    key: "inventory",
+    label: "Inventory",
+    title: "Inventory Summary",
+    description: "Aggregated material stock by type across all sites with site-wise breakdown.",
+    columns: [
+      { key: "materialName", label: "Material" },
+      { key: "totalQty", label: "Total Qty", type: "number" },
+      { key: "unit", label: "Unit" },
+      { key: "siteCount", label: "Sites", type: "number" },
+      { key: "lastUpdated", label: "Last Updated" },
+    ],
+    filters: [
+      { key: "materialName", label: "Material" },
     ],
   },
   {
@@ -464,8 +481,43 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div><span>Current Balance</span><strong>{{ expenseFilterCurrentLabel() }}</strong></div>
               </div>
 
+              <section class="inventory-cards-section" *ngIf="!tableViewExpanded() && activeModule() === 'inventory'">
+                <div class="inventory-grid">
+                  @for (card of inventoryCards(); track card.materialName) {
+                    <article class="inventory-card" role="button" tabindex="0" (click)="openInventoryBreakdown(card)" (keydown.enter)="openInventoryBreakdown(card)">
+                      <div class="inventory-card-head">
+                        <div class="inventory-material-icon">
+                          <ion-icon name="cube-outline"></ion-icon>
+                        </div>
+                        <div class="inventory-material-info">
+                          <h3>{{ card.materialName }}</h3>
+                          <span class="inventory-unit">{{ card.unit }}</span>
+                        </div>
+                        <span class="inventory-site-count">{{ card.siteCount }} site{{ card.siteCount !== 1 ? 's' : '' }}</span>
+                      </div>
+                      <div class="inventory-card-body">
+                        <div class="inventory-qty">
+                          <span class="qty-label">Total Stock</span>
+                          <strong class="qty-value">{{ card.totalQty }} <small>{{ card.unit }}</small></strong>
+                        </div>
+                        <div class="inventory-meta">
+                          <span class="meta-label">Last Updated</span>
+                          <span class="meta-value">{{ card.lastUpdated || 'N/A' }}</span>
+                        </div>
+                      </div>
+                    </article>
+                  }
+                  @if (inventoryCards().length === 0) {
+                    <div class="inventory-empty">
+                      <ion-icon name="cube-outline"></ion-icon>
+                      <p>No materials found. Add materials to see inventory summary.</p>
+                    </div>
+                  }
+                </div>
+              </section>
+
               <ng-container *ngIf="tableState() as tableState">
-              <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
+              <div class="table-meta-strip" *ngIf="!tableViewExpanded() && activeModule() !== 'inventory'">
                 <span>{{ tableState.rows.length }} rows</span>
                 <span>{{ tableState.columns.length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
@@ -939,6 +991,58 @@ const siteMaterialDetailFields: FieldSchema[] = [
             ></agb-vendor-form-dialog>
           </main>
         </ion-content>
+
+        @if (showInventoryBreakdown() && selectedInventoryCard()) {
+          <section class="form-overlay" role="presentation">
+            <section class="erp-dialog inventory-breakdown-dialog" role="dialog" aria-modal="true" aria-labelledby="inv-breakdown-title">
+              <div class="dialog-head">
+                <div>
+                  <span>Inventory Breakdown</span>
+                  <h2 id="inv-breakdown-title">{{ selectedInventoryCard()!.materialName }}</h2>
+                  <p>Site-wise stock distribution for this material</p>
+                </div>
+                <button type="button" class="icon-button" aria-label="Close breakdown" (click)="closeInventoryBreakdown()">
+                  <ion-icon name="close-outline"></ion-icon>
+                </button>
+              </div>
+              <div class="inventory-breakdown-summary">
+                <div class="breakdown-stat">
+                  <span class="stat-label">Total Qty</span>
+                  <strong class="stat-value">{{ selectedInventoryCard()!.totalQty }} {{ selectedInventoryCard()!.unit }}</strong>
+                </div>
+                <div class="breakdown-stat">
+                  <span class="stat-label">Sites</span>
+                  <strong class="stat-value">{{ selectedInventoryCard()!.siteCount }}</strong>
+                </div>
+                <div class="breakdown-stat">
+                  <span class="stat-label">Last Updated</span>
+                  <strong class="stat-value">{{ selectedInventoryCard()!.lastUpdated || 'N/A' }}</strong>
+                </div>
+              </div>
+              <div class="inventory-breakdown-table">
+                <div class="breakdown-table-head">
+                  <span>Site</span>
+                  <span>Qty</span>
+                  <span>Unit</span>
+                  <span>Quality / Grade</span>
+                  <span>Last Updated</span>
+                </div>
+                @for (row of data.materials().filter(m => m.name === selectedInventoryCard()!.materialName); track row.id) {
+                  <div class="breakdown-table-row">
+                    <span>{{ row.site || 'Unknown Site' }}</span>
+                    <strong>{{ row.quantity ?? 0 }}</strong>
+                    <span>{{ row.unit }}</span>
+                    <span>-</span>
+                    <span>{{ row.requestDate || 'N/A' }}</span>
+                  </div>
+                }
+              </div>
+              <div class="dialog-actions">
+                <button type="button" class="secondary-action" (click)="closeInventoryBreakdown()">Close</button>
+              </div>
+            </section>
+          </section>
+        }
       </div>
     </ion-split-pane>
   `,
@@ -999,6 +1103,186 @@ const siteMaterialDetailFields: FieldSchema[] = [
       border-left: 3px solid #2c5cff;
       margin: 0;
     }
+    .inventory-cards-section {
+      padding: 16px 24px;
+    }
+    .inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .inventory-card {
+      background: #fff;
+      border: 1px solid #e5eaf1;
+      border-radius: 12px;
+      padding: 18px;
+      cursor: pointer;
+      transition: all 160ms ease;
+    }
+    .inventory-card:hover {
+      border-color: #2c5cff;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.1);
+      transform: translateY(-2px);
+    }
+    .inventory-card-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .inventory-material-icon {
+      width: 38px;
+      height: 38px;
+      background: #eef3ff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .inventory-material-icon ion-icon {
+      font-size: 20px;
+      color: #2c5cff;
+    }
+    .inventory-material-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .inventory-material-info h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a2540;
+      margin: 0 0 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .inventory-unit {
+      font-size: 12px;
+      color: #64748b;
+    }
+    .inventory-site-count {
+      font-size: 11px;
+      background: #f0f6ff;
+      color: #2c5cff;
+      border-radius: 20px;
+      padding: 2px 8px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .inventory-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .inventory-qty {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .qty-label {
+      font-size: 12px;
+      color: #64748b;
+    }
+    .qty-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a2540;
+    }
+    .qty-value small {
+      font-size: 13px;
+      font-weight: 400;
+      color: #64748b;
+    }
+    .inventory-meta {
+      display: flex;
+      gap: 8px;
+    }
+    .meta-label {
+      font-size: 12px;
+      color: #64748b;
+    }
+    .meta-value {
+      font-size: 12px;
+      color: #1a2540;
+    }
+    .inventory-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 48px;
+      color: #94a3b8;
+    }
+    .inventory-empty ion-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+    .inventory-breakdown-dialog {
+      max-width: 680px;
+      width: 95%;
+    }
+    .inventory-breakdown-summary {
+      display: flex;
+      gap: 24px;
+      padding: 16px 24px;
+      background: #f8faff;
+      border-bottom: 1px solid #e5eaf1;
+      margin: -20px -24px 0;
+      border-radius: 12px 12px 0 0;
+    }
+    .breakdown-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+    }
+    .stat-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a2540;
+    }
+    .inventory-breakdown-table {
+      margin-top: 16px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+    .breakdown-table-head {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #f3f6ff;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .breakdown-table-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f4ff;
+      font-size: 13px;
+      align-items: center;
+    }
+    .breakdown-table-row:last-child {
+      border-bottom: none;
+    }
+    .breakdown-table-row span {
+      color: #4a5578;
+    }
+    .breakdown-table-row strong {
+      color: #1a2540;
+      font-weight: 600;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -1051,6 +1335,9 @@ export class UniversalDashboardPage {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
+  readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials()));
+  readonly selectedInventoryCard = signal<{ materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
+  readonly showInventoryBreakdown = signal(false);
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
   readonly dashboardRows = computed(() => this.buildRows());
   readonly tableState = computed(() => ({
@@ -1080,6 +1367,36 @@ export class UniversalDashboardPage {
     this.resetFilterState();
     this.closeDropdowns();
     this.clearRowSelection();
+  }
+
+  private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[]) {
+    const map = new Map<string, { qty: number; unit: string; sites: Set<string>; lastUpdated: string }>();
+    for (const m of materials) {
+      if (!m.name) continue;
+      const key = m.name;
+      const existing = map.get(key) || { qty: 0, unit: m.unit || "", sites: new Set<string>(), lastUpdated: "" };
+      existing.qty += m.quantity ?? 0;
+      if (m.site) existing.sites.add(m.site);
+      if (m.requestDate && m.requestDate > existing.lastUpdated) existing.lastUpdated = m.requestDate;
+      map.set(key, existing);
+    }
+    return [...map.entries()].map(([materialName, v]) => ({
+      materialName,
+      totalQty: v.qty,
+      unit: v.unit,
+      siteCount: v.sites.size,
+      lastUpdated: v.lastUpdated,
+    })).sort((a, b) => a.materialName.localeCompare(b.materialName));
+  }
+
+  openInventoryBreakdown(card: { materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string }) {
+    this.selectedInventoryCard.set(card);
+    this.showInventoryBreakdown.set(true);
+  }
+
+  closeInventoryBreakdown() {
+    this.showInventoryBreakdown.set(false);
+    this.selectedInventoryCard.set(null);
   }
 
   rowKey(row: TableRow): string {
@@ -2810,10 +3127,18 @@ visibleRows(): TableRow[] {
       exportFormat,
     }));
 
-    return { materials, clients, labour, expenses, generalExpenses, payments, vendors, subcontractors, reports };
-  }
+return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, inventory: [], reports };
 
   private rowsFor(module: DashboardModule): TableRow[] {
+    if (module === "inventory") {
+      return this.inventoryCards().map((card) => ({
+        materialName: card.materialName,
+        totalQty: card.totalQty,
+        unit: card.unit,
+        siteCount: card.siteCount,
+        lastUpdated: card.lastUpdated,
+      })) as TableRow[];
+    }
     return this.data.tableRowsFor(module, this.dashboardRows()[module]);
   }
 
@@ -2947,6 +3272,13 @@ visibleRows(): TableRow[] {
         supervisor: "",
         approvalStatus: "Pending",
         paymentStatus: "Not Started",
+      },
+      inventory: {
+        materialName: "",
+        totalQty: 0,
+        unit: "",
+        siteCount: 0,
+        lastUpdated: "",
       },
       reports: {
         category: "",
@@ -3266,7 +3598,7 @@ visibleRows(): TableRow[] {
 
   isNoCreateModule(): boolean {
     const m = this.activeModule();
-    return m === "expenses" || m === "materials" || m === "generalExpenses";
+    return m === "expenses" || m === "materials" || m === "generalExpenses" || m === "inventory";
   }
 
   private ensureExpenseOpeningForInput(row: TableRow) {

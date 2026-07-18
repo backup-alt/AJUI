@@ -157,7 +157,7 @@ export class VendorFormDialogComponent implements OnInit {
 
   ngOnInit() {
     this.statusValue = this.initialValue?.status ?? "Active";
-    this.selectedSiteIds.set(new Set(this.initialValue?.siteIds || []));
+    this.selectedSiteIds.set(new Set((this.initialValue?.siteIds || []).map((id: any) => String(id))));
     this.loadSites();
   }
 
@@ -204,7 +204,7 @@ export class VendorFormDialogComponent implements OnInit {
     const count = this.selectedSiteIds().size;
     if (count === 0) return "Select sites...";
     const names = Array.from(this.selectedSiteIds())
-      .map((id) => this.siteOptions().find((s) => s._id === id)?.name)
+      .map((id) => this.siteOptions().find((s) => String(s._id) === id)?.name)
       .filter(Boolean) as string[];
     if (names.length === 0) return "Select sites...";
     if (names.length === 1) return names[0]!;
