@@ -7,6 +7,7 @@ import { generateId } from "./id-generator.service.js";
 import { CreateExpenseInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
+import { uploadToPCloud } from "./pcloud.service.js";
 
 const ALLOWED_TRANSACTION_TYPES = ["Purchase", "Cash Added"] as const;
 type AllowedTransactionType = (typeof ALLOWED_TRANSACTION_TYPES)[number];
@@ -215,12 +216,49 @@ export async function uploadExpenseReceipt(
   if (!expense.poNumber) {
     throw new AppError(400, "PO number must be generated before the receipt can be uploaded");
   }
-  expense.receiptImage = payload.data;
-  expense.receiptImageMimeType = payload.mimeType;
-  expense.receiptImageName = payload.fileName;
+
+  try {
+    const pcloudResult = await uploadToPCloud(
+      payload.data,
+      payload.fileName || `receipt_${expense.expenseId}.${payload.mimeType.split("/")[1] || "jpg"}`,
+      payload.mimeType
+    );
+    expense.billUrl = pcloudResult.fileUrl;
+    expense.receiptImageName = pcloudResult.fileName;
+  } catch (err) {
+    console.warn("[pCloud] Upload failed, falling back to base64 storage:", err);
+    expense.receiptImage = payload.data;
+    expense.receiptImageMimeType = payload.mimeType;
+    expense.receiptImageName = payload.fileName;
+  }
+
   expense.receiptUploadedAt = new Date();
-  // Receipt upload marks the purchase as fully completed.
-  expense.status = "Approved";
+  await expense.save();
+
+  if (expense.type === "site" && expense.projectId && expense.site) {
+    await recomputeSiteLedger(expense.projectId, expense.site);
+  }
+
+  if (expense.poNumber && expense.billUrl) {
+    const { Material } = await import("../models/Material.js");
+    await Material.updateOne({ poNumber: expense.poNumber }, { billUrl: expense.billUrl });
+  }
+
+  return expense.toObject();
+}
+
+export async function markExpenseAsReceived(id: string) {
+  const expense = await Expense.findById(id);
+  if (!expense) throw new AppError(404, "Expense not found");
+  if (expense.status !== "Approved") {
+    throw new AppError(400, "Only approved expenses can be marked as received");
+  }
+  if (!expense.billUrl && !expense.receiptImage) {
+    throw new AppError(400, "Bill must be uploaded before marking as received");
+  }
+
+  expense.received = true;
+  expense.status = "Completed";
   await expense.save();
 
   if (expense.type === "site" && expense.projectId && expense.site) {

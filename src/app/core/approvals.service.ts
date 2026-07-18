@@ -60,6 +60,10 @@ export interface ExpenseApprovalRow {
   materialUnit?: string;
   materialQuantity?: number;
   materialVendor?: string;
+  issuedAmount?: number;
+  givenAmount?: number;
+  billUrl?: string;
+  poNumber?: string;
 }
 
 export interface GeneralExpenseApprovalRow {
@@ -251,6 +255,10 @@ export class ApprovalsService {
             materialUnit: a.materialUnit,
             materialQuantity: a.materialQuantity,
             materialVendor: a.materialVendor,
+            issuedAmount: a.issuedAmount,
+            givenAmount: a.givenAmount,
+            billUrl: a.billUrl,
+            poNumber: a.poNumber,
           } as ExpenseApprovalRow;
         }
         return {

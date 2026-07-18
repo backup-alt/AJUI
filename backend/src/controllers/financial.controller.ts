@@ -197,6 +197,13 @@ export async function uploadExpenseReceipt(req: Request, res: Response, next: Ne
   } catch (e) { next(e); }
 }
 
+export async function markAsReceived(req: Request, res: Response, next: NextFunction) {
+  try {
+    const expense = await expenseService.markExpenseAsReceived(req.params.id);
+    res.json({ expense });
+  } catch (e) { next(e); }
+}
+
 export async function deleteExpense(req: Request, res: Response, next: NextFunction) {
   try {
     await expenseService.deleteExpense(req.params.id);

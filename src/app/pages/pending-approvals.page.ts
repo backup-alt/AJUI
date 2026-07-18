@@ -192,6 +192,8 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Transaction Type</th>
                         <th>Description</th>
                         <th>Amount</th>
+                        <th>Issued Amt</th>
+                        <th>Given Amt</th>
                         <th>Supervisor</th>
                         <th>Bill / Reference</th>
                         <th>Status</th>
@@ -207,15 +209,43 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ row.transactionType || "-" }}</td>
                         <td><strong>{{ row.description || "-" }}</strong></td>
                         <td>{{ row.amount || "-" }}</td>
+                        <td>
+                          <input
+                            class="approval-table-input"
+                            inputmode="decimal"
+                            type="number"
+                            [value]="row.issuedAmount ?? ''"
+                            (input)="updateApprovalCell(row, 'issuedAmount', $any($event.target).value)"
+                            aria-label="Issued amount"
+                            min="0"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            class="approval-table-input"
+                            inputmode="decimal"
+                            type="number"
+                            [value]="row.givenAmount ?? ''"
+                            (input)="updateApprovalCell(row, 'givenAmount', $any($event.target).value)"
+                            aria-label="Given amount"
+                            min="0"
+                          />
+                        </td>
                         <td>{{ row.supervisor || "-" }}</td>
-                        <td>{{ row.reference || "-" }}</td>
+                        <td>
+                          @if (row.billUrl) {
+                            <a class="bill-link" [href]="row.billUrl" target="_blank" rel="noopener noreferrer">View Bill</a>
+                          } @else {
+                            {{ row.reference || "-" }}
+                          }
+                        </td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
                         <td class="approval-actions">
                           <button type="button" class="approve-action" (click)="approve(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>Approve</button>
                           <button type="button" class="decline-action" (click)="decline(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>Decline</button>
                         </td>
                       </tr>
-                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="11"><span>No pending site expense approvals.</span></td></tr>
+                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="13"><span>No pending site expense approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -325,6 +355,10 @@ export class PendingApprovalsPage implements OnInit {
       this._materialRows.update((rows) =>
         rows.map((r) => r.rowId === row.rowId ? Object.assign({}, r, { [key]: value }) : r)
       );
+    } else if (row.module === "expenses") {
+      this._siteExpenseRows.update((rows) =>
+        rows.map((r) => r.rowId === row.rowId ? Object.assign({}, r, { [key]: value }) : r)
+      );
     }
   }
 
@@ -339,6 +373,17 @@ export class PendingApprovalsPage implements OnInit {
   private async applyApproval(row: ApprovalBaseRow, status: "Approved" | "Rejected"): Promise<void> {
     try {
       if (status === "Approved") {
+        if (row.module === "expenses") {
+          const expenseRow = this._siteExpenseRows().find((r) => r.rowId === row.rowId);
+          if (expenseRow?.sourceId && (expenseRow.issuedAmount !== undefined || expenseRow.givenAmount !== undefined)) {
+            await firstValueFrom(
+              this.api.patchExpense(expenseRow.sourceId, {
+                issuedAmount: expenseRow.issuedAmount,
+                givenAmount: expenseRow.givenAmount,
+              })
+            );
+          }
+        }
         await firstValueFrom(this.approvalsService.approve(row.rowId));
         await this.refreshExpensesFromBackend();
       } else {

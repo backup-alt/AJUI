@@ -129,6 +129,7 @@ export class MaterialsService {
     givenAmount: row.givenAmount,
     paymentType: row.paymentType,
     deliveredOn: row.deliveredOn,
+    billUrl: row.billUrl,
   });
 
   private readState(): MaterialRow[] {

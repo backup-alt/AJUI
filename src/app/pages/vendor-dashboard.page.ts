@@ -338,7 +338,12 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                           }
                         </td>
                         <td class="col-bill">
-                          @if (billLinkFor(row.id); as link) {
+                          @if (row.billUrl) {
+                            <a class="bill-link" [href]="row.billUrl" target="_blank" rel="noopener noreferrer" title="View Bill">
+                              <ion-icon name="link-outline"></ion-icon>
+                              <span>View Bill</span>
+                            </a>
+                          } @else if (billLinkFor(row.id); as link) {
                             <a class="bill-link" [href]="link.billUrl" target="_blank" rel="noopener noreferrer" [title]="link.billUrl">
                               <ion-icon name="link-outline"></ion-icon>
                               <span>{{ link.billLabel || shortLinkLabel(link.billUrl) }}</span>

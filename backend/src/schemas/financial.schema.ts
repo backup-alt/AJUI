@@ -108,6 +108,10 @@ export const expenseBaseSchema = z.object({
   materialVendor: z.string().trim().optional(),
   materialVendorId: objectIdSchema.optional(),
   materialRemainingStock: z.coerce.number().nonnegative().optional(),
+  issuedAmount: z.coerce.number().nonnegative().optional(),
+  givenAmount: z.coerce.number().nonnegative().optional(),
+  received: z.boolean().optional(),
+  billUrl: z.string().trim().optional(),
   customFields: z.record(z.unknown()).optional(),
 });
 
@@ -142,7 +146,7 @@ export const listExpensesSchema = z.object({
     type: z.enum(["site", "general"]).optional(),
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
-    status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
+    status: z.enum(["Pending", "Approved", "Rejected", "Completed"]).optional(),
     from: z.string().optional(),
     to: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),

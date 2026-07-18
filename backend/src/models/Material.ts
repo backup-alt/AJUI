@@ -25,6 +25,7 @@ export interface IMaterial extends Document {
   approvalDate?: string;
   status: MaterialStatus;
   notes?: string;
+  billUrl?: string;
   customFields?: Record<string, string | number | boolean | null>;
   createdBy?: string;
   supervisorName?: string;
@@ -66,6 +67,7 @@ const materialSchema = new Schema<IMaterial>(
     approvedBy: { type: String },
     approvedAt: { type: Date },
     notes: { type: String, trim: true, maxlength: 2000 },
+    billUrl: { type: String, trim: true },
     customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
