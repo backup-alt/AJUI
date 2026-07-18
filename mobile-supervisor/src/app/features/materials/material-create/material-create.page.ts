@@ -456,6 +456,7 @@ export class MaterialCreatePage implements OnInit {
       requestedQuantity: number;
       remainingStock?: number;
       vendor?: string;
+      issuedAmount?: number;
       requestDate: string;
       notes?: string;
       customFields?: Record<string, string | number | boolean | null>;
