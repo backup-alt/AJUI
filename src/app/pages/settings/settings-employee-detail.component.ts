@@ -243,10 +243,12 @@ interface ActivityEntry {
                 @if (availableSitesForSupervisor().length === 0) {
                   <p class="settings-w11-empty-hint">No sites available to assign.</p>
                 } @else {
-                  <div class="settings-w11-site-list">
+                  <div class="settings-w11-picker-list">
                     @for (site of availableSitesForSupervisor(); track site.id) {
                       <button type="button" class="settings-w11-site-option" (click)="selectSiteToAssign(site)">
-                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h12M2 8h12M2 11h7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                        <span class="icon-circle">
+                          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </span>
                         {{ site.name }}
                       </button>
                     }
@@ -345,26 +347,46 @@ interface ActivityEntry {
     .settings-w11-site-option {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       width: 100%;
-      padding: 10px 12px;
-      border: none;
-      background: none;
+      padding: 10px 14px;
+      border: 1px solid transparent;
+      background: #f9fafb;
       border-radius: 8px;
       cursor: pointer;
       text-align: left;
       font-size: 14px;
       color: #374151;
-      transition: background 0.15s;
+      transition: all 0.2s;
     }
     .settings-w11-site-option:hover {
-      background: #f3f4f6;
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: #4f46e5;
+    }
+    .settings-w11-site-option .icon-circle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: #fff;
+      border-radius: 50%;
+      color: #9ca3af;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: color 0.2s;
+    }
+    .settings-w11-site-option:hover .icon-circle {
+      color: #4f46e5;
     }
     .settings-w11-site-option svg {
-      width: 16px;
-      height: 16px;
-      color: #9ca3af;
-      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+    }
+    .settings-w11-picker-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -732,14 +754,16 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor" || !emp.supervisorId) return;
 
-    const currentIds = [
-      ...(emp.assignedSiteIds || []).map((id: any) => this.toStringId(id)),
-      ...(emp.assignedSites || []).map((s: any) => String(s))
-    ];
-    if (currentIds.includes(siteId)) return;
+    const currentSiteIds = (emp.assignedSiteIds || []).map((id: any) => this.toStringId(id));
+    if (currentSiteIds.includes(siteId)) return;
 
-    const newSiteIds = [...new Set([...currentIds, siteId])];
-    this.api.updateSupervisor(emp.supervisorId, { assignedSiteIds: newSiteIds }).subscribe({
+    const newSiteIds = [...currentSiteIds, siteId];
+    const newAssignedSites = (emp.assignedSites || []).map((s: any) => String(s));
+
+    this.api.updateSupervisor(emp.supervisorId, { 
+      assignedSiteIds: newSiteIds,
+      assignedSites: newAssignedSites
+    }).subscribe({
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
@@ -753,17 +777,30 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   }
 
 
+
   removeSupervisorSite(siteId: string) {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor" || !emp.supervisorId) return;
 
-    const currentIds = [
-      ...(emp.assignedSiteIds || []).map((id: any) => this.toStringId(id)),
-      ...(emp.assignedSites || []).map((s: any) => String(s))
-    ];
-    const newSiteIds = currentIds.filter((id) => id !== siteId);
+    const currentSiteIds = (emp.assignedSiteIds || []).map((id: any) => this.toStringId(id));
+    const newSiteIds = currentSiteIds.filter((id) => id !== siteId);
 
-    this.api.updateSupervisor(emp.supervisorId, { assignedSiteIds: newSiteIds }).subscribe({
+    const siteToRemove = this.erp.siteEntities().find((s: any) => String(s.id || s._id) === siteId);
+    let newAssignedSites = (emp.assignedSites || []).map(s => String(s));
+    
+    if (siteToRemove) {
+      newAssignedSites = newAssignedSites.filter(s => 
+        s !== siteId && 
+        s.toLowerCase() !== siteToRemove.name.toLowerCase()
+      );
+    } else {
+      newAssignedSites = newAssignedSites.filter(s => s !== siteId);
+    }
+
+    this.api.updateSupervisor(emp.supervisorId, { 
+      assignedSiteIds: newSiteIds,
+      assignedSites: newAssignedSites
+    }).subscribe({
       next: (res) => {
         const row = res?.supervisor;
         if (row) {
