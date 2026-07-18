@@ -43,7 +43,7 @@ export async function uploadToPCloud(
     throw new Error(`pCloud upload failed: ${response.status} - ${errorText}`);
   }
 
-  const result: PCloudResponse = await response.json();
+  const result = await response.json() as PCloudResponse;
 
   if (result.result !== 0) {
     throw new Error(`pCloud API error: ${result.result} - ${result.error || "Unknown error"}`);
@@ -81,6 +81,6 @@ export async function deleteFromPCloud(fileId: string): Promise<boolean> {
     return false;
   }
 
-  const result: PCloudResponse = await response.json();
+  const result = await response.json() as PCloudResponse;
   return result.result === 0;
 }
