@@ -1027,7 +1027,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <span>Quality / Grade</span>
                   <span>Last Updated</span>
                 </div>
-                @for (row of data.materials().filter(m => m.name === selectedInventoryCard()!.materialName); track row.id) {
+                @for (row of inventoryBreakdownRows(); track row.id) {
                   <div class="breakdown-table-row">
                     <span>{{ row.site || 'Unknown Site' }}</span>
                     <strong>{{ row.quantity ?? 0 }}</strong>
@@ -1338,6 +1338,11 @@ export class UniversalDashboardPage {
   readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials()));
   readonly selectedInventoryCard = signal<{ materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
   readonly showInventoryBreakdown = signal(false);
+  readonly inventoryBreakdownRows = computed(() => {
+    const card = this.selectedInventoryCard();
+    if (!card) return [];
+    return this.data.materials().filter((m) => m.name === card.materialName);
+  });
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
   readonly dashboardRows = computed(() => this.buildRows());
   readonly tableState = computed(() => ({
@@ -3127,7 +3132,8 @@ visibleRows(): TableRow[] {
       exportFormat,
     }));
 
-return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, inventory: [], reports };
+return { materials, clients, labour, expenses, generalExpenses, payments, vendors, subcontractors, inventory: [], reports };
+  }
 
   private rowsFor(module: DashboardModule): TableRow[] {
     if (module === "inventory") {

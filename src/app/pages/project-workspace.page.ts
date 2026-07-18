@@ -2490,6 +2490,7 @@ export class ProjectWorkspacePage {
       payments,
       vendors,
       subcontractors,
+      inventory: [],
       reports,
     };
   }
@@ -2609,6 +2610,18 @@ export class ProjectWorkspacePage {
         supervisor: currentProject?.supervisor ?? "",
         approvalStatus: "Pending",
         paymentStatus: "Not Started",
+      },
+      inventory: {
+        site,
+        materialName: "",
+        unit: "",
+        requestedQuantity: "",
+        approvedQuantity: "",
+        requestDate: today,
+        vendor: "",
+        poNumber: "",
+        remainingStock: "",
+        status: "Pending",
       },
       reports: {
         category: "",
