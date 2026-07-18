@@ -73,8 +73,8 @@ type SiteOption = { _id: string; name: string; siteId: string };
                     @for (site of siteOptions(); track site._id) {
                       <label class="site-opt">
                         <input type="checkbox"
-                          [(ngModel)]="selectedSiteIdsArr[site._id]"
-                          (ngModelChange)="onSiteToggle(site._id, $event)" />
+                          [checked]="isSelected(site._id)"
+                          (change)="onSiteToggle(site._id, $any($event.target).checked)" />
                         <span>{{ site.name }}</span>
                       </label>
                     }
@@ -151,13 +151,10 @@ export class VendorFormDialogComponent implements OnInit {
   readonly siteError = signal<string | null>(null);
   readonly selectedSiteIds = signal<Set<string>>(new Set());
   siteDropdownOpen = false;
-  selectedSiteIdsArr: Record<string, boolean> = {};
 
   ngOnInit() {
     this.statusValue = this.initialValue?.status ?? "Active";
-    const initial = new Set(this.initialValue?.siteIds || []);
-    this.selectedSiteIds.set(initial);
-    this.rebuildArr();
+    this.selectedSiteIds.set(new Set(this.initialValue?.siteIds || []));
     this.loadSites();
   }
 
@@ -185,16 +182,7 @@ export class VendorFormDialogComponent implements OnInit {
       checked ? next.add(id) : next.delete(id);
       return next;
     });
-    this.rebuildArr();
     this.siteError.set(null);
-  }
-
-  private rebuildArr() {
-    const arr: Record<string, boolean> = {};
-    for (const site of this.siteOptions()) {
-      arr[site._id] = this.selectedSiteIds().has(site._id);
-    }
-    this.selectedSiteIdsArr = arr;
   }
 
   get selectedLabel(): string {

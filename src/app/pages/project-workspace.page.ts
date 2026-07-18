@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inj
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
-import type { Project, ProjectStatus } from "../../data/dashboardData";
+import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
@@ -327,13 +327,24 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded() && (selectedRowCount() > 0 || !isNoCreateSection())"
-                    [title]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
-                    [attr.aria-label]="selectedRowCount() ? 'Edit selected row' : 'Add row'"
-                    (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
+                    *ngIf="!tableViewExpanded()"
+                    title="Add row"
+                    aria-label="Add row"
+                    (click)="openRecordDialog()"
                   >
-                    <ion-icon [name]="selectedRowCount() ? 'create-outline' : 'add-outline'"></ion-icon>
-                    {{ selectedRowCount() ? 'Edit Row' : 'Add Row' }}
+                    <ion-icon name="add-outline"></ion-icon>
+                    Add Row
+                  </button>
+                  <button
+                    type="button"
+                    class="primary-table-action"
+                    *ngIf="!tableViewExpanded() && selectedRowCount() > 0"
+                    title="Edit selected row"
+                    aria-label="Edit selected row"
+                    (click)="editSelectedRows()"
+                  >
+                    <ion-icon name="create-outline"></ion-icon>
+                    Edit Row
                   </button>
                   <button
                     *ngIf="!tableViewExpanded() && selectedRowCount()"
@@ -1717,6 +1728,38 @@ export class ProjectWorkspacePage {
         return;
       } catch (err) {
         console.error("[ProjectWorkspace] Failed to create Cash Added expense", err);
+        return;
+      }
+    }
+
+    if (section === "materials") {
+      const materialInput: Partial<MaterialRow> = {
+        projectId: this.projectId() || undefined,
+        site: String(draft["site"] || selectedSite || ""),
+        name: String(draft["materialName"] || draft["description"] || ""),
+        unit: String(draft["unit"] || ""),
+        requested: Number(draft["requestedQuantity"]) || 0,
+        approved: Number(draft["approvedQuantity"]) || 0,
+        purchased: 0,
+        notes: String(draft["notes"] || ""),
+      };
+      if (!materialInput.name) {
+        console.warn("[ProjectWorkspace] Cannot save material: no material name");
+        return;
+      }
+      try {
+        const result = await new Promise<MaterialRow>((resolve, reject) => {
+          this.materialsService.createMaterial(materialInput).subscribe({
+            next: (material) => resolve(material),
+            error: reject,
+          });
+        });
+        Object.assign(draft, {
+          __rowId: `material:${result.id}`,
+          materialId: result.id,
+        });
+      } catch (err) {
+        console.error("[ProjectWorkspace] Failed to create material", err);
         return;
       }
     }
