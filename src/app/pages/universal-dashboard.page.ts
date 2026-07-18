@@ -3133,6 +3133,7 @@ visibleRows(): TableRow[] {
     }));
 
 return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, inventory: [], reports };
+  }
 
   private rowsFor(module: DashboardModule): TableRow[] {
     if (module === "inventory") {
