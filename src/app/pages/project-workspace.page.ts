@@ -661,7 +661,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           </div>
                           <ng-template #editableProjectCell>
                             <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
-                              <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
+                              <a class="bill-link" [href]="row['billUrl']" [attr.target]="isDataUrl($any(row['billUrl'])) ? '_self' : '_blank'" [attr.rel]="isDataUrl($any(row['billUrl'])) ? null : 'noopener noreferrer'" (click)="$event.stopPropagation()">View Bill</a>
                             </ng-container>
                             <ng-template #normalEditableCell>
                               <span
@@ -3329,5 +3329,9 @@ export class ProjectWorkspacePage {
 
   private escapeHtml(value: string): string {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  isDataUrl(url: string): boolean {
+    return url.startsWith("data:");
   }
 }

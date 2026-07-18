@@ -288,7 +288,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ row.supervisor || "-" }}</td>
                         <td>
                           @if (row.billUrl) {
-                            <a class="bill-link" [href]="row.billUrl" target="_blank" rel="noopener noreferrer">View Bill</a>
+                            <a class="bill-link" [href]="row.billUrl" [attr.target]="isDataUrl(row.billUrl) ? '_self' : '_blank'" [attr.rel]="isDataUrl(row.billUrl) ? null : 'noopener noreferrer'">View Bill</a>
                           } @else {
                             {{ row.reference || "-" }}
                           }
@@ -487,5 +487,9 @@ export class PendingApprovalsPage implements OnInit {
 
   private sortedUnique(values: string[]): string[] {
     return [...new Set(values.filter(Boolean).map((value) => (value || "").trim()))].sort((first, second) => first.localeCompare(second));
+  }
+
+  isDataUrl(url: string): boolean {
+    return url.startsWith("data:");
   }
 }
