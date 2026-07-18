@@ -170,6 +170,7 @@ export async function uploadMaterialReceipt(
     material.receiptImage = payload.data;
     material.receiptImageMimeType = payload.mimeType;
     material.receiptImageName = payload.fileName;
+    material.billUrl = `data:${payload.mimeType};base64,${payload.data}`;
   }
 
   if (payload.givenAmount !== undefined) {

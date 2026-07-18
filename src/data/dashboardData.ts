@@ -57,6 +57,8 @@ export type MaterialRow = {
   paymentType?: "Cash" | "NEFT" | "Bank Transfer" | "UPI" | "Cheque";
   deliveredOn?: string;
   billUrl?: string;
+  receiptImage?: string;
+  receiptImageMimeType?: string;
   [key: string]: any;
 };
 
