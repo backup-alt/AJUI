@@ -536,12 +536,13 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     this.api.getEmployee(id).subscribe({
       next: (res) => {
         const row: any = res?.employee || res;
+        const mappedRole = (row.role === "admin" ? "Admin" : row.role === "project_manager" ? "Project Manager" : row.role === "accountant" ? "Accountant" : row.role === "supervisor" ? "Supervisor" : "Project Manager") as Role;
         this.employee.set({
           id: row._id ? String(row._id) : (row.id || id),
           name: row.name || "—",
           email: row.email || "",
           phone: row.phone || "",
-          role: (row.role === "admin" ? "Admin" : row.role === "project_manager" ? "Project Manager" : row.role === "accountant" ? "Accountant" : row.role === "supervisor" ? "Supervisor" : "Project Manager") as Role,
+          role: mappedRole,
           status: (row.status || "active") as Status,
           lastLoginAt: row.lastLoginAt || "",
           createdAt: row.createdAt || "",
@@ -550,6 +551,11 @@ export class SettingsEmployeeDetailComponent implements OnInit {
         this.loading.set(false);
         this.loadPermissions(id);
         this.loadActivity(id);
+
+        // If this user is a supervisor, also fetch supervisor data to get assigned sites
+        if (mappedRole === "Supervisor") {
+          this.loadSupervisorSiteData(id);
+        }
       },
       error: (err) => {
         // If regular employee not found, try loading as supervisor
@@ -559,6 +565,43 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           this.employee.set(null);
           this.loading.set(false);
         }
+      },
+    });
+  }
+
+  /**
+   * Fetches supervisor records and finds the one whose userId matches the given
+   * User _id, then merges assignedSiteIds/assignedSites into the employee signal.
+   */
+  private loadSupervisorSiteData(userId: string) {
+    this.api.listSupervisors({ limit: 200 }).subscribe({
+      next: (res) => {
+        const supervisors: any[] = res?.items || (res as any)?.supervisors || [];
+        // Find the supervisor whose userId matches the current employee's User _id
+        const match = supervisors.find((s: any) => {
+          const supUserId = s.userId ? String(s.userId._id || s.userId) : '';
+          return supUserId === userId;
+        });
+        if (!match) return;
+
+        const assignedSiteIds: string[] = match.assignedSiteIds
+          ? match.assignedSiteIds.map((sid: any) => this.toStringId(sid))
+          : [];
+        const assignedSitesRaw: string[] = (match.assignedSites || [])
+          .map((s: any) => String(s))
+          .filter(Boolean);
+
+        this.employee.update((e) => e ? {
+          ...e,
+          assignedSiteIds,
+          assignedSites: assignedSitesRaw,
+          assignedProjectIds: match.assignedProjects
+            ? match.assignedProjects.map((pid: any) => String(pid))
+            : [],
+        } : e);
+      },
+      error: () => {
+        // Silently fail - sites just won't show
       },
     });
   }
