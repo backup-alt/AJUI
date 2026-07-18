@@ -703,10 +703,6 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     });
   }
 
-  selectSiteToAssign(site: { id: string; name: string }) {
-    this.addSupervisorSite(site.id);
-    this.showSitePicker.set(false);
-  }
 
   removeSupervisorSite(siteId: string) {
     const emp = this.employee();
