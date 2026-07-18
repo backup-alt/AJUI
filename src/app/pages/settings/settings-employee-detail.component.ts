@@ -750,6 +750,14 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     });
   }
 
+  /** Strip UI-annotated display names like "Terrace (T Nagar Premium Villa)" before sending to backend */
+  private cleanAssignedSites(sites: string[]): string[] {
+    // Annotated names have " (Project Name)" appended by the UI — strip them to avoid Zod rejection
+    return sites
+      .map(s => String(s).replace(/\s*\([^)]*\)\s*$/, '').trim())
+      .filter(Boolean);
+  }
+
   addSupervisorSite(siteId: string) {
     const emp = this.employee();
     if (!emp || emp.role !== "Supervisor" || !emp.supervisorId) return;
@@ -758,9 +766,12 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     if (currentSiteIds.includes(siteId)) return;
 
     const newSiteIds = [...currentSiteIds, siteId];
-    const newAssignedSites = (emp.assignedSites || []).map((s: any) => String(s));
+    // Only send clean site names (no "(Project)" annotation) back to the backend
+    const newAssignedSites = this.cleanAssignedSites(
+      (emp.assignedSites || []).map((s: any) => String(s))
+    );
 
-    this.api.updateSupervisor(emp.supervisorId, { 
+    this.api.updateSupervisor(emp.supervisorId, {
       assignedSiteIds: newSiteIds,
       assignedSites: newAssignedSites
     }).subscribe({
@@ -772,11 +783,9 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
         }
       },
-      error: (err) => console.warn("[EmployeeDetail] updateSupervisor failed:", err?.message ?? err),
+      error: (err) => console.warn("[EmployeeDetail] addSupervisorSite failed:", err?.message ?? err),
     });
   }
-
-
 
   removeSupervisorSite(siteId: string) {
     const emp = this.employee();
@@ -786,18 +795,21 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     const newSiteIds = currentSiteIds.filter((id) => id !== siteId);
 
     const siteToRemove = this.erp.siteEntities().find((s: any) => String(s.id || s._id) === siteId);
-    let newAssignedSites = (emp.assignedSites || []).map(s => String(s));
-    
+    const rawSites = this.cleanAssignedSites(
+      (emp.assignedSites || []).map(s => String(s))
+    );
+
+    let newAssignedSites: string[];
     if (siteToRemove) {
-      newAssignedSites = newAssignedSites.filter(s => 
-        s !== siteId && 
+      newAssignedSites = rawSites.filter(s =>
+        s !== siteId &&
         s.toLowerCase() !== siteToRemove.name.toLowerCase()
       );
     } else {
-      newAssignedSites = newAssignedSites.filter(s => s !== siteId);
+      newAssignedSites = rawSites.filter(s => s !== siteId);
     }
 
-    this.api.updateSupervisor(emp.supervisorId, { 
+    this.api.updateSupervisor(emp.supervisorId, {
       assignedSiteIds: newSiteIds,
       assignedSites: newAssignedSites
     }).subscribe({
@@ -809,7 +821,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           this.employee.update((e) => e ? { ...e, assignedSiteIds, assignedSites } : e);
         }
       },
-      error: (err) => console.warn("[EmployeeDetail] updateSupervisor failed:", err?.message ?? err),
+      error: (err) => console.warn("[EmployeeDetail] removeSupervisorSite failed:", err?.message ?? err),
     });
   }
 
