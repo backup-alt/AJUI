@@ -182,6 +182,21 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   </article>
                 }
 
+                <article
+                  class="client-card add-site-card"
+                  role="button"
+                  tabindex="0"
+                  (click)="openAddSitePicker()"
+                  (keydown.enter)="openAddSitePicker()"
+                  [class.disabled]="availableSites().length === 0"
+                >
+                  <div class="add-client-icon">
+                    <ion-icon name="add-outline"></ion-icon>
+                  </div>
+                  <h3>Add Site</h3>
+                  <p>{{ availableSites().length === 0 ? 'All sites already assigned' : 'Assign an existing site to this vendor' }}</p>
+                </article>
+
                 @if (vendorSites().length === 0 && !loadingSites()) {
                   <div class="empty-state">
                     <ion-icon name="location-off-outline"></ion-icon>
@@ -189,6 +204,39 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   </div>
                 }
               </section>
+
+              @if (showAddSitePicker()) {
+                <section class="form-overlay" role="presentation">
+                  <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="add-site-title">
+                    <div class="dialog-head">
+                      <div>
+                        <span>Assign Site</span>
+                        <h2 id="add-site-title">Add existing site to {{ selectedVendor()!.name }}</h2>
+                        <p>Select a site to assign to this vendor.</p>
+                      </div>
+                      <button type="button" class="icon-button" aria-label="Close site picker" (click)="closeAddSitePicker()">
+                        <ion-icon name="close-outline"></ion-icon>
+                      </button>
+                    </div>
+                    <div class="site-picker-list">
+                      @if (loadingAvailableSites()) {
+                        <p class="site-msg">Loading sites…</p>
+                      } @else if (availableSites().length === 0) {
+                        <p class="site-msg">All existing sites are already assigned to this vendor.</p>
+                      } @else {
+                        @for (site of availableSites(); track site.id) {
+                          <button type="button" class="site-picker-row" (click)="assignExistingSite(site)">
+                            <div>
+                              <strong>{{ site.name }}</strong>
+                            </div>
+                            <ion-icon name="add-circle-outline"></ion-icon>
+                          </button>
+                        }
+                      }
+                    </div>
+                  </section>
+                </section>
+              }
             } @else {
               <nav class="breadcrumb" aria-label="Breadcrumb">
                 <button type="button" class="breadcrumb-link" (click)="backToVendors()">Vendors</button>
@@ -929,6 +977,51 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       .search-box { max-width: none; }
       .table-actions { justify-content: flex-start; }
     }
+    .add-site-card {
+      border: 2px dashed #c7d9f5;
+      background: #f8faff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 180px;
+      transition: all 160ms ease;
+    }
+    .add-site-card:hover:not(.disabled) {
+      background: #eef3ff;
+      border-color: #2c5cff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+    .add-site-card.disabled { opacity: 0.5; cursor: not-allowed; }
+    .add-site-card h3 { color: #2c5cff; }
+    .site-picker-list {
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .site-picker-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 12px 18px;
+      background: #fff;
+      border: 1px solid #e5eaf1;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: background 140ms ease, border-color 140ms ease;
+      text-align: left;
+    }
+    .site-picker-row:hover {
+      background: #f0f6ff;
+      border-color: #2c5cff;
+    }
+    .site-picker-row > div { display: flex; flex-direction: column; gap: 2px; }
+    .site-picker-row strong { color: #1a2540; font-size: 14px; }
+    .site-picker-row ion-icon { color: #2c5cff; font-size: 22px; }
+    .site-msg { padding: 12px 18px; color: #64748b; font-size: 14px; }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -961,6 +1054,10 @@ export class VendorDashboardPage {
   readonly draftBillLinks = signal<Record<string, string>>({});
   private draftLoaded = new Set<string>();
 
+  readonly showAddSitePicker = signal(false);
+  readonly availableSites = signal<{ id: string; name: string }[]>([]);
+  readonly loadingAvailableSites = signal(false);
+
   readonly vendorSites = computed(() => {
     const vendor = this.selectedVendor();
     if (!vendor) return [] as VendorSite[];
@@ -979,18 +1076,26 @@ export class VendorDashboardPage {
       }
     }
 
-    const vendorSiteNames = Array.from(materialSites.keys());
+    const siteNamesFromIds = new Set<string>();
+    if (vendor.siteIds?.length) {
+      const allSites = this.data.sites();
+      for (const sid of vendor.siteIds) {
+        const s = allSites.find((s) => s.id === sid);
+        if (s) siteNamesFromIds.add(s.name);
+      }
+    }
+    const vendorSiteNames = [...new Set([...siteNamesFromIds, ...Array.from(materialSites.keys())])];
 
     return vendorSiteNames
       .map((siteName) => ({
         id: siteName,
         name: siteName,
         status: "Active" as const,
-        materialEntryCount: materialSites.get(siteName)!.count,
-        materialNames: materialSites.get(siteName)!.materialNames,
-        totalIssued: materialSites.get(siteName)!.totalIssued,
-        totalGiven: materialSites.get(siteName)!.totalGiven,
-        materialCount: materialSites.get(siteName)!.materialNames.length,
+        materialEntryCount: materialSites.get(siteName)?.count ?? 0,
+        materialNames: materialSites.get(siteName)?.materialNames ?? [],
+        totalIssued: materialSites.get(siteName)?.totalIssued ?? 0,
+        totalGiven: materialSites.get(siteName)?.totalGiven ?? 0,
+        materialCount: materialSites.get(siteName)?.materialNames.length ?? 0,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   });
@@ -1088,6 +1193,42 @@ export class VendorDashboardPage {
 
   backToSites() {
     this.selectedSite.set(null);
+  }
+
+  openAddSitePicker() {
+    this.showAddSitePicker.set(true);
+    this.loadAvailableSites();
+  }
+
+  closeAddSitePicker() {
+    this.showAddSitePicker.set(false);
+    this.availableSites.set([]);
+  }
+
+  private loadAvailableSites() {
+    const vendor = this.selectedVendor();
+    if (!vendor) return;
+    this.loadingAvailableSites.set(true);
+    const assignedNames = new Set(this.vendorSites().map((s) => s.name));
+    const all = this.data.sites();
+    this.availableSites.set(all.filter((s) => !assignedNames.has(s.name)));
+    this.loadingAvailableSites.set(false);
+  }
+
+  assignExistingSite(site: { id: string; name: string }) {
+    const vendor = this.selectedVendor();
+    if (!vendor) return;
+    const currentIds = vendor.siteIds ? [...vendor.siteIds] : [];
+    const newSiteIds = [...currentIds, site.id];
+    this.api.patchVendor(vendor.id, { siteIds: newSiteIds }).subscribe({
+      next: () => {
+        const refreshed = { ...vendor, siteIds: newSiteIds };
+        this.data.updateVendor(vendor.id, { siteIds: newSiteIds });
+        this.selectedVendor.set(refreshed);
+      },
+      error: () => {},
+    });
+    this.closeAddSitePicker();
   }
 
   private loadCustomColumns(vendorName: string, siteName: string) {

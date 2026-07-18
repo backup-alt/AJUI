@@ -110,6 +110,7 @@ export type SharedModuleKey =
   | "vendors"
   | "supervisors"
   | "subcontractors"
+  | "inventory"
   | "reports"
   | "settings";
 export type SharedFieldType = "text" | "number" | "date";
@@ -1453,6 +1454,7 @@ export class ErpDataService {
       vendors: [],
       supervisors: [],
       subcontractors: [],
+      inventory: [],
       reports: [],
       settings: [],
     };
@@ -1469,6 +1471,7 @@ export class ErpDataService {
       vendors: [],
       supervisors: [],
       subcontractors: [],
+      inventory: [],
       reports: [],
       settings: [],
     };
@@ -1485,6 +1488,7 @@ export class ErpDataService {
       vendors: [],
       supervisors: [],
       subcontractors: [],
+      inventory: [],
       reports: [],
       settings: [],
     };

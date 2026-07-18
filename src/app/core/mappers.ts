@@ -78,6 +78,8 @@ export function mapVendor(v: any): Vendor {
     phone: v.phone,
     address: v.address,
     gst: v.gstNumber || "",
+    status: v.status,
+    siteIds: (v.siteIds || []).map((id: any) => String(id)),
   };
 }
 
