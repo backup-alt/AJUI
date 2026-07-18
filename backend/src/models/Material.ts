@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-export type MaterialStatus = "Pending" | "Approved" | "Rejected";
+export type MaterialStatus = "Pending" | "Approved" | "Rejected" | "Completed" | "Received" | "Not Received";
 
 export interface IMaterial extends Document {
   _id: Types.ObjectId;
@@ -18,6 +18,8 @@ export interface IMaterial extends Document {
   purchasedQuantity: number;
   consumedQuantity: number;
   remainingStock: number;
+  issuedAmount?: number;
+  givenAmount?: number;
   vendor?: string;
   vendorId?: Types.ObjectId;
   poNumber?: string;
@@ -51,6 +53,8 @@ const materialSchema = new Schema<IMaterial>(
     purchasedQuantity: { type: Number, default: 0 },
     consumedQuantity: { type: Number, default: 0 },
     remainingStock: { type: Number, default: 0 },
+    issuedAmount: { type: Number },
+    givenAmount: { type: Number },
     vendor: { type: String, trim: true },
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor" },
     poNumber: { type: String, trim: true },
@@ -58,7 +62,7 @@ const materialSchema = new Schema<IMaterial>(
     approvalDate: { type: String },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected"],
+      enum: ["Pending", "Approved", "Rejected", "Completed", "Received", "Not Received"],
       default: "Pending",
       index: true,
     },
@@ -79,3 +83,4 @@ materialSchema.pre("save", function (next) {
 });
 
 export const Material = model<IMaterial>("Material", materialSchema);
+

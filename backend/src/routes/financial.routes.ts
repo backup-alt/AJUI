@@ -40,6 +40,7 @@ router.get("/materials", validate(listMaterialsSchema, "query"), ctrl.listMateri
 router.get("/materials/pending", requireRole("admin", "project_manager"), ctrl.getPendingMaterials);
 router.get("/materials/:id", ctrl.getMaterial);
 router.patch("/materials/:id", validate(updateMaterialSchema), ctrl.updateMaterial);
+router.post("/materials/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadMaterialReceipt);
 router.delete("/materials/:id", requireRole("admin", "project_manager"), ctrl.deleteMaterial);
 
 // =================== LABOUR ===================

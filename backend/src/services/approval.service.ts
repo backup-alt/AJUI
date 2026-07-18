@@ -341,6 +341,8 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             submittedBy: d.createdBy,
             clientName: d.clientName,
             supervisorName: d.supervisorName,
+            issuedAmount: d.issuedAmount,
+            givenAmount: d.givenAmount,
           };
         }
       } else if (sourceCollection === "Labour" || sourceCollection === "labour") {

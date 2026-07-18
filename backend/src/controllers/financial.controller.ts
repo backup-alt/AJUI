@@ -75,6 +75,17 @@ export async function deleteMaterial(req: Request, res: Response, next: NextFunc
   } catch (e) { next(e); }
 }
 
+export async function uploadMaterialReceipt(req: Request, res: Response, next: NextFunction) {
+  try {
+    const material = await materialService.uploadMaterialReceipt(req.params.id, {
+      data: req.body.data,
+      mimeType: req.body.mimeType,
+      fileName: req.body.fileName,
+    });
+    res.json({ material });
+  } catch (e) { next(e); }
+}
+
 export async function getPendingMaterials(req: Request, res: Response, next: NextFunction) {
   try {
     const scopeProjectIds = await getScopedProjectIds(req);

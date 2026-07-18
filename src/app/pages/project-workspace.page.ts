@@ -35,6 +35,8 @@ const sectionConfigs: SectionConfig[] = [
       { key: "site", label: "Site" },
       { key: "materialName", label: "Material Name" },
       { key: "unit", label: "Unit" },
+      { key: "issuedAmount", label: "Issued Amount", type: "number" },
+      { key: "givenAmount", label: "Given Amount", type: "number" },
       { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
       { key: "approvedQuantity", label: "Approved Quantity", type: "number" },
       { key: "requestDate", label: "Request Date", type: "date" },

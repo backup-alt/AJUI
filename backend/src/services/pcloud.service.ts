@@ -25,17 +25,40 @@ export async function uploadToPCloud(
 ): Promise<PCloudUploadResult> {
   const url = `${PCLOUD_API}/uploadfile`;
 
-  const formData = new URLSearchParams();
-  formData.append("folderid", FOLDER_ID);
-  formData.append("filename", fileName);
+  // fileData is a base64-encoded string — decode it to a binary buffer
+  const binaryData = Buffer.from(fileData, "base64");
+
+  // Build multipart/form-data manually
+  const boundary = `----PCloudBoundary${Date.now()}`;
+  const parts: Buffer[] = [];
+
+  // folderid field
+  parts.push(Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="folderid"\r\n\r\n${FOLDER_ID}\r\n`
+  ));
+
+  // filename field
+  parts.push(Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="filename"\r\n\r\n${fileName}\r\n`
+  ));
+
+  // file field (the actual binary content)
+  parts.push(Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+  ));
+  parts.push(binaryData);
+  parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+  const body = Buffer.concat(parts);
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${BEARER_TOKEN}`,
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      "Content-Length": String(body.length),
     },
-    body: formData.toString(),
+    body,
   });
 
   if (!response.ok) {

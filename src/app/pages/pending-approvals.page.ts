@@ -32,6 +32,9 @@ type MaterialApprovalRow = ApprovalBaseRow & {
   supervisor: string;
   requestDate: string;
   poNumber: string;
+  issuedAmount?: number;
+  givenAmount?: number;
+  sourceId?: string;
 };
 
 type LabourApprovalRow = ApprovalBaseRow & {
@@ -129,6 +132,8 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Vendor</th>
                         <th>Supervisor</th>
                         <th>Date</th>
+                        <th>Issued Amt</th>
+                        <th>Given Amt</th>
                         <th>Status</th>
                         <th>Actions</th>
                       </tr>
@@ -156,6 +161,28 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         </td>
                         <td>{{ row.supervisor || "-" }}</td>
                         <td>{{ row.requestDate || "-" }}</td>
+                        <td>
+                          <input
+                            class="approval-table-input"
+                            inputmode="decimal"
+                            type="number"
+                            [value]="row.issuedAmount ?? ''"
+                            (input)="updateApprovalCell(row, 'issuedAmount', $any($event.target).value)"
+                            aria-label="Issued amount"
+                            min="0"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            class="approval-table-input"
+                            inputmode="decimal"
+                            type="number"
+                            [value]="row.givenAmount ?? ''"
+                            (input)="updateApprovalCell(row, 'givenAmount', $any($event.target).value)"
+                            aria-label="Given amount"
+                            min="0"
+                          />
+                        </td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
                         <td class="approval-actions">
                           <button type="button" class="approve-action" (click)="approve(row)" aria-label="Approve material">
@@ -356,13 +383,15 @@ export class PendingApprovalsPage implements OnInit {
   }
 
   updateApprovalCell(row: ApprovalBaseRow, key: string, value: string) {
+    const numericFields = ['approvedQuantity', 'issuedAmount', 'givenAmount', 'amount'];
+    const parsedValue = numericFields.includes(key) ? (value === '' ? undefined : Number(value)) : value;
     if (row.module === "materials") {
       this._materialRows.update((rows) =>
-        rows.map((r) => r.rowId === row.rowId ? Object.assign({}, r, { [key]: value }) : r)
+        rows.map((r) => r.rowId === row.rowId ? Object.assign({}, r, { [key]: parsedValue }) : r)
       );
     } else if (row.module === "expenses") {
       this._siteExpenseRows.update((rows) =>
-        rows.map((r) => r.rowId === row.rowId ? Object.assign({}, r, { [key]: value }) : r)
+        rows.map((r) => r.rowId === row.rowId ? Object.assign({}, r, { [key]: parsedValue }) : r)
       );
     }
   }
@@ -385,6 +414,18 @@ export class PendingApprovalsPage implements OnInit {
               this.api.patchExpense(expenseRow.sourceId, {
                 issuedAmount: expenseRow.issuedAmount,
                 givenAmount: expenseRow.givenAmount,
+              })
+            );
+          }
+        } else if (row.module === "materials") {
+          const materialRow = this._materialRows().find((r) => r.rowId === row.rowId);
+          if (materialRow?.sourceId) {
+            const poNumber = `PO-MAT-${Date.now()}`;
+            await firstValueFrom(
+              this.api.patchMaterial(materialRow.sourceId, {
+                issuedAmount: materialRow.issuedAmount,
+                givenAmount: materialRow.givenAmount,
+                poNumber: poNumber,
               })
             );
           }

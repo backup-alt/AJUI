@@ -148,3 +148,28 @@ export async function getPendingMaterials(scopeProjectIds?: ProjectScopeIds) {
   applyProjectScope(query, "projectId", scopeProjectIds);
   return Material.find(query).sort({ createdAt: -1 }).lean();
 }
+
+export async function uploadMaterialReceipt(
+  id: string,
+  payload: { data: string; mimeType: string; fileName?: string }
+) {
+  const material = await Material.findById(id);
+  if (!material) throw new AppError(404, "Material not found");
+
+  const { uploadToPCloud } = await import("./pcloud.service.js");
+
+  try {
+    const pcloudResult = await uploadToPCloud(
+      payload.data,
+      payload.fileName || `receipt_mat_${material.materialId}.${payload.mimeType.split("/")[1] || "jpg"}`,
+      payload.mimeType
+    );
+    material.billUrl = pcloudResult.fileUrl;
+  } catch (err) {
+    console.warn("[pCloud] Upload failed for material:", err);
+    throw new AppError(500, "Failed to upload receipt to pCloud");
+  }
+
+  await material.save();
+  return material.toObject();
+}

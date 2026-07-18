@@ -17,6 +17,8 @@ export const createMaterialSchema = z.object({
     vendorId: objectIdSchema.optional(),
     poNumber: z.string().trim().optional(),
     requestDate: z.string().min(1),
+    issuedAmount: z.coerce.number().nonnegative().optional(),
+    givenAmount: z.coerce.number().nonnegative().optional(),
     createdBy: z.string().trim().optional(),
   }),
 });
@@ -31,7 +33,7 @@ export const listMaterialsSchema = z.object({
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
     vendorId: objectIdSchema.optional(),
-    status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
+    status: z.enum(["Pending", "Approved", "Rejected", "Completed", "Received", "Not Received"]).optional(),
     search: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),

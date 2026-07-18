@@ -19,6 +19,8 @@ export interface MaterialApprovalRow {
   poNumber: string;
   status: string;
   sourceId: string;
+  issuedAmount?: number;
+  givenAmount?: number;
 }
 
 export interface LabourApprovalRow {
@@ -224,6 +226,8 @@ export class ApprovalsService {
           supervisor: a.supervisorName || "",
           requestDate: a.requestDate || "",
           poNumber: a.poNumber || "",
+          issuedAmount: a.issuedAmount,
+          givenAmount: a.givenAmount,
         } as MaterialApprovalRow;
 
       case "labour":
@@ -315,6 +319,8 @@ export class ApprovalsService {
           supervisor: "",
           requestDate: "",
           poNumber: "",
+          issuedAmount: undefined,
+          givenAmount: undefined,
         } as MaterialApprovalRow;
     }
   }

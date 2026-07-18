@@ -418,12 +418,11 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         <td class="col-status">
                           @if (editingRowId() === row.id) {
                             <select [value]="row.status" (blur)="updateField(row, 'status', $any($event.target).value)" class="table-input">
-                              <option value="Pending">Pending</option>
-                              <option value="Approved">Approved</option>
-                              <option value="Rejected">Rejected</option>
+                              <option value="Received">Received</option>
+                              <option value="Not Received">Not Received</option>
                             </select>
                           } @else {
-                            <span class="status-badge" [class]="row.status.toLowerCase()">{{ row.status || 'Pending' }}</span>
+                            <span class="status-badge" [ngClass]="statusBadgeClass(row.status)">{{ row.status || 'Not Received' }}</span>
                           }
                         </td>
                         <td class="col-action">
@@ -933,9 +932,9 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       font-size: 11px;
       font-weight: 600;
     }
-    .status-badge.approved { background: #dcfce7; color: #15803d; }
+    .status-badge.approved, .status-badge.received { background: #dcfce7; color: #15803d; }
     .status-badge.pending { background: #fef9c3; color: #854d0e; }
-    .status-badge.rejected { background: #fee2e2; color: #dc2626; }
+    .status-badge.rejected, .status-badge.not-received { background: #fee2e2; color: #dc2626; }
     .remove-col-btn {
       margin-left: 4px;
       background: #fee2e2;
@@ -1423,6 +1422,10 @@ export class VendorDashboardPage {
 
   vendorInitials(name: string): string {
     return name.split(/\s+/).slice(0, 2).map((p) => p[0] || "").join("").toUpperCase() || "V";
+  }
+
+  statusBadgeClass(status: string): string {
+    return (status || "not-received").toLowerCase().replace(/\s+/g, "-");
   }
 
   createVendor(value: VendorFormValue) {
