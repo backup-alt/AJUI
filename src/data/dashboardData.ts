@@ -135,6 +135,8 @@ export type ExpenseRow = {
   spent: number;
   reference: string;
   status: ApprovalStatus;
+  billUrl?: string;
+  poNumber?: string;
 };
 
 export type PaymentRow = {

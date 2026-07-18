@@ -588,7 +588,7 @@ export class RequestsPage implements OnInit {
   }
 
   async submitUpload(item: RequestItem): Promise<void> {
-    if (!this.canSubmitUpload()) return;
+    if (!this.canSubmitUpload(item)) return;
     this.isUploading.set(true);
 
     const payload: any = {
