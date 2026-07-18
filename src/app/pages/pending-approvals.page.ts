@@ -5,7 +5,7 @@ import { firstValueFrom } from "rxjs";
 import { ErpDataService, type SharedModuleKey } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { ApprovalsService, type ExpenseApprovalRow } from "../core/approvals.service";
+import { ApprovalsService } from "../core/approvals.service";
 import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
 import { mapExpense } from "../core/mappers";
@@ -52,11 +52,16 @@ type ExpenseApprovalRow = ApprovalBaseRow & {
   amount: number;
   supervisor: string;
   reference: string;
+  sourceId: string;
   isSiteMaterial?: boolean;
   materialName?: string;
   materialUnit?: string;
   materialQuantity?: number;
   materialVendor?: string;
+  issuedAmount?: number;
+  givenAmount?: number;
+  billUrl?: string;
+  poNumber?: string;
 };
 
 type SubcontractApprovalRow = ApprovalBaseRow & {
