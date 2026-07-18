@@ -1027,7 +1027,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <span>Quality / Grade</span>
                   <span>Last Updated</span>
                 </div>
-                @for (row of data.materials().filter(m => m.name === selectedInventoryCard()!.materialName); track row.id) {
+                @for (row of inventoryBreakdownRows(); track row.id) {
                   <div class="breakdown-table-row">
                     <span>{{ row.site || 'Unknown Site' }}</span>
                     <strong>{{ row.quantity ?? 0 }}</strong>
@@ -1337,6 +1337,11 @@ export class UniversalDashboardPage {
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials()));
   readonly selectedInventoryCard = signal<{ materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
+  readonly inventoryBreakdownRows = computed(() => {
+    const card = this.selectedInventoryCard();
+    if (!card) return [] as import("../../data/dashboardData").MaterialRow[];
+    return this.data.materials().filter((m) => m.name === card.materialName);
+  });
   readonly showInventoryBreakdown = signal(false);
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
   readonly dashboardRows = computed(() => this.buildRows());
