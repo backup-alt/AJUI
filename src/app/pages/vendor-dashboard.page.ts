@@ -1185,6 +1185,19 @@ export class VendorDashboardPage {
     });
   }
 
+  private refreshSiteAssignments() {
+    const current = this.selectedVendor();
+    if (!current) return;
+    const updated = this.data.vendors().find((v) => v.id === current.id);
+    if (updated) {
+      this.selectedVendor.set(updated);
+      const site = this.selectedSite();
+      if (site && !(updated.siteIds || []).includes(site.id)) {
+        this.selectedSite.set(null);
+      }
+    }
+  }
+
   openVendor(vendor: Vendor) {
     this.selectedVendor.set(vendor);
     this.selectedSite.set(null);

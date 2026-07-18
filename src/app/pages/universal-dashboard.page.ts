@@ -351,7 +351,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded() && (selectedRowCount() > 0 || !isNoCreateModule())"
+                    *ngIf="!tableViewExpanded() && activeModule() !== 'vendors' && (selectedRowCount() > 0 || !isNoCreateModule())"
                     [title]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
                     [attr.aria-label]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
@@ -516,8 +516,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
               </section>
 
-              <ng-container *ngIf="tableState() as tableState">
-              <div class="table-meta-strip" *ngIf="!tableViewExpanded() && activeModule() !== 'inventory'">
+              <ng-container *ngIf="activeModule() !== 'inventory'">
+                <ng-container *ngIf="tableState() as tableState">
+                <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
                 <span>{{ tableState.rows.length }} rows</span>
                 <span>{{ tableState.columns.length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
@@ -726,6 +727,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   </tbody>
                 </table>
               </div>
+              </ng-container>
               </ng-container>
             </section>
 
@@ -3132,7 +3134,7 @@ visibleRows(): TableRow[] {
       exportFormat,
     }));
 
-return { materials, clients, labour, expenses, generalExpenses, payments, vendors, supervisors, subcontractors, inventory: [], reports };
+return { materials, clients, labour, expenses, generalExpenses, payments, vendors, subcontractors, inventory: [], reports };
   }
 
   private rowsFor(module: DashboardModule): TableRow[] {
