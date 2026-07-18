@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from "@angular/core";
+import { Injectable, Injector, inject, signal } from "@angular/core";
 import { Observable } from "rxjs";
 import { ApiService } from "./api.service";
 import { ErpDataService } from "../data/erp-data.service";
@@ -7,7 +7,10 @@ import type { MaterialRow } from "../../data/dashboardData";
 @Injectable({ providedIn: "root" })
 export class MaterialsService {
   private readonly api = inject(ApiService);
-  private readonly data = inject(ErpDataService);
+  private readonly injector = inject(Injector);
+  private get data(): ErpDataService {
+    return this.injector.get(ErpDataService);
+  }
   private readonly storageKey = "agb-erp:materials";
 
   readonly materials = signal<MaterialRow[]>(this.readState());
