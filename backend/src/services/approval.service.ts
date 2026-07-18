@@ -45,7 +45,7 @@ export async function createApproval(params: CreateApprovalParams): Promise<IApp
   return approval.toObject();
 }
 
-export async function approveRequest(approvalId: string, reviewer: string): Promise<IApproval> {
+export async function approveRequest(approvalId: string, reviewer: string, issuedAmount?: number, givenAmount?: number, poNumber?: string): Promise<IApproval> {
   const approval = await Approval.findOne({ approvalId });
   if (!approval) throw new AppError(404, "Approval not found");
   if (approval.status !== "Pending") {
@@ -58,19 +58,22 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
     approvedAt: new Date(),
   };
 
+  if (issuedAmount !== undefined) sourceUpdate.issuedAmount = issuedAmount;
+  if (givenAmount !== undefined) sourceUpdate.givenAmount = givenAmount;
+
   let projectId: Types.ObjectId | undefined;
   let generatedPoNumber: string | undefined;
   switch (approval.sourceCollection) {
     case "materials":
     case "Material": {
       const mat = await Material.findById(approval.sourceId).lean();
-      const poNumber = await generatePoNumberForSite(
+      const generatedPo = poNumber || await generatePoNumberForSite(
         mat?.siteId ? String(mat.siteId) : undefined,
         mat?.site,
         mat?.projectId ? String(mat.projectId) : undefined
       );
-      generatedPoNumber = poNumber;
-      await Material.updateOne({ _id: approval.sourceId }, { ...sourceUpdate, poNumber });
+      generatedPoNumber = generatedPo;
+      await Material.updateOne({ _id: approval.sourceId }, { ...sourceUpdate, poNumber: generatedPo });
       projectId = mat?.projectId;
       break;
     }
@@ -89,12 +92,12 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
       // uploads a receipt. Cash Added is auto-approved on creation, so
       // nothing more is needed here.
       if (exp?.transactionType === "Purchase") {
-        const poNumber = await generatePoNumberForSite(
+        const generatedPo = poNumber || await generatePoNumberForSite(
           exp.siteId ? String(exp.siteId) : undefined,
           exp.site,
           exp.projectId ? String(exp.projectId) : undefined
         );
-        generatedPoNumber = poNumber;
+        generatedPoNumber = generatedPo;
         // Keep status Pending so the supervisor still has to upload a
         // receipt. The approval record itself becomes "Approved" below.
         await Expense.updateOne(
@@ -102,7 +105,9 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
           {
             approvedBy: reviewer,
             approvedAt: new Date(),
-            poNumber,
+            poNumber: generatedPo,
+            ...(issuedAmount !== undefined ? { issuedAmount } : {}),
+            ...(givenAmount !== undefined ? { givenAmount } : {}),
           }
         );
       } else {
@@ -128,12 +133,17 @@ export async function approveRequest(approvalId: string, reviewer: string): Prom
           remainingStock: exp.materialQuantity || 1,
           vendor: exp.materialVendor,
           vendorId: exp.materialVendorId,
+          poNumber: generatedPoNumber,
           status: "Approved",
           approvedBy: reviewer,
           approvedAt: new Date(),
           requestDate: exp.date,
           createdBy: exp.submittedBy,
+          issuedAmount,
+          givenAmount,
           supervisorName: exp.supervisor,
+          ...(issuedAmount !== undefined ? { issuedAmount } : {}),
+          ...(givenAmount !== undefined ? { givenAmount } : {}),
         });
       }
       break;

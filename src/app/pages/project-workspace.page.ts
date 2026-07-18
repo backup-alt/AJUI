@@ -82,6 +82,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "site", label: "Site" },
       { key: "supervisor", label: "Supervisor" },
       { key: "poNumber", label: "PO Number" },
+      { key: "reference", label: "Bill / Reference" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
   },
@@ -658,15 +659,20 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </div>
                           </div>
                           <ng-template #editableProjectCell>
-                            <span
-                              class="editable-cell"
-                              [class.cell-readonly]="!isRowEditing(row) || isReadonlyColumn(column.key)"
-                              [attr.contenteditable]="isRowEditing(row) && !isReadonlyColumn(column.key) ? 'true' : null"
-                              spellcheck="false"
-                              (blur)="isRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
-                            >
-                              {{ row[column.key] }}
-                            </span>
+                            <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
+                              <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
+                            </ng-container>
+                            <ng-template #normalEditableCell>
+                              <span
+                                class="editable-cell"
+                                [class.cell-readonly]="!isRowEditing(row) || isReadonlyColumn(column.key)"
+                                [attr.contenteditable]="isRowEditing(row) && !isReadonlyColumn(column.key) ? 'true' : null"
+                                spellcheck="false"
+                                (blur)="isRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
+                              >
+                                {{ row[column.key] }}
+                              </span>
+                            </ng-template>
                           </ng-template>
                         </ng-template>
                       </td>
@@ -2363,11 +2369,14 @@ export class ProjectWorkspacePage {
       site: row.site,
       materialName: row.name,
       unit: row.unit,
+      issuedAmount: row.issuedAmount ?? "",
+      givenAmount: row.givenAmount ?? "",
       requestedQuantity: formatNumber(row.requested),
       approvedQuantity: formatNumber(row.approved),
       requestDate: row.requestDate || "2026-06-05",
       vendor: row.vendor,
       poNumber: row.poNumber,
+      billUrl: row.billUrl,
       remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
       status: row.status,
     }));
@@ -2409,6 +2418,7 @@ export class ProjectWorkspacePage {
         supervisor: row.supervisor,
         cashIssued: formatMoney(row.received),
         reference: row.reference,
+        billUrl: row.billUrl,
         approvalStatus: row.status,
       }));
 
@@ -2511,7 +2521,12 @@ export class ProjectWorkspacePage {
     }
     if (section === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (section === "labour" && key === "attendance") return ["Present", "Absent"];
-    if (key === "approvalStatus" || key === "status") return ["Pending", "Approved", "Declined"];
+    if (key === "approvalStatus" || key === "status") {
+      if (section === "materials") {
+        return ["Pending", "Approved", "Declined", "Completed", "Received", "Not Received"];
+      }
+      return ["Pending", "Approved", "Declined"];
+    }
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
     return [];

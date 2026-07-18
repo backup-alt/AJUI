@@ -134,6 +134,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Date</th>
                         <th>Issued Amt</th>
                         <th>Given Amt</th>
+                        <th>PO Number</th>
                         <th>Status</th>
                         <th>Actions</th>
                       </tr>
@@ -143,7 +144,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ row.client || "-" }}</td>
                         <td>{{ row.project || "-" }}</td>
                         <td>{{ row.site || "-" }}</td>
-                        <td><strong>{{ row.materialName }}</strong><small class="approval-context">{{ row.poNumber || "PO pending" }}</small></td>
+                        <td><strong>{{ row.materialName }}</strong></td>
                         <td>{{ row.requestedQuantity }} {{ row.unit }}</td>
                         <td>
                           <input
@@ -181,6 +182,16 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             (input)="updateApprovalCell(row, 'givenAmount', $any($event.target).value)"
                             aria-label="Given amount"
                             min="0"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            class="approval-table-input"
+                            type="text"
+                            [value]="row.poNumber ?? ''"
+                            (input)="updateApprovalCell(row, 'poNumber', $any($event.target).value)"
+                            aria-label="PO Number"
+                            placeholder="Auto-generate"
                           />
                         </td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
@@ -226,6 +237,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Amount</th>
                         <th>Issued Amt</th>
                         <th>Given Amt</th>
+                        <th>PO Number</th>
                         <th>Supervisor</th>
                         <th>Bill / Reference</th>
                         <th>Status</th>
@@ -261,6 +273,16 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             (input)="updateApprovalCell(row, 'givenAmount', $any($event.target).value)"
                             aria-label="Given amount"
                             min="0"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            class="approval-table-input"
+                            type="text"
+                            [value]="row.poNumber ?? ''"
+                            (input)="updateApprovalCell(row, 'poNumber', $any($event.target).value)"
+                            aria-label="PO Number"
+                            placeholder="Auto-generate"
                           />
                         </td>
                         <td>{{ row.supervisor || "-" }}</td>
@@ -407,30 +429,23 @@ export class PendingApprovalsPage implements OnInit {
   private async applyApproval(row: ApprovalBaseRow, status: "Approved" | "Rejected"): Promise<void> {
     try {
       if (status === "Approved") {
+        let payload: any = {};
         if (row.module === "expenses") {
           const expenseRow = this._siteExpenseRows().find((r) => r.rowId === row.rowId);
-          if (expenseRow?.sourceId && (expenseRow.issuedAmount !== undefined || expenseRow.givenAmount !== undefined)) {
-            await firstValueFrom(
-              this.api.patchExpense(expenseRow.sourceId, {
-                issuedAmount: expenseRow.issuedAmount,
-                givenAmount: expenseRow.givenAmount,
-              })
-            );
+          if (expenseRow) {
+            if (expenseRow.issuedAmount !== undefined) payload.issuedAmount = expenseRow.issuedAmount;
+            if (expenseRow.givenAmount !== undefined) payload.givenAmount = expenseRow.givenAmount;
+            if (expenseRow.poNumber !== undefined && expenseRow.poNumber.trim() !== '') payload.poNumber = expenseRow.poNumber;
           }
         } else if (row.module === "materials") {
           const materialRow = this._materialRows().find((r) => r.rowId === row.rowId);
-          if (materialRow?.sourceId) {
-            const poNumber = `PO-MAT-${Date.now()}`;
-            await firstValueFrom(
-              this.api.patchMaterial(materialRow.sourceId, {
-                issuedAmount: materialRow.issuedAmount,
-                givenAmount: materialRow.givenAmount,
-                poNumber: poNumber,
-              })
-            );
+          if (materialRow) {
+            if (materialRow.issuedAmount !== undefined) payload.issuedAmount = materialRow.issuedAmount;
+            if (materialRow.givenAmount !== undefined) payload.givenAmount = materialRow.givenAmount;
+            if (materialRow.poNumber !== undefined && materialRow.poNumber.trim() !== '') payload.poNumber = materialRow.poNumber;
           }
         }
-        await firstValueFrom(this.approvalsService.approve(row.rowId));
+        await firstValueFrom(this.approvalsService.approve(row.rowId, payload));
         await this.refreshExpensesFromBackend();
       } else {
         await firstValueFrom(this.approvalsService.reject(row.rowId));

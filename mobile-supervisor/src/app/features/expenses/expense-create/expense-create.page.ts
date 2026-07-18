@@ -206,7 +206,7 @@ import { Vendor } from '../../../shared/models';
               </ion-item>
             }
 
-            @if (expenseType() === 'Purchase' && !isSiteMaterial) {
+            @if (expenseType() === 'Purchase') {
               <ion-item class="form-item">
                 <ion-label position="stacked">Description *</ion-label>
                 <ion-input
