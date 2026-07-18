@@ -169,6 +169,9 @@ interface RawApprovalItem {
   materialUnit?: string;
   materialQuantity?: number;
   materialVendor?: string;
+  issuedAmount?: number;
+  givenAmount?: number;
+  billUrl?: string;
 }
 
 @Injectable({ providedIn: "root" })

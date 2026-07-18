@@ -8,6 +8,16 @@ export interface PCloudUploadResult {
   fileName: string;
 }
 
+interface PCloudResponse {
+  result: number;
+  error?: string;
+  files?: Array<{
+    fileid: number;
+    name: string;
+    size: number;
+  }>;
+}
+
 export async function uploadToPCloud(
   fileData: string,
   fileName: string,
@@ -33,8 +43,8 @@ export async function uploadToPCloud(
     throw new Error(`pCloud upload failed: ${response.status} - ${errorText}`);
   }
 
-  const result = await response.json();
-  
+  const result: PCloudResponse = await response.json();
+
   if (result.result !== 0) {
     throw new Error(`pCloud API error: ${result.result} - ${result.error || "Unknown error"}`);
   }
@@ -71,6 +81,6 @@ export async function deleteFromPCloud(fileId: string): Promise<boolean> {
     return false;
   }
 
-  const result = await response.json();
+  const result: PCloudResponse = await response.json();
   return result.result === 0;
 }
