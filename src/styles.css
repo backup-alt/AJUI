@@ -5218,6 +5218,10 @@ ion-menu.enterprise-sidebar::part(container) {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .dashboard-kpi-board span {
@@ -5254,6 +5258,9 @@ ion-menu.enterprise-sidebar::part(container) {
   color: #475467;
 }
 
+.universal-workbench .operations-tabs button span {
+  text-align: center;
+}
 .universal-workbench .operations-tabs button small {
   display: inline-grid;
   display: flex;
@@ -12792,6 +12799,10 @@ th:hover .column-insert-action,
 .dashboard-kpi-board > div {
   min-height: 62px;
   padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .dashboard-kpi-board strong {

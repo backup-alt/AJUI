@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, OnInit, Output, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, OnInit, Output, computed, inject, signal } from "@angular/core";
 import { IonIcon } from "@ionic/angular/standalone";
 import { FormsModule } from "@angular/forms";
 import { ApiService } from "../core/api.service";
@@ -57,7 +57,7 @@ type SiteOption = { _id: string; name: string; siteId: string };
             <textarea name="address" required rows="3" [value]="initialValue?.address || ''" placeholder="Door no, street, area, city"></textarea>
           </label>
           <label class="span-2">
-            <span>Assign Sites <em class="req">*</em></span>
+            <span>Site Assigned <em class="req">*</em></span>
             <div class="site-dropdown" [class.open]="siteDropdownOpen">
               <button type="button" class="site-trigger" (click)="toggleDropdown()">
                 <span>{{ selectedLabel }}</span>
@@ -65,12 +65,22 @@ type SiteOption = { _id: string; name: string; siteId: string };
               </button>
               @if (siteDropdownOpen) {
                 <div class="site-panel" (click)="$event.stopPropagation()">
+                  <div class="site-search-wrap">
+                    <input
+                      type="text"
+                      class="site-search-input"
+                      placeholder="Search sites..."
+                      [value]="siteSearchQuery()"
+                      (input)="siteSearchQuery.set($any($event.target).value)"
+                      (click)="$event.stopPropagation()"
+                    />
+                  </div>
                   @if (loadingSites()) {
                     <p class="site-msg">Loading sites...</p>
-                  } @else if (siteOptions().length === 0) {
+                  } @else if (filteredSiteOptions().length === 0) {
                     <p class="site-msg">No sites found.</p>
                   } @else {
-                    @for (site of siteOptions(); track site._id) {
+                    @for (site of filteredSiteOptions(); track site._id) {
                       <label class="site-opt" (click)="$event.stopPropagation()">
                         <input
                           type="checkbox"
@@ -122,8 +132,19 @@ type SiteOption = { _id: string; name: string; siteId: string };
       position: absolute; top: calc(100% + 4px); left: 0; right: 0;
       background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12); z-index: 100;
-      max-height: 220px; overflow-y: auto; padding: 6px 0;
+      max-height: 280px; overflow-y: auto; padding: 6px 0;
     }
+    .site-search-wrap {
+      padding: 6px 10px 4px;
+      border-bottom: 1px solid #f0f4ff;
+    }
+    .site-search-input {
+      width: 100%; padding: 7px 10px; font-size: 13px;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      background: #f8fafc; color: #1e293b;
+      box-sizing: border-box;
+    }
+    .site-search-input:focus { outline: none; border-color: #2c5cff; background: #fff; }
     .site-opt {
       display: flex; align-items: center; gap: 10px;
       padding: 8px 14px; cursor: pointer; font-size: 14px; color: #1e293b;
@@ -142,6 +163,7 @@ export class VendorFormDialogComponent implements OnInit {
   @Input() description = "Create the vendor record to track material purchases, PO numbers, and payment history.";
   @Input() submitLabel = "Create Vendor";
   @Input() initialValue: VendorFormValue | null = null;
+  @Input() preSelectedSiteIds: string[] = [];
   @Output() cancel = new EventEmitter<void>();
   @Output() create = new EventEmitter<VendorFormValue>();
 
@@ -153,11 +175,17 @@ export class VendorFormDialogComponent implements OnInit {
   readonly loadingSites = signal(false);
   readonly siteError = signal<string | null>(null);
   readonly selectedSiteIds = signal<Set<string>>(new Set());
+  readonly siteSearchQuery = signal("");
+  readonly filteredSiteOptions = computed(() => {
+    const q = this.siteSearchQuery().toLowerCase().trim();
+    return this.siteOptions().filter((s) => s.name.toLowerCase().includes(q));
+  });
   siteDropdownOpen = false;
 
   ngOnInit() {
     this.statusValue = this.initialValue?.status ?? "Active";
-    this.selectedSiteIds.set(new Set((this.initialValue?.siteIds || []).map((id: any) => String(id))));
+    const preSelected = new Set([...this.preSelectedSiteIds.map(String), ...(this.initialValue?.siteIds || []).map((id: any) => String(id))]);
+    this.selectedSiteIds.set(preSelected);
     this.loadSites();
   }
 

@@ -351,7 +351,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded() && (selectedRowCount() > 0 || !isNoCreateModule())"
+                    *ngIf="!tableViewExpanded() && activeModule() !== 'vendors' && (selectedRowCount() > 0 || !isNoCreateModule())"
                     [title]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
                     [attr.aria-label]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
@@ -516,8 +516,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
               </section>
 
-              <ng-container *ngIf="tableState() as tableState">
-              <div class="table-meta-strip" *ngIf="!tableViewExpanded() && activeModule() !== 'inventory'">
+              <ng-container *ngIf="activeModule() !== 'inventory'">
+                <ng-container *ngIf="tableState() as tableState">
+                <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
                 <span>{{ tableState.rows.length }} rows</span>
                 <span>{{ tableState.columns.length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
@@ -726,6 +727,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   </tbody>
                 </table>
               </div>
+              </ng-container>
               </ng-container>
             </section>
 
@@ -1337,12 +1339,12 @@ export class UniversalDashboardPage {
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials()));
   readonly selectedInventoryCard = signal<{ materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
-  readonly showInventoryBreakdown = signal(false);
   readonly inventoryBreakdownRows = computed(() => {
     const card = this.selectedInventoryCard();
-    if (!card) return [];
+    if (!card) return [] as import("../../data/dashboardData").MaterialRow[];
     return this.data.materials().filter((m) => m.name === card.materialName);
   });
+  readonly showInventoryBreakdown = signal(false);
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
   readonly dashboardRows = computed(() => this.buildRows());
   readonly tableState = computed(() => ({

@@ -983,6 +983,17 @@ export class QuotationPage {
 
     this.savingQuote.set(true);
 
+    const validItems = this.quotationRows()
+      .map((row) => ({
+        description: (row.description || "").trim(),
+        unit: row.unit || "",
+        qty: Number(row.qty) || 0,
+        rate: Number(row.rate) || 0,
+        amount: Number(row.amount) || 0,
+        isCustom: row.isCustom ?? false,
+      }))
+      .filter((row) => row.description.length > 0);
+
     const quotationData = {
       quotationNumber: this.currentQuoteNumber(),
       date: this.quotationDate(),
@@ -994,7 +1005,7 @@ export class QuotationPage {
       clientAddress: this.clientAddress,
       clientState: this.clientState,
       clientGstin: this.clientGstin,
-      items: this.quotationRows(),
+      items: validItems,
       customColumns: this.customColumns(),
       subtotal: this.subtotal(),
       cgstPercent: this.cgstPercent,
@@ -1016,13 +1027,30 @@ export class QuotationPage {
         this.editingQuoteId.set(null);
       } else {
         const created = await this.api.createQuotation(quotationData).toPromise();
-        this.data.addQuotation(quotationData as any);
+        const saved = {
+          ...quotationData,
+          id: (created as any)._id || (created as any).id || existingId,
+        };
+        this.data.addQuotation(saved as any);
         this.editingQuoteId.set(null);
       }
       this.editingQuotation.set(false);
       this.loadQuotationsFromBackend();
     } catch (err: any) {
-      alert("Failed to save quotation: " + (err?.message || "Unknown error"));
+      const details = err?.error?.details;
+      let msg = "Please check your input and try again.";
+      if (details && typeof details === "object") {
+        const fieldErrors = Object.entries(details as Record<string, unknown[]>)
+          .map(([field, errs]) => {
+            const msgs = (errs as any[])?.map((e: any) => e.message || e).join(", ") || "";
+            return msgs ? `${field}: ${msgs}` : null;
+          })
+          .filter(Boolean);
+        if (fieldErrors.length) msg = fieldErrors.join("; ");
+      } else if (err?.message) {
+        msg = err.message;
+      }
+      alert("Failed to save quotation: " + msg);
     } finally {
       this.savingQuote.set(false);
     }
