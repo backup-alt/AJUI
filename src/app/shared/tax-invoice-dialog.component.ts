@@ -45,7 +45,7 @@ import { jsPDF } from "jspdf";
                 <div class="inv-meta-table">
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Invoice No.</span>
-                    <span class="inv-meta-value">{{ (invoice as any)?.invoiceNumber || (invoice as any)?.quotationNumber || '—' }}</span>
+                    <span class="inv-meta-value">{{ getInvoiceNumber() }}</span>
                   </div>
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Invoice Date</span>
@@ -336,6 +336,11 @@ export class TaxInvoiceDialogComponent {
 
   get items() {
     return (this.invoice as any)?.items || [];
+  }
+
+  getInvoiceNumber(): string {
+    const inv = this.invoice as any;
+    return inv?.invoiceNumber || inv?.quotationNumber || '—';
   }
 
   formatRupee(amount: number): string {
