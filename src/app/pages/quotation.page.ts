@@ -1,11 +1,12 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from "@angular/core";
+import { ChangeDetectionStrategy, Component, inject, signal, computed, ViewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
+import { QuotationReportComponent, QuotationReportData } from "../shared/quotation-report.component";
 import { formatMoney } from "../shared/format";
 import type { Quotation, QuotationRow } from "../../data/dashboardData";
 import { jsPDF } from "jspdf";
@@ -49,7 +50,7 @@ function numberToWords(num: number): string {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, QuotationReportComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="quotations"></agb-enterprise-sidebar>
@@ -125,7 +126,7 @@ function numberToWords(num: number): string {
                   </button>
                   <div class="editor-actions">
                     <button type="button" class="btn-outline" (click)="exportToExcel()">Export Excel</button>
-                    <button type="button" class="btn-outline" (click)="exportToPDF()" [disabled]="savingPdf()">Export PDF</button>
+                    <button type="button" class="btn-outline" (click)="quotationReport?.exportToPDF()" [disabled]="savingPdf()">Export PDF</button>
                     <button type="button" class="btn-secondary" (click)="saveQuotation('Draft')" [disabled]="savingQuote()">Save as Draft</button>
                     <button type="button" class="btn-primary" (click)="saveQuotation('Sent')" [disabled]="savingQuote()">Save & Send</button>
                   </div>
@@ -295,6 +296,7 @@ function numberToWords(num: number): string {
         </ion-content>
       </div>
     </ion-split-pane>
+    <agb-quotation-report #quotationReport [quotationData]="reportQuotation()" />
   `,
   styles: [`
     .quotation-page {
@@ -819,6 +821,8 @@ export class QuotationPage {
   readonly quotationRows = signal<QuotationRow[]>([]);
   readonly customColumns = signal<string[]>([]);
 
+  @ViewChild('quotationReport') quotationReport!: QuotationReportComponent;
+
   readonly companyProfile = this.data.companyProfile;
 
   clientName = "";
@@ -859,6 +863,33 @@ export class QuotationPage {
   );
 
   readonly amountInWords = computed(() => numberToWords(Math.round(this.totalAmount())));
+
+  readonly reportQuotation = computed<QuotationReportData>(() => ({
+    quotationNumber: this.currentQuoteNumber(),
+    date: this.quotationDate(),
+    clientName: this.clientName,
+    clientAddress: this.clientAddress,
+    clientState: this.clientState,
+    clientGstin: this.clientGstin,
+    items: this.quotationRows().map((row, idx) => ({
+      id: row.id || String(idx),
+      description: row.description || "",
+      hsnCode: (row as any).hsnCode || "",
+      unit: row.unit || "",
+      qty: row.qty || 0,
+      rate: row.rate || 0,
+      amount: row.amount || 0,
+      isCustom: row.isCustom ?? false,
+    })),
+    subtotal: this.subtotal(),
+    cgstPercent: this.cgstPercent,
+    sgstPercent: this.sgstPercent,
+    cgstAmount: this.cgstAmount(),
+    sgstAmount: this.sgstAmount(),
+    roundOff: this.roundOff,
+    totalAmount: this.totalAmount(),
+    amountInWords: this.amountInWords(),
+  }));
 
   constructor() {
     this.loadQuotationsFromBackend();

@@ -101,6 +101,20 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'labour/worker/:workerId',
+        loadComponent: () =>
+          import('./features/labour/labour-worker-detail/labour-worker-detail.page').then(
+            (m) => m.LabourWorkerDetailPage
+          ),
+      },
+      {
+        path: 'inventory',
+        loadComponent: () =>
+          import('./features/inventory/inventory.page').then(
+            (m) => m.InventoryPage
+          ),
+      },
+      {
         path: 'expenses',
         loadComponent: () =>
           import('./features/expenses/expenses.page').then((m) => m.ExpensesPage),

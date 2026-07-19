@@ -55,9 +55,15 @@ import {
   checkmarkOutline,
   clipboardOutline,
   clipboardSharp,
+  grid,
+  barChartOutline,
+  barChartSharp,
+  fileTrayOutline,
+  fileTraySharp,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { Site } from '../../shared/models';
 
 @Component({
@@ -91,19 +97,18 @@ import { Site } from '../../shared/models';
       <ion-header class="agb-menu-header">
         <div class="menu-brand">
           <div class="menu-brand-logo">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="36" height="36" fill="none">
-              <circle cx="32" cy="32" r="30" stroke="#c9a227" stroke-width="2.5" fill="none"/>
-              <circle cx="32" cy="32" r="24" stroke="#c9a227" stroke-width="1" opacity="0.4"/>
-              <path d="M22 44 Q32 12 42 44 Z" stroke="#c9a227" stroke-width="2" fill="none"/>
-              <path d="M18 44 Q32 18 46 44 Z" stroke="#c9a227" stroke-width="1.5" opacity="0.6" fill="none"/>
-              <path d="M14 44 Q32 24 50 44 Z" stroke="#c9a227" stroke-width="1" opacity="0.3" fill="none"/>
-              <rect x="20" y="44" width="24" height="6" rx="2" fill="#c9a227"/>
-              <rect x="24" y="50" width="16" height="4" rx="2" fill="#c9a227" opacity="0.7"/>
-              <line x1="32" y1="12" x2="32" y2="4" stroke="#c9a227" stroke-width="1.5"/>
-              <circle cx="32" cy="3" r="2.5" fill="#c9a227"/>
-              <rect x="14" y="30" width="4" height="14" rx="1" fill="#c9a227" opacity="0.5"/>
-              <rect x="46" y="30" width="4" height="14" rx="1" fill="#c9a227" opacity="0.5"/>
-              <text x="32" y="58" text-anchor="middle" fill="#c9a227" font-size="4.5" font-weight="700" font-family="sans-serif">AGB</text>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="40" height="40" fill="none">
+              <circle cx="32" cy="32" r="28" stroke="#c9a227" stroke-width="2" fill="none"/>
+              <circle cx="32" cy="32" r="22" stroke="#c9a227" stroke-width="1" opacity="0.35"/>
+              <path d="M24 42 Q32 16 40 42 Z" stroke="#c9a227" stroke-width="1.8" fill="none"/>
+              <path d="M20 42 Q32 20 44 42 Z" stroke="#c9a227" stroke-width="1.3" opacity="0.55" fill="none"/>
+              <path d="M16 42 Q32 24 48 42 Z" stroke="#c9a227" stroke-width="0.9" opacity="0.3" fill="none"/>
+              <rect x="22" y="42" width="20" height="5" rx="2" fill="#c9a227"/>
+              <rect x="25" y="47" width="14" height="3.5" rx="1.75" fill="#c9a227" opacity="0.65"/>
+              <line x1="32" y1="14" x2="32" y2="6" stroke="#c9a227" stroke-width="1.5"/>
+              <circle cx="32" cy="5" r="2.2" fill="#c9a227"/>
+              <rect x="16" y="28" width="3" height="14" rx="1" fill="#c9a227" opacity="0.45"/>
+              <rect x="45" y="28" width="3" height="14" rx="1" fill="#c9a227" opacity="0.45"/>
             </svg>
           </div>
           <div class="menu-brand-text">
@@ -114,25 +119,7 @@ import { Site } from '../../shared/models';
       </ion-header>
 
       <ion-content class="menu-content">
-        @if (currentUser()) {
-          <div class="user-card">
-            <div class="user-avatar-wrap">
-              <div class="user-avatar">{{ userInitials() }}</div>
-              <span class="online-indicator"></span>
-            </div>
-            <div class="user-info">
-              <div class="user-name">{{ currentUser()?.name }}</div>
-              @if (selectedSiteName()) {
-                <div class="user-project">
-                  <ion-icon name="location-outline"></ion-icon>
-                  <span>{{ selectedSiteName() }}</span>
-                </div>
-              }
-            </div>
-          </div>
-        }
-
-        <div class="menu-section-label">Workspace</div>
+        <div class="menu-section-label">Main Menu</div>
         <ion-list lines="none" class="menu-list">
           <ion-item routerLink="/tabs/dashboard" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/dashboard') ? 'home-sharp' : 'home-outline'" slot="start"></ion-icon>
@@ -140,7 +127,11 @@ import { Site } from '../../shared/models';
           </ion-item>
           <ion-item routerLink="/tabs/sites" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/sites') ? 'location-sharp' : 'location-outline'" slot="start"></ion-icon>
-            <ion-label>My sites</ion-label>
+            <ion-label>My Sites</ion-label>
+          </ion-item>
+          <ion-item routerLink="/tabs/inventory" routerLinkActive="selected" button detail="false">
+            <ion-icon [name]="isActiveRoute('/tabs/inventory') ? 'grid-sharp' : 'grid-outline'" slot="start"></ion-icon>
+            <ion-label>Inventory</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/materials" routerLinkActive="selected" button detail="false">
             <ion-icon [name]="isActiveRoute('/tabs/materials') ? 'cube-sharp' : 'cube-outline'" slot="start"></ion-icon>
@@ -173,11 +164,11 @@ import { Site } from '../../shared/models';
         <div class="menu-footer">
           <ion-item button detail="false" class="logout-item" (click)="logout()">
             <ion-icon [name]="isLoggingOut() ? 'log-out-sharp' : 'log-out-outline'" slot="start"></ion-icon>
-            <ion-label>Sign out</ion-label>
+            <ion-label>Sign Out</ion-label>
           </ion-item>
           <div class="menu-footer-meta">
             <ion-icon name="shield-checkmark-outline"></ion-icon>
-            <span>AGB Supervisor - v1.0</span>
+            <span>AGB Supervisor v1.0</span>
           </div>
         </div>
       </ion-content>
@@ -199,8 +190,11 @@ import { Site } from '../../shared/models';
           </ion-title>
 
           <ion-buttons slot="end">
-            <ion-button class="notification-btn">
+            <ion-button class="notification-btn" (click)="openNotifications()">
               <ion-icon name="notifications-outline"></ion-icon>
+              @if (unreadCount() > 0) {
+                <span class="notification-badge">{{ unreadCount() > 9 ? '9+' : unreadCount() }}</span>
+              }
             </ion-button>
           </ion-buttons>
         </ion-toolbar>
@@ -255,148 +249,116 @@ import { Site } from '../../shared/models';
     </div>
   `,
   styles: [`
-    /* Menu header */
+    :host { display: block; }
+
+    /* Menu header - clean, production-ready */
     .agb-menu-header {
       background: var(--agb-gradient-hero);
-      color: #ffffff;
-      padding: calc(20px + env(safe-area-inset-top)) 18px 24px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+      background-image: linear-gradient(135deg, #002263 0%, #003380 100%);
+      color: var(--m3-on-primary);
+      padding: calc(24px + env(safe-area-inset-top)) 20px 24px;
     }
     .menu-brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
     .menu-brand-logo {
-      width: 44px;
-      height: 44px;
+      width: 48px;
+      height: 48px;
       border-radius: 14px;
-      background: rgba(255, 255, 255, 0.18);
-      backdrop-filter: blur(6px);
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(8px);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
-    .menu-brand-logo svg { width: 36px; height: 36px; }
-    .menu-brand-text { line-height: 1.2; }
-    .menu-brand-name { font-size: 14px; font-weight: 700; }
-    .menu-brand-sub { font-size: 10px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
+    .menu-brand-logo svg { width: 40px; height: 40px; }
+    .menu-brand-text { line-height: 1.3; }
+    .menu-brand-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.1px;
+    }
+    .menu-brand-sub {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.65);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+    }
 
     .menu-content {
-      --background: #f8fafc;
-      --padding-top: 0;
-      --padding-bottom: calc(12px + env(safe-area-inset-bottom));
-    }
-
-    /* User card */
-    .user-card {
-      margin: 16px;
-      padding: 16px;
-      background: #002263;
-      color: #ffffff;
-      border-radius: 18px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      box-shadow: 0 12px 28px -14px rgba(0, 34, 99, 0.50);
-    }
-    .user-avatar-wrap { position: relative; }
-    .user-avatar {
-      width: 48px;
-      height: 48px;
-      background: linear-gradient(135deg, #c9a227 0%, #d4b45a 100%);
-      color: #1f2937;
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 16px;
-    }
-    .online-indicator {
-      position: absolute;
-      bottom: -2px;
-      right: -2px;
-      width: 12px;
-      height: 12px;
-      background: #22c55e;
-      border: 2px solid #002263;
-      border-radius: 50%;
-    }
-    .user-info { flex: 1; min-width: 0; }
-    .user-name { font-weight: 700; font-size: 15px; line-height: 1.2; }
-    .user-role { font-size: 11px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
-    .user-project {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 6px;
-      font-size: 11px;
-      opacity: 0.85;
-    }
-    .user-project ion-icon { font-size: 12px; color: #c9a227; }
-    .user-project span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      --background: var(--m3-surface);
+      --padding-top: var(--md-space-3);
+      --padding-bottom: calc(16px + env(safe-area-inset-bottom));
     }
 
     /* Section labels */
     .menu-section-label {
       font-size: 10px;
       font-weight: 700;
-      color: #94a3b8;
+      color: var(--m3-on-surface-muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
-      padding: 12px 22px 6px;
+      letter-spacing: 1.2px;
+      padding: var(--md-space-4) var(--md-space-6) var(--md-space-2);
     }
 
-    .menu-list { background: transparent; padding: 0 12px; }
+    .menu-list { background: transparent; padding: 0 var(--md-space-2); }
     .menu-list ion-item {
       --background: transparent;
-      --color: #0f172a;
-      --border-radius: 12px;
-      --inner-border-radius: 12px;
-      --padding-start: 14px;
-      --padding-end: 14px;
+      --color: var(--m3-on-surface);
+      --border-radius: var(--md-radius-lg);
+      --inner-border-radius: var(--md-radius-lg);
+      --padding-start: var(--md-space-4);
+      --padding-end: var(--md-space-4);
       --min-height: 48px;
       font-size: 14px;
       font-weight: 600;
       margin: 2px 0;
       border-bottom: none;
+      transition: background var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
-    .menu-list ion-item ion-icon { font-size: 20px; color: #475569; margin-right: 12px; }
+    .menu-list ion-item ion-icon {
+      font-size: 20px;
+      color: var(--m3-on-surface-variant);
+      margin-right: var(--md-space-3);
+    }
     .menu-list ion-item.selected {
-      --background: var(--agb-gradient-primary);
-      --color: #ffffff;
-      box-shadow: 0 6px 16px -8px rgba(0, 34, 99, 0.50);
+      --background: var(--m3-primary-container);
+      --color: var(--m3-on-primary-container);
+      box-shadow: none;
     }
-    .menu-list ion-item.selected ion-icon { color: #ffffff; }
+    .menu-list ion-item.selected ion-icon { color: var(--m3-on-primary-container); }
 
-    .menu-spacer { flex: 1; min-height: 24px; }
+    .menu-spacer { flex: 1; min-height: var(--md-space-6); }
 
-    .menu-footer { padding: 12px 12px calc(24px + env(safe-area-inset-bottom)); }
+    .menu-footer {
+      padding: var(--md-space-3) var(--md-space-3) calc(16px + env(safe-area-inset-bottom));
+    }
     .menu-footer ion-item {
       --background: transparent;
-      --color: #dc2626;
-      --border-radius: 12px;
-      --inner-border-radius: 12px;
-      --padding-start: 14px;
-      --padding-end: 14px;
+      --color: var(--m3-error);
+      --border-radius: var(--md-radius-lg);
+      --inner-border-radius: var(--md-radius-lg);
+      --padding-start: var(--md-space-4);
+      --padding-end: var(--md-space-4);
       --min-height: 48px;
       font-weight: 600;
       margin: 0;
     }
-    .menu-footer ion-item ion-icon { color: #dc2626; font-size: 20px; }
+    .menu-footer ion-item ion-icon { color: var(--m3-error); font-size: 20px; }
     .menu-footer-meta {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: var(--md-space-2);
       font-size: 10px;
-      color: #94a3b8;
-      margin-top: 14px;
+      color: var(--m3-on-surface-muted);
+      margin-top: var(--md-space-4);
       letter-spacing: 0.5px;
       text-transform: uppercase;
     }
@@ -404,32 +366,37 @@ import { Site } from '../../shared/models';
 
     /* Top header */
     .agb-app-header {
-      --background: #ffffff;
+      --background: var(--m3-surface-bright);
       --border-color: transparent;
     }
     .site-selector {
       display: flex;
       align-items: center;
-      gap: 10px;
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      padding: 6px 10px 6px 6px;
-      border-radius: 14px;
+      gap: var(--md-space-3);
+      background: var(--m3-surface-container);
+      border: 1px solid var(--m3-outline-variant);
+      padding: var(--md-space-1) var(--md-space-3) var(--md-space-1) var(--md-space-1);
+      border-radius: var(--md-radius-pill);
       cursor: pointer;
       max-width: min(52vw, 240px);
       min-width: 0;
       margin: 0 auto;
-      transition: background var(--agb-transition-fast), border-color var(--agb-transition-fast);
+      transition:
+        background var(--md-motion-duration-short1) var(--md-motion-easing-standard),
+        border-color var(--md-motion-duration-short1) var(--md-motion-easing-standard);
       font-family: inherit;
     }
-    .site-selector:hover { background: #e2e8f0; }
+    .site-selector:hover {
+      background: var(--m3-surface-container-high);
+      border-color: var(--m3-outline);
+    }
     .site-selector:active { transform: scale(0.985); }
     .site-icon {
       width: 30px;
       height: 30px;
-      border-radius: 10px;
-      background: rgba(0, 34, 99, 0.10);
-      color: #002263;
+      border-radius: var(--md-radius-pill);
+      background: var(--m3-primary-container);
+      color: var(--m3-on-primary-container);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -439,17 +406,17 @@ import { Site } from '../../shared/models';
     .site-name {
       font-weight: 700;
       font-size: 13px;
-      color: #0f172a;
+      color: var(--m3-on-surface);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       min-width: 0;
     }
     .site-chev { flex-shrink: 0; }
-    .site-chev ion-icon { color: #64748b; font-size: 16px; }
+    .site-chev ion-icon { color: var(--m3-on-surface-muted); font-size: 16px; }
 
-    .notification-btn { position: relative; --padding-end: 8px; }
-    .notification-btn ion-icon { font-size: 22px; color: #475569; }
+    .notification-btn { position: relative; --padding-end: var(--md-space-2); }
+    .notification-btn ion-icon { font-size: 22px; color: var(--m3-on-surface-variant); }
     .notification-badge {
       position: absolute;
       top: 8px;
@@ -457,22 +424,22 @@ import { Site } from '../../shared/models';
       min-width: 16px;
       height: 16px;
       padding: 0 4px;
-      background: #dc2626;
-      color: #ffffff;
+      background: var(--m3-error);
+      color: var(--m3-on-error);
       font-size: 10px;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 999px;
-      border: 1.5px solid #ffffff;
+      border-radius: var(--md-radius-pill);
+      border: 1.5px solid var(--m3-surface-bright);
     }
 
-    /* Popover */
+    /* Site-switch popover */
     .popover-header {
       font-size: 11px;
       font-weight: 700;
-      color: #64748b;
+      color: var(--m3-on-surface-muted);
       text-transform: uppercase;
       letter-spacing: 0.6px;
       --background: transparent;
@@ -484,9 +451,9 @@ import { Site } from '../../shared/models';
     .site-tile-icon {
       width: 38px;
       height: 38px;
-      border-radius: 12px;
-      background: rgba(0, 34, 99, 0.08);
-      color: #002263;
+      border-radius: var(--md-radius-md);
+      background: var(--m3-primary-container);
+      color: var(--m3-on-primary-container);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -497,17 +464,29 @@ import { Site } from '../../shared/models';
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 32px 16px;
-      color: #94a3b8;
+      padding: var(--md-space-8) var(--md-space-4);
+      color: var(--m3-on-surface-muted);
       text-align: center;
     }
-    .empty-sites ion-icon { font-size: 40px; margin-bottom: 8px; opacity: 0.6; }
-    .empty-sites p { font-size: 14px; font-weight: 600; color: #475569; margin: 0; }
-    .empty-sites span { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .empty-sites ion-icon {
+      font-size: 40px;
+      margin-bottom: var(--md-space-3);
+      opacity: 0.5;
+    }
+    .empty-sites p {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--m3-on-surface-variant);
+      margin: 0 0 var(--md-space-1);
+    }
+    .empty-sites span {
+      font-size: 12px;
+      color: var(--m3-on-surface-muted);
+    }
 
-    /* ▸ Shell header overlap fix (host class set synchronously) */
+    /* Shell header overlap fix */
     app-shell.agb-shell-active ion-content {
-      --padding-top: calc(var(--agb-header-h) + env(safe-area-inset-top));
+      --padding-top: calc(var(--agb-header-height) + env(safe-area-inset-top));
       --padding-bottom: calc(24px + env(safe-area-inset-bottom));
     }
     app-shell.agb-shell-active ion-content.auth-content,
@@ -524,7 +503,8 @@ import { Site } from '../../shared/models';
     app-shell.agb-shell-active ion-content > .sites-list,
     app-shell.agb-shell-active ion-content > .materials-list,
     app-shell.agb-shell-active ion-content > .expense-list,
-    app-shell.agb-shell-active ion-content > .requests-list {
+    app-shell.agb-shell-active ion-content > .requests-list,
+    app-shell.agb-shell-active ion-content > .inventory-list {
       margin-top: var(--agb-shell-gutter);
     }
   `],
@@ -532,6 +512,7 @@ import { Site } from '../../shared/models';
 export class ShellComponent implements OnInit {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
+  private notifications = inject(NotificationService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
 
@@ -543,13 +524,7 @@ export class ShellComponent implements OnInit {
   isLoadingSites = signal(false);
   isLoggingOut = signal(false);
   siteCount = computed(() => this.sites().length);
-
-  userInitials = computed(() => {
-    const name = this.currentUser()?.name || 'S';
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  });
+  unreadCount = computed(() => this.notifications.unreadCount());
 
   isActiveRoute(path: string): boolean {
     return this.router.url === path;
@@ -564,6 +539,7 @@ export class ShellComponent implements OnInit {
       constructOutline, shieldCheckmarkOutline, locationOutline, locationSharp,
       appsOutline, gridOutline, checkmarkOutline, logOutSharp,
       clipboardOutline, clipboardSharp,
+      grid, barChartOutline, barChartSharp, fileTrayOutline, fileTraySharp,
     });
 
     this.currentUser.set(this.auth.currentUser());
@@ -630,5 +606,9 @@ export class ShellComponent implements OnInit {
     } finally {
       this.isLoggingOut.set(false);
     }
+  }
+
+  async openNotifications(): Promise<void> {
+    await this.router.navigate(['/tabs/requests']);
   }
 }

@@ -43,27 +43,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       return next(authReq);
     }),
     catchError((error: HttpErrorResponse): Observable<HttpEvent<unknown>> => {
-      if (error.status === 401 && !req.url.includes('/auth/refresh')) {
+      const isRefreshPath = req.url.includes('/auth/refresh');
+
+      if (error.status === 401 && !isRefreshPath) {
         return from(
           (async () => {
             const newToken = await api.refreshAccessTokenSafely().catch(() => '');
-            if (newToken) {
-              const retried = req.clone({
-                setHeaders: { Authorization: `Bearer ${newToken}` },
-              });
-              // We can't synchronously call next() here because next() returns
-              // an Observable. We resolve the inner promise by mapping the
-              // outcome to a marker the outer code can use.
-              return newToken;
-            }
-            return '';
+            return newToken;
           })()
         ).pipe(
           switchMap((t): Observable<HttpEvent<unknown>> => {
             if (!t) {
-              // Refresh failed: log out and propagate the original 401.
-              void auth.logout();
-              router.navigate(['/auth/login']);
               return throwError(() => error);
             }
             return next(

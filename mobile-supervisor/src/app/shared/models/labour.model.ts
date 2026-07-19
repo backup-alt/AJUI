@@ -137,6 +137,7 @@ export interface Attendance {
   lateFine: number;
   paymentMode: PaymentMode;
   notes?: string;
+  status?: 'Present' | 'Absent';
   createdAt: string;
 }
 

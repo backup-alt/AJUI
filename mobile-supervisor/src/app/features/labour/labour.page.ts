@@ -2,32 +2,51 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import {
   IonContent, IonSegment, IonSegmentButton, IonLabel,
   IonFab, IonFabButton, IonIcon, IonSkeletonText,
-  IonRefresher, IonRefresherContent,
+  IonRefresher, IonRefresherContent, ModalController,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
 import {
   addOutline, peopleOutline, timeOutline, personAddOutline,
-  chevronForwardOutline, businessOutline, briefcaseOutline,
-  constructOutline, hammerOutline, flashOutline, buildOutline,
-  cutOutline, homeOutline, closeOutline, checkmarkOutline,
+  chevronForwardOutline, closeOutline, checkmarkOutline,
+  constructOutline, buildOutline, flashOutline, cutOutline,
+  homeOutline, colorPaletteOutline, hammerOutline, gridOutline,
+  layersOutline, carOutline, sparklesOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Worker, Attendance, LabourTypeCount } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import { EmptyStateComponent } from '../../shared/components';
+import { WorkerListModalComponent } from './worker-list-modal/worker-list-modal.component';
 
 const LABOUR_TYPE_ICONS: Record<string, string> = {
   'Helper': 'hammer-outline',
-  'Mason': 'construct-outline',
+  'Mason': 'layers-outline',
   'Plumber': 'build-outline',
   'Electrician': 'flash-outline',
-  'Carpenter': 'cut-outline',
+  'Carpenter': 'construct-outline',
+  'Painter': 'color-palette-outline',
   'Civil': 'home-outline',
+  'Tiles Worker': 'grid-outline',
+  'Steel Fixer': 'car-outline',
+  'Welder': 'sparkles-outline',
+  'Fabricator': 'construct-outline',
 };
 
-const ALL_LABOUR_TYPES = ['Helper', 'Mason', 'Plumber', 'Electrician', 'Carpenter', 'Civil'];
+const LABOUR_TYPE_COLORS: Record<string, string> = {
+  'Helper': 'helper',
+  'Mason': 'mason',
+  'Plumber': 'plumber',
+  'Electrician': 'electrician',
+  'Carpenter': 'carpenter',
+  'Painter': 'painter',
+  'Civil': 'civil',
+  'Tiles Worker': 'tiles',
+  'Steel Fixer': 'steel',
+  'Welder': 'welder',
+  'Fabricator': 'fabricator',
+};
 
 @Component({
   selector: 'app-labour',
@@ -100,31 +119,6 @@ const ALL_LABOUR_TYPES = ['Helper', 'Mason', 'Plumber', 'Electrician', 'Carpente
             }
           }
         </div>
-
-        @if (selectedLabourType()) {
-          <div class="workers-sheet">
-            <div class="sheet-header">
-              <h3>{{ selectedLabourType() }} Workers</h3>
-              <button class="close-btn" (click)="closeWorkersSheet()">
-                <ion-icon name="close-outline"></ion-icon>
-              </button>
-            </div>
-            <div class="workers-list">
-              @for (worker of workersOfType(); track worker._id) {
-                <div class="worker-row">
-                  <div class="worker-info">
-                    <span class="worker-name">{{ worker.name }}</span>
-                    <span class="worker-pay">{{ worker.weeklyPay | currency:'INR':'symbol':'1.0-0' }}/week</span>
-                  </div>
-                  <button class="mark-btn" (click)="markAttendance(worker)">
-                    Mark Present
-                  </button>
-                </div>
-              }
-            </div>
-          </div>
-          <div class="sheet-backdrop" (click)="closeWorkersSheet()"></div>
-        }
       }
 
       @if (activeTab === 'attendance') {
@@ -192,38 +186,53 @@ const ALL_LABOUR_TYPES = ['Helper', 'Mason', 'Plumber', 'Electrician', 'Carpente
         </div>
       }
 
-      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button (click)="createWorker()">
-          <ion-icon name="person-add-outline"></ion-icon>
-        </ion-fab-button>
-      </ion-fab>
+      @if (!showWorkerSheet()) {
+        <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+          <ion-fab-button (click)="createWorker()">
+            <ion-icon name="person-add-outline"></ion-icon>
+          </ion-fab-button>
+        </ion-fab>
+      }
     </ion-content>
   `,
   styles: [`
-    .labour-content { --background: #f5f6f8; }
+    .labour-content { --background: var(--m3-surface); }
 
-    .page-head { padding: 16px 16px 0; }
-    .page-head h1 { font-size: 22px; font-weight: 700; color: #0f172a; margin: 0 0 2px; letter-spacing: -0.2px; }
-    .page-head p { font-size: 13px; color: #64748b; margin: 0 0 12px; }
+    .page-head { padding: var(--md-space-4) var(--md-space-4) 0; }
+    .page-head h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      margin: 0 0 2px;
+      letter-spacing: -0.2px;
+    }
+    .page-head p { font-size: 13px; color: var(--m3-on-surface-muted); margin: 0 0 12px; }
 
-    .filter-stack { padding: 0 16px 8px; }
+    .filter-stack { padding: 0 var(--md-space-4) var(--md-space-2); }
     .seg-wrap { padding: 4px 4px 8px; }
 
     .section-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 16px 8px;
+      padding: 12px var(--md-space-4) 8px;
     }
-    .section-header h2 { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+    .section-header h2 {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--m3-on-surface-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin: 0;
+    }
     .add-worker-btn {
       display: flex;
       align-items: center;
       gap: 4px;
       padding: 6px 12px;
-      background: #002263;
-      color: #fff;
-      border-radius: 8px;
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border-radius: var(--md-radius-lg);
       font-size: 12px;
       font-weight: 700;
       font-family: inherit;
@@ -235,189 +244,147 @@ const ALL_LABOUR_TYPES = ['Helper', 'Mason', 'Plumber', 'Electrician', 'Carpente
     .type-cards {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      padding: 4px 16px 96px;
+      gap: var(--md-space-3);
+      padding: 4px var(--md-space-4) 96px;
     }
     .type-card {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 14px;
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: 14px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      gap: var(--md-space-3);
+      padding: var(--md-space-4);
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      box-shadow: var(--md-elevation-1);
       cursor: pointer;
       font-family: inherit;
       text-align: left;
-      transition: transform 0.15s, box-shadow 0.15s;
+      transition: transform var(--md-motion-duration-short1) var(--md-motion-easing-standard),
+                  box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
     .type-card:active { transform: scale(0.98); }
     .type-card.skeleton { cursor: default; }
     .type-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--md-radius-lg);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
-    .type-icon ion-icon { font-size: 18px; }
-    .type-icon.icon-helper { background: rgba(14, 165, 233, 0.10); color: #0369a1; }
-    .type-icon.icon-mason { background: rgba(168, 85, 247, 0.10); color: #7e22ce; }
-    .type-icon.icon-plumber { background: rgba(34, 197, 94, 0.10); color: #15803d; }
-    .type-icon.icon-electrician { background: rgba(234, 179, 8, 0.10); color: #a86c02; }
-    .type-icon.icon-carpenter { background: rgba(249, 115, 22, 0.10); color: #c2410c; }
-    .type-icon.icon-civil { background: rgba(156, 163, 175, 0.10); color: #4b5563; }
-    .type-icon.icon-default { background: rgba(201, 162, 39, 0.10); color: #a8861f; }
-    .type-info { flex: 1; min-width: 0; }
-    .type-name { display: block; font-size: 14px; font-weight: 700; color: #0f172a; }
-    .type-count { display: block; font-size: 11px; color: #64748b; margin-top: 2px; }
-    .type-arrow { font-size: 16px; color: #94a3b8; }
+    .type-icon ion-icon { font-size: 20px; }
 
-    .workers-sheet {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      max-height: 70vh;
-      background: #ffffff;
-      border-radius: 22px 22px 0 0;
-      z-index: 101;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.20);
-    }
-    .sheet-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.40);
-      z-index: 100;
-      backdrop-filter: blur(2px);
-    }
-    .sheet-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 18px 18px 14px;
-      border-bottom: 1px solid #f1f5f9;
-    }
-    .sheet-header h3 { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0; }
-    .close-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: #f1f5f9;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .close-btn ion-icon { font-size: 20px; color: #64748b; }
-    .workers-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px 0 24px;
-    }
-    .worker-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 18px;
-      border-bottom: 1px solid #f8fafc;
-    }
-    .worker-info { display: flex; flex-direction: column; gap: 2px; }
-    .worker-name { font-size: 14px; font-weight: 600; color: #0f172a; }
-    .worker-pay { font-size: 12px; color: #64748b; }
-    .mark-btn {
-      padding: 8px 14px;
-      background: #002263;
-      color: #fff;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 700;
-      font-family: inherit;
-      border: none;
-      cursor: pointer;
-    }
+    .type-icon.icon-helper { background: rgba(14, 165, 233, 0.12); color: #0369a1; }
+    .type-icon.icon-mason { background: rgba(168, 85, 247, 0.12); color: #7e22ce; }
+    .type-icon.icon-plumber { background: rgba(34, 197, 94, 0.12); color: #15803d; }
+    .type-icon.icon-electrician { background: rgba(234, 179, 8, 0.12); color: #a86c02; }
+    .type-icon.icon-carpenter { background: rgba(249, 115, 22, 0.12); color: #c2410c; }
+    .type-icon.icon-painter { background: rgba(236, 72, 153, 0.12); color: #be185d; }
+    .type-icon.icon-civil { background: rgba(156, 163, 175, 0.12); color: #4b5563; }
+    .type-icon.icon-tiles { background: rgba(245, 158, 11, 0.12); color: #a16207; }
+    .type-icon.icon-steel { background: rgba(100, 116, 139, 0.12); color: #475569; }
+    .type-icon.icon-welder { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+    .type-icon.icon-fabricator { background: rgba(99, 102, 241, 0.12); color: #4338ca; }
+    .type-icon.icon-default { background: rgba(201, 162, 39, 0.12); color: #a8861f; }
+
+    .type-info { flex: 1; min-width: 0; }
+    .type-name { display: block; font-size: 14px; font-weight: 700; color: var(--m3-on-surface); }
+    .type-count { display: block; font-size: 11px; color: var(--m3-on-surface-muted); margin-top: 2px; }
+    .type-arrow { font-size: 16px; color: var(--m3-on-surface-muted); }
 
     .attendance-date {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 10px 16px 8px;
+      gap: var(--md-space-2);
+      padding: var(--md-space-3) var(--md-space-4) var(--md-space-2);
       font-size: 13px;
       font-weight: 600;
-      color: #64748b;
+      color: var(--m3-on-surface-muted);
     }
     .attendance-date ion-icon { font-size: 16px; }
 
-    .cards { padding: 4px 16px 96px; }
+    .cards { padding: 4px var(--md-space-4) 96px; }
     .att-card {
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: 16px;
-      padding: 14px;
-      margin-bottom: 10px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      padding: var(--md-space-4);
+      margin-bottom: var(--md-space-3);
+      box-shadow: var(--md-elevation-1);
     }
-    .att-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .att-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--md-space-3);
+    }
     .att-worker { display: flex; flex-direction: column; gap: 2px; }
-    .att-name { font-size: 15px; font-weight: 700; color: #0f172a; }
-    .att-type { font-size: 11px; color: #64748b; }
+    .att-name { font-size: 15px; font-weight: 700; color: var(--m3-on-surface); }
+    .att-type { font-size: 11px; color: var(--m3-on-surface-muted); }
     .att-shift {
       font-size: 11px;
       font-weight: 700;
       padding: 4px 8px;
       background: rgba(14, 165, 233, 0.10);
       color: #0369a1;
-      border-radius: 6px;
+      border-radius: var(--md-radius-sm);
     }
     .att-details {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-      background: #f8fafc;
-      border-radius: 10px;
-      padding: 10px 8px;
-      margin-bottom: 10px;
+      gap: var(--md-space-2);
+      background: var(--m3-surface-container);
+      border-radius: var(--md-radius-lg);
+      padding: var(--md-space-3) var(--md-space-2);
+      margin-bottom: var(--md-space-3);
     }
     .att-detail { text-align: center; }
-    .detail-label { display: block; font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
-    .detail-value { display: block; font-size: 12px; font-weight: 700; color: #0f172a; margin-top: 3px; }
-    .att-notes { font-size: 12px; color: #64748b; font-style: italic; margin-bottom: 10px; }
-    .att-footer { display: flex; justify-content: flex-end; gap: 8px; }
+    .detail-label {
+      display: block;
+      font-size: 9px;
+      color: var(--m3-on-surface-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .detail-value { display: block; font-size: 13px; font-weight: 700; color: var(--m3-on-surface); margin-top: 3px; }
+    .att-notes {
+      font-size: 12px;
+      color: var(--m3-on-surface-muted);
+      font-style: italic;
+      margin-bottom: var(--md-space-3);
+    }
+    .att-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--md-space-2);
+    }
     .view-history-btn, .edit-att-btn {
       padding: 6px 12px;
-      border-radius: 8px;
+      border-radius: var(--md-radius-md);
       font-size: 12px;
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
       border: 0;
     }
-    .view-history-btn { background: #f1f5f9; color: #475569; }
-    .edit-att-btn { background: #002263; color: #fff; }
+    .view-history-btn { background: var(--m3-surface-container); color: var(--m3-on-surface-variant); }
+    .edit-att-btn { background: var(--m3-primary); color: var(--m3-on-primary); }
 
     .skeleton-card {
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 10px;
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      padding: var(--md-space-4);
+      margin-bottom: var(--md-space-3);
     }
 
-    ion-fab-button { --background: #002263; --color: #ffffff; }
-
-    .empty-state-container {
-      padding: 40px 16px;
-    }
+    ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
   `],
 })
 export class LabourPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
+  private modalCtrl = inject(ModalController);
   private router = inject(Router);
 
   activeTab = 'workers';
@@ -426,7 +393,7 @@ export class LabourPage implements OnInit, OnDestroy {
   workers = signal<Worker[]>([]);
   todayAttendance = signal<Attendance[]>([]);
   labourTypeCounts = signal<LabourTypeCount[]>([]);
-  selectedLabourType = signal<string | null>(null);
+  showWorkerSheet = signal(false);
   isLoading = signal(true);
 
   workersOfType = computed<Worker[]>(() => {
@@ -434,6 +401,8 @@ export class LabourPage implements OnInit, OnDestroy {
     if (!type) return [];
     return this.workers().filter(w => w.labourType === type);
   });
+
+  selectedLabourType = signal<string | null>(null);
 
   workerTypeCounts = computed<LabourTypeCount[]>(() => {
     const counts = new Map<string, number>();
@@ -450,9 +419,10 @@ export class LabourPage implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     addIcons({
       addOutline, peopleOutline, timeOutline, personAddOutline,
-      chevronForwardOutline, businessOutline, briefcaseOutline,
-      constructOutline, hammerOutline, flashOutline, buildOutline,
-      cutOutline, homeOutline, closeOutline, checkmarkOutline,
+      chevronForwardOutline, closeOutline, checkmarkOutline,
+      constructOutline, buildOutline, flashOutline, cutOutline,
+      homeOutline, colorPaletteOutline, hammerOutline, gridOutline,
+      layersOutline, carOutline, sparklesOutline,
     });
     await this.loadData();
 
@@ -521,14 +491,33 @@ export class LabourPage implements OnInit, OnDestroy {
   }
 
   getTypeColor(type: string): string {
-    return type.toLowerCase() || 'default';
+    const t = type.toLowerCase().replace(/\s+/g, '');
+    return LABOUR_TYPE_COLORS[type] || 'default';
   }
 
-  openWorkersOfType(type: string): void {
+  async openWorkersOfType(type: string): Promise<void> {
     this.selectedLabourType.set(type);
+    this.showWorkerSheet.set(true);
+
+    const modal = await this.modalCtrl.create({
+      component: WorkerListModalComponent,
+      componentProps: {
+        workers: this.workers().filter(w => w.labourType === type),
+        labourType: type,
+      },
+      presentingElement: await this.modalCtrl.getTop(),
+    });
+
+    modal.onDidDismiss().then(() => {
+      this.showWorkerSheet.set(false);
+      this.selectedLabourType.set(null);
+    });
+
+    await modal.present();
   }
 
   closeWorkersSheet(): void {
+    this.showWorkerSheet.set(false);
     this.selectedLabourType.set(null);
   }
 

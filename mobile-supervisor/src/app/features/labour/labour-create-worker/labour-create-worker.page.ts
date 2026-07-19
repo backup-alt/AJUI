@@ -26,7 +26,19 @@ import { locationOutline, peopleOutline, checkmarkCircleOutline, businessOutline
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Subcontractor } from '../../../shared/models';
 
-const LABOUR_TYPES = ['Helper', 'Mason', 'Plumber', 'Electrician', 'Carpenter', 'Civil'];
+const LABOUR_TYPES = [
+  'Helper',
+  'Mason',
+  'Plumber',
+  'Electrician',
+  'Carpenter',
+  'Painter',
+  'Civil',
+  'Tiles Worker',
+  'Steel Fixer',
+  'Welder',
+  'Fabricator',
+];
 
 @Component({
   selector: 'app-labour-create-worker',

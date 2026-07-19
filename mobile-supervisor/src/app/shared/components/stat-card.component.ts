@@ -26,31 +26,56 @@ import { IonIcon } from '@ionic/angular/standalone';
     .agb-stat-card {
       width: 100%;
       text-align: left;
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: var(--agb-radius-lg);
-      padding: 14px 16px;
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      padding: var(--md-space-4);
       display: flex;
       align-items: center;
-      gap: 12px;
-      box-shadow: var(--agb-shadow-2xs);
-      transition: box-shadow var(--agb-transition-fast), transform var(--agb-transition-fast);
+      gap: var(--md-space-3);
+      box-shadow: var(--md-elevation-1);
+      transition: box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard),
+                  transform var(--md-motion-duration-short1) var(--md-motion-easing-standard);
       font-family: inherit;
     }
     .agb-stat-card.interactive { cursor: pointer; }
-    .agb-stat-card.interactive:hover { box-shadow: var(--agb-shadow-md); }
+    .agb-stat-card.interactive:hover { box-shadow: var(--md-elevation-2); }
     .agb-stat-card.interactive:active { transform: scale(0.985); }
-    .content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-    .value { font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.1; }
-    .label { font-size: 12px; color: #64748b; margin-top: 4px; font-weight: 500; }
-    .sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-    .chev { color: #94a3b8; font-size: 18px; flex-shrink: 0; }
+    .content {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      line-height: 1.1;
+    }
+    .label {
+      font-size: 12px;
+      color: var(--m3-on-surface-muted);
+      margin-top: var(--md-space-1);
+      font-weight: 500;
+    }
+    .sub {
+      font-size: 11px;
+      color: var(--m3-on-surface-muted);
+      margin-top: 2px;
+      opacity: 0.8;
+    }
+    .chev {
+      color: var(--m3-on-surface-muted);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
   `],
 })
 export class StatCardComponent {
   @Input() icon = 'cube-outline';
-  @Input() iconBg = 'rgba(0, 34, 99, 0.08)';
-  @Input() iconColor = '#002263';
+  @Input() iconBg = 'var(--m3-primary-container)';
+  @Input() iconColor = 'var(--m3-on-primary-container)';
   @Input() value: string | number = '';
   @Input() label = '';
   @Input() sub?: string;

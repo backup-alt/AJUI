@@ -1,21 +1,49 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from "@angular/core";
-import { FormsModule } from "@angular/forms";
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject, signal } from "@angular/core";
 import { ErpDataService } from "../data/erp-data.service";
-import type { Quotation, TaxInvoice } from "../../data/dashboardData";
 import { formatMoney } from "./format";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
+export interface QuotationReportItem {
+  id?: string;
+  sno?: number;
+  description: string;
+  hsnCode?: string;
+  unit?: string;
+  qty?: number;
+  rate?: number;
+  amount?: number;
+  isCustom?: boolean;
+}
+
+export interface QuotationReportData {
+  quotationNumber: string;
+  date: string;
+  clientName: string;
+  clientAddress: string;
+  clientState: string;
+  clientGstin: string;
+  items: QuotationReportItem[];
+  subtotal: number;
+  cgstPercent: number;
+  sgstPercent: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  roundOff: number;
+  totalAmount: number;
+  amountInWords: string;
+}
+
 @Component({
-  selector: "agb-tax-invoice-dialog",
+  selector: "agb-quotation-report",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   template: `
     <div class="invoice-overlay" role="presentation" (click)="closeIfOverlay($event)">
-      <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Tax Invoice">
+      <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Quotation Report">
         <div class="invoice-toolbar">
-          <span>Tax Invoice Preview</span>
+          <span>Quotation Preview</span>
           <div class="toolbar-actions">
             <button type="button" class="btn-secondary" (click)="exportToPDF()">
               {{ saving() ? 'Generating...' : 'Download PDF' }}
@@ -25,7 +53,7 @@ import { jsPDF } from "jspdf";
         </div>
 
         <div class="invoice-scroll-area">
-          <div class="invoice-page" id="tax-invoice-print-area">
+          <div class="invoice-page" id="quotation-report-print-area">
 
             <div class="inv-header">
               <div class="inv-company-block">
@@ -34,30 +62,21 @@ import { jsPDF } from "jspdf";
                 <div class="inv-company-state-gst">
                   {{ profile().state || 'State' }} | GSTIN: {{ profile().gstin || 'GSTIN' }}
                 </div>
-                @if (profile().bankName) {
-                  <div class="inv-company-bank">
-                    Bank: {{ profile().bankName }} | A/C: {{ profile().accountNumber }} | IFSC: {{ profile().ifsc }} | Branch: {{ profile().branch }}
-                  </div>
-                }
               </div>
               <div class="inv-title-block">
-                <div class="inv-title">TAX INVOICE</div>
+                <div class="inv-title">QUOTATION</div>
                 <div class="inv-meta-table">
                   <div class="inv-meta-row">
-                    <span class="inv-meta-label">Invoice No.</span>
-                    <span class="inv-meta-value">{{ getInvoiceNumber() }}</span>
+                    <span class="inv-meta-label">Quote No.</span>
+                    <span class="inv-meta-value">{{ quotationData?.quotationNumber || '—' }}</span>
                   </div>
                   <div class="inv-meta-row">
-                    <span class="inv-meta-label">Invoice Date</span>
-                    <span class="inv-meta-value">{{ invoice?.date || '—' }}</span>
+                    <span class="inv-meta-label">Date</span>
+                    <span class="inv-meta-value">{{ quotationData?.date || '—' }}</span>
                   </div>
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Place of Supply</span>
-                    <span class="inv-meta-value">{{ invoice?.state || '—' }}</span>
-                  </div>
-                  <div class="inv-meta-row">
-                    <span class="inv-meta-label">Supply Type</span>
-                    <span class="inv-meta-value" [class.intrastate]="supplyType() === 'Intrastate'" [class.interstate]="supplyType() === 'Interstate'">{{ supplyType() }}</span>
+                    <span class="inv-meta-value">{{ quotationData?.clientState || '—' }}</span>
                   </div>
                 </div>
               </div>
@@ -66,9 +85,9 @@ import { jsPDF } from "jspdf";
             <div class="inv-bill-to">
               <div class="inv-section-label">Bill To:</div>
               <div class="inv-party-details">
-                <div class="inv-party-name">{{ invoice?.clientName || '—' }}</div>
-                <div class="inv-party-address">{{ invoice?.clientAddress || '—' }}</div>
-                <div class="inv-party-gst">State: {{ invoice?.clientState || '—' }} | GSTIN: {{ invoice?.clientGstin || '—' }}</div>
+                <div class="inv-party-name">{{ quotationData?.clientName || '—' }}</div>
+                <div class="inv-party-address">{{ quotationData?.clientAddress || '—' }}</div>
+                <div class="inv-party-gst">State: {{ quotationData?.clientState || '—' }} | GSTIN: {{ quotationData?.clientGstin || '—' }}</div>
               </div>
             </div>
 
@@ -114,53 +133,42 @@ import { jsPDF } from "jspdf";
               <div class="inv-summary-left">
                 <div class="inv-amount-words">
                   <span class="summary-label">Amount Chargeable (in words):</span>
-                  <strong>{{ invoice?.amountInWords || '—' }}</strong>
+                  <strong>{{ quotationData?.amountInWords || '—' }}</strong>
                 </div>
               </div>
               <div class="inv-summary-right">
                 <div class="inv-summary-table">
                   <div class="inv-summary-row">
                     <span class="summary-label">Sub Total</span>
-                    <span class="summary-value">{{ formatRupee(invoice?.subtotal || 0) }}</span>
+                    <span class="summary-value">{{ formatRupee(quotationData?.subtotal || 0) }}</span>
                   </div>
-                  @if (invoice?.cgstPercent) {
+                  @if (quotationData?.cgstPercent) {
                     <div class="inv-summary-row">
-                      <span class="summary-label">Add: CGST @ {{ invoice?.cgstPercent }}%</span>
-                      <span class="summary-value">{{ formatRupee(invoice?.cgstAmount || 0) }}</span>
+                      <span class="summary-label">Add: CGST @ {{ quotationData?.cgstPercent }}%</span>
+                      <span class="summary-value">{{ formatRupee(quotationData?.cgstAmount || 0) }}</span>
                     </div>
                   }
-                  @if (invoice?.sgstPercent) {
+                  @if (quotationData?.sgstPercent) {
                     <div class="inv-summary-row">
-                      <span class="summary-label">Add: SGST @ {{ invoice?.sgstPercent }}%</span>
-                      <span class="summary-value">{{ formatRupee(invoice?.sgstAmount || 0) }}</span>
+                      <span class="summary-label">Add: SGST @ {{ quotationData?.sgstPercent }}%</span>
+                      <span class="summary-value">{{ formatRupee(quotationData?.sgstAmount || 0) }}</span>
                     </div>
                   }
-                  @if (invoice?.roundOff !== 0 && invoice?.roundOff !== undefined) {
+                  @if (quotationData?.roundOff !== 0 && quotationData?.roundOff !== undefined) {
                     <div class="inv-summary-row">
                       <span class="summary-label">Round Off</span>
-                      <span class="summary-value">{{ formatRupee(invoice?.roundOff || 0) }}</span>
+                      <span class="summary-value">{{ formatRupee(quotationData?.roundOff || 0) }}</span>
                     </div>
                   }
                   <div class="inv-summary-row inv-total-row">
-                    <span class="summary-label">Total Amount Payable (₹)</span>
-                    <span class="summary-value">{{ formatRupee(invoice?.totalAmount || 0) }}</span>
+                    <span class="summary-label">Total Amount (₹)</span>
+                    <span class="summary-value">{{ formatRupee(quotationData?.totalAmount || 0) }}</span>
                   </div>
                 </div>
               </div>
             </div>
 
             <div class="inv-footer-section">
-              <div class="inv-bank-details">
-                <div class="inv-footer-label">Bank Details:</div>
-                @if (profile().bankName) {
-                  <div class="inv-bank-row"><span>Bank Name:</span> {{ profile().bankName }}</div>
-                  <div class="inv-bank-row"><span>Account Number:</span> {{ profile().accountNumber }}</div>
-                  <div class="inv-bank-row"><span>IFSC Code:</span> {{ profile().ifsc }}</div>
-                  <div class="inv-bank-row"><span>Branch:</span> {{ profile().branch }}</div>
-                } @else {
-                  <div class="inv-bank-row"><em>Bank details not configured. Add them in Settings → Company Profile.</em></div>
-                }
-              </div>
               <div class="inv-signatory">
                 <div class="inv-footer-label">For {{ profile().name || 'Company Name' }}:</div>
                 <div class="inv-signature-area">
@@ -170,7 +178,7 @@ import { jsPDF } from "jspdf";
             </div>
 
             <div class="inv-footer-note">
-              This is a computer-generated Tax Invoice. No signature required. &nbsp;|&nbsp; Page <span class="page-num">{{ currentPage() }}</span> of <span class="page-total">{{ totalPages() }}</span>
+              This is a computer-generated Quotation. No signature required. &nbsp;|&nbsp; Page <span class="page-num">{{ currentPage() }}</span> of <span class="page-total">{{ totalPages() }}</span>
             </div>
 
           </div>
@@ -220,7 +228,6 @@ import { jsPDF } from "jspdf";
     .inv-company-name { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
     .inv-company-address { font-size: 12px; color: #475569; margin-bottom: 2px; }
     .inv-company-state-gst { font-size: 12px; color: #475569; font-weight: 600; }
-    .inv-company-bank { font-size: 11px; color: #64748b; margin-top: 4px; }
     .inv-title-block { text-align: right; }
     .inv-title {
       font-size: 22px; font-weight: 800; color: #1a2540; letter-spacing: 4px;
@@ -274,19 +281,14 @@ import { jsPDF } from "jspdf";
     .inv-total-row .summary-label { font-weight: 700; color: #0f172a; font-size: 13px; }
     .inv-total-row .summary-value { font-weight: 800; font-size: 14px; color: #0f172a; }
     .inv-footer-section {
-      display: flex; justify-content: space-between; align-items: flex-start;
+      display: flex; justify-content: flex-end; align-items: flex-start;
       border-top: 1px solid #e2e8f0; padding-top: 16px; margin-bottom: 16px; gap: 40px;
     }
     .inv-footer-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-    .inv-bank-details { flex: 1; }
-    .inv-bank-row { font-size: 12px; color: #1e293b; margin-bottom: 3px; }
-    .inv-bank-row span { font-weight: 600; color: #475569; }
     .inv-signatory { text-align: right; min-width: 200px; }
     .inv-signature-area { border-top: 1px solid #cbd5e1; padding-top: 4px; }
     .inv-signature-line { font-size: 11px; color: #94a3b8; text-align: right; margin-top: 40px; }
     .inv-footer-note { text-align: center; font-size: 10px; color: #94a3b8; font-style: italic; }
-    .intrastate { color: #16a34a !important; font-weight: 700; }
-    .interstate { color: #d97706 !important; font-weight: 700; }
     .page-num, .page-total { font-style: normal; }
     @media print {
       .invoice-overlay { background: #fff; padding: 0; }
@@ -298,8 +300,8 @@ import { jsPDF } from "jspdf";
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TaxInvoiceDialogComponent {
-  @Input() invoice: (Quotation | TaxInvoice) | null = null;
+export class QuotationReportComponent {
+  @Input() quotationData: QuotationReportData | null = null;
   @Output() closed = new EventEmitter<void>();
 
   private readonly data = inject(ErpDataService);
@@ -308,26 +310,12 @@ export class TaxInvoiceDialogComponent {
   readonly currentPage = signal(1);
   readonly totalPages = signal(1);
 
-  readonly supplyType = computed(() => {
-    const inv = this.invoice as (Quotation | TaxInvoice) | null;
-    if (!inv) return "—";
-    if ("supplyType" in inv && inv.supplyType) return inv.supplyType;
-    const co = this.profile();
-    if (!co?.state || !inv.state) return "—";
-    return co.state.trim().toLowerCase() === inv.state.trim().toLowerCase() ? "Intrastate" : "Interstate";
-  });
-
   get items() {
-    return (this.invoice as any)?.items || [];
+    return this.quotationData?.items || [];
   }
 
-  getInvoiceNumber(): string {
-    const inv = this.invoice as any;
-    return inv?.invoiceNumber || inv?.quotationNumber || '—';
-  }
-
-  formatRupee(amount: number): string {
-    return formatMoney(amount);
+  formatRupee(amount: number | undefined): string {
+    return formatMoney(amount ?? 0);
   }
 
   stripSectionPrefix(desc: string): string {
@@ -341,7 +329,7 @@ export class TaxInvoiceDialogComponent {
   }
 
   async exportToPDF() {
-    const el = document.getElementById("tax-invoice-print-area");
+    const el = document.getElementById("quotation-report-print-area");
     if (!el) return;
     this.saving.set(true);
     try {
@@ -374,8 +362,8 @@ export class TaxInvoiceDialogComponent {
         pdf.setTextColor(148, 163, 184);
         pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 6, { align: "center" });
       }
-      const inv = this.invoice as any;
-      pdf.save(`tax-invoice-${inv?.invoiceNumber || inv?.quotationNumber || 'draft'}.pdf`);
+      const qnum = this.quotationData?.quotationNumber || 'draft';
+      pdf.save(`quotation-${qnum}.pdf`);
     } catch (err) {
       console.error("PDF export failed:", err);
       alert("Failed to export PDF. Please try again.");
