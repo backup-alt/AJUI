@@ -40,6 +40,15 @@ export class AppComponent implements OnInit {
     }
 
     this.registerDeepLink();
+    this.hideSplashScreen();
+  }
+
+  private hideSplashScreen(): void {
+    const splash = document.getElementById('splash-screen');
+    if (splash) {
+      splash.classList.add('fade-out');
+      setTimeout(() => { if (splash.parentNode) splash.remove(); }, 600);
+    }
   }
 
   /**

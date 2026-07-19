@@ -59,6 +59,7 @@ import {
       <div class="dashboard-container">
         <!-- Hero greeting -->
         <div class="hero">
+          <div class="hero-decor"></div>
           <div class="hero-content">
             <div class="greeting">
               <span class="greeting-pre">{{ greeting() }},</span>
@@ -85,24 +86,24 @@ import {
           <div class="stats-grid">
             <app-stat-card
               icon="location-outline"
-              iconBg="rgba(0, 34, 99, 0.10)"
-              iconColor="#002263"
+              iconBg="var(--m3-primary-container)"
+              iconColor="var(--m3-on-primary-container)"
               [value]="dashboard()?.counts?.sites || 0"
               label="Active sites"
               (click)="navigateTo('/tabs/sites')"
             ></app-stat-card>
             <app-stat-card
               icon="cube-outline"
-              iconBg="rgba(220, 38, 38, 0.10)"
-              iconColor="#b91c1c"
+              iconBg="var(--m3-error-container)"
+              iconColor="var(--m3-on-error-container)"
               [value]="dashboard()?.counts?.pendingMaterials || 0"
               label="Material requests"
               (click)="navigateTo('/tabs/materials')"
             ></app-stat-card>
             <app-stat-card
               icon="people-outline"
-              iconBg="rgba(14, 165, 233, 0.12)"
-              iconColor="#0369a1"
+              iconBg="var(--m3-tertiary-container)"
+              iconColor="var(--m3-on-tertiary-container)"
               [value]="dashboard()?.counts?.pendingLabour || 0"
               label="Labour entries"
               (click)="navigateTo('/tabs/labour')"
@@ -156,7 +157,7 @@ import {
                         <span>{{ site.employeeCount }} worker{{ site.employeeCount !== 1 ? 's' : '' }}</span>
                       }
                       @if (site.employeeCount !== undefined && site.daysActive !== undefined) {
-                        <span class="dot">-</span>
+                        <span class="dot">·</span>
                       }
                       @if (site.daysActive !== undefined) {
                         <span>{{ site.daysActive }} day{{ site.daysActive !== 1 ? 's' : '' }} active</span>
@@ -175,20 +176,27 @@ import {
     </ion-content>
   `,
   styles: [`
-    .dashboard-content { --background: #f5f6f8; }
+    .dashboard-content { --background: var(--m3-surface); }
     .dashboard-container { padding: 0; }
 
     /* Hero */
     .hero {
       position: relative;
-      background: var(--agb-gradient-hero);
-      color: #ffffff;
+      background: var(--m3-primary);
+      background-image: linear-gradient(135deg, var(--m3-primary) 0%, #003380 100%);
+      color: var(--m3-on-primary);
       padding: 32px 20px 56px;
       overflow: hidden;
     }
-
+    .hero-decor {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 100% 0%, rgba(255,255,255,0.12), transparent 40%),
+                  radial-gradient(circle at 0% 100%, rgba(201, 162, 39, 0.18), transparent 50%);
+      pointer-events: none;
+    }
     .hero-content { position: relative; }
-    .greeting { margin-bottom: 16px; }
+    .greeting { margin-bottom: var(--md-space-4); }
     .greeting-pre {
       display: block;
       font-size: 13px;
@@ -201,28 +209,37 @@ import {
       font-size: 26px;
       font-weight: 800;
       letter-spacing: -0.4px;
-      margin: 4px 0 0;
+      margin: var(--md-space-1) 0 0;
     }
     .hero-meta {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--md-space-2);
       flex-wrap: wrap;
       font-size: 12px;
       color: rgba(255, 255, 255, 0.85);
     }
-    .hero-meta ion-icon { font-size: 14px; color: #c9a227; }
-    .meta-item { display: inline-flex; align-items: center; gap: 4px; }
-    .meta-divider { width: 4px; height: 4px; background: rgba(255, 255, 255, 0.4); border-radius: 50%; }
+    .hero-meta ion-icon { font-size: 14px; color: var(--m3-secondary); }
+    .meta-item { display: inline-flex; align-items: center; gap: var(--md-space-1); }
+    .meta-divider {
+      width: 4px; height: 4px;
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+    }
 
-    .content-stack { padding: 0 16px; margin-top: -32px; position: relative; z-index: 2; }
+    .content-stack {
+      padding: 0 var(--md-space-4);
+      margin-top: -32px;
+      position: relative;
+      z-index: 2;
+    }
 
     /* Stats grid */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      margin-bottom: 14px;
+      gap: var(--md-space-3);
+      margin-bottom: var(--md-space-4);
     }
 
     /* Expense card */
@@ -230,112 +247,133 @@ import {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: var(--agb-gradient-primary);
-      color: #ffffff;
-      border-radius: 20px;
-      padding: 18px 20px;
-      margin-bottom: 18px;
-      box-shadow: 0 12px 28px -12px rgba(0, 34, 99, 0.45);
+      background: var(--m3-primary);
+      background-image: linear-gradient(135deg, var(--m3-primary) 0%, #003380 100%);
+      color: var(--m3-on-primary);
+      border-radius: var(--md-radius-xl);
+      padding: var(--md-space-5);
+      margin-bottom: var(--md-space-5);
+      box-shadow: var(--md-elevation-3);
       cursor: pointer;
-      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
+      transition: transform var(--md-motion-duration-short1) var(--md-motion-easing-standard),
+                  box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
     .expense-card:active { transform: scale(0.99); }
-    .expense-card:hover { box-shadow: 0 16px 32px -12px rgba(0, 34, 99, 0.55); }
-    .expense-label { font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
-    .expense-amount { font-size: 28px; font-weight: 800; line-height: 1.1; margin-top: 4px; }
-    .expense-trend {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 11px; opacity: 0.8; margin-top: 6px;
+    .expense-card:hover { box-shadow: var(--md-elevation-4); }
+    .expense-label {
+      font-size: 11px;
+      opacity: 0.8;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 600;
     }
-    .expense-trend ion-icon { font-size: 14px; color: #c9a227; }
+    .expense-amount {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-top: var(--md-space-1);
+    }
+    .expense-trend {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--md-space-1);
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: var(--md-space-2);
+    }
+    .expense-trend ion-icon { font-size: 14px; color: var(--m3-secondary); }
     .expense-right { text-align: right; }
-    .expense-count { font-size: 28px; font-weight: 800; color: #c9a227; line-height: 1.1; }
-    .expense-count-label { font-size: 10px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+    .expense-count {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--m3-secondary);
+      line-height: 1.1;
+    }
+    .expense-count-label {
+      font-size: 10px;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: var(--md-space-1);
+    }
 
     /* Section */
-    .section { margin-top: 8px; margin-bottom: 8px; }
+    .section {
+      margin-top: var(--md-space-2);
+      margin-bottom: var(--md-space-2);
+    }
     .section-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 4px 4px 10px;
+      padding: var(--md-space-1) var(--md-space-1) var(--md-space-3);
     }
     .section-title {
       font-size: 16px;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--m3-on-surface);
       margin: 0;
       letter-spacing: -0.1px;
     }
     .section-link {
-      display: inline-flex; align-items: center; gap: 2px;
-      background: transparent; border: 0; padding: 0;
-      color: #002263; font-weight: 600; font-size: 12px; cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: var(--m3-primary);
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
       font-family: inherit;
     }
     .section-link ion-icon { font-size: 14px; }
     .section-link:hover { text-decoration: underline; }
 
-    /* Approval card */
-    .approval-card {
-      width: 100%;
-      text-align: left;
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: 18px;
-      padding: 14px 16px;
-      margin-bottom: 8px;
-      box-shadow: var(--agb-shadow-2xs);
-      cursor: pointer;
-      font-family: inherit;
-      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
-    }
-    .approval-card:active { transform: scale(0.99); }
-    .approval-card:hover { box-shadow: var(--agb-shadow-sm); }
-    .approval-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-    .approval-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 6px; }
-    .approval-meta {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      margin-bottom: 6px;
-    }
-    .meta-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #64748b; }
-    .meta-item ion-icon { font-size: 13px; }
-    .amount { font-size: 14px; font-weight: 700; color: #002263; }
-    .approval-time { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #94a3b8; }
-    .approval-time ion-icon { font-size: 12px; }
-
     /* Site card */
     .site-card {
       width: 100%;
       text-align: left;
-      display: flex; align-items: center; gap: 12px;
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: 18px;
-      padding: 14px 16px;
-      margin-bottom: 8px;
-      box-shadow: var(--agb-shadow-2xs);
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-3);
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      padding: var(--md-space-4);
+      margin-bottom: var(--md-space-2);
+      box-shadow: var(--md-elevation-1);
       cursor: pointer;
       font-family: inherit;
-      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
+      transition: transform var(--md-motion-duration-short1) var(--md-motion-easing-standard),
+                  box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
     .site-card:active { transform: scale(0.99); }
-    .site-card:hover { box-shadow: var(--agb-shadow-sm); }
+    .site-card:hover { box-shadow: var(--md-elevation-2); }
     .site-tile-icon {
-      width: 40px; height: 40px;
-      border-radius: 12px;
-      background: rgba(201, 162, 39, 0.14);
-      color: #a8861f;
-      display: flex; align-items: center; justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--md-radius-md);
+      background: var(--m3-secondary-container);
+      color: var(--m3-on-secondary-container);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
     }
     .site-tile-icon ion-icon { font-size: 20px; }
     .site-info { flex: 1; min-width: 0; }
-    .site-name { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
-    .site-stats { font-size: 12px; color: #64748b; margin: 0; }
-    .site-stats .dot { margin: 0 4px; color: #cbd5e1; }
+    .site-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      margin: 0 0 2px;
+    }
+    .site-stats { font-size: 12px; color: var(--m3-on-surface-muted); margin: 0; }
+    .site-stats .dot { margin: 0 4px; color: var(--m3-on-surface-muted); opacity: 0.5; }
 
-    .bottom-spacer { height: 32px; }
+    .bottom-spacer { height: var(--md-space-8); }
   `],
 })
 export class DashboardPage implements OnInit, OnDestroy {
