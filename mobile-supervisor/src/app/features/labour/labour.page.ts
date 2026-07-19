@@ -11,7 +11,7 @@ import { addIcons } from 'ionicons';
 import {
   addOutline, peopleOutline, timeOutline, personAddOutline,
   chevronForwardOutline, businessOutline, briefcaseOutline,
-  constructOutline, hammerOutline, flashOutline, wrenchOutline,
+  constructOutline, hammerOutline, flashOutline, buildOutline,
   cutOutline, homeOutline, closeOutline, checkmarkOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
@@ -25,7 +25,7 @@ import {
 const LABOUR_TYPE_ICONS: Record<string, string> = {
   'Helper': 'hammer-outline',
   'Mason': 'construct-outline',
-  'Plumber': 'wrench-outline',
+  'Plumber': 'build-outline',
   'Electrician': 'flash-outline',
   'Carpenter': 'cut-outline',
   'Civil': 'home-outline',
@@ -444,7 +444,7 @@ export class LabourPage implements OnInit, OnDestroy {
     addIcons({
       addOutline, peopleOutline, timeOutline, personAddOutline,
       chevronForwardOutline, businessOutline, briefcaseOutline,
-      constructOutline, hammerOutline, flashOutline, wrenchOutline,
+      constructOutline, hammerOutline, flashOutline, buildOutline,
       cutOutline, homeOutline, closeOutline, checkmarkOutline,
     });
     await this.loadData();
@@ -471,7 +471,7 @@ export class LabourPage implements OnInit, OnDestroy {
       const projectId = this.supervisor.selectedProjectId();
 
       const [workersRes, attendanceRes, countsRes] = await Promise.all([
-        this.supervisor.getWorkers({ siteId, limit: 100 }).toPromise(),
+        this.supervisor.getWorkers({ siteId: siteId || undefined, limit: 100 }).toPromise(),
         this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).toPromise(),
         siteId ? this.supervisor.getLabourTypeCounts(siteId, this.todayDate).toPromise() : Promise.resolve({ counts: [] }),
       ]);

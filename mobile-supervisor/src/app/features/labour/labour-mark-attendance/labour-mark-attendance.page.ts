@@ -25,7 +25,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { addIcons } from 'ionicons';
 import { locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
-import { Worker, PaymentMode } from '../../../shared/models';
+import { Worker, LabourPaymentMode } from '../../../shared/models';
 import { CurrencyPipe } from '@angular/common';
 
 @Component({
@@ -262,7 +262,7 @@ export class LabourMarkAttendancePage implements OnInit {
   overtimeHours = 0;
   overtimeAmount = 0;
   lateFine = 0;
-  paymentMode: PaymentMode = 'Cash';
+  paymentMode: LabourPaymentMode = 'Cash';
   notes = '';
 
   isSubmitting = signal(false);

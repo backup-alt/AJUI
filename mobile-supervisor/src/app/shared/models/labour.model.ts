@@ -119,8 +119,6 @@ export interface Subcontractor {
 }
 
 // =================== ATTENDANCE ===================
-export type PaymentMode = 'Cash' | 'NEFT' | 'UPI' | 'Cheque';
-
 export interface Attendance {
   _id: string;
   attendanceId: string;

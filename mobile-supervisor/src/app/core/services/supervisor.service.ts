@@ -169,15 +169,15 @@ export class SupervisorService {
 
   getAttendanceForDate(date: string, siteId?: string, projectId?: string) {
     const params: Record<string, string> = { date };
-    if (siteId) params.siteId = siteId;
-    if (projectId) params.projectId = projectId;
+    if (siteId) params['siteId'] = siteId;
+    if (projectId) params['projectId'] = projectId;
     return this.api.get<AttendanceListResponse>('/supervisor/attendance', params);
   }
 
   getAttendanceForWorker(workerId: string, page?: number, limit?: number) {
     const params: Record<string, string | number> = {};
-    if (page) params.page = page;
-    if (limit) params.limit = limit;
+    if (page) params['page'] = page;
+    if (limit) params['limit'] = limit;
     return this.api.get<{ items: Attendance[]; total: number; page: number; limit: number; pages: number }>(
       `/supervisor/attendance/worker/${workerId}`,
       params
@@ -203,7 +203,7 @@ export class SupervisorService {
   // ---------------- Subcontractors ----------------
   getSubcontractors(projectId: string, siteId?: string) {
     const params: Record<string, string> = { projectId };
-    if (siteId) params.siteId = siteId;
+    if (siteId) params['siteId'] = siteId;
     return this.api.get<{ subcontractors: Subcontractor[] }>('/supervisor/subcontractors', params);
   }
 

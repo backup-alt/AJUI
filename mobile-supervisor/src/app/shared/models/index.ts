@@ -32,5 +32,5 @@ export {
   AttendanceListResponse,
   WorkerListResponse,
   LabourTypeCount,
+  PaymentMode as LabourPaymentMode,
 } from './labour.model';
-export { PaymentMode as LabourPaymentMode, PaymentMode } from './labour.model';

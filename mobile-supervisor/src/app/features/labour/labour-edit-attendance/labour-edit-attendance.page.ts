@@ -25,8 +25,9 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { addIcons } from 'ionicons';
 import { locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline, createOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
-import { Worker, Attendance, PaymentMode } from '../../../shared/models';
+import { Worker, Attendance, LabourPaymentMode } from '../../../shared/models';
 import { CurrencyPipe } from '@angular/common';
+import { EmptyStateComponent } from '../../../shared/components';
 
 @Component({
   selector: 'app-labour-edit-attendance',
@@ -52,6 +53,7 @@ import { CurrencyPipe } from '@angular/common';
     IonSegmentButton,
     FormsModule,
     CurrencyPipe,
+    EmptyStateComponent,
   ],
   template: `
     <ion-header>
@@ -87,7 +89,7 @@ import { CurrencyPipe } from '@angular/common';
               <span class="worker-type">{{ attendance()!.labourType }}</span>
             </div>
             <div class="attendance-date">
-              <span class="date-label">{{ attendance()!.date }}</span>
+              <span class="date-label">{{ attendance()!.attendanceDate }}</span>
             </div>
           </div>
 
@@ -296,7 +298,7 @@ export class LabourEditAttendancePage implements OnInit {
   overtimeHours = 0;
   overtimeAmount = 0;
   lateFine = 0;
-  paymentMode: PaymentMode = 'Cash';
+  paymentMode: LabourPaymentMode = 'Cash';
   notes = '';
 
   isLoading = signal(true);
@@ -320,7 +322,7 @@ export class LabourEditAttendancePage implements OnInit {
       next: (res) => {
         const att = res.attendance;
         this.attendance.set(att);
-        this.attendanceDate = att.date;
+        this.attendanceDate = att.attendanceDate;
         this.shiftCount = att.shiftCount;
         this.overtimeHours = att.overtimeHours;
         this.overtimeAmount = att.overtimeAmount;
