@@ -98,7 +98,8 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     await ActivityLog.create({
       userId: result.user.id,
       userRole: result.user.role,
-      action: "login_password",
+      action: "sign_in",
+      description: "Email + password sign-in",
       ip: req.ip,
       userAgent: req.headers["user-agent"],
     });
