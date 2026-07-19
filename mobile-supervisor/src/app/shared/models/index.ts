@@ -24,5 +24,13 @@ export {
   LabourListResponse,
   LabourFilters,
   LaborTypeEntry,
+  Worker,
+  CreateWorkerRequest,
+  Subcontractor,
+  Attendance,
+  MarkAttendanceRequest,
+  AttendanceListResponse,
+  WorkerListResponse,
+  LabourTypeCount,
 } from './labour.model';
-export { PaymentMode as LabourPaymentMode } from './labour.model';
+export { PaymentMode as LabourPaymentMode, PaymentMode } from './labour.model';

@@ -17,6 +17,14 @@ import {
   Site,
   SitesResponse,
   Vendor,
+  Worker,
+  CreateWorkerRequest,
+  Subcontractor,
+  Attendance,
+  MarkAttendanceRequest,
+  AttendanceListResponse,
+  WorkerListResponse,
+  LabourTypeCount,
 } from '../../shared/models';
 
 export interface SiteSelection {
@@ -133,6 +141,70 @@ export class SupervisorService {
 
   createLabour(request: CreateLabourRequest) {
     return this.api.post<{ labour: Labour }>('/supervisor/labour', request);
+  }
+
+  // ---------------- Workers ----------------
+  createWorker(request: CreateWorkerRequest) {
+    return this.api.post<{ worker: Worker }>('/supervisor/workers', request);
+  }
+
+  getWorkers(filters?: {
+    projectId?: string;
+    siteId?: string;
+    labourType?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.api.get<WorkerListResponse>('/supervisor/workers', filters);
+  }
+
+  getWorkerDetail(workerId: string) {
+    return this.api.get<{ worker: Worker }>(`/supervisor/workers/${workerId}`);
+  }
+
+  // ---------------- Attendance ----------------
+  markAttendance(request: MarkAttendanceRequest) {
+    return this.api.post<{ attendance: Attendance }>('/supervisor/attendance', request);
+  }
+
+  getAttendanceForDate(date: string, siteId?: string, projectId?: string) {
+    const params: Record<string, string> = { date };
+    if (siteId) params.siteId = siteId;
+    if (projectId) params.projectId = projectId;
+    return this.api.get<AttendanceListResponse>('/supervisor/attendance', params);
+  }
+
+  getAttendanceForWorker(workerId: string, page?: number, limit?: number) {
+    const params: Record<string, string | number> = {};
+    if (page) params.page = page;
+    if (limit) params.limit = limit;
+    return this.api.get<{ items: Attendance[]; total: number; page: number; limit: number; pages: number }>(
+      `/supervisor/attendance/worker/${workerId}`,
+      params
+    );
+  }
+
+  getAttendanceDetail(attendanceId: string) {
+    return this.api.get<{ attendance: Attendance }>(`/supervisor/attendance/${attendanceId}`);
+  }
+
+  updateAttendance(attendanceId: string, patch: Partial<MarkAttendanceRequest>) {
+    return this.api.patch<{ attendance: Attendance }>(`/supervisor/attendance/${attendanceId}`, patch);
+  }
+
+  deleteAttendance(attendanceId: string) {
+    return this.api.delete(`/supervisor/attendance/${attendanceId}`);
+  }
+
+  getLabourTypeCounts(siteId: string, date: string) {
+    return this.api.get<{ counts: LabourTypeCount[] }>('/supervisor/labour-types', { siteId, date });
+  }
+
+  // ---------------- Subcontractors ----------------
+  getSubcontractors(projectId: string, siteId?: string) {
+    const params: Record<string, string> = { projectId };
+    if (siteId) params.siteId = siteId;
+    return this.api.get<{ subcontractors: Subcontractor[] }>('/supervisor/subcontractors', params);
   }
 
   // ---------------- Expenses ----------------

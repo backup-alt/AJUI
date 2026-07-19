@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
+import { firstValueFrom } from "rxjs";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
@@ -1098,6 +1099,7 @@ export class ProjectWorkspacePage {
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly previewImageUrl = signal<string | null>(null);
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
+  readonly attendanceRows = signal<TableRow[]>([]);
   readonly tableState = computed(() => ({
     rows: this.visibleRows(this.activeSection()),
     columns: this.columnsFor(this.activeSection()),
@@ -1118,6 +1120,10 @@ export class ProjectWorkspacePage {
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.data.touchProject(projectId);
+    });
+    effect(() => {
+      const projectId = this.projectId();
+      if (projectId) this.fetchAttendanceData(projectId);
     });
     effect(() => {
       if (this.queryParamMap().get("editProject") !== "1") return;
@@ -1360,6 +1366,9 @@ export class ProjectWorkspacePage {
   visibleRows(section: ModuleKey): TableRow[] {
     const query = this.tableSearch().trim().toLowerCase();
     let rows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (row) => this.rowBelongsToProject(row));
+    if (section === "labour") {
+      rows = [...rows, ...this.attendanceRows()];
+    }
     const site = this.activeSiteFilter();
     if (this.isSiteAware(section) && site !== "All") {
       rows = rows.filter((row) => String(row["site"] ?? "").toLowerCase() === site.toLowerCase());
@@ -2419,6 +2428,50 @@ export class ProjectWorkspacePage {
       } else {
         void this.router.navigate(["/clients", this.clientId()]);
       }
+    }
+  }
+
+  private async fetchAttendanceData(projectId: string): Promise<void> {
+    try {
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const fromDate = thirtyDaysAgo.toISOString().slice(0, 10);
+      const toDate = today.toISOString().slice(0, 10);
+
+      const result = await firstValueFrom(this.api.listGroupedAttendance({
+        projectId,
+        from: fromDate,
+        to: toDate,
+        limit: 500,
+      }));
+
+      const rows: TableRow[] = (result.items || []).flatMap((group: any) =>
+        (group.workers || []).map((w: any, idx: number) => ({
+          __rowId: `attendance:${group.date}:${group.shift}:${w.workerId}:${idx}`,
+          __projectId: projectId,
+          projectId,
+          client: "",
+          site: group.site || "",
+          attendanceDate: group.date,
+          staffName: w.workerName,
+          labourTypes: group.labourType || "",
+          staffCount: 1,
+          attendance: "Present",
+          shift: group.shift,
+          overtime: `${w.overtimeHours || 0} hrs`,
+          lateFine: formatMoney(w.lateFine || 0),
+          paymentMode: group.paymentMode || "Cash",
+          notes: "",
+          status: "Active",
+          dailyPay: w.dailyPay,
+        }))
+      );
+
+      this.attendanceRows.set(rows);
+    } catch (err) {
+      console.error("[ProjectWorkspace] failed to fetch attendance data", err);
+      this.attendanceRows.set([]);
     }
   }
 

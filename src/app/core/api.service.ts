@@ -520,6 +520,31 @@ export class ApiService {
     );
   }
 
+  // =================== ATTENDANCE (New Model) ===================
+  listGroupedAttendance(params?: { projectId?: string; from?: string; to?: string; page?: number; limit?: number }): Observable<{ items: any[]; total: number }> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get<{ items: any[]; total: number }>(`${this.baseUrl}/attendance/grouped${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getLabourReport(params?: { projectId?: string; from?: string; to?: string }): Observable<{ items: any[]; weeklySummaries: any[]; grandTotal: any }> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get<{ items: any[]; weeklySummaries: any[]; grandTotal: any }>(`${this.baseUrl}/attendance/report${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== EXPENSES ===================
   listExpenses(params?: { type?: string; projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";

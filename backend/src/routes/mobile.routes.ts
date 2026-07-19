@@ -12,6 +12,9 @@ import {
   uploadExpenseReceiptMobileSchema,
   approvalActionSchema,
   updateMaterialStockSchema,
+  createWorkerSchema,
+  markAttendanceSchema,
+  updateAttendanceSchema,
 } from "../schemas/mobile.schema.js";
 
 const router = Router();
@@ -49,6 +52,23 @@ router.post("/supervisor/materials/:id/receipt", validate(uploadExpenseReceiptMo
 router.get("/supervisor/labour", ctrl.listLabour);
 router.get("/supervisor/labour/:id", ctrl.getLabour);
 router.post("/supervisor/labour", validate(createLabourMobileSchema), ctrl.createLabour);
+
+// Workers
+router.post("/supervisor/workers", validate(createWorkerSchema), ctrl.createWorker);
+router.get("/supervisor/workers", ctrl.listWorkers);
+router.get("/supervisor/workers/:id", ctrl.getWorker);
+
+// Attendance
+router.post("/supervisor/attendance", validate(markAttendanceSchema), ctrl.markAttendance);
+router.get("/supervisor/attendance", ctrl.listAttendanceForDate);
+router.get("/supervisor/attendance/worker/:workerId", ctrl.listAttendanceForWorker);
+router.get("/supervisor/attendance/:id", ctrl.getAttendance);
+router.patch("/supervisor/attendance/:id", validate(updateAttendanceSchema), ctrl.updateAttendance);
+router.delete("/supervisor/attendance/:id", ctrl.deleteAttendance);
+router.get("/supervisor/labour-types", ctrl.getLabourTypeCounts);
+
+// Subcontractors
+router.get("/supervisor/subcontractors", ctrl.listSubcontractors);
 
 // Expenses
 router.get("/supervisor/expenses", ctrl.listExpenses);

@@ -118,3 +118,47 @@ export const approvalActionSchema = z.object({
     comment: z.string().trim().optional(),
   }),
 });
+
+// =================== WORKER SCHEMAS ===================
+export const createWorkerSchema = z.object({
+  body: z.object({
+    projectId: objectIdSchema,
+    siteId: objectIdSchema.optional(),
+    site: z.string().trim().min(1).max(200),
+    name: z.string().trim().min(1).max(200),
+    address: z.string().trim().max(500).optional(),
+    labourType: z.string().trim().min(1).max(100),
+    weeklyPay: z.coerce.number().nonnegative().min(0),
+    isSubcontract: z.boolean().default(false),
+    subcontractorId: objectIdSchema.optional(),
+    subcontractorName: z.string().trim().max(200).optional(),
+  }),
+});
+
+export const markAttendanceSchema = z.object({
+  body: z.object({
+    workerId: objectIdSchema,
+    projectId: objectIdSchema,
+    siteId: objectIdSchema.optional(),
+    site: z.string().trim().min(1).max(200),
+    attendanceDate: z.string().min(1),
+    shiftCount: z.coerce.number().int().min(1).max(2).default(1),
+    overtimeHours: z.coerce.number().nonnegative().default(0),
+    overtimeAmount: z.coerce.number().nonnegative().default(0),
+    lateFine: z.coerce.number().nonnegative().default(0),
+    paymentMode: z.enum(["Cash", "NEFT", "UPI", "Cheque"]).default("Cash"),
+    notes: z.string().trim().max(1000).optional(),
+  }),
+});
+
+export const updateAttendanceSchema = z.object({
+  params: z.object({ id: objectIdSchema }),
+  body: z.object({
+    shiftCount: z.coerce.number().int().min(1).max(2).optional(),
+    overtimeHours: z.coerce.number().nonnegative().optional(),
+    overtimeAmount: z.coerce.number().nonnegative().optional(),
+    lateFine: z.coerce.number().nonnegative().optional(),
+    paymentMode: z.enum(["Cash", "NEFT", "UPI", "Cheque"]).optional(),
+    notes: z.string().trim().max(1000).optional(),
+  }),
+});

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as ctrl from "../controllers/financial.controller.js";
+import * as attendanceCtrl from "../controllers/attendance.controller.js";
 import { validate } from "../middleware/validation.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole, canCreateMaterials, canCreateLabour, canCreateExpenses, canCreatePayments, canCreateVendors, canCreateSubcontractors } from "../middleware/rbac.js";
@@ -56,6 +57,10 @@ router.get("/labour/summary/:projectId", ctrl.getLabourSummary);
 router.get("/labour/:id", ctrl.getLabour);
 router.patch("/labour/:id", validate(updateLabourSchema), ctrl.updateLabour);
 router.delete("/labour/:id", requireRole("admin", "project_manager"), ctrl.deleteLabour);
+
+// =================== ATTENDANCE (New Model) ===================
+router.get("/attendance/grouped", attendanceCtrl.getGroupedAttendance);
+router.get("/attendance/report", attendanceCtrl.getLabourReportHandler);
 
 // =================== EXPENSES ===================
 router.post(
