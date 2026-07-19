@@ -72,21 +72,21 @@ const ALL_LABOUR_TYPES = ['Helper', 'Mason', 'Plumber', 'Electrician', 'Carpente
         </div>
 
         <div class="type-cards">
-          @if (isLoading() && labourTypeCounts().length === 0) {
+          @if (isLoading() && workerTypeCounts().length === 0 && workers().length === 0) {
             @for (i of [1,2,3,4]; track i) {
               <div class="type-card skeleton">
                 <ion-skeleton-text animated style="width: 50%; height: 16px;"></ion-skeleton-text>
                 <ion-skeleton-text animated style="width: 30%; height: 24px; margin-top: 8px;"></ion-skeleton-text>
               </div>
             }
-          } @else if (labourTypeCounts().length === 0 && !isLoading()) {
+          } @else if (workerTypeCounts().length === 0 && !isLoading()) {
             <app-empty-state
               icon="people-outline"
               title="No workers yet"
               message="Add your first worker to start tracking attendance."
             ></app-empty-state>
           } @else {
-            @for (type of labourTypeCounts(); track type.labourType) {
+            @for (type of workerTypeCounts(); track type.labourType) {
               <button class="type-card" (click)="openWorkersOfType(type.labourType)">
                 <div class="type-icon" [class]="'icon-' + getTypeColor(type.labourType)">
                   <ion-icon [name]="getTypeIcon(type.labourType)"></ion-icon>
@@ -435,6 +435,18 @@ export class LabourPage implements OnInit, OnDestroy {
     return this.workers().filter(w => w.labourType === type);
   });
 
+  workerTypeCounts = computed<LabourTypeCount[]>(() => {
+    const counts = new Map<string, number>();
+    for (const w of this.workers()) {
+      const t = (w.labourType || '').trim();
+      if (!t) continue;
+      counts.set(t, (counts.get(t) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([labourType, count]) => ({ labourType, count }))
+      .sort((a, b) => a.labourType.localeCompare(b.labourType));
+  });
+
   async ngOnInit(): Promise<void> {
     addIcons({
       addOutline, peopleOutline, timeOutline, personAddOutline,
@@ -467,21 +479,18 @@ export class LabourPage implements OnInit, OnDestroy {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
 
-      const [workersRes, attendanceRes, countsRes] = await Promise.all([
-        this.supervisor.getWorkers({ siteId: siteId || undefined, limit: 100 }).toPromise(),
+      const [workersRes, attendanceRes] = await Promise.all([
+        this.supervisor.getWorkers({ siteId: siteId || undefined, limit: 200 }).toPromise(),
         this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).toPromise(),
-        siteId ? this.supervisor.getLabourTypeCounts(siteId, this.todayDate).toPromise() : Promise.resolve({ counts: [] }),
       ]);
 
       this.workers.set(workersRes?.items || []);
       this.todayAttendance.set(attendanceRes?.attendances || []);
-      this.labourTypeCounts.set(countsRes?.counts || []);
       this.isLoading.set(false);
     } catch (e) {
       console.error('[Labour] failed to load', e);
       this.workers.set([]);
       this.todayAttendance.set([]);
-      this.labourTypeCounts.set([]);
       this.isLoading.set(false);
     }
   }
