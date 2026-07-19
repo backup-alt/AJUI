@@ -1293,7 +1293,10 @@ export class VendorDashboardPage {
     if (!vendor) return;
     this.loadingAvailableSites.set(true);
     const assignedNames = new Set(this.vendorSites().map((s) => s.name));
-    const all = this.data.sites();
+    const siteEntities = this.data.siteEntities();
+    const all = siteEntities.length > 0
+      ? siteEntities
+      : this.data.sites().map((s) => ({ id: s.id, name: s.name }));
     this.availableSites.set(all.filter((s) => !assignedNames.has(s.name)));
     this.loadingAvailableSites.set(false);
   }

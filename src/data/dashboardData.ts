@@ -101,6 +101,46 @@ export type Quotation = {
   updatedAt: string;
 };
 
+export type TaxInvoiceRow = {
+  id: string;
+  sno: number;
+  description: string;
+  hsnCode?: string;
+  unit: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  isCustom?: boolean;
+};
+
+export type TaxInvoice = {
+  id: string;
+  invoiceNumber: string;
+  date: string;
+  companyName: string;
+  companyAddress: string;
+  state: string;
+  gstin: string;
+  clientName: string;
+  clientAddress: string;
+  clientState: string;
+  clientGstin: string;
+  items: TaxInvoiceRow[];
+  customColumns: string[];
+  subtotal: number;
+  cgstPercent: number;
+  sgstPercent: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  roundOff: number;
+  totalAmount: number;
+  amountInWords: string;
+  supplyType: "Intrastate" | "Interstate";
+  status: "Draft" | "Sent" | "Paid";
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CompanyProfile = {
   name: string;
   address: string;

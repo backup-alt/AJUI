@@ -5,6 +5,7 @@ import type {
   Subcontractor,
   ClientStatus,
 } from "../data/erp-data.service";
+import type { TaxInvoice, TaxInvoiceRow } from "../../data/dashboardData";
 
 /**
  * Mappers from backend API response shapes (Mongoose documents) to
@@ -238,6 +239,46 @@ export function mapSubcontractor(s: any): Subcontractor {
     supervisor: s.supervisor,
     approvalStatus: s.approvalStatus || "Pending",
     paymentStatus: s.paymentStatus || "Not Started",
+  };
+}
+
+export function mapInvoice(i: any): TaxInvoice {
+  return {
+    id: i._id,
+    invoiceNumber: i.invoiceNumber,
+    date: i.date,
+    companyName: i.companyName || "",
+    companyAddress: i.companyAddress || "",
+    state: i.state || "",
+    gstin: i.gstin || "",
+    clientName: i.clientName || "",
+    clientAddress: i.clientAddress || "",
+    clientState: i.clientState || "",
+    clientGstin: i.clientGstin || "",
+    items: (i.items || []).map((it: any, idx: number): TaxInvoiceRow => ({
+      id: String(idx),
+      sno: it.sno ?? idx + 1,
+      description: it.description || "",
+      hsnCode: it.hsnCode || "",
+      unit: it.unit || "",
+      qty: it.qty ?? 0,
+      rate: it.rate ?? 0,
+      amount: it.amount ?? 0,
+      isCustom: it.isCustom ?? false,
+    })),
+    customColumns: i.customColumns || [],
+    subtotal: i.subtotal ?? 0,
+    cgstPercent: i.cgstPercent ?? 9,
+    sgstPercent: i.sgstPercent ?? 9,
+    cgstAmount: i.cgstAmount ?? 0,
+    sgstAmount: i.sgstAmount ?? 0,
+    roundOff: i.roundOff ?? 0,
+    totalAmount: i.totalAmount ?? 0,
+    amountInWords: i.amountInWords || "",
+    supplyType: i.supplyType || "Intrastate",
+    status: (i.status as TaxInvoice["status"]) || "Draft",
+    createdAt: i.createdAt,
+    updatedAt: i.updatedAt,
   };
 }
 

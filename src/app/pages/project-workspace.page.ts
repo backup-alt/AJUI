@@ -230,7 +230,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
           title="Project Workspace"
           eyebrow="Project Operations"
           metaLabel="Site records"
-          [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm()"
+          [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm() || showVendorDialog() || !!editingInlineVendor()"
           [showTitle]="false"
           searchPlaceholder="Search"
         />

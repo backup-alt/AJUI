@@ -181,6 +181,7 @@ export class EnterpriseSidebarComponent {
       { key: "clients", label: "Clients", icon: "people-outline", route: ["/clients"] },
       { key: "vendors", label: "Vendors", icon: "storefront-outline", route: ["/vendors"] },
       { key: "quotations", label: "Quotations", icon: "document-text-outline", route: ["/quotations"] },
+      { key: "tax-invoices", label: "Invoice", icon: "receipt-outline", route: ["/tax-invoices"] },
       { key: "projects", label: "Project list", icon: "folder-open-outline", route: ["/projects"] },
       { key: "approvals", label: "Pending Approvals", icon: "checkmark-done-outline", route: ["/approvals"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
