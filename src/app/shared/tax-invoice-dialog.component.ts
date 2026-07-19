@@ -180,7 +180,7 @@ import { jsPDF } from "jspdf";
             </div>
 
             <div class="inv-footer-note">
-              This is a computer-generated Tax Invoice. No signature required. &nbsp;|&nbsp; Page <span class="page-num">{{ currentPage }}</span> of <span class="page-total">{{ totalPages }}</span>
+              This is a computer-generated Tax Invoice. No signature required. &nbsp;|&nbsp; Page <span class="page-num">{{ currentPage() }}</span> of <span class="page-total">{{ totalPages() }}</span>
             </div>
 
           </div>

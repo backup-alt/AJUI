@@ -1,5 +1,5 @@
 import { Injectable, inject } from "@angular/core";
-import { forkJoin, firstValueFrom } from "rxjs";
+import { firstValueFrom } from "rxjs";
 import { ErpDataService } from "../data/erp-data.service";
 import {
   mapClient,
@@ -24,21 +24,18 @@ export class WorkspaceHydrationService {
   async hydrateFromBackend(): Promise<void> {
     this.clearWorkspaceData();
 
-    // Load clients and projects first (they're interdependent)
-    const [{ clients, projects }, sites, vendors, supervisors, materials, labour, expenses, payments, subcontractors, invoices] = await Promise.all([
-      firstValueFrom(forkJoin({
-        clients: this.api.listClients({ limit: 100 }),
-        projects: this.api.listProjects({ limit: 100 }),
-      })),
-      firstValueFrom(this.api.listSites()),
-      firstValueFrom(this.api.listVendors({ limit: 100 })),
-      firstValueFrom(this.api.listSupervisors()),
-      firstValueFrom(this.api.listMaterials({ limit: 100 })),
-      firstValueFrom(this.api.listLabour({ limit: 100 })),
-      firstValueFrom(this.api.listExpenses({ limit: 100 })),
-      firstValueFrom(this.api.listPayments({ limit: 100 })),
-      firstValueFrom(this.api.listSubcontractors({ limit: 100 })),
-      firstValueFrom(this.api.listInvoices({ limit: 100 })),
+    const [clients, projects, sites, vendors, supervisors, materials, labour, expenses, payments, subcontractors, invoices] = await Promise.all([
+      firstValueFrom(this.api.listClients({ limit: 100 })).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listProjects({ limit: 100 })).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listSites()).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listVendors({ limit: 100 })).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listSupervisors()).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listMaterials({ limit: 100 })).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listLabour({ limit: 100 })).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listExpenses({ limit: 100 })).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listPayments({ limit: 100 })).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listSubcontractors({ limit: 100 })).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listInvoices({ limit: 100 })).catch(() => ({ items: [] })),
     ]);
 
     const mappedProjects = (projects.items || []).map(mapProject);
