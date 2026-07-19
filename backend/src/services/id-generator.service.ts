@@ -12,6 +12,7 @@ export type IdPrefix =
   | "SUP"
   | "SUB"
   | "APR"
+  | "QUO"
   | "RPT"
   | "PO"
   | "WRK"
