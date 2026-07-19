@@ -18,31 +18,39 @@ export async function createWorker(input: {
   subcontractorName?: string;
   createdBy: string;
 }) {
+  const { Project } = await import("../models/Project.js");
+  const project = await Project.findById(input.projectId).lean();
+  if (!project) throw new AppError(404, "Project not found");
+
+  let subcontractorObjectId: Types.ObjectId | undefined;
+  if (input.isSubcontract && input.subcontractorId) {
+    const sub = await Subcontractor.findOne({
+      subcontractId: input.subcontractorId,
+      projectId: project._id,
+    })
+      .select("_id")
+      .lean();
+    if (!sub) throw new AppError(404, "Subcontractor not found for this project");
+    subcontractorObjectId = sub._id;
+  }
+
   const workerId = await generateId("WRK");
   const worker = await Worker.create({
     workerId,
-    projectId: new Types.ObjectId(input.projectId),
-    projectName: "",
-    clientId: new Types.ObjectId(),
-    siteId: input.siteId ? new Types.ObjectId(input.siteId) : undefined,
+    projectId: project._id,
+    projectName: project.name,
+    clientId: project.clientId,
+    siteId: input.siteId && Types.ObjectId.isValid(input.siteId) ? new Types.ObjectId(input.siteId) : undefined,
     site: input.site,
     name: input.name,
     address: input.address,
     labourType: input.labourType,
     weeklyPay: input.weeklyPay,
     isSubcontract: input.isSubcontract,
-    subcontractorId: input.subcontractorId ? new Types.ObjectId(input.subcontractorId) : undefined,
+    subcontractorId: subcontractorObjectId,
     subcontractorName: input.subcontractorName,
     createdBy: input.createdBy,
   });
-
-  const { Project } = await import("../models/Project.js");
-  const project = await Project.findById(input.projectId).lean();
-  if (project) {
-    worker.projectName = project.name;
-    worker.clientId = project.clientId;
-    await worker.save();
-  }
 
   return worker.toObject();
 }
@@ -56,8 +64,12 @@ export async function listWorkers(filter: {
   limit?: number;
 }) {
   const query: Record<string, unknown> = {};
-  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
-  if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
+  if (filter.projectId && Types.ObjectId.isValid(filter.projectId)) {
+    query.projectId = new Types.ObjectId(filter.projectId);
+  }
+  if (filter.siteId && Types.ObjectId.isValid(filter.siteId)) {
+    query.siteId = new Types.ObjectId(filter.siteId);
+  }
   if (filter.labourType) query.labourType = filter.labourType;
   if (filter.createdBy) query.createdBy = filter.createdBy;
 
@@ -74,6 +86,9 @@ export async function listWorkers(filter: {
 }
 
 export async function getWorkerById(id: string) {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new AppError(400, "Invalid worker id");
+  }
   const worker = await Worker.findById(id).lean();
   if (!worker) throw new AppError(404, "Worker not found");
   return worker;
@@ -99,6 +114,12 @@ export async function markAttendance(input: {
   notes?: string;
   createdBy: string;
 }) {
+  if (!Types.ObjectId.isValid(input.workerId)) {
+    throw new AppError(400, "Invalid worker id");
+  }
+  if (!Types.ObjectId.isValid(input.projectId)) {
+    throw new AppError(400, "Invalid project id");
+  }
   const worker = await Worker.findById(input.workerId).lean();
   if (!worker) throw new AppError(404, "Worker not found");
 
@@ -110,7 +131,7 @@ export async function markAttendance(input: {
     projectId: new Types.ObjectId(input.projectId),
     projectName: worker.projectName,
     clientId: worker.clientId,
-    siteId: input.siteId ? new Types.ObjectId(input.siteId) : undefined,
+    siteId: input.siteId && Types.ObjectId.isValid(input.siteId) ? new Types.ObjectId(input.siteId) : undefined,
     site: input.site,
     labourType: worker.labourType,
     weeklyPay: worker.weeklyPay,
@@ -127,17 +148,25 @@ export async function markAttendance(input: {
   return attendance.toObject();
 }
 
-export async function listAttendanceForDate(siteId: string, date: string, projectId?: string) {
+export async function listAttendanceForDate(siteId: string | undefined, date: string, projectId?: string) {
   const query: Record<string, unknown> = {
     attendanceDate: date,
   };
-  if (siteId) query.siteId = new Types.ObjectId(siteId);
-  if (projectId) query.projectId = new Types.ObjectId(projectId);
-
+  if (siteId && Types.ObjectId.isValid(siteId)) {
+    query.siteId = new Types.ObjectId(siteId);
+  } else if (siteId) {
+    delete query.siteId;
+  }
+  if (projectId && Types.ObjectId.isValid(projectId)) {
+    query.projectId = new Types.ObjectId(projectId);
+  }
   return Attendance.find(query).sort({ workerName: 1 }).lean();
 }
 
 export async function listAttendanceForWorker(workerId: string, page = 1, limit = 50) {
+  if (!Types.ObjectId.isValid(workerId)) {
+    throw new AppError(400, "Invalid worker id");
+  }
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
     Attendance.find({ workerId: new Types.ObjectId(workerId) })
@@ -151,6 +180,9 @@ export async function listAttendanceForWorker(workerId: string, page = 1, limit 
 }
 
 export async function getAttendanceById(id: string) {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new AppError(400, "Invalid attendance id");
+  }
   const attendance = await Attendance.findById(id).lean();
   if (!attendance) throw new AppError(404, "Attendance record not found");
   return attendance;
@@ -167,25 +199,36 @@ export async function updateAttendance(
     notes?: string;
   }
 ) {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new AppError(400, "Invalid attendance id");
+  }
   const attendance = await Attendance.findByIdAndUpdate(id, patch, { new: true });
   if (!attendance) throw new AppError(404, "Attendance record not found");
   return attendance.toObject();
 }
 
 export async function deleteAttendance(id: string) {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new AppError(400, "Invalid attendance id");
+  }
   const result = await Attendance.deleteOne({ _id: id });
   if (result.deletedCount === 0) throw new AppError(404, "Attendance record not found");
 }
 
 export async function listSubcontractors(projectId: string, siteId?: string) {
+  if (!Types.ObjectId.isValid(projectId)) {
+    throw new AppError(400, "Invalid project id");
+  }
   const query: Record<string, unknown> = {
     projectId: new Types.ObjectId(projectId),
     approvalStatus: "Approved",
   };
-  if (siteId) query.siteId = new Types.ObjectId(siteId);
+  if (siteId && Types.ObjectId.isValid(siteId)) {
+    query.siteId = new Types.ObjectId(siteId);
+  }
 
   const subs = await Subcontractor.find(query)
-    .select("subcontractorId subcontractorName")
+    .select("subcontractId subcontractorName")
     .sort({ subcontractorName: 1 })
     .lean();
 
@@ -195,15 +238,19 @@ export async function listSubcontractors(projectId: string, siteId?: string) {
   }));
 }
 
-export async function getLabourTypeCounts(siteId: string, date: string) {
-  const workers = await Worker.find({ siteId: new Types.ObjectId(siteId) }).lean();
+export async function getLabourTypeCounts(siteId: string | undefined, date: string) {
+  if (!siteId || !Types.ObjectId.isValid(siteId)) {
+    return [];
+  }
+  const siteObjectId = new Types.ObjectId(siteId);
+
+  const workers = await Worker.find({ siteId: siteObjectId }).lean();
 
   const attendances = await Attendance.find({
-    siteId: new Types.ObjectId(siteId),
+    siteId: siteObjectId,
     attendanceDate: date,
   }).lean();
 
-  const workerMap = new Map(workers.map((w) => [w._id.toString(), w]));
   const typeCountMap = new Map<string, number>();
 
   for (const att of attendances) {

@@ -130,7 +130,7 @@ export const createWorkerSchema = z.object({
     labourType: z.string().trim().min(1).max(100),
     weeklyPay: z.coerce.number().nonnegative().min(0),
     isSubcontract: z.boolean().default(false),
-    subcontractorId: objectIdSchema.optional(),
+    subcontractorId: z.string().trim().min(1).max(100).optional(),
     subcontractorName: z.string().trim().max(200).optional(),
   }),
 });

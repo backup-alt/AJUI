@@ -26,7 +26,6 @@ import { addIcons } from 'ionicons';
 import { locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline, createOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Worker, Attendance, LabourPaymentMode } from '../../../shared/models';
-import { CurrencyPipe } from '@angular/common';
 import { EmptyStateComponent } from '../../../shared/components';
 
 @Component({
@@ -52,7 +51,6 @@ import { EmptyStateComponent } from '../../../shared/components';
     IonSegment,
     IonSegmentButton,
     FormsModule,
-    CurrencyPipe,
     EmptyStateComponent,
   ],
   template: `

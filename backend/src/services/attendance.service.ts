@@ -35,9 +35,9 @@ export async function listGroupedAttendance(filter: {
   const match: Record<string, unknown> = {};
   if (filter.projectId) match.projectId = new Types.ObjectId(filter.projectId);
   if (filter.from || filter.to) {
-    match.date = {};
-    if (filter.from) (match.date as Record<string, string>).$gte = filter.from;
-    if (filter.to) (match.date as Record<string, string>).$lte = filter.to;
+    match.attendanceDate = {};
+    if (filter.from) (match.attendanceDate as Record<string, string>).$gte = filter.from;
+    if (filter.to) (match.attendanceDate as Record<string, string>).$lte = filter.to;
   }
   applyProjectScope(match, "projectId", filter.scopeProjectIds);
 
@@ -57,8 +57,8 @@ export async function listGroupedAttendance(filter: {
     {
       $group: {
         _id: {
-          date: "$date",
-          shift: "$shift",
+          attendanceDate: "$attendanceDate",
+          shiftCount: "$shiftCount",
           paymentMode: "$paymentMode",
           site: "$site",
           subcontractorName: "$subcontractorName",
@@ -68,6 +68,7 @@ export async function listGroupedAttendance(filter: {
           $push: {
             workerId: { $toString: "$workerId" },
             workerName: "$worker.name",
+            weeklyPay: "$worker.weeklyPay",
             shiftCount: "$shiftCount",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",
@@ -77,7 +78,7 @@ export async function listGroupedAttendance(filter: {
         totalWorkers: { $sum: 1 },
       },
     },
-    { $sort: { "_id.date": -1, "_id.shift": 1 } },
+    { $sort: { "_id.attendanceDate": -1, "_id.shiftCount": 1 } },
     { $skip: skip },
     { $limit: filter.limit },
   ];
@@ -90,26 +91,30 @@ export async function listGroupedAttendance(filter: {
   const total = countResult.length > 0 ? countResult[0].total : 0;
 
   const items: GroupedAttendance[] = results.map((r) => {
-    const weeklyPay = r.workers[0]?.weeklyPay || 0;
-    const shiftMultiplier = r._id.shift === 1 ? 0.5 : 1;
-    const dailyPay = (weeklyPay / 7) * shiftMultiplier;
+    const baseWeeklyPay = r.workers[0]?.weeklyPay || 0;
+    const shiftMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
+    const baseDaily = (baseWeeklyPay / 7) * shiftMultiplier;
+
+    const workers = r.workers.map((w: any) => {
+      const wPay = w.weeklyPay || 0;
+      const wMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
+      const wDailyBase = (wPay / 7) * wMultiplier;
+      const dailyPay = w.shiftCount * wDailyBase - w.lateFine + w.overtimeAmount;
+      return { ...w, dailyPay: Math.round(dailyPay * 100) / 100 };
+    });
 
     return {
-      date: r._id.date,
-      shift: r._id.shift,
+      date: r._id.attendanceDate,
+      shift: r._id.shiftCount,
       paymentMode: r._id.paymentMode,
       site: r._id.site,
       subcontractorName: r._id.subcontractorName,
       labourType: r._id.labourType,
-      workers: r.workers.map((w: any) => ({
-        ...w,
-        dailyPay: w.shiftCount * dailyPay - w.lateFine + w.overtimeAmount,
-      })),
+      workers,
       totalWorkers: r.totalWorkers,
-      totalDailyPay: r.workers.reduce(
-        (sum: number, w: any) => sum + w.dailyPay,
-        0
-      ),
+      totalDailyPay: Math.round(
+        workers.reduce((sum: number, w: any) => sum + w.dailyPay, 0) * 100
+      ) / 100,
     };
   });
 
@@ -125,9 +130,9 @@ export async function getLabourReport(filter: {
   const match: Record<string, unknown> = {};
   if (filter.projectId) match.projectId = new Types.ObjectId(filter.projectId);
   if (filter.from || filter.to) {
-    match.date = {};
-    if (filter.from) (match.date as Record<string, string>).$gte = filter.from;
-    if (filter.to) (match.date as Record<string, string>).$lte = filter.to;
+    match.attendanceDate = {};
+    if (filter.from) (match.attendanceDate as Record<string, string>).$gte = filter.from;
+    if (filter.to) (match.attendanceDate as Record<string, string>).$lte = filter.to;
   }
   applyProjectScope(match, "projectId", filter.scopeProjectIds);
 
@@ -145,8 +150,8 @@ export async function getLabourReport(filter: {
     {
       $group: {
         _id: {
-          date: "$date",
-          shift: "$shift",
+          attendanceDate: "$attendanceDate",
+          shiftCount: "$shiftCount",
           paymentMode: "$paymentMode",
           subcontractorName: "$subcontractorName",
           labourType: "$worker.labourType",
@@ -165,14 +170,14 @@ export async function getLabourReport(filter: {
         totalWorkers: { $sum: 1 },
       },
     },
-    { $sort: { "_id.date": 1, "_id.shift": 1 } },
+    { $sort: { "_id.attendanceDate": 1, "_id.shiftCount": 1 } },
   ] as any);
 
   const subtotalsByWeek: Record<string, any> = {};
   const grandTotal = { totalWorkers: 0, totalDailyPay: 0 };
 
   const report = results.map((r) => {
-    const weekStart = getMonday(r._id.date);
+    const weekStart = getMonday(r._id.attendanceDate);
     if (!subtotalsByWeek[weekStart]) {
       subtotalsByWeek[weekStart] = { weekStart, totalWorkers: 0, totalDailyPay: 0, groups: [] };
     }
@@ -180,7 +185,7 @@ export async function getLabourReport(filter: {
     let groupDailyPay = 0;
     const workers = r.workers.map((w: any) => {
       const weeklyPay = w.weeklyPay || 0;
-      const shiftMultiplier = r._id.shift === 1 ? 0.5 : 1;
+      const shiftMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
       const baseDaily = weeklyPay / 7;
       const dailyPay = w.shiftCount * baseDaily * shiftMultiplier - w.lateFine + w.overtimeAmount;
       groupDailyPay += dailyPay;
@@ -188,8 +193,8 @@ export async function getLabourReport(filter: {
     });
 
     const group = {
-      date: r._id.date,
-      shift: r._id.shift,
+      date: r._id.attendanceDate,
+      shift: r._id.shiftCount,
       paymentMode: r._id.paymentMode,
       subcontractorName: r._id.subcontractorName,
       labourType: r._id.labourType,

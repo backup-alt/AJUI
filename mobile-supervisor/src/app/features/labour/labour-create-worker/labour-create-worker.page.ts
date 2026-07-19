@@ -320,10 +320,10 @@ export class LabourCreateWorkerPage implements OnInit {
       projectId,
       siteId,
       site: siteName,
-      name: this.worker.name,
-      address: this.worker.address || undefined,
+      name: this.worker.name.trim(),
+      address: this.worker.address?.trim() || undefined,
       labourType: this.worker.labourType,
-      weeklyPay: this.worker.weeklyPay || 0,
+      weeklyPay: Number(this.worker.weeklyPay) || 0,
       isSubcontract: this.worker.isSubcontract,
       subcontractorId: this.worker.subcontractorId || undefined,
       subcontractorName: selectedSub?.subcontractorName || undefined,
@@ -343,9 +343,15 @@ export class LabourCreateWorkerPage implements OnInit {
       },
       error: async (err) => {
         this.isSubmitting.set(false);
+        const msg =
+          err?.error?.details?.fieldErrors?.subcontractorId?.[0] ||
+          err?.error?.details?.fieldErrors?.weeklyPay?.[0] ||
+          err?.error?.error ||
+          err?.message ||
+          'Failed to create worker';
         const toast = await this.toastCtrl.create({
-          message: err?.message || 'Failed to create worker',
-          duration: 3000,
+          message: msg,
+          duration: 3500,
           color: 'danger',
           position: 'top',
         });

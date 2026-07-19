@@ -1,9 +1,8 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import {
-  IonContent, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
+  IonContent, IonSegment, IonSegmentButton, IonLabel,
   IonFab, IonFabButton, IonIcon, IonSkeletonText,
-  IonRefresher, IonRefresherContent, IonList, IonItem, IonBadge,
-  IonSpinner, IonActionSheet, IonButton,
+  IonRefresher, IonRefresherContent,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -15,12 +14,9 @@ import {
   cutOutline, homeOutline, closeOutline, checkmarkOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
-import { Worker, Attendance, LabourTypeCount, PaymentMode } from '../../shared/models';
+import { Worker, Attendance, LabourTypeCount } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
-import {
-  EmptyStateComponent,
-  StatusPillComponent,
-} from '../../shared/components';
+import { EmptyStateComponent } from '../../shared/components';
 
 const LABOUR_TYPE_ICONS: Record<string, string> = {
   'Helper': 'hammer-outline',
@@ -37,11 +33,10 @@ const ALL_LABOUR_TYPES = ['Helper', 'Mason', 'Plumber', 'Electrician', 'Carpente
   selector: 'app-labour',
   standalone: true,
   imports: [
-    IonContent, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
+    IonContent, IonSegment, IonSegmentButton, IonLabel,
     IonFab, IonFabButton, IonIcon, IonSkeletonText,
-    IonRefresher, IonRefresherContent, IonList, IonItem, IonBadge,
-    IonSpinner, IonActionSheet, IonButton, FormsModule, DatePipe, CurrencyPipe,
-    EmptyStateComponent, StatusPillComponent,
+    IonRefresher, IonRefresherContent, FormsModule, DatePipe, CurrencyPipe,
+    EmptyStateComponent,
   ],
   template: `
     <ion-content class="labour-content">
