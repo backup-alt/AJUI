@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -757,7 +757,7 @@ interface WageCalculation {
     }
   `],
 })
-export class LabourWorkerDetailPage implements OnInit, OnDestroy {
+export class LabourWorkerDetailPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private route = inject(ActivatedRoute);
   private toastCtrl = inject(ToastController);
@@ -865,8 +865,6 @@ export class LabourWorkerDetailPage implements OnInit, OnDestroy {
       await Promise.all([this.loadWorker(), this.loadAttendance()]);
     }
   }
-
-  ngOnDestroy(): void {}
 
   async refresh(event: CustomEvent): Promise<void> {
     await Promise.all([this.loadWorker(), this.loadAttendance()]);
