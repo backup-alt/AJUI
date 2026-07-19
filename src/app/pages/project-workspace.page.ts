@@ -1025,7 +1025,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
               [description]="editingInlineVendor() ? 'Update vendor contact, material type, GST, and address information.' : 'Create the vendor record to track material purchases and GST.'"
               [submitLabel]="editingInlineVendor() ? 'Save Changes' : 'Create Vendor'"
               [initialValue]="editingInlineVendor() ? inlineVendorEditValue() : null"
-              [preSelectedSiteIds]="getCurrentProjectSiteIds()"
               (cancel)="closeVendorDialog()"
               (create)="editingInlineVendor() ? updateInlineVendor($event) : createInlineVendor($event)"
             ></agb-vendor-form-dialog>
@@ -1717,15 +1716,6 @@ export class ProjectWorkspacePage {
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
-  }
-
-  getCurrentProjectSiteIds(): string[] {
-    const proj = this.project();
-    if (!proj) return [];
-    const allSites = this.data.sites();
-    return proj.sites
-      .map((siteName) => allSites.find((s) => s.name === siteName)?.id)
-      .filter(Boolean) as string[];
   }
 
   closeVendorDialog() {

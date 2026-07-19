@@ -3,6 +3,7 @@ import { objectIdSchema } from "./financial.schema.js";
 
 const quotationItemSchema = z.object({
   description: z.string().trim().min(1, "Item description is required"),
+  hsnCode: z.string().trim().max(20).optional().default(""),
   unit: z.string().trim().max(40).optional().default(""),
   qty: z.coerce.number().min(0).default(0),
   rate: z.coerce.number().min(0).default(0),

@@ -1,11 +1,17 @@
 import { Quotation, IQuotation } from "../models/Quotation.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { generateId } from "./id-generator.service.js";
 
 export async function createQuotation(input: Partial<IQuotation> & { quotationNumber: string }) {
-  const existing = await Quotation.findOne({ quotationNumber: input.quotationNumber }).lean();
-  if (existing) throw new AppError(409, `Quotation ${input.quotationNumber} already exists`);
-  const quotation = await Quotation.create({ ...input, archived: false });
-  return quotation.toObject();
+  try {
+    const quotation = await Quotation.create({ ...input, archived: false });
+    return quotation.toObject();
+  } catch (err: any) {
+    if (err?.code === 11000) {
+      throw new AppError(409, `Quotation ${input.quotationNumber} already exists`);
+    }
+    throw err;
+  }
 }
 
 export async function listQuotations(filter: { search?: string; status?: string; page?: number; limit?: number; includeArchived?: boolean } = {}) {
@@ -50,11 +56,5 @@ export async function deleteQuotation(id: string) {
 }
 
 export async function getNextQuotationNumber(): Promise<string> {
-  const lastQuotation = await Quotation.findOne().sort({ createdAt: -1 }).lean();
-  let nextNum = 1;
-  if (lastQuotation?.quotationNumber) {
-    const match = lastQuotation.quotationNumber.match(/QUO-(\d+)/);
-    if (match) nextNum = parseInt(match[1], 10) + 1;
-  }
-  return `QUO-${String(nextNum).padStart(4, "0")}`;
+  return generateId("QUO", 4);
 }

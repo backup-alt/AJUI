@@ -107,6 +107,69 @@ const INDIAN_STATES = [
     <section class="settings-w11-card">
       <div class="settings-w11-card-head">
         <div>
+          <h2>Bank Details</h2>
+          <p>Appears on Tax Invoices for banking and payment reference.</p>
+        </div>
+      </div>
+      <div class="settings-w11-card-body">
+        <div class="settings-w11-field-row">
+          <div class="settings-w11-field">
+            <label for="bank-name">Bank Name</label>
+            <input
+              id="bank-name"
+              type="text"
+              [value]="bankName()"
+              (input)="bankName.set($any($event.target).value)"
+              placeholder="e.g. State Bank of India"
+            />
+          </div>
+          <div class="settings-w11-field">
+            <label for="account-number">Account Number</label>
+            <input
+              id="account-number"
+              type="text"
+              [value]="accountNumber()"
+              (input)="accountNumber.set($any($event.target).value)"
+              placeholder="e.g. 123456789012"
+            />
+          </div>
+        </div>
+        <div class="settings-w11-field-row">
+          <div class="settings-w11-field">
+            <label for="ifsc">IFSC Code</label>
+            <input
+              id="ifsc"
+              type="text"
+              [value]="ifsc()"
+              (input)="ifsc.set($any($event.target).value)"
+              placeholder="e.g. SBIN0001234"
+            />
+          </div>
+          <div class="settings-w11-field">
+            <label for="branch">Branch</label>
+            <input
+              id="branch"
+              type="text"
+              [value]="branch()"
+              (input)="branch.set($any($event.target).value)"
+              placeholder="e.g. Chennai Main Branch"
+            />
+          </div>
+        </div>
+        <div class="settings-w11-actions">
+          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="saveCompanyProfile()">
+            {{ saving() ? 'Saving…' : 'Save changes' }}
+          </button>
+        </div>
+        @if (message()) {
+          <div class="settings-w11-message" [class.error]="isError()">{{ message() }}</div>
+        }
+      </div>
+    </section>
+
+    <section class="settings-w11-card">
+      <div class="settings-w11-card-head">
+        <div>
           <h2>Preview</h2>
           <p>This is how your company details will appear on quotations.</p>
         </div>
@@ -129,6 +192,24 @@ const INDIAN_STATES = [
             <span class="preview-label">GSTIN:</span>
             <span class="preview-value">{{ companyGstin() || 'Not set' }}</span>
           </div>
+          @if (bankName()) {
+            <div class="preview-row">
+              <span class="preview-label">Bank:</span>
+              <span class="preview-value">{{ bankName() }} {{ branch() ? '— ' + branch() : '' }}</span>
+            </div>
+          }
+          @if (accountNumber()) {
+            <div class="preview-row">
+              <span class="preview-label">A/C No.:</span>
+              <span class="preview-value">{{ accountNumber() }}</span>
+            </div>
+          }
+          @if (ifsc()) {
+            <div class="preview-row">
+              <span class="preview-label">IFSC:</span>
+              <span class="preview-value">{{ ifsc() }}</span>
+            </div>
+          }
         </div>
       </div>
     </section>
@@ -304,6 +385,10 @@ export class SettingsCompanyComponent {
   readonly companyAddress = signal(this.data.companyProfile().address);
   readonly companyState = signal(this.data.companyProfile().state);
   readonly companyGstin = signal(this.data.companyProfile().gstin);
+  readonly bankName = signal(this.data.companyProfile().bankName || "");
+  readonly accountNumber = signal(this.data.companyProfile().accountNumber || "");
+  readonly ifsc = signal(this.data.companyProfile().ifsc || "");
+  readonly branch = signal(this.data.companyProfile().branch || "");
 
   readonly saving = signal(false);
   readonly message = signal<string | null>(null);
@@ -319,6 +404,10 @@ export class SettingsCompanyComponent {
       address: this.companyAddress().trim(),
       state: this.companyState(),
       gstin: this.companyGstin().trim().toUpperCase(),
+      bankName: this.bankName().trim(),
+      accountNumber: this.accountNumber().trim(),
+      ifsc: this.ifsc().trim().toUpperCase(),
+      branch: this.branch().trim(),
     };
 
     this.data.updateCompanyProfile(profile);

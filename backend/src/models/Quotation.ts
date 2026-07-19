@@ -4,6 +4,7 @@ export type QuotationStatus = "Draft" | "Sent" | "Accepted" | "Rejected";
 
 export interface IQuotationItem extends Document {
   description: string;
+  hsnCode?: string;
   unit: string;
   qty: number;
   rate: number;
@@ -42,6 +43,7 @@ export interface IQuotation extends Document {
 const quotationItemSchema = new Schema<IQuotationItem>(
   {
     description: { type: String, required: true },
+    hsnCode: { type: String, default: "" },
     unit: { type: String, default: "" },
     qty: { type: Number, default: 0 },
     rate: { type: Number, default: 0 },
