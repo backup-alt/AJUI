@@ -66,6 +66,34 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'labour/create-worker',
+        loadComponent: () =>
+          import('./features/labour/labour-create-worker/labour-create-worker.page').then(
+            (m) => m.LabourCreateWorkerPage
+          ),
+      },
+      {
+        path: 'labour/mark-attendance/:workerId',
+        loadComponent: () =>
+          import('./features/labour/labour-mark-attendance/labour-mark-attendance.page').then(
+            (m) => m.LabourMarkAttendancePage
+          ),
+      },
+      {
+        path: 'labour/worker-history/:workerId',
+        loadComponent: () =>
+          import('./features/labour/labour-worker-history/labour-worker-history.page').then(
+            (m) => m.LabourWorkerHistoryPage
+          ),
+      },
+      {
+        path: 'labour/edit-attendance/:id',
+        loadComponent: () =>
+          import('./features/labour/labour-edit-attendance/labour-edit-attendance.page').then(
+            (m) => m.LabourEditAttendancePage
+          ),
+      },
+      {
         path: 'labour/:id',
         loadComponent: () =>
           import('./features/labour/labour-detail/labour-detail.page').then(

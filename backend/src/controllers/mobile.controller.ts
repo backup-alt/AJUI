@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
 import { AppError } from "../middleware/errorHandler.js";
 import * as mobileService from "../services/supervisor-mobile.service.js";
+import * as workerService from "../services/worker.service.js";
 import * as vendorService from "../services/vendor.service.js";
 import * as deviceService from "../services/device-token.service.js";
 
@@ -483,5 +484,121 @@ export async function takeApprovalAction(req: Request, res: Response, next: Next
       comment,
     });
     res.json({ approval });
+  } catch (e) { next(e); }
+}
+
+// =================== WORKERS (mobile) ===================
+export async function createWorker(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const { Project } = await import("../models/Project.js");
+
+    const project = await Project.findById(req.body.projectId).lean();
+    if (!project) throw new AppError(404, "Project not found");
+
+    const worker = await workerService.createWorker({
+      ...req.body,
+      createdBy: userId,
+    });
+
+    res.status(201).json({ worker });
+  } catch (e) { next(e); }
+}
+
+export async function listWorkers(req: Request, res: Response, next: NextFunction) {
+  try {
+    requireSupervisor(req);
+    const result = await workerService.listWorkersForSupervisor({
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      labourType: req.query.labourType as string | undefined,
+      page: req.query.page ? Number(req.query.page) : 1,
+      limit: req.query.limit ? Number(req.query.limit) : 50,
+    });
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getWorker(req: Request, res: Response, next: NextFunction) {
+  try {
+    const worker = await workerService.getWorkerById(req.params.id);
+    res.json({ worker });
+  } catch (e) { next(e); }
+}
+
+// =================== ATTENDANCE (mobile) ===================
+export async function markAttendance(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const attendance = await workerService.markAttendance({
+      ...req.body,
+      createdBy: userId,
+    });
+    res.status(201).json({ attendance });
+  } catch (e) { next(e); }
+}
+
+export async function listAttendanceForDate(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const date = req.query.date as string;
+    if (!date) throw new AppError(400, "date is required");
+    const attendances = await workerService.listAttendanceForDate(
+      req.query.siteId as string,
+      date,
+      req.query.projectId as string | undefined
+    );
+    res.json({ attendances });
+  } catch (e) { next(e); }
+}
+
+export async function listAttendanceForWorker(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await workerService.listAttendanceForWorker(
+      req.params.workerId,
+      req.query.page ? Number(req.query.page) : 1,
+      req.query.limit ? Number(req.query.limit) : 50
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getAttendance(req: Request, res: Response, next: NextFunction) {
+  try {
+    const attendance = await workerService.getAttendanceById(req.params.id);
+    res.json({ attendance });
+  } catch (e) { next(e); }
+}
+
+export async function updateAttendance(req: Request, res: Response, next: NextFunction) {
+  try {
+    const attendance = await workerService.updateAttendance(req.params.id, req.body);
+    res.json({ attendance });
+  } catch (e) { next(e); }
+}
+
+export async function deleteAttendance(req: Request, res: Response, next: NextFunction) {
+  try {
+    await workerService.deleteAttendance(req.params.id);
+    res.json({ success: true });
+  } catch (e) { next(e); }
+}
+
+export async function getLabourTypeCounts(req: Request, res: Response, next: NextFunction) {
+  try {
+    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const counts = await workerService.getLabourTypeCounts(req.query.siteId as string, date);
+    res.json({ counts });
+  } catch (e) { next(e); }
+}
+
+// =================== SUBCONTRACTORS (mobile) ===================
+export async function listSubcontractors(req: Request, res: Response, next: NextFunction) {
+  try {
+    const subs = await workerService.listSubcontractors(
+      req.query.projectId as string,
+      req.query.siteId as string | undefined
+    );
+    res.json({ subcontractors: subs });
   } catch (e) { next(e); }
 }

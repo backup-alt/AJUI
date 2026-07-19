@@ -57,39 +57,58 @@ export class ApiService {
       return new Error('Unable to connect to server. Please check your internet connection.');
     }
 
-    const serverMessage =
-      (typeof error.error === 'object' && error.error && 'message' in error.error
-        ? (error.error as { message?: string }).message
-        : undefined) ||
-      (typeof error.error === 'object' && error.error && 'error' in error.error
-        ? (error.error as { error?: string }).error
-        : undefined);
+    const body = (typeof error.error === 'object' && error.error) || {};
 
-    switch (error.status) {
+    const firstFieldError = (() => {
+      const fields = (body as { details?: { fieldErrors?: Record<string, string[]> } }).details?.fieldErrors;
+      if (!fields) return undefined;
+      for (const key of Object.keys(fields)) {
+        const list = fields[key];
+        if (Array.isArray(list) && list.length > 0) return list[0];
+      }
+      return undefined;
+    })();
+
+    const serverMessage =
+      firstFieldError ||
+      ((body as { message?: string }).message) ||
+      ((body as { error?: string }).error);
+
+    const appError: Error & { details?: unknown } = new Error(
+      serverMessage || this.fallbackMessage(error.status)
+    );
+    if ((body as { details?: unknown }).details) {
+      appError.details = (body as { details?: unknown }).details;
+    }
+    return appError;
+  }
+
+  private fallbackMessage(status: number): string {
+    switch (status) {
       case 400:
-        return new Error(serverMessage || 'Invalid request');
+        return 'Invalid request';
       case 401:
-        return new Error(serverMessage || 'Session expired. Please login again.');
+        return 'Session expired. Please login again.';
       case 403:
-        return new Error(serverMessage || 'You do not have permission to perform this action');
+        return 'You do not have permission to perform this action';
       case 404:
-        return new Error(serverMessage || 'Resource not found');
+        return 'Resource not found';
       case 409:
-        return new Error(serverMessage || 'Conflict occurred');
+        return 'Conflict occurred';
       case 410:
-        return new Error(serverMessage || 'Resource no longer available');
+        return 'Resource no longer available';
       case 422:
-        return new Error(serverMessage || 'Validation failed');
+        return 'Validation failed';
       case 429:
-        return new Error('Too many requests. Please wait a moment and try again.');
+        return 'Too many requests. Please wait a moment and try again.';
       case 500:
-        return new Error('Server error. Please try again later.');
+        return 'Server error. Please try again later.';
       case 502:
       case 503:
       case 504:
-        return new Error('Server temporarily unavailable. Please try again later.');
+        return 'Server temporarily unavailable. Please try again later.';
       default:
-        return new Error(serverMessage || `Request failed (${error.status})`);
+        return `Request failed (${status})`;
     }
   }
 

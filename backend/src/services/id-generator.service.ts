@@ -14,7 +14,6 @@ export type IdPrefix =
   | "APR"
   | "RPT"
   | "PO"
-  | "QUO"
   | "WRK"
   | "ATT";
 

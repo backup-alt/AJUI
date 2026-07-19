@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
+import { firstValueFrom } from "rxjs";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
@@ -172,6 +173,47 @@ const siteMaterialDetailFields: FieldSchema[] = [
     ProjectFormDialogComponent,
     VendorFormDialogComponent,
   ],
+  styles: [`
+    .image-preview-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .image-preview-overlay img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    }
+    .image-preview-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.15);
+      border: none;
+      color: #fff;
+      font-size: 28px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .image-preview-close:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  `],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar
@@ -661,7 +703,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           </div>
                           <ng-template #editableProjectCell>
                             <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
-                              <a class="bill-link" [href]="row['billUrl']" [attr.target]="isDataUrl($any(row['billUrl'])) ? '_self' : '_blank'" [attr.rel]="isDataUrl($any(row['billUrl'])) ? null : 'noopener noreferrer'" (click)="$event.stopPropagation()">View Bill</a>
+                              @if (isDataUrl($any(row['billUrl']))) {
+                                <button type="button" class="bill-link" (click)="openImagePreview($any(row['billUrl']))">View Bill</button>
+                              } @else {
+                                <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
+                              }
                             </ng-container>
                             <ng-template #normalEditableCell>
                               <span
@@ -985,6 +1031,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
           </main>
         </ion-content>
       </div>
+
+      @if (previewImageUrl()) {
+        <div class="image-preview-overlay" (click)="closeImagePreview()">
+          <button type="button" class="image-preview-close" (click)="closeImagePreview()" aria-label="Close">×</button>
+          <img [src]="previewImageUrl()" alt="Bill preview" (click)="$event.stopPropagation()" />
+        </div>
+      }
     </ion-split-pane>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -1043,7 +1096,9 @@ export class ProjectWorkspacePage {
   readonly expenseOpeningEdit = signal(false);
   readonly handledEditProjectQuery = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
+  readonly previewImageUrl = signal<string | null>(null);
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
+  readonly attendanceRows = signal<TableRow[]>([]);
   readonly tableState = computed(() => ({
     rows: this.visibleRows(this.activeSection()),
     columns: this.columnsFor(this.activeSection()),
@@ -1064,6 +1119,10 @@ export class ProjectWorkspacePage {
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.data.touchProject(projectId);
+    });
+    effect(() => {
+      const projectId = this.projectId();
+      if (projectId) this.fetchAttendanceData(projectId);
     });
     effect(() => {
       if (this.queryParamMap().get("editProject") !== "1") return;
@@ -1306,6 +1365,9 @@ export class ProjectWorkspacePage {
   visibleRows(section: ModuleKey): TableRow[] {
     const query = this.tableSearch().trim().toLowerCase();
     let rows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (row) => this.rowBelongsToProject(row));
+    if (section === "labour") {
+      rows = [...rows, ...this.attendanceRows()];
+    }
     const site = this.activeSiteFilter();
     if (this.isSiteAware(section) && site !== "All") {
       rows = rows.filter((row) => String(row["site"] ?? "").toLowerCase() === site.toLowerCase());
@@ -2359,6 +2421,50 @@ export class ProjectWorkspacePage {
     }
   }
 
+  private async fetchAttendanceData(projectId: string): Promise<void> {
+    try {
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const fromDate = thirtyDaysAgo.toISOString().slice(0, 10);
+      const toDate = today.toISOString().slice(0, 10);
+
+      const result = await firstValueFrom(this.api.listGroupedAttendance({
+        projectId,
+        from: fromDate,
+        to: toDate,
+        limit: 500,
+      }));
+
+      const rows: TableRow[] = (result.items || []).flatMap((group: any) =>
+        (group.workers || []).map((w: any, idx: number) => ({
+          __rowId: `attendance:${group.date}:${group.shift}:${w.workerId}:${idx}`,
+          __projectId: projectId,
+          projectId,
+          client: "",
+          site: group.site || "",
+          attendanceDate: group.date,
+          staffName: w.workerName,
+          labourTypes: group.labourType || "",
+          staffCount: 1,
+          attendance: "Present",
+          shift: group.shift,
+          overtime: `${w.overtimeHours || 0} hrs`,
+          lateFine: formatMoney(w.lateFine || 0),
+          paymentMode: group.paymentMode || "Cash",
+          notes: "",
+          status: "Active",
+          dailyPay: w.dailyPay,
+        }))
+      );
+
+      this.attendanceRows.set(rows);
+    } catch (err) {
+      console.error("[ProjectWorkspace] failed to fetch attendance data", err);
+      this.attendanceRows.set([]);
+    }
+  }
+
   private buildInitialRows(projectId: string): Record<ModuleKey, TableRow[]> {
     void this.data.vendors();
     const currentProject = this.data.projectById(projectId);
@@ -3326,7 +3432,15 @@ export class ProjectWorkspacePage {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  isDataUrl(url: string): boolean {
+isDataUrl(url: string): boolean {
     return url.startsWith("data:");
+  }
+
+  openImagePreview(url: string) {
+    this.previewImageUrl.set(url);
+  }
+
+  closeImagePreview() {
+    this.previewImageUrl.set(null);
   }
 }

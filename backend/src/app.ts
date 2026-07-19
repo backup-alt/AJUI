@@ -165,6 +165,8 @@ export async function bootstrap(): Promise<void> {
   await seedDefaultReports();
   const { seedDefaultAdmin } = await import("./utils/seed-admin.js");
   await seedDefaultAdmin();
+  const { ensureWorkersCollection } = await import("./utils/ensure-collections.js");
+  await ensureWorkersCollection();
 
   const app = createApp();
   app.listen(env.PORT, () => {

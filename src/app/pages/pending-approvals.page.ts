@@ -81,6 +81,47 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 @Component({
   standalone: true,
   imports: [CommonModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  styles: [`
+    .image-preview-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .image-preview-overlay img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    }
+    .image-preview-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.15);
+      border: none;
+      color: #fff;
+      font-size: 28px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .image-preview-close:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  `],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="approvals"></agb-enterprise-sidebar>
@@ -288,7 +329,11 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ row.supervisor || "-" }}</td>
                         <td>
                           @if (row.billUrl) {
-                            <a class="bill-link" [href]="row.billUrl" [attr.target]="isDataUrl(row.billUrl) ? '_self' : '_blank'" [attr.rel]="isDataUrl(row.billUrl) ? null : 'noopener noreferrer'">View Bill</a>
+                            @if (isDataUrl(row.billUrl)) {
+                              <button type="button" class="bill-link" (click)="openImagePreview(row.billUrl)">View Bill</button>
+                            } @else {
+                              <a class="bill-link" [href]="row.billUrl" target="_blank" rel="noopener noreferrer">View Bill</a>
+                            }
                           } @else {
                             {{ row.reference || "-" }}
                           }
@@ -313,9 +358,16 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
               
             </div>
           </main>
-        </ion-content>
-      </div>
-    </ion-split-pane>
+</ion-content>
+        </div>
+
+        @if (previewImageUrl()) {
+          <div class="image-preview-overlay" (click)="closeImagePreview()">
+            <button type="button" class="image-preview-close" (click)="closeImagePreview()" aria-label="Close">×</button>
+            <img [src]="previewImageUrl()" alt="Bill preview" (click)="$event.stopPropagation()" />
+          </div>
+        }
+      </ion-split-pane>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -330,6 +382,8 @@ export class PendingApprovalsPage implements OnInit {
   readonly showSiteExpense = signal(false);
   readonly isLoading = signal(false);
   readonly loadError = signal(false);
+
+  readonly previewImageUrl = signal<string | null>(null);
 
   private _materialRows = signal<MaterialApprovalRow[]>([]);
   private _labourRows = signal<LabourApprovalRow[]>([]);
@@ -489,7 +543,15 @@ export class PendingApprovalsPage implements OnInit {
     return [...new Set(values.filter(Boolean).map((value) => (value || "").trim()))].sort((first, second) => first.localeCompare(second));
   }
 
-  isDataUrl(url: string): boolean {
+isDataUrl(url: string): boolean {
     return url.startsWith("data:");
+  }
+
+  openImagePreview(url: string) {
+    this.previewImageUrl.set(url);
+  }
+
+  closeImagePreview() {
+    this.previewImageUrl.set(null);
   }
 }

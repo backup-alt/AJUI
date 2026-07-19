@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import {
-  IonContent, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
+  IonContent, IonSegment, IonSegmentButton, IonLabel,
   IonFab, IonFabButton, IonIcon, IonSkeletonText,
   IonRefresher, IonRefresherContent,
 } from '@ionic/angular/standalone';
@@ -8,35 +8,35 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
 import {
-  addOutline, peopleOutline, timeOutline, personAddOutline, checkmarkOutline,
-  chevronForwardOutline, businessOutline, briefcaseOutline, ribbonOutline,
-  addCircleOutline,
+  addOutline, peopleOutline, timeOutline, personAddOutline,
+  chevronForwardOutline, businessOutline, briefcaseOutline,
+  constructOutline, hammerOutline, flashOutline, buildOutline,
+  cutOutline, homeOutline, closeOutline, checkmarkOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
-import { Labour, LabourStatus } from '../../shared/models';
+import { Worker, Attendance, LabourTypeCount } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
-import {
-  EmptyStateComponent,
-  StatusPillComponent,
-} from '../../shared/components';
+import { EmptyStateComponent } from '../../shared/components';
 
-const DEFAULT_LABOUR_TYPES = ['Mason', 'Helper', 'Electrician', 'Plumber', 'Civil'];
+const LABOUR_TYPE_ICONS: Record<string, string> = {
+  'Helper': 'hammer-outline',
+  'Mason': 'construct-outline',
+  'Plumber': 'build-outline',
+  'Electrician': 'flash-outline',
+  'Carpenter': 'cut-outline',
+  'Civil': 'home-outline',
+};
 
-interface Employee {
-  name: string;
-  labourTypes: string[];
-  lastSeen: string;
-  entryCount: number;
-}
+const ALL_LABOUR_TYPES = ['Helper', 'Mason', 'Plumber', 'Electrician', 'Carpenter', 'Civil'];
 
 @Component({
   selector: 'app-labour',
   standalone: true,
   imports: [
-    IonContent, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
+    IonContent, IonSegment, IonSegmentButton, IonLabel,
     IonFab, IonFabButton, IonIcon, IonSkeletonText,
     IonRefresher, IonRefresherContent, FormsModule, DatePipe, CurrencyPipe,
-    EmptyStateComponent, StatusPillComponent,
+    EmptyStateComponent,
   ],
   template: `
     <ion-content class="labour-content">
@@ -46,176 +46,157 @@ interface Employee {
 
       <div class="page-head">
         <h1>Labour</h1>
-        <p>Manage your workers and daily attendance.</p>
+        <p>Manage workers and daily attendance.</p>
       </div>
 
       <div class="filter-stack">
-        <ion-searchbar
-          [placeholder]="activeTab === 'employees' ? 'Search employees' : 'Search attendance'"
-          [(ngModel)]="searchQuery"
-          (ionInput)="onSearch()"
-        ></ion-searchbar>
         <div class="seg-wrap">
-          <ion-segment [(ngModel)]="activeTab" (ionChange)="onTabChange()" [value]="'employees'">
-            <ion-segment-button value="employees">
-              <ion-label>Employees</ion-label>
+          <ion-segment [(ngModel)]="activeTab" (ionChange)="onTabChange()" [value]="'workers'">
+            <ion-segment-button value="workers">
+              <ion-label>Workers</ion-label>
             </ion-segment-button>
             <ion-segment-button value="attendance">
-              <ion-label>Attendance</ion-label>
+              <ion-label>Today's Attendance</ion-label>
             </ion-segment-button>
           </ion-segment>
         </div>
       </div>
 
-      @if (activeTab === 'employees') {
-        <div class="cards">
-          @if (isLoading() && employees().length === 0) {
-            @for (i of [1,2,3]; track i) {
-              <div class="skeleton-card">
-                <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
-                <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+      @if (activeTab === 'workers') {
+        <div class="section-header">
+          <h2>Labour Types</h2>
+          <button class="add-worker-btn" (click)="createWorker()">
+            <ion-icon name="person-add-outline"></ion-icon>
+            Add Worker
+          </button>
+        </div>
+
+        <div class="type-cards">
+          @if (isLoading() && workerTypeCounts().length === 0 && workers().length === 0) {
+            @for (i of [1,2,3,4]; track i) {
+              <div class="type-card skeleton">
+                <ion-skeleton-text animated style="width: 50%; height: 16px;"></ion-skeleton-text>
+                <ion-skeleton-text animated style="width: 30%; height: 24px; margin-top: 8px;"></ion-skeleton-text>
               </div>
             }
-          } @else if (filteredEmployees().length === 0) {
+          } @else if (workerTypeCounts().length === 0 && !isLoading()) {
             <app-empty-state
               icon="people-outline"
-              title="No employees yet"
-              message="Log a worker's first attendance to start tracking them."
+              title="No workers yet"
+              message="Add your first worker to start tracking attendance."
             ></app-empty-state>
           } @else {
-            @for (emp of filteredEmployees(); track emp.name) {
-              <article class="emp-card">
-                <header class="emp-head">
-                  <span class="emp-tile">
-                    <ion-icon name="briefcase-outline"></ion-icon>
-                  </span>
-                  <div class="emp-info">
-                    <h3 class="emp-name">{{ emp.name }}</h3>
-                    <p class="emp-meta">
-                      <ion-icon name="ribbon-outline"></ion-icon>
-                      {{ emp.entryCount }} {{ emp.entryCount === 1 ? 'entry' : 'entries' }}
-                    </p>
-                  </div>
-                </header>
-                <div class="emp-types">
-                  @for (type of emp.labourTypes; track type) {
-                    <span class="type-chip">{{ type }}</span>
-                  }
-                  @if (emp.labourTypes.length === 0) {
-                    <span class="type-chip neutral">No categories yet</span>
-                  }
+            @for (type of workerTypeCounts(); track type.labourType) {
+              <button class="type-card" (click)="openWorkersOfType(type.labourType)">
+                <div class="type-icon" [class]="'icon-' + getTypeColor(type.labourType)">
+                  <ion-icon [name]="getTypeIcon(type.labourType)"></ion-icon>
                 </div>
-              </article>
-            }
-          }
-        </div>
-
-        <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-          <ion-fab-button (click)="showAddEmployee = true">
-            <ion-icon name="person-add-outline"></ion-icon>
-          </ion-fab-button>
-        </ion-fab>
-
-        @if (showAddEmployee) {
-          <div class="modal-backdrop" (click)="showAddEmployee = false"></div>
-          <div class="add-emp-modal">
-            <div class="modal-tile">
-              <ion-icon name="person-add-outline"></ion-icon>
-            </div>
-            <h3>How new employees are tracked</h3>
-            <p>
-              In AGB, employees are tracked as
-              <strong>labour entries</strong> by party name and category.
-            </p>
-            <p>
-              To add a new employee, log their first day's attendance using the
-              <strong>Log attendance</strong> button. They'll appear here once recorded.
-            </p>
-            <div class="modal-actions">
-              <button class="btn ghost" (click)="showAddEmployee = false">Got it</button>
-              <button class="btn primary" (click)="logFirstAttendance()">Log first attendance</button>
-            </div>
-          </div>
-        }
-      }
-
-      @if (activeTab === 'attendance') {
-        <div class="filter-bar">
-          <ion-segment [(ngModel)]="statusFilter" (ionChange)="filterLabour()" [value]="''">
-            <ion-segment-button [value]="''"><ion-label>All</ion-label></ion-segment-button>
-            <ion-segment-button value="Pending"><ion-label>Pending</ion-label></ion-segment-button>
-            <ion-segment-button value="Approved"><ion-label>Approved</ion-label></ion-segment-button>
-          </ion-segment>
-        </div>
-
-        <div class="cards">
-          @if (isLoading() && labour().length === 0) {
-            @for (i of [1,2,3]; track i) {
-              <div class="skeleton-card">
-                <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
-                <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-              </div>
-            }
-          } @else if (filteredLabour().length === 0) {
-            <app-empty-state
-              icon="time-outline"
-              title="No attendance records"
-              message="Log today's attendance to get started."
-            ></app-empty-state>
-          } @else {
-            @for (entry of filteredLabour(); track entry.labourId) {
-              <button class="labour-card" (click)="viewLabour(entry)">
-                <header class="labour-head">
-                  <div class="labour-info">
-                    <h3 class="labour-party">{{ entry.partyName }}</h3>
-                    <p class="labour-site">
-                      <ion-icon name="business-outline"></ion-icon>
-                      {{ entry.site }} - {{ entry.projectName }}
-                    </p>
-                  </div>
-                  <app-status-pill [tone]="getStatusTone(entry.status)">{{ entry.status }}</app-status-pill>
-                </header>
-
-                <div class="labour-stats">
-                  <div class="stat">
-                    <div class="stat-value">{{ entry.presentCount }}</div>
-                    <div class="stat-label">Present</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-value">{{ entry.presentDays }}</div>
-                    <div class="stat-label">Days</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-value">{{ entry.dailyWage | currency:'INR':'symbol':'1.0-0' }}</div>
-                    <div class="stat-label">Daily wage</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-value">{{ entry.shift }}</div>
-                    <div class="stat-label">Shift</div>
-                  </div>
+                <div class="type-info">
+                  <span class="type-name">{{ type.labourType }}</span>
+                  <span class="type-count">{{ type.count }} {{ type.count === 1 ? 'worker' : 'workers' }}</span>
                 </div>
-
-                <footer class="labour-footer">
-                  <div class="labour-date">
-                    <ion-icon name="time-outline"></ion-icon>
-                    {{ entry.attendanceDate | date:'MMM d, yyyy' }}
-                  </div>
-                  <span class="view-link">
-                    View
-                    <ion-icon name="chevron-forward-outline"></ion-icon>
-                  </span>
-                </footer>
+                <ion-icon name="chevron-forward-outline" class="type-arrow"></ion-icon>
               </button>
             }
           }
         </div>
 
-        <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-          <ion-fab-button (click)="createLabour()">
-            <ion-icon name="add-outline"></ion-icon>
-          </ion-fab-button>
-        </ion-fab>
+        @if (selectedLabourType()) {
+          <div class="workers-sheet">
+            <div class="sheet-header">
+              <h3>{{ selectedLabourType() }} Workers</h3>
+              <button class="close-btn" (click)="closeWorkersSheet()">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+            </div>
+            <div class="workers-list">
+              @for (worker of workersOfType(); track worker._id) {
+                <div class="worker-row">
+                  <div class="worker-info">
+                    <span class="worker-name">{{ worker.name }}</span>
+                    <span class="worker-pay">{{ worker.weeklyPay | currency:'INR':'symbol':'1.0-0' }}/week</span>
+                  </div>
+                  <button class="mark-btn" (click)="markAttendance(worker)">
+                    Mark Present
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+          <div class="sheet-backdrop" (click)="closeWorkersSheet()"></div>
+        }
       }
+
+      @if (activeTab === 'attendance') {
+        <div class="attendance-date">
+          <ion-icon name="calendar-outline"></ion-icon>
+          {{ todayDate | date:'EEEE, MMMM d, yyyy' }}
+        </div>
+
+        <div class="cards">
+          @if (isLoading() && todayAttendance().length === 0) {
+            @for (i of [1,2,3]; track i) {
+              <div class="skeleton-card">
+                <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
+                <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+              </div>
+            }
+          } @else if (todayAttendance().length === 0) {
+            <app-empty-state
+              icon="time-outline"
+              title="No attendance for today"
+              message="Select a worker type and mark attendance to get started."
+            ></app-empty-state>
+          } @else {
+            @for (att of todayAttendance(); track att._id) {
+              <div class="att-card">
+                <div class="att-header">
+                  <div class="att-worker">
+                    <span class="att-name">{{ att.workerName }}</span>
+                    <span class="att-type">{{ att.labourType }}</span>
+                  </div>
+                  <span class="att-shift">Shift {{ att.shiftCount }}</span>
+                </div>
+                <div class="att-details">
+                  <div class="att-detail">
+                    <span class="detail-label">OT Hours</span>
+                    <span class="detail-value">{{ att.overtimeHours }}h</span>
+                  </div>
+                  <div class="att-detail">
+                    <span class="detail-label">OT Amount</span>
+                    <span class="detail-value">{{ att.overtimeAmount | currency:'INR':'symbol':'1.0-0' }}</span>
+                  </div>
+                  <div class="att-detail">
+                    <span class="detail-label">Late Fine</span>
+                    <span class="detail-value">{{ att.lateFine | currency:'INR':'symbol':'1.0-0' }}</span>
+                  </div>
+                  <div class="att-detail">
+                    <span class="detail-label">Payment</span>
+                    <span class="detail-value">{{ att.paymentMode }}</span>
+                  </div>
+                </div>
+                @if (att.notes) {
+                  <div class="att-notes">Note: {{ att.notes }}</div>
+                }
+                <div class="att-footer">
+                  <button class="view-history-btn" (click)="viewHistory(att)">
+                    View History
+                  </button>
+                  <button class="edit-att-btn" (click)="editAttendance(att)">
+                    Edit
+                  </button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+        <ion-fab-button (click)="createWorker()">
+          <ion-icon name="person-add-outline"></ion-icon>
+        </ion-fab-button>
+      </ion-fab>
     </ion-content>
   `,
   styles: [`
@@ -227,262 +208,343 @@ interface Employee {
 
     .filter-stack { padding: 0 16px 8px; }
     .seg-wrap { padding: 4px 4px 8px; }
-    .filter-bar { padding: 0 16px 4px; }
 
-    .cards { padding: 4px 16px 96px; }
-    .emp-card {
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px 8px;
+    }
+    .section-header h2 { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+    .add-worker-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      background: #002263;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: inherit;
+      border: none;
+      cursor: pointer;
+    }
+    .add-worker-btn ion-icon { font-size: 14px; }
+
+    .type-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      padding: 4px 16px 96px;
+    }
+    .type-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px;
       background: #ffffff;
       border: 1px solid #eef0f3;
-      border-radius: 18px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      box-shadow: var(--agb-shadow-2xs);
-    }
-    .emp-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
-    .emp-tile {
-      width: 40px; height: 40px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(14, 165, 233, 0.04));
-      color: #0369a1;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-    .emp-tile ion-icon { font-size: 18px; }
-    .emp-info { flex: 1; min-width: 0; }
-    .emp-name { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
-    .emp-meta { font-size: 12px; color: #64748b; margin: 0; display: inline-flex; align-items: center; gap: 4px; }
-    .emp-meta ion-icon { font-size: 12px; }
-    .emp-types { display: flex; flex-wrap: wrap; gap: 6px; }
-    .type-chip {
-      font-size: 11px;
-      padding: 4px 10px;
-      background: rgba(201, 162, 39, 0.10);
-      border: 1px solid rgba(201, 162, 39, 0.20);
-      color: #a8861f;
-      border-radius: 999px;
-      font-weight: 600;
-    }
-    .type-chip.neutral { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
-
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.50); z-index: 100; backdrop-filter: blur(2px); }
-    .add-emp-modal {
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-      width: calc(100% - 32px); max-width: 360px;
-      background: #ffffff; border-radius: 22px; padding: 22px 20px;
-      z-index: 101;
-      box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.30);
-      text-align: center;
-    }
-    .modal-tile {
-      width: 56px; height: 56px;
-      margin: 0 auto 14px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(14, 165, 233, 0.04));
-      color: #0369a1;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .modal-tile ion-icon { font-size: 26px; }
-    .add-emp-modal h3 { font-size: 17px; font-weight: 700; color: #0f172a; margin: 0 0 12px; }
-    .add-emp-modal p { font-size: 13px; color: #475569; margin: 0 0 10px; line-height: 1.55; text-align: left; }
-    .add-emp-modal p strong { color: #0f172a; }
-    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
-    .btn {
-      flex: 1; min-width: 0;
-      padding: 12px 14px;
-      border-radius: 12px;
-      font-weight: 700;
-      font-size: 13px;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
       cursor: pointer;
       font-family: inherit;
-      border: 0;
-      transition: filter var(--agb-transition-fast);
+      text-align: left;
+      transition: transform 0.15s, box-shadow 0.15s;
     }
-    .btn.ghost { background: #f1f5f9; color: #002263; border: 1px solid #e2e8f0; }
-    .btn.primary { background: #002263; color: #ffffff; }
+    .type-card:active { transform: scale(0.98); }
+    .type-card.skeleton { cursor: default; }
+    .type-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .type-icon ion-icon { font-size: 18px; }
+    .type-icon.icon-helper { background: rgba(14, 165, 233, 0.10); color: #0369a1; }
+    .type-icon.icon-mason { background: rgba(168, 85, 247, 0.10); color: #7e22ce; }
+    .type-icon.icon-plumber { background: rgba(34, 197, 94, 0.10); color: #15803d; }
+    .type-icon.icon-electrician { background: rgba(234, 179, 8, 0.10); color: #a86c02; }
+    .type-icon.icon-carpenter { background: rgba(249, 115, 22, 0.10); color: #c2410c; }
+    .type-icon.icon-civil { background: rgba(156, 163, 175, 0.10); color: #4b5563; }
+    .type-icon.icon-default { background: rgba(201, 162, 39, 0.10); color: #a8861f; }
+    .type-info { flex: 1; min-width: 0; }
+    .type-name { display: block; font-size: 14px; font-weight: 700; color: #0f172a; }
+    .type-count { display: block; font-size: 11px; color: #64748b; margin-top: 2px; }
+    .type-arrow { font-size: 16px; color: #94a3b8; }
+
+    .workers-sheet {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-height: 70vh;
+      background: #ffffff;
+      border-radius: 22px 22px 0 0;
+      z-index: 101;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.20);
+    }
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.40);
+      z-index: 100;
+      backdrop-filter: blur(2px);
+    }
+    .sheet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .sheet-header h3 { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0; }
+    .close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .close-btn ion-icon { font-size: 20px; color: #64748b; }
+    .workers-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0 24px;
+    }
+    .worker-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1px solid #f8fafc;
+    }
+    .worker-info { display: flex; flex-direction: column; gap: 2px; }
+    .worker-name { font-size: 14px; font-weight: 600; color: #0f172a; }
+    .worker-pay { font-size: 12px; color: #64748b; }
+    .mark-btn {
+      padding: 8px 14px;
+      background: #002263;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: inherit;
+      border: none;
+      cursor: pointer;
+    }
+
+    .attendance-date {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+    }
+    .attendance-date ion-icon { font-size: 16px; }
+
+    .cards { padding: 4px 16px 96px; }
+    .att-card {
+      background: #ffffff;
+      border: 1px solid #eef0f3;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .att-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .att-worker { display: flex; flex-direction: column; gap: 2px; }
+    .att-name { font-size: 15px; font-weight: 700; color: #0f172a; }
+    .att-type { font-size: 11px; color: #64748b; }
+    .att-shift {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      background: rgba(14, 165, 233, 0.10);
+      color: #0369a1;
+      border-radius: 6px;
+    }
+    .att-details {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 10px 8px;
+      margin-bottom: 10px;
+    }
+    .att-detail { text-align: center; }
+    .detail-label { display: block; font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
+    .detail-value { display: block; font-size: 12px; font-weight: 700; color: #0f172a; margin-top: 3px; }
+    .att-notes { font-size: 12px; color: #64748b; font-style: italic; margin-bottom: 10px; }
+    .att-footer { display: flex; justify-content: flex-end; gap: 8px; }
+    .view-history-btn, .edit-att-btn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border: 0;
+    }
+    .view-history-btn { background: #f1f5f9; color: #475569; }
+    .edit-att-btn { background: #002263; color: #fff; }
 
     .skeleton-card {
       background: #ffffff;
       border: 1px solid #eef0f3;
-      border-radius: 18px;
+      border-radius: 16px;
       padding: 16px;
       margin-bottom: 10px;
     }
 
-    /* Labour attendance card */
-    .labour-card {
-      width: 100%;
-      text-align: left;
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: 20px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      box-shadow: var(--agb-shadow-2xs);
-      cursor: pointer;
-      font-family: inherit;
-      transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
-    }
-    .labour-card:active { transform: scale(0.99); }
-    .labour-card:hover { box-shadow: var(--agb-shadow-sm); }
-    .labour-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
-    .labour-info { flex: 1; min-width: 0; }
-    .labour-party { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
-    .labour-site { font-size: 12px; color: #64748b; margin: 0; display: inline-flex; align-items: center; gap: 4px; }
-    .labour-site ion-icon { font-size: 12px; }
-
-    .labour-stats {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-      background: #f8fafc;
-      border: 1px solid #f1f5f9;
-      border-radius: 12px;
-      padding: 10px 8px;
-      margin-bottom: 10px;
-    }
-    .stat { text-align: center; }
-    .stat-value { font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.1; }
-    .stat-label { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 3px; }
-
-    .labour-footer { display: flex; align-items: center; justify-content: space-between; }
-    .labour-date { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #64748b; }
-    .labour-date ion-icon { font-size: 13px; }
-    .view-link { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: #002263; }
-    .view-link ion-icon { font-size: 14px; }
-
     ion-fab-button { --background: #002263; --color: #ffffff; }
+
+    .empty-state-container {
+      padding: 40px 16px;
+    }
   `],
 })
 export class LabourPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
-  activeTab = 'employees';
-  searchQuery = '';
-  statusFilter: LabourStatus | '' = '';
+  activeTab = 'workers';
+  todayDate = new Date().toISOString().slice(0, 10);
 
-  labour = signal<Labour[]>([]);
-  filteredLabour = signal<Labour[]>([]);
+  workers = signal<Worker[]>([]);
+  todayAttendance = signal<Attendance[]>([]);
+  labourTypeCounts = signal<LabourTypeCount[]>([]);
+  selectedLabourType = signal<string | null>(null);
   isLoading = signal(true);
 
-  employees = computed<Employee[]>(() => {
-    const map = new Map<string, Employee>();
-    for (const entry of this.labour()) {
-      if (!map.has(entry.partyName)) {
-        map.set(entry.partyName, {
-          name: entry.partyName,
-          labourTypes: [...new Set(entry.laborTypes?.map((t) => t.name) || [])],
-          lastSeen: entry.attendanceDate,
-          entryCount: 1,
-        });
-      } else {
-        const existing = map.get(entry.partyName)!;
-        existing.entryCount++;
-        if (entry.attendanceDate > existing.lastSeen) existing.lastSeen = entry.attendanceDate;
-        for (const t of entry.laborTypes || []) {
-          if (!existing.labourTypes.includes(t.name)) existing.labourTypes.push(t.name);
-        }
-      }
+  workersOfType = computed<Worker[]>(() => {
+    const type = this.selectedLabourType();
+    if (!type) return [];
+    return this.workers().filter(w => w.labourType === type);
+  });
+
+  workerTypeCounts = computed<LabourTypeCount[]>(() => {
+    const counts = new Map<string, number>();
+    for (const w of this.workers()) {
+      const t = (w.labourType || '').trim();
+      if (!t) continue;
+      counts.set(t, (counts.get(t) || 0) + 1);
     }
-    return Array.from(map.values());
+    return Array.from(counts.entries())
+      .map(([labourType, count]) => ({ labourType, count }))
+      .sort((a, b) => a.labourType.localeCompare(b.labourType));
   });
-
-  filteredEmployees = computed<Employee[]>(() => {
-    const q = this.searchQuery.trim().toLowerCase();
-    if (!q) return this.employees();
-    return this.employees().filter((e) => e.name.toLowerCase().includes(q));
-  });
-
-  showAddEmployee = false;
-  newEmployeeName = '';
-  newEmployeeTypes: string[] = [];
-  defaultTypes = DEFAULT_LABOUR_TYPES;
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      addOutline, peopleOutline, timeOutline, personAddOutline, checkmarkOutline,
-      chevronForwardOutline, businessOutline, briefcaseOutline, ribbonOutline, addCircleOutline,
+      addOutline, peopleOutline, timeOutline, personAddOutline,
+      chevronForwardOutline, businessOutline, briefcaseOutline,
+      constructOutline, hammerOutline, flashOutline, buildOutline,
+      cutOutline, homeOutline, closeOutline, checkmarkOutline,
     });
-    await this.loadLabour();
+    await this.loadData();
 
     if (typeof window !== 'undefined') {
       window.addEventListener('agb:site-changed', this.handleSiteChange);
+      window.addEventListener('agb:labour-changed', this.handleSiteChange);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:site-changed', this.handleSiteChange);
+      window.removeEventListener('agb:labour-changed', this.handleSiteChange);
     }
   }
 
   private handleSiteChange = (): void => {
-    void this.loadLabour();
+    void this.loadData();
   };
 
-  async loadLabour(): Promise<void> {
+  async loadData(): Promise<void> {
     this.isLoading.set(true);
     try {
-      this.supervisor
-        .getLabourEntries({
-          limit: 100,
-        })
-        .subscribe({
-          next: (r) => {
-            this.labour.set(r.labour || []);
-            this.filterLabour();
-            this.isLoading.set(false);
-          },
-          error: (err) => {
-            console.error('[Labour] failed to load', err);
-            this.labour.set([]);
-            this.filterLabour();
-            this.isLoading.set(false);
-          },
-        });
+      const siteId = this.supervisor.selectedSiteId();
+      const projectId = this.supervisor.selectedProjectId();
+
+      const [workersRes, attendanceRes] = await Promise.all([
+        this.supervisor.getWorkers({ siteId: siteId || undefined, limit: 200 }).toPromise(),
+        this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).toPromise(),
+      ]);
+
+      this.workers.set(workersRes?.items || []);
+      this.todayAttendance.set(attendanceRes?.attendances || []);
+      this.isLoading.set(false);
     } catch (e) {
-      console.error(e);
+      console.error('[Labour] failed to load', e);
+      this.workers.set([]);
+      this.todayAttendance.set([]);
       this.isLoading.set(false);
     }
   }
 
   async refreshAll(event: CustomEvent): Promise<void> {
-    await this.loadLabour();
+    await this.loadData();
     (event.target as HTMLIonRefresherElement).complete();
   }
 
   onTabChange() {
-    this.searchQuery = '';
-    this.filterLabour();
-  }
-
-  onSearch() {
-    if (this.activeTab === 'attendance') this.filterLabour();
-  }
-
-  filterLabour(): void {
-    let filtered = this.labour();
-    if (this.searchQuery) {
-      const q = this.searchQuery.toLowerCase();
-      filtered = filtered.filter((l) => l.partyName.toLowerCase().includes(q) || l.site.toLowerCase().includes(q));
+    if (this.activeTab === 'attendance') {
+      void this.loadAttendance();
     }
-    if (this.statusFilter) filtered = filtered.filter((l) => l.status === this.statusFilter);
-    this.filteredLabour.set(filtered);
   }
 
-  toggleNewType(t: string) {
-    const idx = this.newEmployeeTypes.indexOf(t);
-    if (idx >= 0) this.newEmployeeTypes.splice(idx, 1);
-    else this.newEmployeeTypes.push(t);
+  async loadAttendance(): Promise<void> {
+    const siteId = this.supervisor.selectedSiteId();
+    const projectId = this.supervisor.selectedProjectId();
+    this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined)
+      .subscribe({
+        next: (res) => this.todayAttendance.set(res.attendances || []),
+        error: (err) => console.error('[Labour] failed to load attendance', err),
+      });
   }
 
-  logFirstAttendance(): void {
-    this.showAddEmployee = false;
-    this.createLabour();
+  getTypeIcon(type: string): string {
+    return LABOUR_TYPE_ICONS[type] || 'briefcase-outline';
   }
 
-  viewLabour(entry: Labour): void { this.router.navigate(['/tabs/labour', entry._id]); }
-  createLabour(): void { this.router.navigate(['/tabs/labour/create']); }
+  getTypeColor(type: string): string {
+    return type.toLowerCase() || 'default';
+  }
 
-  getStatusTone(status: LabourStatus): 'success' | 'warning' | 'danger' | 'neutral' {
-    return status === 'Pending' ? 'warning' : status === 'Approved' ? 'success' : status === 'Rejected' ? 'danger' : 'neutral';
+  openWorkersOfType(type: string): void {
+    this.selectedLabourType.set(type);
+  }
+
+  closeWorkersSheet(): void {
+    this.selectedLabourType.set(null);
+  }
+
+  createWorker(): void {
+    this.router.navigate(['/tabs/labour/create-worker']);
+  }
+
+  markAttendance(worker: Worker): void {
+    this.router.navigate(['/tabs/labour/mark-attendance', worker._id]);
+  }
+
+  viewHistory(att: Attendance): void {
+    this.router.navigate(['/tabs/labour/worker-history', att.workerId]);
+  }
+
+  editAttendance(att: Attendance): void {
+    this.router.navigate(['/tabs/labour/edit-attendance', att._id]);
   }
 }

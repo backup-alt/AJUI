@@ -80,3 +80,99 @@ export interface LabourFilters {
   page?: number;
   limit?: number;
 }
+
+// =================== WORKER ===================
+export interface Worker {
+  _id: string;
+  workerId: string;
+  projectId: string;
+  projectName: string;
+  siteId?: string;
+  site: string;
+  name: string;
+  address?: string;
+  labourType: string;
+  weeklyPay: number;
+  isSubcontract: boolean;
+  subcontractorId?: string;
+  subcontractorName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWorkerRequest {
+  projectId: string;
+  siteId?: string;
+  site: string;
+  name: string;
+  address?: string;
+  labourType: string;
+  weeklyPay: number;
+  isSubcontract: boolean;
+  subcontractorId?: string;
+  subcontractorName?: string;
+}
+
+export interface Subcontractor {
+  subcontractorId: string;
+  subcontractorName: string;
+}
+
+// =================== ATTENDANCE ===================
+export interface Attendance {
+  _id: string;
+  attendanceId: string;
+  workerId: string;
+  workerName: string;
+  projectId: string;
+  projectName: string;
+  siteId?: string;
+  site: string;
+  labourType: string;
+  weeklyPay: number;
+  attendanceDate: string;
+  shiftCount: number;
+  overtimeHours: number;
+  overtimeAmount: number;
+  lateFine: number;
+  paymentMode: PaymentMode;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface MarkAttendanceRequest {
+  workerId: string;
+  projectId: string;
+  siteId?: string;
+  site: string;
+  attendanceDate: string;
+  shiftCount: number;
+  overtimeHours: number;
+  overtimeAmount: number;
+  lateFine: number;
+  paymentMode: PaymentMode;
+  notes?: string;
+}
+
+export interface AttendanceListResponse {
+  attendances: Attendance[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface WorkerListResponse {
+  items: Worker[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface LabourTypeCount {
+  labourType: string;
+  count: number;
+}
