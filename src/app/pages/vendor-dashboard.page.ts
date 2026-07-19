@@ -1547,7 +1547,16 @@ export class VendorDashboardPage {
   }
 
   async createVendor(value: VendorFormValue) {
-    if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
+    if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) {
+      const toast = await this.toastController.create({
+        message: "Please fill all required fields before saving",
+        duration: 3000,
+        color: "warning",
+        position: "top",
+      });
+      await toast.present();
+      return;
+    }
 
     const statusValue: VendorStatus = value.status === "Not Active" ? "Not Active" : "Active";
 
@@ -1582,16 +1591,52 @@ export class VendorDashboardPage {
 
       this.showVendorForm.set(false);
       this.refreshSiteAssignments();
+
+      const toast = await this.toastController.create({
+        message: "Vendor created successfully",
+        duration: 2000,
+        color: "success",
+        position: "top",
+      });
+      await toast.present();
     } catch (err: any) {
-      const msg = err?.error?.message || err?.message || "Failed to create vendor";
+      console.error("Failed to create vendor", err);
+      const msg = this.formatVendorError(err);
       const toast = await this.toastController.create({
         message: msg,
-        duration: 4000,
+        duration: 5000,
         color: "danger",
         position: "top",
       });
       await toast.present();
     }
+  }
+
+  private formatVendorError(err: any): string {
+    const errorBody = err?.error;
+    if (errorBody?.details && typeof errorBody.details === "object") {
+      const entries = Object.entries(errorBody.details as Record<string, unknown>);
+      const messages: string[] = [];
+      for (const [field, val] of entries) {
+        if (Array.isArray(val)) {
+          for (const item of val) {
+            const text = typeof item === "string" ? item : item?.message || JSON.stringify(item);
+            messages.push(`${field}: ${text}`);
+          }
+        } else if (val) {
+          const text = typeof val === "string" ? val : (val as any)?.message || JSON.stringify(val);
+          messages.push(`${field}: ${text}`);
+        }
+      }
+      if (messages.length) return messages.join("; ");
+    }
+    if (errorBody?.details && Array.isArray(errorBody.details)) {
+      const text = (errorBody.details as any[])
+        .map((d) => typeof d === "string" ? d : d?.message || JSON.stringify(d))
+        .join("; ");
+      if (text) return text;
+    }
+    return errorBody?.message || err?.message || "Failed to save vendor. Please check your input.";
   }
 
   editVendor(vendor: Vendor, event: Event) {
@@ -1618,7 +1663,17 @@ export class VendorDashboardPage {
 
   async updateVendor(value: VendorFormValue) {
     const vendor = this.editingVendor();
-    if (!vendor || !value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
+    if (!vendor || !value.name || !value.materialType || !value.phone || !value.gst || !value.address) {
+      if (!vendor) return;
+      const toast = await this.toastController.create({
+        message: "Please fill all required fields before saving",
+        duration: 3000,
+        color: "warning",
+        position: "top",
+      });
+      await toast.present();
+      return;
+    }
 
     const statusValue: VendorStatus = value.status === "Not Active" ? "Not Active" : "Active";
 
@@ -1656,10 +1711,11 @@ export class VendorDashboardPage {
       });
       await toast.present();
     } catch (err: any) {
-      const msg = err?.error?.message || err?.message || "Failed to update vendor";
+      console.error("Failed to update vendor", err);
+      const msg = this.formatVendorError(err);
       const toast = await this.toastController.create({
         message: msg,
-        duration: 4000,
+        duration: 5000,
         color: "danger",
         position: "top",
       });
