@@ -7,6 +7,7 @@ import { ApiService } from "../core/api.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney } from "../shared/format";
+import { TaxInvoiceDialogComponent } from "../shared/tax-invoice-dialog.component";
 import type { Quotation, QuotationRow } from "../../data/dashboardData";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -49,7 +50,7 @@ function numberToWords(num: number): string {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, TaxInvoiceDialogComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="quotations"></agb-enterprise-sidebar>
@@ -126,6 +127,7 @@ function numberToWords(num: number): string {
                   <div class="editor-actions">
                     <button type="button" class="btn-outline" (click)="exportToExcel()">Export Excel</button>
                     <button type="button" class="btn-outline" (click)="exportToPDF()" [disabled]="savingPdf()">Export PDF</button>
+                    <button type="button" class="btn-outline" (click)="showTaxInvoice.set(true)">Tax Invoice</button>
                     <button type="button" class="btn-secondary" (click)="saveQuotation('Draft')" [disabled]="savingQuote()">Save as Draft</button>
                     <button type="button" class="btn-primary" (click)="saveQuotation('Sent')" [disabled]="savingQuote()">Save & Send</button>
                   </div>
@@ -295,6 +297,12 @@ function numberToWords(num: number): string {
         </ion-content>
       </div>
     </ion-split-pane>
+    @if (showTaxInvoice()) {
+      <agb-tax-invoice-dialog
+        [quotation]="currentQuotationForInvoice()"
+        (closed)="showTaxInvoice.set(false)"
+      ></agb-tax-invoice-dialog>
+    }
   `,
   styles: [`
     .quotation-page {
@@ -815,6 +823,38 @@ export class QuotationPage {
   readonly newColumnName = signal("");
   readonly savingPdf = signal(false);
   readonly savingQuote = signal(false);
+  readonly showTaxInvoice = signal(false);
+
+  readonly currentQuotationForInvoice = computed<Quotation | null>(() => {
+    if (!this.editingQuotation()) return null;
+    const rows = this.quotationRows();
+    return {
+      id: this.editingQuoteId() || "",
+      quotationNumber: this.currentQuoteNumber(),
+      date: this.quotationDate(),
+      companyName: this.companyProfile().name,
+      companyAddress: this.companyProfile().address,
+      state: this.companyProfile().state,
+      gstin: this.companyProfile().gstin,
+      clientName: this.clientName,
+      clientAddress: this.clientAddress,
+      clientState: this.clientState,
+      clientGstin: this.clientGstin,
+      items: rows,
+      customColumns: this.customColumns(),
+      subtotal: this.subtotal(),
+      cgstPercent: this.cgstPercent,
+      sgstPercent: this.sgstPercent,
+      cgstAmount: this.cgstAmount(),
+      sgstAmount: this.sgstAmount(),
+      roundOff: this.roundOff,
+      totalAmount: this.totalAmount(),
+      amountInWords: this.amountInWords(),
+      status: "Draft",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  });
 
   readonly editingQuoteId = signal<string | null>(null);
   readonly quotationRows = signal<QuotationRow[]>([]);
@@ -1029,7 +1069,8 @@ export class QuotationPage {
         const created = await this.api.createQuotation(quotationData).toPromise();
         const saved = {
           ...quotationData,
-          id: (created as any)._id || (created as any).id || existingId,
+          quotationNumber: (created as any).quotation?.quotationNumber || quotationData.quotationNumber,
+          id: (created as any).quotation?._id || (created as any).id || existingId,
         };
         this.data.addQuotation(saved as any);
         this.editingQuoteId.set(null);

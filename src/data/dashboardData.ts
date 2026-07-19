@@ -66,6 +66,7 @@ export type QuotationRow = {
   id: string;
   sno: number;
   description: string;
+  hsnCode?: string;
   unit: string;
   qty: number;
   rate: number;
@@ -105,6 +106,10 @@ export type CompanyProfile = {
   address: string;
   state: string;
   gstin: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  branch?: string;
 };
 
 export type LabourRow = {

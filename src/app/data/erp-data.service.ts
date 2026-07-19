@@ -398,6 +398,10 @@ export class ErpDataService {
       address: "",
       state: "Tamil Nadu",
       gstin: "",
+      bankName: "",
+      accountNumber: "",
+      ifsc: "",
+      branch: "",
     }),
   );
 
@@ -1579,34 +1583,13 @@ export class ErpDataService {
     this.companyProfile.update((profile) => ({ ...profile, ...patch }));
   }
 
-  addQuotation(input: Omit<Quotation, "id" | "quotationNumber" | "createdAt" | "updatedAt">): Quotation {
-    const nextNumber =
-      Math.max(
-        0,
-        ...this.quotations()
-          .map((q) => Number(q.quotationNumber.replace(/\D/g, "")))
-          .filter((value) => Number.isFinite(value)),
-      ) + 1;
+  addQuotation(input: Quotation): Quotation {
     const quotation: Quotation = {
-      id: `QUO-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      quotationNumber: `QUO-${String(nextNumber).padStart(4, "0")}`,
+      ...input,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      ...input,
     };
     this.quotations.update((quotations) => [quotation, ...quotations]);
-
-    this.api.createQuotation(quotation).subscribe({
-      next: (res) => {
-        if (res?.quotation?._id) {
-          this.quotations.update((qs) =>
-            qs.map((q) => q.id === quotation.id ? { ...q, id: res.quotation._id } : q)
-          );
-        }
-      },
-      error: (err) => console.warn("[ERP] createQuotation failed:", err?.message ?? err),
-    });
-
     return quotation;
   }
 
