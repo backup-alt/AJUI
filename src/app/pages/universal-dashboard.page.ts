@@ -288,7 +288,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
           title="Dashboard"
           eyebrow="Universal Records · Backend source of truth"
           metaLabel=""
-          [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen()"
+          [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showVendorDialog() || !!editingInlineVendor()"
           [showTitle]="false"
           searchPlaceholder="Search"
           />

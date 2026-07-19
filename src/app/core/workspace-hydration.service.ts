@@ -4,6 +4,7 @@ import { ErpDataService } from "../data/erp-data.service";
 import {
   mapClient,
   mapExpense,
+  mapInvoice,
   mapLabour,
   mapMaterial,
   mapPayment,
@@ -24,7 +25,7 @@ export class WorkspaceHydrationService {
     this.clearWorkspaceData();
 
     // Load clients and projects first (they're interdependent)
-    const [{ clients, projects }, sites, vendors, supervisors, materials, labour, expenses, payments, subcontractors] = await Promise.all([
+    const [{ clients, projects }, sites, vendors, supervisors, materials, labour, expenses, payments, subcontractors, invoices] = await Promise.all([
       firstValueFrom(forkJoin({
         clients: this.api.listClients({ limit: 100 }),
         projects: this.api.listProjects({ limit: 100 }),
@@ -37,6 +38,7 @@ export class WorkspaceHydrationService {
       firstValueFrom(this.api.listExpenses({ limit: 100 })),
       firstValueFrom(this.api.listPayments({ limit: 100 })),
       firstValueFrom(this.api.listSubcontractors({ limit: 100 })),
+      firstValueFrom(this.api.listInvoices({ limit: 100 })),
     ]);
 
     const mappedProjects = (projects.items || []).map(mapProject);
@@ -61,6 +63,7 @@ export class WorkspaceHydrationService {
     this.setSignalAndStorage("expenses", (expenses.items || []).map(mapExpense), this.erp.expenses);
     this.setSignalAndStorage("payments", (payments.items || []).map(mapPayment), this.erp.payments);
     this.setSignalAndStorage("subcontractors", (subcontractors.items || []).map(mapSubcontractor), this.erp.subcontractors);
+    this.setSignalAndStorage("taxInvoices", (invoices.items || []).map(mapInvoice), this.erp.taxInvoices);
   }
 
   private clearWorkspaceData(): void {
@@ -74,6 +77,7 @@ export class WorkspaceHydrationService {
     this.erp.supervisors.set([]);
     this.erp.subcontractors.set([]);
 
+    this.erp.taxInvoices.set([]);
     [
       "clients",
       "projects",
@@ -85,6 +89,7 @@ export class WorkspaceHydrationService {
       "vendors",
       "supervisors",
       "subcontractors",
+      "taxInvoices",
     ].forEach((key) => {
       try {
         localStorage.removeItem(this.storageKey(key));

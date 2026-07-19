@@ -1,4 +1,6 @@
 import { Counter } from "../models/Counter.js";
+import { Quotation } from "../models/Quotation.js";
+import { Invoice } from "../models/Invoice.js";
 
 export type IdPrefix =
   | "CLI"
@@ -14,8 +16,10 @@ export type IdPrefix =
   | "APR"
   | "RPT"
   | "PO"
+  | "QUO"
   | "WRK"
-  | "ATT";
+  | "ATT"
+  | "INV";
 
 export async function generateId(prefix: IdPrefix, padding = 3): Promise<string> {
   const result = await Counter.findByIdAndUpdate(
@@ -24,5 +28,43 @@ export async function generateId(prefix: IdPrefix, padding = 3): Promise<string>
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
   const seq = result?.seq ?? 1;
+
+  const maxSuffix = await seedMaxFromCollection(prefix, seq);
+  const effectiveSeq = maxSuffix > seq ? maxSuffix : seq;
+
+  if (effectiveSeq > seq) {
+    const updated = await Counter.findByIdAndUpdate(prefix, { $set: { seq: effectiveSeq } }, { new: true });
+    return `${prefix}-${String(updated?.seq ?? effectiveSeq).padStart(padding, "0")}`;
+  }
+
   return `${prefix}-${String(seq).padStart(padding, "0")}`;
+}
+
+async function seedMaxFromCollection(prefix: IdPrefix, currentSeq: number): Promise<number> {
+  let collection: any;
+  let regex: RegExp;
+
+  if (prefix === "QUO") {
+    collection = Quotation;
+    regex = /^QUO-(\d+)$/;
+  } else if (prefix === "INV") {
+    collection = Invoice;
+    regex = /^INV-(\d+)$/;
+  } else {
+    return currentSeq;
+  }
+
+  try {
+    const doc = await collection
+      .findOne({ invoiceNumber: regex }, { invoiceNumber: 1, _id: 0 })
+      .sort({ invoiceNumber: -1 })
+      .lean();
+    if (!doc) return currentSeq;
+    const match = (doc as any).invoiceNumber?.match(/^.{3}-(\d+)$/);
+    if (!match) return currentSeq;
+    const max = parseInt(match[1], 10);
+    return isNaN(max) ? currentSeq : max;
+  } catch {
+    return currentSeq;
+  }
 }

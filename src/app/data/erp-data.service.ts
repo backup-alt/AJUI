@@ -13,6 +13,8 @@ import {
   type ProjectStatus,
   type Quotation,
   type QuotationRow,
+  type TaxInvoice,
+  type TaxInvoiceRow,
   type CompanyProfile,
 } from "../../data/dashboardData";
 import { CustomFieldsService } from "../core/custom-fields.service";
@@ -406,6 +408,7 @@ export class ErpDataService {
   );
 
   readonly quotations = signal<Quotation[]>(this.readState<Quotation[]>("quotations", []));
+  readonly taxInvoices = signal<TaxInvoice[]>(this.readState<TaxInvoice[]>("taxInvoices", []));
 
   constructor() {
     effect(() => this.writeState("clients", this.clients()));
@@ -430,6 +433,7 @@ export class ErpDataService {
     effect(() => this.writeState("appUsers", this.users()));
     effect(() => this.writeState("companyProfile", this.companyProfile()));
     effect(() => this.writeState("quotations", this.quotations()));
+    effect(() => this.writeState("taxInvoices", this.taxInvoices()));
     effect(() => {
       const rows = this.materials();
       if (rows && rows.length) {
@@ -1615,5 +1619,37 @@ export class ErpDataService {
 
   quotationById(quotationId: string): Quotation | undefined {
     return this.quotations().find((q) => q.id === quotationId);
+  }
+
+  addTaxInvoice(input: TaxInvoice): TaxInvoice {
+    const invoice: TaxInvoice = {
+      ...input,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    this.taxInvoices.update((invoices) => [invoice, ...invoices]);
+    return invoice;
+  }
+
+  updateTaxInvoice(invoiceId: string, patch: Partial<Omit<TaxInvoice, "id" | "invoiceNumber" | "createdAt">>) {
+    this.taxInvoices.update((invoices) =>
+      invoices.map((inv) =>
+        inv.id !== invoiceId ? inv : { ...inv, ...patch, updatedAt: new Date().toISOString() }
+      ),
+    );
+    this.api.patchInvoice(invoiceId, patch).subscribe({
+      error: (err) => console.warn("[ERP] patchInvoice failed:", err?.message ?? err),
+    });
+  }
+
+  deleteTaxInvoice(invoiceId: string) {
+    this.taxInvoices.update((invoices) => invoices.filter((inv) => inv.id !== invoiceId));
+    this.api.deleteInvoice(invoiceId).subscribe({
+      error: (err) => console.warn("[ERP] deleteInvoice failed:", err?.message ?? err),
+    });
+  }
+
+  taxInvoiceById(invoiceId: string): TaxInvoice | undefined {
+    return this.taxInvoices().find((inv) => inv.id === invoiceId);
   }
 }

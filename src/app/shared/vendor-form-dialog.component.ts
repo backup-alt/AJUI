@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, computed, inject, signal } from "@angular/core";
 import { IonIcon } from "@ionic/angular/standalone";
 import { FormsModule } from "@angular/forms";
-import { ErpDataService, type VendorStatus } from "../data/erp-data.service";
+import { ErpDataService, type Site, type VendorStatus } from "../data/erp-data.service";
 
 export type VendorFormValue = {
   name: string;
@@ -188,7 +188,11 @@ export class VendorFormDialogComponent implements OnInit {
   readonly allSiteEntities = this.data.siteEntities;
 
   readonly unselectedSites = computed(() => {
-    return this.allSiteEntities().filter((s) => !this.selectedSiteIds.includes(s.id));
+    const entities = this.allSiteEntities();
+    const source = entities.length > 0
+      ? entities
+      : this.data.sites().map(s => ({ id: s.id, name: s.name } as Site));
+    return source.filter((s) => !this.selectedSiteIds.includes(s.id));
   });
 
   ngOnInit() {

@@ -2,16 +2,26 @@ import { Quotation, IQuotation } from "../models/Quotation.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 
+const MAX_CREATE_ATTEMPTS = 3;
+
 export async function createQuotation(input: Partial<IQuotation> & { quotationNumber: string }) {
-  try {
-    const quotation = await Quotation.create({ ...input, archived: false });
-    return quotation.toObject();
-  } catch (err: any) {
-    if (err?.code === 11000) {
-      throw new AppError(409, `Quotation ${input.quotationNumber} already exists`);
+  let lastError: any;
+  for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt++) {
+    try {
+      const num = await generateId("QUO", 4);
+      const quotation = await Quotation.create({ ...input, quotationNumber: num, archived: false });
+      return quotation.toObject();
+    } catch (err: any) {
+      lastError = err;
+      if (err?.code !== 11000 || attempt === MAX_CREATE_ATTEMPTS - 1) {
+        if (err?.code === 11000) {
+          throw new AppError(409, `Quotation ${input.quotationNumber} already exists — please retry`);
+        }
+        throw err;
+      }
     }
-    throw err;
   }
+  throw lastError;
 }
 
 export async function listQuotations(filter: { search?: string; status?: string; page?: number; limit?: number; includeArchived?: boolean } = {}) {

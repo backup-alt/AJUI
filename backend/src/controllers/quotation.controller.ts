@@ -3,11 +3,7 @@ import * as quotationService from "../services/quotation.service.js";
 
 export async function createQuotation(req: Request, res: Response, next: NextFunction) {
   try {
-    const quotationNumber = await quotationService.getNextQuotationNumber();
-    const quotation = await quotationService.createQuotation({
-      ...req.body,
-      quotationNumber,
-    });
+    const quotation = await quotationService.createQuotation(req.body);
     res.status(201).json({ quotation });
   } catch (e) { next(e); }
 }

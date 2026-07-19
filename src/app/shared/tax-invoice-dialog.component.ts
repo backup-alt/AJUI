@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ErpDataService } from "../data/erp-data.service";
-import type { Quotation } from "../../data/dashboardData";
+import type { Quotation, TaxInvoice } from "../../data/dashboardData";
 import { formatMoney } from "./format";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -45,15 +45,15 @@ import { jsPDF } from "jspdf";
                 <div class="inv-meta-table">
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Invoice No.</span>
-                    <span class="inv-meta-value">{{ quotation?.quotationNumber || '—' }}</span>
+                    <span class="inv-meta-value">{{ (invoice as any)?.invoiceNumber || (invoice as any)?.quotationNumber || '—' }}</span>
                   </div>
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Invoice Date</span>
-                    <span class="inv-meta-value">{{ quotation?.date || '—' }}</span>
+                    <span class="inv-meta-value">{{ invoice?.date || '—' }}</span>
                   </div>
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Place of Supply</span>
-                    <span class="inv-meta-value">{{ quotation?.state || '—' }}</span>
+                    <span class="inv-meta-value">{{ invoice?.state || '—' }}</span>
                   </div>
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Supply Type</span>
@@ -66,9 +66,9 @@ import { jsPDF } from "jspdf";
             <div class="inv-bill-to">
               <div class="inv-section-label">Bill To:</div>
               <div class="inv-party-details">
-                <div class="inv-party-name">{{ quotation?.clientName || '—' }}</div>
-                <div class="inv-party-address">{{ quotation?.clientAddress || '—' }}</div>
-                <div class="inv-party-gst">State: {{ quotation?.clientState || '—' }} | GSTIN: {{ quotation?.clientGstin || '—' }}</div>
+                <div class="inv-party-name">{{ invoice?.clientName || '—' }}</div>
+                <div class="inv-party-address">{{ invoice?.clientAddress || '—' }}</div>
+                <div class="inv-party-gst">State: {{ invoice?.clientState || '—' }} | GSTIN: {{ invoice?.clientGstin || '—' }}</div>
               </div>
             </div>
 
@@ -114,36 +114,36 @@ import { jsPDF } from "jspdf";
               <div class="inv-summary-left">
                 <div class="inv-amount-words">
                   <span class="summary-label">Amount Chargeable (in words):</span>
-                  <strong>{{ quotation?.amountInWords || '—' }}</strong>
+                  <strong>{{ invoice?.amountInWords || '—' }}</strong>
                 </div>
               </div>
               <div class="inv-summary-right">
                 <div class="inv-summary-table">
                   <div class="inv-summary-row">
                     <span class="summary-label">Sub Total</span>
-                    <span class="summary-value">{{ formatRupee(quotation?.subtotal || 0) }}</span>
+                    <span class="summary-value">{{ formatRupee(invoice?.subtotal || 0) }}</span>
                   </div>
-                  @if (quotation?.cgstPercent) {
+                  @if (invoice?.cgstPercent) {
                     <div class="inv-summary-row">
-                      <span class="summary-label">Add: CGST @ {{ quotation?.cgstPercent }}%</span>
-                      <span class="summary-value">{{ formatRupee(quotation?.cgstAmount || 0) }}</span>
+                      <span class="summary-label">Add: CGST @ {{ invoice?.cgstPercent }}%</span>
+                      <span class="summary-value">{{ formatRupee(invoice?.cgstAmount || 0) }}</span>
                     </div>
                   }
-                  @if (quotation?.sgstPercent) {
+                  @if (invoice?.sgstPercent) {
                     <div class="inv-summary-row">
-                      <span class="summary-label">Add: SGST @ {{ quotation?.sgstPercent }}%</span>
-                      <span class="summary-value">{{ formatRupee(quotation?.sgstAmount || 0) }}</span>
+                      <span class="summary-label">Add: SGST @ {{ invoice?.sgstPercent }}%</span>
+                      <span class="summary-value">{{ formatRupee(invoice?.sgstAmount || 0) }}</span>
                     </div>
                   }
-                  @if (quotation?.roundOff !== 0 && quotation?.roundOff !== undefined) {
+                  @if (invoice?.roundOff !== 0 && invoice?.roundOff !== undefined) {
                     <div class="inv-summary-row">
                       <span class="summary-label">Round Off</span>
-                      <span class="summary-value">{{ formatRupee(quotation?.roundOff || 0) }}</span>
+                      <span class="summary-value">{{ formatRupee(invoice?.roundOff || 0) }}</span>
                     </div>
                   }
                   <div class="inv-summary-row inv-total-row">
                     <span class="summary-label">Total Amount Payable (₹)</span>
-                    <span class="summary-value">{{ formatRupee(quotation?.totalAmount || 0) }}</span>
+                    <span class="summary-value">{{ formatRupee(invoice?.totalAmount || 0) }}</span>
                   </div>
                 </div>
               </div>
@@ -316,7 +316,7 @@ import { jsPDF } from "jspdf";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TaxInvoiceDialogComponent {
-  @Input() quotation: Quotation | null = null;
+  @Input() invoice: (Quotation | TaxInvoice) | null = null;
   @Output() closed = new EventEmitter<void>();
 
   private readonly data = inject(ErpDataService);
@@ -326,14 +326,16 @@ export class TaxInvoiceDialogComponent {
   readonly totalPages = signal(1);
 
   readonly supplyType = computed(() => {
+    const inv = this.invoice as (Quotation | TaxInvoice) | null;
+    if (!inv) return "—";
+    if ("supplyType" in inv && inv.supplyType) return inv.supplyType;
     const co = this.profile();
-    const q = this.quotation;
-    if (!co?.state || !q?.state) return "—";
-    return co.state.trim().toLowerCase() === q.state.trim().toLowerCase() ? "Intrastate" : "Interstate";
+    if (!co?.state || !inv.state) return "—";
+    return co.state.trim().toLowerCase() === inv.state.trim().toLowerCase() ? "Intrastate" : "Interstate";
   });
 
   get items() {
-    return this.quotation?.items || [];
+    return (this.invoice as any)?.items || [];
   }
 
   formatRupee(amount: number): string {
@@ -384,7 +386,8 @@ export class TaxInvoiceDialogComponent {
         pdf.setTextColor(148, 163, 184);
         pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 6, { align: "center" });
       }
-      pdf.save(`tax-invoice-${this.quotation?.quotationNumber || 'draft'}.pdf`);
+      const inv = this.invoice as any;
+      pdf.save(`tax-invoice-${inv?.invoiceNumber || inv?.quotationNumber || 'draft'}.pdf`);
     } catch (err) {
       console.error("PDF export failed:", err);
       alert("Failed to export PDF. Please try again.");

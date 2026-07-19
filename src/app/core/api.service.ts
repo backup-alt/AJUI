@@ -330,6 +330,39 @@ export class ApiService {
     );
   }
 
+  // =================== INVOICES ===================
+  deleteInvoice(id: string): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/invoices/${id}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  patchInvoice(id: string, payload: any): Observable<any> {
+    return this.http.patch(`${this.baseUrl}/invoices/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  createInvoice(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/invoices`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  getInvoice(id: string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/invoices/${id}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+  listInvoices(params?: { page?: number; limit?: number; search?: string; status?: string }): Observable<PaginatedResponse<any>> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/invoices${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== SUBCONTRACTORS ===================
   deleteSubcontractor(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/subcontractors/${id}`, { headers: this.authHeaders() }).pipe(
