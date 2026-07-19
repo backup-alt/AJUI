@@ -339,6 +339,9 @@ export class LabourCreateWorkerPage implements OnInit {
           position: 'top',
         });
         await toast.present();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:labour-changed'));
+        }
         this.router.navigate(['/tabs/labour']);
       },
       error: async (err) => {

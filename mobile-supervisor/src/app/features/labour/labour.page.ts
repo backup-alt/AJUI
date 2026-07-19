@@ -446,12 +446,14 @@ export class LabourPage implements OnInit, OnDestroy {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('agb:site-changed', this.handleSiteChange);
+      window.addEventListener('agb:labour-changed', this.handleSiteChange);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:site-changed', this.handleSiteChange);
+      window.removeEventListener('agb:labour-changed', this.handleSiteChange);
     }
   }
 

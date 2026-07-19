@@ -383,12 +383,15 @@ export class LabourEditAttendancePage implements OnInit {
           position: 'top',
         });
         await toast.present();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:labour-changed'));
+        }
         this.router.navigate(['/tabs/labour']);
       },
       error: async (err) => {
         this.isSubmitting.set(false);
         const toast = await this.toastCtrl.create({
-          message: err?.message || 'Failed to update attendance',
+          message: err?.error?.error || err?.message || 'Failed to update attendance',
           duration: 3000,
           color: 'danger',
           position: 'top',
@@ -414,12 +417,15 @@ export class LabourEditAttendancePage implements OnInit {
           position: 'top',
         });
         await toast.present();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:labour-changed'));
+        }
         this.router.navigate(['/tabs/labour']);
       },
       error: async (err) => {
         this.isDeleting.set(false);
         const toast = await this.toastCtrl.create({
-          message: err?.message || 'Failed to delete attendance',
+          message: err?.error?.error || err?.message || 'Failed to delete attendance',
           duration: 3000,
           color: 'danger',
           position: 'top',

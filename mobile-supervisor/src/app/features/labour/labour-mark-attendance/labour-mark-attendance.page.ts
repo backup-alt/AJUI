@@ -345,12 +345,15 @@ export class LabourMarkAttendancePage implements OnInit {
           position: 'top',
         });
         await toast.present();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:labour-changed'));
+        }
         this.router.navigate(['/tabs/labour']);
       },
       error: async (err) => {
         this.isSubmitting.set(false);
         const toast = await this.toastCtrl.create({
-          message: err?.message || 'Failed to mark attendance',
+          message: err?.error?.error || err?.message || 'Failed to mark attendance',
           duration: 3000,
           color: 'danger',
           position: 'top',

@@ -507,12 +507,11 @@ export async function createWorker(req: Request, res: Response, next: NextFuncti
 
 export async function listWorkers(req: Request, res: Response, next: NextFunction) {
   try {
-    const userId = requireSupervisor(req);
-    const result = await workerService.listWorkers({
+    requireSupervisor(req);
+    const result = await workerService.listWorkersForSupervisor({
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       labourType: req.query.labourType as string | undefined,
-      createdBy: userId,
       page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 50,
     });

@@ -85,6 +85,27 @@ export async function listWorkers(filter: {
   return { items, total, page, limit, pages: Math.ceil(total / limit) };
 }
 
+/**
+ * List all workers accessible to the current supervisor.
+ * Filters by site and/or project; ignores the historical createdBy filter
+ * so any supervisor with site access can see every worker for that site.
+ */
+export async function listWorkersForSupervisor(filter: {
+  siteId?: string;
+  projectId?: string;
+  labourType?: string;
+  page?: number;
+  limit?: number;
+}) {
+  return listWorkers({
+    siteId: filter.siteId,
+    projectId: filter.projectId,
+    labourType: filter.labourType,
+    page: filter.page,
+    limit: filter.limit,
+  });
+}
+
 export async function getWorkerById(id: string) {
   if (!Types.ObjectId.isValid(id)) {
     throw new AppError(400, "Invalid worker id");

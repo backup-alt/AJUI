@@ -35,11 +35,13 @@ const workerSchema = new Schema<IWorker>(
     isSubcontract: { type: Boolean, default: false },
     subcontractorId: { type: Schema.Types.ObjectId, ref: "Subcontractor" },
     subcontractorName: { type: String, trim: true },
-    createdBy: { type: String, required: true },
+    createdBy: { type: String, required: true, index: true },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "workers" }
 );
 
 workerSchema.index({ siteId: 1, labourType: 1 });
+workerSchema.index({ projectId: 1, siteId: 1 });
+workerSchema.index({ siteId: 1, createdAt: -1 });
 
 export const Worker = model<IWorker>("Worker", workerSchema);
