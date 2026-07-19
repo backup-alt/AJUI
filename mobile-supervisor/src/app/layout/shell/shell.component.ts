@@ -1,12 +1,11 @@
 import {
   Component,
   OnInit,
-  OnDestroy,
   inject,
   signal,
   computed,
+  ViewEncapsulation,
 } from '@angular/core';
-import { DOCUMENT } from '@angular/common';
 import {
   IonContent,
   IonMenu,
@@ -64,6 +63,8 @@ import { Site } from '../../shared/models';
 @Component({
   selector: 'app-shell',
   standalone: true,
+  encapsulation: ViewEncapsulation.None,
+  host: { '[class.agb-shell-active]': 'true' },
   imports: [
     IonContent,
     IonMenu,
@@ -90,7 +91,20 @@ import { Site } from '../../shared/models';
       <ion-header class="agb-menu-header">
         <div class="menu-brand">
           <div class="menu-brand-logo">
-            <img src="assets/logo.png" alt="AGB" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="36" height="36" fill="none">
+              <circle cx="32" cy="32" r="30" stroke="#c9a227" stroke-width="2.5" fill="none"/>
+              <circle cx="32" cy="32" r="24" stroke="#c9a227" stroke-width="1" opacity="0.4"/>
+              <path d="M22 44 Q32 12 42 44 Z" stroke="#c9a227" stroke-width="2" fill="none"/>
+              <path d="M18 44 Q32 18 46 44 Z" stroke="#c9a227" stroke-width="1.5" opacity="0.6" fill="none"/>
+              <path d="M14 44 Q32 24 50 44 Z" stroke="#c9a227" stroke-width="1" opacity="0.3" fill="none"/>
+              <rect x="20" y="44" width="24" height="6" rx="2" fill="#c9a227"/>
+              <rect x="24" y="50" width="16" height="4" rx="2" fill="#c9a227" opacity="0.7"/>
+              <line x1="32" y1="12" x2="32" y2="4" stroke="#c9a227" stroke-width="1.5"/>
+              <circle cx="32" cy="3" r="2.5" fill="#c9a227"/>
+              <rect x="14" y="30" width="4" height="14" rx="1" fill="#c9a227" opacity="0.5"/>
+              <rect x="46" y="30" width="4" height="14" rx="1" fill="#c9a227" opacity="0.5"/>
+              <text x="32" y="58" text-anchor="middle" fill="#c9a227" font-size="4.5" font-weight="700" font-family="sans-serif">AGB</text>
+            </svg>
           </div>
           <div class="menu-brand-text">
             <div class="menu-brand-name">Annai Golden Builders</div>
@@ -108,7 +122,6 @@ import { Site } from '../../shared/models';
             </div>
             <div class="user-info">
               <div class="user-name">{{ currentUser()?.name }}</div>
-              <div class="user-role">Site Supervisor</div>
               @if (selectedSiteName()) {
                 <div class="user-project">
                   <ion-icon name="location-outline"></ion-icon>
@@ -265,7 +278,7 @@ import { Site } from '../../shared/models';
       justify-content: center;
       flex-shrink: 0;
     }
-    .menu-brand-logo img { width: 28px; height: 28px; object-fit: contain; }
+    .menu-brand-logo svg { width: 36px; height: 36px; }
     .menu-brand-text { line-height: 1.2; }
     .menu-brand-name { font-size: 14px; font-weight: 700; }
     .menu-brand-sub { font-size: 10px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
@@ -491,15 +504,36 @@ import { Site } from '../../shared/models';
     .empty-sites ion-icon { font-size: 40px; margin-bottom: 8px; opacity: 0.6; }
     .empty-sites p { font-size: 14px; font-weight: 600; color: #475569; margin: 0; }
     .empty-sites span { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+    /* ▸ Shell header overlap fix (host class set synchronously) */
+    app-shell.agb-shell-active ion-content {
+      --padding-top: calc(var(--agb-header-h) + env(safe-area-inset-top));
+      --padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+    app-shell.agb-shell-active ion-content.auth-content,
+    app-shell.agb-shell-active ion-content.full-bleed {
+      --padding-top: 0;
+    }
+    app-shell.agb-shell-active ion-content > .dashboard-container,
+    app-shell.agb-shell-active ion-content > .content-stack,
+    app-shell.agb-shell-active ion-content > .cards,
+    app-shell.agb-shell-active ion-content > .form-container,
+    app-shell.agb-shell-active ion-content > .filter-stack,
+    app-shell.agb-shell-active ion-content > .ledger-card,
+    app-shell.agb-shell-active ion-content > .labour-list,
+    app-shell.agb-shell-active ion-content > .sites-list,
+    app-shell.agb-shell-active ion-content > .materials-list,
+    app-shell.agb-shell-active ion-content > .expense-list,
+    app-shell.agb-shell-active ion-content > .requests-list {
+      margin-top: var(--agb-shell-gutter);
+    }
   `],
 })
-export class ShellComponent implements OnInit, OnDestroy {
+export class ShellComponent implements OnInit {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
-  private document = inject(DOCUMENT);
-  private readonly shellBodyClass = 'agb-shell-active';
 
   currentUser = signal<{ name: string; email: string } | null>(null);
   sites = signal<Site[]>([]);
@@ -535,18 +569,6 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
     await this.loadSites();
-
-    const body = this.document?.body;
-    if (body && !body.classList.contains(this.shellBodyClass)) {
-      body.classList.add(this.shellBodyClass);
-    }
-  }
-
-  ngOnDestroy(): void {
-    const body = this.document?.body;
-    if (body && body.classList.contains(this.shellBodyClass)) {
-      body.classList.remove(this.shellBodyClass);
-    }
   }
 
   async loadSites(): Promise<void> {
