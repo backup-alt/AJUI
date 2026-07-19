@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal, computed, ViewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -129,6 +129,7 @@ function numberToWords(num: number): string {
                     <button type="button" class="btn-outline" (click)="quotationReport?.exportToPDF()" [disabled]="savingPdf()">Export PDF</button>
                     <button type="button" class="btn-secondary" (click)="saveQuotation('Draft')" [disabled]="savingQuote()">Save as Draft</button>
                     <button type="button" class="btn-primary" (click)="saveQuotation('Sent')" [disabled]="savingQuote()">Save & Send</button>
+                    <button type="button" class="btn-outline" (click)="showQuotationPreview.set(true)" [disabled]="savingQuote()">Preview</button>
                   </div>
                 </div>
 
@@ -297,6 +298,30 @@ function numberToWords(num: number): string {
       </div>
     </ion-split-pane>
     <agb-quotation-report #quotationReport [quotationData]="reportQuotation()" />
+
+    @if (showQuotationPreview()) {
+      <div class="form-overlay" role="presentation">
+        <section class="erp-dialog quotation-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+          <div class="dialog-head">
+            <div>
+              <span>Quotation Preview</span>
+              <h2 id="preview-title">{{ currentQuoteNumber() }}</h2>
+            </div>
+            <button type="button" class="icon-button" aria-label="Close preview" (click)="showQuotationPreview.set(false)">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
+          <agb-quotation-report [quotationData]="reportQuotation()" class="preview-report" />
+          <div class="dialog-actions">
+            <button type="button" class="primary-action" (click)="quotationReport?.exportToPDF()">
+              <ion-icon name="download-outline"></ion-icon>
+              Download PDF
+            </button>
+            <button type="button" class="secondary-action" (click)="showQuotationPreview.set(false)">Close</button>
+          </div>
+        </section>
+      </div>
+    }
   `,
   styles: [`
     .quotation-page {
@@ -803,6 +828,97 @@ function numberToWords(num: number): string {
       .quotation-title { text-align: left; }
       .quotation-meta { text-align: left; }
     }
+    .form-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .quotation-preview-dialog {
+      background: #fff;
+      border-radius: 16px;
+      max-width: 900px;
+      width: 100%;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .quotation-preview-dialog .dialog-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 20px 24px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .quotation-preview-dialog .dialog-head h2 {
+      margin: 4px 0 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .quotation-preview-dialog .icon-button {
+      background: #f1f5f9;
+      border: none;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #475569;
+    }
+    .quotation-preview-dialog .icon-button:hover {
+      background: #e2e8f0;
+    }
+    .preview-report {
+      flex: 1;
+      overflow: auto;
+      padding: 24px;
+    }
+    .quotation-preview-dialog .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 16px 24px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .dialog-actions .primary-action,
+    .dialog-actions .secondary-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    .dialog-actions .primary-action {
+      background: #2c5cff;
+      color: #fff;
+    }
+    .dialog-actions .primary-action:hover {
+      background: #1e4ae8;
+    }
+    .dialog-actions .secondary-action {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+    .dialog-actions .secondary-action:hover {
+      background: #e2e8f0;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -815,11 +931,12 @@ export class QuotationPage {
   readonly editingQuotation = signal(false);
   readonly showAddColumnInput = signal(false);
   readonly newColumnName = signal("");
-  readonly savingPdf = signal(false);
+readonly savingPdf = signal(false);
   readonly savingQuote = signal(false);
   readonly editingQuoteId = signal<string | null>(null);
   readonly quotationRows = signal<QuotationRow[]>([]);
   readonly customColumns = signal<string[]>([]);
+  readonly showQuotationPreview = signal(false);
 
   @ViewChild('quotationReport') quotationReport!: QuotationReportComponent;
 
@@ -890,6 +1007,12 @@ export class QuotationPage {
     totalAmount: this.totalAmount(),
     amountInWords: this.amountInWords(),
   }));
+
+  readonly previewQuotation = computed<QuotationReportData>(() => this.reportQuotation());
+
+  showPreview() {
+    this.showQuotationPreview.set(true);
+  }
 
   constructor() {
     this.loadQuotationsFromBackend();

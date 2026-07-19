@@ -203,7 +203,9 @@ export class VendorFormDialogComponent implements OnInit {
   }
 
   siteName(id: string): string {
-    return this.allSiteEntities().find((s) => s.id === id)?.name ?? id;
+    const site = this.allSiteEntities().find((s) => s.id === id);
+    if (site) return site.name;
+    return `Site (${id.slice(0, 8)}...)`;
   }
 
   toggleSite(id: string) {

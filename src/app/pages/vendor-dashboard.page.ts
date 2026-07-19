@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
-import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { Vendor, VendorStatus, ErpDataService, Site } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
@@ -1098,6 +1098,7 @@ export class VendorDashboardPage {
   readonly api = inject(ApiService);
   readonly materialsService = inject(MaterialsService);
   readonly formatMoney = formatMoney;
+  readonly toastController = inject(ToastController);
 
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
@@ -1427,7 +1428,15 @@ export class VendorDashboardPage {
   addMaterialRow() {
     const vendor = this.selectedVendor();
     const site = this.selectedSite();
-    if (!vendor || !site) return;
+    if (!vendor || !site) {
+      this.toastController.create({
+        message: "Please select a vendor and site first",
+        duration: 3000,
+        color: "warning",
+        position: "top",
+      }).then(t => t.present());
+      return;
+    }
     const payload: Partial<MaterialRow> = {
       projectId: "",
       site: site.name,
@@ -1454,7 +1463,12 @@ export class VendorDashboardPage {
         this.nameError.set(null);
       },
       error: (err) => {
-        console.error("Failed to create material row:", err);
+        this.toastController.create({
+          message: "Failed to create material row: " + (err?.message || "Unknown error"),
+          duration: 4000,
+          color: "danger",
+          position: "top",
+        }).then(t => t.present());
       },
     });
   }
@@ -1532,7 +1546,7 @@ export class VendorDashboardPage {
     return (status || "not-received").toLowerCase().replace(/\s+/g, "-");
   }
 
-  createVendor(value: VendorFormValue) {
+  async createVendor(value: VendorFormValue) {
     if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
 
     const statusValue: VendorStatus = value.status === "Not Active" ? "Not Active" : "Active";
@@ -1547,39 +1561,37 @@ export class VendorDashboardPage {
       siteIds: value.siteIds || [],
     };
 
-    const tempId = `VEN-LOCAL-${Date.now()}`;
-    const optimisticVendor: Vendor = {
-      id: tempId,
-      name: value.name,
-      materialType: value.materialType,
-      phone: value.phone,
-      address: value.address,
-      gst: value.gst,
-      status: statusValue,
-      siteIds: value.siteIds || [],
-    };
-    this.data.vendors.update((list) => [optimisticVendor, ...list]);
-    this.showVendorForm.set(false);
+    try {
+      const res = await this.api.createVendor(payload).toPromise();
+      const vendorId = res?.vendorId || res?._id || res?.id;
+      const serverSiteIds = Array.isArray(res?.siteIds)
+        ? res.siteIds.map((id: any) => String(id))
+        : (value.siteIds || []).map((id) => String(id));
 
-    this.api.createVendor(payload).subscribe({
-      next: (res: any) => {
-        const vendorId = res.vendorId || res._id || res.id || tempId;
-        const serverSiteIds = Array.isArray(res.siteIds)
-          ? res.siteIds.map((id: any) => String(id))
-          : (value.siteIds || []).map((id) => String(id));
-        this.data.vendors.update((list) =>
-          list.map((v) =>
-            v.id === tempId
-              ? { ...v, id: vendorId, _id: res._id, siteIds: serverSiteIds }
-              : v,
-          ),
-        );
-        this.refreshSiteAssignments();
-      },
-      error: (err) => {
-        console.error("Failed to create vendor on backend", err);
-      },
-    });
+      this.data.addVendor({
+        id: vendorId,
+        name: value.name,
+        materialType: value.materialType,
+        phone: value.phone,
+        address: value.address,
+        gst: value.gst,
+        status: statusValue,
+        siteIds: serverSiteIds,
+        _id: res?._id,
+      } as Vendor);
+
+      this.showVendorForm.set(false);
+      this.refreshSiteAssignments();
+    } catch (err: any) {
+      const msg = err?.error?.message || err?.message || "Failed to create vendor";
+      const toast = await this.toastController.create({
+        message: msg,
+        duration: 4000,
+        color: "danger",
+        position: "top",
+      });
+      await toast.present();
+    }
   }
 
   editVendor(vendor: Vendor, event: Event) {
@@ -1604,7 +1616,7 @@ export class VendorDashboardPage {
     };
   }
 
-  updateVendor(value: VendorFormValue) {
+  async updateVendor(value: VendorFormValue) {
     const vendor = this.editingVendor();
     if (!vendor || !value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
 
@@ -1620,31 +1632,39 @@ export class VendorDashboardPage {
       siteIds: value.siteIds || [],
     };
 
-    this.data.vendors.update((list) =>
-      list.map((v) =>
-        v.id === vendor.id
-          ? { ...v, ...value, status: statusValue, siteIds: value.siteIds || [] }
-          : v,
-      ),
-    );
-    const refreshed = this.data.vendors().find((v) => v.id === vendor.id);
-    if (refreshed) this.selectedVendor.set(refreshed);
-    this.closeVendorForm();
+    try {
+      const res = await this.api.patchVendor(vendor.id, payload).toPromise();
+      const serverSiteIds = Array.isArray(res?.siteIds)
+        ? res.siteIds.map((id: any) => String(id))
+        : (value.siteIds || []).map((id) => String(id));
 
-    this.api.patchVendor(vendor.id, payload).subscribe({
-      next: (res: any) => {
-        const serverSiteIds = Array.isArray(res?.siteIds)
-          ? res.siteIds.map((id: any) => String(id))
-          : (value.siteIds || []).map((id) => String(id));
-        this.data.vendors.update((list) =>
-          list.map((v) => (v.id === vendor.id ? { ...v, siteIds: serverSiteIds } : v)),
-        );
-        this.refreshSiteAssignments();
-      },
-      error: (err) => {
-        console.error("Failed to update vendor on backend", err);
-      },
-    });
+      this.data.updateVendor(vendor.id, {
+        ...value,
+        status: statusValue,
+        siteIds: serverSiteIds,
+      });
+      const refreshed = this.data.vendors().find((v) => v.id === vendor.id);
+      if (refreshed) this.selectedVendor.set(refreshed);
+      this.closeVendorForm();
+      this.refreshSiteAssignments();
+
+      const toast = await this.toastController.create({
+        message: "Vendor updated successfully",
+        duration: 2000,
+        color: "success",
+        position: "top",
+      });
+      await toast.present();
+    } catch (err: any) {
+      const msg = err?.error?.message || err?.message || "Failed to update vendor";
+      const toast = await this.toastController.create({
+        message: msg,
+        duration: 4000,
+        color: "danger",
+        position: "top",
+      });
+      await toast.present();
+    }
   }
 
   deleteVendor(vendorId: string) {

@@ -2542,17 +2542,21 @@ export class ProjectWorkspacePage {
       approvalStatus: row.status,
     }));
 
-    const vendors = this.data.vendors().map((vendor) => ({
-      __rowId: `vendor:${vendor.id}`,
-      __projectId: projectId,
-      projectId,
-      vendorName: vendor.name,
-      materialType: vendor.materialType,
-      materialsBought: this.materialPurchaseSummaryForVendor(vendor.name, projectId),
-      phoneNumber: vendor.phone,
-      address: vendor.address,
-      gstNumber: vendor.gst,
-    }));
+    const projectMaterials = this.data.materials().filter((row) => row.projectId === projectId);
+    const vendorNamesInProject = new Set(projectMaterials.map((m) => m.vendor).filter(Boolean));
+    const vendors = this.data.vendors()
+      .filter((vendor) => vendorNamesInProject.has(vendor.name))
+      .map((vendor) => ({
+        __rowId: `vendor:${vendor.id}`,
+        __projectId: projectId,
+        projectId,
+        vendorName: vendor.name,
+        materialType: vendor.materialType,
+        materialsBought: this.materialPurchaseSummaryForVendor(vendor.name, projectId),
+        phoneNumber: vendor.phone,
+        address: vendor.address,
+        gstNumber: vendor.gst,
+      }));
 
     const subcontractors = this.data.subcontractorsForProject(projectId).map((row) => ({
       __rowId: `subcontractor:${row.id}`,
@@ -2829,13 +2833,21 @@ export class ProjectWorkspacePage {
   }
 
   private vendorNameOptions(): string[] {
+    const projectId = this.projectId();
+    if (!projectId) return [];
+
+    const projectMaterials = this.materialsService.materials().filter((m) => m.projectId === projectId);
+    const vendorNamesInProject = new Set(projectMaterials.map((m) => m.vendor).filter(Boolean));
+
+    const projectTableMaterials = this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row));
+    projectTableMaterials.forEach((row) => {
+      const v = String(row["vendor"] || "").trim();
+      if (v) vendorNamesInProject.add(v);
+    });
+
     return [
-      ...new Set([
-        ...this.data.vendors().map((vendor) => vendor.name),
-        ...this.materialsService.materials().map((material) => material.vendor),
-        ...this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row)).map((row) => String(row["vendor"] || "")),
-      ].map((value) => value.trim()).filter(Boolean)),
-    ].sort((first, second) => first.localeCompare(second));
+      ...Array.from(vendorNamesInProject).sort((a, b) => a.localeCompare(b)),
+    ];
   }
 
   private materialNameOptions(): string[] {
