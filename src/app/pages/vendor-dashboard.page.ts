@@ -387,15 +387,29 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         </td>
                         <td class="col-bill">
                           @if (row.billUrl) {
-                            <a class="bill-link" [href]="row.billUrl" [attr.target]="isDataUrl(row.billUrl) ? '_self' : '_blank'" [attr.rel]="isDataUrl(row.billUrl) ? null : 'noopener noreferrer'" title="View Bill">
-                              <ion-icon name="link-outline"></ion-icon>
-                              <span>View Bill</span>
-                            </a>
+                            @if (isDataUrl(row.billUrl)) {
+                              <button type="button" class="bill-link" (click)="openImagePreview(row.billUrl)" title="View Bill">
+                                <ion-icon name="link-outline"></ion-icon>
+                                <span>View Bill</span>
+                              </button>
+                            } @else {
+                              <a class="bill-link" [href]="row.billUrl" target="_blank" rel="noopener noreferrer" title="View Bill">
+                                <ion-icon name="link-outline"></ion-icon>
+                                <span>View Bill</span>
+                              </a>
+                            }
                           } @else if (billLinkFor(row.id); as link) {
-                            <a class="bill-link" [href]="link.billUrl" [attr.target]="isDataUrl(link.billUrl) ? '_self' : '_blank'" [attr.rel]="isDataUrl(link.billUrl) ? null : 'noopener noreferrer'" [title]="link.billUrl">
-                              <ion-icon name="link-outline"></ion-icon>
-                              <span>{{ link.billLabel || shortLinkLabel(link.billUrl) }}</span>
-                            </a>
+                            @if (isDataUrl(link.billUrl)) {
+                              <button type="button" class="bill-link" (click)="openImagePreview(link.billUrl)" [title]="link.billUrl">
+                                <ion-icon name="link-outline"></ion-icon>
+                                <span>{{ link.billLabel || shortLinkLabel(link.billUrl) }}</span>
+                              </button>
+                            } @else {
+                              <a class="bill-link" [href]="link.billUrl" target="_blank" rel="noopener noreferrer" [title]="link.billUrl">
+                                <ion-icon name="link-outline"></ion-icon>
+                                <span>{{ link.billLabel || shortLinkLabel(link.billUrl) }}</span>
+                              </a>
+                            }
                           } @else if (editingRowId() === row.id) {
                             <input type="text" [value]="draftBillLink(row.id)" (input)="setDraftBillLink(row.id, $any($event.target).value)" (blur)="commitBillLink(row.id, $any($event.target).value)" placeholder="Paste PCLOUD URL" class="table-input" />
                           } @else {
@@ -456,6 +470,13 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
           (create)="editingVendor() ? updateVendor($event) : createVendor($event)"
         ></agb-vendor-form-dialog>
       </div>
+
+      @if (previewImageUrl()) {
+        <div class="image-preview-overlay" (click)="closeImagePreview()">
+          <button type="button" class="image-preview-close" (click)="closeImagePreview()" aria-label="Close">×</button>
+          <img [src]="previewImageUrl()" alt="Bill preview" (click)="$event.stopPropagation()" />
+        </div>
+      }
     </ion-split-pane>
   `,
   styles: [`
@@ -1030,6 +1051,45 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     .site-picker-row small { color: #94a3b8; font-size: 11px; }
     .site-picker-row ion-icon { color: #2c5cff; font-size: 22px; }
     .site-msg { padding: 12px 18px; color: #64748b; font-size: 14px; }
+    .image-preview-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .image-preview-overlay img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    }
+    .image-preview-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.15);
+      border: none;
+      color: #fff;
+      font-size: 28px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .image-preview-close:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -1065,6 +1125,8 @@ export class VendorDashboardPage {
   readonly showAddSitePicker = signal(false);
   readonly availableSites = signal<{ id: string; name: string }[]>([]);
   readonly loadingAvailableSites = signal(false);
+
+  readonly previewImageUrl = signal<string | null>(null);
 
   readonly vendorSites = computed(() => {
     const vendor = this.selectedVendor();
@@ -1302,6 +1364,14 @@ export class VendorDashboardPage {
 
   isDataUrl(url: string): boolean {
     return url.startsWith("data:");
+  }
+
+  openImagePreview(url: string) {
+    this.previewImageUrl.set(url);
+  }
+
+  closeImagePreview() {
+    this.previewImageUrl.set(null);
   }
 
   commitBillLink(materialId: string, value: string) {

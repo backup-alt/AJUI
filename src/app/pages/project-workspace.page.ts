@@ -172,6 +172,47 @@ const siteMaterialDetailFields: FieldSchema[] = [
     ProjectFormDialogComponent,
     VendorFormDialogComponent,
   ],
+  styles: [`
+    .image-preview-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .image-preview-overlay img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    }
+    .image-preview-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.15);
+      border: none;
+      color: #fff;
+      font-size: 28px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .image-preview-close:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  `],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar
@@ -661,7 +702,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           </div>
                           <ng-template #editableProjectCell>
                             <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
-                              <a class="bill-link" [href]="row['billUrl']" [attr.target]="isDataUrl($any(row['billUrl'])) ? '_self' : '_blank'" [attr.rel]="isDataUrl($any(row['billUrl'])) ? null : 'noopener noreferrer'" (click)="$event.stopPropagation()">View Bill</a>
+                              @if (isDataUrl($any(row['billUrl']))) {
+                                <button type="button" class="bill-link" (click)="openImagePreview($any(row['billUrl']))">View Bill</button>
+                              } @else {
+                                <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
+                              }
                             </ng-container>
                             <ng-template #normalEditableCell>
                               <span
@@ -986,6 +1031,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
           </main>
         </ion-content>
       </div>
+
+      @if (previewImageUrl()) {
+        <div class="image-preview-overlay" (click)="closeImagePreview()">
+          <button type="button" class="image-preview-close" (click)="closeImagePreview()" aria-label="Close">×</button>
+          <img [src]="previewImageUrl()" alt="Bill preview" (click)="$event.stopPropagation()" />
+        </div>
+      }
     </ion-split-pane>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -1044,6 +1096,7 @@ export class ProjectWorkspacePage {
   readonly expenseOpeningEdit = signal(false);
   readonly handledEditProjectQuery = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
+  readonly previewImageUrl = signal<string | null>(null);
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
   readonly tableState = computed(() => ({
     rows: this.visibleRows(this.activeSection()),
@@ -3336,7 +3389,15 @@ export class ProjectWorkspacePage {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  isDataUrl(url: string): boolean {
+isDataUrl(url: string): boolean {
     return url.startsWith("data:");
+  }
+
+  openImagePreview(url: string) {
+    this.previewImageUrl.set(url);
+  }
+
+  closeImagePreview() {
+    this.previewImageUrl.set(null);
   }
 }
