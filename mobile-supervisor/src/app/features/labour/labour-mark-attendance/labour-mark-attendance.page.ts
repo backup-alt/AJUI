@@ -293,11 +293,12 @@ export class LabourMarkAttendancePage implements OnInit {
   }
 
   isValid(): boolean {
+    const sc = Number(this.shiftCount);
     return !!(
       this.workerId &&
       this.attendanceDate &&
-      this.shiftCount &&
-      (this.shiftCount === 1 || this.shiftCount === 2)
+      sc >= 1 &&
+      sc <= 2
     );
   }
 
