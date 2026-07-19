@@ -1,10 +1,12 @@
 import {
   Component,
   OnInit,
+  OnDestroy,
   inject,
   signal,
   computed,
 } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import {
   IonContent,
   IonMenu,
@@ -491,11 +493,13 @@ import { Site } from '../../shared/models';
     .empty-sites span { font-size: 12px; color: #94a3b8; margin-top: 4px; }
   `],
 })
-export class ShellComponent implements OnInit {
+export class ShellComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
+  private document = inject(DOCUMENT);
+  private readonly shellBodyClass = 'agb-shell-active';
 
   currentUser = signal<{ name: string; email: string } | null>(null);
   sites = signal<Site[]>([]);
@@ -531,6 +535,18 @@ export class ShellComponent implements OnInit {
     this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
     await this.loadSites();
+
+    const body = this.document?.body;
+    if (body && !body.classList.contains(this.shellBodyClass)) {
+      body.classList.add(this.shellBodyClass);
+    }
+  }
+
+  ngOnDestroy(): void {
+    const body = this.document?.body;
+    if (body && body.classList.contains(this.shellBodyClass)) {
+      body.classList.remove(this.shellBodyClass);
+    }
   }
 
   async loadSites(): Promise<void> {
