@@ -50,6 +50,4 @@ const accessTemplateSchema = new Schema<IAccessTemplate>(
   { timestamps: true }
 );
 
-accessTemplateSchema.index({ role: 1 }, { unique: true });
-
 export const AccessTemplate = model<IAccessTemplate>("AccessTemplate", accessTemplateSchema);

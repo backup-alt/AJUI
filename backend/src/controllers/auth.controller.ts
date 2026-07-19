@@ -87,19 +87,19 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       ip: req.ip,
     });
 
-    if (result.user.role === "supervisor") {
-      throw new AppError(403, "Supervisor accounts cannot log in. Please contact admin for access.");
-    }
-
-    const accessStatus = await checkAccessRestriction(result.user.role);
-    if (accessStatus.isRestricted) {
-      throw new AppError(403, `Access restricted until ${accessStatus.currentWindow?.endTime || "scheduled end"}. Contact admin if you need access.`);
+    if (result.user.role !== "supervisor" && result.user.role !== "admin"
+        && result.user.role !== "project_manager" && result.user.role !== "accountant") {
+      const accessStatus = await checkAccessRestriction(result.user.role);
+      if (accessStatus.isRestricted) {
+        throw new AppError(403, `Access restricted until ${accessStatus.currentWindow?.endTime || "scheduled end"}. Contact admin if you need access.`);
+      }
     }
 
     await ActivityLog.create({
       userId: result.user.id,
+      userRole: result.user.role,
       action: "sign_in",
-      description: `Signed in`,
+      description: "Email + password sign-in",
       ip: req.ip,
       userAgent: req.headers["user-agent"],
     });
