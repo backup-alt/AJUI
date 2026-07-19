@@ -205,7 +205,7 @@ export const createVendorSchema = z.object({
 
 export const updateVendorSchema = z.object({
   body: createVendorSchema.shape.body.partial().extend({
-    siteIds: z.array(objectIdSchema).min(1).optional(),
+    siteIds: z.array(objectIdSchema).min(0).optional(),
   }),
   params: z.object({ id: objectIdSchema }),
 });

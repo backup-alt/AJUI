@@ -1,8 +1,8 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, computed, inject, signal } from "@angular/core";
 import { IonIcon } from "@ionic/angular/standalone";
 import { FormsModule } from "@angular/forms";
-import type { VendorStatus } from "../data/erp-data.service";
+import { ErpDataService, type VendorStatus } from "../data/erp-data.service";
 
 export type VendorFormValue = {
   name: string;
@@ -61,6 +61,27 @@ export type VendorFormValue = {
             </select>
           </label>
 
+          <label class="span-2">
+            <span>Site Assigned</span>
+            <div class="site-field">
+              <div class="site-chips">
+                @for (siteId of selectedSiteIds; track siteId) {
+                  @let site = siteName(siteId);
+                  <span class="site-chip">
+                    {{ site || siteId }}
+                    <button type="button" class="chip-remove" (click)="toggleSite(siteId)" aria-label="Remove site">×</button>
+                  </span>
+                }
+                @if (selectedSiteIds.length === 0) {
+                  <span class="site-chip-empty">No site assigned</span>
+                }
+                <button type="button" class="site-add-btn" (click)="showPicker.set(true)">
+                  <ion-icon name="add-outline"></ion-icon> Add Site
+                </button>
+              </div>
+            </div>
+          </label>
+
           <div class="dialog-actions span-2">
             <button type="button" class="secondary-action" (click)="cancel.emit()">Cancel</button>
             <button type="submit" class="primary-action">{{ submitLabel }}</button>
@@ -68,9 +89,84 @@ export type VendorFormValue = {
         </form>
       </section>
     </div>
+
+    @if (showPicker()) {
+      <div class="picker-overlay" role="presentation" (click)="closePicker($event)">
+        <div class="picker-panel" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+          <div class="picker-head">
+            <h3 id="picker-title">Assign Sites</h3>
+            <button type="button" class="icon-button" aria-label="Close" (click)="showPicker.set(false)">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
+          <div class="picker-list">
+            @if (unselectedSites().length === 0) {
+              <p class="picker-empty">All sites are already assigned.</p>
+            }
+            @for (site of unselectedSites(); track site.id) {
+              <button type="button" class="picker-row" (click)="pickSite(site.id)">
+                <div class="picker-row-info">
+                  <ion-icon name="location-outline"></ion-icon>
+                  <span>{{ site.name }}</span>
+                </div>
+                <ion-icon name="add-circle-outline"></ion-icon>
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .req { color: #dc2626; }
+
+    .site-field { padding: 6px 0; }
+    .site-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 36px; }
+    .site-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe;
+      border-radius: 16px; padding: 3px 10px; font-size: 12px; font-weight: 500;
+    }
+    .chip-remove {
+      background: none; border: none; cursor: pointer; color: #1d4ed8;
+      font-size: 14px; line-height: 1; padding: 0; display: flex; align-items: center;
+    }
+    .chip-remove:hover { color: #dc2626; }
+    .site-chip-empty { font-size: 12px; color: #94a3b8; font-style: italic; }
+    .site-add-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: none; border: 1.5px dashed #94a3b8; color: #64748b;
+      border-radius: 16px; padding: 3px 10px; font-size: 12px; cursor: pointer;
+    }
+    .site-add-btn:hover { border-color: #2c5cff; color: #2c5cff; }
+    .site-add-btn ion-icon { font-size: 14px; }
+
+    .picker-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10000;
+      display: flex; align-items: flex-start; justify-content: center; padding: 60px 20px;
+    }
+    .picker-panel {
+      background: #fff; border-radius: 10px; width: 100%; max-width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25); overflow: hidden;
+    }
+    .picker-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid #e2e8f0;
+    }
+    .picker-head h3 { margin: 0; font-size: 15px; color: #1a2540; }
+    .picker-list { max-height: 320px; overflow-y: auto; }
+    .picker-row {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; padding: 11px 18px; background: none; border: none;
+      border-bottom: 1px solid #f1f5f9; cursor: pointer; text-align: left;
+    }
+    .picker-row:hover { background: #f8fafc; }
+    .picker-row:last-child { border-bottom: none; }
+    .picker-row-info { display: flex; align-items: center; gap: 8px; }
+    .picker-row-info ion-icon { color: #64748b; font-size: 18px; }
+    .picker-row-info span { font-size: 14px; color: #1a2540; }
+    .picker-row ion-icon:last-child { color: #2c5cff; font-size: 20px; }
+    .picker-empty { padding: 20px 18px; color: #94a3b8; font-size: 13px; text-align: center; }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -83,10 +179,51 @@ export class VendorFormDialogComponent implements OnInit {
   @Output() cancel = new EventEmitter<void>();
   @Output() create = new EventEmitter<VendorFormValue>();
 
+  private readonly data = inject(ErpDataService);
+
   statusValue: VendorStatus = "Active";
+  readonly selectedSiteIds: string[] = [];
+  readonly showPicker = signal(false);
+
+  readonly allSiteEntities = this.data.siteEntities;
+
+  readonly unselectedSites = computed(() => {
+    return this.allSiteEntities().filter((s) => !this.selectedSiteIds.includes(s.id));
+  });
 
   ngOnInit() {
     this.statusValue = this.initialValue?.status ?? "Active";
+    if (this.initialValue?.siteIds?.length) {
+      this.selectedSiteIds.push(...this.initialValue.siteIds);
+    }
+  }
+
+  siteName(id: string): string {
+    return this.allSiteEntities().find((s) => s.id === id)?.name ?? id;
+  }
+
+  toggleSite(id: string) {
+    const idx = this.selectedSiteIds.indexOf(id);
+    if (idx >= 0) {
+      this.selectedSiteIds.splice(idx, 1);
+    } else {
+      this.selectedSiteIds.push(id);
+    }
+  }
+
+  pickSite(id: string) {
+    if (!this.selectedSiteIds.includes(id)) {
+      this.selectedSiteIds.push(id);
+    }
+    if (this.unselectedSites().length === 0) {
+      this.showPicker.set(false);
+    }
+  }
+
+  closePicker(event: MouseEvent) {
+    if ((event.target as HTMLElement).classList.contains("picker-overlay")) {
+      this.showPicker.set(false);
+    }
   }
 
   submit(event: Event) {
@@ -100,7 +237,7 @@ export class VendorFormDialogComponent implements OnInit {
       address: String(formData.get("address") ?? "").trim(),
       gst: String(formData.get("gst") ?? "").trim(),
       status: (String(formData.get("status") ?? "Active") === "Not Active" ? "Not Active" : "Active") as VendorStatus,
-      siteIds: [],
+      siteIds: this.selectedSiteIds.slice(),
     });
   }
 }

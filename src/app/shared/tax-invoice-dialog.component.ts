@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ErpDataService } from "../data/erp-data.service";
 import type { Quotation } from "../../data/dashboardData";
@@ -54,6 +54,10 @@ import { jsPDF } from "jspdf";
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Place of Supply</span>
                     <span class="inv-meta-value">{{ quotation?.state || '—' }}</span>
+                  </div>
+                  <div class="inv-meta-row">
+                    <span class="inv-meta-label">Supply Type</span>
+                    <span class="inv-meta-value" [class.intrastate]="supplyType() === 'Intrastate'" [class.interstate]="supplyType() === 'Interstate'">{{ supplyType() }}</span>
                   </div>
                 </div>
               </div>
@@ -165,8 +169,18 @@ import { jsPDF } from "jspdf";
               </div>
             </div>
 
+            <div class="inv-terms-section">
+              <div class="inv-footer-label">Terms & Conditions:</div>
+              <ul class="inv-terms-list">
+                <li>Payment due within 15 days of invoice date.</li>
+                <li>Interest @ 18% p.a. will be charged on overdue payments.</li>
+                <li>Goods once sold will not be taken back or exchanged.</li>
+                <li>Subject to {{ profile().state || 'Local' }} jurisdiction only.</li>
+              </ul>
+            </div>
+
             <div class="inv-footer-note">
-              This is a computer-generated Tax Invoice. No signature required.
+              This is a computer-generated Tax Invoice. No signature required. &nbsp;|&nbsp; Page <span class="page-num">{{ currentPage }}</span> of <span class="page-total">{{ totalPages }}</span>
             </div>
 
           </div>
@@ -281,6 +295,16 @@ import { jsPDF } from "jspdf";
     .inv-signature-area { border-top: 1px solid #cbd5e1; padding-top: 4px; }
     .inv-signature-line { font-size: 11px; color: #94a3b8; text-align: right; margin-top: 40px; }
     .inv-footer-note { text-align: center; font-size: 10px; color: #94a3b8; font-style: italic; }
+    .intrastate { color: #16a34a !important; font-weight: 700; }
+    .interstate { color: #d97706 !important; font-weight: 700; }
+    .inv-terms-section {
+      border-top: 1px solid #e2e8f0; padding-top: 12px; margin-bottom: 12px;
+    }
+    .inv-terms-list {
+      margin: 6px 0 0 18px; padding: 0; font-size: 11px; color: #475569; line-height: 1.7;
+    }
+    .inv-terms-list li { margin-bottom: 2px; }
+    .page-num, .page-total { font-style: normal; }
     @media print {
       .invoice-overlay { background: #fff; padding: 0; }
       .invoice-modal { box-shadow: none; border-radius: 0; }
@@ -298,6 +322,15 @@ export class TaxInvoiceDialogComponent {
   private readonly data = inject(ErpDataService);
   readonly saving = signal(false);
   readonly profile = this.data.companyProfile;
+  readonly currentPage = signal(1);
+  readonly totalPages = signal(1);
+
+  readonly supplyType = computed(() => {
+    const co = this.profile();
+    const q = this.quotation;
+    if (!co?.state || !q?.state) return "—";
+    return co.state.trim().toLowerCase() === q.state.trim().toLowerCase() ? "Intrastate" : "Interstate";
+  });
 
   get items() {
     return this.quotation?.items || [];
@@ -333,13 +366,23 @@ export class TaxInvoiceDialogComponent {
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
       let position = 0;
+      let pageCount = 0;
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
+      pageCount = 1;
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
+        pageCount++;
+      }
+      this.totalPages.set(pageCount);
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(9);
+        pdf.setTextColor(148, 163, 184);
+        pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 6, { align: "center" });
       }
       pdf.save(`tax-invoice-${this.quotation?.quotationNumber || 'draft'}.pdf`);
     } catch (err) {
