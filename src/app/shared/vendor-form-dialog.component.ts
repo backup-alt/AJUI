@@ -203,9 +203,42 @@ export class VendorFormDialogComponent implements OnInit {
   }
 
   siteName(id: string): string {
-    const site = this.allSiteEntities().find((s) => s.id === id);
-    if (site) return site.name;
+    if (!id) return "Unassigned site";
+
+    const entities = this.allSiteEntities();
+    const directMatch = entities.find((s) =>
+      s.id === id || s._id === id || s.siteId === id
+    );
+    if (directMatch?.name) return directMatch.name;
+
+    const projectMatch = this.findSiteInProjects(id);
+    if (projectMatch) return projectMatch;
+
+    const materialMatch = this.findSiteInMaterials(id);
+    if (materialMatch) return materialMatch;
+
     return `Site (${id.slice(0, 8)}...)`;
+  }
+
+  private findSiteInProjects(id: string): string | null {
+    for (const project of this.data.projects()) {
+      if (project?.id === id && project.name) return project.name;
+      if (Array.isArray(project?.sites)) {
+        for (const siteName of project.sites) {
+          if (siteName === id) return siteName;
+        }
+      }
+    }
+    return null;
+  }
+
+  private findSiteInMaterials(id: string): string | null {
+    try {
+      const materials = this.data.materials?.() ?? [];
+      const match = materials.find((m: any) => m?.site === id || m?.siteId === id);
+      if (match?.site) return match.site;
+    } catch {}
+    return null;
   }
 
   toggleSite(id: string) {
