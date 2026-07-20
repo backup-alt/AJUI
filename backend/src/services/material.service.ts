@@ -62,6 +62,7 @@ export async function createMaterial(input: CreateMaterialInput) {
     approvalDate: input.approvedQuantity ? new Date().toISOString().slice(0, 10) : undefined,
     status: input.approvedQuantity ? "Pending" : "Pending",
     createdBy: input.createdBy,
+    notes: input.notes,
   });
 
   await createApproval({

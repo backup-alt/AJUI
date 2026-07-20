@@ -752,6 +752,74 @@ type CombinedInvite = {
       </div>
     }
   `,
+  styles: [`
+    .settings-w11-invite-method-choice {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .settings-w11-method-card {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) 24px;
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+      min-height: 92px;
+      padding: 14px;
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #102033;
+      text-align: left;
+      cursor: pointer;
+    }
+    .settings-w11-method-card.selected {
+      border-color: #002263;
+      background: #f7f9ff;
+    }
+    .settings-w11-method-icon,
+    .settings-w11-method-check {
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      color: #002263;
+      background: #eef3ff;
+      overflow: hidden;
+    }
+    .settings-w11-method-check {
+      width: 22px;
+      height: 22px;
+      opacity: 0;
+      background: #002263;
+      color: #ffffff;
+    }
+    .settings-w11-method-check.visible { opacity: 1; }
+    .settings-w11-method-icon svg,
+    .settings-w11-method-check svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      flex: 0 0 auto;
+    }
+    .settings-w11-method-info {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .settings-w11-method-info strong {
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .settings-w11-method-info span {
+      font-size: 12px;
+      line-height: 1.4;
+      color: #64748b;
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsRolesComponent implements OnInit, OnDestroy {

@@ -563,9 +563,18 @@ export class ShellComponent implements OnInit {
       const savedSiteId = this.supervisor.selectedSiteId();
       const savedSiteName = this.supervisor.selectedSiteName();
 
-      if (savedSiteId && savedSiteName) {
+      if (savedSiteId) {
+        const saved = response.sites.find((site) => site.id === savedSiteId);
         this.selectedSiteId.set(savedSiteId);
-        this.selectedSiteName.set(savedSiteName);
+        this.selectedSiteName.set(savedSiteName || saved?.name || null);
+        if (saved && !savedSiteName) {
+          await this.supervisor.setSelectedSite(
+            saved.id,
+            saved.projectId || '',
+            saved.projectName || saved.name,
+            saved.name
+          );
+        }
       } else if (response.sites.length > 0) {
         const first = response.sites[0];
         await this.selectSite(first);
@@ -579,6 +588,9 @@ export class ShellComponent implements OnInit {
 
   toggleSitePopover(event: Event): void {
     event.preventDefault();
+    if (!this.isSitePopoverOpen() && this.sites().length === 0 && !this.isLoadingSites()) {
+      void this.loadSites();
+    }
     this.isSitePopoverOpen.set(!this.isSitePopoverOpen());
   }
 

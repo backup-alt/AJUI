@@ -1,4 +1,4 @@
-export type MaterialStatus = 'Pending' | 'Approved' | 'Rejected';
+export type MaterialStatus = 'Pending' | 'Approved' | 'Rejected' | 'Completed' | 'Received' | 'Not Received';
 
 export interface Material {
   _id: string;
@@ -18,11 +18,13 @@ export interface Material {
   vendor?: string;
   vendorId?: string;
   poNumber?: string;
+  billUrl?: string;
   requestDate: string;
   approvalDate?: string;
   status: MaterialStatus;
   notes?: string;
   issuedAmount?: number;
+  givenAmount?: number;
   customFields?: Record<string, string | number | boolean | null>;
   createdBy?: string;
   approvedBy?: string;

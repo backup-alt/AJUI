@@ -108,7 +108,7 @@ import { Vendor } from '../../../shared/models';
               </div>
               <div class="type-info">
                 <strong>Add Cash</strong>
-                <span>Add cash to project site (auto-approved immediately)</span>
+                <span>Request cash for the project site</span>
               </div>
             </div>
           </div>
@@ -224,6 +224,15 @@ import { Vendor } from '../../../shared/models';
                   [clearInput]="true"
                 ></ion-input>
               </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Notes</ion-label>
+                <ion-input
+                  placeholder="Optional note for admin"
+                  [(ngModel)]="expense.notes"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
             }
 
             @if (expenseType() === 'Add Cash') {
@@ -242,6 +251,15 @@ import { Vendor } from '../../../shared/models';
                   type="number"
                   placeholder="0"
                   [(ngModel)]="expense.amount"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Notes</ion-label>
+                <ion-input
+                  placeholder="Optional note for admin"
+                  [(ngModel)]="expense.notes"
                   [clearInput]="true"
                 ></ion-input>
               </ion-item>
@@ -328,6 +346,7 @@ export class ExpenseCreatePage implements OnInit {
     materialVendorId: '',
     materialVendor: '',
     issuedAmount: null as number | null,
+    notes: '',
   };
 
   selectedVendorId = signal<string>('');
@@ -524,6 +543,7 @@ export class ExpenseCreatePage implements OnInit {
       amount: this.expense.amount || 0,
       date: new Date().toISOString().slice(0, 10),
       description: this.expense.description,
+      notes: this.expense.notes?.trim() || undefined,
     };
 
     if (!isCashAdded) {
@@ -543,7 +563,7 @@ export class ExpenseCreatePage implements OnInit {
       next: async () => {
         this.isSubmitting.set(false);
         const toast = await this.toastCtrl.create({
-          message: isCashAdded ? 'Cash added successfully' : 'Purchase submitted for approval',
+          message: isCashAdded ? 'Cash request submitted for approval' : 'Purchase submitted for approval',
           duration: 2500,
           color: 'success',
           position: 'top',

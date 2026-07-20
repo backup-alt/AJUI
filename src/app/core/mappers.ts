@@ -128,6 +128,7 @@ export function mapMaterial(m: any): any {
     givenAmount: m.givenAmount,
     requestDate: m.requestDate,
     approvalDate: m.approvalDate,
+    notes: m.notes || "",
     status: m.status,
   };
 }
@@ -192,6 +193,7 @@ export function mapExpense(e: any): any {
     runningBalance: e.runningBalance,
     date: e.date,
     description: e.description,
+    notes: e.notes || "",
     status: e.status,
     isSiteMaterial: e.isSiteMaterial,
     materialName: e.materialName,

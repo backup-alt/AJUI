@@ -601,6 +601,7 @@ export class ApiService {
     amount: number;
     date: string;
     description: string;
+    notes?: string;
     reference?: string;
     amountPaidBy?: string;
     submittedBy?: string;

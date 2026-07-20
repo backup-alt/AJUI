@@ -242,10 +242,13 @@ export async function listSubcontractors(projectId: string, siteId?: string) {
   }
   const query: Record<string, unknown> = {
     projectId: new Types.ObjectId(projectId),
-    approvalStatus: "Approved",
   };
   if (siteId && Types.ObjectId.isValid(siteId)) {
-    query.siteId = new Types.ObjectId(siteId);
+    query.$or = [
+      { siteId: new Types.ObjectId(siteId) },
+      { siteId: { $exists: false } },
+      { siteId: null },
+    ];
   }
 
   const subs = await Subcontractor.find(query)

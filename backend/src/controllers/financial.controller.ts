@@ -456,8 +456,14 @@ export async function approveApproval(req: Request, res: Response, next: NextFun
       }
     }
 
-    const { issuedAmount, givenAmount, poNumber } = req.body;
-    const updated = await approvalService.approveRequest(req.params.id, reviewer, issuedAmount, givenAmount, poNumber);
+    const { issuedAmount, givenAmount, poNumber, approvedQuantity, vendor } = req.body;
+    const updated = await approvalService.approveRequest(req.params.id, reviewer, {
+      issuedAmount,
+      givenAmount,
+      poNumber,
+      approvedQuantity,
+      vendor,
+    });
 
     if (req.user?.sub) {
       await ActivityLog.create({

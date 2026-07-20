@@ -192,8 +192,10 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <input
                             class="approval-table-input"
                             inputmode="decimal"
+                            type="number"
                             [(ngModel)]="row.approvedQuantity"
                             aria-label="Approved quantity"
+                            min="0"
                           />
                         </td>
                         <td>
@@ -488,6 +490,8 @@ export class PendingApprovalsPage implements OnInit {
         } else if (row.module === "materials") {
           const materialRow = this._materialRows().find((r) => r.rowId === row.rowId);
           if (materialRow) {
+            payload.approvedQuantity = Number(materialRow.approvedQuantity) || 0;
+            if (materialRow.vendor !== undefined && materialRow.vendor.trim() !== '') payload.vendor = materialRow.vendor;
             if (materialRow.issuedAmount !== undefined) payload.issuedAmount = materialRow.issuedAmount;
             if (materialRow.givenAmount !== undefined) payload.givenAmount = materialRow.givenAmount;
             if (materialRow.poNumber !== undefined && materialRow.poNumber.trim() !== '') payload.poNumber = materialRow.poNumber;

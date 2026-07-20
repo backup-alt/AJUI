@@ -142,6 +142,7 @@ const LABOUR_TYPES = [
           <ion-item class="form-item toggle-item">
             <ion-label class="toggle-label">From Subcontractor?</ion-label>
             <ion-toggle
+              class="subcontract-toggle"
               [(ngModel)]="worker.isSubcontract"
               (ionChange)="onSubcontractToggle()"
               slot="end"
@@ -229,6 +230,12 @@ const LABOUR_TYPES = [
     .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
     .toggle-item { min-height: 72px; display: flex; align-items: center; }
     .toggle-label { font-size: 14px; font-weight: 600; color: #111827; margin: 0; }
+    .subcontract-toggle {
+      --track-background: #e5e7eb;
+      --track-background-checked: rgba(0, 34, 99, 0.28);
+      --handle-background: #ffffff;
+      --handle-background-checked: #002263;
+    }
     .form-actions { padding: 20px 0; }
   `],
 })
@@ -291,6 +298,9 @@ export class LabourCreateWorkerPage implements OnInit {
   }
 
   async openSubcontractorActionSheet() {
+    if (this.subcontractors().length === 0) {
+      await this.loadSubcontractors();
+    }
     const buttons: Array<{ text: string; handler: () => void; role?: string }> = this.subcontractors().map((sub) => ({
       text: sub.subcontractorName,
       handler: () => {

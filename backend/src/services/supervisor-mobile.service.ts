@@ -711,6 +711,7 @@ export async function listExpensesForSupervisor(
       amount: e.amount,
       date: e.date,
       description: e.description,
+      notes: (e as any).notes,
       status: e.status,
       submittedBy: e.submittedBy,
       createdAt: e.createdAt,
@@ -735,8 +736,12 @@ export async function updateMaterialStockForSupervisor(
   const { query } = await buildScopedEntityQuery(userId);
   const material = await Material.findOne({ ...query, _id: materialId });
   if (!material) throw new AppError(404, "Material not found or not accessible");
-  if (updates.purchasedQuantity !== undefined) material.purchasedQuantity = updates.purchasedQuantity;
-  if (updates.consumedQuantity !== undefined) material.consumedQuantity = updates.consumedQuantity;
+  if (updates.purchasedQuantity !== undefined) {
+    material.purchasedQuantity = Math.max(0, material.purchasedQuantity + updates.purchasedQuantity);
+  }
+  if (updates.consumedQuantity !== undefined) {
+    material.consumedQuantity = Math.max(0, material.consumedQuantity + updates.consumedQuantity);
+  }
   await material.save();
   return material.toObject();
 }

@@ -59,14 +59,6 @@ const PRIMARY_BUTTON = (label: string, href: string): string => `
     </tr>
   </table>`;
 
-const FOOTER_LINK = (href: string): string => `
-  <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
-    If the button doesn't work, copy and paste this link into your browser:
-  </p>
-  <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
-    ${href}
-  </p>`;
-
 // =============================================================
 // 1. OTP EMAIL
 // =============================================================
@@ -123,14 +115,11 @@ export function buildCreateAccountEmail(input: CreateAccountEmailInput): { subje
     <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
       Hi <strong>${input.name}</strong>, your AGB account is ready. Tap the button below to set up your password and finish your account.
     </p>
-    ${PRIMARY_BUTTON(label, input.setupUrl)}
-    ${FOOTER_LINK(input.setupUrl)}`;
+    ${PRIMARY_BUTTON(label, input.setupUrl)}`;
   const html = SHELL_HTML(body);
   const text = `Hi ${input.name},
 
-Your AGB account is ready. Open the link below to set up your password and finish your account:
-
-${input.setupUrl}
+Your AGB account is ready. Use the account setup button in this email to set up your password and finish your account.
 
 ---
 Annai Golden Builders`;
@@ -160,22 +149,12 @@ export function buildResetPasswordEmail(input: ResetPasswordEmailInput): { subje
     <p style="margin:0 0 8px;color:#98a2b3;font-size:13px;line-height:1.5;">
       This link expires in <strong>${expiry} minutes</strong>.
     </p>
-    ${input.webFallbackUrl ? `
-    <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
-      If the button doesn't open the app, copy and paste this link into your browser:
-    </p>
-    <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
-      ${input.webFallbackUrl}
-    </p>` : ''}
-    ${FOOTER_LINK(input.resetUrl)}`;
+    `;
   const html = SHELL_HTML(body);
   const text = `Hi ${input.name},
 
-We received a request to reset your AGB password. Open the link below to choose a new password (expires in ${expiry} minutes):
+We received a request to reset your AGB password. Use the reset button in this email to choose a new password. This link expires in ${expiry} minutes.
 
-${input.resetUrl}
-
-${input.webFallbackUrl ? `If the link doesn't open the app, use this link in your browser:\n${input.webFallbackUrl}\n` : ''}
 If you did not request a password reset, please ignore this email.
 
 ---
@@ -204,16 +183,13 @@ export function buildEmployeeInviteEmail(input: EmployeeInviteEmailInput): { sub
     <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
       Tap the button below to set up your password and activate your account.
     </p>
-    ${PRIMARY_BUTTON("Create Account", input.setupUrl)}
-    ${FOOTER_LINK(input.setupUrl)}`;
+    ${PRIMARY_BUTTON("Create Account", input.setupUrl)}`;
   const html = SHELL_HTML(body);
   const text = `Hi ${input.name},
 
 You have been invited to join AGB (Annai Golden Builders) as a ${input.role}.
 
-Open the link below to set up your password and activate your account:
-
-${input.setupUrl}
+Use the create account button in this email to set up your password and activate your account.
 
 ---
 Annai Golden Builders`;
@@ -239,25 +215,14 @@ export function buildSupervisorInviteEmail(input: SupervisorInviteEmailInput): {
       Hi <strong>${input.name}</strong>, you have been added to AGB (Annai Golden Builders) as a Site Supervisor. Tap the button below to open the AGB Supervisor app and finish your account setup.
     </p>
     ${PRIMARY_BUTTON("Open AGB App & Activate", input.deepLink)}
-    ${input.webFallbackUrl ? `
-    <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
-      If the button doesn't open the app, copy and paste this link into your browser:
-    </p>
-    <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
-      ${input.webFallbackUrl}
-    </p>` : ''}
     <p style="margin:0 0 8px;color:#98a2b3;font-size:13px;line-height:1.5;">
       This link expires in <strong>${input.expiresMinutes} minutes</strong>.
-    </p>
-    ${FOOTER_LINK(input.deepLink)}`;
+    </p>`;
   const html = SHELL_HTML(body);
   const text = `Hi ${input.name},
 
-You have been added to AGB (Annai Golden Builders) as a Site Supervisor. Open the link below on your phone to finish your account setup (expires in ${input.expiresMinutes} minutes):
+You have been added to AGB (Annai Golden Builders) as a Site Supervisor. Use the activation button in this email on your phone to finish account setup. This link expires in ${input.expiresMinutes} minutes.
 
-${input.deepLink}
-
-${input.webFallbackUrl ? `If the link doesn't open the app, use this link in your browser:\n${input.webFallbackUrl}\n` : ''}
 ---
 Annai Golden Builders
 Operations Workspace`;

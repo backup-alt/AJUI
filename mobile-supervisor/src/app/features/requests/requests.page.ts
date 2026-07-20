@@ -175,8 +175,13 @@ interface RequestItem {
                       </div>
                     }
                     
-                    <div class="upload-field checkbox-field" style="margin-bottom: 16px;">
-                      <ion-checkbox [(ngModel)]="isReceivedInput" class="received-checkbox">Received (Materials reached the site)</ion-checkbox>
+                    <div class="upload-field checkbox-field">
+                      <ion-checkbox
+                        [(ngModel)]="isReceivedInput"
+                        class="received-checkbox"
+                        aria-label="Received materials reached the site"
+                      ></ion-checkbox>
+                      <span class="received-label">Received (materials reached the site)</span>
                     </div>
 
                     <div class="upload-actions">
@@ -350,15 +355,24 @@ interface RequestItem {
     .checkbox-field {
       display: flex;
       align-items: center;
+      gap: 10px;
       margin-bottom: 10px;
     }
     .received-checkbox {
-      --checkbox-background: #002263;
+      --checkbox-background: #ffffff;
+      --checkbox-background-checked: #002263;
+      --border-color: #94a3b8;
+      --border-color-checked: #002263;
       --checkbox-border-radius: 6px;
-      --checkbox-checked-background: #002263;
-      --checkbox-checked-border-color: #002263;
       --checkbox-size: 20px;
       margin: 0;
+      flex: 0 0 auto;
+    }
+    .received-label {
+      font-size: 13px;
+      line-height: 1.35;
+      color: #334155;
+      font-weight: 600;
     }
     .upload-field-label {
       display: block;
