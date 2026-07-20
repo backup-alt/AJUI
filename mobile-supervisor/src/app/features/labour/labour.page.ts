@@ -106,7 +106,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
             ></app-empty-state>
           } @else {
             @for (type of workerTypeCounts(); track type.labourType) {
-              <button class="type-card" (click)="openWorkersOfType(type.labourType)">
+              <button type="button" class="type-card" (click)="openWorkersOfType(type.labourType)">
                 <div class="type-icon" [class]="'icon-' + getTypeColor(type.labourType)">
                   <ion-icon [name]="getTypeIcon(type.labourType)"></ion-icon>
                 </div>
@@ -459,8 +459,6 @@ export class LabourPage implements OnInit, OnDestroy {
       this.isLoading.set(false);
     } catch (e) {
       console.error('[Labour] failed to load', e);
-      this.workers.set([]);
-      this.todayAttendance.set([]);
       this.isLoading.set(false);
     }
   }
@@ -498,14 +496,29 @@ export class LabourPage implements OnInit, OnDestroy {
   async openWorkersOfType(type: string): Promise<void> {
     this.selectedLabourType.set(type);
     this.showWorkerSheet.set(true);
+    const normalizedType = type.trim().toLowerCase();
+    let workers = this.workers().filter(w => (w.labourType || '').trim().toLowerCase() === normalizedType);
+
+    try {
+      const siteId = this.supervisor.selectedSiteId();
+      const projectId = this.supervisor.selectedProjectId();
+      const fresh = await this.supervisor.getWorkers({
+        siteId: siteId || undefined,
+        projectId: projectId || undefined,
+        labourType: type,
+        limit: 200,
+      }).toPromise();
+      workers = fresh?.items || workers;
+    } catch (err) {
+      console.error('[Labour] failed to refresh workers for type', err);
+    }
 
     const modal = await this.modalCtrl.create({
       component: WorkerListModalComponent,
       componentProps: {
-        workers: this.workers().filter(w => w.labourType === type),
+        workers,
         labourType: type,
       },
-      presentingElement: await this.modalCtrl.getTop(),
     });
 
     modal.onDidDismiss().then(() => {

@@ -442,10 +442,10 @@ export class ExpenseCreatePage implements OnInit {
         next: (res) => {
           const cashAdded = res.expenses
             .filter((e) => e.status === 'Approved' && e.transactionType === 'Cash Added')
-            .reduce((s, e) => s + (e.amount || 0), 0);
+            .reduce((s, e) => s + (Number(e.amount) || 0), 0);
           const spent = res.expenses
             .filter((e) => e.status === 'Approved' && e.transactionType !== 'Cash Added')
-            .reduce((s, e) => s + (e.amount || 0), 0);
+            .reduce((s, e) => s + (Number(e.amount) || 0), 0);
           this.currentBalance.set(cashAdded - spent);
         },
         error: () => this.currentBalance.set(0),

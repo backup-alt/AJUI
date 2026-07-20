@@ -11,6 +11,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
 import { recomputeSiteLedger } from "./expense.service.js";
+import { addApprovedMaterialToInventory } from "./inventory.service.js";
 
 export interface CreateApprovalParams {
   type: ApprovalType;
@@ -92,6 +93,11 @@ export async function approveRequest(
           ...(options.vendor !== undefined ? { vendor: options.vendor } : {}),
         }
       );
+      await addApprovedMaterialToInventory(
+        approval.sourceId,
+        options.approvedQuantity ?? mat?.approvedQuantity ?? mat?.requestedQuantity ?? 0,
+        reviewer
+      );
       projectId = mat?.projectId;
       break;
     }
@@ -136,7 +142,7 @@ export async function approveRequest(
       projectId = exp?.projectId;
       if (exp?.isSiteMaterial) {
         const materialId = await generateId("MAT");
-        await (await import("../models/Material.js")).Material.create({
+        const createdMaterial = await (await import("../models/Material.js")).Material.create({
           materialId,
           projectId: exp.projectId,
           projectName: exp.projectName,
@@ -166,6 +172,11 @@ export async function approveRequest(
           ...(options.issuedAmount !== undefined ? { issuedAmount: options.issuedAmount } : {}),
           ...(options.givenAmount !== undefined ? { givenAmount: options.givenAmount } : {}),
         });
+        await addApprovedMaterialToInventory(
+          createdMaterial._id,
+          createdMaterial.approvedQuantity,
+          reviewer
+        );
       }
       break;
     }

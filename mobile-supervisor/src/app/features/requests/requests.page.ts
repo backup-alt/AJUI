@@ -346,8 +346,15 @@ interface RequestItem {
       padding: 6px 10px;
       background: #f0fdf4;
       border-radius: 8px;
+      min-width: 0;
     }
     .file-preview ion-icon { font-size: 16px; }
+    .file-preview span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     .upload-field {
       margin-bottom: 10px;

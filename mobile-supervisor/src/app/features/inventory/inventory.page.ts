@@ -549,12 +549,10 @@ export class InventoryPage implements OnInit, OnDestroy {
         },
         error: (err) => {
           console.error('[Inventory] failed to load', err);
-          this.items.set([]);
           this.isLoading.set(false);
         },
       });
     } catch {
-      this.items.set([]);
       this.isLoading.set(false);
     }
   }

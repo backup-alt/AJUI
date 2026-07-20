@@ -68,7 +68,7 @@ import {
         <div class="ledger-stats">
           <div class="ledger-stat added">
             <div class="stat-label">Cash Added</div>
-            <div class="stat-value">{{ cashAdded() | currency:'INR':'symbol':'1.0-0'</div>
+            <div class="stat-value">{{ cashAdded() | currency:'INR':'symbol':'1.0-0' }}</div>
          </div>
           <div class="ledger-stat spent">
             <div class="stat-label">Spent</div>
@@ -253,12 +253,12 @@ export class ExpensesPage implements OnInit, OnDestroy {
 
   cashAdded = computed(() => this.expenses()
     .filter((e) => e.status === 'Approved' && e.transactionType === 'Cash Added')
-    .reduce((sum, e) => sum + (e.amount || 0), 0)
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
   );
 
   cashSpent = computed(() => this.expenses()
     .filter((e) => e.status === 'Approved' && e.transactionType !== 'Cash Added')
-    .reduce((sum, e) => sum + (e.amount || 0), 0)
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
   );
 
   balance = computed(() => this.cashAdded() - this.cashSpent());
@@ -298,13 +298,15 @@ export class ExpensesPage implements OnInit, OnDestroy {
         })
         .subscribe({
           next: (r) => {
-            this.expenses.set(r.expenses || []);
+            this.expenses.set((r.expenses || []).map((expense) => ({
+              ...expense,
+              amount: Number(expense.amount) || 0,
+            })));
             this.filterExpenses();
             this.isLoading.set(false);
           },
           error: (err) => {
             console.error('[Expenses] failed to load', err);
-            this.expenses.set([]);
             this.filterExpenses();
             this.isLoading.set(false);
           },

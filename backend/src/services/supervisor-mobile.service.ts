@@ -10,6 +10,8 @@ import { Payment } from "../models/Payment.js";
 import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { Inventory } from "../models/Inventory.js";
+import { backfillApprovedMaterialsToInventory } from "./inventory.service.js";
 
 type SupervisorAccess = {
   user: Awaited<ReturnType<typeof User.findById>>;
@@ -590,42 +592,80 @@ export async function listMaterialsForSupervisor(
   userId: string,
   filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
 ) {
-  const { query } = await buildScopedEntityQuery(userId, filters);
+  const { query } = await buildScopedEntityQuery(userId, {
+    projectId: filters.projectId,
+    siteId: filters.siteId,
+  });
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
   const skip = (page - 1) * limit;
 
+  if (filters.status !== "Approved") {
+    if (filters.status) query.status = filters.status;
+    const [requestItems, requestTotal] = await Promise.all([
+      Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Material.countDocuments(query),
+    ]);
+
+    return {
+      materials: requestItems.map((m) => ({
+        _id: m._id.toString(),
+        materialId: m.materialId,
+        projectId: m.projectId,
+        projectName: m.projectName,
+        siteId: m.siteId,
+        site: m.site,
+        name: m.name,
+        unit: m.unit,
+        requestedQuantity: m.requestedQuantity,
+        approvedQuantity: m.approvedQuantity,
+        purchasedQuantity: m.purchasedQuantity,
+        consumedQuantity: m.consumedQuantity,
+        remainingStock: m.remainingStock,
+        vendor: m.vendor,
+        poNumber: m.poNumber,
+        issuedAmount: m.issuedAmount,
+        givenAmount: (m as any).givenAmount,
+        billUrl: (m as any).billUrl,
+        received: (m as any).status === "Received",
+        requestDate: m.requestDate,
+        status: m.status,
+        notes: m.notes,
+        createdBy: m.createdBy,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+      })),
+      pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
+    };
+  }
+
+  await backfillApprovedMaterialsToInventory(query);
+
   const [items, total] = await Promise.all([
-    Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Material.countDocuments(query),
+    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+    Inventory.countDocuments(query),
   ]);
 
   return {
     materials: items.map((m) => ({
       _id: m._id.toString(),
-      materialId: m.materialId,
+      materialId: m._id.toString(),
       projectId: m.projectId,
       projectName: m.projectName,
       siteId: m.siteId,
       site: m.site,
       name: m.name,
       unit: m.unit,
-      requestedQuantity: m.requestedQuantity,
+      requestedQuantity: m.approvedQuantity,
       approvedQuantity: m.approvedQuantity,
       purchasedQuantity: m.purchasedQuantity,
       consumedQuantity: m.consumedQuantity,
       remainingStock: m.remainingStock,
       vendor: m.vendor,
       poNumber: m.poNumber,
-      issuedAmount: m.issuedAmount,
-      givenAmount: (m as any).givenAmount,
-      billUrl: (m as any).billUrl,
-      received: (m as any).status === 'Received',
-      requestDate: m.requestDate,
-      status: m.status,
-      notes: m.notes,
-      createdBy: m.createdBy,
+      requestDate: m.createdAt,
+      status: "Approved",
       createdAt: m.createdAt,
       updatedAt: m.updatedAt,
     })),
@@ -723,7 +763,9 @@ export async function listExpensesForSupervisor(
 
 export async function getMaterialDetailForSupervisor(userId: string, materialId: string) {
   const { query } = await buildScopedEntityQuery(userId);
-  const material = await Material.findOne({ ...query, _id: materialId }).lean();
+  const material =
+    await Inventory.findOne({ ...query, _id: materialId }).lean() ||
+    await Material.findOne({ ...query, _id: materialId }).lean();
   if (!material) throw new AppError(404, "Material not found or not accessible");
   return material;
 }
@@ -734,10 +776,11 @@ export async function updateMaterialStockForSupervisor(
   updates: { purchasedQuantity?: number; consumedQuantity?: number }
 ) {
   const { query } = await buildScopedEntityQuery(userId);
-  const material = await Material.findOne({ ...query, _id: materialId });
+  const material = await Inventory.findOne({ ...query, _id: materialId });
   if (!material) throw new AppError(404, "Material not found or not accessible");
   if (updates.purchasedQuantity !== undefined) {
     material.purchasedQuantity = Math.max(0, material.purchasedQuantity + updates.purchasedQuantity);
+    material.approvedQuantity = Math.max(material.approvedQuantity, material.purchasedQuantity);
   }
   if (updates.consumedQuantity !== undefined) {
     material.consumedQuantity = Math.max(0, material.consumedQuantity + updates.consumedQuantity);

@@ -2807,6 +2807,7 @@ export class ProjectWorkspacePage {
       normalized.includes("payment") ||
       normalized.includes("received") ||
       normalized.includes("cash issued") ||
+      normalized.includes("cash added") ||
       normalized.includes("add cash") ||
       normalized.includes("refund") ||
       normalized.includes("credit")
@@ -3089,7 +3090,7 @@ export class ProjectWorkspacePage {
   }
 
   private normalizedExpenseTransactionType(value: string): string {
-    return this.isExpenseCredit(value) ? "Add Cash" : "Purchase";
+    return this.isExpenseCredit(value) ? "Cash Added" : "Purchase";
   }
 
   private positiveExpenseAmountValue(value: unknown): string {
