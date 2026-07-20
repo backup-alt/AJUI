@@ -109,7 +109,7 @@ import {
                     [tone]="expense.transactionType === 'Cash Added' ? 'warning' : 'info'"
                     [icon]="expense.transactionType === 'Cash Added' ? 'cash-outline' : 'card-outline'"
                   >
-                    {{ (expense.transactionType === 'Cash Added' ? 'Add Cash' : (expense.transactionType || 'Purchase')) }}
+                    {{ expense.transactionType === 'Cash Added' ? 'Add Cash' : (expense.transactionType || 'Purchase') }}
                  </app-status-pill>
                   <h3 class="expense-desc">{{ expense.description }}</h3>
                   <p class="expense-meta">

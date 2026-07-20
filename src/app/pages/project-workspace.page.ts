@@ -2629,7 +2629,7 @@ export class ProjectWorkspacePage {
     if (section === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
     if (section === "labour" && key === "staffName") return this.staffNameOptionsForProject();
     if (section === "expenses" && key === "transactionType") {
-      return ["Purchase", "Cash Added"];
+      return ["Purchase", "Add Cash"];
     }
     if (section === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (section === "labour" && key === "attendance") return ["Present", "Absent"];
@@ -2681,7 +2681,7 @@ export class ProjectWorkspacePage {
       },
       expenses: {
         expenseDate: today,
-        transactionType: "Cash Added",
+        transactionType: "Add Cash",
         description: "",
         amount: "0",
         siteMaterial: "No",
@@ -2807,7 +2807,7 @@ export class ProjectWorkspacePage {
       normalized.includes("payment") ||
       normalized.includes("received") ||
       normalized.includes("cash issued") ||
-      normalized.includes("cash added") ||
+      normalized.includes("add cash") ||
       normalized.includes("refund") ||
       normalized.includes("credit")
     );
@@ -3089,7 +3089,7 @@ export class ProjectWorkspacePage {
   }
 
   private normalizedExpenseTransactionType(value: string): string {
-    return this.isExpenseCredit(value) ? "Cash Added" : "Purchase";
+    return this.isExpenseCredit(value) ? "Add Cash" : "Purchase";
   }
 
   private positiveExpenseAmountValue(value: unknown): string {

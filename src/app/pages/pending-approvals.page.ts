@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
+import { FormsModule } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 import { ErpDataService, type SharedModuleKey } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -80,7 +81,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, FormsModule],
   styles: [`
     .image-preview-overlay {
       position: fixed;
@@ -191,13 +192,12 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <input
                             class="approval-table-input"
                             inputmode="decimal"
-                            [value]="row.approvedQuantity"
-                            (input)="updateApprovalCell(row, 'approvedQuantity', $any($event.target).value)"
+                            [(ngModel)]="row.approvedQuantity"
                             aria-label="Approved quantity"
                           />
                         </td>
                         <td>
-                          <select class="approval-table-select" [value]="row.vendor" (change)="updateApprovalCell(row, 'vendor', $any($event.target).value)">
+                          <select class="approval-table-select" [(ngModel)]="row.vendor">
                             <option *ngFor="let vendor of vendorOptions(row.vendor)" [value]="vendor">{{ vendor }}</option>
                           </select>
                         </td>
@@ -208,8 +208,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             class="approval-table-input"
                             inputmode="decimal"
                             type="number"
-                            [value]="row.issuedAmount ?? ''"
-                            (input)="updateApprovalCell(row, 'issuedAmount', $any($event.target).value)"
+                            [(ngModel)]="row.issuedAmount"
                             aria-label="Issued amount"
                             min="0"
                           />
@@ -219,8 +218,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             class="approval-table-input"
                             inputmode="decimal"
                             type="number"
-                            [value]="row.givenAmount ?? ''"
-                            (input)="updateApprovalCell(row, 'givenAmount', $any($event.target).value)"
+                            [(ngModel)]="row.givenAmount"
                             aria-label="Given amount"
                             min="0"
                           />
@@ -229,8 +227,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <input
                             class="approval-table-input"
                             type="text"
-                            [value]="row.poNumber ?? ''"
-                            (input)="updateApprovalCell(row, 'poNumber', $any($event.target).value)"
+                            [(ngModel)]="row.poNumber"
                             aria-label="PO Number"
                             placeholder="Auto-generate"
                           />
@@ -299,8 +296,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             class="approval-table-input"
                             inputmode="decimal"
                             type="number"
-                            [value]="row.issuedAmount ?? ''"
-                            (input)="updateApprovalCell(row, 'issuedAmount', $any($event.target).value)"
+                            [(ngModel)]="row.issuedAmount"
                             aria-label="Issued amount"
                             min="0"
                           />
@@ -310,8 +306,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             class="approval-table-input"
                             inputmode="decimal"
                             type="number"
-                            [value]="row.givenAmount ?? ''"
-                            (input)="updateApprovalCell(row, 'givenAmount', $any($event.target).value)"
+                            [(ngModel)]="row.givenAmount"
                             aria-label="Given amount"
                             min="0"
                           />
@@ -320,8 +315,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <input
                             class="approval-table-input"
                             type="text"
-                            [value]="row.poNumber ?? ''"
-                            (input)="updateApprovalCell(row, 'poNumber', $any($event.target).value)"
+                            [(ngModel)]="row.poNumber"
                             aria-label="PO Number"
                             placeholder="Auto-generate"
                           />

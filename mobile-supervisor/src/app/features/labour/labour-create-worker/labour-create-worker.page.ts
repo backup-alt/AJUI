@@ -18,6 +18,7 @@ import {
   IonSpinner,
   IonToggle,
   ToastController,
+  ActionSheetController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -148,19 +149,14 @@ const LABOUR_TYPES = [
           </ion-item>
 
           @if (worker.isSubcontract) {
-            <ion-item class="form-item form-item-last">
+            <ion-item class="form-item form-item-last" (click)="openSubcontractorActionSheet()">
               <ion-label position="stacked">Select Subcontractor *</ion-label>
-              <ion-select
+              <ion-input
                 placeholder="Choose subcontractor"
-                [(ngModel)]="worker.subcontractorId"
-                interface="popover"
-              >
-                @for (sub of subcontractors(); track sub.subcontractorId) {
-                  <ion-select-option [value]="sub.subcontractorId">
-                    {{ sub.subcontractorName }}
-                  </ion-select-option>
-                }
-              </ion-select>
+                [value]="selectedSubcontractorName()"
+                readonly="true"
+                class="subcontractor-input"
+              ></ion-input>
             </ion-item>
           }
         </ion-list>
@@ -253,11 +249,16 @@ export class LabourCreateWorkerPage implements OnInit {
     subcontractorName: '',
   };
 
+  selectedSubcontractorId = signal<string>('');
+  selectedSubcontractorName = signal<string>('');
+
   subcontractors = signal<Subcontractor[]>([]);
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
+
+  private actionSheetCtrl = inject(ActionSheetController);
 
   async ngOnInit(): Promise<void> {
     addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline, businessOutline });
@@ -273,6 +274,8 @@ export class LabourCreateWorkerPage implements OnInit {
     } else {
       this.worker.subcontractorId = '';
       this.worker.subcontractorName = '';
+      this.selectedSubcontractorId.set('');
+      this.selectedSubcontractorName.set('');
     }
   }
 
@@ -285,6 +288,24 @@ export class LabourCreateWorkerPage implements OnInit {
       next: (res) => this.subcontractors.set(res.subcontractors || []),
       error: (err) => console.error('[CreateWorker] failed to load subcontractors', err),
     });
+  }
+
+  async openSubcontractorActionSheet() {
+    const buttons: Array<{ text: string; handler: () => void; role?: string }> = this.subcontractors().map((sub) => ({
+      text: sub.subcontractorName,
+      handler: () => {
+        this.selectedSubcontractorId.set(sub.subcontractorId);
+        this.selectedSubcontractorName.set(sub.subcontractorName);
+        this.worker.subcontractorId = sub.subcontractorId;
+        this.worker.subcontractorName = sub.subcontractorName;
+      },
+    }));
+    buttons.push({ text: 'Cancel', role: 'cancel', handler: () => {} });
+    const actionSheet = await this.actionSheetCtrl.create({
+      header: 'Select Subcontractor',
+      buttons,
+    });
+    await actionSheet.present();
   }
 
   isValid(): boolean {

@@ -13,7 +13,6 @@ import {
   IonTextarea,
   IonIcon,
   IonSpinner,
-  ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -21,6 +20,7 @@ import { addIcons } from 'ionicons';
 import { closeOutline, checkmarkOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { InventoryItem } from '../inventory.page';
+import { ModalController } from '@ionic/angular/standalone';
 
 @Component({
   selector: 'app-inventory-request-modal',

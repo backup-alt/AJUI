@@ -102,10 +102,10 @@ import { Expense } from '../../../shared/models';
             </ion-badge>
           </div>
 
-          <div class="amount-block" [class.cash-added]="isCashAdded()">
+          <div class="amount-block" [class.add-cash]="isCashAdded()">
             <div class="amount-label">
               @if (isCashAdded()) {
-                Cash Added
+                Add Cash
               } @else {
                 Purchase Amount
               }
@@ -267,7 +267,7 @@ import { Expense } from '../../../shared/models';
       padding: 16px 20px;
       margin-bottom: 12px;
     }
-    .amount-block.cash-added {
+    .amount-block.add-cash {
       border-left-color: #c9a227;
     }
     .amount-label {
@@ -284,7 +284,7 @@ import { Expense } from '../../../shared/models';
       color: #002263;
       line-height: 1;
     }
-    .amount-block.cash-added .amount-value { color: #a8861f; }
+    .amount-block.add-cash .amount-value { color: #a8861f; }
     ion-card {
       margin: 0 0 12px;
       border: 1px solid #e5e7eb;

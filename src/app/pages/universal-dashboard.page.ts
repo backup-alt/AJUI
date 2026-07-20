@@ -2410,12 +2410,12 @@ visibleRows(): TableRow[] {
     const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor"]);
     return this.columnsForActive().filter((column) => {
       if (this.activeModule() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
-      const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
+      const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Add Cash")) === "Add Cash";
       if (this.activeModule() === "expenses" && isCashAdded && !cashAddedFields.has(column.key)) return false;
       if (
         this.activeModule() === "expenses" &&
         column.key === "siteMaterial" &&
-        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) !== "Purchase"
+        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Add Cash")) !== "Purchase"
       ) {
         return false;
       }
@@ -2508,17 +2508,17 @@ visibleRows(): TableRow[] {
       const preparedRow = this.withGeneratedReferences(module === "expenses" ? this.normalizedExpenseInputRow(row) : row);
       if (module === "expenses") this.ensureExpenseOpeningForInput(preparedRow);
 
-      const isCashAdded = module === "expenses" && preparedRow["transactionType"] === "Cash Added";
+      const isCashAdded = module === "expenses" && preparedRow["transactionType"] === "Add Cash";
 
       if (isCashAdded) {
         const projectId = String(preparedRow["projectId"] || preparedRow["__projectId"] || "");
         const site = String(preparedRow["site"] || "");
         const date = String(preparedRow["expenseDate"] || new Date().toISOString().slice(0, 10));
-        const description = String(preparedRow["description"] || "Cash Added");
+        const description = String(preparedRow["description"] || "Add Cash");
         const amount = Math.abs(Number(preparedRow["amount"]) || 0);
 
         if (!projectId) {
-          console.warn("[UniversalDashboard] Cannot save Cash Added: no project selected");
+          console.warn("[UniversalDashboard] Cannot save Add Cash: no project selected");
           return;
         }
 
@@ -2551,7 +2551,7 @@ visibleRows(): TableRow[] {
           this.recordDialogOpen.set(false);
           return;
         } catch (err) {
-          console.error("[UniversalDashboard] Failed to create Cash Added expense", err);
+          console.error("[UniversalDashboard] Failed to create Add Cash expense", err);
           return;
         }
       }
@@ -3162,7 +3162,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
     if (module === "materials" && key === "materialName") return this.materialNameOptions();
     if (module === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
     if (module === "expenses" && key === "transactionType") {
-      return ["Purchase", "Cash Added"];
+      return ["Purchase", "Add Cash"];
     }
     if (module === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (module === "labour" && key === "attendance") return ["Present", "Absent"];
@@ -3228,7 +3228,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
         project: "",
         site: "",
         expenseDate: today,
-        transactionType: "Cash Added",
+        transactionType: "Add Cash",
         description: "",
         amount: "0",
         siteMaterial: "No",
@@ -3367,7 +3367,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
       normalized.includes("payment") ||
       normalized.includes("received") ||
       normalized.includes("cash issued") ||
-      normalized.includes("cash added") ||
+      normalized.includes("add cash") ||
       normalized.includes("refund") ||
       normalized.includes("credit")
     );
@@ -3589,7 +3589,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
   }
 
   private normalizedExpenseTransactionType(value: string): string {
-    return this.isExpenseCredit(value) ? "Cash Added" : "Purchase";
+    return this.isExpenseCredit(value) ? "Add Cash" : "Purchase";
   }
 
   private positiveExpenseAmountValue(value: unknown): string {
@@ -3628,7 +3628,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
       const rowSite = String(row["site"] || "").trim().toLowerCase();
       const sameProject = projectId ? rowProjectId === projectId : rowProjectName === projectName;
       return sameProject && rowSite === normalizedSite &&
-        this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Cash Added";
+        this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Add Cash";
     });
     if (cashAddedRows.length === 0) return 0;
     const earliest = cashAddedRows.reduce((prev, curr) =>
@@ -3649,7 +3649,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
         return sameProject && rowSite === normalizedSite;
       });
     const cashAddedRows = rows.filter((row) =>
-      this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Cash Added"
+      this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Add Cash"
     );
     return cashAddedRows.reduce((sum, row) => sum + Math.abs(this.moneyNumber(row["amount"])), 0);
   }
