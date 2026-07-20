@@ -3395,6 +3395,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
       normalized.includes("received") ||
       normalized.includes("cash issued") ||
       normalized.includes("add cash") ||
+      normalized.includes("cash added") ||
       normalized.includes("refund") ||
       normalized.includes("credit")
     );
