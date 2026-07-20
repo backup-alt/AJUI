@@ -103,6 +103,7 @@ export function mapSupervisor(s: any): Supervisor {
 }
 
 export function mapMaterial(m: any): any {
+  const remainingStock = m.remainingStock ?? Math.max(0, (m.purchasedQuantity ?? 0) - (m.consumedQuantity ?? 0));
   return {
     _id: m._id,
     id: m.materialId,
@@ -119,7 +120,8 @@ export function mapMaterial(m: any): any {
     approved: m.approvedQuantity ?? 0,
     purchased: m.purchasedQuantity ?? 0,
     consumed: m.consumedQuantity ?? 0,
-    remainingStock: m.remainingStock ?? Math.max(0, (m.purchasedQuantity ?? 0) - (m.consumedQuantity ?? 0)),
+    quantity: remainingStock,
+    remainingStock,
     vendor: m.vendor,
     vendorId: m.vendorId,
     poNumber: m.poNumber,
