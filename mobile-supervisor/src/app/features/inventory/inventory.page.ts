@@ -501,16 +501,22 @@ export class InventoryPage implements OnInit, OnDestroy {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('agb:site-changed', this.handleSiteChange);
+      window.addEventListener('agb:inventory-changed', this.handleInventoryChange);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:site-changed', this.handleSiteChange);
+      window.removeEventListener('agb:inventory-changed', this.handleInventoryChange);
     }
   }
 
   private handleSiteChange = (): void => {
+    void this.loadInventory();
+  };
+
+  private handleInventoryChange = (): void => {
     void this.loadInventory();
   };
 

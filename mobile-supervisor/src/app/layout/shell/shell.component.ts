@@ -302,10 +302,10 @@ import { Site } from '../../shared/models';
       color: var(--m3-on-surface-muted);
       text-transform: uppercase;
       letter-spacing: 1.2px;
-      padding: var(--md-space-3) var(--md-space-6) var(--md-space-2);
+      padding: var(--md-space-4) var(--md-space-6) var(--md-space-2);
     }
     .menu-section-label:first-of-type {
-      padding-top: var(--md-space-2);
+      padding-top: var(--md-space-4);
     }
 
     .menu-list { background: transparent; padding: 0 var(--md-space-2); }

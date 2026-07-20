@@ -290,7 +290,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ row.project || "-" }}</td>
                         <td>{{ row.site || "-" }}</td>
                         <td>{{ row.expenseDate || "-" }}</td>
-                        <td>{{ row.transactionType || "-" }}</td>
+                        <td>{{ transactionTypeLabel(row.transactionType) }}</td>
                         <td><strong>{{ row.description || "-" }}</strong></td>
                         <td>{{ row.amount || "-" }}</td>
                         <td>
@@ -535,6 +535,18 @@ export class PendingApprovalsPage implements OnInit {
 
   private isPending(value: string): boolean {
     return value.toLowerCase() === "pending";
+  }
+
+  /**
+   * Display label for an expense transaction type.
+   * The backend stores the raw value "Cash Added" or "Purchase";
+   * we map "Cash Added" -> "Add Cash" for the UI.
+   */
+  transactionTypeLabel(raw: string | undefined | null): string {
+    const value = (raw || "").trim();
+    if (!value) return "-";
+    if (value === "Cash Added") return "Add Cash";
+    return value;
   }
 
   private sortedUnique(values: string[]): string[] {

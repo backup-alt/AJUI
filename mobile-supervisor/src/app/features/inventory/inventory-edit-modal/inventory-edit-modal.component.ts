@@ -255,6 +255,9 @@ export class InventoryEditModalComponent implements OnInit {
     }).subscribe({
       next: async () => {
         this.isSubmitting.set(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: this.item._id } }));
+        }
         await this.modalCtrl.dismiss({ updated: true });
       },
       error: async (err) => {

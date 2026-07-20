@@ -666,6 +666,9 @@ export class RequestsPage implements OnInit {
       });
       await toast.present();
       this.cancelUpload();
+      if (typeof window !== 'undefined' && item.type === 'material') {
+        window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: item._id, reason: 'received' } }));
+      }
       await this.loadAllRequests();
     } catch (err: any) {
       const toast = await this.toastCtrl.create({

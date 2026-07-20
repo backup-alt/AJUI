@@ -776,17 +776,34 @@ export async function updateMaterialStockForSupervisor(
   updates: { purchasedQuantity?: number; consumedQuantity?: number }
 ) {
   const { query } = await buildScopedEntityQuery(userId);
-  const material = await Inventory.findOne({ ...query, _id: materialId });
-  if (!material) throw new AppError(404, "Material not found or not accessible");
+  const inventory = await Inventory.findOne({ ...query, _id: materialId });
+  if (!inventory) throw new AppError(404, "Material not found or not accessible");
   if (updates.purchasedQuantity !== undefined) {
-    material.purchasedQuantity = Math.max(0, material.purchasedQuantity + updates.purchasedQuantity);
-    material.approvedQuantity = Math.max(material.approvedQuantity, material.purchasedQuantity);
+    inventory.purchasedQuantity = Math.max(0, inventory.purchasedQuantity + updates.purchasedQuantity);
+    inventory.approvedQuantity = Math.max(inventory.approvedQuantity, inventory.purchasedQuantity);
   }
   if (updates.consumedQuantity !== undefined) {
-    material.consumedQuantity = Math.max(0, material.consumedQuantity + updates.consumedQuantity);
+    inventory.consumedQuantity = Math.max(0, inventory.consumedQuantity + updates.consumedQuantity);
   }
-  await material.save();
-  return material.toObject();
+  await inventory.save();
+
+  // Keep the linked Material document in sync so all views (mobile + web)
+  // see the same purchased / consumed / remaining numbers.
+  if (inventory.lastMaterialId) {
+    try {
+      const linkedMaterial = await Material.findById(inventory.lastMaterialId);
+      if (linkedMaterial) {
+        linkedMaterial.purchasedQuantity = inventory.purchasedQuantity;
+        linkedMaterial.consumedQuantity = inventory.consumedQuantity;
+        linkedMaterial.approvedQuantity = inventory.approvedQuantity;
+        await linkedMaterial.save();
+      }
+    } catch (err) {
+      console.warn("[supervisor-mobile] failed to sync linked material", err);
+    }
+  }
+
+  return inventory.toObject();
 }
 
 export async function getLabourDetailForSupervisor(userId: string, labourId: string) {

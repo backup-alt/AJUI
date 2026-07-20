@@ -659,7 +659,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             [class.open]="isSelectMenuOpen(row, column.key)"
                           >
                             <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
-                              <span>{{ row[column.key] || 'Select' }}</span>
+                              <span>{{ displayCell(row, column.key) || 'Select' }}</span>
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                 <path d="M5.5 7.5 10 12l4.5-4.5" />
                               </svg>
@@ -705,7 +705,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                               spellcheck="false"
                               (blur)="isRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
                             >
-                              {{ row[column.key] }}
+                              {{ displayCell(row, column.key) }}
                             </span>
                           </ng-template>
                         </ng-template>
@@ -2036,6 +2036,17 @@ visibleRows(): TableRow[] {
       key === "staffCount" ||
       key === "balance"
     );
+  }
+
+  /**
+   * Display value for a cell. Currently maps the stored "Cash Added"
+   * transaction type to the user-facing "Add Cash" label. The raw value
+   * is preserved on the row so it can be sent back to the backend.
+   */
+  displayCell(row: TableRow, key: string): string {
+    const raw = row[key];
+    if (key === "transactionType" && raw === "Cash Added") return "Add Cash";
+    return raw == null ? "" : String(raw);
   }
 
   setFilter(key: string, value: string) {

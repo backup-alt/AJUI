@@ -323,6 +323,9 @@ export class InventoryRequestModalComponent implements OnInit {
     }).subscribe({
       next: async () => {
         this.isSubmitting.set(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { reason: 'requested' } }));
+        }
         await this.modalCtrl.dismiss({ requested: true });
       },
       error: async (err) => {
