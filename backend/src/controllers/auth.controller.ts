@@ -495,6 +495,7 @@ const adminCreateInviteSchema = z.object({
   cashLimit: z.coerce.number().nonnegative().optional(),
   address: z.string().trim().max(500).optional(),
   metadata: z.record(z.unknown()).optional(),
+  sendEmail: z.boolean().optional(), // true = send deep link email, false = generate QR only
 });
 
 export async function adminCreateInvite(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -513,6 +514,7 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       address: body.address,
       metadata: body.metadata,
       expiryMinutes: 5,
+      sendEmail: body.sendEmail,
     });
 
     const qrDataUrl = await generateQRDataURL(JSON.stringify(qrPayload));

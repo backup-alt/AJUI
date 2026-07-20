@@ -228,6 +228,7 @@ export interface SupervisorInviteEmailInput {
   name: string;
   deepLink: string;
   expiresMinutes: number;
+  webFallbackUrl?: string;
 }
 
 export function buildSupervisorInviteEmail(input: SupervisorInviteEmailInput): { subject: string; html: string; text: string } {
@@ -238,6 +239,13 @@ export function buildSupervisorInviteEmail(input: SupervisorInviteEmailInput): {
       Hi <strong>${input.name}</strong>, you have been added to AGB (Annai Golden Builders) as a Site Supervisor. Tap the button below to open the AGB Supervisor app and finish your account setup.
     </p>
     ${PRIMARY_BUTTON("Open AGB App & Activate", input.deepLink)}
+    ${input.webFallbackUrl ? `
+    <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
+      If the button doesn't open the app, copy and paste this link into your browser:
+    </p>
+    <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
+      ${input.webFallbackUrl}
+    </p>` : ''}
     <p style="margin:0 0 8px;color:#98a2b3;font-size:13px;line-height:1.5;">
       This link expires in <strong>${input.expiresMinutes} minutes</strong>.
     </p>
@@ -249,6 +257,7 @@ You have been added to AGB (Annai Golden Builders) as a Site Supervisor. Open th
 
 ${input.deepLink}
 
+${input.webFallbackUrl ? `If the link doesn't open the app, use this link in your browser:\n${input.webFallbackUrl}\n` : ''}
 ---
 Annai Golden Builders
 Operations Workspace`;

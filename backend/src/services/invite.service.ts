@@ -78,6 +78,7 @@ export interface CreateInviteParams {
   address?: string;
   metadata?: Record<string, unknown>;
   expiryMinutes?: number;
+  sendEmail?: boolean; // if true, send deep link email; if false, generate QR only
 }
 
 export interface CreateEmployeeInviteParams {
@@ -146,24 +147,51 @@ export async function createInvite(params: CreateInviteParams): Promise<{
   invite.otpHash = otpHash;
   await invite.save();
 
-  const { subject, html, text } = buildOtpEmail({
-    name: params.supervisorName,
-    code: otp,
-    purpose: "complete your supervisor account setup",
-    expiresMinutes: expiryMinutes,
-  });
-  const emailBody = {
-    to: params.supervisorEmail,
-    subject,
-    html,
-    text,
-  };
   let emailSent = false;
-  try {
-    await sendEmail(emailBody);
-    emailSent = true;
-  } catch (emailErr) {
-    console.error("[InviteService] Failed to send OTP email (returning OTP for fallback):", emailErr);
+  if (params.sendEmail) {
+    // Send deep link email instead of OTP email
+    const separator = env.QR_BASE_URL.includes("?") ? "&" : "?";
+    const deepLink = `${env.QR_BASE_URL}${separator}token=${encodeURIComponent(token)}`;
+    const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/#/auth/signup?token=${encodeURIComponent(token)}`;
+
+    const { subject, html, text } = buildSupervisorInviteEmail({
+      name: params.supervisorName,
+      deepLink,
+      expiresMinutes: expiryMinutes,
+      webFallbackUrl,
+    });
+
+    try {
+      await sendEmail({
+        to: params.supervisorEmail,
+        subject,
+        html,
+        text,
+      });
+      emailSent = true;
+    } catch (emailErr) {
+      console.error("[InviteService] Failed to send supervisor invite email:", emailErr);
+    }
+  } else {
+    // Send OTP email as before for QR flow
+    const { subject, html, text } = buildOtpEmail({
+      name: params.supervisorName,
+      code: otp,
+      purpose: "complete your supervisor account setup",
+      expiresMinutes: expiryMinutes,
+    });
+    const emailBody = {
+      to: params.supervisorEmail,
+      subject,
+      html,
+      text,
+    };
+    try {
+      await sendEmail(emailBody);
+      emailSent = true;
+    } catch (emailErr) {
+      console.error("[InviteService] Failed to send OTP email (returning OTP for fallback):", emailErr);
+    }
   }
 
   const separator = env.QR_BASE_URL.includes("?") ? "&" : "?";
@@ -389,7 +417,7 @@ export async function resendOtp(token: string): Promise<{ otp: string; emailSent
  * Sends a deep link via email to a supervisor so they can open the mobile
  * app and complete the OTP/QR flow. The link uses the configured
  * QR_BASE_URL (default `agb-supervisor://invite`) and includes the
- * invite token.
+ * invite token. Also provides a web fallback URL.
  */
 export async function sendSupervisorInviteEmail(
   token: string
@@ -410,6 +438,9 @@ export async function sendSupervisorInviteEmail(
   const separator = env.QR_BASE_URL.includes("?") ? "&" : "?";
   const deepLink = `${env.QR_BASE_URL}${separator}token=${encodeURIComponent(token)}`;
 
+  // Web fallback URL for browsers that can't open the deep link
+  const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/#/auth/signup?token=${encodeURIComponent(token)}`;
+
   const name = extractSupervisorName(invite);
   const expiryMinutes = Math.max(
     1,
@@ -420,6 +451,7 @@ export async function sendSupervisorInviteEmail(
     name,
     deepLink,
     expiresMinutes: expiryMinutes,
+    webFallbackUrl,
   });
 
   let emailSent = false;
