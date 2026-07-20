@@ -1374,6 +1374,13 @@ export class UniversalDashboardPage {
     this.resetFilterState();
     this.closeDropdowns();
     this.clearRowSelection();
+
+    // Inventory is derived from the materials collection. If we have no
+    // materials yet, kick off a backend fetch so the inventory cards
+    // populate immediately when the user opens the section.
+    if (module === "inventory" && this.data.materials().length === 0) {
+      this.refreshFromBackend();
+    }
   }
 
   private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[]) {
@@ -1731,6 +1738,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapClient);
           localStorage.setItem("agb-erp:clients", JSON.stringify(items));
+          this.data.clients.set(items);
         } catch {}
         finishOne();
       },
@@ -1742,6 +1750,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapProject);
           localStorage.setItem("agb-erp:projects", JSON.stringify(items));
+          this.data.projects.set(items);
         } catch {}
         finishOne();
       },
@@ -1753,6 +1762,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapSite);
           localStorage.setItem("agb-erp:sites", JSON.stringify(items));
+          this.data.siteEntities.set(items);
         } catch {}
         finishOne();
       },
@@ -1764,6 +1774,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapMaterial);
           localStorage.setItem("agb-erp:materials", JSON.stringify(items));
+          this.data.materials.set(items);
         } catch {}
         finishOne();
       },
@@ -1775,6 +1786,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapLabour);
           localStorage.setItem("agb-erp:labour", JSON.stringify(items));
+          this.data.labour.set(items);
         } catch {}
         finishOne();
       },
@@ -1786,6 +1798,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapExpense);
           localStorage.setItem("agb-erp:expenses", JSON.stringify(items));
+          this.data.expenses.set(items);
         } catch {}
         finishOne();
       },
@@ -1797,6 +1810,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapPayment);
           localStorage.setItem("agb-erp:payments", JSON.stringify(items));
+          this.data.payments.set(items);
         } catch {}
         finishOne();
       },
@@ -1808,6 +1822,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapVendor);
           localStorage.setItem("agb-erp:vendors", JSON.stringify(items));
+          this.data.vendors.set(items);
         } catch {}
         finishOne();
       },
@@ -1819,6 +1834,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapSubcontractor);
           localStorage.setItem("agb-erp:subcontractors", JSON.stringify(items));
+          this.data.subcontractors.set(items);
         } catch {}
         finishOne();
       },
