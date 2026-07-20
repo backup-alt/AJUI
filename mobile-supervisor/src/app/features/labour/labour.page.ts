@@ -493,40 +493,9 @@ export class LabourPage implements OnInit, OnDestroy {
     return LABOUR_TYPE_COLORS[type] || 'default';
   }
 
-  async openWorkersOfType(type: string): Promise<void> {
+  openWorkersOfType(type: string): void {
     this.selectedLabourType.set(type);
-    this.showWorkerSheet.set(true);
-    const normalizedType = type.trim().toLowerCase();
-    let workers = this.workers().filter(w => (w.labourType || '').trim().toLowerCase() === normalizedType);
-
-    try {
-      const siteId = this.supervisor.selectedSiteId();
-      const projectId = this.supervisor.selectedProjectId();
-      const fresh = await this.supervisor.getWorkers({
-        siteId: siteId || undefined,
-        projectId: projectId || undefined,
-        labourType: type,
-        limit: 200,
-      }).toPromise();
-      workers = fresh?.items || workers;
-    } catch (err) {
-      console.error('[Labour] failed to refresh workers for type', err);
-    }
-
-    const modal = await this.modalCtrl.create({
-      component: WorkerListModalComponent,
-      componentProps: {
-        workers,
-        labourType: type,
-      },
-    });
-
-    modal.onDidDismiss().then(() => {
-      this.showWorkerSheet.set(false);
-      this.selectedLabourType.set(null);
-    });
-
-    await modal.present();
+    void this.router.navigate(['/tabs/labour/type', type]);
   }
 
   closeWorkersSheet(): void {

@@ -73,6 +73,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'labour/type/:type',
+        loadComponent: () =>
+          import('./features/labour/labour-workers/labour-workers.page').then(
+            (m) => m.LabourWorkersPage
+          ),
+      },
+      {
         path: 'labour/mark-attendance/:workerId',
         loadComponent: () =>
           import('./features/labour/labour-mark-attendance/labour-mark-attendance.page').then(
