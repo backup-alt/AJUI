@@ -94,17 +94,17 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'labour/:id',
-        loadComponent: () =>
-          import('./features/labour/labour-detail/labour-detail.page').then(
-            (m) => m.LabourDetailPage
-          ),
-      },
-      {
         path: 'labour/worker/:workerId',
         loadComponent: () =>
           import('./features/labour/labour-worker-detail/labour-worker-detail.page').then(
             (m) => m.LabourWorkerDetailPage
+          ),
+      },
+      {
+        path: 'labour/:id',
+        loadComponent: () =>
+          import('./features/labour/labour-detail/labour-detail.page').then(
+            (m) => m.LabourDetailPage
           ),
       },
       {

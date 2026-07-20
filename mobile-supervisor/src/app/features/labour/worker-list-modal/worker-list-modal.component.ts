@@ -195,8 +195,10 @@ export class WorkerListModalComponent implements OnInit {
     this.modalCtrl.dismiss();
   }
 
-  navigateToDetail(worker: Worker): void {
-    this.modalCtrl.dismiss();
-    this.router.navigate(['/tabs/labour/worker', worker._id]);
+  async navigateToDetail(worker: Worker): Promise<void> {
+    console.log('[WorkerListModal] Navigating to worker detail:', worker._id);
+    await this.modalCtrl.dismiss();
+    await this.router.navigate(['/tabs/labour/worker', worker._id]);
+    console.log('[WorkerListModal] Navigation complete');
   }
 }

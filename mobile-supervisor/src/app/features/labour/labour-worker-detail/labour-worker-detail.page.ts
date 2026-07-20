@@ -872,13 +872,16 @@ export class LabourWorkerDetailPage implements OnInit {
   }
 
   private async loadWorker(): Promise<void> {
+    console.log('[WorkerDetail] Loading worker:', this.workerId);
     this.supervisor.getWorkerDetail(this.workerId).subscribe({
       next: (res) => {
+        console.log('[WorkerDetail] Worker loaded:', res.worker);
         this.worker.set(res.worker);
         this.weeklyPayInput.set(res.worker.weeklyPay);
         this.isLoading.set(false);
       },
-      error: () => {
+      error: (err) => {
+        console.error('[WorkerDetail] Error loading worker:', err);
         this.worker.set(null);
         this.isLoading.set(false);
       },
@@ -886,9 +889,16 @@ export class LabourWorkerDetailPage implements OnInit {
   }
 
   private async loadAttendance(): Promise<void> {
+    console.log('[WorkerDetail] Loading attendance for worker:', this.workerId);
     this.supervisor.getAttendanceForWorker(this.workerId).subscribe({
-      next: (res) => this.attendance.set(res.items || []),
-      error: () => this.attendance.set([]),
+      next: (res) => {
+        console.log('[WorkerDetail] Attendance loaded:', res.items?.length || 0, 'records');
+        this.attendance.set(res.items || []);
+      },
+      error: (err) => {
+        console.error('[WorkerDetail] Error loading attendance:', err);
+        this.attendance.set([]);
+      },
     });
   }
 
