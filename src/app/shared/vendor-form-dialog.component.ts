@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output
 import { IonIcon } from "@ionic/angular/standalone";
 import { FormsModule } from "@angular/forms";
 import { ErpDataService, type Site, type VendorStatus } from "../data/erp-data.service";
+import { ApiService } from "../core/api.service";
 
 export type VendorFormValue = {
   name: string;
@@ -35,27 +36,27 @@ export type VendorFormValue = {
         <form class="erp-form" (submit)="submit($event)">
           <label>
             <span>Vendor Name</span>
-            <input name="name" required [value]="initialValue?.name || ''" placeholder="Enter vendor or company name" />
+            <input name="name" [(ngModel)]="nameValue" placeholder="Enter vendor or company name" />
           </label>
           <label>
             <span>Material Type</span>
-            <input name="materialType" required [value]="initialValue?.materialType || ''" placeholder="e.g. Cement, Bricks, Steel" />
+            <input name="materialType" [(ngModel)]="materialTypeValue" placeholder="e.g. Cement, Bricks, Steel" />
           </label>
           <label>
             <span>Phone Number</span>
-            <input name="phone" required [value]="initialValue?.phone || ''" placeholder="+91 98765 43210" />
+            <input name="phone" [(ngModel)]="phoneValue" placeholder="+91 98765 43210" />
           </label>
           <label>
             <span>GST Number</span>
-            <input name="gst" required [value]="initialValue?.gst || ''" placeholder="33AABCS1402P1Z8" />
+            <input name="gst" [(ngModel)]="gstValue" placeholder="33AABCS1402P1Z8" />
           </label>
           <label class="span-2">
             <span>Address</span>
-            <textarea name="address" required rows="3" [value]="initialValue?.address || ''" placeholder="Door no, street, area, city"></textarea>
+            <textarea name="address" [(ngModel)]="addressValue" rows="3" placeholder="Door no, street, area, city"></textarea>
           </label>
           <label class="span-2">
             <span>Status</span>
-            <select name="status" required [(ngModel)]="statusValue" class="form-select">
+            <select name="status" [(ngModel)]="statusValue" class="form-select">
               <option value="Active">Active</option>
               <option value="Not Active">Not Active</option>
             </select>
@@ -180,8 +181,14 @@ export class VendorFormDialogComponent implements OnInit {
   @Output() create = new EventEmitter<VendorFormValue>();
 
   private readonly data = inject(ErpDataService);
+  private readonly api = inject(ApiService);
 
   statusValue: VendorStatus = "Active";
+  nameValue = "";
+  materialTypeValue = "";
+  phoneValue = "";
+  gstValue = "";
+  addressValue = "";
   readonly selectedSiteIds: string[] = [];
   readonly showPicker = signal(false);
 
@@ -195,10 +202,41 @@ export class VendorFormDialogComponent implements OnInit {
     return source.filter((s) => !this.selectedSiteIds.includes(s.id));
   });
 
-  ngOnInit() {
+  async ngOnInit() {
     this.statusValue = this.initialValue?.status ?? "Active";
+    this.nameValue = this.initialValue?.name ?? "";
+    this.materialTypeValue = this.initialValue?.materialType ?? "";
+    this.phoneValue = this.initialValue?.phone ?? "";
+    this.gstValue = this.initialValue?.gst ?? "";
+    this.addressValue = this.initialValue?.address ?? "";
     if (this.initialValue?.siteIds?.length) {
       this.selectedSiteIds.push(...this.initialValue.siteIds);
+    }
+
+    // Load sites from backend to populate siteEntities for name lookup
+    await this.loadSitesFromBackend();
+  }
+
+  private async loadSitesFromBackend(): Promise<void> {
+    try {
+      const res = await this.api.listSites().toPromise();
+      const sites = (res?.items || []).map((s: any) => ({
+        id: s._id || s.id,
+        _id: s._id,
+        siteId: s.siteId,
+        name: s.name,
+        status: s.status || "Active",
+        supervisor: s.supervisor,
+        startDate: s.startDate,
+        targetEndDate: s.targetEndDate,
+        projectIds: s.projectIds || [],
+      })) as Site[];
+      // Only update if we got results and it's different from current
+      if (sites.length > 0) {
+        this.data.siteEntities.set(sites);
+      }
+    } catch (e) {
+      console.warn("Failed to load sites from backend for vendor dialog", e);
     }
   }
 
@@ -267,15 +305,13 @@ export class VendorFormDialogComponent implements OnInit {
 
   submit(event: Event) {
     event.preventDefault();
-    const form = event.currentTarget as HTMLFormElement;
-    const formData = new FormData(form);
     this.create.emit({
-      name: String(formData.get("name") ?? "").trim(),
-      materialType: String(formData.get("materialType") ?? "").trim(),
-      phone: String(formData.get("phone") ?? "").trim(),
-      address: String(formData.get("address") ?? "").trim(),
-      gst: String(formData.get("gst") ?? "").trim(),
-      status: (String(formData.get("status") ?? "Active") === "Not Active" ? "Not Active" : "Active") as VendorStatus,
+      name: this.nameValue.trim(),
+      materialType: this.materialTypeValue.trim(),
+      phone: this.phoneValue.trim(),
+      address: this.addressValue.trim(),
+      gst: this.gstValue.trim(),
+      status: this.statusValue,
       siteIds: this.selectedSiteIds.slice(),
     });
   }

@@ -297,8 +297,6 @@ function numberToWords(num: number): string {
         </ion-content>
       </div>
     </ion-split-pane>
-    <agb-quotation-report #quotationReport [quotationData]="reportQuotation()" />
-
     @if (showQuotationPreview()) {
       <div class="form-overlay" role="presentation">
         <section class="erp-dialog quotation-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title">
@@ -311,7 +309,7 @@ function numberToWords(num: number): string {
               <ion-icon name="close-outline"></ion-icon>
             </button>
           </div>
-          <agb-quotation-report [quotationData]="reportQuotation()" class="preview-report" />
+          <agb-quotation-report #quotationReport [quotationData]="reportQuotation()" class="preview-report" />
           <div class="dialog-actions">
             <button type="button" class="primary-action" (click)="quotationReport?.exportToPDF()">
               <ion-icon name="download-outline"></ion-icon>
