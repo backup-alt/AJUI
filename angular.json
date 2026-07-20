@@ -21,7 +21,9 @@
             "outputPath": "dist/annai-builders-dashboard",
             "index": "index.html",
             "browser": "src/main.ts",
-            "polyfills": ["zone.js"],
+            "polyfills": [
+              "zone.js"
+            ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
@@ -55,7 +57,12 @@
                   "replace": "src/environments/environment.ts",
                   "with": "src/environments/environment.prod.ts"
                 }
-              ]
+              ],
+              "optimization": {
+                "scripts": true,
+                "styles": true,
+                "fonts": true
+              }
             },
             "development": {
               "optimization": false,

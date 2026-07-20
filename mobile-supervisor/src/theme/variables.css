@@ -349,3 +349,31 @@
   --ion-tab-bar-background: var(--m3-surface-bright);
   --ion-tab-bar-border-color: var(--m3-outline-variant);
 }
+
+/* Force light mode - disable dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --m3-surface-dim: #ecedef;
+    --m3-surface: #f5f6f8;
+    --m3-surface-bright: #ffffff;
+    --m3-surface-container-lowest: #ffffff;
+    --m3-surface-container-low: #fafbfc;
+    --m3-surface-container: #f3f4f6;
+    --m3-surface-container-high: #eceef1;
+    --m3-surface-container-highest: #e5e7eb;
+    --m3-on-surface: #0f172a;
+    --m3-on-surface-variant: #475569;
+    --m3-on-surface-muted: #64748b;
+    --m3-outline: #cbd5e1;
+    --m3-outline-variant: #e2e8f0;
+    --m3-inverse-surface: #1f2937;
+    --m3-inverse-on-surface: #f1f5f9;
+    --m3-scrim: rgba(15, 23, 42, 0.45);
+    --m3-shadow: rgba(15, 23, 42, 0.18);
+    --ion-background-color: #f5f6f8;
+    --ion-toolbar-background: #ffffff;
+    --ion-item-background: #ffffff;
+    --ion-card-background: #ffffff;
+    --ion-tab-bar-background: #ffffff;
+  }
+}

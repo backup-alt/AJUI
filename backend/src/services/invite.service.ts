@@ -10,6 +10,7 @@ import {
   buildSupervisorInviteEmail,
   buildEmployeeInviteEmail,
   buildCreateAccountEmail,
+  buildResetPasswordEmail,
 } from "./email-templates/index.js";
 
 const QR_EXPIRY_MINUTES = 5;
@@ -387,8 +388,8 @@ export async function resendOtp(token: string): Promise<{ otp: string; emailSent
 /**
  * Sends a deep link via email to a supervisor so they can open the mobile
  * app and complete the OTP/QR flow. The link uses the configured
- * QR_BASE_URL (default `ajui://supervisor/signup`) and includes the
- * invite token plus the OTP so the mobile app can pre-fill it.
+ * QR_BASE_URL (default `agb-supervisor://invite`) and includes the
+ * invite token.
  */
 export async function sendSupervisorInviteEmail(
   token: string
@@ -415,79 +416,17 @@ export async function sendSupervisorInviteEmail(
     Math.round((invite.expiresAt.getTime() - Date.now()) / 60000)
   );
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your AGB Supervisor Activation Link</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f6f8;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.06);">
-          <tr>
-            <td style="background-color:#002263;padding:28px 32px;text-align:center;">
-              <div style="display:inline-block;background:#c9a227;color:#2a230a;width:48px;height:48px;line-height:48px;border-radius:12px;font-weight:800;font-size:18px;letter-spacing:1px;">AGB</div>
-              <h1 style="margin:14px 0 0;color:#ffffff;font-size:20px;font-weight:600;">Annai Golden Builders</h1>
-              <p style="margin:4px 0 0;color:#9bb3e0;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;">Supervisor Activation</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px;">
-              <h2 style="margin:0 0 12px;color:#1d2939;font-size:22px;font-weight:700;">Activate your supervisor account</h2>
-              <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
-                Hi <strong>${name}</strong>, tap the button below on your phone to open the AGB supervisor app and complete your activation. The link expires in <strong>${expiryMinutes} minutes</strong>.
-              </p>
-              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
-                <tr>
-                  <td style="background-color:#002263;border-radius:8px;">
-                    <a href="${deepLink}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:0.02em;">Open AGB App &amp; Activate</a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
-                If the button doesn't open the app, copy and paste this link into your phone's browser:
-              </p>
-              <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
-                ${deepLink}
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e6eaf2;">
-              <p style="margin:0;color:#98a2b3;font-size:11px;line-height:1.5;">
-                © ${new Date().getFullYear()} Annai Golden Builders. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-  const text = `Hi ${name},
-
-You have been invited to join AGB (Annai Golden Builders) as a supervisor.
-
-Tap the link below on your phone to open the AGB supervisor app and complete activation. The link expires in ${expiryMinutes} minutes:
-
-${deepLink}
-
-If the link doesn't open the app, paste it into your phone's browser.
-
----
-Annai Golden Builders
-Operations Workspace`;
+  const { subject, html, text } = buildSupervisorInviteEmail({
+    name,
+    deepLink,
+    expiresMinutes: expiryMinutes,
+  });
 
   let emailSent = false;
   try {
     await sendEmail({
       to: recipient,
-      subject: "Activate your AGB Supervisor account",
+      subject,
       html,
       text,
     });

@@ -13764,3 +13764,59 @@ ion-menu.enterprise-sidebar .sidebar-project-list {
 ion-menu.enterprise-sidebar .sidebar-project-scroll {
   max-height: none !important;
 }
+
+
+/* ============================================
+   FORCE LIGHT MODE — Disable dark mode permanently
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light !important;
+  }
+  
+  html, body {
+    background: #ffffff !important;
+    color: #191c1e !important;
+  }
+  
+  /* Override all .dark-mode and dark scheme styles to light values */
+  .dark-mode,
+  .dark-mode .header-profile-trigger,
+  .dark-mode .header-profile-trigger:hover,
+  .dark-mode .header-profile-trigger.active,
+  .dark-mode .header-user-name,
+  .dark-mode .header-user-role,
+  .dark-mode .header-profile-menu,
+  .dark-mode .header-menu-header,
+  .dark-mode .header-menu-user-info strong,
+  .dark-mode .header-menu-user-info span,
+  .dark-mode .header-menu-item,
+  .dark-mode .header-menu-item:hover,
+  .dark-mode .header-menu-logout,
+  .dark-mode .header-menu-logout:hover,
+  .dark-mode .sidebar-logout-minimal,
+  .dark-mode .sidebar-logout-minimal:hover,
+  .dark-mode .sidebar-footer-actions,
+  .dark-mode .sidebar-view-all-projects,
+  .dark-mode .projects-directory-head,
+  .dark-mode .projects-directory-card,
+  .dark-mode .projects-directory-head h1,
+  .dark-mode .projects-directory-title h2,
+  .dark-mode .projects-directory-ledger strong,
+  .dark-mode .projects-directory-head p,
+  .dark-mode .projects-directory-title p,
+  .dark-mode .projects-directory-footer span,
+  .dark-mode .projects-directory-meta,
+  .dark-mode .projects-directory-search,
+  .dark-mode .projects-directory-ledger > div,
+  .dark-mode .projects-directory-search input {
+    background: #ffffff !important;
+    color: #191c1e !important;
+    border-color: #e2e8f0 !important;
+  }
+}
+
+/* Force light color-scheme globally */
+:root {
+  color-scheme: light !important;
+}
