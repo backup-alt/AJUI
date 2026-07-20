@@ -85,6 +85,23 @@ export class AppComponent implements OnInit {
         return;
       }
 
+      // Determine target route from URL host/path
+      let targetRoute = '/auth/signup';
+      let queryParams: Record<string, string> = { token };
+      try {
+        const u = new URL(url);
+        if (u.hostname === 'reset-password' || u.pathname.includes('reset-password')) {
+          targetRoute = '/auth/reset-password';
+        } else if (u.hostname === 'invite' || u.pathname.includes('invite')) {
+          targetRoute = '/auth/signup';
+        }
+      } catch {
+        // fallback: if URL contains reset-password keyword
+        if (url.includes('reset-password')) {
+          targetRoute = '/auth/reset-password';
+        }
+      }
+
       this.auth.verifyInvite(token).subscribe({
         next: (response) => {
           try {
@@ -97,14 +114,14 @@ export class AppComponent implements OnInit {
               queryParams: { token },
             });
           } else {
-            this.router.navigate(['/auth/signup'], {
-              queryParams: { token },
+            this.router.navigate([targetRoute], {
+              queryParams,
             });
           }
         },
         error: () => {
-          this.router.navigate(['/auth/signup'], {
-            queryParams: { token },
+          this.router.navigate([targetRoute], {
+            queryParams,
           });
         },
       });

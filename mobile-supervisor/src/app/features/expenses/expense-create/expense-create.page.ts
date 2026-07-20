@@ -106,7 +106,7 @@ import { Vendor } from '../../../shared/models';
                 <ion-icon name="cash-outline"></ion-icon>
               </div>
               <div class="type-info">
-                <strong>Cash Added</strong>
+                <strong>Add Cash</strong>
                 <span>Add cash to project site (auto-approved immediately)</span>
               </div>
             </div>
@@ -366,7 +366,7 @@ export class ExpenseCreatePage implements OnInit {
 
   getTitle(): string {
     if (this.step() === 1) return 'Log Expense';
-    return this.expenseType() === 'Cash Added' ? 'Cash Added' : 'Purchase Expense';
+    return this.expenseType() === 'Cash Added' ? 'Add Cash' : 'Purchase Expense';
   }
 
   getSubmitLabel(): string {

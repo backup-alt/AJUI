@@ -67,9 +67,9 @@ import {
         </header>
         <div class="ledger-stats">
           <div class="ledger-stat added">
-            <div class="stat-label">Cash added</div>
-            <div class="stat-value">{{ cashAdded() | currency:'INR':'symbol':'1.0-0' }}</div>
-          </div>
+            <div class="stat-label">Cash Added</div>
+            <div class="stat-value">{{ cashAdded() | currency:'INR':'symbol':'1.0-0'</div>
+         </div>
           <div class="ledger-stat spent">
             <div class="stat-label">Spent</div>
             <div class="stat-value">{{ cashSpent() | currency:'INR':'symbol':'1.0-0' }}</div>
@@ -97,7 +97,7 @@ import {
             message="Log a site expense or cash top-up to get started."
           ></app-empty-state>
         } @else {
-          @for (expense of filteredExpenses(); track expense._id) {
+            @for (expense of filteredExpenses(); track expense._id) {
             <button
               class="expense-card"
               [class.cash-added]="expense.transactionType === 'Cash Added'"
@@ -109,8 +109,8 @@ import {
                     [tone]="expense.transactionType === 'Cash Added' ? 'warning' : 'info'"
                     [icon]="expense.transactionType === 'Cash Added' ? 'cash-outline' : 'card-outline'"
                   >
-                    {{ expense.transactionType || 'Purchase' }}
-                  </app-status-pill>
+                    {{ (expense.transactionType === 'Cash Added' ? 'Add Cash' : (expense.transactionType || 'Purchase')) }}
+                 </app-status-pill>
                   <h3 class="expense-desc">{{ expense.description }}</h3>
                   <p class="expense-meta">
                     <ion-icon name="location-outline"></ion-icon>

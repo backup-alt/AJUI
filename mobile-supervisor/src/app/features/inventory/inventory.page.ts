@@ -2,15 +2,12 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import {
   IonContent,
   IonSearchbar,
-  IonSegment,
-  IonSegmentButton,
-  IonLabel,
-  IonFab,
-  IonFabButton,
   IonIcon,
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
+  IonFab,
+  IonFabButton,
   ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
@@ -19,7 +16,6 @@ import { addIcons } from 'ionicons';
 import {
   gridOutline,
   searchOutline,
-  filterOutline,
   addOutline,
   chevronDownOutline,
   timeOutline,
@@ -34,11 +30,7 @@ import {
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
-import {
-  PageHeaderComponent,
-  EmptyStateComponent,
-  StatusPillComponent,
-} from '../../shared/components';
+import { PageHeaderComponent, EmptyStateComponent } from '../../shared/components';
 import { InventoryEditModalComponent } from './inventory-edit-modal/inventory-edit-modal.component';
 import { InventoryRequestModalComponent } from './inventory-request-modal/inventory-request-modal.component';
 
@@ -70,9 +62,6 @@ type SortDir = 'asc' | 'desc';
     FormsModule,
     IonContent,
     IonSearchbar,
-    IonSegment,
-    IonSegmentButton,
-    IonLabel,
     IonFab,
     IonFabButton,
     IonIcon,
@@ -83,7 +72,6 @@ type SortDir = 'asc' | 'desc';
     CurrencyPipe,
     PageHeaderComponent,
     EmptyStateComponent,
-    StatusPillComponent,
   ],
   template: `
     <ion-content class="inventory-content">
@@ -104,26 +92,9 @@ type SortDir = 'asc' | 'desc';
           [(ngModel)]="searchQuery"
           (ionInput)="applyFilters()"
           class="search-bar"
-        ></ion-searchbar>
+       />
 
         <div class="filter-row">
-          <div class="seg-wrap">
-            <ion-segment [(ngModel)]="categoryFilter" (ionChange)="applyFilters()" [value]="''">
-              <ion-segment-button [value]="''">
-                <ion-label>All</ion-label>
-              </ion-segment-button>
-              <ion-segment-button value="Raw Material">
-                <ion-label>Raw</ion-label>
-              </ion-segment-button>
-              <ion-segment-button value="Finished">
-                <ion-label>Finished</ion-label>
-              </ion-segment-button>
-              <ion-segment-button value="Consumable">
-                <ion-label>Consumable</ion-label>
-              </ion-segment-button>
-            </ion-segment>
-          </div>
-
           <button class="sort-btn" (click)="cycleSort()">
             <ion-icon name="swap-vertical-outline"></ion-icon>
             <span>{{ sortLabel() }}</span>
@@ -143,9 +114,9 @@ type SortDir = 'asc' | 'desc';
         } @else if (filteredItems().length === 0) {
           <app-empty-state
             icon="grid-outline"
-            [title]="searchQuery || categoryFilter ? 'No matches found' : 'No inventory yet'"
-            [message]="searchQuery || categoryFilter
-              ? 'Try adjusting your search or filters.'
+            [title]="searchQuery ? 'No matches found' : 'No inventory yet'"
+            [message]="searchQuery
+              ? 'Try adjusting your search.'
               : 'Approved materials will appear here as inventory.'"
           ></app-empty-state>
         } @else {
@@ -476,7 +447,6 @@ export class InventoryPage implements OnInit, OnDestroy {
   items = signal<InventoryItem[]>([]);
   isLoading = signal(true);
   searchQuery = '';
-  categoryFilter = '';
   sortField = signal<SortField>('name');
   sortDir = signal<SortDir>('asc');
 
@@ -492,10 +462,6 @@ export class InventoryPage implements OnInit, OnDestroy {
           i.poNumber?.toLowerCase().includes(q) ||
           i.site.toLowerCase().includes(q)
       );
-    }
-
-    if (this.categoryFilter) {
-      result = result.filter((i) => i.category === this.categoryFilter);
     }
 
     const field = this.sortField();
@@ -525,7 +491,7 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      gridOutline, searchOutline, filterOutline, addOutline,
+      gridOutline, searchOutline, addOutline,
       chevronDownOutline, timeOutline, businessOutline, documentTextOutline,
       checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline,
       swapVerticalOutline,

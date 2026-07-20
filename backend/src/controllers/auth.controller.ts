@@ -290,7 +290,12 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     // Use BACKEND_PUBLIC_URL or FRONTEND_URL; strip trailing slash
     const baseUrl = (process.env.BACKEND_PUBLIC_URL || process.env.FRONTEND_URL || "https://backup-alt.github.io/AJUI")
       .replace(/\/+$/, "");
-    const resetUrl = `${baseUrl}/#/login?token=${rawToken}`;
+    // Deep link for mobile app
+    const deepLink = `agb-supervisor://reset-password?token=${rawToken}`;
+    // Web fallback route (hash-based Angular route)
+    const webResetUrl = `${baseUrl}/#/auth/reset-password?token=${rawToken}`;
+    // In the email, prefer the deep link as primary CTA, web as fallback
+    const resetUrl = deepLink;
 
     const html = `<!DOCTYPE html>
 <html>
@@ -321,19 +326,20 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
               </p>
               <p style="margin:0 0 24px;color:#475467;font-size:15px;line-height:1.6;">
                 Click the button below to set a new password. This link expires in <strong>1 hour</strong>.
+                <br><span style="font-size:12px;color:#98a2b3;">If you're on mobile, this will open the AGB app directly.</span>
               </p>
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
                 <tr>
                   <td style="background-color:#002263;border-radius:8px;">
-                    <a href="${resetUrl}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:0.02em;">Reset Password</a>
+                    <a href="${deepLink}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:0.02em;">Reset Password</a>
                   </td>
                 </tr>
               </table>
               <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
-                If the button doesn't work, copy and paste this link into your browser:
+                If the button doesn't open the app, copy and paste this link into your browser:
               </p>
               <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
-                ${resetUrl}
+                ${webResetUrl}
               </p>
               <hr style="border:none;border-top:1px solid #e6eaf2;margin:24px 0;">
               <p style="margin:0;color:#98a2b3;font-size:12px;line-height:1.5;">

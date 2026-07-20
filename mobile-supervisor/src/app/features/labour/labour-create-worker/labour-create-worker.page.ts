@@ -139,13 +139,12 @@ const LABOUR_TYPES = [
           </ion-item>
 
           <ion-item class="form-item toggle-item">
-            <div class="toggle-row">
-              <ion-label position="stacked">From Subcontractor?</ion-label>
-              <ion-toggle
-                [(ngModel)]="worker.isSubcontract"
-                (ionChange)="onSubcontractToggle()"
-              ></ion-toggle>
-            </div>
+            <ion-label class="toggle-label">From Subcontractor?</ion-label>
+            <ion-toggle
+              [(ngModel)]="worker.isSubcontract"
+              (ionChange)="onSubcontractToggle()"
+              slot="end"
+            ></ion-toggle>
           </ion-item>
 
           @if (worker.isSubcontract) {
@@ -232,14 +231,8 @@ const LABOUR_TYPES = [
       border-bottom: none;
     }
     .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
-    .toggle-item { min-height: 72px; }
-    .toggle-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-    }
-    .toggle-row ion-label { position: static !important; }
+    .toggle-item { min-height: 72px; display: flex; align-items: center; }
+    .toggle-label { font-size: 14px; font-weight: 600; color: #111827; margin: 0; }
     .form-actions { padding: 20px 0; }
   `],
 })

@@ -26,7 +26,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 24px;
+      gap: 28px;
       transition: opacity 0.5s ease, visibility 0.5s ease;
     }
     .splash-screen.fade-out {
@@ -35,17 +35,21 @@
       pointer-events: none;
     }
     .splash-logo {
-      width: 88px;
-      height: 88px;
+      width: 196px;
+      height: 216px;
       animation: splash-pulse 2s ease-in-out infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .splash-logo svg {
+    .splash-logo-img {
       width: 100%;
       height: 100%;
+      object-fit: contain;
+      display: block;
+      filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25));
     }
-    .splash-brand {
-      text-align: center;
-    }
+    .splash-brand { text-align: center; }
     .splash-brand-name {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 20px;
@@ -63,8 +67,8 @@
       letter-spacing: 2px;
     }
     .splash-loader {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       position: relative;
     }
     .splash-loader-ring {
@@ -77,31 +81,23 @@
     }
     @keyframes splash-pulse {
       0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.04); opacity: 0.9; }
+      50% { transform: scale(1.03); opacity: 0.94; }
     }
     @keyframes splash-spin {
       to { transform: rotate(360deg); }
     }
-  </style>
+ </style>
 </head>
 <body>
   <!-- Premium branded splash screen -->
   <div class="splash-screen" id="splash-screen">
     <div class="splash-logo">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-        <circle cx="32" cy="32" r="28" stroke="#c9a227" stroke-width="2" fill="none"/>
-        <circle cx="32" cy="32" r="22" stroke="#c9a227" stroke-width="1" opacity="0.35"/>
-        <path d="M24 42 Q32 16 40 42 Z" stroke="#c9a227" stroke-width="1.8" fill="none"/>
-        <path d="M20 42 Q32 20 44 42 Z" stroke="#c9a227" stroke-width="1.3" opacity="0.55" fill="none"/>
-        <path d="M16 42 Q32 24 48 42 Z" stroke="#c9a227" stroke-width="0.9" opacity="0.3" fill="none"/>
-        <rect x="22" y="42" width="20" height="5" rx="2" fill="#c9a227"/>
-        <rect x="25" y="47" width="14" height="3.5" rx="1.75" fill="#c9a227" opacity="0.65"/>
-        <line x1="32" y1="14" x2="32" y2="6" stroke="#c9a227" stroke-width="1.5"/>
-        <circle cx="32" cy="5" r="2.2" fill="#c9a227"/>
-        <rect x="16" y="28" width="3" height="14" rx="1" fill="#c9a227" opacity="0.45"/>
-        <rect x="45" y="28" width="3" height="14" rx="1" fill="#c9a227" opacity="0.45"/>
-      </svg>
-    </div>
+      <img
+        src="assets/logo.png"
+        alt="Annai Golden Builders"
+        class="splash-logo-img"
+      />
+   </div>
     <div class="splash-brand">
       <div class="splash-brand-name">Annai Golden Builders</div>
       <div class="splash-brand-sub">Supervisor Portal</div>

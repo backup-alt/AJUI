@@ -22,7 +22,7 @@ const envSchema = z.object({
 
   FRONTEND_URL: z.string().url().default("http://localhost:4200"),
   MOBILE_APP_URL: z.string().default("*"),
-  QR_BASE_URL: z.string().default("ajui://supervisor/signup"),
+  QR_BASE_URL: z.string().default("agb-supervisor://invite"),
   BACKEND_PUBLIC_URL: z.string().url().optional(),
 
   FIREBASE_PROJECT_ID: z.string().optional(),

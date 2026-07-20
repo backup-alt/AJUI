@@ -97,25 +97,17 @@ import { Site } from '../../shared/models';
       <ion-header class="agb-menu-header">
         <div class="menu-brand">
           <div class="menu-brand-logo">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="40" height="40" fill="none">
-              <circle cx="32" cy="32" r="28" stroke="#c9a227" stroke-width="2" fill="none"/>
-              <circle cx="32" cy="32" r="22" stroke="#c9a227" stroke-width="1" opacity="0.35"/>
-              <path d="M24 42 Q32 16 40 42 Z" stroke="#c9a227" stroke-width="1.8" fill="none"/>
-              <path d="M20 42 Q32 20 44 42 Z" stroke="#c9a227" stroke-width="1.3" opacity="0.55" fill="none"/>
-              <path d="M16 42 Q32 24 48 42 Z" stroke="#c9a227" stroke-width="0.9" opacity="0.3" fill="none"/>
-              <rect x="22" y="42" width="20" height="5" rx="2" fill="#c9a227"/>
-              <rect x="25" y="47" width="14" height="3.5" rx="1.75" fill="#c9a227" opacity="0.65"/>
-              <line x1="32" y1="14" x2="32" y2="6" stroke="#c9a227" stroke-width="1.5"/>
-              <circle cx="32" cy="5" r="2.2" fill="#c9a227"/>
-              <rect x="16" y="28" width="3" height="14" rx="1" fill="#c9a227" opacity="0.45"/>
-              <rect x="45" y="28" width="3" height="14" rx="1" fill="#c9a227" opacity="0.45"/>
-            </svg>
-          </div>
+            <img
+              src="assets/logo.png"
+              alt="Annai Golden Builders"
+              class="menu-brand-logo-img"
+            />
+         </div>
           <div class="menu-brand-text">
             <div class="menu-brand-name">Annai Golden Builders</div>
             <div class="menu-brand-sub">Supervisor Portal</div>
-          </div>
-        </div>
+         </div>
+       </div>
       </ion-header>
 
       <ion-content class="menu-content">
@@ -264,17 +256,23 @@ import { Site } from '../../shared/models';
       gap: 14px;
     }
     .menu-brand-logo {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(8px);
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
     }
-    .menu-brand-logo svg { width: 40px; height: 40px; }
+    .menu-brand-logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
     .menu-brand-text { line-height: 1.3; }
     .menu-brand-name {
       font-size: 14px;
@@ -293,7 +291,7 @@ import { Site } from '../../shared/models';
 
     .menu-content {
       --background: var(--m3-surface);
-      --padding-top: var(--md-space-3);
+      --padding-top: var(--md-space-2);
       --padding-bottom: calc(16px + env(safe-area-inset-bottom));
     }
 
@@ -304,7 +302,10 @@ import { Site } from '../../shared/models';
       color: var(--m3-on-surface-muted);
       text-transform: uppercase;
       letter-spacing: 1.2px;
-      padding: var(--md-space-4) var(--md-space-6) var(--md-space-2);
+      padding: var(--md-space-3) var(--md-space-6) var(--md-space-2);
+    }
+    .menu-section-label:first-of-type {
+      padding-top: var(--md-space-2);
     }
 
     .menu-list { background: transparent; padding: 0 var(--md-space-2); }

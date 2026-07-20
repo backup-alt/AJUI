@@ -342,7 +342,7 @@ export class ExpenseDetailPage implements OnInit {
 
   transactionLabel = computed(() => {
     if (!this.expense()) return '';
-    if (this.expense()!.transactionType === 'Cash Added') return 'Cash Added';
+    if (this.expense()!.transactionType === 'Cash Added') return 'Add Cash';
     return this.expense()!.transactionType || 'Purchase';
   });
 

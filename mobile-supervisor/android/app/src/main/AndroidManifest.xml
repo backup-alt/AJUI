@@ -33,6 +33,16 @@
                 <data android:scheme="agb-supervisor" android:host="invite" />
             </intent-filter>
 
+            <!-- Custom-scheme deep link for password reset emails:
+                 agb-supervisor://reset-password?token=ABC
+                 Opens the app on the reset-password page with token pre-filled. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="agb-supervisor" android:host="reset-password" />
+            </intent-filter>
+
             <!-- Universal Link for invite emails:
                  https://agb-o3cc.onrender.com/invite?token=ABC
                  (If you set up assetlinks.json at /.well-known/assetlinks.json with the
