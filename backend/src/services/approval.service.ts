@@ -52,6 +52,7 @@ export async function approveRequest(
   options: {
     issuedAmount?: number;
     givenAmount?: number;
+    approvedAmount?: number;
     poNumber?: string;
     approvedQuantity?: number;
     vendor?: string;
@@ -112,8 +113,29 @@ export async function approveRequest(
     case "Expense": {
       const exp = await Expense.findById(approval.sourceId).lean();
       // Purchase approvals generate a PO and then move into the supervisor bill upload flow.
-      // Cash Added approvals become approved here and then update the site ledger.
-      if (exp?.transactionType === "Purchase") {
+      // Cash Added approvals become approved here with the admin's approvedAmount
+      // and then update the site ledger.
+      if (exp?.transactionType === "Cash Added") {
+        // For Cash Added: only the admin-entered approvedAmount matters.
+        // Default to the requested amount if no override was supplied.
+        const approvedCashAmount =
+          options.approvedAmount !== undefined && options.approvedAmount !== null
+            ? Number(options.approvedAmount)
+            : Number(exp.amount) || 0;
+        await Expense.updateOne(
+          { _id: approval.sourceId },
+          {
+            status: "Approved",
+            approvedBy: reviewer,
+            approvedAt: new Date(),
+            amount: approvedCashAmount,
+            ...(options.approvedAmount !== undefined ? { approvedAmount: approvedCashAmount } : {}),
+          }
+        );
+        if (exp?.projectId && exp.site) {
+          await recomputeSiteLedger(exp.projectId, exp.site);
+        }
+      } else if (exp?.transactionType === "Purchase") {
         const generatedPo = options.poNumber || await generatePoNumberForSite(
           exp.siteId ? String(exp.siteId) : undefined,
           exp.site,
