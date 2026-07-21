@@ -337,12 +337,14 @@ export class LoginPage {
   }
 
   private detectModeFromUrl(): void {
-    const path = this.router.url.split('?')[0];
-    const query = this.route.snapshot.queryParamMap;
+    const hash = window.location.hash;
+    const queryParams = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : '');
+    const path = hash.split('?')[0];
 
-    if (path.endsWith('/auth/reset-password') || query.has('token')) {
-      this.resetToken = query.get('token');
-      if (this.resetToken) {
+    if (path.endsWith('/auth/reset-password') || queryParams.has('token')) {
+      const token = queryParams.get('token');
+      if (token) {
+        this.resetToken = token;
         this.mode.set('reset');
       }
       return;

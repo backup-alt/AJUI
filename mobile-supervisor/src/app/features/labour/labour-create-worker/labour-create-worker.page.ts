@@ -127,10 +127,10 @@ const LABOUR_TYPES = [
           </ion-item>
 
           <ion-item class="form-item">
-            <ion-label position="stacked">Weekly Pay (INR) *</ion-label>
+            <ion-label position="stacked">Daily Pay (INR) *</ion-label>
             <ion-input
               type="number"
-              placeholder="Enter weekly pay"
+              placeholder="Enter daily pay"
               [(ngModel)]="worker.weeklyPay"
               [clearInput]="true"
             ></ion-input>

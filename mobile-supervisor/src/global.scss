@@ -111,8 +111,8 @@ ion-page {
 }
 
 ion-card {
-  --border-radius: var(--md-radius-xl);
-  --inner-border-radius: var(--md-radius-xl);
+  --border-radius: var(--md-radius-xs);
+  --inner-border-radius: var(--md-radius-xs);
   margin: var(--md-space-3) var(--md-space-4);
   border: 1px solid var(--m3-outline-variant);
   background: var(--m3-surface-bright);
@@ -725,31 +725,12 @@ body .site-banner ion-icon {
   flex-shrink: 0;
 }
 
-body .site-banner-value,
-body .page-title,
-body .page-subtitle {
-  overflow-wrap: anywhere;
-}
-
-body .form-list {
-  display: grid;
-  gap: 10px;
-  background: transparent;
-}
-
-body .form-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
-  gap: 10px;
-}
-
-body .form-row .form-item,
 body .form-item {
   border: 1px solid var(--m3-outline-variant) !important;
   border-bottom: 1px solid var(--m3-outline-variant) !important;
   margin-bottom: 0 !important;
-  --border-radius: var(--md-radius-lg) !important;
-  --inner-border-radius: var(--md-radius-lg) !important;
+  --border-radius: var(--md-radius-xs) !important;
+  --inner-border-radius: var(--md-radius-xs) !important;
 }
 
 body .form-actions {

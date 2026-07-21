@@ -11,6 +11,7 @@ import {
   IonSpinner,
   IonRefresher,
   IonRefresherContent,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
 import { addIcons } from 'ionicons';
@@ -80,12 +81,9 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     IonTitle,
     IonBackButton,
     IonButtons,
-    IonButton,
     IonIcon,
-    IonSpinner,
     IonRefresher,
     IonRefresherContent,
-    DatePipe,
     CurrencyPipe,
     EmptyStateComponent,
   ],
@@ -174,6 +172,11 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
                 </div>
               </div>
               <div class="worker-actions" (click)="$event.stopPropagation()">
+                @if (!isMarkedToday(worker)) {
+                  <button class="action-btn success" (click)="markAttendance(worker)" title="Mark present today">
+                    <ion-icon name="checkmark-circle-outline"></ion-icon>
+                  </button>
+                }
                 <button class="action-btn secondary" (click)="viewWorker(worker)" title="View details">
                   <ion-icon name="chevron-forward-outline"></ion-icon>
                 </button>
@@ -367,6 +370,10 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       background: var(--m3-surface-container);
       color: var(--m3-on-surface-variant);
     }
+    .action-btn.success {
+      background: rgba(34, 197, 94, 0.12);
+      color: #16a34a;
+    }
 
     .skeleton-card {
       display: flex;
@@ -411,6 +418,7 @@ export class LabourWorkersPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private supervisor = inject(SupervisorService);
+  private toastCtrl = inject(ToastController);
 
   labourType = signal<string>('');
   workers = signal<Worker[]>([]);
@@ -500,6 +508,56 @@ export class LabourWorkersPage implements OnInit {
 
   addWorker(): void {
     void this.router.navigate(['/tabs/labour/create-worker']);
+  }
+
+  async markAttendance(worker: Worker): Promise<void> {
+    const siteId = this.supervisor.selectedSiteId();
+    const siteName = this.supervisor.selectedSiteName() || '';
+    const projectId = this.supervisor.selectedProjectId();
+
+    if (!siteId || !projectId) {
+      const toast = await this.toastCtrl.create({
+        message: 'Please select a site first',
+        duration: 2500,
+        color: 'warning',
+        position: 'top',
+      });
+      await toast.present();
+      return;
+    }
+
+    this.supervisor.markAttendance({
+      workerId: (worker as any).workerId || worker._id,
+      projectId,
+      siteId,
+      site: siteName,
+      attendanceDate: this.todayDate,
+      shiftCount: 1,
+      overtimeHours: 0,
+      overtimeAmount: 0,
+      lateFine: 0,
+      paymentMode: 'Cash',
+    }).subscribe({
+      next: async () => {
+        const toast = await this.toastCtrl.create({
+          message: `${worker.name} marked present`,
+          duration: 2000,
+          color: 'success',
+          position: 'top',
+        });
+        await toast.present();
+        await this.loadWorkers();
+      },
+      error: async (err) => {
+        const toast = await this.toastCtrl.create({
+          message: err?.error?.message || 'Failed to mark attendance',
+          duration: 2500,
+          color: 'danger',
+          position: 'top',
+        });
+        await toast.present();
+      },
+    });
   }
 
   getInitials(name: string): string {

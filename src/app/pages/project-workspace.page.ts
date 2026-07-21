@@ -3208,6 +3208,8 @@ export class ProjectWorkspacePage {
         { key: "attendance", label: "Attendance" },
         { key: "shift", label: "Shift" },
         { key: "overtimeLate", label: "Overtime / Late" },
+        { key: "dailyPayByType", label: "Daily Pay by Labour Type" },
+        { key: "combinedDailyPay", label: "Combined Daily Pay" },
         { key: "weeklyPayByType", label: "Weekly Pay by Labour Type" },
         { key: "weeklyPayTotal", label: "Combined Weekly Pay" },
       ];
@@ -3239,9 +3241,19 @@ export class ProjectWorkspacePage {
     if (section !== "labour") return rows;
     return rows.map((row) => {
       const weeklyPay = this.labourWeeklyPayForRow(row);
+      const shift = this.moneyNumber(row["shift"]) || 1;
+      const dailyEntries = this.labourTypeEntriesForRow(row).map((entry) => ({
+        ...entry,
+        dailyAmount: entry.count * entry.wage,
+      }));
+      const combinedDaily = dailyEntries.reduce((sum, item) => sum + item.dailyAmount, 0);
       return {
         ...row,
         overtimeLate: `${row["overtime"] || "0"} overtime / ${row["lateFine"] || "0"} late fine`,
+        dailyPayByType: dailyEntries.length
+          ? dailyEntries.map((item) => `${item.type}: ${formatMoney(item.dailyAmount)}`).join(", ")
+          : formatMoney(0),
+        combinedDailyPay: formatMoney(combinedDaily),
         weeklyPayByType: weeklyPay.breakup,
         weeklyPayTotal: formatMoney(weeklyPay.total),
       };

@@ -359,21 +359,6 @@ interface WageCalculation {
                 <span class="wage-value net-value">{{ calculatedWage().netPay | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
             </div>
-
-            <div class="wage-rules">
-              <h3>Wage Calculation Rules</h3>
-              <ul>
-                <li>One shift = <strong>50%</strong> of daily wage</li>
-                <li>Two shifts = <strong>100%</strong> of daily wage (full day)</li>
-                <li>Overtime is added on top of base wage</li>
-                <li>Late fine is deducted from net pay</li>
-              </ul>
-              <div class="formula">
-                <strong>Formula:</strong><br/>
-                Net = Attendance Pay + Overtime − Late Fine<br/>
-                Attendance Pay = Days × (Shifts/Day × Daily Wage/2)
-              </div>
-            </div>
           </div>
         }
       }

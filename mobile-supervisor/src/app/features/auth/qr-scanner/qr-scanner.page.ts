@@ -25,7 +25,6 @@ import {
   flashOffOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../../core/services/auth.service';
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 @Component({
   selector: 'app-qr-scanner',
@@ -273,7 +272,6 @@ export class QrScannerPage implements OnInit {
       }
 
       if (result.payload) {
-        await Haptics.impact({ style: ImpactStyle.Medium });
         this.inviteToken = result.payload.token;
         this.state.set('verifying');
 
