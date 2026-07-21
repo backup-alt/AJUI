@@ -1318,7 +1318,7 @@ export class ErpDataService {
     const baseRows: SharedTableRow[] = [
       ...this.materials(),
       ...this.labour(),
-      ...this.expenses(),
+      ...(this.expenses() as unknown as SharedTableRow[]),
       ...this.payments(),
       ...this.subcontractors(),
     ];
