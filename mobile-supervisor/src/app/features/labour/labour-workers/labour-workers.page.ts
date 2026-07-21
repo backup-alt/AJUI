@@ -11,7 +11,6 @@ import {
   IonSpinner,
   IonRefresher,
   IonRefresherContent,
-  ToastController,
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
 import { addIcons } from 'ionicons';
@@ -21,7 +20,6 @@ import {
   peopleOutline,
   addOutline,
   locationOutline,
-  calendarOutline,
   walletOutline,
   timeOutline,
   hammerOutline,
@@ -54,6 +52,7 @@ const LABOUR_TYPE_ICONS: Record<string, string> = {
   'Steel Fixer': 'car-outline',
   'Welder': 'sparkles-outline',
   'Fabricator': 'construct-outline',
+  'Other': 'briefcase-outline',
 };
 
 const LABOUR_TYPE_COLORS: Record<string, string> = {
@@ -68,6 +67,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
   'Steel Fixer': 'steel',
   'Welder': 'welder',
   'Fabricator': 'fabricator',
+  'Other': 'other',
 };
 
 @Component({
@@ -126,17 +126,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
         </button>
       </div>
 
-      <div class="quick-actions">
-        <button class="qa-btn qa-attendance" (click)="markAllAttendance()">
-          <ion-icon name="calendar-outline"></ion-icon>
-          <span>Mark Attendance</span>
-        </button>
-        <button class="qa-btn qa-history" (click)="viewAllHistory()">
-          <ion-icon name="time-outline"></ion-icon>
-          <span>View History</span>
-        </button>
-      </div>
-
       <div class="workers-list">
         @if (isLoading() && workers().length === 0) {
           @for (i of [1,2,3,4]; track i) {
@@ -180,9 +169,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
                 </div>
               </div>
               <div class="worker-actions" (click)="$event.stopPropagation()">
-                <button class="action-btn primary" (click)="markAttendance(worker)" title="Mark attendance">
-                  <ion-icon name="calendar-outline"></ion-icon>
-                </button>
                 <button class="action-btn secondary" (click)="viewWorker(worker)" title="View details">
                   <ion-icon name="chevron-forward-outline"></ion-icon>
                 </button>
@@ -194,13 +180,14 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     </ion-content>
   `,
   styles: [`
-    .workers-content { --background: var(--m3-surface); }
+    .workers-content { --background: var(--m3-surface); --padding-top: 0; --padding-bottom: 0; }
 
     .type-hero {
       display: flex;
       align-items: center;
       gap: var(--md-space-3);
-      padding: var(--md-space-5) var(--md-space-4) var(--md-space-3);
+      padding: var(--md-space-4) var(--md-space-4) var(--md-space-3);
+      margin-top: 0;
       background: linear-gradient(135deg, #002263 0%, #003380 100%);
       color: #ffffff;
     }
@@ -259,39 +246,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     }
     .add-btn ion-icon { font-size: 16px; font-weight: 800; }
-
-    .quick-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--md-space-2);
-      padding: var(--md-space-3) var(--md-space-4) var(--md-space-2);
-      background: var(--m3-surface);
-    }
-    .qa-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px var(--md-space-3);
-      border-radius: var(--md-radius-lg);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-      border: 1px solid var(--m3-outline-variant);
-      transition: transform var(--md-motion-duration-short1);
-    }
-    .qa-btn:active { transform: scale(0.98); }
-    .qa-btn ion-icon { font-size: 18px; }
-    .qa-attendance {
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-      border-color: var(--m3-primary);
-    }
-    .qa-history {
-      background: var(--m3-surface-bright);
-      color: var(--m3-on-surface);
-    }
 
     .workers-list {
       padding: var(--md-space-2) var(--md-space-4) 96px;
@@ -390,10 +344,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       justify-content: center;
     }
     .action-btn ion-icon { font-size: 18px; }
-    .action-btn.primary {
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-    }
     .action-btn.secondary {
       background: var(--m3-surface-container);
       color: var(--m3-on-surface-variant);
@@ -442,7 +392,6 @@ export class LabourWorkersPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private supervisor = inject(SupervisorService);
-  private toastCtrl = inject(ToastController);
 
   labourType = signal<string>('');
   workers = signal<Worker[]>([]);
@@ -458,7 +407,6 @@ export class LabourWorkersPage implements OnInit {
       peopleOutline,
       addOutline,
       locationOutline,
-      calendarOutline,
       walletOutline,
       timeOutline,
       hammerOutline,
@@ -517,48 +465,8 @@ export class LabourWorkersPage implements OnInit {
     void this.router.navigate(['/tabs/labour/worker', worker._id]);
   }
 
-  markAttendance(worker: Worker): void {
-    void this.router.navigate(['/tabs/labour/mark-attendance', worker._id]);
-  }
-
-  viewHistory(worker: Worker): void {
-    void this.router.navigate(['/tabs/labour/worker-history', worker._id]);
-  }
-
   addWorker(): void {
     void this.router.navigate(['/tabs/labour/create-worker']);
-  }
-
-  async markAllAttendance(): Promise<void> {
-    const ws = this.workers();
-    if (ws.length === 0) return;
-    if (ws.length === 1) {
-      this.markAttendance(ws[0]);
-      return;
-    }
-    const toast = await this.toastCtrl.create({
-      message: 'Pick a worker to mark attendance for.',
-      duration: 2000,
-      color: 'primary',
-      position: 'top',
-    });
-    await toast.present();
-  }
-
-  async viewAllHistory(): Promise<void> {
-    const ws = this.workers();
-    if (ws.length === 0) return;
-    if (ws.length === 1) {
-      this.viewHistory(ws[0]);
-      return;
-    }
-    const toast = await this.toastCtrl.create({
-      message: 'Pick a worker to view their history.',
-      duration: 2000,
-      color: 'primary',
-      position: 'top',
-    });
-    await toast.present();
   }
 
   getInitials(name: string): string {

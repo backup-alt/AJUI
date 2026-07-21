@@ -2,8 +2,15 @@ import { Types } from "mongoose";
 import { Worker } from "../models/Worker.js";
 import { Attendance } from "../models/Attendance.js";
 import { Subcontractor } from "../models/Subcontractor.js";
+import { User } from "../models/User.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
+
+async function resolveSupervisorName(userId: string): Promise<string> {
+  if (!userId || !Types.ObjectId.isValid(userId)) return "";
+  const user = await User.findById(userId).select("name").lean();
+  return user?.name || "";
+}
 
 export async function createWorker(input: {
   projectId: string;
@@ -144,11 +151,13 @@ export async function markAttendance(input: {
   const worker = await Worker.findById(input.workerId).lean();
   if (!worker) throw new AppError(404, "Worker not found");
 
+  const supervisorName = await resolveSupervisorName(input.createdBy);
+
   const attendanceId = await generateId("ATT");
   const attendance = await Attendance.create({
     attendanceId,
     workerId: worker._id,
-    workerName: worker.name,
+    workerName: supervisorName,
     projectId: new Types.ObjectId(input.projectId),
     projectName: worker.projectName,
     clientId: worker.clientId,

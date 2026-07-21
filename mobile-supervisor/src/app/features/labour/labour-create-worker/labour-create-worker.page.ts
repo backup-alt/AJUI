@@ -39,6 +39,7 @@ const LABOUR_TYPES = [
   'Steel Fixer',
   'Welder',
   'Fabricator',
+  'Other',
 ];
 
 @Component({

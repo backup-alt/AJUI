@@ -15,7 +15,7 @@ import {
   IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
   chevronBackOutline,
@@ -39,6 +39,7 @@ import {
   colorPaletteOutline,
   hammerOutline,
   sparklesOutline,
+  checkmarkDoneOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Worker, Attendance } from '../../../shared/models';
@@ -259,6 +260,13 @@ interface WageCalculation {
               </div>
             </div>
 
+            <div class="attendance-actions">
+              <button class="mark-attendance-btn" (click)="markAttendance()">
+                <ion-icon name="checkmark-done-outline"></ion-icon>
+                Mark Attendance
+              </button>
+            </div>
+
             @if (groupedAttendance().length === 0) {
               <app-empty-state
                 icon="calendar-outline"
@@ -429,6 +437,8 @@ interface WageCalculation {
     .avatar.avatar-steelfixer { background: rgba(156, 163, 175, 0.25); color: #d1d5db; }
     .avatar.avatar-tiles { background: rgba(245, 158, 11, 0.25); color: #fde68a; }
     .avatar.avatar-welder { background: rgba(239, 68, 68, 0.25); color: #fecaca; }
+    .avatar.avatar-fabricator { background: rgba(99, 102, 241, 0.25); color: #c7d2fe; }
+    .avatar.avatar-other { background: rgba(107, 114, 128, 0.25); color: #d1d5db; }
     .avatar.avatar-default { background: rgba(201, 162, 39, 0.25); color: #fef3c7; }
     .status-dot {
       position: absolute;
@@ -578,6 +588,27 @@ interface WageCalculation {
     }
 
     .attendance-log { }
+    .attendance-actions {
+      margin: var(--md-space-3) 0 var(--md-space-2);
+      display: flex;
+      justify-content: flex-end;
+    }
+    .mark-attendance-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      border-radius: var(--md-radius-pill);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    }
+    .mark-attendance-btn ion-icon { font-size: 16px; }
     .week-group { margin-bottom: var(--md-space-4); }
     .week-header {
       font-size: 11px;
@@ -760,6 +791,7 @@ interface WageCalculation {
 export class LabourWorkerDetailPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private toastCtrl = inject(ToastController);
 
   worker = signal<Worker | null>(null);
@@ -857,7 +889,7 @@ export class LabourWorkerDetailPage implements OnInit {
       checkmarkCircleOutline, closeCircleOutline, alertCircleOutline,
       constructOutline, buildOutline, flashOutline, cutOutline, homeOutline,
       gridOutline, colorPaletteOutline, hammerOutline,
-      sparklesOutline,
+      sparklesOutline, checkmarkDoneOutline,
     });
 
     this.workerId = this.route.snapshot.paramMap.get('workerId') || '';
@@ -920,6 +952,8 @@ export class LabourWorkerDetailPage implements OnInit {
       'Tiles Worker': 'grid-outline',
       'Welder': 'sparkles-outline',
       'Civil': 'home-outline',
+      'Fabricator': 'construct-outline',
+      'Other': 'briefcase-outline',
     };
     return icons[type] || 'briefcase-outline';
   }
@@ -936,6 +970,8 @@ export class LabourWorkerDetailPage implements OnInit {
       'Tiles Worker': 'tiles',
       'Welder': 'welder',
       'Civil': 'default',
+      'Fabricator': 'fabricator',
+      'Other': 'other',
     };
     return colors[type] || 'default';
   }
@@ -947,5 +983,10 @@ export class LabourWorkerDetailPage implements OnInit {
   onWeeklyPayChange(event: Event): void {
     const val = parseFloat((event.target as HTMLInputElement).value);
     this.weeklyPayInput.set(isNaN(val) ? 0 : val);
+  }
+
+  markAttendance(): void {
+    if (!this.workerId) return;
+    void this.router.navigate(['/tabs/labour/mark-attendance', this.workerId]);
   }
 }

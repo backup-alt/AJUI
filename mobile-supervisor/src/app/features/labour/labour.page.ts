@@ -2,8 +2,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import {
   IonContent, IonSegment, IonSegmentButton, IonLabel,
   IonFab, IonFabButton, IonIcon, IonSkeletonText,
-  IonRefresher, IonRefresherContent, ModalController,
-  ToastController,
+  IonRefresher, IonRefresherContent,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -14,13 +13,12 @@ import {
   constructOutline, buildOutline, flashOutline, cutOutline,
   homeOutline, colorPaletteOutline, hammerOutline, gridOutline,
   layersOutline, carOutline, sparklesOutline,
-  calendarOutline, checkmarkDoneOutline, ellipsisHorizontalOutline,
+  calendarOutline, ellipsisHorizontalOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Worker, Attendance, LabourTypeCount } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import { EmptyStateComponent } from '../../shared/components';
-import { WorkerListModalComponent } from './worker-list-modal/worker-list-modal.component';
 
 const LABOUR_TYPE_ICONS: Record<string, string> = {
   'Helper': 'hammer-outline',
@@ -34,6 +32,7 @@ const LABOUR_TYPE_ICONS: Record<string, string> = {
   'Steel Fixer': 'car-outline',
   'Welder': 'sparkles-outline',
   'Fabricator': 'construct-outline',
+  'Other': 'briefcase-outline',
 };
 
 const LABOUR_TYPE_COLORS: Record<string, string> = {
@@ -48,6 +47,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
   'Steel Fixer': 'steel',
   'Welder': 'welder',
   'Fabricator': 'fabricator',
+  'Other': 'other',
 };
 
 @Component({
@@ -86,16 +86,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       @if (activeTab === 'workers') {
         <div class="section-header">
           <h2>Labour Types</h2>
-          <div class="section-actions">
-            <button class="mark-att-btn" (click)="openMarkAttendancePicker()">
-              <ion-icon name="checkmark-done-outline"></ion-icon>
-              Mark Attendance
-            </button>
-            <button class="add-worker-btn" (click)="createWorker()">
-              <ion-icon name="person-add-outline"></ion-icon>
-              Add Worker
-            </button>
-          </div>
         </div>
 
         <div class="type-cards">
@@ -135,10 +125,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
             <ion-icon name="calendar-outline"></ion-icon>
             {{ todayDate | date:'EEEE, MMMM d, yyyy' }}
           </h2>
-          <button class="mark-att-btn" (click)="openMarkAttendancePicker()">
-            <ion-icon name="checkmark-done-outline"></ion-icon>
-            Mark New
-          </button>
         </div>
 
         <div class="cards">
@@ -207,12 +193,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
               <ion-icon name="person-add-outline"></ion-icon>
             </ion-fab-button>
           </ion-fab>
-        } @else {
-          <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-            <ion-fab-button (click)="openMarkAttendancePicker()">
-              <ion-icon name="checkmark-done-outline"></ion-icon>
-            </ion-fab-button>
-          </ion-fab>
         }
       }
     </ion-content>
@@ -247,11 +227,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       letter-spacing: 0.8px;
       margin: 0;
     }
-    .section-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
     .attendance-section-header h2 {
       display: inline-flex;
       align-items: center;
@@ -263,36 +238,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       letter-spacing: 0;
     }
     .attendance-section-header h2 ion-icon { font-size: 16px; }
-    .mark-att-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 6px 12px;
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-      border-radius: var(--md-radius-lg);
-      font-size: 12px;
-      font-weight: 700;
-      font-family: inherit;
-      border: none;
-      cursor: pointer;
-    }
-    .mark-att-btn ion-icon { font-size: 14px; }
-    .add-worker-btn {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 6px 12px;
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-      border-radius: var(--md-radius-lg);
-      font-size: 12px;
-      font-weight: 700;
-      font-family: inherit;
-      border: none;
-      cursor: pointer;
-    }
-    .add-worker-btn ion-icon { font-size: 14px; }
 
     .type-cards {
       display: grid;
@@ -339,6 +284,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     .type-icon.icon-steel { background: rgba(100, 116, 139, 0.12); color: #475569; }
     .type-icon.icon-welder { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
     .type-icon.icon-fabricator { background: rgba(99, 102, 241, 0.12); color: #4338ca; }
+    .type-icon.icon-other { background: rgba(107, 114, 128, 0.12); color: #374151; }
     .type-icon.icon-default { background: rgba(201, 162, 39, 0.12); color: #a8861f; }
 
     .type-info { flex: 1; min-width: 0; }
@@ -437,9 +383,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
 })
 export class LabourPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
-  private modalCtrl = inject(ModalController);
   private router = inject(Router);
-  private toastCtrl = inject(ToastController);
 
   activeTab = 'workers';
   todayDate = new Date().toISOString().slice(0, 10);
@@ -477,7 +421,7 @@ export class LabourPage implements OnInit, OnDestroy {
       constructOutline, buildOutline, flashOutline, cutOutline,
       homeOutline, colorPaletteOutline, hammerOutline, gridOutline,
       layersOutline, carOutline, sparklesOutline,
-      calendarOutline, checkmarkDoneOutline, ellipsisHorizontalOutline,
+      calendarOutline, ellipsisHorizontalOutline,
     });
     await this.loadData();
 
@@ -560,39 +504,6 @@ export class LabourPage implements OnInit, OnDestroy {
 
   createWorker(): void {
     this.router.navigate(['/tabs/labour/create-worker']);
-  }
-
-  markAttendance(worker: Worker): void {
-    this.router.navigate(['/tabs/labour/mark-attendance', worker._id]);
-  }
-
-  async openMarkAttendancePicker(): Promise<void> {
-    const ws = this.workers();
-    if (ws.length === 0) {
-      const toast = await this.toastCtrl.create({
-        message: 'Add a worker first to mark attendance.',
-        duration: 2200,
-        color: 'warning',
-        position: 'top',
-      });
-      await toast.present();
-      return;
-    }
-    if (ws.length === 1) {
-      this.markAttendance(ws[0]);
-      return;
-    }
-    const modal = await this.modalCtrl.create({
-      component: WorkerListModalComponent,
-      componentProps: {
-        workers: ws,
-        labourType: 'Select worker to mark attendance',
-        action: 'mark-attendance',
-      },
-      breakpoints: [0, 0.6, 0.9],
-      initialBreakpoint: 0.9,
-    });
-    await modal.present();
   }
 
   viewHistory(att: Attendance): void {

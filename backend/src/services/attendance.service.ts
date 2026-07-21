@@ -1,7 +1,5 @@
 import { Types } from "mongoose";
 import { Attendance } from "../models/Attendance.js";
-import { Worker } from "../models/Worker.js";
-import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 export interface GroupedAttendance {
@@ -47,13 +45,13 @@ export async function listGroupedAttendance(filter: {
     { $match: match },
     {
       $lookup: {
-        from: "workers",
-        localField: "workerId",
+        from: "users",
+        localField: "createdBy",
         foreignField: "_id",
-        as: "worker",
+        as: "supervisor",
       },
     },
-    { $unwind: { path: "$worker", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$supervisor", preserveNullAndEmptyArrays: true } },
     {
       $group: {
         _id: {
@@ -62,13 +60,12 @@ export async function listGroupedAttendance(filter: {
           paymentMode: "$paymentMode",
           site: "$site",
           subcontractorName: "$subcontractorName",
-          labourType: "$worker.labourType",
+          labourType: "$labourType",
         },
         workers: {
           $push: {
             workerId: { $toString: "$workerId" },
-            workerName: "$worker.name",
-            weeklyPay: "$worker.weeklyPay",
+            workerName: "$supervisor.name",
             shiftCount: "$shiftCount",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",
@@ -140,13 +137,13 @@ export async function getLabourReport(filter: {
     { $match: match as any },
     {
       $lookup: {
-        from: "workers",
-        localField: "workerId",
+        from: "users",
+        localField: "createdBy",
         foreignField: "_id",
-        as: "worker",
+        as: "supervisor",
       },
     },
-    { $unwind: { path: "$worker", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$supervisor", preserveNullAndEmptyArrays: true } },
     {
       $group: {
         _id: {
@@ -154,13 +151,12 @@ export async function getLabourReport(filter: {
           shiftCount: "$shiftCount",
           paymentMode: "$paymentMode",
           subcontractorName: "$subcontractorName",
-          labourType: "$worker.labourType",
+          labourType: "$labourType",
         },
         workers: {
           $push: {
             workerId: { $toString: "$workerId" },
-            workerName: "$worker.name",
-            weeklyPay: "$worker.weeklyPay",
+            workerName: "$supervisor.name",
             shiftCount: "$shiftCount",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",
@@ -184,7 +180,7 @@ export async function getLabourReport(filter: {
 
     let groupDailyPay = 0;
     const workers = r.workers.map((w: any) => {
-      const weeklyPay = w.weeklyPay || 0;
+      const weeklyPay = r._id.weeklyPay || 0;
       const shiftMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
       const baseDaily = weeklyPay / 7;
       const dailyPay = w.shiftCount * baseDaily * shiftMultiplier - w.lateFine + w.overtimeAmount;
