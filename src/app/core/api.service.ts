@@ -1077,6 +1077,19 @@ export class ApiService {
     } catch {}
   }
 
+  // =================== COMPANY PROFILE ===================
+  getCompanyProfile(): Observable<{ name: string; address: string; state: string; gstin: string; bankName: string; accountNumber: string; ifsc: string; branch: string }> {
+    return this.http.get<any>(`${this.baseUrl}/company-profile`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  saveCompanyProfile(profile: { name: string; address: string; state: string; gstin: string; bankName: string; accountNumber: string; ifsc: string; branch: string }): Observable<{ success: boolean }> {
+    return this.http.post<{ success: boolean }>(`${this.baseUrl}/company-profile`, profile, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   clearSession(): void {
     this.accessTokenSignal.set(null);
     this.userSignal.set(null);

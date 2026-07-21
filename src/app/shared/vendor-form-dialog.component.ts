@@ -203,6 +203,9 @@ export class VendorFormDialogComponent implements OnInit {
   });
 
   async ngOnInit() {
+    // Load sites from backend first so siteEntities is populated for name lookup
+    await this.loadSitesFromBackend();
+
     this.statusValue = this.initialValue?.status ?? "Active";
     this.nameValue = this.initialValue?.name ?? "";
     this.materialTypeValue = this.initialValue?.materialType ?? "";
@@ -212,9 +215,6 @@ export class VendorFormDialogComponent implements OnInit {
     if (this.initialValue?.siteIds?.length) {
       this.selectedSiteIds.push(...this.initialValue.siteIds);
     }
-
-    // Load sites from backend to populate siteEntities for name lookup
-    await this.loadSitesFromBackend();
   }
 
   private async loadSitesFromBackend(): Promise<void> {
@@ -261,6 +261,15 @@ export class VendorFormDialogComponent implements OnInit {
   private findSiteInProjects(id: string): string | null {
     for (const project of this.data.projects()) {
       if (project?.id === id && project.name) return project.name;
+      // Check siteIds array (may contain ObjectId strings)
+      const siteIds = (project as any)?.siteIds;
+      if (Array.isArray(siteIds) && siteIds.includes(id)) {
+        // Try to find matching site name from siteNames array
+        const siteNames = (project as any)?.siteNames;
+        const idx = siteIds.indexOf(id);
+        if (Array.isArray(siteNames) && siteNames[idx]) return siteNames[idx];
+        if (project.name) return project.name;
+      }
       if (Array.isArray(project?.sites)) {
         for (const siteName of project.sites) {
           if (siteName === id) return siteName;

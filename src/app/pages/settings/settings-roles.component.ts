@@ -604,11 +604,13 @@ type CombinedInvite = {
             <div class="settings-w11-form">
               <p class="settings-w11-step-hint">How would you like to send the invite?</p>
               <div class="settings-w11-invite-method-choice">
+                <!-- Send via Email method card: temporarily hidden (email invite disabled for supervisor) -->
                 <button
                   type="button"
                   class="settings-w11-method-card"
                   [class.selected]="inviteMethod() === 'email'"
                   (click)="setInviteMethod('email')"
+                  [style.display]="'none'"
                 >
                   <div class="settings-w11-method-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
@@ -722,12 +724,14 @@ type CombinedInvite = {
 
               <div class="settings-w11-qr-actions">
                 @if (inviteMethod() === 'email') {
-                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0 || invite.emailSent">
+                  <!-- Email invite: temporarily hidden (backend code preserved for future re-enable) -->
+                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0 || invite.emailSent" [style.display]="'none'">
                     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     {{ sendingEmail() ? 'Sending…' : (invite.emailSent ? 'Email sent' : 'Resend email') }}
                   </button>
                 } @else {
-                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0">
+                  <!-- Email invite fallback: temporarily hidden (backend code preserved for future re-enable) -->
+                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0" [style.display]="'none'">
                     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     {{ sendingEmail() ? 'Sending…' : 'Send via email' }}
                   </button>
@@ -1443,7 +1447,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     }
     this.supervisorError.set(null);
     this.supervisorStep.set(3);
-    this.inviteMethod.set(null);
+    // Email invite disabled — default to QR so admin doesn't need to
+    // interact with Step 3 method chooser; future re-enable would reset
+    // inviteMethod to null and surface the email/QR cards again.
+    this.inviteMethod.set('qr');
   }
 
   setInviteMethod(method: 'email' | 'qr') {

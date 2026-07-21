@@ -434,6 +434,7 @@ export class ErpDataService {
     effect(() => this.writeState("companyProfile", this.companyProfile()));
     effect(() => this.writeState("quotations", this.quotations()));
     effect(() => this.writeState("taxInvoices", this.taxInvoices()));
+    this.loadCompanyProfile();
     effect(() => {
       const rows = this.materials();
       if (rows && rows.length) {
@@ -1585,6 +1586,26 @@ export class ErpDataService {
 
   updateCompanyProfile(patch: Partial<CompanyProfile>) {
     this.companyProfile.update((profile) => ({ ...profile, ...patch }));
+  }
+
+  loadCompanyProfile() {
+    this.api.getCompanyProfile().subscribe({
+      next: (profile) => {
+        if (profile) {
+          this.companyProfile.set({
+            name: profile.name ?? "",
+            address: profile.address ?? "",
+            state: profile.state ?? "Tamil Nadu",
+            gstin: profile.gstin ?? "",
+            bankName: profile.bankName ?? "",
+            accountNumber: profile.accountNumber ?? "",
+            ifsc: profile.ifsc ?? "",
+            branch: profile.branch ?? "",
+          });
+        }
+      },
+      error: (err) => console.warn("[ERP] loadCompanyProfile failed:", err?.message ?? err),
+    });
   }
 
   addQuotation(input: Quotation): Quotation {
