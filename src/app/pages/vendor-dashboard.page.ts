@@ -1018,9 +1018,8 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       transform: translateY(-2px);
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
     }
-.add-site-card.disabled {
+    .add-site-card.disabled {
       opacity: 0.5;
-      cursor: not-allowed;
     }
     .add-site-card h3 { color: #2c5cff; }
     .site-picker-list {

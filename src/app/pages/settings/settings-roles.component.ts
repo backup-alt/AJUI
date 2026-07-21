@@ -638,7 +638,8 @@ type CombinedInvite = {
               </div>
 
               <div class="settings-w11-qr-actions">
-                <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0">
+                <!-- Send via email: temporarily hidden (backend code preserved for future re-enable) -->
+                <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0" [style.display]="'none'">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   {{ sendingEmail() ? 'Sending…' : 'Send via email' }}
                 </button>
