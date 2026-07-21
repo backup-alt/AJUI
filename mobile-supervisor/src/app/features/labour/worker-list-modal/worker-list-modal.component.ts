@@ -41,7 +41,7 @@ import { CurrencyPipe } from '@angular/common';
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>{{ labourType }} Workers</ion-title>
+        <ion-title>{{ titleText }}</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="dismiss()">
             <ion-icon name="close-outline"></ion-icon>
@@ -180,6 +180,7 @@ export class WorkerListModalComponent implements OnInit {
 
   workers: Worker[] = [];
   labourType = '';
+  action: 'view' | 'mark-attendance' = 'view';
 
   ngOnInit(): void {
     addIcons({ closeOutline, chevronForwardOutline, personOutline });
@@ -191,14 +192,27 @@ export class WorkerListModalComponent implements OnInit {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
 
+  get titleText(): string {
+    if (this.action === 'mark-attendance') {
+      return this.labourType && this.labourType !== 'Select worker to mark attendance'
+        ? `Mark Attendance — ${this.labourType}`
+        : 'Mark Attendance';
+    }
+    return this.labourType ? `${this.labourType} Workers` : 'Workers';
+  }
+
   dismiss(): void {
     this.modalCtrl.dismiss();
   }
 
   async navigateToDetail(worker: Worker): Promise<void> {
-    console.log('[WorkerListModal] Navigating to worker detail:', worker._id);
+    console.log('[WorkerListModal] Action:', this.action, 'Worker:', worker._id);
     await this.modalCtrl.dismiss();
-    await this.router.navigate(['/tabs/labour/worker', worker._id]);
+    if (this.action === 'mark-attendance') {
+      await this.router.navigate(['/tabs/labour/mark-attendance', worker._id]);
+    } else {
+      await this.router.navigate(['/tabs/labour/worker', worker._id]);
+    }
     console.log('[WorkerListModal] Navigation complete');
   }
 }

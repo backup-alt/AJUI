@@ -403,7 +403,7 @@ interface WageCalculation {
       display: flex;
       align-items: center;
       gap: var(--md-space-4);
-      padding: var(--md-space-5) var(--md-space-4);
+      padding: var(--md-space-3) var(--md-space-4);
       background: var(--m3-primary);
       background-image: linear-gradient(135deg, var(--m3-primary) 0%, #003380 100%);
       color: var(--m3-on-primary);
