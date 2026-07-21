@@ -19,6 +19,7 @@ export const createMaterialSchema = z.object({
     requestDate: z.string().min(1),
     issuedAmount: z.coerce.number().nonnegative().optional(),
     givenAmount: z.coerce.number().nonnegative().optional(),
+    notes: z.string().trim().max(2000).optional(),
     createdBy: z.string().trim().optional(),
   }),
 });
@@ -102,6 +103,7 @@ export const expenseBaseSchema = z.object({
   amount: z.coerce.number().nonnegative(),
   date: z.string().min(1),
   description: z.string().trim().min(1).max(500),
+  notes: z.string().trim().max(2000).optional(),
   submittedBy: z.string().trim().optional(),
   isSiteMaterial: z.boolean().optional(),
   materialName: z.string().trim().optional(),

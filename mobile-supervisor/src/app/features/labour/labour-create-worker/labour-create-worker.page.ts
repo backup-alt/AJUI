@@ -18,6 +18,7 @@ import {
   IonSpinner,
   IonToggle,
   ToastController,
+  ActionSheetController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -139,29 +140,24 @@ const LABOUR_TYPES = [
           </ion-item>
 
           <ion-item class="form-item toggle-item">
-            <div class="toggle-row">
-              <ion-label position="stacked">From Subcontractor?</ion-label>
-              <ion-toggle
-                [(ngModel)]="worker.isSubcontract"
-                (ionChange)="onSubcontractToggle()"
-              ></ion-toggle>
-            </div>
+            <ion-label class="toggle-label">From Subcontractor?</ion-label>
+            <ion-toggle
+              class="subcontract-toggle"
+              [(ngModel)]="worker.isSubcontract"
+              (ionChange)="onSubcontractToggle()"
+              slot="end"
+            ></ion-toggle>
           </ion-item>
 
           @if (worker.isSubcontract) {
-            <ion-item class="form-item form-item-last">
+            <ion-item class="form-item form-item-last" (click)="openSubcontractorActionSheet()">
               <ion-label position="stacked">Select Subcontractor *</ion-label>
-              <ion-select
+              <ion-input
                 placeholder="Choose subcontractor"
-                [(ngModel)]="worker.subcontractorId"
-                interface="popover"
-              >
-                @for (sub of subcontractors(); track sub.subcontractorId) {
-                  <ion-select-option [value]="sub.subcontractorId">
-                    {{ sub.subcontractorName }}
-                  </ion-select-option>
-                }
-              </ion-select>
+                [value]="selectedSubcontractorName()"
+                readonly="true"
+                class="subcontractor-input"
+              ></ion-input>
             </ion-item>
           }
         </ion-list>
@@ -232,14 +228,14 @@ const LABOUR_TYPES = [
       border-bottom: none;
     }
     .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
-    .toggle-item { min-height: 72px; }
-    .toggle-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
+    .toggle-item { min-height: 72px; display: flex; align-items: center; }
+    .toggle-label { font-size: 14px; font-weight: 600; color: #111827; margin: 0; }
+    .subcontract-toggle {
+      --track-background: #e5e7eb;
+      --track-background-checked: rgba(0, 34, 99, 0.28);
+      --handle-background: #ffffff;
+      --handle-background-checked: #002263;
     }
-    .toggle-row ion-label { position: static !important; }
     .form-actions { padding: 20px 0; }
   `],
 })
@@ -260,11 +256,16 @@ export class LabourCreateWorkerPage implements OnInit {
     subcontractorName: '',
   };
 
+  selectedSubcontractorId = signal<string>('');
+  selectedSubcontractorName = signal<string>('');
+
   subcontractors = signal<Subcontractor[]>([]);
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
+
+  private actionSheetCtrl = inject(ActionSheetController);
 
   async ngOnInit(): Promise<void> {
     addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline, businessOutline });
@@ -280,6 +281,8 @@ export class LabourCreateWorkerPage implements OnInit {
     } else {
       this.worker.subcontractorId = '';
       this.worker.subcontractorName = '';
+      this.selectedSubcontractorId.set('');
+      this.selectedSubcontractorName.set('');
     }
   }
 
@@ -292,6 +295,27 @@ export class LabourCreateWorkerPage implements OnInit {
       next: (res) => this.subcontractors.set(res.subcontractors || []),
       error: (err) => console.error('[CreateWorker] failed to load subcontractors', err),
     });
+  }
+
+  async openSubcontractorActionSheet() {
+    if (this.subcontractors().length === 0) {
+      await this.loadSubcontractors();
+    }
+    const buttons: Array<{ text: string; handler: () => void; role?: string }> = this.subcontractors().map((sub) => ({
+      text: sub.subcontractorName,
+      handler: () => {
+        this.selectedSubcontractorId.set(sub.subcontractorId);
+        this.selectedSubcontractorName.set(sub.subcontractorName);
+        this.worker.subcontractorId = sub.subcontractorId;
+        this.worker.subcontractorName = sub.subcontractorName;
+      },
+    }));
+    buttons.push({ text: 'Cancel', role: 'cancel', handler: () => {} });
+    const actionSheet = await this.actionSheetCtrl.create({
+      header: 'Select Subcontractor',
+      buttons,
+    });
+    await actionSheet.present();
   }
 
   isValid(): boolean {

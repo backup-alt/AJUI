@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, Input } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -11,16 +11,21 @@ import {
   IonItem,
   IonLabel,
   IonTextarea,
+  IonSelect,
+  IonSelectOption,
   IonIcon,
   IonSpinner,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
-import { ModalController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { closeOutline, checkmarkOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { InventoryItem } from '../inventory.page';
+import { ModalController } from '@ionic/angular/standalone';
+import { Vendor } from '../../../shared/models';
+
+const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Litre', 'Cft'];
 
 @Component({
   selector: 'app-inventory-request-modal',
@@ -37,6 +42,8 @@ import { InventoryItem } from '../inventory.page';
     IonItem,
     IonLabel,
     IonTextarea,
+    IonSelect,
+    IonSelectOption,
     IonIcon,
     IonSpinner,
     FormsModule,
@@ -87,12 +94,43 @@ import { InventoryItem } from '../inventory.page';
           </div>
           <div class="form-group">
             <label class="form-label">Unit *</label>
-            <ion-input
+            <ion-select
               class="form-input"
               [(ngModel)]="unit"
+              interface="popover"
+              placeholder="Select unit"
+            >
+              @for (option of unitOptions; track option) {
+                <ion-select-option [value]="option">{{ option }}</ion-select-option>
+              }
+            </ion-select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Issued Amount *</label>
+            <ion-input
+              class="form-input"
+              type="number"
+              [(ngModel)]="issuedAmount"
               [clearInput]="true"
-              placeholder="e.g. kg, pieces"
+              placeholder="0"
             ></ion-input>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Vendor *</label>
+            <ion-select
+              class="form-input"
+              [(ngModel)]="vendorId"
+              interface="popover"
+              placeholder="Select vendor"
+              (ionChange)="onVendorChange()"
+            >
+              @for (vendor of vendors(); track vendor._id) {
+                <ion-select-option [value]="vendor._id">{{ vendor.name }}</ion-select-option>
+              }
+            </ion-select>
           </div>
         </div>
 
@@ -202,11 +240,16 @@ export class InventoryRequestModalComponent implements OnInit {
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
 
-  preSelected: InventoryItem | null = null;
+  @Input() preSelected: InventoryItem | null = null;
   name = '';
   quantity: number | null = null;
   unit = '';
+  issuedAmount: number | null = null;
+  vendorId = '';
+  vendorName = '';
   notes = '';
+  unitOptions = MATERIAL_UNITS;
+  vendors = signal<Vendor[]>([]);
   isSubmitting = signal(false);
 
   ngOnInit(): void {
@@ -214,11 +257,31 @@ export class InventoryRequestModalComponent implements OnInit {
     if (this.preSelected) {
       this.name = this.preSelected.name;
       this.unit = this.preSelected.unit;
+      this.vendorName = this.preSelected.vendor || '';
     }
+    this.loadVendors();
   }
 
   isValid(): boolean {
-    return !!this.name.trim() && this.quantity !== null && this.quantity > 0 && !!this.unit.trim();
+    return !!this.name.trim()
+      && this.quantity !== null
+      && this.quantity > 0
+      && !!this.unit.trim()
+      && this.issuedAmount !== null
+      && this.issuedAmount >= 0
+      && !!this.vendorName.trim();
+  }
+
+  loadVendors(): void {
+    this.supervisor.getVendors({ limit: 100 }).subscribe({
+      next: (res) => this.vendors.set(res.items || []),
+      error: () => this.vendors.set([]),
+    });
+  }
+
+  onVendorChange(): void {
+    const selected = this.vendors().find((vendor) => vendor._id === this.vendorId);
+    this.vendorName = selected?.name || '';
   }
 
   dismiss(): void {
@@ -252,11 +315,17 @@ export class InventoryRequestModalComponent implements OnInit {
       name: this.name.trim(),
       unit: this.unit.trim(),
       requestedQuantity: this.quantity!,
+      issuedAmount: this.issuedAmount!,
+      vendor: this.vendorName.trim(),
+      vendorId: this.vendorId || undefined,
       requestDate: new Date().toISOString().slice(0, 10),
       notes: this.notes.trim() || undefined,
     }).subscribe({
       next: async () => {
         this.isSubmitting.set(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { reason: 'requested' } }));
+        }
         await this.modalCtrl.dismiss({ requested: true });
       },
       error: async (err) => {

@@ -480,14 +480,14 @@ type CombinedInvite = {
       </div>
     }
 
-    <!-- Add Supervisor modal (QR generation) -->
+    <!-- Add Supervisor modal (QR generation or Email invite) -->
     @if (showAddSupervisor()) {
       <div class="settings-w11-modal-backdrop" (click)="closeAddSupervisor()" aria-hidden="true"></div>
       <div class="settings-w11-modal settings-w11-modal-wide" role="dialog" aria-label="Add supervisor">
         <header class="settings-w11-modal-head">
           <div>
             <h2>Add Supervisor</h2>
-            <small>Generate a time-limited QR code the supervisor scans from the AGB mobile app.</small>
+            <small>{{ supervisorStep() === 1 ? 'Enter supervisor details and choose how to send the invite' : (supervisorStep() === 2 ? 'Select sites for this supervisor' : 'QR Code generated') }}</small>
           </div>
           <button type="button" class="settings-w11-icon-btn" (click)="closeAddSupervisor()" aria-label="Close">
             <svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -495,7 +495,7 @@ type CombinedInvite = {
         </header>
 
         <div class="settings-w11-modal-body">
-          @if (supervisorStep() < 3) {
+          @if (supervisorStep() < 4) {
             <div class="settings-w11-step-indicator">
               <div class="settings-w11-step" [class.active]="supervisorStep() === 1" [class.done]="supervisorStep() > 1">
                 <span class="step-circle">{{ supervisorStep() > 1 ? '✓' : '1' }}</span>
@@ -507,9 +507,14 @@ type CombinedInvite = {
                 <span class="step-label">Sites</span>
               </div>
               <div class="step-line" [class.done]="supervisorStep() > 2"></div>
-              <div class="settings-w11-step" [class.active]="supervisorStep() === 3">
-                <span class="step-circle">3</span>
-                <span class="step-label">QR</span>
+              <div class="settings-w11-step" [class.active]="supervisorStep() === 3" [class.done]="supervisorStep() > 3">
+                <span class="step-circle">{{ supervisorStep() > 3 ? '✓' : '3' }}</span>
+                <span class="step-label">Invite Method</span>
+              </div>
+              <div class="step-line" [class.done]="supervisorStep() > 3"></div>
+              <div class="settings-w11-step" [class.active]="supervisorStep() === 4">
+                <span class="step-circle">4</span>
+                <span class="step-label">Done</span>
               </div>
             </div>
           }
@@ -588,14 +593,72 @@ type CombinedInvite = {
                 type="button"
                 class="settings-w11-btn settings-w11-btn-primary"
                 [disabled]="supervisorLoading() || selectedSiteIds().size === 0"
-                (click)="generateSupervisorQr()"
+                (click)="goToInviteMethod()"
               >
-                {{ supervisorLoading() ? 'Generating…' : 'Generate QR Code' }}
+                {{ supervisorLoading() ? 'Loading…' : 'Next: Choose Invite Method' }}
               </button>
             </div>
           }
 
-          @if (currentInvite(); as invite) {
+          @if (supervisorStep() === 3) {
+            <div class="settings-w11-form">
+              <p class="settings-w11-step-hint">How would you like to send the invite?</p>
+              <div class="settings-w11-invite-method-choice">
+                <!-- Send via Email method card: temporarily hidden (email invite disabled for supervisor) -->
+                <button
+                  type="button"
+                  class="settings-w11-method-card"
+                  [class.selected]="inviteMethod() === 'email'"
+                  (click)="setInviteMethod('email')"
+                  [style.display]="'none'"
+                >
+                  <div class="settings-w11-method-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                  </div>
+                  <div class="settings-w11-method-info">
+                    <strong>Send via Email</strong>
+                    <span>Send a deep link email that opens the AGB app directly. Supervisor taps the link, enters OTP, and creates their account.</span>
+                  </div>
+                  <div class="settings-w11-method-check" [class.visible]="inviteMethod() === 'email'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  class="settings-w11-method-card"
+                  [class.selected]="inviteMethod() === 'qr'"
+                  (click)="setInviteMethod('qr')"
+                >
+                  <div class="settings-w11-method-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                  </div>
+                  <div class="settings-w11-method-info">
+                    <strong>Generate QR Code</strong>
+                    <span>Create a time-limited QR code. Supervisor scans it from the AGB app welcome screen and enters the OTP sent to their email.</span>
+                  </div>
+                  <div class="settings-w11-method-check" [class.visible]="inviteMethod() === 'qr'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                </button>
+              </div>
+              @if (supervisorError()) {
+                <div class="settings-w11-message error">{{ supervisorError() }}</div>
+              }
+              <div class="settings-w11-form-actions">
+                <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="prevStep()">Back</button>
+                <button
+                  type="button"
+                  class="settings-w11-btn settings-w11-btn-primary"
+                  [disabled]="supervisorLoading() || !inviteMethod()"
+                  (click)="createInviteWithMethod()"
+                >
+                  {{ supervisorLoading() ? 'Creating…' : (inviteMethod() === 'email' ? 'Send Email Invite' : 'Generate QR Code') }}
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (supervisorStep() === 4 && currentInvite(); as invite) {
             <div class="settings-w11-qr-popup" [class.scanned]="invite.scanned">
               <header class="settings-w11-qr-popup-head">
                 <div>
@@ -616,13 +679,35 @@ type CombinedInvite = {
                 </div>
               </header>
 
-              <div class="settings-w11-qr-frame">
-                <img [src]="invite.qrDataUrl" alt="Supervisor QR Code" />
-              </div>
+              @if (inviteMethod() === 'qr' || (inviteMethod() === 'email' && !invite.emailSent)) {
+                <div class="settings-w11-qr-frame">
+                  <img [src]="invite.qrDataUrl" alt="Supervisor QR Code" />
+                </div>
+              }
 
-              <p class="settings-w11-hint" *ngIf="!invite.scanned">
-                Ask the supervisor to open the <strong>AGB</strong> app, tap <strong>Scan QR</strong> on the welcome screen, and enter the OTP sent to their email.
-              </p>
+              @if (inviteMethod() === 'email') {
+                <div class="settings-w11-email-sent" *ngIf="invite.emailSent">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#28a745" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 13.07V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v6"/>
+                    <path d="M22 13.07L12 19.07 2 13.07"/>
+                    <path d="M2 7l10 6.46 10-6.46"/>
+                  </svg>
+                  <strong>Invite email sent!</strong>
+                  <span>A deep link has been sent to <strong>{{ invite.supervisorEmail }}</strong>. The supervisor can tap the link in their email to open the AGB app and complete their account setup.</span>
+                </div>
+                <div class="settings-w11-email-pending" *ngIf="!invite.emailSent">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#ffc107" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v6l4 2"/>
+                  </svg>
+                  <strong>Email queued</strong>
+                  <span>The email is being sent. You can also share the QR code below as a backup.</span>
+                </div>
+              } @else {
+                <p class="settings-w11-hint" *ngIf="!invite.scanned">
+                  Ask the supervisor to open the <strong>AGB</strong> app, tap <strong>Scan QR</strong> on the welcome screen, and enter the OTP sent to their email.
+                </p>
+              }
 
               <div class="settings-w11-otp-block" *ngIf="!invite.scanned && invite.otp && invite.emailSent === false">
                 <span class="settings-w11-otp-label">Email delivery failed — share this code verbally</span>
@@ -638,11 +723,19 @@ type CombinedInvite = {
               </div>
 
               <div class="settings-w11-qr-actions">
-                <!-- Send via email: temporarily hidden (backend code preserved for future re-enable) -->
-                <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0" [style.display]="'none'">
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  {{ sendingEmail() ? 'Sending…' : 'Send via email' }}
-                </button>
+                @if (inviteMethod() === 'email') {
+                  <!-- Email invite: temporarily hidden (backend code preserved for future re-enable) -->
+                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0 || invite.emailSent" [style.display]="'none'">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    {{ sendingEmail() ? 'Sending…' : (invite.emailSent ? 'Email sent' : 'Resend email') }}
+                  </button>
+                } @else {
+                  <!-- Email invite fallback: temporarily hidden (backend code preserved for future re-enable) -->
+                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="sendSupervisorEmail(invite)" [disabled]="sendingEmail() || invite.remainingMs <= 0" [style.display]="'none'">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12v8H2z M2 4l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    {{ sendingEmail() ? 'Sending…' : 'Send via email' }}
+                  </button>
+                }
                 <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="resendCurrentOtp()" [disabled]="resendingOtp()">
                   {{ resendingOtp() ? 'Sending…' : 'Resend OTP' }}
                 </button>
@@ -655,7 +748,7 @@ type CombinedInvite = {
         </div>
 
         <footer class="settings-w11-modal-foot">
-          @if (supervisorStep() === 2) {
+          @if (supervisorStep() === 2 || supervisorStep() === 3) {
             <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="prevStep()">Back</button>
           }
           <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="closeAddSupervisor()">Close</button>
@@ -663,6 +756,74 @@ type CombinedInvite = {
       </div>
     }
   `,
+  styles: [`
+    .settings-w11-invite-method-choice {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .settings-w11-method-card {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) 24px;
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+      min-height: 92px;
+      padding: 14px;
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #102033;
+      text-align: left;
+      cursor: pointer;
+    }
+    .settings-w11-method-card.selected {
+      border-color: #002263;
+      background: #f7f9ff;
+    }
+    .settings-w11-method-icon,
+    .settings-w11-method-check {
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      color: #002263;
+      background: #eef3ff;
+      overflow: hidden;
+    }
+    .settings-w11-method-check {
+      width: 22px;
+      height: 22px;
+      opacity: 0;
+      background: #002263;
+      color: #ffffff;
+    }
+    .settings-w11-method-check.visible { opacity: 1; }
+    .settings-w11-method-icon svg,
+    .settings-w11-method-check svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      flex: 0 0 auto;
+    }
+    .settings-w11-method-info {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .settings-w11-method-info strong {
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .settings-w11-method-info span {
+      font-size: 12px;
+      line-height: 1.4;
+      color: #64748b;
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsRolesComponent implements OnInit, OnDestroy {
@@ -787,6 +948,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly availableSites = signal<any[]>([]);
   readonly selectedSiteIds = signal<Set<string>>(new Set());
   readonly sitesLoading = signal(false);
+  readonly inviteMethod = signal<'email' | 'qr' | null>(null);
 
   // Pending invites table
   readonly pendingInvites = signal<PendingInvite[]>([]);
@@ -1209,6 +1371,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.showAddSupervisor.set(false);
     this.currentInvite.set(null);
     this.supervisorError.set(null);
+    this.inviteMethod.set(null);
     this.refreshInvites();
   }
 
@@ -1220,6 +1383,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.supervisorPhoneDraft.set("");
     this.supervisorStep.set(1);
     this.selectedSiteIds.set(new Set());
+    this.inviteMethod.set(null);
   }
 
   nextStep() {
@@ -1243,7 +1407,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   }
 
   prevStep() {
-    this.supervisorStep.set(1);
+    const currentStep = this.supervisorStep();
+    if (currentStep > 1) {
+      this.supervisorStep.set(currentStep - 1);
+    }
     this.supervisorError.set(null);
   }
 
@@ -1257,7 +1424,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.selectedSiteIds.set(current);
   }
 
-  generateSupervisorQr() {
+  goToInviteMethod() {
     const name = this.supervisorNameDraft().trim();
     const email = this.supervisorEmailDraft().trim();
     const phone = this.supervisorPhoneDraft().trim();
@@ -1279,9 +1446,38 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       return;
     }
     this.supervisorError.set(null);
+    this.supervisorStep.set(3);
+    // Email invite disabled — default to QR so admin doesn't need to
+    // interact with Step 3 method chooser; future re-enable would reset
+    // inviteMethod to null and surface the email/QR cards again.
+    this.inviteMethod.set('qr');
+  }
+
+  setInviteMethod(method: 'email' | 'qr') {
+    this.inviteMethod.set(method);
+    this.supervisorError.set(null);
+  }
+
+  createInviteWithMethod() {
+    const method = this.inviteMethod();
+    if (!method) {
+      this.supervisorError.set("Please choose an invite method.");
+      return;
+    }
+    const name = this.supervisorNameDraft().trim();
+    const email = this.supervisorEmailDraft().trim();
+    const phone = this.supervisorPhoneDraft().trim();
+    const siteIds = Array.from(this.selectedSiteIds());
+    this.supervisorError.set(null);
     this.supervisorLoading.set(true);
 
-    this.api.createSupervisorInvite({ supervisorName: name, supervisorEmail: email, supervisorPhone: phone, siteIds }).subscribe({
+    this.api.createSupervisorInvite({ 
+      supervisorName: name, 
+      supervisorEmail: email, 
+      supervisorPhone: phone, 
+      siteIds,
+      sendEmail: method === 'email'
+    }).subscribe({
       next: (invite) => {
         const fiveMinMs = 5 * 60 * 1000;
         this.currentInvite.set({
@@ -1297,13 +1493,13 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
           otp: invite.otp,
           emailSent: invite.emailSent,
         });
-        this.supervisorStep.set(3);
+        this.supervisorStep.set(4);
         this.supervisorLoading.set(false);
         this.refreshInvites();
       },
       error: (err) => {
         const status = err?.status ?? err?.statusCode;
-        const detail = err?.error?.error || err?.message || "Failed to generate QR.";
+        const detail = err?.error?.error || err?.message || "Failed to create invite.";
         this.supervisorError.set(`[${status ?? "?"}] ${detail}`);
         this.supervisorLoading.set(false);
       },

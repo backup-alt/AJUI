@@ -25,7 +25,7 @@ const SHELL_HTML = (body: string): string => `<!DOCTYPE html>
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.06);">
           <tr>
             <td style="background-color:#002263;padding:28px 32px;text-align:center;">
-              <div style="display:inline-block;background:#c9a227;color:#2a230a;width:48px;height:48px;line-height:48px;border-radius:12px;font-weight:800;font-size:18px;letter-spacing:1px;">AGB</div>
+              <img src="https://backup-alt.github.io/AJUI/assets/logo.png" alt="Annai Golden Builders" style="width:96px;height:auto;border-radius:12px;display:block;margin:0 auto;">
               <h1 style="margin:14px 0 0;color:#ffffff;font-size:20px;font-weight:600;">Annai Golden Builders</h1>
               <p style="margin:4px 0 0;color:#9bb3e0;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;">Operations Workspace</p>
             </td>
@@ -58,14 +58,6 @@ const PRIMARY_BUTTON = (label: string, href: string): string => `
       </td>
     </tr>
   </table>`;
-
-const FOOTER_LINK = (href: string): string => `
-  <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
-    If the button doesn't work, copy and paste this link into your browser:
-  </p>
-  <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
-    ${href}
-  </p>`;
 
 // =============================================================
 // 1. OTP EMAIL
@@ -123,14 +115,11 @@ export function buildCreateAccountEmail(input: CreateAccountEmailInput): { subje
     <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
       Hi <strong>${input.name}</strong>, your AGB account is ready. Tap the button below to set up your password and finish your account.
     </p>
-    ${PRIMARY_BUTTON(label, input.setupUrl)}
-    ${FOOTER_LINK(input.setupUrl)}`;
+    ${PRIMARY_BUTTON(label, input.setupUrl)}`;
   const html = SHELL_HTML(body);
   const text = `Hi ${input.name},
 
-Your AGB account is ready. Open the link below to set up your password and finish your account:
-
-${input.setupUrl}
+Your AGB account is ready. Use the account setup button in this email to set up your password and finish your account.
 
 ---
 Annai Golden Builders`;
@@ -145,6 +134,7 @@ export interface ResetPasswordEmailInput {
   name: string;
   resetUrl: string;
   expiresMinutes?: number;
+  webFallbackUrl?: string;
 }
 
 export function buildResetPasswordEmail(input: ResetPasswordEmailInput): { subject: string; html: string; text: string } {
@@ -159,21 +149,17 @@ export function buildResetPasswordEmail(input: ResetPasswordEmailInput): { subje
     <p style="margin:0 0 8px;color:#98a2b3;font-size:13px;line-height:1.5;">
       This link expires in <strong>${expiry} minutes</strong>.
     </p>
-    <p style="margin:8px 0 0;color:#98a2b3;font-size:13px;line-height:1.5;">
-      If you did not request a password reset, please ignore this email — your password will remain unchanged.
-    </p>
-    ${FOOTER_LINK(input.resetUrl)}`;
+    `;
   const html = SHELL_HTML(body);
   const text = `Hi ${input.name},
 
-We received a request to reset your AGB password. Open the link below to choose a new password (expires in ${expiry} minutes):
-
-${input.resetUrl}
+We received a request to reset your AGB password. Use the reset button in this email to choose a new password. This link expires in ${expiry} minutes.
 
 If you did not request a password reset, please ignore this email.
 
 ---
-Annai Golden Builders`;
+Annai Golden Builders
+Operations Workspace`;
   return { subject, html, text };
 }
 
@@ -197,16 +183,13 @@ export function buildEmployeeInviteEmail(input: EmployeeInviteEmailInput): { sub
     <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
       Tap the button below to set up your password and activate your account.
     </p>
-    ${PRIMARY_BUTTON("Create Account", input.setupUrl)}
-    ${FOOTER_LINK(input.setupUrl)}`;
+    ${PRIMARY_BUTTON("Create Account", input.setupUrl)}`;
   const html = SHELL_HTML(body);
   const text = `Hi ${input.name},
 
 You have been invited to join AGB (Annai Golden Builders) as a ${input.role}.
 
-Open the link below to set up your password and activate your account:
-
-${input.setupUrl}
+Use the create account button in this email to set up your password and activate your account.
 
 ---
 Annai Golden Builders`;
@@ -221,6 +204,7 @@ export interface SupervisorInviteEmailInput {
   name: string;
   deepLink: string;
   expiresMinutes: number;
+  webFallbackUrl?: string;
 }
 
 export function buildSupervisorInviteEmail(input: SupervisorInviteEmailInput): { subject: string; html: string; text: string } {
@@ -230,19 +214,17 @@ export function buildSupervisorInviteEmail(input: SupervisorInviteEmailInput): {
     <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
       Hi <strong>${input.name}</strong>, you have been added to AGB (Annai Golden Builders) as a Site Supervisor. Tap the button below to open the AGB Supervisor app and finish your account setup.
     </p>
-    ${PRIMARY_BUTTON("Create Account", input.deepLink)}
+    ${PRIMARY_BUTTON("Open AGB App & Activate", input.deepLink)}
     <p style="margin:0 0 8px;color:#98a2b3;font-size:13px;line-height:1.5;">
       This link expires in <strong>${input.expiresMinutes} minutes</strong>.
-    </p>
-    ${FOOTER_LINK(input.deepLink)}`;
+    </p>`;
   const html = SHELL_HTML(body);
   const text = `Hi ${input.name},
 
-You have been added to AGB (Annai Golden Builders) as a Site Supervisor. Open the link below on your phone to finish your account setup (expires in ${input.expiresMinutes} minutes):
-
-${input.deepLink}
+You have been added to AGB (Annai Golden Builders) as a Site Supervisor. Use the activation button in this email on your phone to finish account setup. This link expires in ${input.expiresMinutes} minutes.
 
 ---
-Annai Golden Builders`;
+Annai Golden Builders
+Operations Workspace`;
   return { subject, html, text };
 }

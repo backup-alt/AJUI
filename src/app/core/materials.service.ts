@@ -131,7 +131,7 @@ export class MaterialsService {
     approved: row.approved ?? row.approvedQuantity ?? 0,
     purchased: row.purchased ?? row.purchasedQuantity ?? 0,
     consumed: row.consumed ?? row.consumedQuantity ?? 0,
-    quantity: row.quantity ?? 0,
+    quantity: row.quantity ?? row.remainingStock ?? Math.max(0, (row.purchasedQuantity ?? row.purchased ?? 0) - (row.consumedQuantity ?? row.consumed ?? 0)),
     vendor: row.vendor,
     poNumber: row.poNumber,
     status: row.status,

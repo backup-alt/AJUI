@@ -179,8 +179,12 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
       clientId: project.clientId,
       clientName: project.client,
       site: siteName,
+      vendorId: req.body.vendorId ? new Types.ObjectId(req.body.vendorId) : undefined,
+      issuedAmount: req.body.issuedAmount,
+      notes: req.body.notes,
       purchasedQuantity: initialStock,
       consumedQuantity: 0,
+      remainingStock: initialStock,
       status: "Pending",
       createdBy: userId,
       supervisorName,
@@ -366,7 +370,6 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
     }
 
     const expenseId = await generateId("EXP");
-    const isCashAdded = req.body.transactionType === "Cash Added";
     const expense = await Expense.create({
       ...req.body,
       expenseId,
@@ -374,18 +377,19 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
       clientId,
       clientName,
       site: siteName,
-      status: isCashAdded ? "Approved" : "Pending",
+      status: "Pending",
       submittedBy: userId,
     });
 
     const isSiteMaterialExpense = req.body.isSiteMaterial === true;
-    // Only Purchase (site materials) needs admin approval; Cash Added is auto-approved
-    if (req.body.type === "site" && !isCashAdded) {
+    if (req.body.type === "site") {
       await Approval.create({
         approvalId: await generateId("APR"),
         type: "expense",
         title: isSiteMaterialExpense
           ? `Site Material: ${expense.materialName || expense.description}`
+          : req.body.transactionType === "Cash Added"
+          ? `Cash Added: ${expense.description}`
           : `Site Expense: ${expense.description}`,
         projectId: expense.projectId,
         projectName: expense.projectName,
@@ -399,11 +403,6 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
         status: "Pending",
         owner: userId,
       });
-    }
-
-    if (isCashAdded && expense.projectId && expense.site) {
-      const { recomputeSiteLedger } = await import("../services/expense.service.js");
-      await recomputeSiteLedger(expense.projectId, expense.site);
     }
 
     res.status(201).json({ expense });

@@ -663,7 +663,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             [class.open]="isSelectMenuOpen(row, column.key)"
                           >
                             <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
-                              <span>{{ row[column.key] || 'Select' }}</span>
+                              <span>{{ displayCell(row, column.key) || 'Select' }}</span>
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                 <path d="M5.5 7.5 10 12l4.5-4.5" />
                               </svg>
@@ -717,7 +717,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                 spellcheck="false"
                                 (blur)="isRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
                               >
-                                {{ row[column.key] }}
+                                {{ displayCell(row, column.key) }}
                               </span>
                             </ng-template>
                           </ng-template>
@@ -2622,6 +2622,17 @@ export class ProjectWorkspacePage {
     return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance";
   }
 
+  /**
+   * Display value for a cell. Maps the stored "Cash Added" transaction
+   * type to the user-facing "Add Cash" label. The raw value is preserved
+   * on the row so it can be sent back to the backend.
+   */
+  displayCell(row: TableRow, key: string): string {
+    const raw = row[key];
+    if (key === "transactionType" && raw === "Cash Added") return "Add Cash";
+    return raw == null ? "" : String(raw);
+  }
+
   selectOptions(section: ModuleKey, key: string): string[] {
     if (key === "site") return this.projectSites();
     if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
@@ -2629,7 +2640,7 @@ export class ProjectWorkspacePage {
     if (section === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
     if (section === "labour" && key === "staffName") return this.staffNameOptionsForProject();
     if (section === "expenses" && key === "transactionType") {
-      return ["Purchase", "Cash Added"];
+      return ["Purchase", "Add Cash"];
     }
     if (section === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (section === "labour" && key === "attendance") return ["Present", "Absent"];
@@ -2681,7 +2692,7 @@ export class ProjectWorkspacePage {
       },
       expenses: {
         expenseDate: today,
-        transactionType: "Cash Added",
+        transactionType: "Add Cash",
         description: "",
         amount: "0",
         siteMaterial: "No",
@@ -2808,6 +2819,7 @@ export class ProjectWorkspacePage {
       normalized.includes("received") ||
       normalized.includes("cash issued") ||
       normalized.includes("cash added") ||
+      normalized.includes("add cash") ||
       normalized.includes("refund") ||
       normalized.includes("credit")
     );

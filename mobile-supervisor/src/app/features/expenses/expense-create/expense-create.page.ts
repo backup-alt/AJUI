@@ -17,6 +17,7 @@ import {
   IonSpinner,
   IonToggle,
   ToastController,
+  ActionSheetController,
 } from '@ionic/angular/standalone';
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -101,13 +102,13 @@ import { Vendor } from '../../../shared/models';
                 <span>Record a purchase expense (goes through approval, checks balance)</span>
               </div>
             </div>
-            <div class="type-card" [class.selected]="expenseType() === 'Cash Added'" (click)="selectType('Cash Added')">
+            <div class="type-card" [class.selected]="expenseType() === 'Add Cash'" (click)="selectType('Add Cash')">
               <div class="type-icon type-icon-green">
                 <ion-icon name="cash-outline"></ion-icon>
               </div>
               <div class="type-info">
-                <strong>Cash Added</strong>
-                <span>Add cash to project site (auto-approved immediately)</span>
+                <strong>Add Cash</strong>
+                <span>Request cash for the project site</span>
               </div>
             </div>
           </div>
@@ -182,17 +183,14 @@ import { Vendor } from '../../../shared/models';
                 ></ion-input>
               </ion-item>
 
-              <ion-item class="form-item">
+              <ion-item class="form-item" (click)="openVendorActionSheet()">
                 <ion-label position="stacked">Vendor</ion-label>
-                <ion-select
+                <ion-input
                   placeholder="Select Vendor"
-                  [(ngModel)]="expense.materialVendorId"
-                  interface="popover"
-                >
-                  @for (vendor of vendors(); track vendor._id) {
-                    <ion-select-option [value]="vendor._id">{{ vendor.name }}</ion-select-option>
-                  }
-                </ion-select>
+                  [value]="selectedVendorName()"
+                  readonly="true"
+                  class="vendor-input"
+                ></ion-input>
               </ion-item>
 
               <ion-item class="form-item form-item-last">
@@ -226,9 +224,18 @@ import { Vendor } from '../../../shared/models';
                   [clearInput]="true"
                 ></ion-input>
               </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Notes</ion-label>
+                <ion-input
+                  placeholder="Optional note for admin"
+                  [(ngModel)]="expense.notes"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
             }
 
-            @if (expenseType() === 'Cash Added') {
+            @if (expenseType() === 'Add Cash') {
               <ion-item class="form-item">
                 <ion-label position="stacked">Description *</ion-label>
                 <ion-input
@@ -244,6 +251,15 @@ import { Vendor } from '../../../shared/models';
                   type="number"
                   placeholder="0"
                   [(ngModel)]="expense.amount"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Notes</ion-label>
+                <ion-input
+                  placeholder="Optional note for admin"
+                  [(ngModel)]="expense.notes"
                   [clearInput]="true"
                 ></ion-input>
               </ion-item>
@@ -330,17 +346,23 @@ export class ExpenseCreatePage implements OnInit {
     materialVendorId: '',
     materialVendor: '',
     issuedAmount: null as number | null,
+    notes: '',
   };
+
+  selectedVendorId = signal<string>('');
+  selectedVendorName = signal<string>('');
 
   isSiteMaterial = false;
   step = signal(1);
-  expenseType = signal<'Purchase' | 'Cash Added' | ''>('');
+  expenseType = signal<'Purchase' | 'Add Cash' | ''>('');
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
   currentBalance = signal<number | null>(null);
   vendors = signal<Vendor[]>([]);
+
+  private actionSheetCtrl = inject(ActionSheetController);
 
   async ngOnInit(): Promise<void> {
     addIcons({
@@ -360,17 +382,17 @@ export class ExpenseCreatePage implements OnInit {
     await this.loadVendors();
   }
 
-  selectType(type: 'Purchase' | 'Cash Added') {
+  selectType(type: 'Purchase' | 'Add Cash') {
     this.expenseType.set(type);
   }
 
   getTitle(): string {
     if (this.step() === 1) return 'Log Expense';
-    return this.expenseType() === 'Cash Added' ? 'Cash Added' : 'Purchase Expense';
+    return this.expenseType() === 'Add Cash' ? 'Add Cash' : 'Purchase Expense';
   }
 
   getSubmitLabel(): string {
-    return this.expenseType() === 'Cash Added' ? 'Add Cash' : 'Submit Purchase';
+    return this.expenseType() === 'Add Cash' ? 'Add Cash' : 'Submit Purchase';
   }
 
   async loadVendors() {
@@ -378,6 +400,24 @@ export class ExpenseCreatePage implements OnInit {
       next: (res) => this.vendors.set(res.items || []),
       error: () => this.vendors.set([]),
     });
+  }
+
+  async openVendorActionSheet() {
+    const buttons: Array<{ text: string; handler: () => void; role?: string }> = this.vendors().map((vendor) => ({
+      text: vendor.name,
+      handler: () => {
+        this.selectedVendorId.set(vendor._id);
+        this.selectedVendorName.set(vendor.name);
+        this.expense.materialVendorId = vendor._id;
+        this.expense.materialVendor = vendor.name;
+      },
+    }));
+    buttons.push({ text: 'Cancel', role: 'cancel', handler: () => {} });
+    const actionSheet = await this.actionSheetCtrl.create({
+      header: 'Select Vendor',
+      buttons,
+    });
+    await actionSheet.present();
   }
 
   async goToStep2() {
@@ -402,10 +442,10 @@ export class ExpenseCreatePage implements OnInit {
         next: (res) => {
           const cashAdded = res.expenses
             .filter((e) => e.status === 'Approved' && e.transactionType === 'Cash Added')
-            .reduce((s, e) => s + (e.amount || 0), 0);
+            .reduce((s, e) => s + (Number(e.amount) || 0), 0);
           const spent = res.expenses
             .filter((e) => e.status === 'Approved' && e.transactionType !== 'Cash Added')
-            .reduce((s, e) => s + (e.amount || 0), 0);
+            .reduce((s, e) => s + (Number(e.amount) || 0), 0);
           this.currentBalance.set(cashAdded - spent);
         },
         error: () => this.currentBalance.set(0),
@@ -424,6 +464,8 @@ export class ExpenseCreatePage implements OnInit {
       this.expense.materialVendorId = '';
       this.expense.materialVendor = '';
       this.expense.issuedAmount = null;
+      this.selectedVendorId.set('');
+      this.selectedVendorName.set('');
     }
   }
 
@@ -441,7 +483,7 @@ export class ExpenseCreatePage implements OnInit {
     if (this.expenseType() === 'Purchase' && !this.isSiteMaterial) {
       return !!(this.expense.description && this.expense.amount);
     }
-    if (this.expenseType() === 'Cash Added') {
+    if (this.expenseType() === 'Add Cash') {
       return !!(this.expense.description && this.expense.amount);
     }
     return false;
@@ -490,7 +532,7 @@ export class ExpenseCreatePage implements OnInit {
     this.isSubmitting.set(true);
 
     const selectedVendor = this.vendors().find(v => v._id === this.expense.materialVendorId);
-    const isCashAdded = this.expenseType() === 'Cash Added';
+    const isCashAdded = this.expenseType() === 'Add Cash';
 
     const payload: any = {
       type: 'site',
@@ -501,6 +543,7 @@ export class ExpenseCreatePage implements OnInit {
       amount: this.expense.amount || 0,
       date: new Date().toISOString().slice(0, 10),
       description: this.expense.description,
+      notes: this.expense.notes?.trim() || undefined,
     };
 
     if (!isCashAdded) {
@@ -520,7 +563,7 @@ export class ExpenseCreatePage implements OnInit {
       next: async () => {
         this.isSubmitting.set(false);
         const toast = await this.toastCtrl.create({
-          message: isCashAdded ? 'Cash added successfully' : 'Purchase submitted for approval',
+          message: isCashAdded ? 'Cash request submitted for approval' : 'Purchase submitted for approval',
           duration: 2500,
           color: 'success',
           position: 'top',

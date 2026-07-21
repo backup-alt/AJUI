@@ -50,6 +50,7 @@ interface RequestItem {
   givenAmount?: number;
   billUrl?: string;
   received?: boolean;
+  transactionType?: string;
   needsUpload: boolean;
 }
 
@@ -122,10 +123,12 @@ interface RequestItem {
               <header class="request-head">
                 <div class="type-pill" [class.material]="item.type === 'material'" [class.expense]="item.type === 'expense'">
                   <ion-icon [name]="item.type === 'material' ? 'cube-outline' : 'cart-outline'"></ion-icon>
-                  {{ item.type === 'material' ? 'Material' : 'Purchase' }}
-                </div>
+                  {{ item.type === 'material'
+                      ? 'Material'
+                      : (item.transactionType === 'Cash Added' ? 'Add Cash' : 'Purchase') }}
+             </div>
                 <app-status-pill [tone]="getStatusTone(item.status)">{{ item.status }}</app-status-pill>
-              </header>
+          </header>
 
               <h3 class="request-title">{{ item.title }}</h3>
               <p class="request-subtitle">{{ item.subtitle }}</p>
@@ -172,8 +175,13 @@ interface RequestItem {
                       </div>
                     }
                     
-                    <div class="upload-field" style="margin-bottom: 16px;">
-                      <ion-checkbox [(ngModel)]="isReceivedInput">Received (Materials reached the site)</ion-checkbox>
+                    <div class="upload-field checkbox-field">
+                      <ion-checkbox
+                        [(ngModel)]="isReceivedInput"
+                        class="received-checkbox"
+                        aria-label="Received materials reached the site"
+                      ></ion-checkbox>
+                      <span class="received-label">Received (materials reached the site)</span>
                     </div>
 
                     <div class="upload-actions">
@@ -338,11 +346,40 @@ interface RequestItem {
       padding: 6px 10px;
       background: #f0fdf4;
       border-radius: 8px;
+      min-width: 0;
     }
     .file-preview ion-icon { font-size: 16px; }
+    .file-preview span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     .upload-field {
       margin-bottom: 10px;
+    }
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .received-checkbox {
+      --checkbox-background: #ffffff;
+      --checkbox-background-checked: #002263;
+      --border-color: #94a3b8;
+      --border-color-checked: #002263;
+      --checkbox-border-radius: 6px;
+      --checkbox-size: 20px;
+      margin: 0;
+      flex: 0 0 auto;
+    }
+    .received-label {
+      font-size: 13px;
+      line-height: 1.35;
+      color: #334155;
+      font-weight: 600;
     }
     .upload-field-label {
       display: block;
@@ -489,13 +526,16 @@ export class RequestsPage implements OnInit {
         });
       });
 
-      // Load expenses (site material purchases only)
+      // Load expenses — include ALL transaction types (Purchase + Add Cash)
       await new Promise<void>((resolve) => {
         this.supervisor.getExpenses({ type: 'site', limit: 200 }).subscribe({
           next: (res) => {
             for (const e of res.expenses || []) {
-              // Only include site material purchases and regular purchase expenses
-              if (e.transactionType === 'Cash Added') continue;
+              // Display-friendly transaction type label
+              const txLabel =
+                e.transactionType === 'Cash Added' ? 'Add Cash' :
+                (e.transactionType || 'Purchase');
+
               items.push({
                 _id: e._id,
                 type: 'expense',
@@ -503,8 +543,8 @@ export class RequestsPage implements OnInit {
                   ? `${(e as any).materialName || e.description}`
                   : e.description,
                 subtitle: (e as any).isSiteMaterial
-                  ? `${(e as any).materialQuantity || ''} ${(e as any).materialUnit || ''} - Purchase`
-                  : `Purchase expense`,
+                  ? `${(e as any).materialQuantity || ''} ${(e as any).materialUnit || ''} - ${txLabel}`
+                  : `${txLabel} expense`,
                 site: e.site || 'General',
                 date: e.date,
                 status: e.status,
@@ -513,6 +553,7 @@ export class RequestsPage implements OnInit {
                 givenAmount: (e as any).givenAmount,
                 billUrl: (e as any).billUrl,
                 received: (e as any).received,
+                transactionType: e.transactionType,
                 needsUpload:
                   (e.status === 'Approved') &&
                   !(e as any).billUrl &&
@@ -625,6 +666,9 @@ export class RequestsPage implements OnInit {
       });
       await toast.present();
       this.cancelUpload();
+      if (typeof window !== 'undefined' && item.type === 'material') {
+        window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: item._id, reason: 'received' } }));
+      }
       await this.loadAllRequests();
     } catch (err: any) {
       const toast = await this.toastCtrl.create({

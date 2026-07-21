@@ -4371,3 +4371,42 @@
 .dark-mode .mat-item-info strong {
   color: #f9fafb;
 }
+
+
+/* ============================================
+   FORCE LIGHT MODE — Disable dark mode permanently
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light !important;
+  }
+  
+  html, body {
+    background: #ffffff !important;
+    color: #191c1e !important;
+  }
+  
+  /* Override dark mode styles */
+  .dark-mode,
+  .settings-w11-modal,
+  .settings-w11-card,
+  .settings-w11-shell,
+  .settings-w11-nav,
+  .settings-w11-content,
+  .settings-w11-input,
+  .settings-w11-btn,
+  .settings-w11-link,
+  .settings-w11-approval-card,
+  .settings-w11-approval-section,
+  .settings-w11-mini-toggle,
+  .settings-w11-toggle-check {
+    background: #ffffff !important;
+    color: #191c1e !important;
+    border-color: #e2e8f0 !important;
+  }
+}
+
+/* Force light color-scheme globally */
+:root {
+  color-scheme: light !important;
+}

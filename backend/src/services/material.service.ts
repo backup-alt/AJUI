@@ -9,6 +9,7 @@ import { generateId } from "./id-generator.service.js";
 import { createApproval } from "./approval.service.js";
 import { CreateMaterialInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { backfillApprovedMaterialsToInventory, inventoryKeyForMaterial, inventoryStockMapForMaterials } from "./inventory.service.js";
 
 async function populateRefs(input: CreateMaterialInput) {
   const project = await Project.findById(input.projectId);
@@ -62,6 +63,7 @@ export async function createMaterial(input: CreateMaterialInput) {
     approvalDate: input.approvedQuantity ? new Date().toISOString().slice(0, 10) : undefined,
     status: input.approvedQuantity ? "Pending" : "Pending",
     createdBy: input.createdBy,
+    notes: input.notes,
   });
 
   await createApproval({
@@ -114,6 +116,13 @@ export async function listMaterials(filter: {
       }
     });
   }
+
+  await backfillApprovedMaterialsToInventory(query);
+  const stockMap = await inventoryStockMapForMaterials(items);
+  items.forEach((item) => {
+    const sharedStock = stockMap.get(inventoryKeyForMaterial(item));
+    if (sharedStock !== undefined) item.remainingStock = sharedStock;
+  });
 
   return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }

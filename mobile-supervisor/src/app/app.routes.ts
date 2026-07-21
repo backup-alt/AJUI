@@ -73,6 +73,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'labour/type/:type',
+        loadComponent: () =>
+          import('./features/labour/labour-workers/labour-workers.page').then(
+            (m) => m.LabourWorkersPage
+          ),
+      },
+      {
         path: 'labour/mark-attendance/:workerId',
         loadComponent: () =>
           import('./features/labour/labour-mark-attendance/labour-mark-attendance.page').then(
@@ -94,17 +101,17 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'labour/:id',
-        loadComponent: () =>
-          import('./features/labour/labour-detail/labour-detail.page').then(
-            (m) => m.LabourDetailPage
-          ),
-      },
-      {
         path: 'labour/worker/:workerId',
         loadComponent: () =>
           import('./features/labour/labour-worker-detail/labour-worker-detail.page').then(
             (m) => m.LabourWorkerDetailPage
+          ),
+      },
+      {
+        path: 'labour/:id',
+        loadComponent: () =>
+          import('./features/labour/labour-detail/labour-detail.page').then(
+            (m) => m.LabourDetailPage
           ),
       },
       {

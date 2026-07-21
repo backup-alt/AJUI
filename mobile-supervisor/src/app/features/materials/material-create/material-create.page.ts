@@ -484,6 +484,9 @@ export class MaterialCreatePage implements OnInit {
     this.supervisor.createMaterial(payload).subscribe({
       next: async () => {
         this.isSubmitting.set(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { reason: 'requested' } }));
+        }
         const toast = await this.toastCtrl.create({
           message: 'Material request submitted successfully',
           duration: 2500,

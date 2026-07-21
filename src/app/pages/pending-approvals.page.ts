@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
+import { FormsModule } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 import { ErpDataService, type SharedModuleKey } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -80,7 +81,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, FormsModule],
   styles: [`
     .image-preview-overlay {
       position: fixed;
@@ -191,13 +192,14 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <input
                             class="approval-table-input"
                             inputmode="decimal"
-                            [value]="row.approvedQuantity"
-                            (input)="updateApprovalCell(row, 'approvedQuantity', $any($event.target).value)"
+                            type="number"
+                            [(ngModel)]="row.approvedQuantity"
                             aria-label="Approved quantity"
+                            min="0"
                           />
                         </td>
                         <td>
-                          <select class="approval-table-select" [value]="row.vendor" (change)="updateApprovalCell(row, 'vendor', $any($event.target).value)">
+                          <select class="approval-table-select" [(ngModel)]="row.vendor">
                             <option *ngFor="let vendor of vendorOptions(row.vendor)" [value]="vendor">{{ vendor }}</option>
                           </select>
                         </td>
@@ -208,8 +210,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             class="approval-table-input"
                             inputmode="decimal"
                             type="number"
-                            [value]="row.issuedAmount ?? ''"
-                            (input)="updateApprovalCell(row, 'issuedAmount', $any($event.target).value)"
+                            [(ngModel)]="row.issuedAmount"
                             aria-label="Issued amount"
                             min="0"
                           />
@@ -219,8 +220,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             class="approval-table-input"
                             inputmode="decimal"
                             type="number"
-                            [value]="row.givenAmount ?? ''"
-                            (input)="updateApprovalCell(row, 'givenAmount', $any($event.target).value)"
+                            [(ngModel)]="row.givenAmount"
                             aria-label="Given amount"
                             min="0"
                           />
@@ -229,8 +229,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <input
                             class="approval-table-input"
                             type="text"
-                            [value]="row.poNumber ?? ''"
-                            (input)="updateApprovalCell(row, 'poNumber', $any($event.target).value)"
+                            [(ngModel)]="row.poNumber"
                             aria-label="PO Number"
                             placeholder="Auto-generate"
                           />
@@ -291,7 +290,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ row.project || "-" }}</td>
                         <td>{{ row.site || "-" }}</td>
                         <td>{{ row.expenseDate || "-" }}</td>
-                        <td>{{ row.transactionType || "-" }}</td>
+                        <td>{{ transactionTypeLabel(row.transactionType) }}</td>
                         <td><strong>{{ row.description || "-" }}</strong></td>
                         <td>{{ row.amount || "-" }}</td>
                         <td>
@@ -299,8 +298,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             class="approval-table-input"
                             inputmode="decimal"
                             type="number"
-                            [value]="row.issuedAmount ?? ''"
-                            (input)="updateApprovalCell(row, 'issuedAmount', $any($event.target).value)"
+                            [(ngModel)]="row.issuedAmount"
                             aria-label="Issued amount"
                             min="0"
                           />
@@ -310,8 +308,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             class="approval-table-input"
                             inputmode="decimal"
                             type="number"
-                            [value]="row.givenAmount ?? ''"
-                            (input)="updateApprovalCell(row, 'givenAmount', $any($event.target).value)"
+                            [(ngModel)]="row.givenAmount"
                             aria-label="Given amount"
                             min="0"
                           />
@@ -320,8 +317,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <input
                             class="approval-table-input"
                             type="text"
-                            [value]="row.poNumber ?? ''"
-                            (input)="updateApprovalCell(row, 'poNumber', $any($event.target).value)"
+                            [(ngModel)]="row.poNumber"
                             aria-label="PO Number"
                             placeholder="Auto-generate"
                           />
@@ -494,6 +490,8 @@ export class PendingApprovalsPage implements OnInit {
         } else if (row.module === "materials") {
           const materialRow = this._materialRows().find((r) => r.rowId === row.rowId);
           if (materialRow) {
+            payload.approvedQuantity = Number(materialRow.approvedQuantity) || 0;
+            if (materialRow.vendor !== undefined && materialRow.vendor.trim() !== '') payload.vendor = materialRow.vendor;
             if (materialRow.issuedAmount !== undefined) payload.issuedAmount = materialRow.issuedAmount;
             if (materialRow.givenAmount !== undefined) payload.givenAmount = materialRow.givenAmount;
             if (materialRow.poNumber !== undefined && materialRow.poNumber.trim() !== '') payload.poNumber = materialRow.poNumber;
@@ -537,6 +535,18 @@ export class PendingApprovalsPage implements OnInit {
 
   private isPending(value: string): boolean {
     return value.toLowerCase() === "pending";
+  }
+
+  /**
+   * Display label for an expense transaction type.
+   * The backend stores the raw value "Cash Added" or "Purchase";
+   * we map "Cash Added" -> "Add Cash" for the UI.
+   */
+  transactionTypeLabel(raw: string | undefined | null): string {
+    const value = (raw || "").trim();
+    if (!value) return "-";
+    if (value === "Cash Added") return "Add Cash";
+    return value;
   }
 
   private sortedUnique(values: string[]): string[] {

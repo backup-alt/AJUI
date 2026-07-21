@@ -1,4 +1,4 @@
-export type ExpenseStatus = 'Pending' | 'Approved' | 'Rejected';
+export type ExpenseStatus = 'Pending' | 'Approved' | 'Rejected' | 'Completed';
 
 export interface Expense {
   _id: string;
@@ -23,6 +23,14 @@ export interface Expense {
   status: ExpenseStatus;
   notes?: string;
   issuedAmount?: number;
+  givenAmount?: number;
+  billUrl?: string;
+  received?: boolean;
+  isSiteMaterial?: boolean;
+  materialName?: string;
+  materialUnit?: string;
+  materialQuantity?: number;
+  materialVendor?: string;
   submittedBy?: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -38,6 +46,7 @@ export interface CreateExpenseRequest {
   amount: number;
   date: string;
   description: string;
+  notes?: string;
   site?: string;
   isSiteMaterial?: boolean;
   materialName?: string;

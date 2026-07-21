@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { Expense } from "../models/Expense.js";
+import { Approval } from "../models/Approval.js";
 import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -8,33 +9,6 @@ import { CreateExpenseInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
 import { uploadToPCloud } from "./pcloud.service.js";
-
-const ALLOWED_TRANSACTION_TYPES = ["Purchase", "Cash Added"] as const;
-type AllowedTransactionType = (typeof ALLOWED_TRANSACTION_TYPES)[number];
-
-function isCashAdded(input: CreateExpenseInput): boolean {
-  return input.transactionType === "Cash Added";
-}
-
-/**
- * Latest approved running balance for the given (projectId, site) pair.
- * Used as the basis for computing the next balance when a new transaction
- * lands. Falls back to 0 if there is no prior record.
- */
-async function getLatestRunningBalance(
-  projectId: Types.ObjectId,
-  site: string
-): Promise<number> {
-  const last = await Expense.findOne({
-    projectId,
-    site,
-    type: "site",
-    status: "Approved",
-  })
-    .sort({ date: -1, createdAt: -1, _id: -1 })
-    .lean();
-  return Number(last?.runningBalance ?? 0);
-}
 
 /**
  * Recompute the running balance for every approved site expense of a single
@@ -108,18 +82,7 @@ export async function createExpense(input: CreateExpenseInput) {
   }
 
   const expenseId = await generateId("EXP");
-  const isCash = isCashAdded(input);
-  const status = isCash ? "Approved" : "Pending";
-
-  // Compute the running balance eagerly for Cash Added (which is auto-approved
-  // on creation). For Purchase we let recomputeSiteLedger catch up after the
-  // admin approves the request and uploads a PO number.
-  let runningBalance = 0;
-  if (input.type === "site" && project && input.site && isCash) {
-    const previous = await getLatestRunningBalance(project._id, input.site);
-    const amount = Number(input.amount) || 0;
-    runningBalance = previous + amount;
-  }
+  const status = "Pending";
 
   const expense = await Expense.create({
     expenseId,
@@ -134,9 +97,10 @@ export async function createExpense(input: CreateExpenseInput) {
     transactionType: input.transactionType,
     amount: input.amount,
     siteMaterialBalance: input.siteMaterialBalance,
-    runningBalance,
+    runningBalance: 0,
     date: input.date,
     description: input.description,
+    notes: input.notes,
     submittedBy: input.submittedBy,
     isSiteMaterial: input.isSiteMaterial,
     materialName: input.materialName,
@@ -150,9 +114,32 @@ export async function createExpense(input: CreateExpenseInput) {
     issuedAmount: input.issuedAmount,
     customFields: input.customFields,
     status,
-    approvedBy: isCash ? input.submittedBy : undefined,
-    approvedAt: isCash ? new Date() : undefined,
   });
+
+  if (input.type === "site") {
+    const isSiteMaterialExpense = input.isSiteMaterial === true;
+    await Approval.create({
+      approvalId: await generateId("APR"),
+      type: "expense",
+      title: isSiteMaterialExpense
+        ? `Site Material: ${expense.materialName || expense.description}`
+        : input.transactionType === "Cash Added"
+        ? `Cash Added: ${expense.description}`
+        : `Site Expense: ${expense.description}`,
+      sourceCollection: "expenses",
+      sourceId: expense._id,
+      projectId: expense.projectId,
+      projectName: expense.projectName,
+      site: expense.site,
+      owner: input.submittedBy,
+      amount: expense.amount,
+      detail: isSiteMaterialExpense
+        ? `Material: ${expense.materialName} - Qty: ${expense.materialQuantity} ${expense.materialUnit}`
+        : `${expense.transactionType || "Expense"} - ${expense.description}`,
+      status: "Pending",
+      submittedAt: new Date(),
+    });
+  }
 
   return expense.toObject();
 }

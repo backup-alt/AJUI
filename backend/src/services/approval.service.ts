@@ -11,6 +11,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
 import { recomputeSiteLedger } from "./expense.service.js";
+import { addApprovedMaterialToInventory } from "./inventory.service.js";
 
 export interface CreateApprovalParams {
   type: ApprovalType;
@@ -45,7 +46,17 @@ export async function createApproval(params: CreateApprovalParams): Promise<IApp
   return approval.toObject();
 }
 
-export async function approveRequest(approvalId: string, reviewer: string, issuedAmount?: number, givenAmount?: number, poNumber?: string): Promise<IApproval> {
+export async function approveRequest(
+  approvalId: string,
+  reviewer: string,
+  options: {
+    issuedAmount?: number;
+    givenAmount?: number;
+    poNumber?: string;
+    approvedQuantity?: number;
+    vendor?: string;
+  } = {}
+): Promise<IApproval> {
   const approval = await Approval.findOne({ approvalId });
   if (!approval) throw new AppError(404, "Approval not found");
   if (approval.status !== "Pending") {
@@ -58,8 +69,8 @@ export async function approveRequest(approvalId: string, reviewer: string, issue
     approvedAt: new Date(),
   };
 
-  if (issuedAmount !== undefined) sourceUpdate.issuedAmount = issuedAmount;
-  if (givenAmount !== undefined) sourceUpdate.givenAmount = givenAmount;
+  if (options.issuedAmount !== undefined) sourceUpdate.issuedAmount = options.issuedAmount;
+  if (options.givenAmount !== undefined) sourceUpdate.givenAmount = options.givenAmount;
 
   let projectId: Types.ObjectId | undefined;
   let generatedPoNumber: string | undefined;
@@ -67,13 +78,26 @@ export async function approveRequest(approvalId: string, reviewer: string, issue
     case "materials":
     case "Material": {
       const mat = await Material.findById(approval.sourceId).lean();
-      const generatedPo = poNumber || await generatePoNumberForSite(
+      const generatedPo = options.poNumber || await generatePoNumberForSite(
         mat?.siteId ? String(mat.siteId) : undefined,
         mat?.site,
         mat?.projectId ? String(mat.projectId) : undefined
       );
       generatedPoNumber = generatedPo;
-      await Material.updateOne({ _id: approval.sourceId }, { ...sourceUpdate, poNumber: generatedPo });
+      await Material.updateOne(
+        { _id: approval.sourceId },
+        {
+          ...sourceUpdate,
+          poNumber: generatedPo,
+          ...(options.approvedQuantity !== undefined ? { approvedQuantity: options.approvedQuantity } : {}),
+          ...(options.vendor !== undefined ? { vendor: options.vendor } : {}),
+        }
+      );
+      await addApprovedMaterialToInventory(
+        approval.sourceId,
+        options.approvedQuantity ?? mat?.approvedQuantity ?? mat?.requestedQuantity ?? 0,
+        reviewer
+      );
       projectId = mat?.projectId;
       break;
     }
@@ -87,12 +111,10 @@ export async function approveRequest(approvalId: string, reviewer: string, issue
     case "expenses":
     case "Expense": {
       const exp = await Expense.findById(approval.sourceId).lean();
-      // For Purchase expenses the workflow is: admin approval generates a PO
-      // number but the expense itself stays "Pending" until the supervisor
-      // uploads a receipt. Cash Added is auto-approved on creation, so
-      // nothing more is needed here.
+      // Purchase approvals generate a PO and then move into the supervisor bill upload flow.
+      // Cash Added approvals become approved here and then update the site ledger.
       if (exp?.transactionType === "Purchase") {
-        const generatedPo = poNumber || await generatePoNumberForSite(
+        const generatedPo = options.poNumber || await generatePoNumberForSite(
           exp.siteId ? String(exp.siteId) : undefined,
           exp.site,
           exp.projectId ? String(exp.projectId) : undefined
@@ -103,20 +125,24 @@ export async function approveRequest(approvalId: string, reviewer: string, issue
         await Expense.updateOne(
           { _id: approval.sourceId },
           {
+            status: "Approved",
             approvedBy: reviewer,
             approvedAt: new Date(),
             poNumber: generatedPo,
-            ...(issuedAmount !== undefined ? { issuedAmount } : {}),
-            ...(givenAmount !== undefined ? { givenAmount } : {}),
+            ...(options.issuedAmount !== undefined ? { issuedAmount: options.issuedAmount } : {}),
+            ...(options.givenAmount !== undefined ? { givenAmount: options.givenAmount } : {}),
           }
         );
       } else {
         await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
+        if (exp?.projectId && exp.site) {
+          await recomputeSiteLedger(exp.projectId, exp.site);
+        }
       }
       projectId = exp?.projectId;
       if (exp?.isSiteMaterial) {
         const materialId = await generateId("MAT");
-        await (await import("../models/Material.js")).Material.create({
+        const createdMaterial = await (await import("../models/Material.js")).Material.create({
           materialId,
           projectId: exp.projectId,
           projectName: exp.projectName,
@@ -139,12 +165,18 @@ export async function approveRequest(approvalId: string, reviewer: string, issue
           approvedAt: new Date(),
           requestDate: exp.date,
           createdBy: exp.submittedBy,
-          issuedAmount,
-          givenAmount,
+          issuedAmount: options.issuedAmount,
+          givenAmount: options.givenAmount,
           supervisorName: exp.supervisor,
-          ...(issuedAmount !== undefined ? { issuedAmount } : {}),
-          ...(givenAmount !== undefined ? { givenAmount } : {}),
+          notes: exp.notes,
+          ...(options.issuedAmount !== undefined ? { issuedAmount: options.issuedAmount } : {}),
+          ...(options.givenAmount !== undefined ? { givenAmount: options.givenAmount } : {}),
         });
+        await addApprovedMaterialToInventory(
+          createdMaterial._id,
+          createdMaterial.approvedQuantity,
+          reviewer
+        );
       }
       break;
     }

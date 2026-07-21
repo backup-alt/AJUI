@@ -311,7 +311,6 @@ export class MaterialsPage implements OnInit, OnDestroy {
           },
           error: (err) => {
             console.error('[Materials] failed to load', err);
-            this.materials.set([]);
             this.filterMaterials();
             this.isLoading.set(false);
           },

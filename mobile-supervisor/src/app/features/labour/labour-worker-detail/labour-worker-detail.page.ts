@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -403,7 +403,7 @@ interface WageCalculation {
       display: flex;
       align-items: center;
       gap: var(--md-space-4);
-      padding: var(--md-space-5) var(--md-space-4);
+      padding: var(--md-space-3) var(--md-space-4);
       background: var(--m3-primary);
       background-image: linear-gradient(135deg, var(--m3-primary) 0%, #003380 100%);
       color: var(--m3-on-primary);
@@ -757,7 +757,7 @@ interface WageCalculation {
     }
   `],
 })
-export class LabourWorkerDetailPage implements OnInit, OnDestroy {
+export class LabourWorkerDetailPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private route = inject(ActivatedRoute);
   private toastCtrl = inject(ToastController);
@@ -866,21 +866,22 @@ export class LabourWorkerDetailPage implements OnInit, OnDestroy {
     }
   }
 
-  ngOnDestroy(): void {}
-
   async refresh(event: CustomEvent): Promise<void> {
     await Promise.all([this.loadWorker(), this.loadAttendance()]);
     (event.target as HTMLIonRefresherElement).complete();
   }
 
   private async loadWorker(): Promise<void> {
+    console.log('[WorkerDetail] Loading worker:', this.workerId);
     this.supervisor.getWorkerDetail(this.workerId).subscribe({
       next: (res) => {
+        console.log('[WorkerDetail] Worker loaded:', res.worker);
         this.worker.set(res.worker);
         this.weeklyPayInput.set(res.worker.weeklyPay);
         this.isLoading.set(false);
       },
-      error: () => {
+      error: (err) => {
+        console.error('[WorkerDetail] Error loading worker:', err);
         this.worker.set(null);
         this.isLoading.set(false);
       },
@@ -888,9 +889,16 @@ export class LabourWorkerDetailPage implements OnInit, OnDestroy {
   }
 
   private async loadAttendance(): Promise<void> {
+    console.log('[WorkerDetail] Loading attendance for worker:', this.workerId);
     this.supervisor.getAttendanceForWorker(this.workerId).subscribe({
-      next: (res) => this.attendance.set(res.items || []),
-      error: () => this.attendance.set([]),
+      next: (res) => {
+        console.log('[WorkerDetail] Attendance loaded:', res.items?.length || 0, 'records');
+        this.attendance.set(res.items || []);
+      },
+      error: (err) => {
+        console.error('[WorkerDetail] Error loading attendance:', err);
+        this.attendance.set([]);
+      },
     });
   }
 

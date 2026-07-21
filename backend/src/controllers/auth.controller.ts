@@ -21,6 +21,7 @@ import { env } from "../config/env.js";
 import { PasswordResetToken } from "../models/PasswordResetToken.js";
 import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
+import { buildResetPasswordEmail } from "../services/email-templates/index.js";
 
 async function checkAccessRestriction(userRole: string): Promise<{ isRestricted: boolean; currentWindow?: { startTime: string; endTime: string; reason: string } }> {
   try {
@@ -290,90 +291,21 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     // Use BACKEND_PUBLIC_URL or FRONTEND_URL; strip trailing slash
     const baseUrl = (process.env.BACKEND_PUBLIC_URL || process.env.FRONTEND_URL || "https://backup-alt.github.io/AJUI")
       .replace(/\/+$/, "");
-    const resetUrl = `${baseUrl}/#/login?token=${rawToken}`;
+    // Deep link for mobile app
+    const deepLink = `agb-supervisor://reset-password?token=${rawToken}`;
+    // Web fallback route (hash-based Angular route)
+    const webResetUrl = `${baseUrl}/#/auth/reset-password?token=${rawToken}`;
 
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset your AGB password</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f6f8;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.06);">
-          <!-- Brand header -->
-          <tr>
-            <td style="background-color:#002263;padding:28px 32px;text-align:center;">
-              <div style="display:inline-block;background:#c9a227;color:#2a230a;width:48px;height:48px;line-height:48px;border-radius:12px;font-weight:800;font-size:18px;letter-spacing:1px;">AGB</div>
-              <h1 style="margin:14px 0 0;color:#ffffff;font-size:20px;font-weight:600;">Annai Golden Builders</h1>
-              <p style="margin:4px 0 0;color:#9bb3e0;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;">Operations Workspace</p>
-            </td>
-          </tr>
-          <!-- Body -->
-          <tr>
-            <td style="padding:32px;">
-              <h2 style="margin:0 0 12px;color:#1d2939;font-size:22px;font-weight:700;">Reset your password</h2>
-              <p style="margin:0 0 20px;color:#475467;font-size:15px;line-height:1.6;">
-                Hi <strong>${user.name}</strong>, we received a request to reset the password for your AGB account.
-              </p>
-              <p style="margin:0 0 24px;color:#475467;font-size:15px;line-height:1.6;">
-                Click the button below to set a new password. This link expires in <strong>1 hour</strong>.
-              </p>
-              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
-                <tr>
-                  <td style="background-color:#002263;border-radius:8px;">
-                    <a href="${resetUrl}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:0.02em;">Reset Password</a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin:24px 0 0;color:#98a2b3;font-size:12px;line-height:1.5;">
-                If the button doesn't work, copy and paste this link into your browser:
-              </p>
-              <p style="margin:8px 0 0;padding:12px;background-color:#f8fafc;border:1px solid #e6eaf2;border-radius:6px;word-break:break-all;font-size:12px;color:#475467;font-family:monospace;">
-                ${resetUrl}
-              </p>
-              <hr style="border:none;border-top:1px solid #e6eaf2;margin:24px 0;">
-              <p style="margin:0;color:#98a2b3;font-size:12px;line-height:1.5;">
-                If you didn't request this password reset, you can safely ignore this email. Your password will remain unchanged.
-              </p>
-            </td>
-          </tr>
-          <!-- Footer -->
-          <tr>
-            <td style="background-color:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e6eaf2;">
-              <p style="margin:0;color:#98a2b3;font-size:11px;line-height:1.5;">
-                © ${new Date().getFullYear()} Annai Golden Builders. All rights reserved.<br>
-                <span style="color:#cfd8e6;">This is an automated security message.</span>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-    const text = `Hi ${user.name},
-
-We received a request to reset the password for your AGB account.
-
-Click the link below to set a new password. This link expires in 1 hour:
-
-${resetUrl}
-
-If you didn't request this password reset, you can safely ignore this email.
-
----
-Annai Golden Builders
-Operations Workspace`;
+    const { subject, html, text } = buildResetPasswordEmail({
+      name: user.name,
+      resetUrl: deepLink,
+      expiresMinutes: 60,
+      webFallbackUrl: webResetUrl,
+    });
 
     await sendEmail({
       to: user.email,
-      subject: "Reset your AGB password",
+      subject,
       html,
       text,
     });
@@ -563,6 +495,7 @@ const adminCreateInviteSchema = z.object({
   cashLimit: z.coerce.number().nonnegative().optional(),
   address: z.string().trim().max(500).optional(),
   metadata: z.record(z.unknown()).optional(),
+  sendEmail: z.boolean().optional(), // true = send deep link email, false = generate QR only
 });
 
 export async function adminCreateInvite(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -581,6 +514,7 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       address: body.address,
       metadata: body.metadata,
       expiryMinutes: 5,
+      sendEmail: body.sendEmail,
     });
 
     const qrDataUrl = await generateQRDataURL(JSON.stringify(qrPayload));

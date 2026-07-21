@@ -125,6 +125,7 @@ export class ApiService {
     supervisorPhone?: string;
     projectId?: string;
     siteIds?: string[];
+    sendEmail?: boolean; // true = send deep link email, false = generate QR only
   }): Observable<{
     inviteId: string;
     token: string;
@@ -600,6 +601,7 @@ export class ApiService {
     amount: number;
     date: string;
     description: string;
+    notes?: string;
     reference?: string;
     amountPaidBy?: string;
     submittedBy?: string;

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, Input } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -11,10 +11,10 @@ import {
   IonLabel,
   IonIcon,
   IonSpinner,
+  ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
-import { ModalController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { closeOutline, checkmarkOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
@@ -221,7 +221,7 @@ export class InventoryEditModalComponent implements OnInit {
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
 
-  item!: InventoryItem;
+  @Input() item!: InventoryItem;
   purchasedQty: number | null = null;
   consumedQty: number | null = null;
   isSubmitting = signal(false);
@@ -255,6 +255,9 @@ export class InventoryEditModalComponent implements OnInit {
     }).subscribe({
       next: async () => {
         this.isSubmitting.set(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: this.item._id } }));
+        }
         await this.modalCtrl.dismiss({ updated: true });
       },
       error: async (err) => {

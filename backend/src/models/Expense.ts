@@ -25,6 +25,7 @@ export interface IExpense extends Document {
   runningBalance: number;
   date: string;
   description: string;
+  notes?: string;
   status: ExpenseStatus;
   poNumber?: string;
   submittedBy?: string;
@@ -68,6 +69,7 @@ const expenseSchema = new Schema<IExpense>(
     runningBalance: { type: Number, default: 0 },
     date: { type: String, required: true, index: true },
     description: { type: String, required: true },
+    notes: { type: String, trim: true, maxlength: 2000 },
     status: {
       type: String,
       enum: ["Pending", "Approved", "Rejected", "Completed"],

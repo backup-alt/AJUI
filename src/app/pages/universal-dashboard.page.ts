@@ -659,7 +659,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             [class.open]="isSelectMenuOpen(row, column.key)"
                           >
                             <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
-                              <span>{{ row[column.key] || 'Select' }}</span>
+                              <span>{{ displayCell(row, column.key) || 'Select' }}</span>
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                 <path d="M5.5 7.5 10 12l4.5-4.5" />
                               </svg>
@@ -705,7 +705,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                               spellcheck="false"
                               (blur)="isRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
                             >
-                              {{ row[column.key] }}
+                              {{ displayCell(row, column.key) }}
                             </span>
                           </ng-template>
                         </ng-template>
@@ -1374,6 +1374,13 @@ export class UniversalDashboardPage {
     this.resetFilterState();
     this.closeDropdowns();
     this.clearRowSelection();
+
+    // Inventory is derived from the materials collection. If we have no
+    // materials yet, kick off a backend fetch so the inventory cards
+    // populate immediately when the user opens the section.
+    if (module === "inventory" && this.data.materials().length === 0) {
+      this.refreshFromBackend();
+    }
   }
 
   private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[]) {
@@ -1731,6 +1738,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapClient);
           localStorage.setItem("agb-erp:clients", JSON.stringify(items));
+          this.data.clients.set(items);
         } catch {}
         finishOne();
       },
@@ -1742,6 +1750,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapProject);
           localStorage.setItem("agb-erp:projects", JSON.stringify(items));
+          this.data.projects.set(items);
         } catch {}
         finishOne();
       },
@@ -1753,6 +1762,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapSite);
           localStorage.setItem("agb-erp:sites", JSON.stringify(items));
+          this.data.siteEntities.set(items);
         } catch {}
         finishOne();
       },
@@ -1764,6 +1774,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapMaterial);
           localStorage.setItem("agb-erp:materials", JSON.stringify(items));
+          this.data.materials.set(items);
         } catch {}
         finishOne();
       },
@@ -1775,6 +1786,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapLabour);
           localStorage.setItem("agb-erp:labour", JSON.stringify(items));
+          this.data.labour.set(items);
         } catch {}
         finishOne();
       },
@@ -1786,6 +1798,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapExpense);
           localStorage.setItem("agb-erp:expenses", JSON.stringify(items));
+          this.data.expenses.set(items);
         } catch {}
         finishOne();
       },
@@ -1797,6 +1810,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapPayment);
           localStorage.setItem("agb-erp:payments", JSON.stringify(items));
+          this.data.payments.set(items);
         } catch {}
         finishOne();
       },
@@ -1808,6 +1822,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapVendor);
           localStorage.setItem("agb-erp:vendors", JSON.stringify(items));
+          this.data.vendors.set(items);
         } catch {}
         finishOne();
       },
@@ -1819,6 +1834,7 @@ export class UniversalDashboardPage {
         try {
           const items = (r.items || []).map(mapSubcontractor);
           localStorage.setItem("agb-erp:subcontractors", JSON.stringify(items));
+          this.data.subcontractors.set(items);
         } catch {}
         finishOne();
       },
@@ -2036,6 +2052,17 @@ visibleRows(): TableRow[] {
       key === "staffCount" ||
       key === "balance"
     );
+  }
+
+  /**
+   * Display value for a cell. Currently maps the stored "Cash Added"
+   * transaction type to the user-facing "Add Cash" label. The raw value
+   * is preserved on the row so it can be sent back to the backend.
+   */
+  displayCell(row: TableRow, key: string): string {
+    const raw = row[key];
+    if (key === "transactionType" && raw === "Cash Added") return "Add Cash";
+    return raw == null ? "" : String(raw);
   }
 
   setFilter(key: string, value: string) {
@@ -2410,12 +2437,12 @@ visibleRows(): TableRow[] {
     const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor"]);
     return this.columnsForActive().filter((column) => {
       if (this.activeModule() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
-      const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
+      const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Add Cash")) === "Add Cash";
       if (this.activeModule() === "expenses" && isCashAdded && !cashAddedFields.has(column.key)) return false;
       if (
         this.activeModule() === "expenses" &&
         column.key === "siteMaterial" &&
-        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) !== "Purchase"
+        this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Add Cash")) !== "Purchase"
       ) {
         return false;
       }
@@ -2508,17 +2535,17 @@ visibleRows(): TableRow[] {
       const preparedRow = this.withGeneratedReferences(module === "expenses" ? this.normalizedExpenseInputRow(row) : row);
       if (module === "expenses") this.ensureExpenseOpeningForInput(preparedRow);
 
-      const isCashAdded = module === "expenses" && preparedRow["transactionType"] === "Cash Added";
+      const isCashAdded = module === "expenses" && preparedRow["transactionType"] === "Add Cash";
 
       if (isCashAdded) {
         const projectId = String(preparedRow["projectId"] || preparedRow["__projectId"] || "");
         const site = String(preparedRow["site"] || "");
         const date = String(preparedRow["expenseDate"] || new Date().toISOString().slice(0, 10));
-        const description = String(preparedRow["description"] || "Cash Added");
+        const description = String(preparedRow["description"] || "Add Cash");
         const amount = Math.abs(Number(preparedRow["amount"]) || 0);
 
         if (!projectId) {
-          console.warn("[UniversalDashboard] Cannot save Cash Added: no project selected");
+          console.warn("[UniversalDashboard] Cannot save Add Cash: no project selected");
           return;
         }
 
@@ -2551,7 +2578,7 @@ visibleRows(): TableRow[] {
           this.recordDialogOpen.set(false);
           return;
         } catch (err) {
-          console.error("[UniversalDashboard] Failed to create Cash Added expense", err);
+          console.error("[UniversalDashboard] Failed to create Add Cash expense", err);
           return;
         }
       }
@@ -3162,7 +3189,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
     if (module === "materials" && key === "materialName") return this.materialNameOptions();
     if (module === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
     if (module === "expenses" && key === "transactionType") {
-      return ["Purchase", "Cash Added"];
+      return ["Purchase", "Add Cash"];
     }
     if (module === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (module === "labour" && key === "attendance") return ["Present", "Absent"];
@@ -3228,7 +3255,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
         project: "",
         site: "",
         expenseDate: today,
-        transactionType: "Cash Added",
+        transactionType: "Add Cash",
         description: "",
         amount: "0",
         siteMaterial: "No",
@@ -3367,6 +3394,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
       normalized.includes("payment") ||
       normalized.includes("received") ||
       normalized.includes("cash issued") ||
+      normalized.includes("add cash") ||
       normalized.includes("cash added") ||
       normalized.includes("refund") ||
       normalized.includes("credit")
@@ -3589,7 +3617,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
   }
 
   private normalizedExpenseTransactionType(value: string): string {
-    return this.isExpenseCredit(value) ? "Cash Added" : "Purchase";
+    return this.isExpenseCredit(value) ? "Add Cash" : "Purchase";
   }
 
   private positiveExpenseAmountValue(value: unknown): string {
@@ -3628,7 +3656,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
       const rowSite = String(row["site"] || "").trim().toLowerCase();
       const sameProject = projectId ? rowProjectId === projectId : rowProjectName === projectName;
       return sameProject && rowSite === normalizedSite &&
-        this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Cash Added";
+        this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Add Cash";
     });
     if (cashAddedRows.length === 0) return 0;
     const earliest = cashAddedRows.reduce((prev, curr) =>
@@ -3649,7 +3677,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
         return sameProject && rowSite === normalizedSite;
       });
     const cashAddedRows = rows.filter((row) =>
-      this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Cash Added"
+      this.normalizedExpenseTransactionType(String(row["transactionType"] || "")) === "Add Cash"
     );
     return cashAddedRows.reduce((sum, row) => sum + Math.abs(this.moneyNumber(row["amount"])), 0);
   }
