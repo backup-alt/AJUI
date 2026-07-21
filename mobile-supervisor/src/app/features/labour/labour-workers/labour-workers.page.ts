@@ -22,7 +22,6 @@ import {
   addOutline,
   locationOutline,
   walletOutline,
-  timeOutline,
   hammerOutline,
   layersOutline,
   buildOutline,
@@ -445,7 +444,6 @@ export class LabourWorkersPage implements OnInit {
       briefcaseOutline,
       calendarClearOutline,
       checkmarkCircleOutline,
-      timeOutline,
     });
 
     this.labourType.set(decodeURIComponent(this.route.snapshot.paramMap.get('type') || ''));
