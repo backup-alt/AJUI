@@ -85,11 +85,17 @@ interface RequestItem {
 
       <app-page-header
         title="Requests"
-        subtitle="Track your submitted requests"
+        subtitle="All your submitted requests, latest first"
       ></app-page-header>
 
       <div class="seg-wrap">
         <ion-segment [(ngModel)]="activeTab" (ionChange)="onTabChange()">
+          <ion-segment-button value="all">
+            <ion-label>All</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="pending">
+            <ion-label>Pending</ion-label>
+          </ion-segment-button>
           <ion-segment-button value="approved">
             <ion-label>Approved</ion-label>
           </ion-segment-button>
@@ -432,17 +438,25 @@ export class RequestsPage implements OnInit {
   private toastCtrl = inject(ToastController);
   private alertCtrl = inject(AlertController);
 
-  activeTab: 'approved' | 'declined' | 'upload' = 'approved';
+  activeTab: 'all' | 'pending' | 'approved' | 'declined' | 'upload' = 'all';
   isLoading = signal(true);
 
   allItems = signal<RequestItem[]>([]);
   get filteredItems() {
-    const items = this.allItems();
+    const items = [...this.allItems()].sort((a, b) => {
+      const aTime = a.date ? new Date(a.date).getTime() : 0;
+      const bTime = b.date ? new Date(b.date).getTime() : 0;
+      return bTime - aTime;
+    });
+    if (this.activeTab === 'all') return items;
+    if (this.activeTab === 'pending') {
+      return items.filter(i => i.status === 'Pending' || i.status === 'pending');
+    }
     if (this.activeTab === 'approved') {
       return items.filter(i => i.status === 'Approved' || i.status === 'Completed' || i.status === 'Received');
     }
     if (this.activeTab === 'declined') {
-      return items.filter(i => i.status === 'Rejected');
+      return items.filter(i => i.status === 'Rejected' || i.status === 'Declined');
     }
     // Upload tab: only show approved site-material expenses and approved materials that still need upload
     return items.filter(i =>
@@ -461,16 +475,21 @@ export class RequestsPage implements OnInit {
   get emptyIcon() {
     if (this.activeTab === 'approved') return 'checkmark-circle-outline';
     if (this.activeTab === 'declined') return 'close-circle-outline';
+    if (this.activeTab === 'pending') return 'time-outline';
     return 'cloud-upload-outline';
   }
 
   get emptyTitle() {
+    if (this.activeTab === 'all') return 'No requests yet';
+    if (this.activeTab === 'pending') return 'No pending requests';
     if (this.activeTab === 'approved') return 'No approved requests';
     if (this.activeTab === 'declined') return 'No declined requests';
     return 'Nothing to upload';
   }
 
   get emptyMessage() {
+    if (this.activeTab === 'all') return 'Submitted material and expense requests will appear here, latest first.';
+    if (this.activeTab === 'pending') return 'Pending material and expense requests will appear here.';
     if (this.activeTab === 'approved') return 'Approved material and purchase requests will appear here.';
     if (this.activeTab === 'declined') return 'Declined requests will appear here.';
     return 'All bills have been uploaded. Great job!';

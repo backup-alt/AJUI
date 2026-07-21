@@ -151,6 +151,17 @@ export async function markAttendance(input: {
   const worker = await Worker.findById(input.workerId).lean();
   if (!worker) throw new AppError(404, "Worker not found");
 
+  const existing = await Attendance.findOne({
+    workerId: new Types.ObjectId(input.workerId),
+    attendanceDate: input.attendanceDate,
+  }).lean();
+  if (existing) {
+    throw new AppError(
+      409,
+      `Attendance already marked for this worker on ${input.attendanceDate}`
+    );
+  }
+
   const supervisorName = await resolveSupervisorName(input.createdBy);
 
   const attendanceId = await generateId("ATT");

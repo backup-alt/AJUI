@@ -23,7 +23,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { addIcons } from 'ionicons';
-import { locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline } from 'ionicons/icons';
+import { locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline, alertCircleOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Worker, LabourPaymentMode } from '../../../shared/models';
 import { CurrencyPipe } from '@angular/common';
@@ -88,12 +88,23 @@ import { CurrencyPipe } from '@angular/common';
           </div>
         }
 
+        @if (alreadyMarked()) {
+          <div class="warning-banner">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <div>
+              <strong>Already marked for {{ attendanceDate }}</strong>
+              <p>This worker already has attendance recorded for the selected date. You can edit the existing entry instead.</p>
+            </div>
+          </div>
+        }
+
         <ion-list lines="none" class="form-list">
           <ion-item class="form-item">
             <ion-label position="stacked">Date *</ion-label>
             <ion-input
               type="date"
-              [(ngModel)]="attendanceDate"
+              [ngModel]="attendanceDate"
+              (ngModelChange)="onDateChange($event)"
             ></ion-input>
           </ion-item>
 
@@ -223,6 +234,20 @@ import { CurrencyPipe } from '@angular/common';
     .worker-pay { text-align: right; }
     .pay-label { display: block; font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; }
     .pay-value { display: block; font-size: 14px; font-weight: 700; color: #111827; }
+    .warning-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-left: 3px solid #f59e0b;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      color: #9a3412;
+    }
+    .warning-banner ion-icon { font-size: 22px; flex-shrink: 0; color: #ea580c; }
+    .warning-banner strong { display: block; font-size: 13px; margin-bottom: 2px; }
+    .warning-banner p { font-size: 12px; margin: 0; color: #9a3412; line-height: 1.4; }
     .form-list { background: transparent; }
     .form-item {
       --background: #ffffff;
@@ -266,12 +291,13 @@ export class LabourMarkAttendancePage implements OnInit {
   notes = '';
 
   isSubmitting = signal(false);
+  alreadyMarked = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
-    addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline });
+    addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline, alertCircleOutline });
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
@@ -280,6 +306,7 @@ export class LabourMarkAttendancePage implements OnInit {
     this.workerId = this.route.snapshot.paramMap.get('workerId') || '';
     if (this.workerId) {
       this.loadWorker();
+      this.checkExistingAttendance();
     }
   }
 
@@ -292,7 +319,22 @@ export class LabourMarkAttendancePage implements OnInit {
     });
   }
 
+  async checkExistingAttendance(): Promise<void> {
+    const siteId = this.selectedSiteId();
+    const projectId = this.siteProjectId();
+    this.supervisor.getAttendanceForWorker(this.workerId, 1, 50).subscribe({
+      next: (res) => {
+        const existing = (res.items || []).find(
+          (a: any) => a.attendanceDate === this.attendanceDate
+        );
+        this.alreadyMarked.set(!!existing);
+      },
+      error: () => this.alreadyMarked.set(false),
+    });
+  }
+
   isValid(): boolean {
+    if (this.alreadyMarked()) return false;
     const sc = Number(this.shiftCount);
     return !!(
       this.workerId &&
@@ -300,6 +342,12 @@ export class LabourMarkAttendancePage implements OnInit {
       sc >= 1 &&
       sc <= 2
     );
+  }
+
+  onDateChange(value: string): void {
+    this.attendanceDate = value;
+    this.alreadyMarked.set(false);
+    this.checkExistingAttendance();
   }
 
   async submit(): Promise<void> {

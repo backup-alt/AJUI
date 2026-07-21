@@ -14,6 +14,7 @@ import {
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
 import { addIcons } from 'ionicons';
+import { checkmarkCircleOutline, timeOutline } from 'ionicons/icons';
 import {
   chevronForwardOutline,
   personOutline,
@@ -154,6 +155,11 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
                   @if (worker.isSubcontract) {
                     <span class="subcontract-badge">Subcontract</span>
                   }
+                  @if (isMarkedToday(worker)) {
+                    <span class="marked-badge" title="Attendance already marked for today">
+                      <ion-icon name="checkmark-circle-outline"></ion-icon> Marked
+                    </span>
+                  }
                 </div>
                 <p class="worker-meta">
                   @if (worker.isSubcontract && worker.subcontractorName) {
@@ -186,7 +192,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       display: flex;
       align-items: center;
       gap: var(--md-space-3);
-      padding: var(--md-space-4) var(--md-space-4) var(--md-space-3);
+      padding: var(--md-space-3) var(--md-space-4);
       margin-top: 0;
       background: linear-gradient(135deg, #002263 0%, #003380 100%);
       color: #ffffff;
@@ -306,6 +312,20 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       color: #a16207;
       border-radius: 999px;
     }
+    .marked-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      padding: 2px 6px;
+      background: rgba(34, 197, 94, 0.12);
+      color: #15803d;
+      border-radius: 999px;
+    }
+    .marked-badge ion-icon { font-size: 11px; }
     .worker-meta {
       font-size: 11px;
       color: var(--m3-on-surface-muted);
@@ -395,9 +415,12 @@ export class LabourWorkersPage implements OnInit {
 
   labourType = signal<string>('');
   workers = signal<Worker[]>([]);
+  todayAttendance = signal<any[]>([]);
+  todayDate = new Date().toISOString().slice(0, 10);
   isLoading = signal(true);
   selectedSiteName = signal<string>('');
 
+  markedWorkerIds = computed(() => new Set(this.todayAttendance().map(a => a.workerId)));
   hasWorkers = computed(() => this.workers().length > 0);
 
   ngOnInit(): void {
@@ -421,6 +444,8 @@ export class LabourWorkersPage implements OnInit {
       sparklesOutline,
       briefcaseOutline,
       calendarClearOutline,
+      checkmarkCircleOutline,
+      timeOutline,
     });
 
     this.labourType.set(decodeURIComponent(this.route.snapshot.paramMap.get('type') || ''));
@@ -436,21 +461,31 @@ export class LabourWorkersPage implements OnInit {
     try {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
-      const res = await new Promise<{ items?: Worker[] }>((resolve) => {
-        this.supervisor.getWorkers({
-          siteId: siteId || undefined,
-          projectId: projectId || undefined,
-          labourType: this.labourType(),
-          limit: 200,
-        }).subscribe({
-          next: (r) => resolve(r as { items?: Worker[] }),
-          error: () => resolve({ items: [] }),
-        });
-      });
-      this.workers.set(res.items || []);
+      const [workersRes, attendanceRes] = await Promise.all([
+        new Promise<{ items?: Worker[] }>((resolve) => {
+          this.supervisor.getWorkers({
+            siteId: siteId || undefined,
+            projectId: projectId || undefined,
+            labourType: this.labourType(),
+            limit: 200,
+          }).subscribe({
+            next: (r) => resolve(r as { items?: Worker[] }),
+            error: () => resolve({ items: [] }),
+          });
+        }),
+        new Promise<{ attendances?: any[] }>((resolve) => {
+          this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).subscribe({
+            next: (r) => resolve(r as { attendances?: any[] }),
+            error: () => resolve({ attendances: [] }),
+          });
+        }),
+      ]);
+      this.workers.set(workersRes.items || []);
+      this.todayAttendance.set(attendanceRes.attendances || []);
     } catch (e) {
       console.error('[LabourWorkers] failed to load', e);
       this.workers.set([]);
+      this.todayAttendance.set([]);
     } finally {
       this.isLoading.set(false);
     }
@@ -478,6 +513,11 @@ export class LabourWorkersPage implements OnInit {
 
   getTypeIcon(type: string): string {
     return LABOUR_TYPE_ICONS[type] || 'briefcase-outline';
+  }
+
+  isMarkedToday(worker: Worker): boolean {
+    const id = (worker as any).workerId || worker._id;
+    return this.markedWorkerIds().has(id) || this.markedWorkerIds().has(worker._id);
   }
 
   getTypeColor(type: string): string {

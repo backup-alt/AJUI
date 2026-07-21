@@ -298,7 +298,7 @@ export class ProfilePage implements OnInit {
   }
 
   changePassword(): void {
-    this.router.navigate(['/auth/change-password']);
+    this.router.navigate(['/auth/forgot-password']);
   }
 
   async logout(): Promise<void> {
