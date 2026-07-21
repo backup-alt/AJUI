@@ -14,7 +14,8 @@ const DEFAULT_PROFILE = {
 export async function getCompanyProfile() {
   let profile = await CompanyProfile.findOne().lean();
   if (!profile) {
-    profile = await CompanyProfile.create(DEFAULT_PROFILE);
+    const created = await CompanyProfile.create(DEFAULT_PROFILE);
+    profile = created.toObject();
     return profile;
   }
   return profile;
