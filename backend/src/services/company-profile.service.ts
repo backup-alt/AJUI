@@ -14,9 +14,8 @@ const DEFAULT_PROFILE = {
 export async function getCompanyProfile() {
   let profile = await CompanyProfile.findOne().lean();
   if (!profile) {
-    const created = await CompanyProfile.create(DEFAULT_PROFILE);
-    profile = created.toObject();
-    return profile;
+    await CompanyProfile.create(DEFAULT_PROFILE);
+    profile = await CompanyProfile.findOne().lean();
   }
   return profile;
 }
@@ -26,6 +25,6 @@ export async function saveCompanyProfile(patch: Partial<typeof DEFAULT_PROFILE>)
     {},
     { $set: patch },
     { new: true, runValidators: true, upsert: true }
-  );
+  ).lean();
   return updated;
 }
