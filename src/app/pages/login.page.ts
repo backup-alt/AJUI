@@ -333,6 +333,25 @@ export class LoginPage {
 
   ngOnInit() {
     this.loadRememberedCredentials();
+    this.detectModeFromUrl();
+  }
+
+  private detectModeFromUrl(): void {
+    const path = this.router.url.split('?')[0];
+    const query = this.route.snapshot.queryParamMap;
+
+    if (path.endsWith('/auth/reset-password') || query.has('token')) {
+      this.resetToken = query.get('token');
+      if (this.resetToken) {
+        this.mode.set('reset');
+      }
+      return;
+    }
+
+    if (path.endsWith('/auth/forgot-password')) {
+      this.mode.set('forgot');
+      return;
+    }
   }
 
   private loadRememberedCredentials() {
