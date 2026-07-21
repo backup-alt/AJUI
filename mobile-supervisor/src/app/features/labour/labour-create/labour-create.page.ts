@@ -25,6 +25,7 @@ import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import { locationOutline, peopleOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-labour-create',
@@ -84,11 +85,11 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
 
         <ion-list lines="none" class="form-list">
           <ion-item class="form-item">
-            <ion-label position="stacked">Party / Contractor Name *</ion-label>
+            <ion-label position="stacked">Supervisor Name *</ion-label>
             <ion-input
-              placeholder="e.g., ABC Contractors"
-              [(ngModel)]="labour.partyName"
-              [clearInput]="true"
+              [value]="supervisorName()"
+              readonly="true"
+              class="readonly-input"
             ></ion-input>
           </ion-item>
 
@@ -253,10 +254,12 @@ import { SupervisorService } from '../../../core/services/supervisor.service';
     .form-row .form-item:last-of-type { border-right: none; }
     .shift-item { min-height: 80px; }
     .form-actions { padding: 20px 0; }
+    .readonly-input { --color: #111827; font-weight: 600; opacity: 1; }
   `],
 })
 export class LabourCreatePage implements OnInit {
   private supervisor = inject(SupervisorService);
+  private auth = inject(AuthService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
 
@@ -278,13 +281,19 @@ export class LabourCreatePage implements OnInit {
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
+  supervisorName = signal<string>('');
 
   async ngOnInit(): Promise<void> {
     addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline });
+    await this.auth.init();
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
+    const user = this.auth.currentUser();
+    const name = user?.name?.trim() || '';
+    this.supervisorName.set(name);
+    this.labour.partyName = name;
   }
 
   isValid(): boolean {

@@ -1,27 +1,21 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import {
-  IonContent, IonIcon, IonToggle,
+  IonContent, IonIcon,
   AlertController, ToastController,
 } from '@ionic/angular/standalone';
-import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
-  personCircleOutline, mailOutline, callOutline, businessOutline,
-  lockClosedOutline, notificationsOutline, helpCircleOutline,
-  logOutOutline, chevronForwardOutline, shieldCheckmarkOutline,
-  informationCircleOutline, documentTextOutline, globeOutline,
+  personCircleOutline, mailOutline,
+  logOutOutline, shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
-import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
   imports: [
-    IonContent, IonIcon, IonToggle,
-    FormsModule,
+    IonContent, IonIcon,
   ],
   template: `
     <ion-content class="profile-content">
@@ -60,59 +54,6 @@ import { NotificationService } from '../../core/services/notification.service';
             <div class="kv">
               <span class="kv-label">Phone</span>
               <span class="kv-value">{{ currentUser()?.phone || 'Not set' }}</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="profile-card">
-          <header class="card-head">
-            <span class="head-tile"><ion-icon name="globe-outline"></ion-icon></span>
-            <h3>Preferences</h3>
-          </header>
-          <div class="row-item">
-            <span class="row-tile">
-              <ion-icon name="notifications-outline"></ion-icon>
-            </span>
-            <div class="row-content">
-              <div class="row-title">Push notifications</div>
-              <div class="row-sub">Receive alerts for approvals and updates</div>
-            </div>
-            <ion-toggle
-              [checked]="pushEnabled"
-              (ionChange)="togglePush()"
-            ></ion-toggle>
-          </div>
-        </section>
-
-        <section class="profile-card">
-          <header class="card-head">
-            <span class="head-tile"><ion-icon name="shield-checkmark-outline"></ion-icon></span>
-            <h3>Security</h3>
-          </header>
-          <button class="row-item action" (click)="changePassword()">
-            <span class="row-tile">
-              <ion-icon name="lock-closed-outline"></ion-icon>
-            </span>
-            <div class="row-content">
-              <div class="row-title">Change password</div>
-              <div class="row-sub">Update your account password</div>
-            </div>
-            <ion-icon name="chevron-forward-outline" class="chev"></ion-icon>
-          </button>
-        </section>
-
-        <section class="profile-card">
-          <header class="card-head">
-            <span class="head-tile"><ion-icon name="information-circle-outline"></ion-icon></span>
-            <h3>Support</h3>
-          </header>
-          <div class="row-item">
-            <span class="row-tile">
-              <ion-icon name="document-text-outline"></ion-icon>
-            </span>
-            <div class="row-content">
-              <div class="row-title">About AGB Supervisor</div>
-              <div class="row-sub">Version {{ version }}</div>
             </div>
           </div>
         </section>
@@ -262,12 +203,8 @@ export class ProfilePage implements OnInit {
   private supervisor = inject(SupervisorService);
   private alertCtrl = inject(AlertController);
   private toastCtrl = inject(ToastController);
-  private notifications = inject(NotificationService);
-  private router = inject(Router);
 
   currentUser = signal<{ name: string; email: string; phone: string } | null>(null);
-  pushEnabled = false;
-  version = '1.0.0';
 
   userInitials(): string {
     const name = this.currentUser()?.name || 'S';
@@ -278,27 +215,10 @@ export class ProfilePage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      personCircleOutline, mailOutline, callOutline, businessOutline,
-      lockClosedOutline, notificationsOutline, helpCircleOutline,
-      logOutOutline, chevronForwardOutline, shieldCheckmarkOutline,
-      informationCircleOutline, documentTextOutline, globeOutline,
+      personCircleOutline, mailOutline,
+      logOutOutline, shieldCheckmarkOutline,
     });
-
     this.currentUser.set(this.auth.currentUser());
-    this.pushEnabled = this.notifications.pushEnabled();
-  }
-
-  async togglePush(): Promise<void> {
-    if (this.pushEnabled) {
-      await this.notifications.requestPermission();
-    } else {
-      await this.notifications.disable();
-    }
-    this.pushEnabled = this.notifications.pushEnabled();
-  }
-
-  changePassword(): void {
-    this.router.navigate(['/auth/forgot-password']);
   }
 
   async logout(): Promise<void> {

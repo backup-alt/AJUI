@@ -16,16 +16,13 @@ import {
   IonTextarea,
   IonIcon,
   IonSpinner,
-  IonToggle,
   ToastController,
-  ActionSheetController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
-import { locationOutline, peopleOutline, checkmarkCircleOutline, businessOutline } from 'ionicons/icons';
+import { locationOutline, peopleOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
-import { Subcontractor } from '../../../shared/models';
 
 const LABOUR_TYPES = [
   'Helper',
@@ -62,7 +59,6 @@ const LABOUR_TYPES = [
     IonTextarea,
     IonIcon,
     IonSpinner,
-    IonToggle,
     FormsModule,
   ],
   template: `
@@ -107,7 +103,7 @@ const LABOUR_TYPES = [
             ></ion-input>
           </ion-item>
 
-          <ion-item class="form-item">
+          <ion-item class="form-item form-item-last">
             <ion-label position="stacked">Address</ion-label>
             <ion-textarea
               placeholder="Enter address (optional)"
@@ -139,28 +135,6 @@ const LABOUR_TYPES = [
               [clearInput]="true"
             ></ion-input>
           </ion-item>
-
-          <ion-item class="form-item toggle-item">
-            <ion-label class="toggle-label">From Subcontractor?</ion-label>
-            <ion-toggle
-              class="subcontract-toggle"
-              [(ngModel)]="worker.isSubcontract"
-              (ionChange)="onSubcontractToggle()"
-              slot="end"
-            ></ion-toggle>
-          </ion-item>
-
-          @if (worker.isSubcontract) {
-            <ion-item class="form-item form-item-last" (click)="openSubcontractorActionSheet()">
-              <ion-label position="stacked">Select Subcontractor *</ion-label>
-              <ion-input
-                placeholder="Choose subcontractor"
-                [value]="selectedSubcontractorName()"
-                readonly="true"
-                class="subcontractor-input"
-              ></ion-input>
-            </ion-item>
-          }
         </ion-list>
 
         <div class="form-actions">
@@ -252,71 +226,19 @@ export class LabourCreateWorkerPage implements OnInit {
     address: '',
     labourType: '',
     weeklyPay: null as number | null,
-    isSubcontract: false,
-    subcontractorId: '',
-    subcontractorName: '',
   };
 
-  selectedSubcontractorId = signal<string>('');
-  selectedSubcontractorName = signal<string>('');
-
-  subcontractors = signal<Subcontractor[]>([]);
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
 
-  private actionSheetCtrl = inject(ActionSheetController);
-
   async ngOnInit(): Promise<void> {
-    addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline, businessOutline });
+    addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline });
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
-  }
-
-  onSubcontractToggle(): void {
-    if (this.worker.isSubcontract) {
-      void this.loadSubcontractors();
-    } else {
-      this.worker.subcontractorId = '';
-      this.worker.subcontractorName = '';
-      this.selectedSubcontractorId.set('');
-      this.selectedSubcontractorName.set('');
-    }
-  }
-
-  async loadSubcontractors(): Promise<void> {
-    const projectId = this.siteProjectId();
-    const siteId = this.selectedSiteId();
-    if (!projectId) return;
-
-    this.supervisor.getSubcontractors(projectId, siteId || undefined).subscribe({
-      next: (res) => this.subcontractors.set(res.subcontractors || []),
-      error: (err) => console.error('[CreateWorker] failed to load subcontractors', err),
-    });
-  }
-
-  async openSubcontractorActionSheet() {
-    if (this.subcontractors().length === 0) {
-      await this.loadSubcontractors();
-    }
-    const buttons: Array<{ text: string; handler: () => void; role?: string }> = this.subcontractors().map((sub) => ({
-      text: sub.subcontractorName,
-      handler: () => {
-        this.selectedSubcontractorId.set(sub.subcontractorId);
-        this.selectedSubcontractorName.set(sub.subcontractorName);
-        this.worker.subcontractorId = sub.subcontractorId;
-        this.worker.subcontractorName = sub.subcontractorName;
-      },
-    }));
-    buttons.push({ text: 'Cancel', role: 'cancel', handler: () => {} });
-    const actionSheet = await this.actionSheetCtrl.create({
-      header: 'Select Subcontractor',
-      buttons,
-    });
-    await actionSheet.present();
   }
 
   isValid(): boolean {
@@ -324,8 +246,7 @@ export class LabourCreateWorkerPage implements OnInit {
       this.worker.name &&
       this.worker.labourType &&
       this.worker.weeklyPay !== null &&
-      this.worker.weeklyPay > 0 &&
-      (!this.worker.isSubcontract || this.worker.subcontractorId)
+      this.worker.weeklyPay > 0
     );
   }
 
@@ -347,10 +268,6 @@ export class LabourCreateWorkerPage implements OnInit {
       return;
     }
 
-    const selectedSub = this.subcontractors().find(
-      (s) => s.subcontractorId === this.worker.subcontractorId
-    );
-
     this.isSubmitting.set(true);
 
     const payload = {
@@ -361,9 +278,6 @@ export class LabourCreateWorkerPage implements OnInit {
       address: this.worker.address?.trim() || undefined,
       labourType: this.worker.labourType,
       weeklyPay: Number(this.worker.weeklyPay) || 0,
-      isSubcontract: this.worker.isSubcontract,
-      subcontractorId: this.worker.subcontractorId || undefined,
-      subcontractorName: selectedSub?.subcontractorName || undefined,
     };
 
     this.supervisor.createWorker(payload).subscribe({
@@ -384,7 +298,6 @@ export class LabourCreateWorkerPage implements OnInit {
       error: async (err) => {
         this.isSubmitting.set(false);
         const msg =
-          err?.error?.details?.fieldErrors?.subcontractorId?.[0] ||
           err?.error?.details?.fieldErrors?.weeklyPay?.[0] ||
           err?.error?.error ||
           err?.message ||
