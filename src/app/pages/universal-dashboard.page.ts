@@ -1926,8 +1926,9 @@ visibleRows(): TableRow[] {
         const projectSites = project?.sites ?? [];
         const siteIndex = projectSites.findIndex((s) => s.toLowerCase() === rowSiteName.toLowerCase());
         if (siteIndex >= 0) {
-          const rowSiteKey = `${rowProjectId}\u0001${rowSiteName}\u0001${siteIndex}`;
-          matchesSite = rowSiteKey === activeSite;
+          // activeSite is now the display name (set in universalSiteOptions()).
+          // Compare names directly so selection survives data refreshes.
+          matchesSite = rowSiteName.toLowerCase() === activeSiteName.toLowerCase();
         }
       }
       const matchesSearch = !query || Object.values(row).some((value) => String(value).toLowerCase().includes(query));
@@ -1964,7 +1965,22 @@ visibleRows(): TableRow[] {
   }
 
   universalSiteOptions(): { id: string; name: string }[] {
-    return this.data.sites();
+    // Dedupe by name so the chip selection stays stable even when the
+    // underlying projects() / siteEntities() lists change. We use the
+    // display name as both id and name so selectedSite name comparison
+    // works in visibleRows() without needing a composite key.
+    const raw = this.data.sites();
+    const seen = new Set<string>();
+    const out: { id: string; name: string }[] = [];
+    for (const r of raw) {
+      const name = (r.name || r.id || "").trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ id: name, name });
+    }
+    return out;
   }
 
   activeSiteFilter(): string {

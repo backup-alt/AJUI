@@ -6,6 +6,7 @@ import {
   IonToolbar,
 } from "@ionic/angular/standalone";
 import { ApiService } from "../core/api.service";
+import { AccessRestrictionService } from "../core/access-restriction.service";
 
 @Component({
   selector: "agb-enterprise-header",
@@ -79,13 +80,55 @@ import { ApiService } from "../core/api.service";
           </div>
         </div>
       </ion-toolbar>
+      @if (accessRestriction.restricted()) {
+        <div class="access-restriction-banner" role="alert">
+          <span class="access-restriction-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16"><path d="M8 1.5 14.5 13h-13L8 1.5Z M8 6v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="11.8" r="0.8" fill="currentColor"/></svg>
+          </span>
+          <span class="access-restriction-text">{{ accessRestriction.reason() }}</span>
+          <button type="button" class="access-restriction-close" aria-label="Dismiss" (click)="accessRestriction.dismiss()">
+            <svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      }
     </ion-header>
   `,
+  styles: [`
+    .access-restriction-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 24px;
+      background: #fef3c7;
+      border-top: 1px solid #fcd34d;
+      color: #92400e;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .access-restriction-icon { display: inline-flex; flex: 0 0 auto; width: 18px; height: 18px; }
+    .access-restriction-icon svg { width: 18px; height: 18px; }
+    .access-restriction-text { flex: 1 1 auto; min-width: 0; }
+    .access-restriction-close {
+      flex: 0 0 auto;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #92400e;
+      padding: 4px;
+      display: Inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+    .access-restriction-close:hover { background: rgba(146, 64, 14, 0.1); }
+    .access-restriction-close svg { width: 14px; height: 14px; }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EnterpriseHeaderComponent {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  readonly accessRestriction = inject(AccessRestrictionService);
 
   @Input() title = "Dashboard";
   @Input() eyebrow = "Annai Golden Builders";
