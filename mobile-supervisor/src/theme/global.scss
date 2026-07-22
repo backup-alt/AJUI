@@ -349,7 +349,21 @@ ion-progress-bar {
 
 /* Pull to Refresh */
 ion-refresher {
-  --background: var(--agb-off-white);
+  --background: var(--m3-surface-bright);
+}
+ion-refresher .refresher-native {
+  background: var(--m3-surface-bright);
+}
+ion-refresher-content {
+  --color: var(--m3-primary);
+  --text-color: var(--m3-primary);
+  --header-color: var(--m3-primary);
+}
+ion-refresher-content .refresher-arrow {
+  color: var(--m3-primary);
+}
+ion-refresher-content ion-spinner {
+  color: var(--m3-primary);
 }
 
 /* Searchbar */

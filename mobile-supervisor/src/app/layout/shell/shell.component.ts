@@ -174,7 +174,7 @@ import { Site } from '../../shared/models';
           </ion-buttons>
 
           <ion-title>
-            <button class="site-selector" (click)="toggleSitePopover($event)">
+            <button class="site-selector" id="site-selector-btn">
               <span class="site-icon"><ion-icon name="location-outline"></ion-icon></span>
               <span class="site-name">{{ selectedSiteName() || 'Select site' }}</span>
               <span class="site-chev"><ion-icon name="chevron-down-outline"></ion-icon></span>
@@ -194,7 +194,7 @@ import { Site } from '../../shared/models';
 
       <ion-router-outlet />
 
-      <ion-popover #sitePopover [isOpen]="isSitePopoverOpen()" (didDismiss)="closeSitePopover()">
+      <ion-popover #sitePopover trigger="site-selector-btn" trigger-action="click" side="bottom" alignment="center" size="auto" (didDismiss)="closeSitePopover()" (ionPopoverWillPresent)="onSitePopoverOpen()">
         <ng-template>
           <ion-content>
             <ion-list lines="none">
@@ -596,6 +596,12 @@ export class ShellComponent implements OnInit {
 
   closeSitePopover(): void {
     this.isSitePopoverOpen.set(false);
+  }
+
+  onSitePopoverOpen(): void {
+    if (this.sites().length === 0 && !this.isLoadingSites()) {
+      void this.loadSites();
+    }
   }
 
   async selectSite(site: Site): Promise<void> {
