@@ -289,4 +289,8 @@ export class SupervisorService {
   }) {
     return this.api.get<{ items: Vendor[]; total: number; page: number; limit: number; pages: number }>('/supervisor/vendors', filters);
   }
+
+  getVendorById(vendorId: string) {
+    return this.api.get<{ item: Vendor }>(`/supervisor/vendors/${vendorId}`);
+  }
 }

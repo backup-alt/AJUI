@@ -7,9 +7,9 @@ import {
   IonSpinner, IonIcon,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline, gridOutline } from 'ionicons/icons';
+import { cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline, gridOutline, callOutline, locationOutline, documentTextOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
-import { Material } from '../../../shared/models';
+import { Material, Vendor } from '../../../shared/models';
 import { DatePipe } from '@angular/common';
 import { StatusPillComponent } from '../../../shared/components';
 
@@ -87,6 +87,53 @@ import { StatusPillComponent } from '../../../shared/components';
               }
             </div>
           </div>
+
+          @if (material()!.vendor) {
+            <div class="card">
+              <h3 class="card-title">Vendor details</h3>
+              <div class="vendor-profile">
+                <div class="vendor-avatar">
+                  <ion-icon name="business-outline"></ion-icon>
+                </div>
+                <div class="vendor-primary">
+                  <span class="vendor-name">{{ vendor()?.name || material()!.vendor }}</span>
+                  @if (vendor()?.materialType) {
+                    <span class="vendor-type">{{ vendor()!.materialType }}</span>
+                  }
+                </div>
+              </div>
+              <div class="vendor-details">
+                @if (vendor()?.phone) {
+                  <a class="vendor-row" [href]="'tel:' + vendor()!.phone">
+                    <ion-icon name="call-outline"></ion-icon>
+                    <span>{{ vendor()!.phone }}</span>
+                  </a>
+                }
+                @if (vendor()?.address) {
+                  <div class="vendor-row">
+                    <ion-icon name="location-outline"></ion-icon>
+                    <span>{{ vendor()!.address }}</span>
+                  </div>
+                }
+                @if (vendor()?.gst) {
+                  <div class="vendor-row">
+                    <ion-icon name="document-text-outline"></ion-icon>
+                    <span class="gst-label">GST</span>
+                    <span class="gst-value">{{ vendor()!.gst }}</span>
+                  </div>
+                }
+                @if (!vendor() && material()!.vendor && !vendorLoading()) {
+                  <p class="vendor-lookup-note">Full vendor details not available. Supplier: {{ material()!.vendor }}</p>
+                }
+              </div>
+              @if (vendorLoading()) {
+                <div class="vendor-loading">
+                  <ion-spinner name="crescent"></ion-spinner>
+                  <span>Loading vendor info...</span>
+                </div>
+              }
+            </div>
+          }
 
           <div class="card">
             <h3 class="card-title">Live stock</h3>
@@ -215,6 +262,45 @@ import { StatusPillComponent } from '../../../shared/components';
     }
     .stock-link-btn:hover { filter: brightness(1.05); }
     .stock-link-btn ion-icon { font-size: 18px; }
+
+    .vendor-profile {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 14px;
+    }
+    .vendor-avatar {
+      width: 46px; height: 46px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(0, 34, 99, 0.10), rgba(0, 34, 99, 0.04));
+      color: #002263;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .vendor-avatar ion-icon { font-size: 22px; }
+    .vendor-primary { display: flex; flex-direction: column; gap: 2px; }
+    .vendor-name { font-size: 15px; font-weight: 700; color: #0f172a; }
+    .vendor-type { font-size: 12px; color: #64748b; }
+
+    .vendor-details { display: flex; flex-direction: column; gap: 8px; }
+    .vendor-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-radius: 12px;
+      font-size: 13px;
+      color: #0f172a;
+      text-decoration: none;
+    }
+    .vendor-row ion-icon { font-size: 16px; color: #64748b; flex-shrink: 0; }
+    .vendor-row span { flex: 1; }
+    .gst-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; }
+    .gst-value { font-size: 13px; font-weight: 700; color: #0f172a; font-family: monospace; letter-spacing: 0.5px; }
+    .vendor-loading {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      font-size: 13px; color: #64748b;
+    }
+    .vendor-loading ion-spinner { width: 18px; height: 18px; }
+    .vendor-lookup-note { font-size: 13px; color: #64748b; margin: 0; font-style: italic; }
   `],
 })
 export class MaterialDetailPage implements OnInit {
@@ -224,10 +310,12 @@ export class MaterialDetailPage implements OnInit {
   private toast = inject(ToastController);
 
   material = signal<Material | null>(null);
+  vendor = signal<Vendor | null>(null);
   loading = signal(true);
+  vendorLoading = signal(false);
 
   ngOnInit() {
-    addIcons({ cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline, gridOutline });
+    addIcons({ cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline, gridOutline, callOutline, locationOutline, documentTextOutline });
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.loading.set(false);
@@ -238,14 +326,33 @@ export class MaterialDetailPage implements OnInit {
 
   load(id: string) {
     this.loading.set(true);
+    this.vendorLoading.set(true);
     this.supervisor.getMaterialDetail(id).subscribe({
       next: (res: { material: Material }) => {
         this.material.set(res.material);
         this.loading.set(false);
+        if (res.material.vendorId) {
+          this.loadVendor(res.material.vendorId);
+        } else {
+          this.vendorLoading.set(false);
+        }
       },
       error: () => {
         this.loading.set(false);
+        this.vendorLoading.set(false);
         void this.showToast('Failed to load material', true);
+      },
+    });
+  }
+
+  private loadVendor(vendorId: string) {
+    this.supervisor.getVendorById(vendorId).subscribe({
+      next: (res) => {
+        this.vendor.set(res.item);
+        this.vendorLoading.set(false);
+      },
+      error: () => {
+        this.vendorLoading.set(false);
       },
     });
   }
