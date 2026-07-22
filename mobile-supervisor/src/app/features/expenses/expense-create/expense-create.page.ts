@@ -428,6 +428,13 @@ export class ExpenseCreatePage implements OnInit {
     }
   }
 
+  /**
+   * Recompute the running site balance from APPROVED expenses only.
+   * The balance shown to a supervisor is the running total of:
+   *   (sum of approved Cash Added) - (sum of approved Purchases)
+   * Pending / Rejected requests MUST NOT influence the balance that
+   * a supervisor sees while creating a new purchase.
+   */
   async loadBalance() {
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
@@ -436,15 +443,16 @@ export class ExpenseCreatePage implements OnInit {
         siteId: siteId ?? undefined,
         projectId: projectId ?? undefined,
         type: 'site',
+        status: 'Approved',
         limit: 100,
       })
       .subscribe({
         next: (res) => {
           const cashAdded = res.expenses
-            .filter((e) => e.status === 'Approved' && e.transactionType === 'Cash Added')
+            .filter((e) => e.transactionType === 'Cash Added')
             .reduce((s, e) => s + (Number(e.amount) || 0), 0);
           const spent = res.expenses
-            .filter((e) => e.status === 'Approved' && e.transactionType !== 'Cash Added')
+            .filter((e) => e.transactionType !== 'Cash Added')
             .reduce((s, e) => s + (Number(e.amount) || 0), 0);
           this.currentBalance.set(cashAdded - spent);
         },

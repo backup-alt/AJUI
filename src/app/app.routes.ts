@@ -18,6 +18,16 @@ export const routes: Routes = [
     canActivate: [publicOnlyGuard],
   },
   {
+    path: "auth/forgot-password",
+    loadComponent: () => import("./pages/login.page").then((m) => m.LoginPage),
+    canActivate: [publicOnlyGuard],
+  },
+  {
+    path: "auth/reset-password",
+    loadComponent: () => import("./pages/login.page").then((m) => m.LoginPage),
+    canActivate: [publicOnlyGuard],
+  },
+  {
     path: "setup-account",
     loadComponent: () => import("./pages/setup-account.component").then((m) => m.SetupAccountComponent),
     canActivate: [publicOnlyGuard],

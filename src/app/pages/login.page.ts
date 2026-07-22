@@ -333,6 +333,51 @@ export class LoginPage {
 
   ngOnInit() {
     this.loadRememberedCredentials();
+    this.detectModeFromUrl();
+  }
+
+  private detectModeFromUrl(): void {
+    const hash = window.location.hash;
+    const queryParams = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : '');
+    const path = hash.split('?')[0];
+
+    if (path.endsWith('/auth/reset-password') || queryParams.has('token')) {
+      const token = queryParams.get('token');
+      if (token) {
+        this.resetToken = token;
+        this.mode.set('reset');
+      }
+      return;
+    }
+
+    if (path.endsWith('/auth/forgot-password')) {
+      this.mode.set('forgot');
+      return;
+    }
+
+    const url = window.location.href;
+    if (url.includes('/auth/reset-password') && url.includes('token=')) {
+      try {
+        const tokenMatch = url.match(/[?&]token=([^&]+)/);
+        if (tokenMatch && tokenMatch[1]) {
+          this.resetToken = tokenMatch[1];
+          this.mode.set('reset');
+          return;
+        }
+      } catch {}
+    }
+
+    const fullPath = window.location.pathname;
+    if (fullPath.endsWith('/auth/reset-password') || fullPath.endsWith('/auth/forgot-password')) {
+      const fullUrl = new URL(window.location.href);
+      const token = fullUrl.searchParams.get('token');
+      if (token) {
+        this.resetToken = token;
+        this.mode.set('reset');
+      } else if (fullPath.endsWith('/auth/forgot-password')) {
+        this.mode.set('forgot');
+      }
+    }
   }
 
   private loadRememberedCredentials() {

@@ -180,10 +180,20 @@ export type ExpenseRow = {
   type: "Site Expense" | "General Expense";
   received: number;
   spent: number;
+  cashIssued?: number;
   reference: string;
   status: ApprovalStatus;
   billUrl?: string;
   poNumber?: string;
+  transactionType?: "Purchase" | "Cash Added";
+  isSiteMaterial?: boolean;
+  materialName?: string;
+  materialUnit?: string;
+  materialQuantity?: number;
+  materialVendor?: string;
+  issuedAmount?: number;
+  givenAmount?: number;
+  approvedAmount?: number;
 };
 
 export type PaymentRow = {

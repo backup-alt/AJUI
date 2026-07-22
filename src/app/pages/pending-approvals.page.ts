@@ -64,6 +64,7 @@ type ExpenseApprovalRow = ApprovalBaseRow & {
   materialVendor?: string;
   issuedAmount?: number;
   givenAmount?: number;
+  approvedAmount?: number;
   billUrl?: string;
   poNumber?: string;
 };
@@ -275,9 +276,14 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Transaction Type</th>
                         <th>Description</th>
                         <th>Amount</th>
-                        <th>Issued Amt</th>
-                        <th>Given Amt</th>
-                        <th>PO Number</th>
+                        @if (hasCashAddedApproval()) {
+                          <th>Approved Amt</th>
+                          <th>PO Number</th>
+                        } @else {
+                          <th>Issued Amt</th>
+                          <th>Given Amt</th>
+                          <th>PO Number</th>
+                        }
                         <th>Supervisor</th>
                         <th>Bill / Reference</th>
                         <th>Status</th>
@@ -293,35 +299,49 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ transactionTypeLabel(row.transactionType) }}</td>
                         <td><strong>{{ row.description || "-" }}</strong></td>
                         <td>{{ row.amount || "-" }}</td>
-                        <td>
-                          <input
-                            class="approval-table-input"
-                            inputmode="decimal"
-                            type="number"
-                            [(ngModel)]="row.issuedAmount"
-                            aria-label="Issued amount"
-                            min="0"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            class="approval-table-input"
-                            inputmode="decimal"
-                            type="number"
-                            [(ngModel)]="row.givenAmount"
-                            aria-label="Given amount"
-                            min="0"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            class="approval-table-input"
-                            type="text"
-                            [(ngModel)]="row.poNumber"
-                            aria-label="PO Number"
-                            placeholder="Auto-generate"
-                          />
-                        </td>
+                        @if (isCashAddedTransaction(row.transactionType)) {
+                          <td colspan="2">
+                            <input
+                              class="approval-table-input"
+                              inputmode="decimal"
+                              type="number"
+                              [(ngModel)]="row.approvedAmount"
+                              aria-label="Approved amount"
+                              min="0"
+                            />
+                          </td>
+                          <td>-</td>
+                        } @else {
+                          <td>
+                            <input
+                              class="approval-table-input"
+                              inputmode="decimal"
+                              type="number"
+                              [(ngModel)]="row.issuedAmount"
+                              aria-label="Issued amount"
+                              min="0"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              class="approval-table-input"
+                              inputmode="decimal"
+                              type="number"
+                              [(ngModel)]="row.givenAmount"
+                              aria-label="Given amount"
+                              min="0"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              class="approval-table-input"
+                              type="text"
+                              [(ngModel)]="row.poNumber"
+                              aria-label="PO Number"
+                              placeholder="Auto-generate"
+                            />
+                          </td>
+                        }
                         <td>{{ row.supervisor || "-" }}</td>
                         <td>
                           @if (row.billUrl) {
@@ -483,8 +503,13 @@ export class PendingApprovalsPage implements OnInit {
         if (row.module === "expenses") {
           const expenseRow = this._siteExpenseRows().find((r) => r.rowId === row.rowId);
           if (expenseRow) {
-            if (expenseRow.issuedAmount !== undefined) payload.issuedAmount = expenseRow.issuedAmount;
-            if (expenseRow.givenAmount !== undefined) payload.givenAmount = expenseRow.givenAmount;
+            if (this.isCashAddedTransaction(expenseRow.transactionType)) {
+              if (expenseRow.approvedAmount !== undefined) payload.approvedAmount = expenseRow.approvedAmount;
+              payload.approvedAmount = payload.approvedAmount ?? expenseRow.amount;
+            } else {
+              if (expenseRow.issuedAmount !== undefined) payload.issuedAmount = expenseRow.issuedAmount;
+              if (expenseRow.givenAmount !== undefined) payload.givenAmount = expenseRow.givenAmount;
+            }
             if (expenseRow.poNumber !== undefined && expenseRow.poNumber.trim() !== '') payload.poNumber = expenseRow.poNumber;
           }
         } else if (row.module === "materials") {
@@ -547,6 +572,24 @@ export class PendingApprovalsPage implements OnInit {
     if (!value) return "-";
     if (value === "Cash Added") return "Add Cash";
     return value;
+  }
+
+  /**
+   * Returns true if the transaction type is "Cash Added" (Add Cash UI label).
+   * The backend stores "Cash Added"; the UI uses "Add Cash".
+   */
+  isCashAddedTransaction(raw: string | undefined | null): boolean {
+    const value = (raw || "").trim().toLowerCase();
+    return value === "cash added" || value === "add cash";
+  }
+
+  /**
+   * Returns true if any pending site-expense approval is a Cash Added request.
+   * Used to switch the Site Expenses table header between
+   * (Issued / Given / PO) and (Approved Amount / PO).
+   */
+  hasCashAddedApproval(): boolean {
+    return this._siteExpenseRows().some((row) => this.isCashAddedTransaction(row.transactionType));
   }
 
   private sortedUnique(values: string[]): string[] {

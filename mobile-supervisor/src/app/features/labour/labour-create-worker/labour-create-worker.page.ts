@@ -16,16 +16,13 @@ import {
   IonTextarea,
   IonIcon,
   IonSpinner,
-  IonToggle,
   ToastController,
-  ActionSheetController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
-import { locationOutline, peopleOutline, checkmarkCircleOutline, businessOutline } from 'ionicons/icons';
+import { locationOutline, peopleOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
-import { Subcontractor } from '../../../shared/models';
 
 const LABOUR_TYPES = [
   'Helper',
@@ -39,6 +36,7 @@ const LABOUR_TYPES = [
   'Steel Fixer',
   'Welder',
   'Fabricator',
+  'Other',
 ];
 
 @Component({
@@ -61,7 +59,6 @@ const LABOUR_TYPES = [
     IonTextarea,
     IonIcon,
     IonSpinner,
-    IonToggle,
     FormsModule,
   ],
   template: `
@@ -106,7 +103,7 @@ const LABOUR_TYPES = [
             ></ion-input>
           </ion-item>
 
-          <ion-item class="form-item">
+          <ion-item class="form-item form-item-last">
             <ion-label position="stacked">Address</ion-label>
             <ion-textarea
               placeholder="Enter address (optional)"
@@ -130,36 +127,14 @@ const LABOUR_TYPES = [
           </ion-item>
 
           <ion-item class="form-item">
-            <ion-label position="stacked">Weekly Pay (INR) *</ion-label>
+            <ion-label position="stacked">Daily Pay (INR) *</ion-label>
             <ion-input
               type="number"
-              placeholder="Enter weekly pay"
+              placeholder="Enter daily pay"
               [(ngModel)]="worker.weeklyPay"
               [clearInput]="true"
             ></ion-input>
           </ion-item>
-
-          <ion-item class="form-item toggle-item">
-            <ion-label class="toggle-label">From Subcontractor?</ion-label>
-            <ion-toggle
-              class="subcontract-toggle"
-              [(ngModel)]="worker.isSubcontract"
-              (ionChange)="onSubcontractToggle()"
-              slot="end"
-            ></ion-toggle>
-          </ion-item>
-
-          @if (worker.isSubcontract) {
-            <ion-item class="form-item form-item-last" (click)="openSubcontractorActionSheet()">
-              <ion-label position="stacked">Select Subcontractor *</ion-label>
-              <ion-input
-                placeholder="Choose subcontractor"
-                [value]="selectedSubcontractorName()"
-                readonly="true"
-                class="subcontractor-input"
-              ></ion-input>
-            </ion-item>
-          }
         </ion-list>
 
         <div class="form-actions">
@@ -216,18 +191,35 @@ const LABOUR_TYPES = [
     .site-banner ion-icon { font-size: 18px; color: #c9a227; }
     .site-banner-label { font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; }
     .site-banner-value { font-size: 14px; font-weight: 600; color: #111827; }
-    .form-list { background: transparent; }
+    .form-list { background: transparent; padding: 0; }
     .form-item {
       --background: #ffffff;
-      --border-radius: 0 !important;
-      --inner-border-radius: 0 !important;
+      --border-radius: 4px !important;
+      --inner-border-radius: 4px !important;
       --padding-start: 14px;
       --padding-end: 14px;
       --min-height: 64px;
       border: 1px solid #e5e7eb;
-      border-bottom: none;
+      margin-bottom: 12px;
+      overflow: hidden;
     }
-    .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
+    .form-item.form-item-last { margin-bottom: 0; }
+    .form-item ion-input,
+    .form-item ion-textarea,
+    .form-item ion-select {
+      --background: transparent !important;
+      --border-radius: 0 !important;
+      --inner-border-radius: 0 !important;
+      --border-width: 0 !important;
+      --border-color: transparent !important;
+      --padding-start: 0 !important;
+      --padding-end: 0 !important;
+      --padding-top: 0 !important;
+      --padding-bottom: 0 !important;
+      --min-height: 0 !important;
+      min-height: 0 !important;
+      align-self: stretch;
+    }
     .toggle-item { min-height: 72px; display: flex; align-items: center; }
     .toggle-label { font-size: 14px; font-weight: 600; color: #111827; margin: 0; }
     .subcontract-toggle {
@@ -251,71 +243,19 @@ export class LabourCreateWorkerPage implements OnInit {
     address: '',
     labourType: '',
     weeklyPay: null as number | null,
-    isSubcontract: false,
-    subcontractorId: '',
-    subcontractorName: '',
   };
 
-  selectedSubcontractorId = signal<string>('');
-  selectedSubcontractorName = signal<string>('');
-
-  subcontractors = signal<Subcontractor[]>([]);
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
 
-  private actionSheetCtrl = inject(ActionSheetController);
-
   async ngOnInit(): Promise<void> {
-    addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline, businessOutline });
+    addIcons({ locationOutline, peopleOutline, checkmarkCircleOutline });
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
-  }
-
-  onSubcontractToggle(): void {
-    if (this.worker.isSubcontract) {
-      void this.loadSubcontractors();
-    } else {
-      this.worker.subcontractorId = '';
-      this.worker.subcontractorName = '';
-      this.selectedSubcontractorId.set('');
-      this.selectedSubcontractorName.set('');
-    }
-  }
-
-  async loadSubcontractors(): Promise<void> {
-    const projectId = this.siteProjectId();
-    const siteId = this.selectedSiteId();
-    if (!projectId) return;
-
-    this.supervisor.getSubcontractors(projectId, siteId || undefined).subscribe({
-      next: (res) => this.subcontractors.set(res.subcontractors || []),
-      error: (err) => console.error('[CreateWorker] failed to load subcontractors', err),
-    });
-  }
-
-  async openSubcontractorActionSheet() {
-    if (this.subcontractors().length === 0) {
-      await this.loadSubcontractors();
-    }
-    const buttons: Array<{ text: string; handler: () => void; role?: string }> = this.subcontractors().map((sub) => ({
-      text: sub.subcontractorName,
-      handler: () => {
-        this.selectedSubcontractorId.set(sub.subcontractorId);
-        this.selectedSubcontractorName.set(sub.subcontractorName);
-        this.worker.subcontractorId = sub.subcontractorId;
-        this.worker.subcontractorName = sub.subcontractorName;
-      },
-    }));
-    buttons.push({ text: 'Cancel', role: 'cancel', handler: () => {} });
-    const actionSheet = await this.actionSheetCtrl.create({
-      header: 'Select Subcontractor',
-      buttons,
-    });
-    await actionSheet.present();
   }
 
   isValid(): boolean {
@@ -323,8 +263,7 @@ export class LabourCreateWorkerPage implements OnInit {
       this.worker.name &&
       this.worker.labourType &&
       this.worker.weeklyPay !== null &&
-      this.worker.weeklyPay > 0 &&
-      (!this.worker.isSubcontract || this.worker.subcontractorId)
+      this.worker.weeklyPay > 0
     );
   }
 
@@ -346,10 +285,6 @@ export class LabourCreateWorkerPage implements OnInit {
       return;
     }
 
-    const selectedSub = this.subcontractors().find(
-      (s) => s.subcontractorId === this.worker.subcontractorId
-    );
-
     this.isSubmitting.set(true);
 
     const payload = {
@@ -360,9 +295,6 @@ export class LabourCreateWorkerPage implements OnInit {
       address: this.worker.address?.trim() || undefined,
       labourType: this.worker.labourType,
       weeklyPay: Number(this.worker.weeklyPay) || 0,
-      isSubcontract: this.worker.isSubcontract,
-      subcontractorId: this.worker.subcontractorId || undefined,
-      subcontractorName: selectedSub?.subcontractorName || undefined,
     };
 
     this.supervisor.createWorker(payload).subscribe({
@@ -383,7 +315,6 @@ export class LabourCreateWorkerPage implements OnInit {
       error: async (err) => {
         this.isSubmitting.set(false);
         const msg =
-          err?.error?.details?.fieldErrors?.subcontractorId?.[0] ||
           err?.error?.details?.fieldErrors?.weeklyPay?.[0] ||
           err?.error?.error ||
           err?.message ||

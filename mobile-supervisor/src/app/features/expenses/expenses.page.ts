@@ -251,11 +251,21 @@ export class ExpensesPage implements OnInit, OnDestroy {
   statusFilter: ExpenseStatus | '' = '';
   selectedSiteName = signal<string | null>(null);
 
+  /**
+   * Cash Added balance: only counts Cash Added expenses that have been
+   * APPROVED by an admin. Pending or rejected requests must NEVER affect
+   * the running balance, so a supervisor sees their balance move only
+   * after the admin approves the request.
+   */
   cashAdded = computed(() => this.expenses()
     .filter((e) => e.status === 'Approved' && e.transactionType === 'Cash Added')
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
   );
 
+  /**
+   * Spent balance: only counts Purchase (non-Cash-Added) expenses that
+   * have been APPROVED. Same rules as cashAdded above.
+   */
   cashSpent = computed(() => this.expenses()
     .filter((e) => e.status === 'Approved' && e.transactionType !== 'Cash Added')
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0)

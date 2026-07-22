@@ -108,7 +108,7 @@ export interface CreateWorkerRequest {
   address?: string;
   labourType: string;
   weeklyPay: number;
-  isSubcontract: boolean;
+  isSubcontract?: boolean;
   subcontractorId?: string;
   subcontractorName?: string;
 }

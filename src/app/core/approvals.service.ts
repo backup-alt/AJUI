@@ -64,6 +64,7 @@ export interface ExpenseApprovalRow {
   materialVendor?: string;
   issuedAmount?: number;
   givenAmount?: number;
+  approvedAmount?: number;
   billUrl?: string;
   poNumber?: string;
 }

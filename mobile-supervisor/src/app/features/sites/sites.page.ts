@@ -137,17 +137,6 @@ import {
                   <ion-icon name="cube-outline"></ion-icon>
                   Materials
                 </button>
-                @if (site.id !== activeSiteId()) {
-                  <button class="action-btn primary" (click)="switchTo(site, $event)">
-                    Switch to site
-                    <ion-icon name="arrow-forward-outline"></ion-icon>
-                  </button>
-                } @else {
-                  <span class="action-btn primary active">
-                    <ion-icon name="checkmark-circle-outline"></ion-icon>
-                    Active site
-                  </span>
-                }
               </footer>
             </article>
           }

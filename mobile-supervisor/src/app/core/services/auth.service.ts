@@ -2,7 +2,6 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Preferences } from '@capacitor/preferences';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { firstValueFrom, from, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
 import { ApiService } from './api.service';
@@ -63,7 +62,6 @@ export class AuthService {
         await BarcodeScanner.installGoogleBarcodeScannerModule();
       }
 
-      await Haptics.impact({ style: ImpactStyle.Light });
       const result = await BarcodeScanner.scan();
       const barcodes = result.barcodes;
 
@@ -91,7 +89,6 @@ export class AuthService {
         return { scanned: true, error: 'Invalid QR code: missing token' };
       }
 
-      await Haptics.impact({ style: ImpactStyle.Medium });
       return { scanned: true, payload };
     } catch (err) {
       console.error('[Auth] QR scan error', err);
@@ -243,7 +240,6 @@ export class AuthService {
     this.currentUser.set(null);
     this.isAuthenticated.set(false);
 
-    await Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
     await this.router.navigate(['/auth/login']);
   }
 

@@ -1316,11 +1316,11 @@ export class ErpDataService {
   private projectIdFromSharedRowId(rowId: string): string {
     const customRows = Object.values(this.customTableRows()).flat();
     const baseRows: SharedTableRow[] = [
-      ...this.materials(),
-      ...this.labour(),
-      ...this.expenses(),
-      ...this.payments(),
-      ...this.subcontractors(),
+      ...(this.materials() as unknown as SharedTableRow[]),
+      ...(this.labour() as unknown as SharedTableRow[]),
+      ...(this.expenses() as unknown as SharedTableRow[]),
+      ...(this.payments() as unknown as SharedTableRow[]),
+      ...(this.subcontractors() as unknown as SharedTableRow[]),
     ];
     const match = [...customRows, ...baseRows].find((row) => String(row["__rowId"] || "") === rowId);
     const edits = this.tableCellEdits()[rowId] ?? {};

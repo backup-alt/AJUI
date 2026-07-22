@@ -54,6 +54,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         ).pipe(
           switchMap((t): Observable<HttpEvent<unknown>> => {
             if (!t) {
+              // Refresh failed - clear local state and send user back to login.
+              api.clearTokens().catch(() => {});
+              void auth.logout().catch(() => {});
               return throwError(() => error);
             }
             return next(

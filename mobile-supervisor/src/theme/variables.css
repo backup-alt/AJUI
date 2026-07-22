@@ -163,11 +163,11 @@
      ===================================================================== */
   --md-radius-none: 0px;
   --md-radius-xs: 4px;
-  --md-radius-sm: 6px;
-  --md-radius-md: 12px;
-  --md-radius-lg: 16px;
-  --md-radius-xl: 20px;
-  --md-radius-2xl: 28px;
+  --md-radius-sm: 4px;
+  --md-radius-md: 4px;
+  --md-radius-lg: 4px;
+  --md-radius-xl: 4px;
+  --md-radius-2xl: 4px;
   --md-radius-pill: 999px;
 
   /* Legacy radius scale (kept) */

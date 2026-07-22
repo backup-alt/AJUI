@@ -271,14 +271,18 @@ export class MaterialDetailPage implements OnInit {
       purchasedQuantity: this.purchasedInput || 0,
       consumedQuantity: this.consumedInput || 0,
     }).subscribe({
-      next: (res: { material: Material }) => {
-        this.material.set(res.material);
+      next: (res: any) => {
+        const updated = res?.material || res;
+        if (updated && updated._id) {
+          this.material.set(updated);
+        }
         this.saving.set(false);
         void this.showToast('Stock updated', false);
       },
-      error: () => {
+      error: (err) => {
         this.saving.set(false);
-        void this.showToast('Failed to update stock', true);
+        const msg = err?.error?.message || err?.message || 'Failed to update stock';
+        void this.showToast(msg, true);
       },
     });
   }

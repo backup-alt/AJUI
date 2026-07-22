@@ -15,15 +15,14 @@ import {
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
 import { addIcons } from 'ionicons';
+import { checkmarkCircleOutline, timeOutline } from 'ionicons/icons';
 import {
   chevronForwardOutline,
   personOutline,
   peopleOutline,
   addOutline,
   locationOutline,
-  calendarOutline,
   walletOutline,
-  timeOutline,
   hammerOutline,
   layersOutline,
   buildOutline,
@@ -54,6 +53,7 @@ const LABOUR_TYPE_ICONS: Record<string, string> = {
   'Steel Fixer': 'car-outline',
   'Welder': 'sparkles-outline',
   'Fabricator': 'construct-outline',
+  'Other': 'briefcase-outline',
 };
 
 const LABOUR_TYPE_COLORS: Record<string, string> = {
@@ -68,6 +68,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
   'Steel Fixer': 'steel',
   'Welder': 'welder',
   'Fabricator': 'fabricator',
+  'Other': 'other',
 };
 
 @Component({
@@ -80,12 +81,9 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     IonTitle,
     IonBackButton,
     IonButtons,
-    IonButton,
     IonIcon,
-    IonSpinner,
     IonRefresher,
     IonRefresherContent,
-    DatePipe,
     CurrencyPipe,
     EmptyStateComponent,
   ],
@@ -126,17 +124,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
         </button>
       </div>
 
-      <div class="quick-actions">
-        <button class="qa-btn qa-attendance" (click)="markAllAttendance()">
-          <ion-icon name="calendar-outline"></ion-icon>
-          <span>Mark Attendance</span>
-        </button>
-        <button class="qa-btn qa-history" (click)="viewAllHistory()">
-          <ion-icon name="time-outline"></ion-icon>
-          <span>View History</span>
-        </button>
-      </div>
-
       <div class="workers-list">
         @if (isLoading() && workers().length === 0) {
           @for (i of [1,2,3,4]; track i) {
@@ -165,6 +152,11 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
                   @if (worker.isSubcontract) {
                     <span class="subcontract-badge">Subcontract</span>
                   }
+                  @if (isMarkedToday(worker)) {
+                    <span class="marked-badge" title="Attendance already marked for today">
+                      <ion-icon name="checkmark-circle-outline"></ion-icon> Marked
+                    </span>
+                  }
                 </div>
                 <p class="worker-meta">
                   @if (worker.isSubcontract && worker.subcontractorName) {
@@ -180,9 +172,11 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
                 </div>
               </div>
               <div class="worker-actions" (click)="$event.stopPropagation()">
-                <button class="action-btn primary" (click)="markAttendance(worker)" title="Mark attendance">
-                  <ion-icon name="calendar-outline"></ion-icon>
-                </button>
+                @if (!isMarkedToday(worker)) {
+                  <button class="action-btn success" (click)="markAttendance(worker)" title="Mark present today">
+                    <ion-icon name="checkmark-circle-outline"></ion-icon>
+                  </button>
+                }
                 <button class="action-btn secondary" (click)="viewWorker(worker)" title="View details">
                   <ion-icon name="chevron-forward-outline"></ion-icon>
                 </button>
@@ -194,13 +188,14 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     </ion-content>
   `,
   styles: [`
-    .workers-content { --background: var(--m3-surface); }
+    .workers-content { --background: var(--m3-surface); --padding-top: 0; --padding-bottom: 0; }
 
     .type-hero {
       display: flex;
       align-items: center;
       gap: var(--md-space-3);
-      padding: var(--md-space-5) var(--md-space-4) var(--md-space-3);
+      padding: var(--md-space-3) var(--md-space-4);
+      margin-top: 0;
       background: linear-gradient(135deg, #002263 0%, #003380 100%);
       color: #ffffff;
     }
@@ -259,39 +254,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     }
     .add-btn ion-icon { font-size: 16px; font-weight: 800; }
-
-    .quick-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--md-space-2);
-      padding: var(--md-space-3) var(--md-space-4) var(--md-space-2);
-      background: var(--m3-surface);
-    }
-    .qa-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px var(--md-space-3);
-      border-radius: var(--md-radius-lg);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-      border: 1px solid var(--m3-outline-variant);
-      transition: transform var(--md-motion-duration-short1);
-    }
-    .qa-btn:active { transform: scale(0.98); }
-    .qa-btn ion-icon { font-size: 18px; }
-    .qa-attendance {
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-      border-color: var(--m3-primary);
-    }
-    .qa-history {
-      background: var(--m3-surface-bright);
-      color: var(--m3-on-surface);
-    }
 
     .workers-list {
       padding: var(--md-space-2) var(--md-space-4) 96px;
@@ -352,6 +314,20 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       color: #a16207;
       border-radius: 999px;
     }
+    .marked-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      padding: 2px 6px;
+      background: rgba(34, 197, 94, 0.12);
+      color: #15803d;
+      border-radius: 999px;
+    }
+    .marked-badge ion-icon { font-size: 11px; }
     .worker-meta {
       font-size: 11px;
       color: var(--m3-on-surface-muted);
@@ -390,13 +366,13 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       justify-content: center;
     }
     .action-btn ion-icon { font-size: 18px; }
-    .action-btn.primary {
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-    }
     .action-btn.secondary {
       background: var(--m3-surface-container);
       color: var(--m3-on-surface-variant);
+    }
+    .action-btn.success {
+      background: rgba(34, 197, 94, 0.12);
+      color: #16a34a;
     }
 
     .skeleton-card {
@@ -446,9 +422,12 @@ export class LabourWorkersPage implements OnInit {
 
   labourType = signal<string>('');
   workers = signal<Worker[]>([]);
+  todayAttendance = signal<any[]>([]);
+  todayDate = new Date().toISOString().slice(0, 10);
   isLoading = signal(true);
   selectedSiteName = signal<string>('');
 
+  markedWorkerIds = computed(() => new Set(this.todayAttendance().map(a => a.workerId)));
   hasWorkers = computed(() => this.workers().length > 0);
 
   ngOnInit(): void {
@@ -458,7 +437,6 @@ export class LabourWorkersPage implements OnInit {
       peopleOutline,
       addOutline,
       locationOutline,
-      calendarOutline,
       walletOutline,
       timeOutline,
       hammerOutline,
@@ -473,6 +451,7 @@ export class LabourWorkersPage implements OnInit {
       sparklesOutline,
       briefcaseOutline,
       calendarClearOutline,
+      checkmarkCircleOutline,
     });
 
     this.labourType.set(decodeURIComponent(this.route.snapshot.paramMap.get('type') || ''));
@@ -488,21 +467,31 @@ export class LabourWorkersPage implements OnInit {
     try {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
-      const res = await new Promise<{ items?: Worker[] }>((resolve) => {
-        this.supervisor.getWorkers({
-          siteId: siteId || undefined,
-          projectId: projectId || undefined,
-          labourType: this.labourType(),
-          limit: 200,
-        }).subscribe({
-          next: (r) => resolve(r as { items?: Worker[] }),
-          error: () => resolve({ items: [] }),
-        });
-      });
-      this.workers.set(res.items || []);
+      const [workersRes, attendanceRes] = await Promise.all([
+        new Promise<{ items?: Worker[] }>((resolve) => {
+          this.supervisor.getWorkers({
+            siteId: siteId || undefined,
+            projectId: projectId || undefined,
+            labourType: this.labourType(),
+            limit: 200,
+          }).subscribe({
+            next: (r) => resolve(r as { items?: Worker[] }),
+            error: () => resolve({ items: [] }),
+          });
+        }),
+        new Promise<{ attendances?: any[] }>((resolve) => {
+          this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).subscribe({
+            next: (r) => resolve(r as { attendances?: any[] }),
+            error: () => resolve({ attendances: [] }),
+          });
+        }),
+      ]);
+      this.workers.set(workersRes.items || []);
+      this.todayAttendance.set(attendanceRes.attendances || []);
     } catch (e) {
       console.error('[LabourWorkers] failed to load', e);
       this.workers.set([]);
+      this.todayAttendance.set([]);
     } finally {
       this.isLoading.set(false);
     }
@@ -517,48 +506,58 @@ export class LabourWorkersPage implements OnInit {
     void this.router.navigate(['/tabs/labour/worker', worker._id]);
   }
 
-  markAttendance(worker: Worker): void {
-    void this.router.navigate(['/tabs/labour/mark-attendance', worker._id]);
-  }
-
-  viewHistory(worker: Worker): void {
-    void this.router.navigate(['/tabs/labour/worker-history', worker._id]);
-  }
-
   addWorker(): void {
     void this.router.navigate(['/tabs/labour/create-worker']);
   }
 
-  async markAllAttendance(): Promise<void> {
-    const ws = this.workers();
-    if (ws.length === 0) return;
-    if (ws.length === 1) {
-      this.markAttendance(ws[0]);
-      return;
-    }
-    const toast = await this.toastCtrl.create({
-      message: 'Pick a worker to mark attendance for.',
-      duration: 2000,
-      color: 'primary',
-      position: 'top',
-    });
-    await toast.present();
-  }
+  async markAttendance(worker: Worker): Promise<void> {
+    const siteId = this.supervisor.selectedSiteId();
+    const siteName = this.supervisor.selectedSiteName() || '';
+    const projectId = this.supervisor.selectedProjectId();
 
-  async viewAllHistory(): Promise<void> {
-    const ws = this.workers();
-    if (ws.length === 0) return;
-    if (ws.length === 1) {
-      this.viewHistory(ws[0]);
+    if (!siteId || !projectId) {
+      const toast = await this.toastCtrl.create({
+        message: 'Please select a site first',
+        duration: 2500,
+        color: 'warning',
+        position: 'top',
+      });
+      await toast.present();
       return;
     }
-    const toast = await this.toastCtrl.create({
-      message: 'Pick a worker to view their history.',
-      duration: 2000,
-      color: 'primary',
-      position: 'top',
+
+    this.supervisor.markAttendance({
+      workerId: (worker as any).workerId || worker._id,
+      projectId,
+      siteId,
+      site: siteName,
+      attendanceDate: this.todayDate,
+      shiftCount: 1,
+      overtimeHours: 0,
+      overtimeAmount: 0,
+      lateFine: 0,
+      paymentMode: 'Cash',
+    }).subscribe({
+      next: async () => {
+        const toast = await this.toastCtrl.create({
+          message: `${worker.name} marked present`,
+          duration: 2000,
+          color: 'success',
+          position: 'top',
+        });
+        await toast.present();
+        await this.loadWorkers();
+      },
+      error: async (err) => {
+        const toast = await this.toastCtrl.create({
+          message: err?.error?.message || 'Failed to mark attendance',
+          duration: 2500,
+          color: 'danger',
+          position: 'top',
+        });
+        await toast.present();
+      },
     });
-    await toast.present();
   }
 
   getInitials(name: string): string {
@@ -570,6 +569,11 @@ export class LabourWorkersPage implements OnInit {
 
   getTypeIcon(type: string): string {
     return LABOUR_TYPE_ICONS[type] || 'briefcase-outline';
+  }
+
+  isMarkedToday(worker: Worker): boolean {
+    const id = (worker as any).workerId || worker._id;
+    return this.markedWorkerIds().has(id) || this.markedWorkerIds().has(worker._id);
   }
 
   getTypeColor(type: string): string {
