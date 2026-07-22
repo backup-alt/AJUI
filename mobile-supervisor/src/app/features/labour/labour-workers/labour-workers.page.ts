@@ -174,8 +174,12 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
               <div class="worker-actions" (click)="$event.stopPropagation()">
                 @if (!isMarkedToday(worker)) {
                   <button class="action-btn success" (click)="markAttendance(worker)" title="Mark present today">
-                    <ion-icon name="checkmark-circle-outline"></ion-icon>
+                    <ion-icon name="calendar-outline"></ion-icon>
                   </button>
+                } @else {
+                  <span class="action-btn marked-status" title="Attendance already marked">
+                    <ion-icon name="checkmark-circle-outline"></ion-icon>
+                  </span>
                 }
                 <button class="action-btn secondary" (click)="viewWorker(worker)" title="View details">
                   <ion-icon name="chevron-forward-outline"></ion-icon>
@@ -355,8 +359,8 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       flex-shrink: 0;
     }
     .action-btn {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border-radius: var(--md-radius-md);
       border: none;
       cursor: pointer;
@@ -364,15 +368,23 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: transform var(--md-motion-duration-short1), box-shadow var(--md-motion-duration-short1);
     }
-    .action-btn ion-icon { font-size: 18px; }
+    .action-btn:active { transform: scale(0.95); }
+    .action-btn ion-icon { font-size: 20px; }
     .action-btn.secondary {
       background: var(--m3-surface-container);
       color: var(--m3-on-surface-variant);
     }
     .action-btn.success {
-      background: rgba(34, 197, 94, 0.12);
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+      color: #ffffff;
+      box-shadow: 0 6px 14px -6px rgba(22, 163, 74, 0.45);
+    }
+    .action-btn.marked-status {
+      background: rgba(22, 163, 74, 0.14);
       color: #16a34a;
+      cursor: default;
     }
 
     .skeleton-card {

@@ -15,7 +15,6 @@ import {
   IonLabel,
   IonList,
   IonItem,
-  IonBadge,
   IonPopover,
   IonListHeader,
   IonSpinner,
@@ -80,7 +79,6 @@ import { Site } from '../../shared/models';
     IonLabel,
     IonList,
     IonItem,
-    IonBadge,
     IonPopover,
     IonListHeader,
     IonSpinner,
@@ -290,9 +288,9 @@ import { Site } from '../../shared/models';
     }
 
     .menu-content {
-      --background: var(--m3-surface);
+      --background: var(--m3-surface-bright);
       --padding-top: var(--md-space-2);
-      --padding-bottom: calc(16px + env(safe-area-inset-bottom));
+      --padding-bottom: calc(8px + env(safe-area-inset-bottom));
     }
 
     /* Section labels */
@@ -335,7 +333,7 @@ import { Site } from '../../shared/models';
     }
     .menu-list ion-item.selected ion-icon { color: var(--m3-on-primary-container); }
 
-    .menu-spacer { flex: 1; min-height: var(--md-space-6); }
+    .menu-spacer { flex: 1; min-height: var(--md-space-2); max-height: var(--md-space-4); }
 
     .menu-footer {
       padding: var(--md-space-3) var(--md-space-3) calc(16px + env(safe-area-inset-bottom));

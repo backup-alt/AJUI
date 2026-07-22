@@ -738,9 +738,11 @@ body .form-actions {
 }
 
 /* ================================================================
-   RESPONSIVE
+   RESPONSIVE — tailored for every mobile screen ratio
    ================================================================ */
-@media (max-width: 380px) {
+
+/* Compact phones: 280–359px — single column, smaller paddings */
+@media (max-width: 359px) {
   .material-stats,
   .ledger-stats,
   .labour-stats,
@@ -748,17 +750,108 @@ body .form-actions {
   .site-stats {
     grid-template-columns: 1fr !important;
   }
-
   .material-head,
   .expense-head,
   .labour-head {
     align-items: flex-start;
   }
+  .cards,
+  .content-stack,
+  .filter-stack,
+  .form-container {
+    padding-left: var(--md-space-3) !important;
+    padding-right: var(--md-space-3) !important;
+  }
 }
 
-/* ================================================================
-   SAFE-AREA FIX
-   ================================================================ */
+/* Standard phones: 360–413px — optimized grid columns */
+@media (min-width: 360px) and (max-width: 413px) {
+  .site-stats,
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Standard phones: 414–500px — comfortable spacing */
+@media (min-width: 414px) and (max-width: 500px) {
+  .site-stats {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* Phablets / large phones: 500–600px */
+@media (min-width: 500px) {
+  .site-stats {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  .cards {
+    padding-left: var(--md-space-5);
+    padding-right: var(--md-space-5);
+  }
+}
+
+/* Fill-width content on very narrow viewports */
+@media (max-width: 500px) {
+  ion-modal .modal-wrapper,
+  ion-popover .popover-content {
+    min-width: 100vw !important;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    border-radius: 0 !important;
+  }
+}
+
+/* Compact toolbar on very short phones (< 667px height) */
+@media (max-height: 667px) {
+  ion-header ion-toolbar,
+  ion-toolbar {
+    --min-height: 48px !important;
+    --padding-top: 0 !important;
+    --padding-bottom: 0 !important;
+  }
+  .agb-page-header {
+    padding-top: 0 !important;
+  }
+  .page-head {
+    padding-top: var(--md-space-2) !important;
+  }
+}
+
+/* Very short phones (< 600px height) */
+@media (max-height: 600px) {
+  .type-hero {
+    padding: var(--md-space-2) var(--md-space-4) !important;
+  }
+  .profile-header {
+    padding: var(--md-space-3) !important;
+  }
+  .drawer-search {
+    height: 40px !important;
+    margin: 8px 18px 6px !important;
+  }
+  ion-fab {
+    margin-bottom: calc(4px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Tall phones (> 800px height) — give more breathing room */
+@media (min-height: 800px) {
+  .cards,
+  .content-stack,
+  .form-container,
+  .filter-stack {
+    padding-bottom: calc(32px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* ion-menu width capped for tablets/desktop */
+@media (min-width: 768px) {
+  ion-menu {
+    --width: 320px;
+  }
+}
+
+/* Safe area helpers for notched devices */
 @supports (padding: max(0px)) {
   .ion-page {
     --ion-safe-area-top: env(safe-area-inset-top);
@@ -766,6 +859,9 @@ body .form-actions {
   }
   ion-header ion-toolbar:first-of-type {
     --ion-safe-area-top: env(safe-area-inset-top);
+  }
+  ion-footer ion-toolbar:last-of-type {
+    --ion-safe-area-bottom: env(safe-area-inset-bottom);
   }
 }
 

@@ -24,6 +24,7 @@ import {
   calendarOutline,
   chevronForwardOutline,
   layersOutline,
+  searchOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Site, Material } from '../../shared/models';
@@ -145,7 +146,7 @@ import {
       }
     </ion-content>
 
-    <ion-modal [isOpen]="drawerOpen()" (didDismiss)="closeDrawer()">
+    <ion-modal [isOpen]="drawerOpen()" (didDismiss)="closeDrawer()" [breakpoints]="[0, 0.6, 0.92]" [initialBreakpoint]="0.92" [backdropDismiss]="true" class="inventory-drawer">
       <ng-template>
         <div class="drawer">
           <header class="drawer-head">
@@ -153,10 +154,27 @@ import {
               <ion-icon name="close-outline"></ion-icon>
             </button>
             <div class="drawer-title">
-              <div class="drawer-eyebrow">Materials inventory</div>
+              <div class="drawer-eyebrow">Inventory · {{ drawerMaterials().length }} {{ drawerMaterials().length === 1 ? 'item' : 'items' }}</div>
               <h2>{{ drawerSite()?.name }}</h2>
             </div>
+            <div class="drawer-handle"></div>
           </header>
+
+          <div class="drawer-search">
+            <ion-icon name="search-outline" class="search-icon"></ion-icon>
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Search materials..."
+              [value]="drawerSearch()"
+              (input)="onDrawerSearch($event)"
+            />
+            @if (drawerSearch()) {
+              <button class="search-clear" (click)="clearDrawerSearch()" aria-label="Clear">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+            }
+          </div>
 
           <div class="drawer-body">
             @if (drawerLoading()) {
@@ -164,19 +182,26 @@ import {
                 <div class="skeleton-card">
                   <ion-skeleton-text animated style="width: 60%; height: 16px;"></ion-skeleton-text>
                   <ion-skeleton-text animated style="width: 90%; height: 14px; margin-top: 6px;"></ion-skeleton-text>
+                  <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 6px;"></ion-skeleton-text>
                 </div>
               }
-            } @else if (drawerMaterials().length === 0) {
+            } @else if (filteredDrawerMaterials().length === 0) {
               <app-empty-state
                 icon="cube-outline"
-                title="No materials yet"
-                message="This site has no materials recorded."
+                [title]="drawerSearch() ? 'No matches' : 'No materials yet'"
+                [message]="drawerSearch() ? 'Try a different search term.' : 'This site has no materials recorded.'"
               ></app-empty-state>
             } @else {
-              @for (m of drawerMaterials(); track m._id) {
+              @for (m of filteredDrawerMaterials(); track m._id) {
                 <article class="material-card">
                   <header class="m-head">
-                    <h3 class="m-name">{{ m.name }}</h3>
+                    <span class="m-icon"><ion-icon name="cube-outline"></ion-icon></span>
+                    <div class="m-info">
+                      <h3 class="m-name">{{ m.name }}</h3>
+                      @if (m.vendor) {
+                        <p class="m-vendor"><ion-icon name="business-outline"></ion-icon> {{ m.vendor }}</p>
+                      }
+                    </div>
                     <app-status-pill [tone]="getMaterialTone(m.status)">{{ m.status }}</app-status-pill>
                   </header>
                   <div class="m-stats">
@@ -314,20 +339,31 @@ import {
     /* Drawer */
     .drawer {
       background: #f5f6f8;
-      min-height: 100%;
       display: flex;
       flex-direction: column;
+      height: 100%;
+      max-height: 100%;
+      overflow: hidden;
     }
     .drawer-head {
-      position: sticky;
-      top: 0;
-      z-index: 5;
+      flex-shrink: 0;
+      position: relative;
       background: #ffffff;
-      padding: 16px 18px;
+      padding: 16px 18px 12px;
       border-bottom: 1px solid #eef0f3;
       display: flex;
       align-items: center;
       gap: 12px;
+    }
+    .drawer-handle {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 4px;
+      border-radius: 999px;
+      background: #d1d5db;
     }
     .drawer-close {
       width: 36px; height: 36px;
@@ -336,6 +372,7 @@ import {
       color: #475569;
       border: 0; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
     }
     .drawer-close ion-icon { font-size: 20px; }
     .drawer-eyebrow {
@@ -352,7 +389,59 @@ import {
       margin: 2px 0 0;
       letter-spacing: -0.2px;
     }
-    .drawer-body { padding: 12px 0 24px; }
+    .drawer-title { flex: 1; min-width: 0; }
+
+    .drawer-search {
+      flex-shrink: 0;
+      position: relative;
+      margin: 12px 18px 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      height: 44px;
+    }
+    .drawer-search .search-icon {
+      font-size: 18px;
+      color: #94a3b8;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .drawer-search .search-input {
+      flex: 1;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      font: inherit;
+      font-size: 14px;
+      color: #0f172a;
+      min-width: 0;
+    }
+    .drawer-search .search-input::placeholder { color: #94a3b8; }
+    .drawer-search .search-clear {
+      width: 22px; height: 22px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #64748b;
+      border: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .drawer-search .search-clear ion-icon { font-size: 14px; }
+
+    .drawer-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding: 8px 0 24px;
+    }
 
     .material-card {
       background: #ffffff;
@@ -361,8 +450,25 @@ import {
       padding: 14px 16px;
       margin: 0 16px 10px;
     }
-    .m-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .m-name { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; }
+    .m-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .m-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: rgba(0, 34, 99, 0.08);
+      color: #002263;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .m-icon ion-icon { font-size: 18px; }
+    .m-info { flex: 1; min-width: 0; }
+    .m-name { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
+    .m-vendor {
+      font-size: 11px; color: #64748b; margin: 0;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .m-vendor ion-icon { font-size: 12px; }
     .m-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
     .m-stat {
       background: #f8fafc;
@@ -392,12 +498,25 @@ export class SitesPage implements OnInit {
   drawerSite = signal<Site | null>(null);
   drawerMaterials = signal<Material[]>([]);
   drawerLoading = signal(false);
+  drawerSearch = signal('');
+
+  filteredDrawerMaterials = computed(() => {
+    const q = this.drawerSearch().toLowerCase().trim();
+    if (!q) return this.drawerMaterials();
+    return this.drawerMaterials().filter((m) => {
+      const name = (m.name || '').toLowerCase();
+      const vendor = (m.vendor || '').toLowerCase();
+      const status = (m.status || '').toLowerCase();
+      return name.includes(q) || vendor.includes(q) || status.includes(q);
+    });
+  });
 
   async ngOnInit(): Promise<void> {
     addIcons({
       locationOutline, cubeOutline, peopleOutline, arrowForwardOutline,
       closeOutline, businessOutline, checkmarkCircle, alertCircleOutline,
       constructOutline, calendarOutline, chevronForwardOutline, layersOutline,
+      searchOutline,
     });
     await this.loadSites();
   }
@@ -446,6 +565,16 @@ export class SitesPage implements OnInit {
     this.drawerOpen.set(false);
     this.drawerSite.set(null);
     this.drawerMaterials.set([]);
+    this.drawerSearch.set('');
+  }
+
+  onDrawerSearch(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.drawerSearch.set(value);
+  }
+
+  clearDrawerSearch(): void {
+    this.drawerSearch.set('');
   }
 
   private async loadDrawerMaterials(site: Site): Promise<void> {

@@ -82,8 +82,8 @@ import { CurrencyPipe } from '@angular/common';
               <span class="worker-type">{{ worker()!.labourType }}</span>
             </div>
             <div class="worker-pay">
-              <span class="pay-label">Weekly Pay</span>
-              <span class="pay-value">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}</span>
+              <span class="pay-label">Daily Pay</span>
+              <span class="pay-value">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}<span class="pay-suffix">/day</span></span>
             </div>
           </div>
         }
@@ -234,6 +234,7 @@ import { CurrencyPipe } from '@angular/common';
     .worker-pay { text-align: right; }
     .pay-label { display: block; font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; }
     .pay-value { display: block; font-size: 14px; font-weight: 700; color: #111827; }
+    .pay-suffix { font-size: 11px; font-weight: 600; color: #6b7280; margin-left: 2px; }
     .warning-banner {
       display: flex;
       align-items: flex-start;

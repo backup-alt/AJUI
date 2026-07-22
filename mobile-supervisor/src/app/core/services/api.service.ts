@@ -219,23 +219,41 @@ export class ApiService {
    * Same as refreshAccessToken but never throws "No refresh token" - returns empty string instead.
    * This is the version the auth interceptor uses, so a missing refresh token simply
    * triggers logout rather than an opaque error.
+   *
+   * Important: network errors and 5xx responses do NOT clear tokens. Only an
+   * explicit 401/403 from the refresh endpoint clears them, because transient
+   * failures should not log the user out.
    */
   async refreshAccessTokenSafely(): Promise<string> {
     const refreshToken = await this.getRefreshToken();
     if (!refreshToken) return '';
 
-    const response = await fetch(`${this.baseUrl}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!response.ok) {
-      await this.clearTokens();
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch {
+      // Network error - don't clear tokens, just fail this refresh attempt.
       return '';
     }
 
-    const data = (await response.json()) as { accessToken?: string; refreshToken?: string };
+    if (!response.ok) {
+      // Only clear tokens on a definitive auth failure (401/403).
+      // 5xx and other statuses leave tokens alone for retry.
+      if (response.status === 401 || response.status === 403) {
+        await this.clearTokens();
+        return '';
+      }
+      return '';
+    }
+
+    const data = (await response.json().catch(() => ({}))) as {
+      accessToken?: string;
+      refreshToken?: string;
+    };
     if (!data.accessToken) {
       await this.clearTokens();
       return '';

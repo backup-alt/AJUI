@@ -279,27 +279,45 @@ interface WageCalculation {
                   <div class="week-group">
                     <div class="week-header">{{ week.weekLabel }}</div>
                     @for (day of week.days; track day.attendanceId) {
-                      <div class="att-day" [class]="'att-' + day.status.toLowerCase()">
-                        <div class="day-header">
-                          <span class="day-name">{{ day.dayName }}</span>
-                          <span class="day-status" [class]="'status-' + day.status.toLowerCase()">
+                      <div class="att-day-card" [class]="'att-' + day.status.toLowerCase()">
+                        <header class="att-day-head">
+                          <div class="att-day-date">
+                            <span class="att-day-name">{{ day.dayName }}</span>
+                            <span class="att-day-full">{{ day.attendanceDate | date:'MMM d' }}</span>
+                          </div>
+                          <span class="att-day-status" [class]="'status-' + day.status.toLowerCase()">
                             {{ day.status }}
                           </span>
-                        </div>
-                        <div class="day-details">
-                          @if (day.status === 'Present') {
-                            <span class="shifts">Shift {{ day.shiftCount }}</span>
-                            @if (day.overtimeHours > 0) {
-                              <span class="ot">+{{ day.overtimeHours }}h OT</span>
-                            }
-                            @if (day.lateFine > 0) {
-                              <span class="late">-{{ day.lateFine | currency:'INR':'symbol':'1.0-0' }} late</span>
-                            }
-                          } @else {
-                            <span class="absent-reason">Absent</span>
-                          }
-                        </div>
-                        <div class="day-date">{{ day.attendanceDate | date:'MMM d' }}</div>
+                        </header>
+
+                        @if (day.status === 'Present') {
+                          <div class="att-day-grid">
+                            <div class="att-day-cell">
+                              <span class="cell-label">Shift</span>
+                              <span class="cell-value">{{ day.shiftCount }}</span>
+                            </div>
+                            <div class="att-day-cell">
+                              <span class="cell-label">OT Hours</span>
+                              <span class="cell-value">{{ day.overtimeHours }}h</span>
+                            </div>
+                            <div class="att-day-cell">
+                              <span class="cell-label">OT Amount</span>
+                              <span class="cell-value">{{ (day.overtimeAmount || 0) | currency:'INR':'symbol':'1.0-0' }}</span>
+                            </div>
+                            <div class="att-day-cell">
+                              <span class="cell-label">Late Fine</span>
+                              <span class="cell-value" [class.has-fine]="day.lateFine > 0">
+                                {{ day.lateFine > 0 ? ('-' + (day.lateFine | currency:'INR':'symbol':'1.0-0')) : '—' }}
+                              </span>
+                            </div>
+                            <div class="att-day-cell">
+                              <span class="cell-label">Payment</span>
+                              <span class="cell-value">{{ day.paymentMode }}</span>
+                            </div>
+                          </div>
+                        } @else {
+                          <div class="att-day-absent">No attendance recorded</div>
+                        }
                       </div>
                     }
                   </div>
@@ -313,50 +331,34 @@ interface WageCalculation {
         @if (activeTab === 'wage') {
           <div class="tab-content">
             <div class="wage-card">
-              <h2 class="wage-title">Weekly Wage Breakdown</h2>
+              <h2 class="wage-title">Daily Wage</h2>
 
-              <div class="wage-input-group">
-                <label>Weekly Salary (INR)</label>
-                <div class="wage-input-row">
-                  <span class="currency">₹</span>
-                  <input
-                    type="number"
-                    [value]="weeklyPayInput()"
-                    (input)="onWeeklyPayChange($event)"
-                    class="wage-input"
-                    placeholder="Enter weekly wage"
-                  />
-                </div>
+              <div class="wage-display">
+                <div class="wage-display-amount">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</div>
+                <div class="wage-display-suffix">per day</div>
               </div>
 
               <div class="wage-divider"></div>
 
               <div class="wage-row">
-                <span class="wage-label">Daily Wage</span>
-                <span class="wage-value">{{ calculatedWage().dailyPay | currency:'INR':'symbol':'1.0-0' }}</span>
+                <span class="wage-label">Weekly Salary (base)</span>
+                <span class="wage-value">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
               <div class="wage-row">
                 <span class="wage-label">Days Worked</span>
-                <span class="wage-value">{{ calculatedWage().daysWorked }}</span>
+                <span class="wage-value">{{ attendanceDays().length }}</span>
               </div>
               <div class="wage-row">
                 <span class="wage-label">Total Shifts</span>
-                <span class="wage-value">{{ calculatedWage().totalShifts }}</span>
+                <span class="wage-value">{{ totalShifts() }}</span>
               </div>
               <div class="wage-row">
                 <span class="wage-label">Overtime Hours</span>
-                <span class="wage-value">{{ calculatedWage().overtimeHours }}h</span>
+                <span class="wage-value">{{ totalOvertime() }}h</span>
               </div>
               <div class="wage-row fine">
-                <span class="wage-label">Late Fine</span>
-                <span class="wage-value">-{{ calculatedWage().lateFineTotal | currency:'INR':'symbol':'1.0-0' }}</span>
-              </div>
-
-              <div class="wage-divider"></div>
-
-              <div class="wage-row net">
-                <span class="wage-label">Net Weekly Pay</span>
-                <span class="wage-value net-value">{{ calculatedWage().netPay | currency:'INR':'symbol':'1.0-0' }}</span>
+                <span class="wage-label">Late Fines</span>
+                <span class="wage-value">-{{ totalLateFines() | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
             </div>
           </div>
@@ -658,6 +660,74 @@ interface WageCalculation {
       margin-top: 4px;
     }
 
+    .att-day-card {
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-lg);
+      padding: var(--md-space-3) var(--md-space-4);
+      margin-bottom: var(--md-space-2);
+    }
+    .att-day-card.att-present { border-left: 3px solid var(--m3-success); }
+    .att-day-card.att-absent { border-left: 3px solid var(--m3-error); opacity: 0.78; }
+    .att-day-card.att-late { border-left: 3px solid var(--m3-warning); }
+
+    .att-day-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--md-space-3);
+    }
+    .att-day-date { display: flex; flex-direction: column; gap: 2px; }
+    .att-day-name { font-size: 13px; font-weight: 700; color: var(--m3-on-surface); }
+    .att-day-full { font-size: 10px; color: var(--m3-on-surface-muted); }
+    .att-day-status {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .att-day-status.status-present { background: var(--m3-success-container); color: var(--m3-on-success-container); }
+    .att-day-status.status-absent { background: var(--m3-error-container); color: var(--m3-on-error-container); }
+    .att-day-status.status-late { background: var(--m3-warning-container); color: var(--m3-on-warning-container); }
+
+    .att-day-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: var(--md-space-2);
+      background: var(--m3-surface-container);
+      border-radius: var(--md-radius-md);
+      padding: var(--md-space-3) var(--md-space-2);
+    }
+    .att-day-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+    }
+    .cell-label {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--m3-on-surface-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .cell-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+    }
+    .cell-value.has-fine { color: var(--m3-error); }
+
+    .att-day-absent {
+      font-size: 12px;
+      color: var(--m3-on-surface-muted);
+      font-style: italic;
+      padding: 4px 0;
+    }
+
     /* Wage Tab */
     .wage-card {
       background: var(--m3-surface-bright);
@@ -766,6 +836,26 @@ interface WageCalculation {
       line-height: 1.6;
     }
     .formula strong { font-weight: 700; }
+
+    .wage-display {
+      text-align: center;
+      padding: var(--md-space-4) 0;
+    }
+    .wage-display-amount {
+      font-size: 44px;
+      font-weight: 800;
+      color: var(--m3-primary);
+      line-height: 1;
+      letter-spacing: -0.5px;
+    }
+    .wage-display-suffix {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--m3-on-surface-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 4px;
+    }
 
     /* Ionic empty state */
     :host ::ng-deep app-empty-state {

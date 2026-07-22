@@ -1,13 +1,13 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-  IonInput, IonButton, IonSpinner, IonIcon,
+  IonSpinner, IonIcon,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline } from 'ionicons/icons';
+import { cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline, gridOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Material } from '../../../shared/models';
 import { DatePipe } from '@angular/common';
@@ -17,9 +17,9 @@ import { StatusPillComponent } from '../../../shared/components';
   selector: 'app-material-detail',
   standalone: true,
   imports: [
-    FormsModule, DatePipe,
+    FormsModule, DatePipe, RouterLink,
     IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-    IonInput, IonButton, IonSpinner, IonIcon,
+    IonSpinner, IonIcon,
     StatusPillComponent,
   ],
   template: `
@@ -90,7 +90,7 @@ import { StatusPillComponent } from '../../../shared/components';
 
           <div class="card">
             <h3 class="card-title">Live stock</h3>
-            <p class="card-sub">Track purchased and consumed quantities. Remaining is calculated automatically.</p>
+            <p class="card-sub">Track purchased and consumed quantities. Update directly from the Inventory page.</p>
             <div class="stock-grid">
               <div class="stock-stat">
                 <div class="stat-label">Purchased</div>
@@ -106,38 +106,10 @@ import { StatusPillComponent } from '../../../shared/components';
               </div>
             </div>
 
-            <div class="form-field">
-              <label class="form-label">Purchased quantity</label>
-              <ion-input
-                type="number"
-                placeholder="0"
-                [(ngModel)]="purchasedInput"
-                [clearInput]="true"
-              ></ion-input>
-            </div>
-            <div class="form-field">
-              <label class="form-label">Consumed quantity</label>
-              <ion-input
-                type="number"
-                placeholder="0"
-                [(ngModel)]="consumedInput"
-                [clearInput]="true"
-              ></ion-input>
-            </div>
-
-            <ion-button
-              expand="block"
-              class="primary-btn"
-              [disabled]="saving()"
-              (click)="saveStock()"
-            >
-              @if (saving()) {
-                <ion-spinner name="crescent"></ion-spinner>
-              } @else {
-                <ion-icon name="checkmark-circle-outline" slot="end"></ion-icon>
-                <span>Save stock</span>
-              }
-            </ion-button>
+            <a routerLink="/tabs/inventory" class="stock-link-btn">
+              <ion-icon name="grid-outline"></ion-icon>
+              Open Inventory to Update
+            </a>
           </div>
         </div>
       }
@@ -223,6 +195,26 @@ import { StatusPillComponent } from '../../../shared/components';
       font-weight: 700; height: 50px; margin-top: 4px;
     }
     .primary-btn:hover { --background: #001a4d; }
+
+    .stock-link-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px 18px;
+      background: #002263;
+      color: #ffffff;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      margin-top: 4px;
+      box-shadow: 0 8px 18px -10px rgba(0, 34, 99, 0.45);
+      transition: filter var(--md-motion-duration-short1);
+    }
+    .stock-link-btn:hover { filter: brightness(1.05); }
+    .stock-link-btn ion-icon { font-size: 18px; }
   `],
 })
 export class MaterialDetailPage implements OnInit {
@@ -233,12 +225,9 @@ export class MaterialDetailPage implements OnInit {
 
   material = signal<Material | null>(null);
   loading = signal(true);
-  saving = signal(false);
-  purchasedInput: number | null = null;
-  consumedInput: number | null = null;
 
   ngOnInit() {
-    addIcons({ cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline });
+    addIcons({ cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline, gridOutline });
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.loading.set(false);
@@ -252,37 +241,11 @@ export class MaterialDetailPage implements OnInit {
     this.supervisor.getMaterialDetail(id).subscribe({
       next: (res: { material: Material }) => {
         this.material.set(res.material);
-        this.purchasedInput = res.material.purchasedQuantity || 0;
-        this.consumedInput = res.material.consumedQuantity || 0;
         this.loading.set(false);
       },
       error: () => {
         this.loading.set(false);
         void this.showToast('Failed to load material', true);
-      },
-    });
-  }
-
-  saveStock() {
-    const m = this.material();
-    if (!m) return;
-    this.saving.set(true);
-    this.supervisor.updateMaterialStock(m._id, {
-      purchasedQuantity: this.purchasedInput || 0,
-      consumedQuantity: this.consumedInput || 0,
-    }).subscribe({
-      next: (res: any) => {
-        const updated = res?.material || res;
-        if (updated && updated._id) {
-          this.material.set(updated);
-        }
-        this.saving.set(false);
-        void this.showToast('Stock updated', false);
-      },
-      error: (err) => {
-        this.saving.set(false);
-        const msg = err?.error?.message || err?.message || 'Failed to update stock';
-        void this.showToast(msg, true);
       },
     });
   }

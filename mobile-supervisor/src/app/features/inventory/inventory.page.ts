@@ -89,7 +89,8 @@ type SortDir = 'asc' | 'desc';
       <div class="filter-stack">
         <ion-searchbar
           placeholder="Search materials..."
-          [(ngModel)]="searchQuery"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
           (ionInput)="applyFilters()"
           class="search-bar"
        />
@@ -114,8 +115,8 @@ type SortDir = 'asc' | 'desc';
         } @else if (filteredItems().length === 0) {
           <app-empty-state
             icon="grid-outline"
-            [title]="searchQuery ? 'No matches found' : 'No inventory yet'"
-            [message]="searchQuery
+            [title]="searchQuery() ? 'No matches found' : 'No inventory yet'"
+            [message]="searchQuery()
               ? 'Try adjusting your search.'
               : 'Approved materials will appear here as inventory.'"
           ></app-empty-state>
@@ -446,21 +447,22 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   items = signal<InventoryItem[]>([]);
   isLoading = signal(true);
-  searchQuery = '';
+  searchQuery = signal('');
   sortField = signal<SortField>('name');
   sortDir = signal<SortDir>('asc');
 
   filteredItems = computed(() => {
     let result = [...this.items()];
 
-    if (this.searchQuery) {
-      const q = this.searchQuery.toLowerCase();
+    const q = this.searchQuery().toLowerCase().trim();
+    if (q) {
       result = result.filter(
         (i) =>
           i.name.toLowerCase().includes(q) ||
-          i.vendor?.toLowerCase().includes(q) ||
-          i.poNumber?.toLowerCase().includes(q) ||
-          i.site.toLowerCase().includes(q)
+          (i.vendor || '').toLowerCase().includes(q) ||
+          (i.poNumber || '').toLowerCase().includes(q) ||
+          (i.site || '').toLowerCase().includes(q) ||
+          (i.category || '').toLowerCase().includes(q)
       );
     }
 
@@ -569,7 +571,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
-    // triggers computed recompute via signal dependency
+    // No-op: search is bound to a signal, computed re-evaluates automatically.
   }
 
   cycleSort(): void {

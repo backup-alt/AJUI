@@ -146,7 +146,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
               <div class="att-card">
                 <div class="att-header">
                   <div class="att-worker">
-                    <span class="att-name">{{ att.workerName }}</span>
+                    <span class="att-name">{{ getWorkerName(att) }}</span>
                     <span class="att-type">{{ att.labourType }}</span>
                   </div>
                   <span class="att-shift">Shift {{ att.shiftCount }}</span>
@@ -512,5 +512,19 @@ export class LabourPage implements OnInit, OnDestroy {
 
   editAttendance(att: Attendance): void {
     this.router.navigate(['/tabs/labour/edit-attendance', att._id]);
+  }
+
+  /**
+   * Resolve a worker name for an attendance record.
+   * The backend sometimes returns the supervisor's name in the `workerName`
+   * field, so we first try the workers list (matched by workerId) and only
+   * fall back to the API-provided name as a last resort.
+   */
+  getWorkerName(att: Attendance): string {
+    const fromList = this.workers().find(
+      (w) => w._id === att.workerId || (w as any).workerId === att.workerId
+    );
+    if (fromList && fromList.name) return fromList.name;
+    return att.workerName || 'Worker';
   }
 }
