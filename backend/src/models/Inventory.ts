@@ -23,6 +23,14 @@ export interface IInventory extends Document {
   poNumber?: string;
   lastMaterialId?: Types.ObjectId;
   lastUpdatedBy?: string;
+  purchaseHistory?: Array<{
+    vendor: string;
+    vendorId?: Types.ObjectId;
+    quantity: number;
+    date: Date;
+    poNumber?: string;
+    materialId?: Types.ObjectId;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +58,17 @@ const inventorySchema = new Schema<IInventory>(
     poNumber: { type: String, trim: true },
     lastMaterialId: { type: Schema.Types.ObjectId, ref: "Material" },
     lastUpdatedBy: { type: String },
+    purchaseHistory: {
+      type: [{
+        vendor: { type: String, trim: true },
+        vendorId: { type: Schema.Types.ObjectId, ref: "Vendor" },
+        quantity: { type: Number, default: 0 },
+        date: { type: Date, default: Date.now },
+        poNumber: { type: String, trim: true },
+        materialId: { type: Schema.Types.ObjectId, ref: "Material" },
+      }],
+      default: undefined,
+    },
   },
   { timestamps: true }
 );

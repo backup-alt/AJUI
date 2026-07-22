@@ -49,6 +49,7 @@ export async function addApprovedMaterialToInventory(
         normalizedUnit: normalized(material.unit),
         minimumQuantity: 0,
         consumedQuantity: 0,
+        purchaseHistory: [],
       },
       $inc: {
         approvedQuantity: qty,
@@ -60,6 +61,16 @@ export async function addApprovedMaterialToInventory(
         poNumber: material.poNumber,
         lastMaterialId: material._id,
         lastUpdatedBy: updatedBy,
+      },
+      $push: {
+        purchaseHistory: {
+          vendor: material.vendor || "",
+          vendorId: material.vendorId,
+          quantity: qty,
+          date: new Date(),
+          poNumber: material.poNumber,
+          materialId: material._id,
+        },
       },
     },
     { upsert: true, new: true, runValidators: true }
@@ -124,6 +135,14 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
       vendorId: material.vendorId,
       poNumber: material.poNumber,
       lastMaterialId: material._id,
+      purchaseHistory: [{
+        vendor: material.vendor || "",
+        vendorId: material.vendorId,
+        quantity: quantity,
+        date: new Date(),
+        poNumber: material.poNumber,
+        materialId: material._id,
+      }],
     });
     await inventory.save();
   }

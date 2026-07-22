@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inj
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
-import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonRefresher, IonRefresherContent, IonSplitPane } from "@ionic/angular/standalone";
 import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
@@ -167,6 +167,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
     CommonModule,
     IonContent,
     IonIcon,
+    IonRefresher,
+    IonRefresherContent,
     IonSplitPane,
     EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
@@ -236,6 +238,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
         />
 
         <ion-content class="erp-page">
+          <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+            <ion-refresher-content></ion-refresher-content>
+          </ion-refresher>
           <main class="workspace-shell" [class.table-view-expanded]="tableViewExpanded()" *ngIf="project() as currentProject">
             <nav class="workspace-breadcrumb" aria-label="Breadcrumb" *ngIf="!tableViewExpanded()">
               <button type="button" (click)="backToClients()">Clients</button>
@@ -1133,6 +1138,10 @@ export class ProjectWorkspacePage {
       this.editingProject.set(project);
       this.showProjectForm.set(true);
     });
+  }
+
+  async refresh(event: CustomEvent) {
+    void event.detail.complete();
   }
 
   switchSection(section: ModuleKey) {

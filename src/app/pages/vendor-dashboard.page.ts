@@ -853,9 +853,10 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     }
     .materials-table {
       background: #fff;
-      border: 1px solid #e2e8f0;
+      border: 1px solid #eef0f3;
       border-radius: 12px;
       overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
     .materials-table table {
       width: 100%;
@@ -863,20 +864,20 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     }
     .materials-table th {
       background: #f8fafc;
-      color: #475569;
+      color: #64748b;
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 12px 10px;
+      letter-spacing: 0.3px;
+      padding: 12px 14px;
       text-align: left;
-      border-bottom: 2px solid #e2e8f0;
+      border-bottom: 1px solid #eef0f3;
     }
     .materials-table td {
-      padding: 10px;
+      padding: 14px;
       border-bottom: 1px solid #f1f5f9;
       font-size: 13px;
-      color: #1e293b;
+      color: #0f172a;
       vertical-align: middle;
     }
     .materials-table tr:last-child td { border-bottom: none; }

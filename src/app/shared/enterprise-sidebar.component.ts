@@ -24,6 +24,10 @@ type SidebarItem = {
         <div class="sidebar-shell">
           <div class="sidebar-logo-wrap">
             <img class="sidebar-logo" [src]="logoPath" alt="Annai Golden Builders" />
+            <div class="sidebar-brand">
+              <span class="brand-name">Annai Golden Builders</span>
+              <span class="brand-sub">Construction Management</span>
+            </div>
           </div>
 
           <ion-list lines="none" class="sidebar-nav">
@@ -103,7 +107,7 @@ export class EnterpriseSidebarComponent {
   @Output() editProject = new EventEmitter<Project>();
   @Output() deleteProject = new EventEmitter<Project>();
 
-  readonly logoPath = "assets/logo.png";
+  readonly logoPath = "assets/logo.svg";
 
   get clientProjects(): Project[] {
     return this.data.projectsForClient(this.data.clientById(this.clientId));

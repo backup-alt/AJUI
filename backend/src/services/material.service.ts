@@ -39,8 +39,28 @@ async function resolveSiteName(site?: string, siteId?: string): Promise<string |
 
 export async function createMaterial(input: CreateMaterialInput) {
   const { project, client, vendor } = await populateRefs(input);
-  const materialId = await generateId("MAT");
   const siteName = await resolveSiteName(input.site, input.siteId);
+
+  const existingPending = await Material.findOne({
+    projectId: project._id,
+    site: siteName,
+    name: input.name,
+    unit: input.unit,
+    status: { $in: ["Pending", "Not Received"] },
+  });
+
+  if (existingPending) {
+    existingPending.requestedQuantity = input.requestedQuantity;
+    existingPending.notes = input.notes;
+    existingPending.vendor = input.vendor || vendor?.name;
+    existingPending.vendorId = input.vendorId ? new Types.ObjectId(input.vendorId) : vendor?.vendorId;
+    existingPending.poNumber = input.poNumber;
+    existingPending.createdBy = input.createdBy;
+    await existingPending.save();
+    return existingPending.toObject();
+  }
+
+  const materialId = await generateId("MAT");
   const material = await Material.create({
     materialId,
     projectId: project._id,

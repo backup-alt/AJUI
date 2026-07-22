@@ -1,4 +1,4 @@
-import { CommonModule } from "@angular/common";
+import { CommonModule, DatePipe } from "@angular/common";
 import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
@@ -269,7 +269,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
+  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent, DatePipe],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="dashboard"></agb-enterprise-sidebar>
@@ -295,16 +295,52 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
         <ion-content class="erp-page">
           <main class="workspace-shell" [class.table-view-expanded]="tableViewExpanded()">
-            <section class="dashboard-command-strip dashboard-command-center" *ngIf="!tableViewExpanded()">
-              <div class="dashboard-command-copy">
+            <section class="dashboard-modern-hero" *ngIf="!tableViewExpanded()">
+              <div class="hero-header">
                 <h1>Dashboard</h1>
+                <span class="hero-subtitle">Overview of all operations</span>
               </div>
-              <div class="dashboard-kpi-strip dashboard-kpi-board">
-                <div><span>Active Projects</span><strong>{{ activeProjectsCount() }}</strong></div>
-                <div><span>Projects On Hold</span><strong>{{ projectsOnHoldCount() }}</strong></div>
-                <div><span>Completed Projects</span><strong>{{ completedProjectsCount() }}</strong></div>
-                <div><span>Pending Approval</span><strong>{{ pendingApprovalCount() }}</strong></div>
-                <div><span>Active Clients</span><strong>{{ data.activeClients() }}</strong></div>
+              <div class="hero-kpi-strip">
+                <div class="kpi-card">
+                  <div class="kpi-icon active"><ion-icon name="folder-open-outline"></ion-icon></div>
+                  <div class="kpi-content">
+                    <span class="kpi-label">Active Projects</span>
+                    <strong class="kpi-value">{{ activeProjectsCount() }}</strong>
+                    <span class="kpi-badge active">Active</span>
+                  </div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-icon onhold"><ion-icon name="pause-circle-outline"></ion-icon></div>
+                  <div class="kpi-content">
+                    <span class="kpi-label">Projects On Hold</span>
+                    <strong class="kpi-value">{{ projectsOnHoldCount() }}</strong>
+                    <span class="kpi-badge onhold">On Hold</span>
+                  </div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-icon completed"><ion-icon name="checkmark-circle-outline"></ion-icon></div>
+                  <div class="kpi-content">
+                    <span class="kpi-label">Completed Projects</span>
+                    <strong class="kpi-value">{{ completedProjectsCount() }}</strong>
+                    <span class="kpi-badge completed">Done</span>
+                  </div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-icon approval"><ion-icon name="time-outline"></ion-icon></div>
+                  <div class="kpi-content">
+                    <span class="kpi-label">Pending Approval</span>
+                    <strong class="kpi-value">{{ pendingApprovalCount() }}</strong>
+                    <span class="kpi-badge approval">Review</span>
+                  </div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-icon clients"><ion-icon name="people-outline"></ion-icon></div>
+                  <div class="kpi-content">
+                    <span class="kpi-label">Active Clients</span>
+                    <strong class="kpi-value">{{ data.activeClients() }}</strong>
+                    <span class="kpi-badge clients">Ongoing</span>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -504,6 +540,19 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           <span class="meta-label">Last Updated</span>
                           <span class="meta-value">{{ card.lastUpdated || 'N/A' }}</span>
                         </div>
+                        @if (card.vendorHistory.length > 0) {
+                          <div class="inventory-vendor-history">
+                            @for (entry of card.vendorHistory.slice(0, 2); track entry.vendor) {
+                              <div class="vendor-history-row">
+                                <span class="vendor-name">{{ entry.vendor }}</span>
+                                <span class="vendor-qty">{{ entry.qty }} {{ card.unit }}</span>
+                                @if (entry.lastDate) {
+                                  <span class="vendor-date">{{ entry.lastDate | date:'d MMM yyyy' }}</span>
+                                }
+                              </div>
+                            }
+                          </div>
+                        }
                       </div>
                     </article>
                   }
@@ -1021,6 +1070,27 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <strong class="stat-value">{{ selectedInventoryCard()!.lastUpdated || 'N/A' }}</strong>
                 </div>
               </div>
+              @if (selectedInventoryCard()!.vendorHistory && selectedInventoryCard()!.vendorHistory.length > 0) {
+                <div class="breakdown-vendor-history">
+                  <h3 class="vendor-history-title">Vendor Purchase History</h3>
+                  <div class="vendor-history-list">
+                    @for (entry of selectedInventoryCard()!.vendorHistory; track entry.vendor) {
+                      <div class="vendor-history-entry">
+                        <div class="vendor-entry-info">
+                          <ion-icon name="storefront-outline"></ion-icon>
+                          <span class="vendor-entry-name">{{ entry.vendor }}</span>
+                        </div>
+                        <div class="vendor-entry-stats">
+                          <span class="vendor-entry-qty">{{ entry.qty }} {{ selectedInventoryCard()!.unit }}</span>
+                          @if (entry.lastDate) {
+                            <span class="vendor-entry-date">{{ entry.lastDate | date:'d MMM yyyy' }}</span>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
               <div class="inventory-breakdown-table">
                 <div class="breakdown-table-head">
                   <span>Site</span>
@@ -1106,37 +1176,39 @@ const siteMaterialDetailFields: FieldSchema[] = [
       margin: 0;
     }
     .inventory-cards-section {
-      padding: 16px 24px;
+      padding: 20px 24px;
     }
     .inventory-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 16px;
     }
     .inventory-card {
-      background: #fff;
-      border: 1px solid #e5eaf1;
+      background: #ffffff;
+      border: 1px solid #eef0f3;
       border-radius: 12px;
-      padding: 18px;
+      padding: 16px;
       cursor: pointer;
       transition: all 160ms ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
     .inventory-card:hover {
-      border-color: #2c5cff;
-      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.1);
-      transform: translateY(-2px);
+      border-color: #cbd5e1;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+      transform: translateY(-1px);
     }
     .inventory-card-head {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .inventory-material-icon {
-      width: 38px;
-      height: 38px;
-      background: #eef3ff;
-      border-radius: 8px;
+      width: 40px;
+      height: 40px;
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1144,7 +1216,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .inventory-material-icon ion-icon {
       font-size: 20px;
-      color: #2c5cff;
+      color: #64748b;
     }
     .inventory-material-info {
       flex: 1;
@@ -1152,8 +1224,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .inventory-material-info h3 {
       font-size: 15px;
-      font-weight: 600;
-      color: #1a2540;
+      font-weight: 700;
+      color: #0f172a;
       margin: 0 0 2px;
       white-space: nowrap;
       overflow: hidden;
@@ -1165,48 +1237,60 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .inventory-site-count {
       font-size: 11px;
-      background: #f0f6ff;
-      color: #2c5cff;
-      border-radius: 20px;
-      padding: 2px 8px;
-      font-weight: 500;
+      font-weight: 700;
+      background: #f8fafc;
+      color: #64748b;
+      border: 1px solid #f1f5f9;
+      border-radius: 999px;
+      padding: 3px 10px;
       white-space: nowrap;
     }
     .inventory-card-body {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 10px;
+      padding: 12px;
     }
     .inventory-qty {
       display: flex;
       align-items: baseline;
+      justify-content: space-between;
       gap: 8px;
     }
     .qty-label {
-      font-size: 12px;
+      font-size: 10px;
       color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
     }
     .qty-value {
-      font-size: 22px;
+      font-size: 14px;
       font-weight: 700;
-      color: #1a2540;
+      color: #0f172a;
     }
     .qty-value small {
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 400;
       color: #64748b;
     }
     .inventory-meta {
       display: flex;
       gap: 8px;
+      justify-content: space-between;
     }
     .meta-label {
-      font-size: 12px;
+      font-size: 10px;
       color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
     }
     .meta-value {
       font-size: 12px;
-      color: #1a2540;
+      color: #0f172a;
+      font-weight: 500;
     }
     .inventory-empty {
       grid-column: 1 / -1;
@@ -1217,6 +1301,37 @@ const siteMaterialDetailFields: FieldSchema[] = [
     .inventory-empty ion-icon {
       font-size: 40px;
       margin-bottom: 12px;
+    }
+    .inventory-vendor-history {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .vendor-history-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .vendor-history-row .vendor-name {
+      color: #475569;
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .vendor-history-row .vendor-qty {
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .vendor-history-row .vendor-date {
+      color: #94a3b8;
+      font-size: 10px;
     }
     .inventory-breakdown-dialog {
       max-width: 680px;
@@ -1251,6 +1366,60 @@ const siteMaterialDetailFields: FieldSchema[] = [
       margin-top: 16px;
       max-height: 360px;
       overflow-y: auto;
+    }
+    .breakdown-vendor-history {
+      padding: 16px 24px;
+      border-bottom: 1px solid #e5eaf1;
+    }
+    .vendor-history-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0 0 10px;
+    }
+    .vendor-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .vendor-history-entry {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 10px;
+    }
+    .vendor-entry-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .vendor-entry-info ion-icon {
+      font-size: 16px;
+      color: #64748b;
+    }
+    .vendor-entry-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .vendor-entry-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .vendor-entry-qty {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .vendor-entry-date {
+      font-size: 11px;
+      color: #94a3b8;
     }
     .breakdown-table-head {
       display: grid;
@@ -1338,7 +1507,7 @@ export class UniversalDashboardPage {
   readonly labourTypeDailyWage = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials()));
-  readonly selectedInventoryCard = signal<{ materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
+  readonly selectedInventoryCard = signal<{ materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string; vendorHistory: Array<{ vendor: string; qty: number; lastDate: string }> } | null>(null);
   readonly inventoryBreakdownRows = computed(() => {
     const card = this.selectedInventoryCard();
     if (!card) return [] as import("../../data/dashboardData").MaterialRow[];
@@ -1384,14 +1553,20 @@ export class UniversalDashboardPage {
   }
 
   private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[]) {
-    const map = new Map<string, { qty: number; unit: string; sites: Set<string>; lastUpdated: string }>();
+    const map = new Map<string, { qty: number; unit: string; sites: Set<string>; lastUpdated: string; vendorHistory: Map<string, { qty: number; lastDate: string }> }>();
     for (const m of materials) {
       if (!m.name) continue;
       const key = m.name;
-      const existing = map.get(key) || { qty: 0, unit: m.unit || "", sites: new Set<string>(), lastUpdated: "" };
+      const existing = map.get(key) || { qty: 0, unit: m.unit || "", sites: new Set<string>(), lastUpdated: "", vendorHistory: new Map() };
       existing.qty += m.quantity ?? 0;
       if (m.site) existing.sites.add(m.site);
       if (m.requestDate && m.requestDate > existing.lastUpdated) existing.lastUpdated = m.requestDate;
+      if (m.vendor) {
+        const vh = existing.vendorHistory.get(m.vendor) || { qty: 0, lastDate: "" };
+        vh.qty += m.quantity ?? 0;
+        if (m.purchasedDate && m.purchasedDate > vh.lastDate) vh.lastDate = m.purchasedDate;
+        existing.vendorHistory.set(m.vendor, vh);
+      }
       map.set(key, existing);
     }
     return [...map.entries()].map(([materialName, v]) => ({
@@ -1400,10 +1575,11 @@ export class UniversalDashboardPage {
       unit: v.unit,
       siteCount: v.sites.size,
       lastUpdated: v.lastUpdated,
+      vendorHistory: [...v.vendorHistory.entries()].map(([vendor, h]) => ({ vendor, qty: h.qty, lastDate: h.lastDate })),
     })).sort((a, b) => a.materialName.localeCompare(b.materialName));
   }
 
-  openInventoryBreakdown(card: { materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string }) {
+  openInventoryBreakdown(card: { materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string; vendorHistory: Array<{ vendor: string; qty: number; lastDate: string }> }) {
     this.selectedInventoryCard.set(card);
     this.showInventoryBreakdown.set(true);
   }
