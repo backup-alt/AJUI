@@ -16,6 +16,13 @@ export interface ApiUser {
 export interface LoginResponse {
   user: ApiUser;
   accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+}
+
+export interface RefreshResponse {
+  accessToken: string;
+  refreshToken: string;
   expiresAt: string;
 }
 
@@ -85,6 +92,25 @@ export class ApiService {
   logout(): Observable<any> {
     return this.http.post(`${this.baseUrl}/auth/logout`, {}, { withCredentials: true }).pipe(
       tap(() => this.clearSession()),
+      catchError((err) => {
+        this.clearSession();
+        return throwError(() => err);
+      })
+    );
+  }
+
+  refreshTokens(): Observable<RefreshResponse> {
+    const refreshToken = this.getStored(STORAGE_KEYS.REFRESH_TOKEN);
+    return this.http.post<RefreshResponse>(`${this.baseUrl}/auth/refresh`, { refreshToken }, { withCredentials: true }).pipe(
+      tap((res) => {
+        this.accessTokenSignal.set(res.accessToken);
+        this.expiresAtSignal.set(res.expiresAt);
+        try {
+          localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
+          localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
+          localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
+        } catch {}
+      }),
       catchError((err) => {
         this.clearSession();
         return throwError(() => err);
@@ -1072,6 +1098,7 @@ export class ApiService {
     this.expiresAtSignal.set(res.expiresAt);
     try {
       localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
+      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken || "");
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
       localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
     } catch {}

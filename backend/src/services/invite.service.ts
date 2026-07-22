@@ -13,8 +13,8 @@ import {
   buildResetPasswordEmail,
 } from "./email-templates/index.js";
 
-const QR_EXPIRY_MINUTES = 5;
-const INVITE_EXPIRY_MINUTES = 5;
+const QR_EXPIRY_MINUTES = 30;
+const INVITE_EXPIRY_MINUTES = 30;
 const OTP_LENGTH = 6;
 
 function generateToken(): string {
@@ -152,7 +152,7 @@ export async function createInvite(params: CreateInviteParams): Promise<{
     // Send deep link email instead of OTP email
     const separator = env.QR_BASE_URL.includes("?") ? "&" : "?";
     const deepLink = `${env.QR_BASE_URL}${separator}token=${encodeURIComponent(token)}`;
-    const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/#/auth/signup?token=${encodeURIComponent(token)}`;
+const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/#/signup/employee?token=${encodeURIComponent(token)}`;
 
     const { subject, html, text } = buildSupervisorInviteEmail({
       name: params.supervisorName,
@@ -439,7 +439,7 @@ export async function sendSupervisorInviteEmail(
   const deepLink = `${env.QR_BASE_URL}${separator}token=${encodeURIComponent(token)}`;
 
   // Web fallback URL for browsers that can't open the deep link
-  const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/#/auth/signup?token=${encodeURIComponent(token)}`;
+  const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/#/signup/employee?token=${encodeURIComponent(token)}`;
 
   const name = extractSupervisorName(invite);
   const expiryMinutes = Math.max(

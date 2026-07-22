@@ -295,36 +295,78 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
         <ion-content class="erp-page">
           <main class="workspace-shell" [class.table-view-expanded]="tableViewExpanded()">
-            <section class="dashboard-command-strip dashboard-command-center" *ngIf="!tableViewExpanded()">
-              <div class="dashboard-command-copy">
+            <section class="dashboard-hero" *ngIf="!tableViewExpanded()">
+              <div class="hero-content">
                 <h1>Dashboard</h1>
-              </div>
-              <div class="dashboard-kpi-strip dashboard-kpi-board">
-                <div><span>Active Projects</span><strong>{{ activeProjectsCount() }}</strong></div>
-                <div><span>Projects On Hold</span><strong>{{ projectsOnHoldCount() }}</strong></div>
-                <div><span>Completed Projects</span><strong>{{ completedProjectsCount() }}</strong></div>
-                <div><span>Pending Approval</span><strong>{{ pendingApprovalCount() }}</strong></div>
-                <div><span>Active Clients</span><strong>{{ data.activeClients() }}</strong></div>
+                <p class="hero-subtitle">Overview of all projects, materials, and operations</p>
               </div>
             </section>
 
+            <section class="kpi-grid" *ngIf="!tableViewExpanded()">
+              <article class="kpi-card" [class.warning]="pendingApprovalCount() > 0">
+                <div class="kpi-icon">
+                  <ion-icon name="construct-outline"></ion-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Active Projects</span>
+                  <strong class="kpi-value">{{ activeProjectsCount() }}</strong>
+                </div>
+              </article>
+              <article class="kpi-card">
+                <div class="kpi-icon secondary">
+                  <ion-icon name="pause-circle-outline"></ion-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Projects On Hold</span>
+                  <strong class="kpi-value">{{ projectsOnHoldCount() }}</strong>
+                </div>
+              </article>
+              <article class="kpi-card">
+                <div class="kpi-icon success">
+                  <ion-icon name="checkmark-circle-outline"></ion-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Completed Projects</span>
+                  <strong class="kpi-value">{{ completedProjectsCount() }}</strong>
+                </div>
+              </article>
+              <article class="kpi-card warning">
+                <div class="kpi-icon warning">
+                  <ion-icon name="alert-circle-outline"></ion-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Pending Approvals</span>
+                  <strong class="kpi-value">{{ pendingApprovalCount() }}</strong>
+                </div>
+              </article>
+              <article class="kpi-card">
+                <div class="kpi-icon info">
+                  <ion-icon name="people-outline"></ion-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Active Clients</span>
+                  <strong class="kpi-value">{{ data.activeClients() }}</strong>
+                </div>
+              </article>
+            </section>
+
             <section class="operations-workbench universal-workbench" [class.table-expanded]="tableViewExpanded()">
-              <nav class="operations-tabs" aria-label="Universal dashboard modules" *ngIf="!tableViewExpanded()">
+              <nav class="operations-tabs-modern" aria-label="Universal dashboard modules" *ngIf="!tableViewExpanded()">
                 <button
                   *ngFor="let module of modules"
                   type="button"
                   [class.active]="activeModule() === module.key"
                   (click)="switchModule(module.key)"
                 >
-                  <span>{{ module.label }}</span>
-                  <small>{{ rowCountFor(module.key) }}</small>
+                  <span class="tab-label">{{ module.label }}</span>
+                  <span class="tab-count">{{ rowCountFor(module.key) }}</span>
                 </button>
               </nav>
 
-              <div class="site-workbench universal-site-workbench" *ngIf="!tableViewExpanded() && isUniversalSiteAware(activeModule())">
+              <div class="site-workbench-modern" *ngIf="!tableViewExpanded() && isUniversalSiteAware(activeModule())">
                 <div class="site-switch-row">
-                  <span>Site</span>
-                  <div class="site-chip-strip">
+                  <span class="site-label">Site</span>
+                  <div class="site-chip-strip-modern">
                     <button type="button" [class.active]="activeSiteFilter() === 'All'" (click)="selectUniversalSite('All')">All Sites</button>
                     <button
                       *ngFor="let site of universalSiteOptions()"
@@ -1058,6 +1100,170 @@ const siteMaterialDetailFields: FieldSchema[] = [
       color: #fff;
       font-size: 13px;
       border-bottom: 1px solid #2c3760;
+    }
+    .dashboard-hero {
+      padding: 28px 32px 0;
+      background: linear-gradient(135deg, #1a2540 0%, #2d3a5c 100%);
+      border-bottom: 1px solid #2c3760;
+    }
+    .hero-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .dashboard-hero h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0;
+    }
+    .hero-subtitle {
+      font-size: 14px;
+      color: #8b9dc3;
+      margin: 4px 0 0;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      padding: 20px 32px 24px;
+      background: linear-gradient(135deg, #1a2540 0%, #2d3a5c 100%);
+    }
+    .kpi-card {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      backdrop-filter: blur(8px);
+      transition: all 200ms ease;
+    }
+    .kpi-card:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+    .kpi-card.warning {
+      border-color: rgba(255, 183, 77, 0.4);
+      background: rgba(255, 183, 77, 0.08);
+    }
+    .kpi-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .kpi-icon ion-icon {
+      font-size: 22px;
+      color: #6fffb0;
+    }
+    .kpi-icon.secondary ion-icon { color: #64b5f6; }
+    .kpi-icon.success ion-icon { color: #81c784; }
+    .kpi-icon.warning ion-icon { color: #ffb74d; }
+    .kpi-icon.info ion-icon { color: #64b5f6; }
+    .kpi-content {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+    }
+    .kpi-label {
+      font-size: 12px;
+      color: #8b9dc3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1;
+    }
+    .operations-tabs-modern {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 32px;
+      background: #ffffff;
+      border-bottom: 1px solid #e8edf5;
+    }
+    .operations-tabs-modern button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: #64748b;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 150ms ease;
+    }
+    .operations-tabs-modern button:hover {
+      background: #f0f6ff;
+      color: #1a2540;
+    }
+    .operations-tabs-modern button.active {
+      background: #2c5cff;
+      color: #ffffff;
+    }
+    .tab-count {
+      font-size: 11px;
+      background: rgba(0, 0, 0, 0.08);
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+    .operations-tabs-modern button.active .tab-count {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .site-workbench-modern {
+      padding: 12px 32px;
+      background: #ffffff;
+      border-bottom: 1px solid #e8edf5;
+    }
+    .site-switch-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .site-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a2540;
+    }
+    .site-chip-strip-modern {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .site-chip-strip-modern button {
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid #e0e7f0;
+      background: #ffffff;
+      color: #4a5578;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 150ms ease;
+    }
+    .site-chip-strip-modern button:hover {
+      border-color: #2c5cff;
+      color: #2c5cff;
+    }
+    .site-chip-strip-modern button.active {
+      background: #2c5cff;
+      border-color: #2c5cff;
+      color: #ffffff;
     }
     .backend-sync-banner .spinner {
       width: 14px;

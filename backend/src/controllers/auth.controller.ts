@@ -918,7 +918,7 @@ export async function employeeResendOtp(
     if (invite.inviteeEmail) {
       const name = inviteService.extractInviteeName(invite);
       const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
-      const inviteUrl = `${baseUrl}/signup/employee?token=${encodeURIComponent(token)}`;
+      const inviteUrl = `${baseUrl}/#/signup/employee?token=${encodeURIComponent(token)}`;
       const roleLabel =
         invite.role === "project_manager"
           ? "Project Manager"

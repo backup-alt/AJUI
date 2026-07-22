@@ -96,7 +96,7 @@ import { Site } from '../../shared/models';
         <div class="menu-brand">
           <div class="menu-brand-logo">
             <img
-              src="assets/logo.png"
+              src="assets/logo.svg"
               alt="Annai Golden Builders"
               class="menu-brand-logo-img"
             />

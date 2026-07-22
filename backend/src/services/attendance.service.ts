@@ -65,7 +65,7 @@ export async function listGroupedAttendance(filter: {
         workers: {
           $push: {
             workerId: { $toString: "$workerId" },
-            workerName: "$supervisor.name",
+            workerName: "$workerName",
             shiftCount: "$shiftCount",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",
@@ -156,7 +156,7 @@ export async function getLabourReport(filter: {
         workers: {
           $push: {
             workerId: { $toString: "$workerId" },
-            workerName: "$supervisor.name",
+            workerName: "$workerName",
             shiftCount: "$shiftCount",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",

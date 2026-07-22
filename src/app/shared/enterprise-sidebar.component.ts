@@ -103,7 +103,7 @@ export class EnterpriseSidebarComponent {
   @Output() editProject = new EventEmitter<Project>();
   @Output() deleteProject = new EventEmitter<Project>();
 
-  readonly logoPath = "assets/logo.png";
+  readonly logoPath = "assets/logo.svg";
 
   get clientProjects(): Project[] {
     return this.data.projectsForClient(this.data.clientById(this.clientId));

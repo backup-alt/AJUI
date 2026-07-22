@@ -2080,12 +2080,12 @@ ion-menu.enterprise-sidebar::part(container) {
 .sidebar-logo-wrap {
   display: flex;
   justify-content: center;
-  padding: 22px 20px 18px;
+  padding: 8px 20px 4px;
 }
 
 .sidebar-logo {
-  width: 148px;
-  height: 148px;
+  width: 88px;
+  height: 88px;
   object-fit: contain;
   border-radius: 8px;
 }
@@ -3204,7 +3204,7 @@ ion-menu.enterprise-sidebar::part(container) {
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  padding: 24px 18px 20px;
+  padding: 10px 18px 8px;
 }
 
 .sidebar-logo {
@@ -3636,7 +3636,7 @@ ion-menu.enterprise-sidebar::part(container) {
 
 .sidebar-logo-wrap {
   gap: 11px;
-  padding: 18px 18px 16px;
+  padding: 10px 18px 8px;
   border-bottom: 1px solid var(--ui-line);
 }
 
@@ -4078,8 +4078,8 @@ ion-badge.neutral {
 }
 
 .sidebar-logo-wrap {
-  min-height: 88px;
-  padding: 14px 16px;
+  min-height: 70px;
+  padding: 8px 16px 6px;
 }
 
 .sidebar-logo {
@@ -5760,8 +5760,8 @@ body {
 /* Logo, project module tabs, and expense split polish */
 .sidebar-logo-wrap {
   justify-content: center;
-  min-height: 112px;
-  padding: 14px 16px 12px;
+  min-height: 70px;
+  padding: 8px 16px 6px;
   border-bottom: 1px solid rgba(208, 215, 222, 0.78);
 }
 
@@ -6057,8 +6057,8 @@ body {
 }
 
 .sidebar-logo-wrap {
-  min-height: 92px;
-  padding: 12px 16px 10px;
+  min-height: 70px;
+  padding: 8px 16px 6px;
 }
 
 .sidebar-logo {
@@ -12846,8 +12846,8 @@ ion-menu.enterprise-sidebar .sidebar-nav ion-item {
 }
 
 ion-menu.enterprise-sidebar .sidebar-logo-wrap {
-  padding: 12px 14px 10px;
-  min-height: 88px;
+  padding: 8px 14px 6px;
+  min-height: 68px;
 }
 
 ion-menu.enterprise-sidebar .sidebar-logo {
@@ -13767,7 +13767,7 @@ ion-menu.enterprise-sidebar .sidebar-project-scroll {
 
 
 /* ============================================
-   FORCE LIGHT MODE — Disable dark mode permanently
+   FORCE LIGHT MODE ï¿½ Disable dark mode permanently
    ============================================ */
 @media (prefers-color-scheme: dark) {
   :root {

@@ -162,13 +162,11 @@ export async function markAttendance(input: {
     );
   }
 
-  const supervisorName = await resolveSupervisorName(input.createdBy);
-
   const attendanceId = await generateId("ATT");
   const attendance = await Attendance.create({
     attendanceId,
     workerId: worker._id,
-    workerName: supervisorName,
+    workerName: worker.name,
     projectId: new Types.ObjectId(input.projectId),
     projectName: worker.projectName,
     clientId: worker.clientId,

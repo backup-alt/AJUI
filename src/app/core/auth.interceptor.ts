@@ -1,29 +1,33 @@
 import { HttpInterceptorFn } from "@angular/common/http";
 import { inject } from "@angular/core";
-import { catchError, throwError } from "rxjs";
+import { catchError, throwError, switchMap, tap } from "rxjs";
 import { HttpErrorResponse, HttpRequest, HttpHandlerFn, HttpEvent } from "@angular/common/http";
-import { Observable } from "rxjs";
+import { Observable, from, of } from "rxjs";
 import { ApiService } from "./api.service";
 import { AccessRestrictionService } from "./access-restriction.service";
+import { Router } from "@angular/router";
 
 /**
  * Adds the Bearer token to outgoing requests and handles auth error responses.
- *
- * IMPORTANT (Session Persistence policy):
- * - Sessions persist until the user explicitly logs out or closes the
- *   browser window. We do NOT auto-redirect to /login on 401 (token
- *   expiry) — the request simply fails and the user can continue.
- * - For 403 ACCESS_SCHEDULE_RESTRICTED, we surface an in-app banner via
- *   AccessRestrictionService so the user knows their next requests may
- *   fail, but we still do NOT log them out. The backend schedule
- *   restriction remains in force — only its UX changed.
+ * - On 401, attempts token refresh via /auth/refresh endpoint.
+ * - If refresh succeeds, retries the original request with new token.
+ * - If refresh fails, clears session and redirects to /login.
  */
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+function onTokenRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
 export const authInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ): Observable<HttpEvent<unknown>> => {
   const api = inject(ApiService);
   const restriction = inject(AccessRestrictionService);
+  const router = inject(Router);
 
   let token: string | null = null;
   try {
@@ -46,18 +50,43 @@ export const authInterceptor: HttpInterceptorFn = (
         req.url.includes("/auth/reset-password") ||
         req.url.includes("/auth/supervisor/verify");
 
-      // 401 (token expired / invalid) — previously: clearSession + redirect
-      // to /login. Now: just let the request fail. The user can manually
-      // log out via the header/menu or close the window.
       if (err.status === 401 && !isAuthCall) {
-        // Intentionally no clearSession() and no router.navigate here.
-        // Token refresh logic (if any) is handled separately.
-        void api;
+        if (!isRefreshing) {
+          isRefreshing = true;
+          return api.refreshTokens().pipe(
+            tap((res) => {
+              isRefreshing = false;
+              onTokenRefreshed(res.accessToken);
+            }),
+            switchMap((res) => {
+              const retryReq = req.clone({
+                setHeaders: { Authorization: `Bearer ${res.accessToken}` },
+              });
+              return next(retryReq);
+            }),
+            catchError((refreshErr) => {
+              isRefreshing = false;
+              api.clearSession();
+              router.navigate(["/login"], { queryParams: { returnUrl: req.url } });
+              return throwError(() => refreshErr);
+            })
+          );
+        } else {
+          return new Observable<HttpEvent<unknown>>((observer) => {
+            refreshSubscribers.push((newToken) => {
+              const retryReq = req.clone({
+                setHeaders: { Authorization: `Bearer ${newToken}` },
+              });
+              next(retryReq).subscribe({
+                next: (event) => observer.next(event),
+                error: (e) => observer.error(e),
+                complete: () => observer.complete(),
+              });
+            });
+          });
+        }
       }
 
-      // 403 ACCESS_SCHEDULE_RESTRICTED — backend still rejects requests
-      // outside the configured time window. We surface this to the UI via
-      // the AccessRestrictionService banner instead of silently logging out.
       if (err.status === 403) {
         const errorCode = err.error?.code || err.error?.error?.code;
         const errorMessage = err.error?.error || err.error?.message || "";
