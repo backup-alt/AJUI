@@ -354,6 +354,30 @@ export class LoginPage {
       this.mode.set('forgot');
       return;
     }
+
+    const url = window.location.href;
+    if (url.includes('/auth/reset-password') && url.includes('token=')) {
+      try {
+        const tokenMatch = url.match(/[?&]token=([^&]+)/);
+        if (tokenMatch && tokenMatch[1]) {
+          this.resetToken = tokenMatch[1];
+          this.mode.set('reset');
+          return;
+        }
+      } catch {}
+    }
+
+    const fullPath = window.location.pathname;
+    if (fullPath.endsWith('/auth/reset-password') || fullPath.endsWith('/auth/forgot-password')) {
+      const fullUrl = new URL(window.location.href);
+      const token = fullUrl.searchParams.get('token');
+      if (token) {
+        this.resetToken = token;
+        this.mode.set('reset');
+      } else if (fullPath.endsWith('/auth/forgot-password')) {
+        this.mode.set('forgot');
+      }
+    }
   }
 
   private loadRememberedCredentials() {
