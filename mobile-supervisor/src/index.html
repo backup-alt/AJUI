@@ -21,13 +21,13 @@
       position: fixed;
       inset: 0;
       z-index: 99999;
-      background: linear-gradient(145deg, #002263 0%, #003380 50%, #001a4d 100%);
+      background: #FFFFFF;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 28px;
-      transition: opacity 0.5s ease, visibility 0.5s ease;
+      gap: 24px;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
     }
     .splash-screen.fade-out {
       opacity: 0;
@@ -35,9 +35,8 @@
       pointer-events: none;
     }
     .splash-logo {
-      width: 196px;
-      height: 216px;
-      animation: splash-pulse 2s ease-in-out infinite;
+      width: 120px;
+      height: 120px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -47,41 +46,36 @@
       height: 100%;
       object-fit: contain;
       display: block;
-      filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25));
     }
     .splash-brand { text-align: center; }
     .splash-brand-name {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 20px;
-      font-weight: 800;
-      color: #ffffff;
-      letter-spacing: 0.5px;
-      margin: 0 0 4px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #111827;
+      letter-spacing: 0.3px;
+      margin: 0 0 2px;
     }
     .splash-brand-sub {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 11px;
-      font-weight: 600;
-      color: rgba(201, 162, 39, 0.9);
+      font-weight: 500;
+      color: #6b7280;
       text-transform: uppercase;
-      letter-spacing: 2px;
+      letter-spacing: 1.5px;
     }
     .splash-loader {
-      width: 36px;
-      height: 36px;
+      width: 28px;
+      height: 28px;
       position: relative;
     }
     .splash-loader-ring {
       position: absolute;
       inset: 0;
       border-radius: 50%;
-      border: 3px solid rgba(255,255,255,0.15);
-      border-top-color: #c9a227;
-      animation: splash-spin 1s linear infinite;
-    }
-    @keyframes splash-pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.03); opacity: 0.94; }
+      border: 2.5px solid #e5e7eb;
+      border-top-color: #2563eb;
+      animation: splash-spin 0.8s linear infinite;
     }
     @keyframes splash-spin {
       to { transform: rotate(360deg); }
