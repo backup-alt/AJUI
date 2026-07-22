@@ -1148,10 +1148,23 @@ export class VendorDashboardPage {
 
     const siteNamesFromIds = new Set<string>();
     if (vendor.siteIds?.length) {
-      const allSites = this.data.sites();
+      // vendor.siteIds are MongoDB ObjectIds from the backend. data.sites() uses
+      // composite name-keys as ids, so the lookup there always fails. We also
+      // check siteEntities (which carries the real _id) and the legacy `sites()`
+      // list to cover all id formats the backend might return.
+      const allSites = [
+        ...this.data.siteEntities(),
+        ...this.data.sites(),
+      ];
       for (const sid of vendor.siteIds) {
-        const s = allSites.find((s) => s.id === String(sid));
-        if (s) siteNamesFromIds.add(s.name);
+        const target = String(sid);
+        const s = allSites.find(
+          (x) =>
+            x.id === target ||
+            (x as any)._id === target ||
+            (x as any).siteId === target,
+        );
+        if (s?.name) siteNamesFromIds.add(s.name);
       }
     }
     const vendorSiteNames = [...new Set([...siteNamesFromIds, ...Array.from(materialSites.keys())])];
@@ -1293,10 +1306,13 @@ export class VendorDashboardPage {
     if (!vendor) return;
     this.loadingAvailableSites.set(true);
     const assignedNames = new Set(this.vendorSites().map((s) => s.name));
+    // Prefer backend-loaded siteEntities (they carry the real MongoDB _id)
+    // so newly-assigned sites round-trip correctly; fall back to the local
+    // sites() list when no entities have been fetched yet.
     const siteEntities = this.data.siteEntities();
     const all = siteEntities.length > 0
-      ? siteEntities
-      : this.data.sites().map((s) => ({ id: s.id, name: s.name }));
+      ? siteEntities.map((s) => ({ id: s.id || (s as any)._id, name: s.name }))
+      : this.data.sites();
     this.availableSites.set(all.filter((s) => !assignedNames.has(s.name)));
     this.loadingAvailableSites.set(false);
   }

@@ -17,7 +17,6 @@ interface Site {
   projectNames: string[];
   address: string;
   employeeCount?: number;
-  daysActive?: number;
 }
 
 @Component({
@@ -85,14 +84,10 @@ interface Site {
                 </div>
                 <div class="settings-w11-site-row">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v2 M3 6h10v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6Z M6 9h4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  <span>{{ s.startDate }} → {{ s.targetEndDate }}</span>
+                  <span>{{ s.startDate }}</span>
                 </div>
               </div>
               <div class="settings-w11-site-stats">
-                <div class="settings-w11-stat">
-                  <span class="settings-w11-stat-value">{{ s.daysActive ?? '—' }}</span>
-                  <span class="settings-w11-stat-label">Days Active</span>
-                </div>
                 <div class="settings-w11-stat">
                   <span class="settings-w11-stat-value">{{ s.employeeCount ?? 0 }}</span>
                   <span class="settings-w11-stat-label">Employees</span>
@@ -138,7 +133,6 @@ interface Site {
               <div><dt>Address</dt><dd>{{ selected()!.address }}</dd></div>
               <div><dt>Supervisor</dt><dd>{{ selected()!.supervisor }}</dd></div>
               <div><dt>Start Date</dt><dd>{{ selected()!.startDate }}</dd></div>
-              <div><dt>Target End</dt><dd>{{ selected()!.targetEndDate }}</dd></div>
             </dl>
             <h3 class="settings-w11-drawer-h3">Linked Projects</h3>
             <div class="settings-w11-proj-list">
@@ -227,7 +221,6 @@ export class SettingsSitesComponent implements OnInit {
             projectNames: row.projectName ? [row.projectName] : [],
             address: row.address || "Not available",
             employeeCount: typeof row.employeeCount === "number" ? row.employeeCount : undefined,
-            daysActive: typeof row.daysActive === "number" ? row.daysActive : undefined,
           };
         });
         // Merge: local first, then remote (dedup by id)
@@ -244,15 +237,6 @@ export class SettingsSitesComponent implements OnInit {
     });
   }
 
-  private computeTotalDays(start: string | undefined, end: string | undefined): number | undefined {
-    if (!start || !end) return undefined;
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return undefined;
-    const diff = Math.max(0, endDate.getTime() - startDate.getTime());
-    return Math.round(diff / (1000 * 60 * 60 * 24));
-  }
-
   private buildLocalSites(): Site[] {
     const projects = this.erp.projects();
     const users = this.erp.users();
@@ -262,7 +246,6 @@ export class SettingsSitesComponent implements OnInit {
     for (const p of projects) {
       for (const siteName of p.sites || []) {
         const siteKey = `${p.id}:${siteName}`.toLowerCase();
-        const totalDays = this.computeTotalDays(p.startDate, undefined);
         const siteSupervisors = supervisors.filter(
           (s: any) => (s.site || "").toLowerCase() === siteKey
         ).length;
@@ -279,7 +262,6 @@ export class SettingsSitesComponent implements OnInit {
           targetEndDate: "Not available",
           projectNames: [p.name],
           address: p.address || "Not available",
-          daysActive: totalDays,
           employeeCount: siteEmployees,
         });
         counter++;

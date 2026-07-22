@@ -1,27 +1,29 @@
 import { HttpInterceptorFn } from "@angular/common/http";
 import { inject } from "@angular/core";
-import { Router } from "@angular/router";
 import { catchError, throwError } from "rxjs";
 import { HttpErrorResponse, HttpRequest, HttpHandlerFn, HttpEvent } from "@angular/common/http";
 import { Observable } from "rxjs";
 import { ApiService } from "./api.service";
+import { AccessRestrictionService } from "./access-restriction.service";
 
 /**
- * Adds the Bearer token to outgoing requests and handles 401 responses.
+ * Adds the Bearer token to outgoing requests and handles auth error responses.
  *
- * IMPORTANT: We do NOT force a hard redirect (`window.location.href`) on
- * 401 anymore — that destroys component state and silently kicks the
- * admin off pages like Settings. Instead we let the component decide
- * what to do (show a toast, log out, etc.) and only do a router redirect
- * for routes that are clearly outside the admin workspace.
+ * IMPORTANT (Session Persistence policy):
+ * - Sessions persist until the user explicitly logs out or closes the
+ *   browser window. We do NOT auto-redirect to /login on 401 (token
+ *   expiry) — the request simply fails and the user can continue.
+ * - For 403 ACCESS_SCHEDULE_RESTRICTED, we surface an in-app banner via
+ *   AccessRestrictionService so the user knows their next requests may
+ *   fail, but we still do NOT log them out. The backend schedule
+ *   restriction remains in force — only its UX changed.
  */
 export const authInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ): Observable<HttpEvent<unknown>> => {
-  // Interceptors run inside an injection context, so inject() is safe here.
-  const router = inject(Router);
   const api = inject(ApiService);
+  const restriction = inject(AccessRestrictionService);
 
   let token: string | null = null;
   try {
@@ -44,36 +46,30 @@ export const authInterceptor: HttpInterceptorFn = (
         req.url.includes("/auth/reset-password") ||
         req.url.includes("/auth/supervisor/verify");
 
-      const clearAuthState = () => {
-        api.clearSession();
-        try {
-          localStorage.removeItem("agb-erp:session");
-        } catch {}
-      };
-
+      // 401 (token expired / invalid) — previously: clearSession + redirect
+      // to /login. Now: just let the request fail. The user can manually
+      // log out via the header/menu or close the window.
       if (err.status === 401 && !isAuthCall) {
-        const returnUrl = router.url && router.url !== "/login" ? router.url : undefined;
-        clearAuthState();
-
-        queueMicrotask(() => {
-          try {
-            router.navigate(["/login"], { queryParams: returnUrl ? { returnUrl } : undefined });
-          } catch {}
-        });
+        // Intentionally no clearSession() and no router.navigate here.
+        // Token refresh logic (if any) is handled separately.
+        void api;
       }
 
+      // 403 ACCESS_SCHEDULE_RESTRICTED — backend still rejects requests
+      // outside the configured time window. We surface this to the UI via
+      // the AccessRestrictionService banner instead of silently logging out.
       if (err.status === 403) {
         const errorCode = err.error?.code || err.error?.error?.code;
         const errorMessage = err.error?.error || err.error?.message || "";
 
-        if (errorCode === "ACCESS_SCHEDULE_RESTRICTED" || errorMessage.includes("Access timing is over")) {
-          clearAuthState();
-
-          queueMicrotask(() => {
-            try {
-              router.navigate(["/login"], { queryParams: { reason: "access_schedule" } });
-            } catch {}
-          });
+        if (
+          errorCode === "ACCESS_SCHEDULE_RESTRICTED" ||
+          errorMessage.includes("Access timing is over")
+        ) {
+          restriction.show(
+            errorMessage ||
+              "Access timing is over. Contact admin if you need access.",
+          );
         }
       }
 

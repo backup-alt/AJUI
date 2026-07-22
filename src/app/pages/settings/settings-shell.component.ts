@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@a
 import { FormsModule } from "@angular/forms";
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 import { ApiService } from "../../core/api.service";
+import { AccessRestrictionService } from "../../core/access-restriction.service";
 
 type SettingsItem = {
   id: string;
@@ -110,6 +111,18 @@ type SettingsGroup = {
         </div>
       </header>
 
+      @if (accessRestriction.restricted()) {
+        <div class="settings-w11-access-banner" role="alert">
+          <span class="settings-w11-access-banner-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16"><path d="M8 1.5 14.5 13h-13L8 1.5Z M8 6v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="11.8" r="0.8" fill="currentColor"/></svg>
+          </span>
+          <span class="settings-w11-access-banner-text">{{ accessRestriction.reason() }}</span>
+          <button type="button" class="settings-w11-access-banner-close" aria-label="Dismiss" (click)="accessRestriction.dismiss()">
+            <svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      }
+
       <div class="settings-w11-shell">
         <!-- LEFT PANE: Navigation -->
         <aside class="settings-w11-nav" aria-label="Settings navigation">
@@ -178,6 +191,7 @@ type SettingsGroup = {
 export class SettingsShellComponent {
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
+  readonly accessRestriction = inject(AccessRestrictionService);
 
   readonly searchQuery = signal("");
   readonly profileMenuOpen = signal(false);

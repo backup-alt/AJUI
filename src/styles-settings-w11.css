@@ -4374,7 +4374,7 @@
 
 
 /* ============================================
-   FORCE LIGHT MODE — Disable dark mode permanently
+   FORCE LIGHT MODE ï¿½ Disable dark mode permanently
    ============================================ */
 @media (prefers-color-scheme: dark) {
   :root {
@@ -4410,3 +4410,34 @@
 :root {
   color-scheme: light !important;
 }
+
+/* Access restriction banner (shown when access schedule is over) */
+.settings-w11-access-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: #fef3c7;
+  border-top: 1px solid #fcd34d;
+  border-bottom: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.settings-w11-access-banner-icon { display: inline-flex; flex: 0 0 auto; width: 18px; height: 18px; }
+.settings-w11-access-banner-icon svg { width: 18px; height: 18px; }
+.settings-w11-access-banner-text { flex: 1 1 auto; min-width: 0; }
+.settings-w11-access-banner-close {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #92400e;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+.settings-w11-access-banner-close:hover { background: rgba(146, 64, 14, 0.1); }
+.settings-w11-access-banner-close svg { width: 14px; height: 14px; }
