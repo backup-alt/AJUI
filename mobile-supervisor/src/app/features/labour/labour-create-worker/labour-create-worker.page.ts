@@ -191,18 +191,35 @@ const LABOUR_TYPES = [
     .site-banner ion-icon { font-size: 18px; color: #c9a227; }
     .site-banner-label { font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; }
     .site-banner-value { font-size: 14px; font-weight: 600; color: #111827; }
-    .form-list { background: transparent; }
+    .form-list { background: transparent; padding: 0; }
     .form-item {
       --background: #ffffff;
-      --border-radius: 0 !important;
-      --inner-border-radius: 0 !important;
+      --border-radius: 4px !important;
+      --inner-border-radius: 4px !important;
       --padding-start: 14px;
       --padding-end: 14px;
       --min-height: 64px;
       border: 1px solid #e5e7eb;
-      border-bottom: none;
+      margin-bottom: 12px;
+      overflow: hidden;
     }
-    .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
+    .form-item.form-item-last { margin-bottom: 0; }
+    .form-item ion-input,
+    .form-item ion-textarea,
+    .form-item ion-select {
+      --background: transparent !important;
+      --border-radius: 0 !important;
+      --inner-border-radius: 0 !important;
+      --border-width: 0 !important;
+      --border-color: transparent !important;
+      --padding-start: 0 !important;
+      --padding-end: 0 !important;
+      --padding-top: 0 !important;
+      --padding-bottom: 0 !important;
+      --min-height: 0 !important;
+      min-height: 0 !important;
+      align-self: stretch;
+    }
     .toggle-item { min-height: 72px; display: flex; align-items: center; }
     .toggle-label { font-size: 14px; font-weight: 600; color: #111827; margin: 0; }
     .subcontract-toggle {
