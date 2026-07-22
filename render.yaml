@@ -18,11 +18,11 @@ services:
       - key: MONGODB_URI
         sync: false
       - key: JWT_ACCESS_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_REFRESH_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_ACCESS_EXPIRY
-        value: 15m
+        value: 4h
       - key: JWT_REFRESH_EXPIRY
         value: 7d
       - key: RESEND_API_KEY
