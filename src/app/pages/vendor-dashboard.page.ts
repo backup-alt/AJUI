@@ -1206,8 +1206,7 @@ export class VendorDashboardPage {
 
   private initialLoadDone = false;
 
-  constructor() {
-    this.loadVendorsFromBackend();
+  constructor() { this.loadVendorsFromBackend(); this.loadSitesFromBackend();
     effect(() => {
       const vendor = this.selectedVendor();
       const site = this.selectedSite();
@@ -1257,10 +1256,7 @@ export class VendorDashboardPage {
         this.refreshMessage.set("Failed to load vendors: " + (e?.message || "unknown"));
         setTimeout(() => this.refreshMessage.set(null), 4000);
       },
-    });
-  }
-
-  private refreshSiteAssignments() {
+    }); } private async loadSitesFromBackend(): Promise<void> { try { const res = await this.api.listSites().toPromise(); const sites = (res?.items || []).map((s: any) => ({ id: s._id || s.id, _id: s._id, siteId: s.siteId, name: s.name, status: s.status || "Active", supervisor: s.supervisor, startDate: s.startDate, targetEndDate: s.targetEndDate, projectIds: s.projectIds || [], })); if (sites.length > 0) { this.data.siteEntities.set(sites); } } catch (e) { console.warn("Failed to load sites from backend for vendor dashboard", e); } } private refreshSiteAssignments() {
     const current = this.selectedVendor();
     if (!current) return;
     const updated = this.data.vendors().find((v) => v.id === current.id);
@@ -1756,3 +1752,5 @@ export class VendorDashboardPage {
     return vendor.id;
   }
 }
+
+
