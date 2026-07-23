@@ -119,6 +119,12 @@ export class ApiService {
     );
   }
 
+  createClient(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/clients`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== SUPERVISOR INVITES ===================
   createSupervisorInvite(payload: {
     supervisorName: string;

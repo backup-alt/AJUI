@@ -199,10 +199,30 @@ export class ClientDashboardPage {
 
   createClient(value: ClientFormValue) {
     if (!value.name || !value.mobile || !value.address || !value.supervisor) return;
-    const client = this.data.addClient(value);
-    const project = this.data.createDefaultProject(client);
-    this.showClientForm.set(false);
-    setTimeout(() => void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]));
+    
+    const payload = {
+      name: value.name,
+      mobile: value.mobile,
+      address: value.address,
+      supervisor: value.supervisor,
+      status: value.status || 'Active',
+    };
+
+    this.api.createClient(payload).subscribe({
+      next: (res) => {
+        const clientId = res?.clientId || res?.id;
+        const client = this.data.addClient({
+          ...value,
+          id: clientId,
+        } as Client);
+        const project = this.data.createDefaultProject(client);
+        this.showClientForm.set(false);
+        setTimeout(() => void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]));
+      },
+      error: (err) => {
+        console.error("Failed to create client", err);
+      },
+    });
   }
 
   editClient(client: Client, event: Event) {

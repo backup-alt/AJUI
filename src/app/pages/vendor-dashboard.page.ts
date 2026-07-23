@@ -1311,7 +1311,7 @@ export class VendorDashboardPage {
     // sites() list when no entities have been fetched yet.
     const siteEntities = this.data.siteEntities();
     const all = siteEntities.length > 0
-      ? siteEntities.map((s) => ({ id: s.id || (s as any)._id, name: s.name }))
+      ? siteEntities.map((s) => ({ id: s._id || s.id, name: s.name }))
       : this.data.sites();
     this.availableSites.set(all.filter((s) => !assignedNames.has(s.name)));
     this.loadingAvailableSites.set(false);
