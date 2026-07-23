@@ -16,6 +16,7 @@ export interface ApiUser {
 export interface LoginResponse {
   user: ApiUser;
   accessToken: string;
+  refreshToken?: string;
   expiresAt: string;
 }
 
@@ -1074,7 +1075,42 @@ export class ApiService {
       localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
       localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
+      if (res.refreshToken) {
+        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
+      }
     } catch {}
+  }
+
+  private refreshInFlight: Promise<{ accessToken: string; refreshToken?: string; expiresAt: string } | null> | null = null;
+
+  refreshTokens(): Promise<{ accessToken: string; refreshToken?: string; expiresAt: string } | null> {
+    if (this.refreshInFlight) return this.refreshInFlight;
+
+    const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    if (!refreshToken) return Promise.resolve(null);
+
+    this.refreshInFlight = new Promise((resolve) => {
+      this.http.post<{ accessToken: string; refreshToken?: string; expiresAt: string }>(
+        `${this.baseUrl}/auth/refresh`, { refreshToken }
+      ).subscribe({
+        next: (res) => {
+          this.accessTokenSignal.set(res.accessToken);
+          this.expiresAtSignal.set(res.expiresAt);
+          try {
+            localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
+            localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
+            if (res.refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
+          } catch {}
+          this.refreshInFlight = null;
+          resolve(res);
+        },
+        error: () => {
+          this.refreshInFlight = null;
+          resolve(null);
+        },
+      });
+    });
+    return this.refreshInFlight;
   }
 
   // =================== COMPANY PROFILE ===================
