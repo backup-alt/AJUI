@@ -178,25 +178,25 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
   `,
   styles: [`
     /* ─────────────────────────────────────────────
-       BASE — uses app-wide --m3-* design tokens
+       BASE
        ───────────────────────────────────────────── */
     .dashboard-content {
       --background: var(--m3-surface);
       --color: var(--m3-on-surface);
     }
     .dash-wrap {
-      padding: 0 16px;
+      padding: 0 var(--md-space-4);
       padding-top: env(safe-area-inset-top);
     }
 
     /* ─────────────────────────────────────────────
-       GREETING — matches other page title sizing
+       GREETING
        ───────────────────────────────────────────── */
     .greeting-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 16px 0 12px;
+      gap: var(--md-space-3);
+      padding: var(--md-space-4) 0 var(--md-space-4);
     }
     .greeting-avatar {
       width: 36px;
@@ -224,19 +224,19 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .stat-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 16px;
+      gap: var(--md-space-3);
+      margin-bottom: var(--md-space-5);
     }
 
     .stat-card {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 8px;
+      gap: var(--md-space-2);
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-xl);
-      padding: 12px;
+      padding: var(--md-space-3);
       cursor: pointer;
       font-family: inherit;
       box-shadow: var(--md-elevation-1);
@@ -279,13 +279,13 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
 
     /* ─────────────────────────────────────────────
-       EXPENSE CARD — white card, navy accent strip
+       EXPENSE CARD
        ───────────────────────────────────────────── */
     .expense-card {
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-xl);
-      margin-bottom: 16px;
+      margin-bottom: var(--md-space-5);
       overflow: hidden;
       box-shadow: var(--md-elevation-1);
     }
@@ -303,7 +303,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      padding: 14px 16px 10px;
+      padding: var(--md-space-3) var(--md-space-4) var(--md-space-2);
     }
     .expense-header-left {
       display: flex;
@@ -320,7 +320,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-header-row {
       display: flex;
       align-items: baseline;
-      gap: 6px;
+      gap: var(--md-space-2);
     }
     .expense-total {
       font-size: 22px;
@@ -344,7 +344,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       justify-content: center;
       cursor: pointer;
       flex-shrink: 0;
-      margin-top: 4px;
+      margin-top: var(--md-space-1);
     }
     .expense-add:active {
       opacity: 0.8;
@@ -357,7 +357,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-divider {
       height: 1px;
       background: var(--m3-outline-variant);
-      margin: 0 16px;
+      margin: 0 var(--md-space-4);
     }
 
     .expense-list {
@@ -367,8 +367,8 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-empty {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 14px 16px;
+      gap: var(--md-space-2);
+      padding: var(--md-space-3) var(--md-space-4);
       color: var(--m3-on-surface-muted);
       font-size: 13px;
     }
@@ -379,8 +379,8 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
+      gap: var(--md-space-3);
+      padding: var(--md-space-2) var(--md-space-4);
       border-bottom: 1px solid var(--m3-outline-variant);
     }
     .expense-row:last-of-type {
@@ -443,9 +443,9 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 4px;
+      gap: var(--md-space-1);
       width: 100%;
-      padding: 10px;
+      padding: var(--md-space-2);
       background: none;
       border: none;
       border-top: 1px solid var(--m3-outline-variant);
@@ -463,7 +463,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
 
     /* ─────────────────────────────────────────────
-       ACTIVE SITES — no icon box, just dot+text
+       ACTIVE SITES
        ───────────────────────────────────────────── */
     .sites-section {
       margin-bottom: 0;
@@ -472,7 +472,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+      margin-bottom: var(--md-space-3);
     }
     .sites-title {
       font-size: 15px;
@@ -495,12 +495,12 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       width: 100%;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--md-space-3);
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-xl);
-      padding: 12px;
-      margin-bottom: 6px;
+      padding: var(--md-space-3);
+      margin-bottom: var(--md-space-2);
       cursor: pointer;
       font-family: inherit;
       text-align: left;
@@ -565,8 +565,8 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
-      padding: 24px 16px;
+      gap: var(--md-space-2);
+      padding: var(--md-space-6) var(--md-space-4);
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-xl);
@@ -595,18 +595,18 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       color: var(--m3-on-primary);
       border: none;
       border-radius: var(--md-radius-md);
-      padding: 6px 16px;
+      padding: var(--md-space-1) var(--md-space-4);
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      margin-top: 4px;
+      margin-top: var(--md-space-1);
     }
     .sites-empty-cta:active {
       opacity: 0.85;
     }
 
-    .bottom-spacer { height: 24px; }
+    .bottom-spacer { height: var(--md-space-4); }
   `],
 })
 export class DashboardPage implements OnInit, OnDestroy {
