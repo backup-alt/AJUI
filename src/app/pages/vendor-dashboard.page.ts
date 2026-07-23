@@ -1322,20 +1322,46 @@ export class VendorDashboardPage {
     this.loadAvailableSites();
   }
 
-  assignExistingSite(site: { id: string; name: string }) {
+  async assignExistingSite(site: { id: string; name: string }) {
     const vendor = this.selectedVendor();
     if (!vendor) return;
     const currentIds = vendor.siteIds ? [...vendor.siteIds] : [];
-    const newSiteIds = [...currentIds, site.id];
+    // De-duplicate so the same site can never be assigned twice
+    const newSiteIds = Array.from(new Set([...currentIds, site.id]));
+    if (newSiteIds.length === currentIds.length) {
+      // No new id added — site already assigned; just inform the user
+      await this.showToast(`"${site.name}" is already assigned to this vendor.`, "warning");
+      return;
+    }
     this.api.patchVendor(vendor.id, { siteIds: newSiteIds }).subscribe({
-      next: () => {
-        const refreshed = { ...vendor, siteIds: newSiteIds };
-        this.data.updateVendor(vendor.id, { siteIds: newSiteIds });
+      next: async (res) => {
+        const backendIds = (res as any)?.vendor?.siteIds ?? newSiteIds;
+        const refreshed = { ...vendor, siteIds: backendIds };
+        this.data.updateVendor(vendor.id, { siteIds: backendIds });
         this.selectedVendor.set(refreshed);
+        await this.showToast(`"${site.name}" added to ${vendor.name}.`, "success");
+        this.closeAddSitePicker();
       },
-      error: () => {},
+      error: async (err) => {
+        const message =
+          err?.error?.error || err?.message || "Failed to add site";
+        await this.showToast(`Failed to add site: ${message}`, "error");
+      },
     });
-    this.closeAddSitePicker();
+  }
+
+  private async showToast(message: string, color: "success" | "error" | "warning" = "success") {
+    try {
+      const toast = await this.toastController.create({
+        message,
+        duration: 2500,
+        position: "bottom",
+        color,
+      });
+      await toast.present();
+    } catch {
+      /* no-op */
+    }
   }
 
   private loadCustomColumns(vendorName: string, siteName: string) {
@@ -1453,30 +1479,32 @@ export class VendorDashboardPage {
       }).then(t => t.present());
       return;
     }
-    const payload: Partial<MaterialRow> = {
-      projectId: "",
+    // Translate the local MaterialRow shape into the backend Zod schema
+    // (createMaterialSchema). The backend expects the *Quantity suffix
+    // variants and validates strictly, so we MUST send field names it
+    // recognises — otherwise the request 400s before any row is created.
+    const backendPayload: any = {
       site: site.name,
-      name: "",
-      unit: "",
-      requested: 0,
-      approved: 0,
-      purchased: 0,
-      consumed: 0,
-      quantity: 0,
+      name: "New Material",
+      unit: "Nos",
+      requestedQuantity: 0,
+      purchasedQuantity: 0,
+      consumedQuantity: 0,
       vendor: vendor.name,
-      poNumber: "Pending",
-      status: "Pending",
+      poNumber: "",
+      status: "Not Received",
       requestDate: new Date().toISOString().slice(0, 10),
-      purchasedDate: new Date().toISOString().slice(0, 10),
-      issuedAmount: 0,
-      givenAmount: 0,
-      paymentType: "Cash",
-      deliveredOn: "",
     };
-    this.materialsService.createMaterial(payload).subscribe({
+    this.materialsService.createMaterial(backendPayload).subscribe({
       next: (material) => {
         this.editingRowId.set(material.id);
         this.nameError.set(null);
+        this.toastController.create({
+          message: "Material row added. Enter the details and save.",
+          duration: 2500,
+          color: "success",
+          position: "top",
+        }).then(t => t.present());
       },
       error: (err) => {
         this.toastController.create({

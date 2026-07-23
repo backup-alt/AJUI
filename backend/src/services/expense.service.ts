@@ -148,6 +148,7 @@ export async function listExpenses(filter: {
   type?: string;
   projectId?: string;
   siteId?: string;
+  site?: string;
   status?: string;
   from?: string;
   to?: string;
@@ -159,6 +160,7 @@ export async function listExpenses(filter: {
   if (filter.type) query.type = filter.type;
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
+  if (filter.site) query.site = filter.site;
   if (filter.status) query.status = filter.status;
   if (filter.from || filter.to) {
     query.date = {};

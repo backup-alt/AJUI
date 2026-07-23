@@ -60,6 +60,7 @@ export async function createLabour(input: CreateLabourInput) {
 export async function listLabour(filter: {
   projectId?: string;
   siteId?: string;
+  site?: string;
   category?: string;
   status?: string;
   from?: string;
@@ -71,6 +72,7 @@ export async function listLabour(filter: {
   const query: Record<string, unknown> = {};
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
+  if (filter.site) query.site = filter.site;
   if (filter.category) query.category = filter.category;
   if (filter.status) query.status = filter.status;
   if (filter.from || filter.to) {

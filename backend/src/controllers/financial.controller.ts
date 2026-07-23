@@ -35,6 +35,7 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
     const result = await materialService.listMaterials({
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
+      site: req.query.site as string | undefined,
       vendorId: req.query.vendorId as string | undefined,
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,
@@ -109,6 +110,7 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
     const result = await labourService.listLabour({
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
+      site: req.query.site as string | undefined,
       category: req.query.category as string | undefined,
       status: req.query.status as string | undefined,
       from: req.query.from as string | undefined,
@@ -173,6 +175,7 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       type: req.query.type as string | undefined,
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
+      site: req.query.site as string | undefined,
       status: req.query.status as string | undefined,
       from: req.query.from as string | undefined,
       to: req.query.to as string | undefined,
@@ -369,6 +372,8 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
     const scopeProjectIds = await getScopedProjectIds(req);
     const result = await subcontractorService.listSubcontractors({
       projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      site: req.query.site as string | undefined,
       approvalStatus: req.query.approvalStatus as string | undefined,
       paymentStatus: req.query.paymentStatus as string | undefined,
       page: Number(req.query.page) || 1,

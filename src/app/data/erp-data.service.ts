@@ -578,7 +578,7 @@ export class ErpDataService {
             shift: String(1 + (index % 2)),
             notes: `${primary} - ${primaryCount}, Helper - ${helpers}`,
             paymentMode: index % 3 === 0 ? "Cash" : "NEFT",
-            status: index % 4 === 0 ? "Pending" : "Approved",
+            status: index % 4 === 0 ? "Not Received" : "Received",
           };
         }),
         ...rows,
@@ -724,7 +724,7 @@ export class ErpDataService {
       quantity: input.quantity ?? 0,
       vendor: input.vendor || "",
       poNumber: input.poNumber || "",
-      status: input.status || "Pending",
+      status: input.status || "Not Received",
       requestDate: input.requestDate,
       purchasedDate: input.purchasedDate,
       issuedAmount: input.issuedAmount,

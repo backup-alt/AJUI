@@ -1130,6 +1130,13 @@ export class ProjectWorkspacePage {
       if (projectId) this.fetchAttendanceData(projectId);
     });
     effect(() => {
+      const projectId = this.projectId();
+      if (projectId) {
+        const saved = localStorage.getItem(`agb-erp:workspace-active-site:${projectId}`);
+        if (saved && this.activeSite() === "All") this.activeSite.set(saved);
+      }
+    });
+    effect(() => {
       if (this.queryParamMap().get("editProject") !== "1") return;
       const project = this.project();
       if (!project || this.showProjectForm()) return;
@@ -2000,6 +2007,7 @@ export class ProjectWorkspacePage {
 
   selectSite(site: string) {
     this.activeSite.set(site);
+    localStorage.setItem(`agb-erp:workspace-active-site:${this.projectId()}`, site);
     this.expenseOpeningEdit.set(false);
     this.tableSearch.set("");
     this.closeDropdowns();
@@ -2022,6 +2030,7 @@ export class ProjectWorkspacePage {
       this.data.setExpenseOpeningBalance(this.projectId(), site, openingBalance);
     }
     this.activeSite.set(site);
+    localStorage.setItem(`agb-erp:workspace-active-site:${this.projectId()}`, site);
     this.siteDraftOpen.set(false);
   }
 
@@ -2033,7 +2042,10 @@ export class ProjectWorkspacePage {
   deleteSite(site: string, event: Event) {
     event.stopPropagation();
     const updatedProject = this.data.removeSiteFromProject(this.projectId(), site);
-    if (updatedProject && this.activeSite() === site) this.activeSite.set("All");
+    if (updatedProject && this.activeSite() === site) {
+      this.activeSite.set("All");
+      localStorage.setItem(`agb-erp:workspace-active-site:${this.projectId()}`, "All");
+    }
   }
 
   openFieldDialog(afterKey?: string, event?: Event) {
