@@ -301,7 +301,7 @@ import { Site } from '../../shared/models';
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 16px 8px;
+      padding: var(--md-space-3) var(--md-space-4) var(--md-space-2);
       border-bottom: 1px solid var(--m3-outline-variant);
       margin: 0;
     }
