@@ -245,7 +245,7 @@ export class VendorFormDialogComponent implements OnInit {
 
     const entities = this.allSiteEntities();
     const directMatch = entities.find((s) =>
-      s.id === id || s._id === id || s.siteId === id
+      s._id === id || s.id === id || s.siteId === id
     );
     if (directMatch?.name) return directMatch.name;
 
