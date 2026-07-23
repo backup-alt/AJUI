@@ -22,7 +22,7 @@ services:
       - key: JWT_REFRESH_SECRET
         generateValue: true
       - key: JWT_ACCESS_EXPIRY
-        value: 15m
+        value: 4h
       - key: JWT_REFRESH_EXPIRY
         value: 7d
       - key: RESEND_API_KEY
