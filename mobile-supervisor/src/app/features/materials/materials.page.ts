@@ -45,6 +45,7 @@ interface ConsolidatedMaterial {
   projectNames: string[];
   status: MaterialStatus;
   items: Material[];
+  lowStock: boolean;
 }
 
 @Component({
@@ -136,6 +137,12 @@ interface ConsolidatedMaterial {
                     </p>
                   </div>
                   <app-status-pill [tone]="getStatusTone(group.status)">{{ group.status }}</app-status-pill>
+                  @if (group.lowStock) {
+                    <span class="low-stock-flag">
+                      <ion-icon name="alert-circle-outline"></ion-icon>
+                      Low
+                    </span>
+                  }
                   <ion-icon class="expand-chevron" name="chevron-down-outline"></ion-icon>
                 </header>
 
@@ -237,7 +244,21 @@ interface ConsolidatedMaterial {
     }
     .material-card:active { transform: scale(0.99); }
 
-    .material-head { display: flex; align-items: center; gap: 12px; margin-bottom: var(--md-space-3); }
+    .material-head { display: flex; align-items: center; gap: 12px; margin-bottom: var(--md-space-3); flex-wrap: wrap; }
+    .low-stock-flag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: 3px 7px;
+      background: rgba(245, 158, 11, 0.14);
+      color: #b45309;
+      border-radius: 999px;
+    }
+    .low-stock-flag ion-icon { font-size: 12px; }
     .material-tile {
       width: 42px; height: 42px;
       border-radius: var(--md-radius-lg);
@@ -413,7 +434,9 @@ export class MaterialsPage implements OnInit, OnDestroy {
         existing.siteCount += 1;
         existing.status = this.worstStatus(existing.status, m.status);
         existing.items.push(m);
+        existing.lowStock = existing.totalApproved > 0 && existing.totalRemaining < existing.totalApproved * 0.7;
       } else {
+        const lowStock = (m.approvedQuantity ?? 0) > 0 && (m.remainingStock ?? 0) < (m.approvedQuantity ?? 0) * 0.7;
         map.set(m.name, {
           name: m.name,
           unit: m.unit,
@@ -424,6 +447,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
           projectNames: [m.projectName],
           status: m.status,
           items: [m],
+          lowStock,
         });
       }
     }

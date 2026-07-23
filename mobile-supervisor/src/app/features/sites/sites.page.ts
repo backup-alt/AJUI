@@ -244,9 +244,9 @@ import {
     }
     .site-card:active { transform: scale(0.99); }
     .site-card.active {
-      border-color: var(--m3-secondary);
-      box-shadow: 0 12px 28px -16px rgba(201, 162, 39, 0.45);
-      background: linear-gradient(180deg, var(--m3-secondary-container) 0%, var(--m3-surface-bright) 30%);
+      border-color: var(--m3-primary);
+      box-shadow: none;
+      background: var(--m3-surface-bright);
     }
 
     .site-head { display: flex; align-items: center; gap: 12px; margin-bottom: var(--md-space-3); }

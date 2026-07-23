@@ -127,6 +127,13 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
           </h2>
         </div>
 
+        <div class="mark-attendance-bar">
+          <button class="mark-attendance-btn" (click)="goMarkAttendance()">
+            <ion-icon name="checkmark-circle-outline"></ion-icon>
+            Mark Attendance
+          </button>
+        </div>
+
         <div class="cards">
           @if (isLoading() && todayAttendance().length === 0) {
             @for (i of [1,2,3]; track i) {
@@ -238,6 +245,30 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       letter-spacing: 0;
     }
     .attendance-section-header h2 ion-icon { font-size: 16px; }
+
+    .mark-attendance-bar {
+      padding: 0 var(--md-space-4) var(--md-space-3);
+    }
+    .mark-attendance-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px;
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      border-radius: var(--md-radius-xl);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: var(--md-elevation-2);
+      transition: transform var(--md-motion-duration-short1);
+    }
+    .mark-attendance-btn:active { transform: scale(0.98); }
+    .mark-attendance-btn ion-icon { font-size: 20px; }
 
     .type-cards {
       display: grid;
@@ -512,6 +543,10 @@ export class LabourPage implements OnInit, OnDestroy {
 
   editAttendance(att: Attendance): void {
     this.router.navigate(['/tabs/labour/edit-attendance', att._id]);
+  }
+
+  goMarkAttendance(): void {
+    this.activeTab = 'workers';
   }
 
   /**
