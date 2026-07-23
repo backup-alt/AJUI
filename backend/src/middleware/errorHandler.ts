@@ -23,6 +23,17 @@ export function errorHandler(
     return;
   }
 
+  if (err.name === "ValidationError") {
+    const details = Object.values((err as any).errors).map((e: any) => e.message);
+    res.status(400).json({ error: details.join(", ") });
+    return;
+  }
+
+  if (err.name === "CastError") {
+    res.status(400).json({ error: `Invalid value for ${(err as any).path}: ${(err as any).value}` });
+    return;
+  }
+
   console.error("[ERROR]", err);
 
   res.status(500).json({
