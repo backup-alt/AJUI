@@ -133,9 +133,13 @@ interface ConsolidatedMaterial {
                     <h3 class="material-name">{{ group.name }}</h3>
                     <p class="material-site">
                       <ion-icon name="business-outline"></ion-icon>
-                      {{ group.siteCount }} site{{ group.siteCount === 1 ? '' : 's' }} &bull; {{ group.projectNames.slice(0, 2).join(', ') }}{{ group.projectNames.length > 2 ? ' +' + (group.projectNames.length - 2) : '' }}
+                      <span class="site-text">{{ group.siteCount }} site{{ group.siteCount === 1 ? '' : 's' }} &bull; {{ group.projectNames.slice(0, 2).join(', ') }}{{ group.projectNames.length > 2 ? ' +' + (group.projectNames.length - 2) : '' }}</span>
                     </p>
                   </div>
+                  <ion-icon class="expand-chevron" name="chevron-down-outline"></ion-icon>
+                </header>
+
+                <div class="material-badges">
                   <app-status-pill [tone]="getStatusTone(group.status)">{{ group.status }}</app-status-pill>
                   @if (group.lowStock) {
                     <span class="low-stock-flag">
@@ -143,8 +147,7 @@ interface ConsolidatedMaterial {
                       Low
                     </span>
                   }
-                  <ion-icon class="expand-chevron" name="chevron-down-outline"></ion-icon>
-                </header>
+                </div>
 
                 <div class="material-stats">
                   <div class="stat">
@@ -244,7 +247,44 @@ interface ConsolidatedMaterial {
     }
     .material-card:active { transform: scale(0.99); }
 
-    .material-head { display: flex; align-items: center; gap: 12px; margin-bottom: var(--md-space-3); flex-wrap: wrap; }
+    .material-head { display: flex; align-items: center; gap: 12px; margin-bottom: 0; }
+    .material-tile {
+      width: 42px; height: 42px;
+      border-radius: var(--md-radius-lg);
+      background: rgba(220, 38, 38, 0.08);
+      color: var(--m3-error);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .material-tile ion-icon { font-size: 20px; }
+    .material-info { flex: 1; min-width: 0; }
+    .material-name { font-size: 15px; font-weight: 700; color: var(--m3-on-surface); margin: 0 0 2px; }
+    .material-site {
+      font-size: 12px; color: var(--m3-on-surface-muted); margin: 0;
+      display: inline-flex; align-items: center; gap: 4px;
+      max-width: 100%;
+    }
+    .material-site ion-icon { font-size: 12px; flex-shrink: 0; }
+    .site-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    .expand-chevron {
+      font-size: 16px;
+      color: var(--m3-on-surface-muted);
+      transition: transform 200ms ease;
+      flex-shrink: 0;
+    }
+    .material-group.expanded .expand-chevron { transform: rotate(180deg); }
+
+    .material-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: var(--md-space-3);
+    }
     .low-stock-flag {
       display: inline-flex;
       align-items: center;
@@ -259,26 +299,6 @@ interface ConsolidatedMaterial {
       border-radius: 999px;
     }
     .low-stock-flag ion-icon { font-size: 12px; }
-    .material-tile {
-      width: 42px; height: 42px;
-      border-radius: var(--md-radius-lg);
-      background: rgba(220, 38, 38, 0.08);
-      color: var(--m3-error);
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-    .material-tile ion-icon { font-size: 20px; }
-    .material-info { flex: 1; min-width: 0; }
-    .material-name { font-size: 15px; font-weight: 700; color: var(--m3-on-surface); margin: 0 0 2px; }
-    .material-site { font-size: 12px; color: var(--m3-on-surface-muted); margin: 0; display: inline-flex; align-items: center; gap: 4px; }
-    .material-site ion-icon { font-size: 12px; }
-    .expand-chevron {
-      font-size: 16px;
-      color: var(--m3-on-surface-muted);
-      transition: transform 200ms ease;
-      flex-shrink: 0;
-    }
-    .material-group.expanded .expand-chevron { transform: rotate(180deg); }
 
     .material-stats {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
