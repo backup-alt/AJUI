@@ -486,7 +486,7 @@ import { Site } from '../../shared/models';
     /* Shell header overlap fix */
     app-shell.agb-shell-active ion-content {
       --padding-top: calc(var(--agb-header-height) + env(safe-area-inset-top));
-      --padding-bottom: calc(24px + env(safe-area-inset-bottom));
+      --padding-bottom: calc(64px + env(safe-area-inset-bottom));
     }
     app-shell.agb-shell-active ion-content.auth-content,
     app-shell.agb-shell-active ion-content.full-bleed {

@@ -17,18 +17,25 @@ import {
   receiptOutline,
   settingsOutline,
   personOutline,
-  alertCircleOutline,
-  timeOutline,
+  checkmarkCircleOutline,
   cashOutline,
   documentTextOutline,
   chevronForwardOutline,
   locationOutline,
+  gitBranchOutline,
+  boatOutline,
+  trainOutline,
+  leafOutline,
+  storefrontOutline,
+  ribbonOutline,
+  analyticsOutline,
+  clipboardOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { AuthService } from '../../core/services/auth.service';
 import { DashboardData, Site } from '../../shared/models';
 import { Expense } from '../../shared/models/expense.model';
-import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 
 @Component({
   selector: 'app-dashboard',
@@ -40,8 +47,6 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
     IonRefresherContent,
     CurrencyPipe,
     DatePipe,
-    CurrencyPipe,
-    TitleCasePipe,
   ],
   template: `
     <ion-content class="dashboard-content">
@@ -51,32 +56,38 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
 
       <div class="dash-wrap">
 
+        <!-- ═══ GREETING ═══ -->
+        <div class="greeting-row">
+          <div class="greeting-avatar">{{ userInitial() }}</div>
+          <span class="greeting-text">{{ greeting() }}, {{ userName() }}</span>
+        </div>
+
         <!-- ═══ STAT CARDS — 2×2 GRID ═══ -->
         <section class="stat-grid">
           <button class="stat-card" (click)="navigateTo('/tabs/sites')">
-            <div class="stat-icon stat-icon--navy">
+            <div class="stat-icon si-navy">
               <ion-icon name="location-outline"></ion-icon>
             </div>
             <span class="stat-val">{{ dashboard()?.counts?.sites || 0 }}</span>
             <span class="stat-label">Sites</span>
           </button>
           <button class="stat-card" (click)="navigateTo('/tabs/materials')">
-            <div class="stat-icon stat-icon--gold">
+            <div class="stat-icon si-gold">
               <ion-icon name="cube-outline"></ion-icon>
             </div>
             <span class="stat-val">{{ dashboard()?.counts?.pendingMaterials || 0 }}</span>
             <span class="stat-label">Materials</span>
           </button>
           <button class="stat-card" (click)="navigateTo('/tabs/labour')">
-            <div class="stat-icon stat-icon--navy">
+            <div class="stat-icon si-navy">
               <ion-icon name="people-outline"></ion-icon>
             </div>
             <span class="stat-val">{{ dashboard()?.counts?.pendingLabour || 0 }}</span>
             <span class="stat-label">Labour</span>
           </button>
           <button class="stat-card" (click)="navigateTo('/tabs/requests')">
-            <div class="stat-icon stat-icon--gold">
-              <ion-icon name="alert-circle-outline"></ion-icon>
+            <div class="stat-icon si-gold">
+              <ion-icon name="clipboard-outline"></ion-icon>
             </div>
             <span class="stat-val">{{ dashboard()?.counts?.pendingApprovals || 0 }}</span>
             <span class="stat-label">Approvals</span>
@@ -88,10 +99,12 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
           <div class="expense-header">
             <div class="expense-header-left">
               <span class="expense-title">Today's Expenses</span>
-              <span class="expense-total">{{ dashboard()?.todayExpense?.total | currency:'INR':'symbol':'1.0-0' }}</span>
-              <span class="expense-count">{{ dashboard()?.todayExpense?.count || 0 }} transactions</span>
+              <div class="expense-header-row">
+                <span class="expense-total">{{ dashboard()?.todayExpense?.total | currency:'INR':'symbol':'1.0-0' }}</span>
+                <span class="expense-count">{{ dashboard()?.todayExpense?.count || 0 }} txn</span>
+              </div>
             </div>
-            <button class="expense-add-btn" (click)="navigateTo('/tabs/expenses/create')">
+            <button class="expense-add" (click)="navigateTo('/tabs/expenses/create')">
               <ion-icon name="add-outline"></ion-icon>
             </button>
           </div>
@@ -112,17 +125,17 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
                   </div>
                   <div class="expense-row-details">
                     <span class="expense-row-desc">{{ expense.description }}</span>
-                    <span class="expense-row-meta">{{ expense.materialVendor || expense.type | titlecase }}</span>
+                    <span class="expense-row-meta">{{ expense.materialVendor || expense.type }}</span>
                   </div>
                   <div class="expense-row-right">
-                    <span class="expense-row-amount">{{ expense.amount | currency:'INR':'symbol':'1.0-0' }}</span>
+                    <span class="expense-row-amt">{{ expense.amount | currency:'INR':'symbol':'1.0-0' }}</span>
                     <span class="expense-row-time">{{ expense.createdAt | date:'shortTime' }}</span>
                   </div>
                 </div>
               }
               @if (todayExpenses().length > 4) {
-                <button class="expense-view-all" (click)="navigateTo('/tabs/expenses')">
-                  View all {{ todayExpenses().length }} expenses
+                <button class="expense-viewall" (click)="navigateTo('/tabs/expenses')">
+                  View all {{ todayExpenses().length }}
                   <ion-icon name="chevron-forward-outline"></ion-icon>
                 </button>
               }
@@ -134,7 +147,7 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
         <section class="sites-section">
           <div class="sites-head">
             <h2 class="sites-title">Active Sites</h2>
-            <button class="view-all-btn" (click)="navigateTo('/tabs/sites')">View All</button>
+            <button class="viewall-btn" (click)="navigateTo('/tabs/sites')">View All</button>
           </div>
 
           @if (sites().length === 0) {
@@ -148,8 +161,11 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
           } @else {
             @for (site of sites().slice(0, 5); track site.id) {
               <button class="site-row" (click)="navigateToSite(site)">
-                <div class="site-icon-box">
-                  <ion-icon name="construct-outline"></ion-icon>
+                <div class="site-icon-box"
+                  [class.si-active]="site.status === 'Active'"
+                  [class.si-hold]="site.status === 'On Hold'"
+                  [class.si-done]="site.status === 'Completed'">
+                  <ion-icon [name]="getSiteIcon(site.name)"></ion-icon>
                 </div>
                 <div class="site-info">
                   <span class="site-name">{{ site.name }}</span>
@@ -157,11 +173,11 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
                     {{ site.employeeCount || 0 }} worker{{ (site.employeeCount || 0) !== 1 ? 's' : '' }}
                   </span>
                 </div>
-                <span class="site-status"
-                  [class.status-active]="site.status === 'Active'"
-                  [class.status-hold]="site.status === 'On Hold'"
-                  [class.status-done]="site.status === 'Completed'">
-                  <span class="status-dot"></span>
+                <span class="site-status">
+                  <span class="status-dot"
+                    [class.dot-active]="site.status === 'Active'"
+                    [class.dot-hold]="site.status === 'On Hold'"
+                    [class.dot-done]="site.status === 'Completed'"></span>
                   {{ site.status || 'Active' }}
                 </span>
                 <ion-icon name="chevron-forward-outline" class="site-arrow"></ion-icon>
@@ -173,7 +189,7 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
         <div class="bottom-spacer"></div>
       </div>
 
-      <!-- ═══ FLOATING BOTTOM NAV ═══ -->
+      <!-- ═══ BOTTOM NAV — fixed full-width ═══ -->
       <nav class="bottom-nav">
         <button class="nav-item active" (click)="navigateTo('/tabs/dashboard')">
           <ion-icon name="home-outline"></ion-icon>
@@ -202,22 +218,18 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       --navy: #0B1E4D;
       --navy-dark: #071538;
       --gold: #C9962B;
-      --gold-light: #D4A94E;
       --gold-bg: rgba(201, 150, 43, 0.08);
       --cream: #F5F3EE;
       --white: #FFFFFF;
       --slate: #5B6472;
       --slate-light: #8A929E;
       --green: #22C55E;
-      --green-bg: rgba(34, 197, 94, 0.10);
+      --green-bg: rgba(34, 197, 94, 0.08);
       --amber: #F59E0B;
-      --amber-bg: rgba(245, 158, 11, 0.10);
-      --red: #EF4444;
+      --amber-bg: rgba(245, 158, 11, 0.08);
       --border: #E8E5DF;
-      --radius: 14px;
-      --radius-sm: 10px;
-      --shadow-sm: 0 1px 3px rgba(11, 30, 77, 0.06);
-      --shadow-md: 0 4px 12px rgba(11, 30, 77, 0.08);
+      --r: 4px;
+      --shadow: 0 1px 2px rgba(11, 30, 77, 0.06);
     }
 
     /* ─────────────────────────────────────────────
@@ -228,8 +240,37 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       --color: #1A1A1A;
     }
     .dash-wrap {
-      padding: 4px 20px 0;
+      padding: 0 16px;
       padding-top: env(safe-area-inset-top);
+    }
+
+    /* ─────────────────────────────────────────────
+       GREETING — single compact line
+       ───────────────────────────────────────────── */
+    .greeting-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 0 16px;
+    }
+    .greeting-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      background: var(--navy);
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      letter-spacing: 0;
+    }
+    .greeting-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--slate);
     }
 
     /* ─────────────────────────────────────────────
@@ -238,58 +279,56 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
     .stat-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 20px;
+      gap: 8px;
+      margin-bottom: 16px;
     }
 
     .stat-card {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 10px;
+      gap: 8px;
       background: var(--white);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
+      border-radius: var(--r);
+      padding: 12px;
       cursor: pointer;
       font-family: inherit;
-      box-shadow: var(--shadow-sm);
-      transition: transform 120ms ease, box-shadow 120ms ease;
+      box-shadow: var(--shadow);
+      transition: transform 100ms ease;
     }
     .stat-card:active {
       transform: scale(0.97);
-      box-shadow: var(--shadow-md);
     }
 
     .stat-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: var(--radius-sm);
+      width: 32px;
+      height: 32px;
+      border-radius: var(--r);
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .stat-icon ion-icon {
-      font-size: 20px;
+      font-size: 17px;
     }
-    .stat-icon--navy {
-      background: rgba(11, 30, 77, 0.07);
+    .si-navy {
+      background: rgba(11, 30, 77, 0.06);
       color: var(--navy);
     }
-    .stat-icon--gold {
+    .si-gold {
       background: var(--gold-bg);
       color: var(--gold);
     }
 
     .stat-val {
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 700;
       color: #1A1A1A;
       line-height: 1;
-      letter-spacing: -0.5px;
     }
     .stat-label {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--slate);
     }
@@ -299,17 +338,16 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
        ───────────────────────────────────────────── */
     .expense-card {
       background: var(--navy);
-      border-radius: var(--radius);
-      margin-bottom: 24px;
+      border-radius: var(--r);
+      margin-bottom: 16px;
       overflow: hidden;
-      box-shadow: 0 4px 16px rgba(11, 30, 77, 0.18);
     }
 
     .expense-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      padding: 20px 20px 14px;
+      padding: 16px 16px 12px;
     }
     .expense-header-left {
       display: flex;
@@ -317,29 +355,32 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       gap: 2px;
     }
     .expense-title {
-      font-size: 13px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.55);
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.45);
       text-transform: uppercase;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.5px;
+    }
+    .expense-header-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
     }
     .expense-total {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 700;
       color: #FFFFFF;
       line-height: 1.2;
-      letter-spacing: -0.3px;
     }
     .expense-count {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.4);
-      margin-top: 2px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.35);
     }
 
-    .expense-add-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
+    .expense-add {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--r);
       background: var(--gold);
       border: none;
       display: flex;
@@ -348,43 +389,42 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       cursor: pointer;
       flex-shrink: 0;
       margin-top: 2px;
-      transition: background 120ms ease;
     }
-    .expense-add-btn:active {
-      background: var(--gold-light);
+    .expense-add:active {
+      opacity: 0.85;
     }
-    .expense-add-btn ion-icon {
-      font-size: 22px;
+    .expense-add ion-icon {
+      font-size: 20px;
       color: #FFFFFF;
     }
 
     .expense-divider {
       height: 1px;
-      background: rgba(255, 255, 255, 0.08);
-      margin: 0 20px;
+      background: rgba(255, 255, 255, 0.07);
+      margin: 0 16px;
     }
 
     .expense-list {
-      padding: 4px 0;
+      padding: 0;
     }
 
     .expense-empty {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 16px 20px;
-      color: rgba(255, 255, 255, 0.35);
+      padding: 14px 16px;
+      color: rgba(255, 255, 255, 0.3);
       font-size: 13px;
     }
     .expense-empty ion-icon {
-      font-size: 18px;
+      font-size: 16px;
     }
 
     .expense-row {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 12px 20px;
+      gap: 10px;
+      padding: 10px 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
     .expense-row:last-of-type {
@@ -392,18 +432,18 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
     }
 
     .expense-row-icon {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.07);
+      width: 30px;
+      height: 30px;
+      border-radius: var(--r);
+      background: rgba(255, 255, 255, 0.06);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
     .expense-row-icon ion-icon {
-      font-size: 16px;
-      color: rgba(255, 255, 255, 0.5);
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.45);
     }
 
     .expense-row-details {
@@ -414,16 +454,16 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       gap: 1px;
     }
     .expense-row-desc {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
-      color: rgba(255, 255, 255, 0.85);
+      color: rgba(255, 255, 255, 0.8);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .expense-row-meta {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.35);
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.3);
     }
 
     .expense-row-right {
@@ -433,64 +473,62 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       gap: 1px;
       flex-shrink: 0;
     }
-    .expense-row-amount {
-      font-size: 14px;
+    .expense-row-amt {
+      font-size: 13px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.9);
+      color: rgba(255, 255, 255, 0.85);
     }
     .expense-row-time {
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.3);
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.25);
     }
 
-    .expense-view-all {
+    .expense-viewall {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 4px;
       width: 100%;
-      padding: 12px;
+      padding: 10px;
       background: none;
       border: none;
       border-top: 1px solid rgba(255, 255, 255, 0.06);
       color: var(--gold);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      transition: background 120ms ease;
     }
-    .expense-view-all:active {
-      background: rgba(255, 255, 255, 0.04);
+    .expense-viewall:active {
+      background: rgba(255, 255, 255, 0.03);
     }
-    .expense-view-all ion-icon {
-      font-size: 14px;
+    .expense-viewall ion-icon {
+      font-size: 13px;
     }
 
     /* ─────────────────────────────────────────────
        ACTIVE SITES
        ───────────────────────────────────────────── */
     .sites-section {
-      margin-bottom: 8px;
+      margin-bottom: 0;
     }
     .sites-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 14px;
+      margin-bottom: 8px;
     }
     .sites-title {
-      font-size: 18px;
+      font-size: 15px;
       font-weight: 700;
       color: #1A1A1A;
       margin: 0;
-      letter-spacing: -0.2px;
     }
-    .view-all-btn {
+    .viewall-btn {
       background: none;
       border: 0;
       padding: 0;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--gold);
       cursor: pointer;
@@ -501,36 +539,45 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       width: 100%;
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
       background: var(--white);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      margin-bottom: 10px;
+      border-radius: var(--r);
+      padding: 12px;
+      margin-bottom: 6px;
       cursor: pointer;
       font-family: inherit;
       text-align: left;
-      box-shadow: var(--shadow-sm);
-      transition: transform 120ms ease, box-shadow 120ms ease;
+      box-shadow: var(--shadow);
+      transition: transform 100ms ease;
     }
     .site-row:active {
       transform: scale(0.985);
-      box-shadow: var(--shadow-md);
     }
 
     .site-icon-box {
-      width: 42px;
-      height: 42px;
-      border-radius: var(--radius-sm);
-      background: rgba(11, 30, 77, 0.06);
+      width: 36px;
+      height: 36px;
+      border-radius: var(--r);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
     .site-icon-box ion-icon {
-      font-size: 20px;
-      color: var(--navy);
+      font-size: 18px;
+    }
+    .si-active {
+      background: var(--green-bg);
+      color: #15803D;
+    }
+    .si-hold {
+      background: var(--amber-bg);
+      color: #B45309;
+    }
+    .si-done {
+      background: rgba(107, 114, 128, 0.08);
+      color: var(--slate);
     }
 
     .site-info {
@@ -538,58 +585,45 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1px;
     }
     .site-name {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       color: #1A1A1A;
-      letter-spacing: -0.1px;
     }
     .site-meta {
-      font-size: 13px;
+      font-size: 12px;
       color: var(--slate);
     }
 
     .site-status {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      font-size: 12px;
+      gap: 4px;
+      font-size: 11px;
       font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 20px;
+      color: var(--slate);
       flex-shrink: 0;
     }
     .status-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
+      background: var(--slate-light);
     }
-    .status-active {
-      background: var(--green-bg);
-      color: #15803D;
-    }
-    .status-active .status-dot {
+    .dot-active {
       background: var(--green);
     }
-    .status-hold {
-      background: var(--amber-bg);
-      color: #B45309;
-    }
-    .status-hold .status-dot {
+    .dot-hold {
       background: var(--amber);
     }
-    .status-done {
-      background: rgba(107, 114, 128, 0.10);
-      color: var(--slate);
-    }
-    .status-done .status-dot {
+    .dot-done {
       background: var(--slate-light);
     }
 
     .site-arrow {
-      font-size: 16px;
+      font-size: 14px;
       color: var(--slate-light);
       flex-shrink: 0;
     }
@@ -601,28 +635,28 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
-      padding: 32px 20px;
+      gap: 8px;
+      padding: 24px 16px;
       background: var(--white);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-sm);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
     }
     .sites-empty-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--r);
       background: var(--gold-bg);
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .sites-empty-icon ion-icon {
-      font-size: 24px;
+      font-size: 20px;
       color: var(--gold);
     }
     .sites-empty-text {
-      font-size: 14px;
+      font-size: 13px;
       color: var(--slate);
       font-weight: 500;
     }
@@ -630,9 +664,9 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       background: var(--navy);
       color: #FFFFFF;
       border: none;
-      border-radius: 8px;
-      padding: 8px 20px;
-      font-size: 13px;
+      border-radius: var(--r);
+      padding: 6px 16px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
@@ -642,55 +676,44 @@ import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
       background: var(--navy-dark);
     }
 
-    .bottom-spacer { height: 100px; }
+    .bottom-spacer { height: 16px; }
 
     /* ─────────────────────────────────────────────
-       FLOATING BOTTOM NAV — navy/gold
+       BOTTOM NAV — fixed full-width
        ───────────────────────────────────────────── */
     .bottom-nav {
       position: fixed;
-      bottom: calc(14px + env(safe-area-inset-bottom));
-      left: 50%;
-      transform: translateX(-50%);
+      bottom: 0;
+      left: 0;
+      right: 0;
       display: flex;
-      align-items: center;
-      gap: 2px;
-      background: var(--navy);
-      border-radius: 24px;
-      padding: 6px 10px;
-      box-shadow: 0 8px 28px rgba(11, 30, 77, 0.25);
+      align-items: stretch;
+      background: var(--white);
+      border-top: 1px solid var(--border);
+      padding-bottom: env(safe-area-inset-bottom);
       z-index: 100;
     }
     .nav-item {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 2px;
       background: none;
       border: 0;
-      padding: 7px 16px;
-      border-radius: 16px;
+      padding: 8px 0;
       cursor: pointer;
       font-family: inherit;
-      transition: background 120ms ease;
-    }
-    .nav-item:active {
-      background: rgba(255, 255, 255, 0.06);
     }
     .nav-item ion-icon {
-      font-size: 21px;
-      color: rgba(255, 255, 255, 0.4);
-      transition: color 120ms ease;
+      font-size: 20px;
+      color: var(--slate-light);
     }
     .nav-item span {
       font-size: 10px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.4);
-      letter-spacing: 0.2px;
-      transition: color 120ms ease;
-    }
-    .nav-item.active {
-      background: rgba(201, 150, 43, 0.15);
+      color: var(--slate-light);
     }
     .nav-item.active ion-icon {
       color: var(--gold);
@@ -708,6 +731,32 @@ export class DashboardPage implements OnInit, OnDestroy {
   dashboard = signal<DashboardData | null>(null);
   sites = signal<Site[]>([]);
   todayExpenses = signal<Expense[]>([]);
+  userName = signal<string>('Supervisor');
+
+  userInitial(): string {
+    return this.userName().charAt(0).toUpperCase();
+  }
+
+  greeting(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  getSiteIcon(name: string): string {
+    const n = name.toLowerCase();
+    if (n.includes('road') || n.includes('highway') || n.includes('flyover')) return 'git-branch-outline';
+    if (n.includes('bridge')) return 'boat-outline';
+    if (n.includes('metro') || n.includes('rail')) return 'train-outline';
+    if (n.includes('house') || n.includes('villa') || n.includes('home')) return 'home-outline';
+    if (n.includes('tower') || n.includes('sky')) return 'business-outline';
+    if (n.includes('park') || n.includes('garden')) return 'leaf-outline';
+    if (n.includes('commercial') || n.includes('mall') || n.includes('office')) return 'storefront-outline';
+    if (n.includes('terrace') || n.includes('block') || n.includes('mep')) return 'ribbon-outline';
+    if (n.includes('stock') || n.includes('yard') || n.includes('godown')) return 'analytics-outline';
+    return 'construct-outline';
+  }
 
   getExpenseIcon(expense: Expense): string {
     if (expense.isSiteMaterial) return 'cube-outline';
@@ -722,8 +771,11 @@ export class DashboardPage implements OnInit, OnDestroy {
       cubeOutline, peopleOutline, walletOutline,
       constructOutline, homeOutline, businessOutline,
       receiptOutline, settingsOutline, personOutline,
-      alertCircleOutline, timeOutline, cashOutline,
+      checkmarkCircleOutline, cashOutline,
       documentTextOutline, chevronForwardOutline, locationOutline,
+      gitBranchOutline, boatOutline, trainOutline,
+      leafOutline, storefrontOutline, ribbonOutline,
+      analyticsOutline, clipboardOutline,
     });
 
     await this.auth.initAfterLogin();
@@ -763,6 +815,14 @@ export class DashboardPage implements OnInit, OnDestroy {
       this.supervisor.getSites().subscribe({
         next: (res) => {
           this.sites.set(res.sites || []);
+        },
+        error: () => undefined,
+      });
+
+      this.supervisor.getProfile().subscribe({
+        next: (res) => {
+          const name = (res as { user?: { name?: string } }).user?.name;
+          if (name) this.userName.set(name);
         },
         error: () => undefined,
       });
