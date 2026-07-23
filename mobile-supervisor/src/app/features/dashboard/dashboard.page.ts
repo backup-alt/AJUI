@@ -10,26 +10,17 @@ import { addIcons } from 'ionicons';
 import {
   cubeOutline,
   peopleOutline,
-  walletOutline,
   constructOutline,
   homeOutline,
   businessOutline,
   receiptOutline,
-  settingsOutline,
   personOutline,
-  checkmarkCircleOutline,
   cashOutline,
   documentTextOutline,
   chevronForwardOutline,
   locationOutline,
-  gitBranchOutline,
-  boatOutline,
-  trainOutline,
-  leafOutline,
-  storefrontOutline,
-  ribbonOutline,
-  analyticsOutline,
   clipboardOutline,
+  addOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -96,50 +87,53 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 
         <!-- ═══ TODAY'S EXPENSES ═══ -->
         <section class="expense-card">
-          <div class="expense-header">
-            <div class="expense-header-left">
-              <span class="expense-title">Today's Expenses</span>
-              <div class="expense-header-row">
-                <span class="expense-total">{{ dashboard()?.todayExpense?.total | currency:'INR':'symbol':'1.0-0' }}</span>
-                <span class="expense-count">{{ dashboard()?.todayExpense?.count || 0 }} txn</span>
-              </div>
-            </div>
-            <button class="expense-add" (click)="navigateTo('/tabs/expenses/create')">
-              <ion-icon name="add-outline"></ion-icon>
-            </button>
-          </div>
-
-          <div class="expense-divider"></div>
-
-          <div class="expense-list">
-            @if (todayExpenses().length === 0) {
-              <div class="expense-empty">
-                <ion-icon name="receipt-outline"></ion-icon>
-                <span>No expenses logged today</span>
-              </div>
-            } @else {
-              @for (expense of todayExpenses().slice(0, 4); track expense._id) {
-                <div class="expense-row">
-                  <div class="expense-row-icon">
-                    <ion-icon [name]="getExpenseIcon(expense)"></ion-icon>
-                  </div>
-                  <div class="expense-row-details">
-                    <span class="expense-row-desc">{{ expense.description }}</span>
-                    <span class="expense-row-meta">{{ expense.materialVendor || expense.type }}</span>
-                  </div>
-                  <div class="expense-row-right">
-                    <span class="expense-row-amt">{{ expense.amount | currency:'INR':'symbol':'1.0-0' }}</span>
-                    <span class="expense-row-time">{{ expense.createdAt | date:'shortTime' }}</span>
-                  </div>
+          <div class="expense-accent"></div>
+          <div class="expense-body">
+            <div class="expense-header">
+              <div class="expense-header-left">
+                <span class="expense-title">Today's Expenses</span>
+                <div class="expense-header-row">
+                  <span class="expense-total">{{ dashboard()?.todayExpense?.total | currency:'INR':'symbol':'1.0-0' }}</span>
+                  <span class="expense-count">{{ dashboard()?.todayExpense?.count || 0 }} txn</span>
                 </div>
+              </div>
+              <button class="expense-add" (click)="navigateTo('/tabs/expenses/create')">
+                <ion-icon name="add-outline"></ion-icon>
+              </button>
+            </div>
+
+            <div class="expense-divider"></div>
+
+            <div class="expense-list">
+              @if (todayExpenses().length === 0) {
+                <div class="expense-empty">
+                  <ion-icon name="receipt-outline"></ion-icon>
+                  <span>No expenses logged today</span>
+                </div>
+              } @else {
+                @for (expense of todayExpenses().slice(0, 4); track expense._id) {
+                  <div class="expense-row">
+                    <div class="expense-row-icon">
+                      <ion-icon [name]="getExpenseIcon(expense)"></ion-icon>
+                    </div>
+                    <div class="expense-row-details">
+                      <span class="expense-row-desc">{{ expense.description }}</span>
+                      <span class="expense-row-meta">{{ expense.materialVendor || expense.type }}</span>
+                    </div>
+                    <div class="expense-row-right">
+                      <span class="expense-row-amt">{{ expense.amount | currency:'INR':'symbol':'1.0-0' }}</span>
+                      <span class="expense-row-time">{{ expense.createdAt | date:'shortTime' }}</span>
+                    </div>
+                  </div>
+                }
+                @if (todayExpenses().length > 4) {
+                  <button class="expense-viewall" (click)="navigateTo('/tabs/expenses')">
+                    View all {{ todayExpenses().length }}
+                    <ion-icon name="chevron-forward-outline"></ion-icon>
+                  </button>
+                }
               }
-              @if (todayExpenses().length > 4) {
-                <button class="expense-viewall" (click)="navigateTo('/tabs/expenses')">
-                  View all {{ todayExpenses().length }}
-                  <ion-icon name="chevron-forward-outline"></ion-icon>
-                </button>
-              }
-            }
+            </div>
           </div>
         </section>
 
@@ -161,25 +155,17 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
           } @else {
             @for (site of sites().slice(0, 5); track site.id) {
               <button class="site-row" (click)="navigateToSite(site)">
-                <div class="site-icon-box"
-                  [class.si-active]="site.status === 'Active'"
-                  [class.si-hold]="site.status === 'On Hold'"
-                  [class.si-done]="site.status === 'Completed'">
-                  <ion-icon [name]="getSiteIcon(site.name)"></ion-icon>
-                </div>
+                <span class="status-dot"
+                  [class.dot-active]="site.status === 'Active'"
+                  [class.dot-hold]="site.status === 'On Hold'"
+                  [class.dot-done]="site.status === 'Completed'"></span>
                 <div class="site-info">
                   <span class="site-name">{{ site.name }}</span>
                   <span class="site-meta">
                     {{ site.employeeCount || 0 }} worker{{ (site.employeeCount || 0) !== 1 ? 's' : '' }}
                   </span>
                 </div>
-                <span class="site-status">
-                  <span class="status-dot"
-                    [class.dot-active]="site.status === 'Active'"
-                    [class.dot-hold]="site.status === 'On Hold'"
-                    [class.dot-done]="site.status === 'Completed'"></span>
-                  {{ site.status || 'Active' }}
-                </span>
+                <span class="site-status-text">{{ site.status || 'Active' }}</span>
                 <ion-icon name="chevron-forward-outline" class="site-arrow"></ion-icon>
               </button>
             }
@@ -188,26 +174,6 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 
         <div class="bottom-spacer"></div>
       </div>
-
-      <!-- ═══ BOTTOM NAV — fixed full-width ═══ -->
-      <nav class="bottom-nav">
-        <button class="nav-item active" (click)="navigateTo('/tabs/dashboard')">
-          <ion-icon name="home-outline"></ion-icon>
-          <span>Home</span>
-        </button>
-        <button class="nav-item" (click)="navigateTo('/tabs/sites')">
-          <ion-icon name="location-outline"></ion-icon>
-          <span>Sites</span>
-        </button>
-        <button class="nav-item" (click)="navigateTo('/tabs/expenses')">
-          <ion-icon name="receipt-outline"></ion-icon>
-          <span>Ledger</span>
-        </button>
-        <button class="nav-item" (click)="navigateTo('/tabs/profile')">
-          <ion-icon name="settings-outline"></ion-icon>
-          <span>Settings</span>
-        </button>
-      </nav>
     </ion-content>
   `,
   styles: [`
@@ -216,7 +182,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
        ───────────────────────────────────────────── */
     :host {
       --navy: #0B1E4D;
-      --navy-dark: #071538;
+      --navy-mid: #1A3466;
       --gold: #C9962B;
       --gold-bg: rgba(201, 150, 43, 0.08);
       --cream: #F5F3EE;
@@ -245,7 +211,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
 
     /* ─────────────────────────────────────────────
-       GREETING — single compact line
+       GREETING
        ───────────────────────────────────────────── */
     .greeting-row {
       display: flex;
@@ -265,7 +231,6 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      letter-spacing: 0;
     }
     .greeting-text {
       font-size: 14px;
@@ -334,20 +299,31 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
 
     /* ─────────────────────────────────────────────
-       EXPENSE CARD
+       EXPENSE CARD — white card, navy accent strip
        ───────────────────────────────────────────── */
     .expense-card {
-      background: var(--navy);
+      background: var(--white);
+      border: 1px solid var(--border);
       border-radius: var(--r);
       margin-bottom: 16px;
       overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .expense-accent {
+      height: 3px;
+      background: var(--navy);
+    }
+
+    .expense-body {
+      padding: 0;
     }
 
     .expense-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      padding: 16px 16px 12px;
+      padding: 14px 16px 10px;
     }
     .expense-header-left {
       display: flex;
@@ -357,50 +333,50 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-title {
       font-size: 11px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.45);
+      color: var(--slate);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .expense-header-row {
       display: flex;
       align-items: baseline;
-      gap: 8px;
+      gap: 6px;
     }
     .expense-total {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
-      color: #FFFFFF;
+      color: var(--navy);
       line-height: 1.2;
     }
     .expense-count {
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.35);
+      color: var(--slate-light);
     }
 
     .expense-add {
-      width: 32px;
-      height: 32px;
+      width: 28px;
+      height: 28px;
       border-radius: var(--r);
-      background: var(--gold);
+      background: var(--navy);
       border: none;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       flex-shrink: 0;
-      margin-top: 2px;
+      margin-top: 4px;
     }
     .expense-add:active {
-      opacity: 0.85;
+      opacity: 0.8;
     }
     .expense-add ion-icon {
-      font-size: 20px;
+      font-size: 16px;
       color: #FFFFFF;
     }
 
     .expense-divider {
       height: 1px;
-      background: rgba(255, 255, 255, 0.07);
+      background: var(--border);
       margin: 0 16px;
     }
 
@@ -413,7 +389,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       align-items: center;
       gap: 8px;
       padding: 14px 16px;
-      color: rgba(255, 255, 255, 0.3);
+      color: var(--slate-light);
       font-size: 13px;
     }
     .expense-empty ion-icon {
@@ -425,7 +401,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       align-items: center;
       gap: 10px;
       padding: 10px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid var(--border);
     }
     .expense-row:last-of-type {
       border-bottom: none;
@@ -435,7 +411,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       width: 30px;
       height: 30px;
       border-radius: var(--r);
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(11, 30, 77, 0.05);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -443,7 +419,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
     .expense-row-icon ion-icon {
       font-size: 14px;
-      color: rgba(255, 255, 255, 0.45);
+      color: var(--navy-mid);
     }
 
     .expense-row-details {
@@ -456,14 +432,14 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-row-desc {
       font-size: 13px;
       font-weight: 500;
-      color: rgba(255, 255, 255, 0.8);
+      color: #1A1A1A;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .expense-row-meta {
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.3);
+      color: var(--slate-light);
     }
 
     .expense-row-right {
@@ -476,11 +452,11 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-row-amt {
       font-size: 13px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.85);
+      color: var(--navy);
     }
     .expense-row-time {
       font-size: 10px;
-      color: rgba(255, 255, 255, 0.25);
+      color: var(--slate-light);
     }
 
     .expense-viewall {
@@ -492,7 +468,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       padding: 10px;
       background: none;
       border: none;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      border-top: 1px solid var(--border);
       color: var(--gold);
       font-size: 12px;
       font-weight: 600;
@@ -500,14 +476,14 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       font-family: inherit;
     }
     .expense-viewall:active {
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(201, 150, 43, 0.04);
     }
     .expense-viewall ion-icon {
       font-size: 13px;
     }
 
     /* ─────────────────────────────────────────────
-       ACTIVE SITES
+       ACTIVE SITES — no icon box, just dot+text
        ───────────────────────────────────────────── */
     .sites-section {
       margin-bottom: 0;
@@ -555,29 +531,21 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       transform: scale(0.985);
     }
 
-    .site-icon-box {
-      width: 36px;
-      height: 36px;
-      border-radius: var(--r);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--slate-light);
       flex-shrink: 0;
     }
-    .site-icon-box ion-icon {
-      font-size: 18px;
+    .dot-active {
+      background: var(--green);
     }
-    .si-active {
-      background: var(--green-bg);
-      color: #15803D;
+    .dot-hold {
+      background: var(--amber);
     }
-    .si-hold {
-      background: var(--amber-bg);
-      color: #B45309;
-    }
-    .si-done {
-      background: rgba(107, 114, 128, 0.08);
-      color: var(--slate);
+    .dot-done {
+      background: var(--slate-light);
     }
 
     .site-info {
@@ -597,29 +565,11 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       color: var(--slate);
     }
 
-    .site-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
+    .site-status-text {
       font-size: 11px;
       font-weight: 600;
-      color: var(--slate);
+      color: var(--slate-light);
       flex-shrink: 0;
-    }
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--slate-light);
-    }
-    .dot-active {
-      background: var(--green);
-    }
-    .dot-hold {
-      background: var(--amber);
-    }
-    .dot-done {
-      background: var(--slate-light);
     }
 
     .site-arrow {
@@ -673,54 +623,10 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       margin-top: 4px;
     }
     .sites-empty-cta:active {
-      background: var(--navy-dark);
+      opacity: 0.85;
     }
 
-    .bottom-spacer { height: 16px; }
-
-    /* ─────────────────────────────────────────────
-       BOTTOM NAV — fixed full-width
-       ───────────────────────────────────────────── */
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      align-items: stretch;
-      background: var(--white);
-      border-top: 1px solid var(--border);
-      padding-bottom: env(safe-area-inset-bottom);
-      z-index: 100;
-    }
-    .nav-item {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      background: none;
-      border: 0;
-      padding: 8px 0;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .nav-item ion-icon {
-      font-size: 20px;
-      color: var(--slate-light);
-    }
-    .nav-item span {
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--slate-light);
-    }
-    .nav-item.active ion-icon {
-      color: var(--gold);
-    }
-    .nav-item.active span {
-      color: var(--gold);
-    }
+    .bottom-spacer { height: 24px; }
   `],
 })
 export class DashboardPage implements OnInit, OnDestroy {
@@ -744,20 +650,6 @@ export class DashboardPage implements OnInit, OnDestroy {
     return 'Good evening';
   }
 
-  getSiteIcon(name: string): string {
-    const n = name.toLowerCase();
-    if (n.includes('road') || n.includes('highway') || n.includes('flyover')) return 'git-branch-outline';
-    if (n.includes('bridge')) return 'boat-outline';
-    if (n.includes('metro') || n.includes('rail')) return 'train-outline';
-    if (n.includes('house') || n.includes('villa') || n.includes('home')) return 'home-outline';
-    if (n.includes('tower') || n.includes('sky')) return 'business-outline';
-    if (n.includes('park') || n.includes('garden')) return 'leaf-outline';
-    if (n.includes('commercial') || n.includes('mall') || n.includes('office')) return 'storefront-outline';
-    if (n.includes('terrace') || n.includes('block') || n.includes('mep')) return 'ribbon-outline';
-    if (n.includes('stock') || n.includes('yard') || n.includes('godown')) return 'analytics-outline';
-    return 'construct-outline';
-  }
-
   getExpenseIcon(expense: Expense): string {
     if (expense.isSiteMaterial) return 'cube-outline';
     if (expense.transactionType === 'Cash Added') return 'cash-outline';
@@ -768,14 +660,11 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      cubeOutline, peopleOutline, walletOutline,
-      constructOutline, homeOutline, businessOutline,
-      receiptOutline, settingsOutline, personOutline,
-      checkmarkCircleOutline, cashOutline,
-      documentTextOutline, chevronForwardOutline, locationOutline,
-      gitBranchOutline, boatOutline, trainOutline,
-      leafOutline, storefrontOutline, ribbonOutline,
-      analyticsOutline, clipboardOutline,
+      cubeOutline, peopleOutline, constructOutline,
+      homeOutline, businessOutline, receiptOutline,
+      personOutline, cashOutline, documentTextOutline,
+      chevronForwardOutline, locationOutline,
+      clipboardOutline, addOutline,
     });
 
     await this.auth.initAfterLogin();
