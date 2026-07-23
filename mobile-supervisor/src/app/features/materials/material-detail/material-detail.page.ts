@@ -265,6 +265,10 @@ import { StatusPillComponent } from '../../../shared/components';
 
     .vendor-profile {
       display: flex; align-items: center; gap: 12px;
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 12px;
+      padding: 14px;
       margin-bottom: 14px;
     }
     .vendor-avatar {

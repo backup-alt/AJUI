@@ -223,7 +223,7 @@ interface ConsolidatedMaterial {
       border: 1px solid #eef0f3;
       border-radius: 20px;
       padding: 16px;
-      box-shadow: var(--agb-shadow-2xs);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
       cursor: pointer;
       font-family: inherit;
       transition: transform var(--agb-transition-fast), box-shadow var(--agb-transition-fast);
