@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inj
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
-import { IonContent, IonIcon, IonRefresher, IonRefresherContent, IonSplitPane } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
@@ -167,8 +167,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
     CommonModule,
     IonContent,
     IonIcon,
-    IonRefresher,
-    IonRefresherContent,
     IonSplitPane,
     EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
@@ -238,9 +236,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
         />
 
         <ion-content class="erp-page">
-          <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
-            <ion-refresher-content></ion-refresher-content>
-          </ion-refresher>
           <main class="workspace-shell" [class.table-view-expanded]="tableViewExpanded()" *ngIf="project() as currentProject">
             <nav class="workspace-breadcrumb" aria-label="Breadcrumb" *ngIf="!tableViewExpanded()">
               <button type="button" (click)="backToClients()">Clients</button>
@@ -1130,13 +1125,6 @@ export class ProjectWorkspacePage {
       if (projectId) this.fetchAttendanceData(projectId);
     });
     effect(() => {
-      const projectId = this.projectId();
-      if (projectId) {
-        const saved = localStorage.getItem(`agb-erp:workspace-active-site:${projectId}`);
-        if (saved && this.activeSite() === "All") this.activeSite.set(saved);
-      }
-    });
-    effect(() => {
       if (this.queryParamMap().get("editProject") !== "1") return;
       const project = this.project();
       if (!project || this.showProjectForm()) return;
@@ -1145,10 +1133,6 @@ export class ProjectWorkspacePage {
       this.editingProject.set(project);
       this.showProjectForm.set(true);
     });
-  }
-
-  async refresh(event: CustomEvent) {
-    void event.detail.complete();
   }
 
   switchSection(section: ModuleKey) {
@@ -2007,7 +1991,6 @@ export class ProjectWorkspacePage {
 
   selectSite(site: string) {
     this.activeSite.set(site);
-    localStorage.setItem(`agb-erp:workspace-active-site:${this.projectId()}`, site);
     this.expenseOpeningEdit.set(false);
     this.tableSearch.set("");
     this.closeDropdowns();
@@ -2030,7 +2013,6 @@ export class ProjectWorkspacePage {
       this.data.setExpenseOpeningBalance(this.projectId(), site, openingBalance);
     }
     this.activeSite.set(site);
-    localStorage.setItem(`agb-erp:workspace-active-site:${this.projectId()}`, site);
     this.siteDraftOpen.set(false);
   }
 
@@ -2042,10 +2024,7 @@ export class ProjectWorkspacePage {
   deleteSite(site: string, event: Event) {
     event.stopPropagation();
     const updatedProject = this.data.removeSiteFromProject(this.projectId(), site);
-    if (updatedProject && this.activeSite() === site) {
-      this.activeSite.set("All");
-      localStorage.setItem(`agb-erp:workspace-active-site:${this.projectId()}`, "All");
-    }
+    if (updatedProject && this.activeSite() === site) this.activeSite.set("All");
   }
 
   openFieldDialog(afterKey?: string, event?: Event) {

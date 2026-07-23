@@ -1841,10 +1841,8 @@ td {
 }
 
 /* Ionic Angular enterprise dashboard layer */
-ion-content.erp-page,
 .erp-page {
   --background: #f6f8fb;
-  --offset-top: 0px;
 }
 
 .enterprise-header {
@@ -2081,39 +2079,15 @@ ion-menu.enterprise-sidebar::part(container) {
 
 .sidebar-logo-wrap {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px 12px;
+  justify-content: center;
+  padding: 22px 20px 18px;
 }
 
 .sidebar-logo {
-  width: 48px;
-  height: 48px;
+  width: 148px;
+  height: 148px;
   object-fit: contain;
-  flex-shrink: 0;
-}
-
-.sidebar-brand {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.brand-name {
-  font-size: 14px;
-  font-weight: 800;
-  color: #e5edf8;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.brand-sub {
-  font-size: 11px;
-  color: #6b7a8f;
-  white-space: nowrap;
+  border-radius: 8px;
 }
 
 .sidebar-nav {
@@ -5046,164 +5020,6 @@ ion-progress-bar,
   margin-top: 6px;
   color: var(--ui-text);
   font-size: 17px;
-}
-
-/* Universal landing dashboard - modern hero redesign */
-.dashboard-modern-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  margin-bottom: 12px;
-  padding: 28px 32px 24px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #0b1020 0%, #1a2540 100%);
-  box-shadow: 0 4px 24px rgba(11, 16, 32, 0.15);
-}
-
-.dashboard-modern-hero .hero-header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.dashboard-modern-hero h1 {
-  margin: 0;
-  color: #ffffff;
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.dashboard-modern-hero .hero-subtitle {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-.dashboard-modern-hero .hero-kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 14px;
-}
-
-.dashboard-modern-hero .kpi-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 18px 20px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
-  transition: all 0.2s ease;
-}
-
-.dashboard-modern-hero .kpi-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
-}
-
-.dashboard-modern-hero .kpi-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  flex-shrink: 0;
-}
-
-.dashboard-modern-hero .kpi-icon ion-icon {
-  font-size: 22px;
-}
-
-.dashboard-modern-hero .kpi-icon.active {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-}
-
-.dashboard-modern-hero .kpi-icon.onhold {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-}
-
-.dashboard-modern-hero .kpi-icon.completed {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-}
-
-.dashboard-modern-hero .kpi-icon.approval {
-  background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
-}
-
-.dashboard-modern-hero .kpi-icon.clients {
-  background: rgba(20, 184, 166, 0.15);
-  color: #14b8a6;
-}
-
-.dashboard-modern-hero .kpi-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.dashboard-modern-hero .kpi-label {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dashboard-modern-hero .kpi-value {
-  color: #ffffff;
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.1;
-  margin: 2px 0;
-}
-
-.dashboard-modern-hero .kpi-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  width: fit-content;
-}
-
-.dashboard-modern-hero .kpi-badge.active {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-}
-
-.dashboard-modern-hero .kpi-badge.onhold {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-}
-
-.dashboard-modern-hero .kpi-badge.completed {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-}
-
-.dashboard-modern-hero .kpi-badge.approval {
-  background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
-}
-
-.dashboard-modern-hero .kpi-badge.clients {
-  background: rgba(20, 184, 166, 0.15);
-  color: #14b8a6;
 }
 
 .universal-filter-bar {
@@ -13030,17 +12846,13 @@ ion-menu.enterprise-sidebar .sidebar-nav ion-item {
 }
 
 ion-menu.enterprise-sidebar .sidebar-logo-wrap {
-  padding: 10px 14px 10px;
-  gap: 10px;
+  padding: 12px 14px 10px;
+  min-height: 88px;
 }
 
 ion-menu.enterprise-sidebar .sidebar-logo {
-  width: 44px;
-  height: 44px;
-}
-
-ion-menu.enterprise-sidebar .sidebar-brand {
-  display: none;
+  width: 56px;
+  height: 56px;
 }
 
 ion-menu.enterprise-sidebar .sidebar-action {
@@ -13955,7 +13767,7 @@ ion-menu.enterprise-sidebar .sidebar-project-scroll {
 
 
 /* ============================================
-   FORCE LIGHT MODE ï¿½ Disable dark mode permanently
+   FORCE LIGHT MODE — Disable dark mode permanently
    ============================================ */
 @media (prefers-color-scheme: dark) {
   :root {

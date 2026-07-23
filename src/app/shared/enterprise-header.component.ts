@@ -142,7 +142,7 @@ export class EnterpriseHeaderComponent {
   @Input() searchPlaceholder = "Search";
 
   readonly profileMenuOpen = signal(false);
-  readonly logoPath = "assets/logo.svg";
+  readonly logoPath = "assets/logo.png";
 
   readonly currentUser = this.api.user;
 

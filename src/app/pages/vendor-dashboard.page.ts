@@ -853,10 +853,9 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     }
     .materials-table {
       background: #fff;
-      border: 1px solid #eef0f3;
+      border: 1px solid #e2e8f0;
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
     .materials-table table {
       width: 100%;
@@ -864,20 +863,20 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     }
     .materials-table th {
       background: #f8fafc;
-      color: #64748b;
+      color: #475569;
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
-      padding: 12px 14px;
+      letter-spacing: 0.05em;
+      padding: 12px 10px;
       text-align: left;
-      border-bottom: 1px solid #eef0f3;
+      border-bottom: 2px solid #e2e8f0;
     }
     .materials-table td {
-      padding: 14px;
+      padding: 10px;
       border-bottom: 1px solid #f1f5f9;
       font-size: 13px;
-      color: #0f172a;
+      color: #1e293b;
       vertical-align: middle;
     }
     .materials-table tr:last-child td { border-bottom: none; }
@@ -1322,46 +1321,20 @@ export class VendorDashboardPage {
     this.loadAvailableSites();
   }
 
-  async assignExistingSite(site: { id: string; name: string }) {
+  assignExistingSite(site: { id: string; name: string }) {
     const vendor = this.selectedVendor();
     if (!vendor) return;
     const currentIds = vendor.siteIds ? [...vendor.siteIds] : [];
-    // De-duplicate so the same site can never be assigned twice
-    const newSiteIds = Array.from(new Set([...currentIds, site.id]));
-    if (newSiteIds.length === currentIds.length) {
-      // No new id added — site already assigned; just inform the user
-      await this.showToast(`"${site.name}" is already assigned to this vendor.`, "warning");
-      return;
-    }
+    const newSiteIds = [...currentIds, site.id];
     this.api.patchVendor(vendor.id, { siteIds: newSiteIds }).subscribe({
-      next: async (res) => {
-        const backendIds = (res as any)?.vendor?.siteIds ?? newSiteIds;
-        const refreshed = { ...vendor, siteIds: backendIds };
-        this.data.updateVendor(vendor.id, { siteIds: backendIds });
+      next: () => {
+        const refreshed = { ...vendor, siteIds: newSiteIds };
+        this.data.updateVendor(vendor.id, { siteIds: newSiteIds });
         this.selectedVendor.set(refreshed);
-        await this.showToast(`"${site.name}" added to ${vendor.name}.`, "success");
-        this.closeAddSitePicker();
       },
-      error: async (err) => {
-        const message =
-          err?.error?.error || err?.message || "Failed to add site";
-        await this.showToast(`Failed to add site: ${message}`, "error");
-      },
+      error: () => {},
     });
-  }
-
-  private async showToast(message: string, color: "success" | "error" | "warning" = "success") {
-    try {
-      const toast = await this.toastController.create({
-        message,
-        duration: 2500,
-        position: "bottom",
-        color,
-      });
-      await toast.present();
-    } catch {
-      /* no-op */
-    }
+    this.closeAddSitePicker();
   }
 
   private loadCustomColumns(vendorName: string, siteName: string) {
@@ -1479,32 +1452,30 @@ export class VendorDashboardPage {
       }).then(t => t.present());
       return;
     }
-    // Translate the local MaterialRow shape into the backend Zod schema
-    // (createMaterialSchema). The backend expects the *Quantity suffix
-    // variants and validates strictly, so we MUST send field names it
-    // recognises — otherwise the request 400s before any row is created.
-    const backendPayload: any = {
+    const payload: Partial<MaterialRow> = {
+      projectId: "",
       site: site.name,
-      name: "New Material",
-      unit: "Nos",
-      requestedQuantity: 0,
-      purchasedQuantity: 0,
-      consumedQuantity: 0,
+      name: "",
+      unit: "",
+      requested: 0,
+      approved: 0,
+      purchased: 0,
+      consumed: 0,
+      quantity: 0,
       vendor: vendor.name,
-      poNumber: "",
-      status: "Not Received",
+      poNumber: "Pending",
+      status: "Pending",
       requestDate: new Date().toISOString().slice(0, 10),
+      purchasedDate: new Date().toISOString().slice(0, 10),
+      issuedAmount: 0,
+      givenAmount: 0,
+      paymentType: "Cash",
+      deliveredOn: "",
     };
-    this.materialsService.createMaterial(backendPayload).subscribe({
+    this.materialsService.createMaterial(payload).subscribe({
       next: (material) => {
         this.editingRowId.set(material.id);
         this.nameError.set(null);
-        this.toastController.create({
-          message: "Material row added. Enter the details and save.",
-          duration: 2500,
-          color: "success",
-          position: "top",
-        }).then(t => t.present());
       },
       error: (err) => {
         this.toastController.create({

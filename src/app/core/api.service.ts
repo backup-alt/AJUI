@@ -16,7 +16,6 @@ export interface ApiUser {
 export interface LoginResponse {
   user: ApiUser;
   accessToken: string;
-  refreshToken?: string;
   expiresAt: string;
 }
 
@@ -530,7 +529,7 @@ export class ApiService {
   }
 
   // =================== MATERIALS ===================
-  listMaterials(params?: { projectId?: string; siteId?: string; site?: string; vendorId?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -543,7 +542,7 @@ export class ApiService {
   }
 
   // =================== LABOUR ===================
-  listLabour(params?: { projectId?: string; siteId?: string; site?: string; category?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listLabour(params?: { projectId?: string; siteId?: string; category?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -581,7 +580,7 @@ export class ApiService {
   }
 
   // =================== EXPENSES ===================
-  listExpenses(params?: { type?: string; projectId?: string; siteId?: string; site?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listExpenses(params?: { type?: string; projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -643,7 +642,7 @@ export class ApiService {
   }
 
   // =================== SUBCONTRACTORS ===================
-  listSubcontractors(params?: { projectId?: string; siteId?: string; site?: string; approvalStatus?: string; paymentStatus?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listSubcontractors(params?: { projectId?: string; approvalStatus?: string; paymentStatus?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -1075,62 +1074,7 @@ export class ApiService {
       localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
       localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
-      if (res.refreshToken) {
-        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
-      }
     } catch {}
-  }
-
-  /**
-   * Exchange the stored refresh token for a new access token (and rotate the
-   * refresh token). Returns null when no refresh token is available.
-   * Concurrent callers share a single in-flight request to avoid races.
-   */
-  private refreshInFlight: Promise<{ accessToken: string; refreshToken?: string; expiresAt: string } | null> | null = null;
-  refreshTokens(): Promise<{ accessToken: string; refreshToken?: string; expiresAt: string } | null> {
-    if (this.refreshInFlight) return this.refreshInFlight;
-    const rt = this.getStored(STORAGE_KEYS.REFRESH_TOKEN);
-    if (!rt) {
-      return Promise.resolve(null);
-    }
-    const headers = new HttpHeaders({ "Content-Type": "application/json" });
-    this.refreshInFlight = new Promise((resolve) => {
-      this.http
-        .post<{ success?: boolean; accessToken?: string; refreshToken?: string; expiresAt?: string }>(
-          `${this.baseUrl}/auth/refresh`,
-          { refreshToken: rt },
-          { headers }
-        )
-        .subscribe({
-          next: (res) => {
-            if (res?.accessToken) {
-              this.accessTokenSignal.set(res.accessToken);
-              try {
-                localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
-                if (res.expiresAt) {
-                  this.expiresAtSignal.set(res.expiresAt);
-                  localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
-                }
-                if (res.refreshToken) {
-                  localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
-                }
-              } catch {}
-              resolve({
-                accessToken: res.accessToken,
-                refreshToken: res.refreshToken,
-                expiresAt: res.expiresAt ?? "",
-              });
-            } else {
-              resolve(null);
-            }
-          },
-          error: () => resolve(null),
-          complete: () => {
-            this.refreshInFlight = null;
-          },
-        });
-    });
-    return this.refreshInFlight;
   }
 
   // =================== COMPANY PROFILE ===================

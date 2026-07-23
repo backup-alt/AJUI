@@ -21,8 +21,7 @@ export type Project = {
   completion: number;
 };
 
-export type MaterialStatus = "Received" | "Not Received";
-export type ApprovalStatus = "Received" | "Not Received";
+export type ApprovalStatus = "Pending" | "Approved" | "Rejected";
 
 export type Approval = {
   id: string;
@@ -50,7 +49,7 @@ export type MaterialRow = {
   quantity: number;
   vendor: string;
   poNumber: string;
-  status: MaterialStatus;
+  status: ApprovalStatus;
   requestDate?: string;
   purchasedDate?: string;
   issuedAmount?: number;
@@ -168,7 +167,7 @@ export type LabourRow = {
   shift: string;
   notes: string;
   paymentMode: "NEFT" | "Cash";
-  status: MaterialStatus;
+  status: ApprovalStatus;
 };
 
 export type ExpenseRow = {
@@ -183,7 +182,7 @@ export type ExpenseRow = {
   spent: number;
   cashIssued?: number;
   reference: string;
-  status: MaterialStatus;
+  status: ApprovalStatus;
   billUrl?: string;
   poNumber?: string;
   transactionType?: "Purchase" | "Cash Added";
@@ -197,8 +196,6 @@ export type ExpenseRow = {
   approvedAmount?: number;
 };
 
-export type PaymentStatus = "Received" | "Not Received";
-
 export type PaymentRow = {
   id: string;
   projectId: string;
@@ -208,7 +205,7 @@ export type PaymentRow = {
   receipt: string;
   reference: string;
   collectedBy: string;
-  status: PaymentStatus;
+  status: ApprovalStatus;
 };
 
 export const roles: Role[] = ["Admin", "Project Manager", "Accountant", "Supervisor"];
@@ -281,7 +278,7 @@ export const approvals: Approval[] = [
     amount: 86500,
     detail: "120 bags requested, 100 bags recommended after site check",
     submittedAt: "Today, 9:10 AM",
-    status: "Not Received",
+    status: "Pending",
   },
   {
     id: "APR-222",
@@ -293,7 +290,7 @@ export const approvals: Approval[] = [
     amount: 12850,
     detail: "TC-135, TC-136 bills attached for local purchases",
     submittedAt: "Today, 11:35 AM",
-    status: "Not Received",
+    status: "Pending",
   },
   {
     id: "APR-223",
@@ -305,7 +302,7 @@ export const approvals: Approval[] = [
     amount: 114000,
     detail: "Mason - 8, Helper - 5, night shift on Friday",
     submittedAt: "Yesterday, 6:40 PM",
-    status: "Not Received",
+    status: "Pending",
   },
   {
     id: "APR-224",
@@ -317,7 +314,7 @@ export const approvals: Approval[] = [
     amount: 350000,
     detail: "UPI reference pending accountant approval",
     submittedAt: "Yesterday, 3:20 PM",
-    status: "Not Received",
+    status: "Pending",
   },
 ];
 
@@ -335,7 +332,7 @@ export const materials: MaterialRow[] = [
     quantity: 10000,
     vendor: "Sri Devi Traders",
     poNumber: "PO-1041",
-    status: "Received",
+    status: "Approved",
     purchasedDate: "2026-05-15",
     issuedAmount: 85000,
     givenAmount: 80000,
@@ -355,7 +352,7 @@ export const materials: MaterialRow[] = [
     quantity: 0,
     vendor: "KMS Agencies",
     poNumber: "Pending",
-    status: "Not Received",
+    status: "Pending",
     purchasedDate: undefined,
     issuedAmount: 0,
     givenAmount: 0,
@@ -375,7 +372,7 @@ export const materials: MaterialRow[] = [
     quantity: 2200,
     vendor: "Amman Steel",
     poNumber: "PO-1045",
-    status: "Received",
+    status: "Approved",
     purchasedDate: "2026-05-20",
     issuedAmount: 165000,
     givenAmount: 160000,
@@ -395,7 +392,7 @@ export const materials: MaterialRow[] = [
     quantity: 6,
     vendor: "Thirumalai Blue Metals",
     poNumber: "PO-1050",
-    status: "Received",
+    status: "Approved",
     purchasedDate: "2026-05-25",
     issuedAmount: 48000,
     givenAmount: 45000,
@@ -420,7 +417,7 @@ export const labour: LabourRow[] = [
     shift: "1.00",
     notes: "Mason - 5, Helper - 2",
     paymentMode: "NEFT",
-    status: "Received",
+    status: "Approved",
   },
   {
     id: "LAB-119",
@@ -437,7 +434,7 @@ export const labour: LabourRow[] = [
     shift: "Day",
     notes: "Pipe chasing completed",
     paymentMode: "Cash",
-    status: "Not Received",
+    status: "Pending",
   },
   {
     id: "LAB-120",
@@ -454,7 +451,7 @@ export const labour: LabourRow[] = [
     shift: "Night",
     notes: "Mason - 8, Helper - 5",
     paymentMode: "NEFT",
-    status: "Not Received",
+    status: "Pending",
   },
 ];
 
@@ -470,7 +467,7 @@ export const expenses: ExpenseRow[] = [
     received: 25000,
     spent: 12850,
     reference: "TC-135 / TC-136",
-    status: "Not Received",
+    status: "Pending",
   },
   {
     id: "EXP-702",
@@ -483,7 +480,7 @@ export const expenses: ExpenseRow[] = [
     received: 0,
     spent: 18500,
     reference: "Cash voucher",
-    status: "Received",
+    status: "Approved",
   },
   {
     id: "EXP-703",
@@ -496,7 +493,7 @@ export const expenses: ExpenseRow[] = [
     received: 10000,
     spent: 2800,
     reference: "GEN-44",
-    status: "Received",
+    status: "Approved",
   },
 ];
 
@@ -510,7 +507,7 @@ export const payments: PaymentRow[] = [
     receipt: "RCT-1882",
     reference: "UTR 6129042",
     collectedBy: "Anitha",
-    status: "Received",
+    status: "Approved",
   },
   {
     id: "PAY-311",
@@ -521,7 +518,7 @@ export const payments: PaymentRow[] = [
     receipt: "RCT-1883",
     reference: "UPI 5140",
     collectedBy: "Anitha",
-    status: "Received",
+    status: "Approved",
   },
   {
     id: "PAY-312",
@@ -532,6 +529,6 @@ export const payments: PaymentRow[] = [
     receipt: "RCT-1884",
     reference: "Pending",
     collectedBy: "Anitha",
-    status: "Not Received",
+    status: "Pending",
   },
 ];
