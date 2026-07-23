@@ -1342,7 +1342,9 @@ export class VendorDashboardPage {
       return;
     }
     const newSiteIds = [...currentIds, site.id];
-    this.api.patchVendor(vendor.id, { siteIds: newSiteIds }).subscribe({
+    // Use vendor._id (MongoDB ObjectId) for the API call
+    const vendorApiId = vendor._id || vendor.id;
+    this.api.patchVendor(vendorApiId, { siteIds: newSiteIds }).subscribe({
       next: () => {
         const refreshed = { ...vendor, siteIds: newSiteIds };
         this.data.updateVendor(vendor.id, { siteIds: newSiteIds });
@@ -1733,7 +1735,8 @@ export class VendorDashboardPage {
     };
 
     try {
-      const res = await this.api.patchVendor(vendor.id, payload).toPromise();
+      const vendorApiId = vendor._id || vendor.id;
+      const res = await this.api.patchVendor(vendorApiId, payload).toPromise();
       const serverSiteIds = Array.isArray(res?.siteIds)
         ? res.siteIds.map((id: any) => String(id))
         : (value.siteIds || []).map((id) => String(id));
