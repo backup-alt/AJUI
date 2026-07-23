@@ -1206,8 +1206,7 @@ export class VendorDashboardPage {
 
   private initialLoadDone = false;
 
-  constructor() {
-    this.loadVendorsFromBackend();
+  constructor() { this.loadVendorsFromBackend(); this.loadSitesFromBackend();
     effect(() => {
       const vendor = this.selectedVendor();
       const site = this.selectedSite();
@@ -1257,10 +1256,7 @@ export class VendorDashboardPage {
         this.refreshMessage.set("Failed to load vendors: " + (e?.message || "unknown"));
         setTimeout(() => this.refreshMessage.set(null), 4000);
       },
-    });
-  }
-
-  private refreshSiteAssignments() {
+    }); } private async loadSitesFromBackend(): Promise<void> { try { const res = await this.api.listSites().toPromise(); const sites = (res?.items || []).map((s: any) => ({ id: s._id || s.id, _id: s._id, siteId: s.siteId, name: s.name, status: s.status || "Active", supervisor: s.supervisor, startDate: s.startDate, targetEndDate: s.targetEndDate, projectIds: s.projectIds || [], })); if (sites.length > 0) { this.data.siteEntities.set(sites); } } catch (e) { console.warn("Failed to load sites from backend for vendor dashboard", e); } } private refreshSiteAssignments() {
     const current = this.selectedVendor();
     if (!current) return;
     const updated = this.data.vendors().find((v) => v.id === current.id);
@@ -1293,7 +1289,14 @@ export class VendorDashboardPage {
 
   openAddSitePicker() {
     this.showAddSitePicker.set(true);
-    this.loadAvailableSites();
+    this.ensureSitesLoaded().then(() => this.loadAvailableSites());
+  }
+
+  async ensureSitesLoaded() {
+    const entities = this.data.siteEntities();
+    if (entities.length === 0) {
+      await this.loadSitesFromBackend();
+    }
   }
 
   closeAddSitePicker() {
@@ -1313,7 +1316,15 @@ export class VendorDashboardPage {
     const all = siteEntities.length > 0
       ? siteEntities.map((s) => ({ id: s._id || s.id, name: s.name }))
       : this.data.sites();
-    this.availableSites.set(all.filter((s) => !assignedNames.has(s.name)));
+    // Deduplicate by site name
+    const seen = new Set<string>();
+    const unique = all.filter((s) => {
+      const key = s.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    this.availableSites.set(unique.filter((s) => !assignedNames.has(s.name)));
     this.loadingAvailableSites.set(false);
   }
 
@@ -1325,16 +1336,35 @@ export class VendorDashboardPage {
     const vendor = this.selectedVendor();
     if (!vendor) return;
     const currentIds = vendor.siteIds ? [...vendor.siteIds] : [];
+    // Avoid duplicate
+    if (currentIds.includes(site.id)) {
+      this.closeAddSitePicker();
+      return;
+    }
     const newSiteIds = [...currentIds, site.id];
     this.api.patchVendor(vendor.id, { siteIds: newSiteIds }).subscribe({
       next: () => {
         const refreshed = { ...vendor, siteIds: newSiteIds };
         this.data.updateVendor(vendor.id, { siteIds: newSiteIds });
         this.selectedVendor.set(refreshed);
+        this.toastController.create({
+          message: `Site "${site.name}" assigned to vendor`,
+          duration: 2000,
+          color: "success",
+          position: "top",
+        }).then(t => t.present());
+        this.closeAddSitePicker();
       },
-      error: () => {},
+      error: (err) => {
+        console.error("Failed to assign site", err);
+        this.toastController.create({
+          message: "Failed to assign site: " + (err?.error?.message || err?.message || "Unknown error"),
+          duration: 4000,
+          color: "danger",
+          position: "top",
+        }).then(t => t.present());
+      },
     });
-    this.closeAddSitePicker();
   }
 
   private loadCustomColumns(vendorName: string, siteName: string) {
@@ -1756,3 +1786,5 @@ export class VendorDashboardPage {
     return vendor.id;
   }
 }
+
+
