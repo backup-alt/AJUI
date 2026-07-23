@@ -94,7 +94,7 @@ import { Site } from '../../shared/models';
         </div>
       </ion-header>
 
-      <ion-content class="menu-content">
+      <div class="menu-body">
         <!-- User row -->
         <div class="user-row">
           <div class="user-avatar">{{ userInitial() }}</div>
@@ -162,7 +162,7 @@ import { Site } from '../../shared/models';
             <span>AGB Supervisor v1.0</span>
           </div>
         </div>
-      </ion-content>
+      </div>
     </ion-menu>
 
     <div class="ion-page" id="main-content">
@@ -287,18 +287,13 @@ import { Site } from '../../shared/models';
       margin-top: 1px;
     }
 
-    .menu-content {
-      --background: var(--m3-surface-bright);
-      --padding-top: 0;
-      --padding-bottom: calc(8px + env(safe-area-inset-bottom));
-      --padding-start: 0;
-      --padding-end: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    .menu-content::part(scroll-container) {
-      padding-top: 0;
-      margin-top: 0;
+    .menu-body {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--m3-surface-bright);
+      padding: 0;
+      margin: 0;
+      -webkit-overflow-scrolling: touch;
     }
 
     /* ─── User row ─── */
@@ -306,9 +301,9 @@ import { Site } from '../../shared/models';
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 16px 6px;
+      padding: 8px 16px 8px;
       border-bottom: 1px solid var(--m3-outline-variant);
-      margin: 0 0 2px;
+      margin: 0;
     }
     .user-avatar {
       width: 32px;
