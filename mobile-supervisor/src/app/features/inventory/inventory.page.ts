@@ -50,6 +50,11 @@ export interface InventoryItem {
   projectName: string;
   siteId: string;
   site: string;
+  purchaseHistory?: Array<{
+    vendor: string;
+    quantity: number;
+    date: string;
+  }>;
 }
 
 type SortField = 'name' | 'currentQuantity' | 'lastUpdated' | 'vendor';
@@ -174,6 +179,22 @@ type SortDir = 'asc' | 'desc';
                   <span class="detail-value">{{ item.lastUpdated | date:'MMM d, yyyy' }}</span>
                 </div>
               </div>
+
+              @if (item.purchaseHistory && item.purchaseHistory.length > 0) {
+                <div class="vendor-history">
+                  <div class="vendor-history-header">
+                    <ion-icon name="time-outline"></ion-icon>
+                    <span>Vendor History</span>
+                  </div>
+                  @for (entry of item.purchaseHistory; track $index) {
+                    <div class="vendor-history-entry">
+                      <span class="vh-vendor">{{ entry.vendor || 'Unknown' }}</span>
+                      <span class="vh-qty">{{ entry.quantity }} {{ item.unit }}</span>
+                      <span class="vh-date">{{ entry.date | date:'MMM d, yyyy' }}</span>
+                    </div>
+                  }
+                </div>
+              }
 
               <footer class="card-footer">
                 <button class="request-btn" (click)="raiseRequest(item)">
@@ -429,6 +450,54 @@ type SortDir = 'asc' | 'desc';
     .request-btn:active { transform: scale(0.98); }
     .request-btn ion-icon { font-size: 16px; }
 
+    .vendor-history {
+      margin-top: var(--md-space-3);
+      padding-top: var(--md-space-3);
+      border-top: 1px solid var(--m3-outline-variant);
+    }
+    .vendor-history-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--m3-on-surface-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--md-space-2);
+    }
+    .vendor-history-header ion-icon { font-size: 14px; }
+    .vendor-history-entry {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--m3-outline-variant);
+    }
+    .vendor-history-entry:last-child { border-bottom: none; }
+    .vh-vendor {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--m3-on-surface);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .vh-qty {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--m3-primary);
+      flex-shrink: 0;
+    }
+    .vh-date {
+      font-size: 11px;
+      color: var(--m3-on-surface-muted);
+      flex-shrink: 0;
+    }
+
     .skeleton-card {
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
@@ -551,6 +620,7 @@ export class InventoryPage implements OnInit, OnDestroy {
             projectName: m.projectName,
             siteId: m.siteId || '',
             site: m.site,
+            purchaseHistory: m.purchaseHistory || [],
           }));
           this.items.set(materials);
           this.isLoading.set(false);

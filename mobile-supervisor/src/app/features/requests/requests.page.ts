@@ -78,31 +78,33 @@ interface RequestItem {
     StatusPillComponent,
   ],
   template: `
-    <ion-content class="requests-content">
+    <ion-content class="requests-content" [scrollY]="true" [forceOverscroll]="false">
       <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      <app-page-header
-        title="Requests"
-        subtitle="All your submitted requests, latest first"
-      ></app-page-header>
+      <div class="page-fixed-header">
+        <app-page-header
+          title="Requests"
+          subtitle="All your submitted requests, latest first"
+        ></app-page-header>
 
-      <div class="seg-wrap">
-        <ion-segment [(ngModel)]="activeTab" (ionChange)="onTabChange()">
-          <ion-segment-button value="pending">
-            <ion-label>Pending</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="approved">
-            <ion-label>Approved</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="declined">
-            <ion-label>Declined</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="upload">
-            <ion-label>Upload</ion-label>
-          </ion-segment-button>
-        </ion-segment>
+        <div class="seg-wrap">
+          <ion-segment [(ngModel)]="activeTab" (ionChange)="onTabChange()">
+            <ion-segment-button value="pending">
+              <ion-label>Pending</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="approved">
+              <ion-label>Approved</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="declined">
+              <ion-label>Declined</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="upload">
+              <ion-label>Upload</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </div>
       </div>
 
       <div class="cards">
@@ -239,27 +241,32 @@ interface RequestItem {
     </ion-content>
   `,
   styles: [`
-    .requests-content { --background: #f5f6f8; }
-    .seg-wrap { padding: 0 16px 8px; }
+    .requests-content { --background: var(--m3-surface); }
+    .page-fixed-header {
+      background: var(--m3-surface);
+      position: relative;
+      z-index: 1;
+    }
+    .seg-wrap { padding: 0 var(--md-space-4) var(--md-space-2); }
 
-    .cards { padding: 0 16px 96px; }
+    .cards { padding: 0 var(--md-space-4) 96px; }
     .request-card {
       width: 100%; text-align: left;
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: 20px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-      border-left: 3px solid #c9a227;
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      padding: var(--md-space-3) var(--md-space-4);
+      margin-bottom: var(--md-space-2);
+      box-shadow: var(--md-elevation-1);
+      border-left: 3px solid var(--m3-secondary);
     }
-    .request-card.upload-mode { border-left-color: #002263; }
+    .request-card.upload-mode { border-left-color: var(--m3-primary); }
 
     .request-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+      margin-bottom: var(--md-space-2);
     }
     .type-pill {
       display: inline-flex;
@@ -270,27 +277,27 @@ interface RequestItem {
       text-transform: uppercase;
       letter-spacing: 0.4px;
       padding: 3px 8px;
-      border-radius: 6px;
+      border-radius: var(--md-radius-sm);
     }
     .type-pill.material {
       background: rgba(220, 53, 69, 0.08);
-      color: #dc3545;
+      color: var(--m3-error);
     }
     .type-pill.expense {
       background: rgba(0, 34, 99, 0.08);
-      color: #002263;
+      color: var(--m3-primary);
     }
     .type-pill ion-icon { font-size: 13px; }
 
     .request-title {
       font-size: 15px;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--m3-on-surface);
       margin: 0 0 2px;
     }
     .request-subtitle {
       font-size: 12px;
-      color: #64748b;
+      color: var(--m3-on-surface-muted);
       margin: 0 0 6px;
     }
     .request-meta {
@@ -298,44 +305,44 @@ interface RequestItem {
       align-items: center;
       gap: 4px;
       font-size: 12px;
-      color: #94a3b8;
+      color: var(--m3-on-surface-muted);
       margin: 0 0 8px;
     }
     .request-meta ion-icon { font-size: 13px; }
-    .meta-sep { color: #cbd5e1; }
+    .meta-sep { color: var(--m3-on-surface-muted); opacity: 0.5; }
 
     .amount-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 6px 10px;
-      background: #f8fafc;
-      border-radius: 8px;
+      background: var(--m3-surface-container);
+      border-radius: var(--md-radius-md);
       margin-bottom: 4px;
     }
-    .amount-row.given { background: #f0fdf4; }
+    .amount-row.given { background: var(--m3-success-container); }
     .amount-label {
       font-size: 11px;
       font-weight: 700;
-      color: #64748b;
+      color: var(--m3-on-surface-muted);
       text-transform: uppercase;
       letter-spacing: 0.3px;
     }
     .amount-value {
       font-size: 14px;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--m3-on-surface);
     }
-    .amount-row.given .amount-value { color: #16a34a; }
+    .amount-row.given .amount-value { color: var(--m3-success); }
 
-    .upload-cta { margin-top: 10px; }
+    .upload-cta { margin-top: var(--md-space-2); }
 
     .upload-section {
-      margin-top: 10px;
-      padding: 12px;
-      background: #f8fafc;
-      border-radius: 12px;
-      border: 1px dashed #cbd5e1;
+      margin-top: var(--md-space-2);
+      padding: var(--md-space-3);
+      background: var(--m3-surface-container);
+      border-radius: var(--md-radius-lg);
+      border: 1px dashed var(--m3-outline);
     }
 
     .file-preview {
@@ -343,12 +350,12 @@ interface RequestItem {
       align-items: center;
       gap: 6px;
       font-size: 12px;
-      color: #16a34a;
+      color: var(--m3-success);
       font-weight: 600;
       margin-bottom: 8px;
       padding: 6px 10px;
-      background: #f0fdf4;
-      border-radius: 8px;
+      background: var(--m3-success-container);
+      border-radius: var(--md-radius-md);
       min-width: 0;
     }
     .file-preview ion-icon { font-size: 16px; }
@@ -359,9 +366,7 @@ interface RequestItem {
       white-space: nowrap;
     }
 
-    .upload-field {
-      margin-bottom: 10px;
-    }
+    .upload-field { margin-bottom: 10px; }
     .checkbox-field {
       display: flex;
       align-items: center;
@@ -369,10 +374,10 @@ interface RequestItem {
       margin-bottom: 10px;
     }
     .received-checkbox {
-      --checkbox-background: #ffffff;
-      --checkbox-background-checked: #002263;
-      --border-color: #94a3b8;
-      --border-color-checked: #002263;
+      --checkbox-background: var(--m3-surface-bright);
+      --checkbox-background-checked: var(--m3-primary);
+      --border-color: var(--m3-outline);
+      --border-color-checked: var(--m3-primary);
       --checkbox-border-radius: 6px;
       --checkbox-size: 20px;
       margin: 0;
@@ -381,24 +386,24 @@ interface RequestItem {
     .received-label {
       font-size: 13px;
       line-height: 1.35;
-      color: #334155;
+      color: var(--m3-on-surface);
       font-weight: 600;
     }
     .upload-field-label {
       display: block;
       font-size: 11px;
       font-weight: 700;
-      color: #475569;
+      color: var(--m3-on-surface-variant);
       text-transform: uppercase;
       letter-spacing: 0.3px;
       margin-bottom: 4px;
     }
     .upload-input {
-      --background: #ffffff;
-      --border-radius: 8px;
+      --background: var(--m3-surface-bright);
+      --border-radius: var(--md-radius-md);
       --padding-start: 10px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-md);
     }
 
     .upload-actions {
@@ -413,20 +418,20 @@ interface RequestItem {
       gap: 6px;
       font-size: 12px;
       font-weight: 600;
-      color: #16a34a;
+      color: var(--m3-success);
       margin-top: 8px;
       padding: 6px 10px;
-      background: #f0fdf4;
-      border-radius: 8px;
+      background: var(--m3-success-container);
+      border-radius: var(--md-radius-md);
     }
     .completed-notice ion-icon { font-size: 16px; }
 
     .skeleton-card {
-      background: #ffffff;
-      border: 1px solid #eef0f3;
-      border-radius: 18px;
-      padding: 16px;
-      margin-bottom: 10px;
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      padding: var(--md-space-4);
+      margin-bottom: var(--md-space-2);
     }
   `],
 })

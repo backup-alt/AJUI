@@ -41,12 +41,12 @@ import { IonIcon } from '@ionic/angular/standalone';
     h3 {
       font-size: 18px;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--m3-on-surface);
       margin: 0 0 6px;
     }
     p {
       font-size: 14px;
-      color: #64748b;
+      color: var(--m3-on-surface-muted);
       margin: 0 0 8px;
       max-width: 320px;
       line-height: 1.5;

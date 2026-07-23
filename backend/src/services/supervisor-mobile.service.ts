@@ -664,6 +664,11 @@ export async function listMaterialsForSupervisor(
       remainingStock: m.remainingStock,
       vendor: m.vendor,
       poNumber: m.poNumber,
+      purchaseHistory: (m.purchaseHistory || []).map((h) => ({
+        vendor: h.vendor,
+        quantity: h.quantity,
+        date: h.date,
+      })),
       requestDate: m.createdAt,
       status: "Approved",
       createdAt: m.createdAt,

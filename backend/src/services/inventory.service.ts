@@ -108,7 +108,21 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
   const materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed"] } }).lean();
   for (const material of materials) {
     const existing = await Inventory.findOne(inventoryMatchForMaterial(material)).lean();
-    if (existing) continue;
+    if (existing) {
+      const qty = Math.max(
+        0,
+        Number(material.approvedQuantity) || 0,
+        Number(material.purchasedQuantity) || 0,
+        Number(material.remainingStock) || 0
+      );
+      if (qty <= 0) continue;
+      const alreadyRecorded = (existing.purchaseHistory || []).some(
+        (h) => h.materialId && h.materialId.toString() === material._id.toString()
+      );
+      if (alreadyRecorded) continue;
+      await addApprovedMaterialToInventory(material._id, qty, material.createdBy);
+      continue;
+    }
     const quantity = Math.max(
       0,
       Number(material.approvedQuantity) || 0,

@@ -29,8 +29,15 @@ export interface Material {
   createdBy?: string;
   approvedBy?: string;
   approvedAt?: string;
+  purchaseHistory?: PurchaseHistoryEntry[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PurchaseHistoryEntry {
+  vendor: string;
+  quantity: number;
+  date: string;
 }
 
 export interface CustomField {

@@ -241,28 +241,28 @@ import { Site } from '../../shared/models';
   styles: [`
     :host { display: block; }
 
-    /* Menu header - clean, production-ready */
+    /* Menu header */
     .agb-menu-header {
       background: var(--agb-gradient-hero);
       background-image: linear-gradient(135deg, #002263 0%, #003380 100%);
-      color: var(--m3-on-primary);
-      padding: calc(24px + env(safe-area-inset-top)) 20px 24px;
+      color: #ffffff;
+      padding: calc(16px + env(safe-area-inset-top)) 16px 16px;
     }
     .menu-brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
     }
     .menu-brand-logo {
-      width: 52px;
-      height: 52px;
+      width: 48px;
+      height: 48px;
       border-radius: 12px;
       background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      overflow: hidden;
+      padding: 6px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
     }
     .menu-brand-logo-img {
@@ -284,12 +284,12 @@ import { Site } from '../../shared/models';
       color: rgba(255, 255, 255, 0.65);
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      margin-top: 3px;
+      margin-top: 2px;
     }
 
     .menu-content {
       --background: var(--m3-surface-bright);
-      --padding-top: var(--md-space-2);
+      --padding-top: 0;
       --padding-bottom: calc(8px + env(safe-area-inset-bottom));
     }
 
@@ -300,10 +300,10 @@ import { Site } from '../../shared/models';
       color: var(--m3-on-surface-muted);
       text-transform: uppercase;
       letter-spacing: 1.2px;
-      padding: var(--md-space-4) var(--md-space-6) var(--md-space-2);
+      padding: var(--md-space-3) var(--md-space-5) var(--md-space-2);
     }
     .menu-section-label:first-of-type {
-      padding-top: var(--md-space-4);
+      padding-top: var(--md-space-3);
     }
 
     .menu-list { background: transparent; padding: 0 var(--md-space-2); }
@@ -312,12 +312,12 @@ import { Site } from '../../shared/models';
       --color: var(--m3-on-surface);
       --border-radius: var(--md-radius-lg);
       --inner-border-radius: var(--md-radius-lg);
-      --padding-start: var(--md-space-4);
-      --padding-end: var(--md-space-4);
-      --min-height: 48px;
+      --padding-start: var(--md-space-3);
+      --padding-end: var(--md-space-3);
+      --min-height: 44px;
       font-size: 14px;
       font-weight: 600;
-      margin: 2px 0;
+      margin: 1px 0;
       border-bottom: none;
       transition: background var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }

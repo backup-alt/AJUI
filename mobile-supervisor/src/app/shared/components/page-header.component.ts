@@ -31,13 +31,13 @@ import { Component, Input } from '@angular/core';
     h1 {
       font-size: 22px;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--m3-on-surface);
       margin: 0 0 2px;
       letter-spacing: -0.2px;
     }
     p {
       font-size: 13px;
-      color: #64748b;
+      color: var(--m3-on-surface-muted);
       margin: 0;
       line-height: 1.45;
     }

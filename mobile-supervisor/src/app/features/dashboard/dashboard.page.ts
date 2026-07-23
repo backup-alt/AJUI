@@ -57,7 +57,6 @@ import {
       </ion-refresher>
 
       <div class="dashboard-container">
-        <!-- Hero greeting -->
         <div class="hero">
           <div class="hero-decor"></div>
           <div class="hero-content">
@@ -82,7 +81,6 @@ import {
         </div>
 
         <div class="content-stack">
-          <!-- Stats grid -->
           <div class="stats-grid">
             <app-stat-card
               icon="location-outline"
@@ -97,7 +95,7 @@ import {
               iconBg="var(--m3-error-container)"
               iconColor="var(--m3-on-error-container)"
               [value]="dashboard()?.counts?.pendingMaterials || 0"
-              label="Material requests"
+              label="Materials"
               (click)="navigateTo('/tabs/materials')"
             ></app-stat-card>
             <app-stat-card
@@ -105,12 +103,11 @@ import {
               iconBg="var(--m3-tertiary-container)"
               iconColor="var(--m3-on-tertiary-container)"
               [value]="dashboard()?.counts?.pendingLabour || 0"
-              label="Labour entries"
+              label="Labour"
               (click)="navigateTo('/tabs/labour')"
             ></app-stat-card>
           </div>
 
-          <!-- Today's expense -->
           <div class="expense-card" (click)="navigateTo('/tabs/expenses')">
             <div class="expense-left">
               <div class="expense-label">Today's expenses</div>
@@ -128,7 +125,6 @@ import {
             </div>
           </div>
 
-          <!-- Active sites -->
           <div class="section">
             <div class="section-head">
               <h2 class="section-title">Your active sites</h2>
@@ -179,13 +175,12 @@ import {
     .dashboard-content { --background: var(--m3-surface); }
     .dashboard-container { padding: 0; }
 
-    /* Hero */
     .hero {
       position: relative;
       background: var(--m3-primary);
       background-image: linear-gradient(135deg, var(--m3-primary) 0%, #003380 100%);
       color: var(--m3-on-primary);
-      padding: 32px 20px 56px;
+      padding: 28px 20px 48px;
       overflow: hidden;
     }
     .hero-decor {
@@ -196,7 +191,7 @@ import {
       pointer-events: none;
     }
     .hero-content { position: relative; }
-    .greeting { margin-bottom: var(--md-space-4); }
+    .greeting { margin-bottom: var(--md-space-3); }
     .greeting-pre {
       display: block;
       font-size: 13px;
@@ -206,7 +201,7 @@ import {
       font-weight: 600;
     }
     .greeting-name {
-      font-size: 26px;
+      font-size: 24px;
       font-weight: 800;
       letter-spacing: -0.4px;
       margin: var(--md-space-1) 0 0;
@@ -229,12 +224,11 @@ import {
 
     .content-stack {
       padding: 0 var(--md-space-4);
-      margin-top: -32px;
+      margin-top: -28px;
       position: relative;
       z-index: 2;
     }
 
-    /* Stats grid */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -242,7 +236,6 @@ import {
       margin-bottom: var(--md-space-4);
     }
 
-    /* Expense card */
     .expense-card {
       display: flex;
       align-items: center;
@@ -251,15 +244,14 @@ import {
       background-image: linear-gradient(135deg, var(--m3-primary) 0%, #003380 100%);
       color: var(--m3-on-primary);
       border-radius: var(--md-radius-xl);
-      padding: var(--md-space-5);
-      margin-bottom: var(--md-space-5);
+      padding: var(--md-space-4);
+      margin-bottom: var(--md-space-4);
       box-shadow: var(--md-elevation-3);
       cursor: pointer;
       transition: transform var(--md-motion-duration-short1) var(--md-motion-easing-standard),
                   box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
     .expense-card:active { transform: scale(0.99); }
-    .expense-card:hover { box-shadow: var(--md-elevation-4); }
     .expense-label {
       font-size: 11px;
       opacity: 0.8;
@@ -268,7 +260,7 @@ import {
       font-weight: 600;
     }
     .expense-amount {
-      font-size: 28px;
+      font-size: 26px;
       font-weight: 800;
       line-height: 1.1;
       margin-top: var(--md-space-1);
@@ -284,7 +276,7 @@ import {
     .expense-trend ion-icon { font-size: 14px; color: var(--m3-secondary); }
     .expense-right { text-align: right; }
     .expense-count {
-      font-size: 28px;
+      font-size: 26px;
       font-weight: 800;
       color: var(--m3-secondary);
       line-height: 1.1;
@@ -297,16 +289,15 @@ import {
       margin-top: var(--md-space-1);
     }
 
-    /* Section */
     .section {
-      margin-top: var(--md-space-2);
+      margin-top: var(--md-space-1);
       margin-bottom: var(--md-space-2);
     }
     .section-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: var(--md-space-1) var(--md-space-1) var(--md-space-3);
+      padding: 0 0 var(--md-space-3);
     }
     .section-title {
       font-size: 16px;
@@ -329,9 +320,7 @@ import {
       font-family: inherit;
     }
     .section-link ion-icon { font-size: 14px; }
-    .section-link:hover { text-decoration: underline; }
 
-    /* Site card */
     .site-card {
       width: 100%;
       text-align: left;
@@ -341,7 +330,7 @@ import {
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-xl);
-      padding: var(--md-space-4);
+      padding: var(--md-space-3);
       margin-bottom: var(--md-space-2);
       box-shadow: var(--md-elevation-1);
       cursor: pointer;
@@ -350,7 +339,6 @@ import {
                   box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
     .site-card:active { transform: scale(0.99); }
-    .site-card:hover { box-shadow: var(--md-elevation-2); }
     .site-tile-icon {
       width: 40px;
       height: 40px;
@@ -365,7 +353,7 @@ import {
     .site-tile-icon ion-icon { font-size: 20px; }
     .site-info { flex: 1; min-width: 0; }
     .site-name {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
       color: var(--m3-on-surface);
       margin: 0 0 2px;
