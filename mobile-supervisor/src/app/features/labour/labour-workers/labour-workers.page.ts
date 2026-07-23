@@ -173,7 +173,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
               </div>
               <div class="worker-actions" (click)="$event.stopPropagation()">
                 @if (!isMarkedToday(worker)) {
-                  <button class="action-btn success" (click)="markAttendance(worker)" title="Mark present today">
+                  <button class="action-btn success" (click)="markAttendance(worker)" title="Mark attendance">
                     <ion-icon name="calendar-outline"></ion-icon>
                   </button>
                 } @else {
@@ -523,53 +523,7 @@ export class LabourWorkersPage implements OnInit {
   }
 
   async markAttendance(worker: Worker): Promise<void> {
-    const siteId = this.supervisor.selectedSiteId();
-    const siteName = this.supervisor.selectedSiteName() || '';
-    const projectId = this.supervisor.selectedProjectId();
-
-    if (!siteId || !projectId) {
-      const toast = await this.toastCtrl.create({
-        message: 'Please select a site first',
-        duration: 2500,
-        color: 'warning',
-        position: 'top',
-      });
-      await toast.present();
-      return;
-    }
-
-    this.supervisor.markAttendance({
-      workerId: (worker as any).workerId || worker._id,
-      projectId,
-      siteId,
-      site: siteName,
-      attendanceDate: this.todayDate,
-      shiftCount: 1,
-      overtimeHours: 0,
-      overtimeAmount: 0,
-      lateFine: 0,
-      paymentMode: 'Cash',
-    }).subscribe({
-      next: async () => {
-        const toast = await this.toastCtrl.create({
-          message: `${worker.name} marked present`,
-          duration: 2000,
-          color: 'success',
-          position: 'top',
-        });
-        await toast.present();
-        await this.loadWorkers();
-      },
-      error: async (err) => {
-        const toast = await this.toastCtrl.create({
-          message: err?.error?.message || 'Failed to mark attendance',
-          duration: 2500,
-          color: 'danger',
-          position: 'top',
-        });
-        await toast.present();
-      },
-    });
+    void this.router.navigate(['/tabs/labour/mark-attendance', worker._id]);
   }
 
   getInitials(name: string): string {
