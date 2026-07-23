@@ -11,34 +11,24 @@ import {
   cubeOutline,
   peopleOutline,
   walletOutline,
-  chevronDownOutline,
-  locationOutline,
   constructOutline,
-  trendingUpOutline,
-  calendarOutline,
   homeOutline,
   businessOutline,
   receiptOutline,
   settingsOutline,
   personOutline,
-  addOutline,
   alertCircleOutline,
   timeOutline,
-  analyticsOutline,
-  gitBranchOutline,
-  boatOutline,
-  trainOutline,
-  leafOutline,
-  storefrontOutline,
-  medkitOutline,
-  schoolOutline,
-  ribbonOutline,
+  cashOutline,
+  documentTextOutline,
+  chevronForwardOutline,
+  locationOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { AuthService } from '../../core/services/auth.service';
 import { DashboardData, Site } from '../../shared/models';
-import { DatePipe, CurrencyPipe } from '@angular/common';
-import { EmptyStateComponent } from '../../shared/components';
+import { Expense } from '../../shared/models/expense.model';
+import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
 
 @Component({
   selector: 'app-dashboard',
@@ -48,9 +38,10 @@ import { EmptyStateComponent } from '../../shared/components';
     IonIcon,
     IonRefresher,
     IonRefresherContent,
+    CurrencyPipe,
     DatePipe,
     CurrencyPipe,
-    EmptyStateComponent,
+    TitleCasePipe,
   ],
   template: `
     <ion-content class="dashboard-content">
@@ -59,79 +50,83 @@ import { EmptyStateComponent } from '../../shared/components';
       </ion-refresher>
 
       <div class="dash-wrap">
-        <!-- ═══ HEADER BAR ═══ -->
-        <header class="d-header">
-          <div class="d-header-left">
-            <div class="avatar-ring">
-              <div class="avatar">
-                <ion-icon name="person-outline"></ion-icon>
-              </div>
-            </div>
-          </div>
-          <div class="d-header-center">
-            <span class="greeting">{{ greeting() }}, {{ userName() }}</span>
-            <button class="location-pill" id="loc-pill">
-              <ion-icon name="location-outline"></ion-icon>
-              <span>{{ currentSiteName() || 'Select site' }}</span>
-              <ion-icon name="chevron-down-outline" class="pill-chev"></ion-icon>
-            </button>
-          </div>
-          <div class="d-header-right">
-            <button class="bell-btn" (click)="navigateTo('/tabs/requests')">
-              <ion-icon name="notifications-outline"></ion-icon>
-              <span class="bell-dot"></span>
-            </button>
-          </div>
-        </header>
 
-        <!-- ═══ SUMMARY METRICS ═══ -->
-        <section class="metrics-strip">
-          <button class="metric-card" (click)="navigateTo('/tabs/sites')">
-            <div class="metric-icon-glass blue">
+        <!-- ═══ STAT CARDS — 2×2 GRID ═══ -->
+        <section class="stat-grid">
+          <button class="stat-card" (click)="navigateTo('/tabs/sites')">
+            <div class="stat-icon stat-icon--navy">
               <ion-icon name="location-outline"></ion-icon>
             </div>
-            <span class="metric-val">{{ dashboard()?.counts?.sites || 0 }}</span>
-            <span class="metric-lbl">Sites</span>
+            <span class="stat-val">{{ dashboard()?.counts?.sites || 0 }}</span>
+            <span class="stat-label">Sites</span>
           </button>
-          <button class="metric-card" (click)="navigateTo('/tabs/materials')">
-            <div class="metric-icon-glass emerald">
+          <button class="stat-card" (click)="navigateTo('/tabs/materials')">
+            <div class="stat-icon stat-icon--gold">
               <ion-icon name="cube-outline"></ion-icon>
             </div>
-            <span class="metric-val">{{ dashboard()?.counts?.pendingMaterials || 0 }}</span>
-            <span class="metric-lbl">Materials</span>
+            <span class="stat-val">{{ dashboard()?.counts?.pendingMaterials || 0 }}</span>
+            <span class="stat-label">Materials</span>
           </button>
-          <button class="metric-card" (click)="navigateTo('/tabs/labour')">
-            <div class="metric-icon-glass purple">
+          <button class="stat-card" (click)="navigateTo('/tabs/labour')">
+            <div class="stat-icon stat-icon--navy">
               <ion-icon name="people-outline"></ion-icon>
             </div>
-            <span class="metric-val">{{ dashboard()?.counts?.pendingLabour || 0 }}</span>
-            <span class="metric-lbl">Active Workers</span>
+            <span class="stat-val">{{ dashboard()?.counts?.pendingLabour || 0 }}</span>
+            <span class="stat-label">Labour</span>
+          </button>
+          <button class="stat-card" (click)="navigateTo('/tabs/requests')">
+            <div class="stat-icon stat-icon--gold">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+            </div>
+            <span class="stat-val">{{ dashboard()?.counts?.pendingApprovals || 0 }}</span>
+            <span class="stat-label">Approvals</span>
           </button>
         </section>
 
         <!-- ═══ TODAY'S EXPENSES ═══ -->
-        <section class="expense-card" (click)="navigateTo('/tabs/expenses')">
-          <svg class="expense-sparkline" viewBox="0 0 300 80" fill="none" preserveAspectRatio="none">
-            <path d="M0 60 Q30 55 60 48 T120 35 T180 22 T240 18 T300 10" stroke="rgba(255,255,255,0.08)" stroke-width="2" fill="none"/>
-            <path d="M0 70 Q40 62 80 55 T160 40 T240 30 T300 20" stroke="rgba(255,255,255,0.05)" stroke-width="1.5" fill="none"/>
-          </svg>
-          <div class="expense-body">
-            <div class="expense-top">
-              <div>
-                <span class="expense-label">Today's Expenses</span>
-                <div class="expense-amount">{{ dashboard()?.todayExpense?.total | currency:'INR':'symbol':'1.0-0' }}</div>
-              </div>
-              <button class="add-btn" (click)="navigateTo('/tabs/expenses/create'); $event.stopPropagation()">
-                <ion-icon name="add-outline"></ion-icon>
-                <span>Add</span>
-              </button>
+        <section class="expense-card">
+          <div class="expense-header">
+            <div class="expense-header-left">
+              <span class="expense-title">Today's Expenses</span>
+              <span class="expense-total">{{ dashboard()?.todayExpense?.total | currency:'INR':'symbol':'1.0-0' }}</span>
+              <span class="expense-count">{{ dashboard()?.todayExpense?.count || 0 }} transactions</span>
             </div>
-            <div class="expense-bottom">
-              <span class="expense-txn-count">
+            <button class="expense-add-btn" (click)="navigateTo('/tabs/expenses/create')">
+              <ion-icon name="add-outline"></ion-icon>
+            </button>
+          </div>
+
+          <div class="expense-divider"></div>
+
+          <div class="expense-list">
+            @if (todayExpenses().length === 0) {
+              <div class="expense-empty">
                 <ion-icon name="receipt-outline"></ion-icon>
-                {{ dashboard()?.todayExpense?.count || 0 }} transactions today
-              </span>
-            </div>
+                <span>No expenses logged today</span>
+              </div>
+            } @else {
+              @for (expense of todayExpenses().slice(0, 4); track expense._id) {
+                <div class="expense-row">
+                  <div class="expense-row-icon">
+                    <ion-icon [name]="getExpenseIcon(expense)"></ion-icon>
+                  </div>
+                  <div class="expense-row-details">
+                    <span class="expense-row-desc">{{ expense.description }}</span>
+                    <span class="expense-row-meta">{{ expense.materialVendor || expense.type | titlecase }}</span>
+                  </div>
+                  <div class="expense-row-right">
+                    <span class="expense-row-amount">{{ expense.amount | currency:'INR':'symbol':'1.0-0' }}</span>
+                    <span class="expense-row-time">{{ expense.createdAt | date:'shortTime' }}</span>
+                  </div>
+                </div>
+              }
+              @if (todayExpenses().length > 4) {
+                <button class="expense-view-all" (click)="navigateTo('/tabs/expenses')">
+                  View all {{ todayExpenses().length }} expenses
+                  <ion-icon name="chevron-forward-outline"></ion-icon>
+                </button>
+              }
+            }
           </div>
         </section>
 
@@ -143,35 +138,33 @@ import { EmptyStateComponent } from '../../shared/components';
           </div>
 
           @if (sites().length === 0) {
-            <app-empty-state
-              icon="location-outline"
-              title="No active sites"
-              message="You have not been assigned to any site yet."
-            ></app-empty-state>
+            <div class="sites-empty">
+              <div class="sites-empty-icon">
+                <ion-icon name="location-outline"></ion-icon>
+              </div>
+              <span class="sites-empty-text">No active sites assigned</span>
+              <button class="sites-empty-cta" (click)="navigateTo('/tabs/sites')">Add a site</button>
+            </div>
           } @else {
-            @for (site of sites().slice(0, 4); track site.id) {
-              <button class="site-row" (click)="navigateTo('/tabs/sites')">
-                <div class="site-icon-box" [style.background]="getIconBg(site.status)">
-                  <ion-icon [name]="getSiteIcon(site.name)"></ion-icon>
+            @for (site of sites().slice(0, 5); track site.id) {
+              <button class="site-row" (click)="navigateToSite(site)">
+                <div class="site-icon-box">
+                  <ion-icon name="construct-outline"></ion-icon>
                 </div>
-                <div class="site-details">
-                  <h3 class="site-name">{{ site.name }}</h3>
-                  <p class="site-sub">
-                    @if (site.employeeCount !== undefined && site.employeeCount > 0) {
-                      {{ site.employeeCount }} worker{{ site.employeeCount !== 1 ? 's' : '' }}
-                    } @else {
-                      0 workers
-                    }
-                    <span class="sub-dot">·</span>
-                    Updated {{ getUpdatedAgo(site.daysActive) }}
-                  </p>
+                <div class="site-info">
+                  <span class="site-name">{{ site.name }}</span>
+                  <span class="site-meta">
+                    {{ site.employeeCount || 0 }} worker{{ (site.employeeCount || 0) !== 1 ? 's' : '' }}
+                  </span>
                 </div>
-                <span class="status-pill"
-                  [class.pill-active]="site.status === 'Active'"
-                  [class.pill-hold]="site.status === 'On Hold'"
-                  [class.pill-done]="site.status === 'Completed'">
+                <span class="site-status"
+                  [class.status-active]="site.status === 'Active'"
+                  [class.status-hold]="site.status === 'On Hold'"
+                  [class.status-done]="site.status === 'Completed'">
+                  <span class="status-dot"></span>
                   {{ site.status || 'Active' }}
                 </span>
+                <ion-icon name="chevron-forward-outline" class="site-arrow"></ion-icon>
               </button>
             }
           }
@@ -181,7 +174,7 @@ import { EmptyStateComponent } from '../../shared/components';
       </div>
 
       <!-- ═══ FLOATING BOTTOM NAV ═══ -->
-      <nav class="floating-nav">
+      <nav class="bottom-nav">
         <button class="nav-item active" (click)="navigateTo('/tabs/dashboard')">
           <ion-icon name="home-outline"></ion-icon>
           <span>Home</span>
@@ -203,309 +196,283 @@ import { EmptyStateComponent } from '../../shared/components';
   `,
   styles: [`
     /* ─────────────────────────────────────────────
-       DESIGN TOKENS (local overrides)
+       BRAND TOKENS
        ───────────────────────────────────────────── */
     :host {
-      --c-bg: #F8FAFC;
-      --c-navy: #0F172A;
-      --c-navy-mid: #1E293B;
-      --c-navy-light: #334155;
-      --c-emerald: #10B981;
-      --c-emerald-bg: rgba(16, 185, 129, 0.10);
-      --c-amber: #F59E0B;
-      --c-amber-bg: rgba(245, 158, 11, 0.10);
-      --c-blue: #3B82F6;
-      --c-blue-bg: rgba(59, 130, 246, 0.10);
-      --c-purple: #8B5CF6;
-      --c-purple-bg: rgba(139, 92, 246, 0.10);
-      --c-text: #0F172A;
-      --c-text-secondary: #64748B;
-      --c-text-tertiary: #94A3B8;
-      --c-surface: #FFFFFF;
-      --c-border: #E2E8F0;
-      --c-radius: 16px;
-      --c-radius-sm: 12px;
-      --c-radius-xs: 10px;
-      --c-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
-      --c-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
-      --c-shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
-      --c-shadow-nav: 0 8px 32px rgba(15, 23, 42, 0.18);
+      --navy: #0B1E4D;
+      --navy-dark: #071538;
+      --gold: #C9962B;
+      --gold-light: #D4A94E;
+      --gold-bg: rgba(201, 150, 43, 0.08);
+      --cream: #F5F3EE;
+      --white: #FFFFFF;
+      --slate: #5B6472;
+      --slate-light: #8A929E;
+      --green: #22C55E;
+      --green-bg: rgba(34, 197, 94, 0.10);
+      --amber: #F59E0B;
+      --amber-bg: rgba(245, 158, 11, 0.10);
+      --red: #EF4444;
+      --border: #E8E5DF;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --shadow-sm: 0 1px 3px rgba(11, 30, 77, 0.06);
+      --shadow-md: 0 4px 12px rgba(11, 30, 77, 0.08);
     }
 
     /* ─────────────────────────────────────────────
        BASE
        ───────────────────────────────────────────── */
     .dashboard-content {
-      --background: var(--c-bg);
-      --color: var(--c-text);
+      --background: var(--cream);
+      --color: #1A1A1A;
     }
     .dash-wrap {
-      padding: 0 20px;
+      padding: 4px 20px 0;
       padding-top: env(safe-area-inset-top);
     }
 
     /* ─────────────────────────────────────────────
-       HEADER BAR
+       STAT CARDS — 2×2 GRID
        ───────────────────────────────────────────── */
-    .d-header {
-      display: flex;
-      align-items: center;
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 12px;
-      padding: 16px 0 12px;
-    }
-    .d-header-left { flex-shrink: 0; }
-    .avatar-ring {
-      width: 44px; height: 44px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--c-blue), var(--c-purple));
-      padding: 2px;
-    }
-    .avatar {
-      width: 100%; height: 100%;
-      border-radius: 50%;
-      background: var(--c-surface);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .avatar ion-icon {
-      font-size: 22px;
-      color: var(--c-navy);
+      margin-bottom: 20px;
     }
 
-    .d-header-center {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-    .greeting {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--c-text-secondary);
-      letter-spacing: -0.1px;
-    }
-    .location-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: var(--c-surface);
-      border: 1px solid var(--c-border);
-      border-radius: 20px;
-      padding: 5px 10px 5px 8px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--c-text);
-      cursor: pointer;
-      font-family: inherit;
-      width: fit-content;
-      max-width: 100%;
-      transition: background 150ms ease;
-    }
-    .location-pill:active { background: #F1F5F9; }
-    .location-pill ion-icon:first-child {
-      font-size: 14px;
-      color: var(--c-blue);
-    }
-    .location-pill span {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 140px;
-    }
-    .pill-chev {
-      font-size: 12px;
-      color: var(--c-text-tertiary);
-      flex-shrink: 0;
-    }
-
-    .d-header-right { flex-shrink: 0; }
-    .bell-btn {
-      position: relative;
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      background: var(--c-surface);
-      border: 1px solid var(--c-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: background 150ms ease;
-    }
-    .bell-btn:active { background: #F1F5F9; }
-    .bell-btn ion-icon { font-size: 20px; color: var(--c-navy); }
-    .bell-dot {
-      position: absolute;
-      top: 8px; right: 9px;
-      width: 8px; height: 8px;
-      background: #EF4444;
-      border-radius: 50%;
-      border: 2px solid var(--c-surface);
-    }
-
-    /* ─────────────────────────────────────────────
-       METRICS STRIP — horizontal scroll
-       ───────────────────────────────────────────── */
-    .metrics-strip {
-      display: flex;
-      gap: 12px;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      -webkit-overflow-scrolling: touch;
-      padding: 4px 0 20px;
-      scrollbar-width: none;
-      margin: 0 -20px;
-      padding-left: 20px;
-      padding-right: 20px;
-    }
-    .metrics-strip::-webkit-scrollbar { display: none; }
-
-    .metric-card {
-      flex: 0 0 auto;
-      scroll-snap-align: start;
+    .stat-card {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       gap: 10px;
-      background: var(--c-surface);
-      border: 1px solid var(--c-border);
-      border-radius: var(--c-radius);
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
       padding: 16px;
-      min-width: 140px;
       cursor: pointer;
       font-family: inherit;
-      box-shadow: var(--c-shadow-sm);
-      transition: transform 150ms ease, box-shadow 150ms ease;
+      box-shadow: var(--shadow-sm);
+      transition: transform 120ms ease, box-shadow 120ms ease;
     }
-    .metric-card:active {
+    .stat-card:active {
       transform: scale(0.97);
-      box-shadow: var(--c-shadow-md);
+      box-shadow: var(--shadow-md);
     }
 
-    .metric-icon-glass {
-      width: 42px; height: 42px;
-      border-radius: var(--c-radius-sm);
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
     }
-    .metric-icon-glass ion-icon { font-size: 20px; }
-    .metric-icon-glass.blue {
-      background: var(--c-blue-bg);
-      color: var(--c-blue);
+    .stat-icon ion-icon {
+      font-size: 20px;
     }
-    .metric-icon-glass.emerald {
-      background: var(--c-emerald-bg);
-      color: var(--c-emerald);
+    .stat-icon--navy {
+      background: rgba(11, 30, 77, 0.07);
+      color: var(--navy);
     }
-    .metric-icon-glass.purple {
-      background: var(--c-purple-bg);
-      color: var(--c-purple);
+    .stat-icon--gold {
+      background: var(--gold-bg);
+      color: var(--gold);
     }
 
-    .metric-val {
-      font-size: 24px;
+    .stat-val {
+      font-size: 26px;
       font-weight: 700;
-      color: var(--c-text);
+      color: #1A1A1A;
       line-height: 1;
       letter-spacing: -0.5px;
     }
-    .metric-lbl {
-      font-size: 12px;
+    .stat-label {
+      font-size: 13px;
       font-weight: 500;
-      color: var(--c-text-secondary);
+      color: var(--slate);
     }
 
     /* ─────────────────────────────────────────────
        EXPENSE CARD
        ───────────────────────────────────────────── */
     .expense-card {
-      position: relative;
-      background: linear-gradient(145deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
-      border-radius: var(--c-radius);
-      padding: 22px;
+      background: var(--navy);
+      border-radius: var(--radius);
       margin-bottom: 24px;
       overflow: hidden;
-      cursor: pointer;
-      box-shadow: var(--c-shadow-lg);
-      transition: transform 150ms ease;
-    }
-    .expense-card:active { transform: scale(0.985); }
-
-    .expense-sparkline {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
+      box-shadow: 0 4px 16px rgba(11, 30, 77, 0.18);
     }
 
-    .expense-body { position: relative; z-index: 1; }
-    .expense-top {
+    .expense-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 12px;
+      padding: 20px 20px 14px;
     }
-    .expense-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.6);
+    .expense-header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .expense-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.55);
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
     }
-    .expense-amount {
-      font-size: 32px;
+    .expense-total {
+      font-size: 28px;
       font-weight: 700;
       color: #FFFFFF;
-      line-height: 1.15;
-      margin-top: 4px;
-      letter-spacing: -0.5px;
+      line-height: 1.2;
+      letter-spacing: -0.3px;
+    }
+    .expense-count {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 2px;
     }
 
-    .add-btn {
+    .expense-add-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--gold);
+      border: none;
       display: flex;
       align-items: center;
-      gap: 4px;
-      background: rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 12px;
-      padding: 8px 14px;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: 2px;
+      transition: background 120ms ease;
+    }
+    .expense-add-btn:active {
+      background: var(--gold-light);
+    }
+    .expense-add-btn ion-icon {
+      font-size: 22px;
       color: #FFFFFF;
+    }
+
+    .expense-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 0 20px;
+    }
+
+    .expense-list {
+      padding: 4px 0;
+    }
+
+    .expense-empty {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 13px;
+    }
+    .expense-empty ion-icon {
+      font-size: 18px;
+    }
+
+    .expense-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .expense-row:last-of-type {
+      border-bottom: none;
+    }
+
+    .expense-row-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .expense-row-icon ion-icon {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .expense-row-details {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .expense-row-desc {
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.85);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .expense-row-meta {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    .expense-row-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1px;
+      flex-shrink: 0;
+    }
+    .expense-row-amount {
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .expense-row-time {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .expense-view-all {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      width: 100%;
+      padding: 12px;
+      background: none;
+      border: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--gold);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      flex-shrink: 0;
-      transition: background 150ms ease;
+      transition: background 120ms ease;
     }
-    .add-btn:active { background: rgba(255, 255, 255, 0.22); }
-    .add-btn ion-icon { font-size: 18px; }
-
-    .expense-bottom {
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    .expense-view-all:active {
+      background: rgba(255, 255, 255, 0.04);
     }
-    .expense-txn-count {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.5);
-      font-weight: 500;
+    .expense-view-all ion-icon {
+      font-size: 14px;
     }
-    .expense-txn-count ion-icon { font-size: 14px; }
 
     /* ─────────────────────────────────────────────
        ACTIVE SITES
        ───────────────────────────────────────────── */
-    .sites-section { margin-bottom: 8px; }
+    .sites-section {
+      margin-bottom: 8px;
+    }
     .sites-head {
       display: flex;
       align-items: center;
@@ -515,9 +482,9 @@ import { EmptyStateComponent } from '../../shared/components';
     .sites-title {
       font-size: 18px;
       font-weight: 700;
-      color: var(--c-text);
+      color: #1A1A1A;
       margin: 0;
-      letter-spacing: -0.3px;
+      letter-spacing: -0.2px;
     }
     .view-all-btn {
       background: none;
@@ -525,7 +492,7 @@ import { EmptyStateComponent } from '../../shared/components';
       padding: 0;
       font-size: 14px;
       font-weight: 600;
-      color: var(--c-blue);
+      color: var(--gold);
       cursor: pointer;
       font-family: inherit;
     }
@@ -535,121 +502,201 @@ import { EmptyStateComponent } from '../../shared/components';
       display: flex;
       align-items: center;
       gap: 14px;
-      background: var(--c-surface);
-      border: 1px solid var(--c-border);
-      border-radius: var(--c-radius);
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
       padding: 14px 16px;
       margin-bottom: 10px;
       cursor: pointer;
       font-family: inherit;
       text-align: left;
-      box-shadow: var(--c-shadow-sm);
-      transition: transform 150ms ease, box-shadow 150ms ease;
+      box-shadow: var(--shadow-sm);
+      transition: transform 120ms ease, box-shadow 120ms ease;
     }
     .site-row:active {
       transform: scale(0.985);
-      box-shadow: var(--c-shadow-md);
+      box-shadow: var(--shadow-md);
     }
 
     .site-icon-box {
-      width: 44px; height: 44px;
-      border-radius: var(--c-radius-sm);
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: rgba(11, 30, 77, 0.06);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
-    .site-icon-box ion-icon { font-size: 22px; color: #fff; }
+    .site-icon-box ion-icon {
+      font-size: 20px;
+      color: var(--navy);
+    }
 
-    .site-details { flex: 1; min-width: 0; }
+    .site-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
     .site-name {
       font-size: 15px;
       font-weight: 600;
-      color: var(--c-text);
-      margin: 0 0 2px;
+      color: #1A1A1A;
       letter-spacing: -0.1px;
     }
-    .site-sub {
+    .site-meta {
       font-size: 13px;
-      color: var(--c-text-secondary);
-      margin: 0;
+      color: var(--slate);
     }
-    .sub-dot { margin: 0 4px; opacity: 0.4; }
 
-    .status-pill {
+    .site-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
       flex-shrink: 0;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 5px 10px;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .status-active {
+      background: var(--green-bg);
+      color: #15803D;
+    }
+    .status-active .status-dot {
+      background: var(--green);
+    }
+    .status-hold {
+      background: var(--amber-bg);
+      color: #B45309;
+    }
+    .status-hold .status-dot {
+      background: var(--amber);
+    }
+    .status-done {
+      background: rgba(107, 114, 128, 0.10);
+      color: var(--slate);
+    }
+    .status-done .status-dot {
+      background: var(--slate-light);
+    }
+
+    .site-arrow {
+      font-size: 16px;
+      color: var(--slate-light);
+      flex-shrink: 0;
+    }
+
+    /* ─────────────────────────────────────────────
+       SITES EMPTY STATE
+       ───────────────────────────────────────────── */
+    .sites-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 32px 20px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+    }
+    .sites-empty-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--gold-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sites-empty-icon ion-icon {
+      font-size: 24px;
+      color: var(--gold);
+    }
+    .sites-empty-text {
+      font-size: 14px;
+      color: var(--slate);
+      font-weight: 500;
+    }
+    .sites-empty-cta {
+      background: var(--navy);
+      color: #FFFFFF;
+      border: none;
       border-radius: 8px;
+      padding: 8px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 4px;
     }
-    .pill-active {
-      background: var(--c-emerald-bg);
-      color: var(--c-emerald);
-    }
-    .pill-hold {
-      background: var(--c-amber-bg);
-      color: var(--c-amber);
-    }
-    .pill-done {
-      background: rgba(99, 102, 241, 0.10);
-      color: #6366F1;
+    .sites-empty-cta:active {
+      background: var(--navy-dark);
     }
 
     .bottom-spacer { height: 100px; }
 
     /* ─────────────────────────────────────────────
-       FLOATING BOTTOM NAV
+       FLOATING BOTTOM NAV — navy/gold
        ───────────────────────────────────────────── */
-    .floating-nav {
+    .bottom-nav {
       position: fixed;
-      bottom: calc(16px + env(safe-area-inset-bottom));
+      bottom: calc(14px + env(safe-area-inset-bottom));
       left: 50%;
       transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 4px;
-      background: var(--c-navy);
-      border-radius: 28px;
-      padding: 8px 12px;
-      box-shadow: var(--c-shadow-nav);
+      gap: 2px;
+      background: var(--navy);
+      border-radius: 24px;
+      padding: 6px 10px;
+      box-shadow: 0 8px 28px rgba(11, 30, 77, 0.25);
       z-index: 100;
-      width: auto;
-      min-width: 280px;
     }
     .nav-item {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
+      gap: 2px;
       background: none;
       border: 0;
-      padding: 8px 16px;
-      border-radius: 20px;
+      padding: 7px 16px;
+      border-radius: 16px;
       cursor: pointer;
       font-family: inherit;
-      transition: background 150ms ease;
-      min-width: 60px;
+      transition: background 120ms ease;
     }
-    .nav-item:active { background: rgba(255, 255, 255, 0.08); }
+    .nav-item:active {
+      background: rgba(255, 255, 255, 0.06);
+    }
     .nav-item ion-icon {
-      font-size: 22px;
-      color: rgba(255, 255, 255, 0.45);
-      transition: color 150ms ease;
+      font-size: 21px;
+      color: rgba(255, 255, 255, 0.4);
+      transition: color 120ms ease;
     }
     .nav-item span {
       font-size: 10px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.45);
+      color: rgba(255, 255, 255, 0.4);
       letter-spacing: 0.2px;
-      transition: color 150ms ease;
+      transition: color 120ms ease;
     }
-    .nav-item.active ion-icon { color: #FFFFFF; }
-    .nav-item.active span { color: #FFFFFF; }
     .nav-item.active {
-      background: rgba(255, 255, 255, 0.12);
+      background: rgba(201, 150, 43, 0.15);
+    }
+    .nav-item.active ion-icon {
+      color: var(--gold);
+    }
+    .nav-item.active span {
+      color: var(--gold);
     }
   `],
 })
@@ -660,57 +707,23 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   dashboard = signal<DashboardData | null>(null);
   sites = signal<Site[]>([]);
-  currentSiteName = signal<string | null>(null);
-  userName = signal<string>('Supervisor');
+  todayExpenses = signal<Expense[]>([]);
 
-  greeting(): string {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
-  getSiteIcon(name: string): string {
-    const n = name.toLowerCase();
-    if (n.includes('road') || n.includes('highway') || n.includes('flyover')) return 'git-branch-outline';
-    if (n.includes('bridge')) return 'boat-outline';
-    if (n.includes('metro') || n.includes('rail')) return 'train-outline';
-    if (n.includes('house') || n.includes('villa') || n.includes('home')) return 'home-outline';
-    if (n.includes('tower') || n.includes('sky')) return 'business-outline';
-    if (n.includes('park') || n.includes('garden')) return 'leaf-outline';
-    if (n.includes('commercial') || n.includes('mall') || n.includes('office')) return 'storefront-outline';
-    if (n.includes('hospital') || n.includes('clinic')) return 'medkit-outline';
-    if (n.includes('school') || n.includes('college')) return 'school-outline';
-    if (n.includes('terrace') || n.includes('block') || n.includes('mep')) return 'ribbon-outline';
-    if (n.includes('stock') || n.includes('yard') || n.includes('godown')) return 'analytics-outline';
-    return 'construct-outline';
-  }
-
-  getIconBg(status?: string): string {
-    if (status === 'On Hold') return 'linear-gradient(135deg, #F59E0B, #D97706)';
-    if (status === 'Completed') return 'linear-gradient(135deg, #6366F1, #4F46E5)';
-    return 'linear-gradient(135deg, #10B981, #059669)';
-  }
-
-  getUpdatedAgo(daysActive?: number): string {
-    if (daysActive === undefined || daysActive === null) return 'today';
-    if (daysActive <= 1) return 'today';
-    if (daysActive <= 2) return '2d ago';
-    if (daysActive <= 7) return `${daysActive}d ago`;
-    return `${Math.floor(daysActive / 7)}w ago`;
+  getExpenseIcon(expense: Expense): string {
+    if (expense.isSiteMaterial) return 'cube-outline';
+    if (expense.transactionType === 'Cash Added') return 'cash-outline';
+    if (expense.description?.toLowerCase().includes('labour') || expense.description?.toLowerCase().includes('worker')) return 'people-outline';
+    if (expense.description?.toLowerCase().includes('transport') || expense.description?.toLowerCase().includes('vehicle')) return 'construct-outline';
+    return 'document-text-outline';
   }
 
   async ngOnInit(): Promise<void> {
     addIcons({
       cubeOutline, peopleOutline, walletOutline,
-      chevronDownOutline, locationOutline, constructOutline,
-      trendingUpOutline, calendarOutline, homeOutline,
-      businessOutline, receiptOutline, settingsOutline,
-      personOutline, addOutline, alertCircleOutline,
-      timeOutline, analyticsOutline, gitBranchOutline,
-      boatOutline, trainOutline, leafOutline,
-      storefrontOutline, medkitOutline, schoolOutline,
-      ribbonOutline,
+      constructOutline, homeOutline, businessOutline,
+      receiptOutline, settingsOutline, personOutline,
+      alertCircleOutline, timeOutline, cashOutline,
+      documentTextOutline, chevronForwardOutline, locationOutline,
     });
 
     await this.auth.initAfterLogin();
@@ -746,37 +759,50 @@ export class DashboardPage implements OnInit, OnDestroy {
           console.error('[Dashboard] failed to load', err);
         },
       });
-      await this.loadUserAndSites();
+
+      this.supervisor.getSites().subscribe({
+        next: (res) => {
+          this.sites.set(res.sites || []);
+        },
+        error: () => undefined,
+      });
+
+      this.loadTodayExpenses();
     } catch (error) {
       console.error('Failed to load dashboard:', error);
     }
   }
 
-  private async loadUserAndSites(): Promise<void> {
-    try {
-      this.supervisor.getProfile().subscribe({
-        next: (res) => {
-          const name = (res as { user?: { name?: string } }).user?.name;
-          if (name) this.userName.set(name);
-        },
-        error: () => undefined,
-      });
+  private loadTodayExpenses(): void {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
 
-      this.supervisor.getSites().subscribe({
-        next: (res) => {
-          this.sites.set(res.sites || []);
-          const savedName = this.supervisor.selectedSiteName();
-          if (savedName) this.currentSiteName.set(savedName);
-          else if (res.sites?.[0]?.name) this.currentSiteName.set(res.sites[0].name);
-        },
-        error: () => undefined,
-      });
-    } catch (e) {
-      console.warn('User/sites load failed', e);
-    }
+    this.supervisor.getExpenses({
+      dateFrom: todayStr,
+      dateTo: todayStr,
+      limit: 5,
+    }).subscribe({
+      next: (res) => {
+        this.todayExpenses.set(res.expenses || []);
+      },
+      error: () => undefined,
+    });
   }
 
   navigateTo(path: string): void {
     this.router.navigate([path]);
+  }
+
+  navigateToSite(site: Site): void {
+    this.supervisor.setSelectedSite(
+      site.siteId,
+      site.projectId || '',
+      site.projectName || '',
+      site.name,
+    );
+    this.router.navigate(['/tabs/sites']);
   }
 }
