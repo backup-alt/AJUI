@@ -291,8 +291,14 @@ import { Site } from '../../shared/models';
       --background: var(--m3-surface-bright);
       --padding-top: 0;
       --padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      --padding-start: 0;
+      --padding-end: 0;
       display: flex;
       flex-direction: column;
+    }
+    .menu-content::part(scroll-container) {
+      padding-top: 0;
+      margin-top: 0;
     }
 
     /* ─── User row ─── */
@@ -300,9 +306,9 @@ import { Site } from '../../shared/models';
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 16px 6px;
+      padding: 8px 16px 6px;
       border-bottom: 1px solid var(--m3-outline-variant);
-      margin-bottom: 2px;
+      margin: 0 0 2px;
     }
     .user-avatar {
       width: 32px;
@@ -351,6 +357,7 @@ import { Site } from '../../shared/models';
     .menu-list {
       background: transparent;
       padding: 0 var(--md-space-2);
+      margin: 0;
     }
     .menu-list ion-item {
       --background: transparent;
