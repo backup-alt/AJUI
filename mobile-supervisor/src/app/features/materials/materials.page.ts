@@ -224,15 +224,15 @@ interface ConsolidatedMaterial {
     .search { --background: var(--m3-surface-bright); padding: 0; }
     .seg-wrap { padding: 4px 4px 6px; }
 
-    .cards { padding: var(--md-space-2) var(--md-space-4) 96px; }
-    .material-group { margin-bottom: var(--md-space-2); }
+    .cards { padding: var(--md-space-3) var(--md-space-4) 96px; }
+    .material-group { margin-bottom: var(--md-space-3); }
     .material-card {
       width: 100%;
       text-align: left;
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-xl);
-      padding: var(--md-space-4);
+      padding: var(--md-space-5);
       box-shadow: var(--md-elevation-1);
       cursor: pointer;
       font-family: inherit;
@@ -247,24 +247,24 @@ interface ConsolidatedMaterial {
     }
     .material-card:active { transform: scale(0.99); }
 
-    .material-head { display: flex; align-items: center; gap: 12px; margin-bottom: 0; }
+    .material-head { display: flex; align-items: center; gap: 14px; margin-bottom: 0; }
     .material-tile {
-      width: 42px; height: 42px;
+      width: 48px; height: 48px;
       border-radius: var(--md-radius-lg);
       background: rgba(220, 38, 38, 0.08);
       color: var(--m3-error);
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
     }
-    .material-tile ion-icon { font-size: 20px; }
+    .material-tile ion-icon { font-size: 22px; }
     .material-info { flex: 1; min-width: 0; }
-    .material-name { font-size: 15px; font-weight: 700; color: var(--m3-on-surface); margin: 0 0 2px; }
+    .material-name { font-size: 16px; font-weight: 700; color: var(--m3-on-surface); margin: 0 0 4px; }
     .material-site {
-      font-size: 12px; color: var(--m3-on-surface-muted); margin: 0;
-      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 13px; color: var(--m3-on-surface-muted); margin: 0;
+      display: inline-flex; align-items: center; gap: 5px;
       max-width: 100%;
     }
-    .material-site ion-icon { font-size: 12px; flex-shrink: 0; }
+    .material-site ion-icon { font-size: 13px; flex-shrink: 0; }
     .site-text {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -272,7 +272,7 @@ interface ConsolidatedMaterial {
       min-width: 0;
     }
     .expand-chevron {
-      font-size: 16px;
+      font-size: 18px;
       color: var(--m3-on-surface-muted);
       transition: transform 200ms ease;
       flex-shrink: 0;
@@ -283,7 +283,8 @@ interface ConsolidatedMaterial {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: var(--md-space-3);
+      margin-bottom: var(--md-space-4);
+      margin-top: var(--md-space-2);
     }
     .low-stock-flag {
       display: inline-flex;
@@ -301,23 +302,23 @@ interface ConsolidatedMaterial {
     .low-stock-flag ion-icon { font-size: 12px; }
 
     .material-stats {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
       background: var(--m3-surface-container);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-lg);
-      padding: 10px;
-      margin-bottom: var(--md-space-3);
+      padding: 14px 12px;
+      margin-bottom: var(--md-space-4);
     }
     .stat { text-align: center; }
-    .stat-label { font-size: 10px; color: var(--m3-on-surface-muted); text-transform: uppercase; letter-spacing: 0.3px; }
-    .stat-value { font-size: 14px; font-weight: 700; color: var(--m3-on-surface); margin-top: 2px; }
+    .stat-label { font-size: 11px; color: var(--m3-on-surface-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+    .stat-value { font-size: 15px; font-weight: 700; color: var(--m3-on-surface); margin-top: 3px; }
     .stat.highlight .stat-value { color: var(--m3-success); }
 
-    .material-footer { display: flex; align-items: center; justify-content: space-between; }
-    .material-date { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--m3-on-surface-muted); }
-    .material-date ion-icon { font-size: 13px; }
-    .view-link { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--m3-primary); }
-    .view-link ion-icon { font-size: 14px; }
+    .material-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 2px; }
+    .material-date { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--m3-on-surface-muted); }
+    .material-date ion-icon { font-size: 14px; }
+    .view-link { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 700; color: var(--m3-primary); }
+    .view-link ion-icon { font-size: 15px; }
 
     .group-breakdown {
       background: var(--m3-surface-bright);
@@ -329,8 +330,8 @@ interface ConsolidatedMaterial {
     }
     .breakdown-item {
       width: 100%;
-      display: flex; align-items: center; gap: 10px;
-      padding: var(--md-space-3) var(--md-space-4);
+      display: flex; align-items: center; gap: 12px;
+      padding: var(--md-space-4) var(--md-space-5);
       border-bottom: 1px solid var(--m3-outline-variant);
       background: transparent;
       cursor: pointer;
@@ -340,11 +341,11 @@ interface ConsolidatedMaterial {
     .breakdown-item:last-child { border-bottom: none; }
     .breakdown-item:active { background: var(--m3-surface-container); }
     .breakdown-info { flex: 1; min-width: 0; text-align: left; }
-    .breakdown-site { display: block; font-size: 13px; font-weight: 600; color: var(--m3-on-surface); }
-    .breakdown-project { font-size: 11px; color: var(--m3-on-surface-muted); }
-    .breakdown-stats { display: flex; align-items: center; gap: 8px; }
-    .breakdown-qty { font-size: 13px; font-weight: 600; color: var(--m3-on-surface); }
-    .breakdown-chevron { font-size: 14px; color: var(--m3-on-surface-muted); }
+    .breakdown-site { display: block; font-size: 14px; font-weight: 600; color: var(--m3-on-surface); }
+    .breakdown-project { font-size: 12px; color: var(--m3-on-surface-muted); margin-top: 2px; }
+    .breakdown-stats { display: flex; align-items: center; gap: 10px; }
+    .breakdown-qty { font-size: 14px; font-weight: 600; color: var(--m3-on-surface); }
+    .breakdown-chevron { font-size: 16px; color: var(--m3-on-surface-muted); }
 
     .skeleton-card {
       background: var(--m3-surface-bright);
