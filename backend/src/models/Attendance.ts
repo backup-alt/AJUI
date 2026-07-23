@@ -33,7 +33,7 @@ const attendanceSchema = new Schema<IAttendance>(
     workerName: { type: String, required: true },
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
     projectName: { type: String, required: true },
-    clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true },
+    clientId: { type: Schema.Types.ObjectId, ref: "Client" },
     siteId: { type: Schema.Types.ObjectId, ref: "Site" },
     site: { type: String, required: true },
     labourType: { type: String, required: true },

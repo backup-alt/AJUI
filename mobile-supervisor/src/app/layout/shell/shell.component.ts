@@ -96,7 +96,7 @@ import { Site } from '../../shared/models';
         <div class="menu-brand">
           <div class="menu-brand-logo">
             <img
-              src="assets/logo.svg"
+              src="assets/logo.jpg"
               alt="Annai Golden Builders"
               class="menu-brand-logo-img"
             />
@@ -254,15 +254,15 @@ import { Site } from '../../shared/models';
       gap: 12px;
     }
     .menu-brand-logo {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
       background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      padding: 6px;
+      padding: 4px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
     }
     .menu-brand-logo-img {

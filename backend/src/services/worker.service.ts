@@ -169,7 +169,7 @@ export async function markAttendance(input: {
     workerName: worker.name,
     projectId: new Types.ObjectId(input.projectId),
     projectName: worker.projectName,
-    clientId: worker.clientId,
+    clientId: worker.clientId || worker.projectId,
     siteId: input.siteId && Types.ObjectId.isValid(input.siteId) ? new Types.ObjectId(input.siteId) : undefined,
     site: input.site,
     labourType: worker.labourType,

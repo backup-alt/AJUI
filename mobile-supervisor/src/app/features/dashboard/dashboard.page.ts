@@ -231,7 +231,7 @@ import {
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: var(--md-space-3);
       margin-bottom: var(--md-space-4);
     }

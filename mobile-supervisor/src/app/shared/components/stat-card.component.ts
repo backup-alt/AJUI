@@ -29,18 +29,27 @@ import { IonIcon } from '@ionic/angular/standalone';
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-xl);
-      padding: var(--md-space-4);
+      padding: var(--md-space-3);
       display: flex;
       align-items: center;
-      gap: var(--md-space-3);
+      gap: var(--md-space-2);
       box-shadow: var(--md-elevation-1);
       transition: box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard),
                   transform var(--md-motion-duration-short1) var(--md-motion-easing-standard);
       font-family: inherit;
     }
     .agb-stat-card.interactive { cursor: pointer; }
-    .agb-stat-card.interactive:hover { box-shadow: var(--md-elevation-2); }
     .agb-stat-card.interactive:active { transform: scale(0.985); }
+    .agb-icon-tile {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .agb-icon-tile ion-icon { font-size: 18px; }
     .content {
       flex: 1;
       min-width: 0;
@@ -48,15 +57,15 @@ import { IonIcon } from '@ionic/angular/standalone';
       flex-direction: column;
     }
     .value {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 700;
       color: var(--m3-on-surface);
       line-height: 1.1;
     }
     .label {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--m3-on-surface-muted);
-      margin-top: var(--md-space-1);
+      margin-top: 2px;
       font-weight: 500;
     }
     .sub {
@@ -67,7 +76,7 @@ import { IonIcon } from '@ionic/angular/standalone';
     }
     .chev {
       color: var(--m3-on-surface-muted);
-      font-size: 18px;
+      font-size: 16px;
       flex-shrink: 0;
     }
   `],
