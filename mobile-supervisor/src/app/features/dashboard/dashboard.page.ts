@@ -178,32 +178,11 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
   `,
   styles: [`
     /* ─────────────────────────────────────────────
-       BRAND TOKENS
-       ───────────────────────────────────────────── */
-    :host {
-      --navy: #0B1E4D;
-      --navy-mid: #1A3466;
-      --gold: #C9962B;
-      --gold-bg: rgba(201, 150, 43, 0.08);
-      --cream: #F5F3EE;
-      --white: #FFFFFF;
-      --slate: #5B6472;
-      --slate-light: #8A929E;
-      --green: #22C55E;
-      --green-bg: rgba(34, 197, 94, 0.08);
-      --amber: #F59E0B;
-      --amber-bg: rgba(245, 158, 11, 0.08);
-      --border: #E8E5DF;
-      --r: 4px;
-      --shadow: 0 1px 2px rgba(11, 30, 77, 0.06);
-    }
-
-    /* ─────────────────────────────────────────────
-       BASE
+       BASE — uses app-wide --m3-* design tokens
        ───────────────────────────────────────────── */
     .dashboard-content {
-      --background: var(--cream);
-      --color: #1A1A1A;
+      --background: var(--m3-surface);
+      --color: var(--m3-on-surface);
     }
     .dash-wrap {
       padding: 0 16px;
@@ -211,21 +190,21 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
 
     /* ─────────────────────────────────────────────
-       GREETING
+       GREETING — matches other page title sizing
        ───────────────────────────────────────────── */
     .greeting-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 12px 0 16px;
+      gap: 10px;
+      padding: 16px 0 12px;
     }
     .greeting-avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 4px;
-      background: var(--navy);
-      color: #FFFFFF;
-      font-size: 12px;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--md-radius-md);
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      font-size: 15px;
       font-weight: 700;
       display: flex;
       align-items: center;
@@ -233,9 +212,10 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       flex-shrink: 0;
     }
     .greeting-text {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--slate);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      letter-spacing: -0.2px;
     }
 
     /* ─────────────────────────────────────────────
@@ -253,13 +233,13 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       flex-direction: column;
       align-items: flex-start;
       gap: 8px;
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
       padding: 12px;
       cursor: pointer;
       font-family: inherit;
-      box-shadow: var(--shadow);
+      box-shadow: var(--md-elevation-1);
       transition: transform 100ms ease;
     }
     .stat-card:active {
@@ -269,7 +249,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .stat-icon {
       width: 32px;
       height: 32px;
-      border-radius: var(--r);
+      border-radius: var(--md-radius-md);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -278,41 +258,41 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       font-size: 17px;
     }
     .si-navy {
-      background: rgba(11, 30, 77, 0.06);
-      color: var(--navy);
+      background: var(--m3-primary-container);
+      color: var(--m3-primary);
     }
     .si-gold {
-      background: var(--gold-bg);
-      color: var(--gold);
+      background: var(--m3-secondary-container);
+      color: var(--m3-secondary);
     }
 
     .stat-val {
       font-size: 22px;
       font-weight: 700;
-      color: #1A1A1A;
+      color: var(--m3-on-surface);
       line-height: 1;
     }
     .stat-label {
       font-size: 12px;
       font-weight: 500;
-      color: var(--slate);
+      color: var(--m3-on-surface-muted);
     }
 
     /* ─────────────────────────────────────────────
        EXPENSE CARD — white card, navy accent strip
        ───────────────────────────────────────────── */
     .expense-card {
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
       margin-bottom: 16px;
       overflow: hidden;
-      box-shadow: var(--shadow);
+      box-shadow: var(--md-elevation-1);
     }
 
     .expense-accent {
       height: 3px;
-      background: var(--navy);
+      background: var(--m3-primary);
     }
 
     .expense-body {
@@ -333,7 +313,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-title {
       font-size: 11px;
       font-weight: 600;
-      color: var(--slate);
+      color: var(--m3-on-surface-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -345,19 +325,19 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-total {
       font-size: 22px;
       font-weight: 700;
-      color: var(--navy);
+      color: var(--m3-primary);
       line-height: 1.2;
     }
     .expense-count {
       font-size: 11px;
-      color: var(--slate-light);
+      color: var(--m3-on-surface-muted);
     }
 
     .expense-add {
       width: 28px;
       height: 28px;
-      border-radius: var(--r);
-      background: var(--navy);
+      border-radius: var(--md-radius-md);
+      background: var(--m3-primary);
       border: none;
       display: flex;
       align-items: center;
@@ -371,12 +351,12 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
     .expense-add ion-icon {
       font-size: 16px;
-      color: #FFFFFF;
+      color: var(--m3-on-primary);
     }
 
     .expense-divider {
       height: 1px;
-      background: var(--border);
+      background: var(--m3-outline-variant);
       margin: 0 16px;
     }
 
@@ -389,7 +369,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       align-items: center;
       gap: 8px;
       padding: 14px 16px;
-      color: var(--slate-light);
+      color: var(--m3-on-surface-muted);
       font-size: 13px;
     }
     .expense-empty ion-icon {
@@ -401,7 +381,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       align-items: center;
       gap: 10px;
       padding: 10px 16px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--m3-outline-variant);
     }
     .expense-row:last-of-type {
       border-bottom: none;
@@ -410,8 +390,8 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-row-icon {
       width: 30px;
       height: 30px;
-      border-radius: var(--r);
-      background: rgba(11, 30, 77, 0.05);
+      border-radius: var(--md-radius-md);
+      background: var(--m3-surface-container);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -419,7 +399,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
     .expense-row-icon ion-icon {
       font-size: 14px;
-      color: var(--navy-mid);
+      color: var(--m3-on-surface-variant);
     }
 
     .expense-row-details {
@@ -432,14 +412,14 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-row-desc {
       font-size: 13px;
       font-weight: 500;
-      color: #1A1A1A;
+      color: var(--m3-on-surface);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .expense-row-meta {
       font-size: 11px;
-      color: var(--slate-light);
+      color: var(--m3-on-surface-muted);
     }
 
     .expense-row-right {
@@ -452,11 +432,11 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-row-amt {
       font-size: 13px;
       font-weight: 600;
-      color: var(--navy);
+      color: var(--m3-on-surface);
     }
     .expense-row-time {
       font-size: 10px;
-      color: var(--slate-light);
+      color: var(--m3-on-surface-muted);
     }
 
     .expense-viewall {
@@ -468,15 +448,15 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       padding: 10px;
       background: none;
       border: none;
-      border-top: 1px solid var(--border);
-      color: var(--gold);
+      border-top: 1px solid var(--m3-outline-variant);
+      color: var(--m3-secondary);
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
     }
     .expense-viewall:active {
-      background: rgba(201, 150, 43, 0.04);
+      background: var(--m3-surface-container);
     }
     .expense-viewall ion-icon {
       font-size: 13px;
@@ -497,7 +477,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .sites-title {
       font-size: 15px;
       font-weight: 700;
-      color: #1A1A1A;
+      color: var(--m3-on-surface);
       margin: 0;
     }
     .viewall-btn {
@@ -506,7 +486,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       padding: 0;
       font-size: 13px;
       font-weight: 600;
-      color: var(--gold);
+      color: var(--m3-secondary);
       cursor: pointer;
       font-family: inherit;
     }
@@ -516,15 +496,15 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       display: flex;
       align-items: center;
       gap: 10px;
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
       padding: 12px;
       margin-bottom: 6px;
       cursor: pointer;
       font-family: inherit;
       text-align: left;
-      box-shadow: var(--shadow);
+      box-shadow: var(--md-elevation-1);
       transition: transform 100ms ease;
     }
     .site-row:active {
@@ -535,17 +515,17 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: var(--slate-light);
+      background: var(--m3-on-surface-muted);
       flex-shrink: 0;
     }
     .dot-active {
-      background: var(--green);
+      background: var(--m3-success);
     }
     .dot-hold {
-      background: var(--amber);
+      background: var(--m3-warning);
     }
     .dot-done {
-      background: var(--slate-light);
+      background: var(--m3-on-surface-muted);
     }
 
     .site-info {
@@ -558,23 +538,23 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .site-name {
       font-size: 14px;
       font-weight: 600;
-      color: #1A1A1A;
+      color: var(--m3-on-surface);
     }
     .site-meta {
       font-size: 12px;
-      color: var(--slate);
+      color: var(--m3-on-surface-muted);
     }
 
     .site-status-text {
       font-size: 11px;
       font-weight: 600;
-      color: var(--slate-light);
+      color: var(--m3-on-surface-muted);
       flex-shrink: 0;
     }
 
     .site-arrow {
       font-size: 14px;
-      color: var(--slate-light);
+      color: var(--m3-on-surface-muted);
       flex-shrink: 0;
     }
 
@@ -587,34 +567,34 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       align-items: center;
       gap: 8px;
       padding: 24px 16px;
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
-      box-shadow: var(--shadow);
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      box-shadow: var(--md-elevation-1);
     }
     .sites-empty-icon {
       width: 40px;
       height: 40px;
-      border-radius: var(--r);
-      background: var(--gold-bg);
+      border-radius: var(--md-radius-md);
+      background: var(--m3-secondary-container);
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .sites-empty-icon ion-icon {
       font-size: 20px;
-      color: var(--gold);
+      color: var(--m3-secondary);
     }
     .sites-empty-text {
       font-size: 13px;
-      color: var(--slate);
+      color: var(--m3-on-surface-muted);
       font-weight: 500;
     }
     .sites-empty-cta {
-      background: var(--navy);
-      color: #FFFFFF;
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
       border: none;
-      border-radius: var(--r);
+      border-radius: var(--md-radius-md);
       padding: 6px 16px;
       font-size: 12px;
       font-weight: 600;
