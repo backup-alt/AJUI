@@ -52,6 +52,8 @@ export async function createSubcontractor(input: CreateSubcontractorInput) {
 
 export async function listSubcontractors(filter: {
   projectId?: string;
+  siteId?: string;
+  site?: string;
   approvalStatus?: string;
   paymentStatus?: string;
   page: number;
@@ -60,6 +62,8 @@ export async function listSubcontractors(filter: {
 }) {
   const query: Record<string, unknown> = {};
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
+  if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
+  if (filter.site) query.site = filter.site;
   if (filter.approvalStatus) query.approvalStatus = filter.approvalStatus;
   if (filter.paymentStatus) query.paymentStatus = filter.paymentStatus;
   applyProjectScope(query, "projectId", filter.scopeProjectIds);

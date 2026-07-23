@@ -6,7 +6,6 @@ import { Vendor } from "../models/Vendor.js";
 import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
-import { createApproval } from "./approval.service.js";
 import { CreateMaterialInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { backfillApprovedMaterialsToInventory, inventoryKeyForMaterial, inventoryStockMapForMaterials } from "./inventory.service.js";
@@ -61,21 +60,9 @@ export async function createMaterial(input: CreateMaterialInput) {
     poNumber: input.poNumber,
     requestDate: input.requestDate,
     approvalDate: input.approvedQuantity ? new Date().toISOString().slice(0, 10) : undefined,
-    status: input.approvedQuantity ? "Pending" : "Pending",
+    status: "Not Received",
     createdBy: input.createdBy,
     notes: input.notes,
-  });
-
-  await createApproval({
-    type: "material",
-    title: `${input.name} - ${input.requestedQuantity}${input.unit}`,
-    sourceCollection: "materials",
-    sourceId: material._id,
-    projectId: project._id,
-    projectName: project.name,
-    site: siteName,
-    amount: input.requestedQuantity,
-    detail: `${input.requestedQuantity} ${input.unit} of ${input.name}`,
   });
 
   return material.toObject();
@@ -84,6 +71,7 @@ export async function createMaterial(input: CreateMaterialInput) {
 export async function listMaterials(filter: {
   projectId?: string;
   siteId?: string;
+  site?: string;
   vendorId?: string;
   status?: string;
   search?: string;
@@ -94,6 +82,7 @@ export async function listMaterials(filter: {
   const query: Record<string, unknown> = {};
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
+  if (filter.site) query.site = filter.site;
   if (filter.vendorId) query.vendorId = new Types.ObjectId(filter.vendorId);
   if (filter.status) query.status = filter.status;
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
@@ -153,7 +142,9 @@ export async function deleteMaterial(id: string) {
 }
 
 export async function getPendingMaterials(scopeProjectIds?: ProjectScopeIds) {
-  const query: Record<string, unknown> = { status: "Pending" };
+  // "Pending" status no longer exists; this function is retained for API
+  // compatibility but returns materials that have not yet been received.
+  const query: Record<string, unknown> = { status: "Not Received" };
   applyProjectScope(query, "projectId", scopeProjectIds);
   return Material.find(query).sort({ createdAt: -1 }).lean();
 }
@@ -189,4 +180,46 @@ export async function uploadMaterialReceipt(
 
   await material.save();
   return material.toObject();
+}
+
+/**
+ * Migrate legacy material statuses to the new 2-value enum.
+ * Old values: Pending, Approved, Rejected, Completed -> Received | Not Received
+ *  - Pending/Approved/Completed  -> "Received"  (we treat any "approved/past" state
+ *    as having been delivered, since these were the historical "go ahead" signals)
+ *  - Rejected                   -> "Not Received"
+ *
+ * Safe to call repeatedly: once a row's status is in the new enum, the query
+ * returns zero documents.
+ */
+export async function migrateMaterialStatus(): Promise<{ matched: number; modified: number }> {
+  const legacy = ["Pending", "Approved", "Rejected", "Completed"];
+  const toReceived = ["Pending", "Approved", "Completed"];
+  const toNotReceived = ["Rejected"];
+
+  const [a, b] = await Promise.all([
+    Material.updateMany(
+      { status: { $in: toReceived } },
+      { $set: { status: "Received" } }
+    ),
+    Material.updateMany(
+      { status: { $in: toNotReceived } },
+      { $set: { status: "Not Received" } }
+    ),
+  ]);
+
+  const matched = (a.matchedCount ?? 0) + (b.matchedCount ?? 0);
+  const modified = (a.modifiedCount ?? 0) + (b.modifiedCount ?? 0);
+
+  if (matched > 0) {
+    console.log(`[MIGRATE] material.status: ${modified} row(s) updated (matched ${matched} legacy values)`);
+  }
+
+  // Sanity: log any stragglers (should be impossible given the enum constraint)
+  const stragglers = await Material.countDocuments({ status: { $nin: ["Received", "Not Received"] } });
+  if (stragglers > 0) {
+    console.warn(`[MIGRATE] material.status: ${stragglers} row(s) still have legacy status`);
+  }
+
+  return { matched, modified };
 }

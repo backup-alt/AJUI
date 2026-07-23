@@ -2,7 +2,7 @@ import { Injectable, Injector, inject, signal } from "@angular/core";
 import { Observable } from "rxjs";
 import { ApiService } from "./api.service";
 import { ErpDataService } from "../data/erp-data.service";
-import type { MaterialRow } from "../../data/dashboardData";
+import type { MaterialRow, MaterialStatus } from "../../data/dashboardData";
 
 @Injectable({ providedIn: "root" })
 export class MaterialsService {
@@ -15,7 +15,7 @@ export class MaterialsService {
 
   readonly materials = signal<MaterialRow[]>(this.readState());
 
-  getAll(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string }) {
+  getAll(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string; site?: string }) {
     this.api.listMaterials({ ...params, limit: 100 }).subscribe({
       next: (r) => {
         const backendItems = (r.items || []).map(this.mapMaterial);
@@ -51,28 +51,59 @@ export class MaterialsService {
     });
   }
 
-  createMaterial(input: Partial<MaterialRow>): Observable<MaterialRow> {
+  /**
+   * Accepts either the local MaterialRow shape (with `requested`, `approved`,
+   * `purchased`, `consumed`) or the backend Zod schema shape (with
+   * `requestedQuantity`, `approvedQuantity`, `purchasedQuantity`,
+   * `consumedQuantity`). Passes the payload through to the API and adapts
+   * the backend response into the local MaterialRow shape before persisting.
+   */
+  createMaterial(input: Partial<MaterialRow> & Record<string, any>): Observable<MaterialRow> {
+    const payload: any = { ...input };
+    // Translate legacy field names to backend schema
+    if (payload.requested !== undefined && payload.requestedQuantity === undefined) {
+      payload.requestedQuantity = payload.requested;
+      delete payload.requested;
+    }
+    if (payload.approved !== undefined && payload.approvedQuantity === undefined) {
+      payload.approvedQuantity = payload.approved;
+      delete payload.approved;
+    }
+    if (payload.purchased !== undefined && payload.purchasedQuantity === undefined) {
+      payload.purchasedQuantity = payload.purchased;
+      delete payload.purchased;
+    }
+    if (payload.consumed !== undefined && payload.consumedQuantity === undefined) {
+      payload.consumedQuantity = payload.consumed;
+      delete payload.consumed;
+    }
+    // Map old status values to the new 2-value enum
+    if (payload.status && !["Received", "Not Received"].includes(payload.status)) {
+      payload.status = "Not Received";
+    }
+
     return new Observable((observer) => {
-      this.api.createMaterial(input).subscribe({
+      this.api.createMaterial(payload).subscribe({
         next: (res: any) => {
+          const backend = res?.material ?? res;
           const material: MaterialRow = {
-            id: res.material?.materialId || res.material?._id || res.materialId || res._id,
-            projectId: input.projectId || "",
-            site: input.site || "",
-            name: input.name || "",
-            unit: input.unit || "",
-            requested: input.requested ?? 0,
-            approved: input.approved ?? 0,
-            purchased: input.purchased ?? 0,
-            consumed: input.consumed ?? 0,
-            quantity: input.quantity ?? 0,
-            vendor: input.vendor || "",
-            poNumber: input.poNumber || "",
-            status: input.status || "Pending",
-            requestDate: input.requestDate,
+            id: backend.materialId || backend._id || backend.id,
+            projectId: backend.projectId || input.projectId || "",
+            site: backend.site || input.site || "",
+            name: backend.name || input.name || "",
+            unit: backend.unit || input.unit || "",
+            requested: backend.requestedQuantity ?? input.requested ?? 0,
+            approved: backend.approvedQuantity ?? input.approved ?? 0,
+            purchased: backend.purchasedQuantity ?? input.purchased ?? 0,
+            consumed: backend.consumedQuantity ?? input.consumed ?? 0,
+            quantity: backend.remainingStock ?? input.quantity ?? 0,
+            vendor: backend.vendor || input.vendor || "",
+            poNumber: backend.poNumber || input.poNumber || "",
+            status: (["Received", "Not Received"].includes(backend.status) ? backend.status : "Not Received") as MaterialStatus,
+            requestDate: backend.requestDate || input.requestDate,
             purchasedDate: input.purchasedDate,
-            issuedAmount: input.issuedAmount,
-            givenAmount: input.givenAmount,
+            issuedAmount: backend.issuedAmount,
+            givenAmount: backend.givenAmount,
             paymentType: input.paymentType,
             deliveredOn: input.deliveredOn,
           };
@@ -87,9 +118,17 @@ export class MaterialsService {
     });
   }
 
-  updateMaterial(id: string, patch: Partial<MaterialRow>): Observable<void> {
+  updateMaterial(id: string, patch: Partial<MaterialRow> & Record<string, any>): Observable<void> {
+    // Translate legacy field names to backend schema
+    const payload: any = { ...patch };
+    if (payload.requested !== undefined && payload.requestedQuantity === undefined) payload.requestedQuantity = payload.requested;
+    if (payload.approved !== undefined && payload.approvedQuantity === undefined) payload.approvedQuantity = payload.approved;
+    if (payload.purchased !== undefined && payload.purchasedQuantity === undefined) payload.purchasedQuantity = payload.purchased;
+    if (payload.consumed !== undefined && payload.consumedQuantity === undefined) payload.consumedQuantity = payload.consumed;
+    if (payload.status && !["Received", "Not Received"].includes(payload.status)) payload.status = "Not Received";
+
     return new Observable((observer) => {
-      this.api.patchMaterial(id, patch).subscribe({
+      this.api.patchMaterial(id, payload).subscribe({
         next: () => {
           this.materials.update((list) =>
             list.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m)),
@@ -134,7 +173,7 @@ export class MaterialsService {
     quantity: row.quantity ?? row.remainingStock ?? Math.max(0, (row.purchasedQuantity ?? row.purchased ?? 0) - (row.consumedQuantity ?? row.consumed ?? 0)),
     vendor: row.vendor,
     poNumber: row.poNumber,
-    status: row.status,
+    status: (["Received", "Not Received"].includes(row.status) ? row.status : "Not Received") as MaterialStatus,
     requestDate: row.requestDate,
     purchasedDate: row.purchasedDate,
     issuedAmount: row.issuedAmount,

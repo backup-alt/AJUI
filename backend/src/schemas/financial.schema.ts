@@ -33,8 +33,9 @@ export const listMaterialsSchema = z.object({
   query: z.object({
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
+    site: z.string().trim().optional(),
     vendorId: objectIdSchema.optional(),
-    status: z.enum(["Pending", "Approved", "Rejected", "Completed", "Received", "Not Received"]).optional(),
+    status: z.enum(["Received", "Not Received"]).optional(),
     search: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -79,6 +80,7 @@ export const listLabourSchema = z.object({
   query: z.object({
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
+    site: z.string().trim().optional(),
     category: z.string().optional(),
     status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
     from: z.string().optional(),
@@ -150,6 +152,7 @@ export const listExpensesSchema = z.object({
     type: z.enum(["site", "general"]).optional(),
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
+    site: z.string().trim().optional(),
     status: z.enum(["Pending", "Approved", "Rejected", "Completed"]).optional(),
     from: z.string().optional(),
     to: z.string().optional(),
@@ -249,6 +252,8 @@ export const updateSubcontractorSchema = z.object({
 export const listSubcontractorsSchema = z.object({
   query: z.object({
     projectId: objectIdSchema.optional(),
+    siteId: objectIdSchema.optional(),
+    site: z.string().trim().optional(),
     approvalStatus: z.enum(["Pending", "Approved", "Rejected"]).optional(),
     paymentStatus: z.enum(["Not Started", "Part Paid", "Paid"]).optional(),
     page: z.coerce.number().int().min(1).default(1),

@@ -1303,7 +1303,7 @@ export class UniversalDashboardPage {
   readonly editingRowKeys = signal<string[]>([]);
   readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly searchText = signal("");
-  readonly activeSite = signal("All");
+  readonly activeSite = signal<string>(localStorage.getItem("agb-erp:universal-active-site") || "All");
   readonly selectedFilters = signal<Record<string, string>>({});
   readonly selectedFilterFields = signal<string[]>([]);
   readonly filterBuilderOpen = signal(false);
@@ -1721,6 +1721,9 @@ export class UniversalDashboardPage {
     this.backendSyncing.set(true);
     this.backendSyncMessage.set("Refreshing from backend…");
 
+    const siteFilter = this.activeSiteFilter();
+    const siteParam = siteFilter !== "All" ? siteFilter : undefined;
+
     let done = 0;
     const total = 9;
     const finishOne = () => {
@@ -1768,8 +1771,8 @@ export class UniversalDashboardPage {
       },
       error: finishOne,
     });
-    // Materials: pipe through mapper (sets id from materialId)
-    this.api.listMaterials({ limit: 100 }).subscribe({
+    // Materials: pipe through mapper (sets id from materialId) — filter by site when selected
+    this.api.listMaterials({ limit: 100, site: siteParam }).subscribe({
       next: (r) => {
         try {
           const items = (r.items || []).map(mapMaterial);
@@ -1780,8 +1783,8 @@ export class UniversalDashboardPage {
       },
       error: finishOne,
     });
-    // Labour: pipe through mapper
-    this.api.listLabour({ limit: 100 }).subscribe({
+    // Labour: pipe through mapper — filter by site when selected
+    this.api.listLabour({ limit: 100, site: siteParam }).subscribe({
       next: (r) => {
         try {
           const items = (r.items || []).map(mapLabour);
@@ -1792,8 +1795,8 @@ export class UniversalDashboardPage {
       },
       error: finishOne,
     });
-    // Expenses: pipe through mapper
-    this.api.listExpenses({ limit: 100 }).subscribe({
+    // Expenses: pipe through mapper — filter by site when selected
+    this.api.listExpenses({ limit: 100, site: siteParam }).subscribe({
       next: (r) => {
         try {
           const items = (r.items || []).map(mapExpense);
@@ -1828,8 +1831,8 @@ export class UniversalDashboardPage {
       },
       error: finishOne,
     });
-    // Subcontractors: pipe through mapper
-    this.api.listSubcontractors({ limit: 100 }).subscribe({
+    // Subcontractors: pipe through mapper — filter by site when selected
+    this.api.listSubcontractors({ limit: 100, site: siteParam }).subscribe({
       next: (r) => {
         try {
           const items = (r.items || []).map(mapSubcontractor);
@@ -1991,8 +1994,10 @@ visibleRows(): TableRow[] {
 
   selectUniversalSite(siteId: string) {
     this.activeSite.set(siteId);
+    localStorage.setItem("agb-erp:universal-active-site", siteId);
     this.closeDropdowns();
     this.clearRowSelection();
+    this.refreshFromBackend();
   }
 
   isFilterMenuOpen(key: string): boolean {

@@ -165,6 +165,8 @@ export async function bootstrap(): Promise<void> {
   await verifyEmailConnection();
   initFirebase();
   await ensureDefaultPermissions();
+  const { migrateMaterialStatus } = await import("./services/material.service.js");
+  await migrateMaterialStatus();
   const { seedDefaultReports } = await import("./utils/seed-reports.js");
   await seedDefaultReports();
   const { seedDefaultAdmin } = await import("./utils/seed-admin.js");

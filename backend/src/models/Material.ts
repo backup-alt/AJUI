@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-export type MaterialStatus = "Pending" | "Approved" | "Rejected" | "Completed" | "Received" | "Not Received";
+export type MaterialStatus = "Received" | "Not Received";
 
 export interface IMaterial extends Document {
   _id: Types.ObjectId;
@@ -65,8 +65,8 @@ const materialSchema = new Schema<IMaterial>(
     approvalDate: { type: String },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected", "Completed", "Received", "Not Received"],
-      default: "Pending",
+      enum: ["Received", "Not Received"],
+      default: "Not Received",
       index: true,
     },
     createdBy: { type: String },

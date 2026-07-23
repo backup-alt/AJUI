@@ -9,6 +9,7 @@ module.exports = {
   testMatch: ["**/__tests__/**/*.test.ts"],
   moduleFileExtensions: ["ts", "js"],
   testTimeout: 30000,
+  globalSetup: "./__tests__/globalSetup.js",
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.test.ts"],
   coveragePathIgnorePatterns: ["/node_modules/", "/dist/", "/__tests__/"],
   moduleNameMapper: {
