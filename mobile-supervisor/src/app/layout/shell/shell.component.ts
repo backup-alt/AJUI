@@ -29,36 +29,22 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
   homeOutline,
-  homeSharp,
   cubeOutline,
-  cubeSharp,
   peopleOutline,
-  peopleSharp,
   walletOutline,
-  walletSharp,
   personCircleOutline,
-  personCircleSharp,
   settingsOutline,
   logOutOutline,
   chevronDownOutline,
   notificationsOutline,
-  notificationsSharp,
   businessOutline,
-  logOutSharp,
   shieldCheckmarkOutline,
   constructOutline,
   locationOutline,
-  locationSharp,
-  appsOutline,
   gridOutline,
-  checkmarkOutline,
   clipboardOutline,
-  clipboardSharp,
-  grid,
   barChartOutline,
-  barChartSharp,
   fileTrayOutline,
-  fileTraySharp,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
@@ -100,51 +86,66 @@ import { Site } from '../../shared/models';
               alt="Annai Golden Builders"
               class="menu-brand-logo-img"
             />
-         </div>
+          </div>
           <div class="menu-brand-text">
             <div class="menu-brand-name">Annai Golden Builders</div>
             <div class="menu-brand-sub">Supervisor Portal</div>
-         </div>
-       </div>
+          </div>
+        </div>
       </ion-header>
 
       <ion-content class="menu-content">
+        <!-- User row -->
+        <div class="user-row">
+          <div class="user-avatar">{{ userInitial() }}</div>
+          <div class="user-info">
+            <span class="user-name">{{ userName() }}</span>
+            <span class="user-role">Site Supervisor · {{ userSite() }}</span>
+          </div>
+        </div>
+
         <div class="menu-section-label">Main Menu</div>
         <ion-list lines="none" class="menu-list">
           <ion-item routerLink="/tabs/dashboard" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/dashboard') ? 'home-sharp' : 'home-outline'" slot="start"></ion-icon>
+            <ion-icon name="home-outline" slot="start"></ion-icon>
             <ion-label>Dashboard</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/sites" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/sites') ? 'location-sharp' : 'location-outline'" slot="start"></ion-icon>
+            <ion-icon name="location-outline" slot="start"></ion-icon>
             <ion-label>My Sites</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/inventory" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/inventory') ? 'grid-sharp' : 'grid-outline'" slot="start"></ion-icon>
+            <ion-icon name="grid-outline" slot="start"></ion-icon>
             <ion-label>Inventory</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/materials" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/materials') ? 'cube-sharp' : 'cube-outline'" slot="start"></ion-icon>
+            <ion-icon name="cube-outline" slot="start"></ion-icon>
             <ion-label>Materials</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/labour" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/labour') ? 'people-sharp' : 'people-outline'" slot="start"></ion-icon>
+            <ion-icon name="people-outline" slot="start"></ion-icon>
             <ion-label>Labour</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/expenses" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/expenses') ? 'wallet-sharp' : 'wallet-outline'" slot="start"></ion-icon>
+            <ion-icon name="wallet-outline" slot="start"></ion-icon>
             <ion-label>Expenses</ion-label>
+            @if (pendingExpenses() > 0) {
+              <span class="menu-badge" slot="end">{{ pendingExpenses() }}</span>
+            }
           </ion-item>
           <ion-item routerLink="/tabs/requests" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/requests') ? 'clipboard-sharp' : 'clipboard-outline'" slot="start"></ion-icon>
+            <ion-icon name="clipboard-outline" slot="start"></ion-icon>
             <ion-label>Requests</ion-label>
+            @if (pendingApprovals() > 0) {
+              <span class="menu-badge" slot="end">{{ pendingApprovals() }}</span>
+            }
           </ion-item>
         </ion-list>
 
         <div class="menu-section-label">Account</div>
         <ion-list lines="none" class="menu-list">
           <ion-item routerLink="/tabs/profile" routerLinkActive="selected" button detail="false">
-            <ion-icon [name]="isActiveRoute('/tabs/profile') ? 'person-circle-sharp' : 'person-circle-outline'" slot="start"></ion-icon>
+            <ion-icon name="person-circle-outline" slot="start"></ion-icon>
             <ion-label>Profile</ion-label>
           </ion-item>
         </ion-list>
@@ -153,7 +154,7 @@ import { Site } from '../../shared/models';
 
         <div class="menu-footer">
           <ion-item button detail="false" class="logout-item" (click)="logout()">
-            <ion-icon [name]="isLoggingOut() ? 'log-out-sharp' : 'log-out-outline'" slot="start"></ion-icon>
+            <ion-icon name="log-out-outline" slot="start"></ion-icon>
             <ion-label>Sign Out</ion-label>
           </ion-item>
           <div class="menu-footer-meta">
@@ -241,12 +242,11 @@ import { Site } from '../../shared/models';
   styles: [`
     :host { display: block; }
 
-    /* Menu header */
+    /* ─── Menu header ─── */
     .agb-menu-header {
-      background: var(--agb-gradient-hero);
-      background-image: linear-gradient(135deg, #002263 0%, #003380 100%);
+      background: linear-gradient(135deg, #002263 0%, #003380 100%);
       color: #ffffff;
-      padding: calc(16px + env(safe-area-inset-top)) 16px 16px;
+      padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
     }
     .menu-brand {
       display: flex;
@@ -254,15 +254,15 @@ import { Site } from '../../shared/models';
       gap: 12px;
     }
     .menu-brand-logo {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
       background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      padding: 4px;
+      padding: 3px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
     }
     .menu-brand-logo-img {
@@ -273,7 +273,7 @@ import { Site } from '../../shared/models';
     }
     .menu-brand-text { line-height: 1.3; }
     .menu-brand-name {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       color: #ffffff;
       letter-spacing: 0.1px;
@@ -281,32 +281,77 @@ import { Site } from '../../shared/models';
     .menu-brand-sub {
       font-size: 10px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.65);
+      color: rgba(255, 255, 255, 0.6);
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      margin-top: 2px;
+      margin-top: 1px;
     }
 
     .menu-content {
       --background: var(--m3-surface-bright);
       --padding-top: 0;
       --padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Section labels */
+    /* ─── User row ─── */
+    .user-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px 6px;
+      border-bottom: 1px solid var(--m3-outline-variant);
+      margin-bottom: 2px;
+    }
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .user-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      line-height: 1.2;
+    }
+    .user-role {
+      font-size: 11px;
+      color: var(--m3-on-surface-muted);
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ─── Section labels ─── */
     .menu-section-label {
       font-size: 10px;
       font-weight: 700;
       color: var(--m3-on-surface-muted);
       text-transform: uppercase;
       letter-spacing: 1.2px;
-      padding: var(--md-space-3) var(--md-space-5) var(--md-space-2);
-    }
-    .menu-section-label:first-of-type {
-      padding-top: var(--md-space-3);
+      padding: 10px var(--md-space-5) 4px;
     }
 
-    .menu-list { background: transparent; padding: 0 var(--md-space-2); }
+    /* ─── Menu list ─── */
+    .menu-list {
+      background: transparent;
+      padding: 0 var(--md-space-2);
+    }
     .menu-list ion-item {
       --background: transparent;
       --color: var(--m3-on-surface);
@@ -314,7 +359,7 @@ import { Site } from '../../shared/models';
       --inner-border-radius: var(--md-radius-lg);
       --padding-start: var(--md-space-3);
       --padding-end: var(--md-space-3);
-      --min-height: 44px;
+      --min-height: 42px;
       font-size: 14px;
       font-weight: 600;
       margin: 1px 0;
@@ -331,12 +376,31 @@ import { Site } from '../../shared/models';
       --color: var(--m3-on-primary-container);
       box-shadow: none;
     }
-    .menu-list ion-item.selected ion-icon { color: var(--m3-on-primary-container); }
+    .menu-list ion-item.selected ion-icon {
+      color: var(--m3-on-primary-container);
+    }
 
-    .menu-spacer { flex: 1; min-height: var(--md-space-2); max-height: var(--md-space-4); }
+    /* ─── Badge count ─── */
+    .menu-badge {
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      background: var(--m3-error);
+      color: var(--m3-on-error);
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--md-radius-pill);
+      line-height: 1;
+    }
+
+    /* ─── Spacer & Footer ─── */
+    .menu-spacer { flex: 1; min-height: 4px; max-height: 12px; }
 
     .menu-footer {
-      padding: var(--md-space-3) var(--md-space-3) calc(16px + env(safe-area-inset-bottom));
+      padding: 8px var(--md-space-3) calc(12px + env(safe-area-inset-bottom));
     }
     .menu-footer ion-item {
       --background: transparent;
@@ -345,7 +409,7 @@ import { Site } from '../../shared/models';
       --inner-border-radius: var(--md-radius-lg);
       --padding-start: var(--md-space-4);
       --padding-end: var(--md-space-4);
-      --min-height: 48px;
+      --min-height: 44px;
       font-weight: 600;
       margin: 0;
     }
@@ -357,13 +421,13 @@ import { Site } from '../../shared/models';
       gap: var(--md-space-2);
       font-size: 10px;
       color: var(--m3-on-surface-muted);
-      margin-top: var(--md-space-4);
+      margin-top: 8px;
       letter-spacing: 0.5px;
       text-transform: uppercase;
     }
     .menu-footer-meta ion-icon { font-size: 12px; }
 
-    /* Top header */
+    /* ─── Top app header ─── */
     .agb-app-header {
       --background: var(--m3-surface-bright);
       --border-color: transparent;
@@ -426,6 +490,7 @@ import { Site } from '../../shared/models';
       background: var(--m3-error);
       color: var(--m3-on-error);
       font-size: 10px;
+      font-size: 10px;
       font-weight: 700;
       display: flex;
       align-items: center;
@@ -434,7 +499,7 @@ import { Site } from '../../shared/models';
       border: 1.5px solid var(--m3-surface-bright);
     }
 
-    /* Site-switch popover */
+    /* ─── Site-switch popover ─── */
     .popover-header {
       font-size: 11px;
       font-weight: 700;
@@ -483,7 +548,7 @@ import { Site } from '../../shared/models';
       color: var(--m3-on-surface-muted);
     }
 
-    /* Shell header overlap fix */
+    /* ─── Shell header overlap fix ─── */
     app-shell.agb-shell-active ion-content {
       --padding-top: calc(var(--agb-header-height) + env(safe-area-inset-top));
       --padding-bottom: calc(24px + env(safe-area-inset-bottom));
@@ -524,6 +589,21 @@ export class ShellComponent implements OnInit {
   isLoggingOut = signal(false);
   siteCount = computed(() => this.sites().length);
   unreadCount = computed(() => this.notifications.unreadCount());
+  pendingApprovals = signal<number>(0);
+  pendingExpenses = signal<number>(0);
+
+  userInitial(): string {
+    const name = this.currentUser()?.name;
+    return name ? name.charAt(0).toUpperCase() : 'S';
+  }
+
+  userName(): string {
+    return this.currentUser()?.name || 'Supervisor';
+  }
+
+  userSite(): string {
+    return this.selectedSiteName() || 'No site';
+  }
 
   isActiveRoute(path: string): boolean {
     return this.router.url === path;
@@ -531,19 +611,18 @@ export class ShellComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      homeOutline, homeSharp, cubeOutline, cubeSharp, peopleOutline, peopleSharp,
-      walletOutline, walletSharp,
-      personCircleOutline, personCircleSharp, settingsOutline, logOutOutline,
-      chevronDownOutline, notificationsOutline, notificationsSharp, businessOutline,
-      constructOutline, shieldCheckmarkOutline, locationOutline, locationSharp,
-      appsOutline, gridOutline, checkmarkOutline, logOutSharp,
-      clipboardOutline, clipboardSharp,
-      grid, barChartOutline, barChartSharp, fileTrayOutline, fileTraySharp,
+      homeOutline, cubeOutline, peopleOutline,
+      walletOutline, personCircleOutline, settingsOutline,
+      logOutOutline, chevronDownOutline, notificationsOutline,
+      businessOutline, shieldCheckmarkOutline, locationOutline,
+      gridOutline, clipboardOutline, barChartOutline,
+      fileTrayOutline,
     });
 
     this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
     await this.loadSites();
+    this.loadBadgeCounts();
   }
 
   async loadSites(): Promise<void> {
@@ -582,6 +661,17 @@ export class ShellComponent implements OnInit {
     } finally {
       this.isLoadingSites.set(false);
     }
+  }
+
+  private loadBadgeCounts(): void {
+    this.supervisor.getDashboard().subscribe({
+      next: (res) => {
+        const d = (res as { dashboard?: { counts?: { pendingApprovals?: number; pendingExpenses?: number } } }).dashboard;
+        this.pendingApprovals.set(d?.counts?.pendingApprovals || 0);
+        this.pendingExpenses.set(d?.counts?.pendingExpenses || 0);
+      },
+      error: () => undefined,
+    });
   }
 
   toggleSitePopover(event: Event): void {
