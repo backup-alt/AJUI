@@ -1,0 +1,10 @@
+node_modules/
+www/
+dist/
+out-tsc/
+.angular/
+android/
+*.log
+apk-output/*.apk
+!apk-output/.gitkeep
+.DS_Store

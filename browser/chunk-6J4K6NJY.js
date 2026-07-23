@@ -1,0 +1,1 @@
+var r=e=>{let n=typeof e=="number"&&Number.isFinite(e)?e:0;return new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(n)},t=e=>{let n=typeof e=="number"&&Number.isFinite(e)?e:0;return new Intl.NumberFormat("en-IN").format(n)},o=e=>e.toLowerCase().replace(/\s+/g,"-");export{r as a,t as b,o as c};
