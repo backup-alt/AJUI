@@ -438,6 +438,7 @@ export async function getAssignedSites(userId: string) {
       projectName: firstProjectId ? projectIdToName.get(firstProjectId) : undefined,
       employeeCount: stats.workerCount,
       daysActive: stats.daysActiveCount,
+      updatedAt: (s as any).updatedAt?.toISOString?.() || s.createdAt?.toISOString?.(),
     };
   });
 }

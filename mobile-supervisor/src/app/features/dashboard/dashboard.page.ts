@@ -118,11 +118,16 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
                     </div>
                     <div class="expense-row-details">
                       <span class="expense-row-desc">{{ expense.description }}</span>
-                      <span class="expense-row-meta">{{ expense.materialVendor || expense.type }}</span>
+                      <span class="expense-row-meta">
+                        {{ expense.materialVendor || expense.type }}
+                        <span class="meta-dot">·</span>
+                        {{ expense.createdAt | date:'MMM d' }}
+                        <span class="meta-dot">·</span>
+                        {{ expense.createdAt | date:'shortTime' }}
+                      </span>
                     </div>
                     <div class="expense-row-right">
                       <span class="expense-row-amt">{{ expense.amount | currency:'INR':'symbol':'1.0-0' }}</span>
-                      <span class="expense-row-time">{{ expense.createdAt | date:'shortTime' }}</span>
                     </div>
                   </div>
                 }
@@ -163,9 +168,11 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
                   <span class="site-name">{{ site.name }}</span>
                   <span class="site-meta">
                     {{ site.employeeCount || 0 }} worker{{ (site.employeeCount || 0) !== 1 ? 's' : '' }}
+                    @if (site.updatedAt) {
+                      <span class="meta-dot">·</span> {{ timeAgo(site.updatedAt) }}
+                    }
                   </span>
                 </div>
-                <span class="site-status-text">{{ site.status || 'Active' }}</span>
                 <ion-icon name="chevron-forward-outline" class="site-arrow"></ion-icon>
               </button>
             }
@@ -420,6 +427,12 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-row-meta {
       font-size: 11px;
       color: var(--m3-on-surface-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .meta-dot {
+      opacity: 0.4;
     }
 
     .expense-row-right {
@@ -433,10 +446,6 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       font-size: 13px;
       font-weight: 600;
       color: var(--m3-on-surface);
-    }
-    .expense-row-time {
-      font-size: 10px;
-      color: var(--m3-on-surface-muted);
     }
 
     .expense-viewall {
@@ -543,14 +552,11 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .site-meta {
       font-size: 12px;
       color: var(--m3-on-surface-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
-
-    .site-status-text {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--m3-on-surface-muted);
-      flex-shrink: 0;
-    }
+    .meta-dot { opacity: 0.4; }
 
     .site-arrow {
       font-size: 14px;
@@ -636,6 +642,22 @@ export class DashboardPage implements OnInit, OnDestroy {
     if (expense.description?.toLowerCase().includes('labour') || expense.description?.toLowerCase().includes('worker')) return 'people-outline';
     if (expense.description?.toLowerCase().includes('transport') || expense.description?.toLowerCase().includes('vehicle')) return 'construct-outline';
     return 'document-text-outline';
+  }
+
+  timeAgo(dateStr: string): string {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diffMs = now - then;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d ago`;
+    const diffWk = Math.floor(diffDay / 7);
+    if (diffWk < 4) return `${diffWk}w ago`;
+    return `${Math.floor(diffDay / 30)}mo ago`;
   }
 
   async ngOnInit(): Promise<void> {
