@@ -718,6 +718,6 @@ export class ShellComponent implements OnInit {
   }
 
   async openNotifications(): Promise<void> {
-    await this.router.navigate(['/tabs/requests']);
+    await this.router.navigate(['/tabs/notifications']);
   }
 }

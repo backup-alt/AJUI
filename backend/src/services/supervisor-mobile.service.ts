@@ -676,6 +676,47 @@ export async function listMaterialsForSupervisor(
     Inventory.countDocuments(query),
   ]);
 
+  // If Inventory collection is empty for this query, fall back to Material collection
+  if (items.length === 0 && total === 0) {
+    const materialQuery: Record<string, unknown> = { ...query };
+    materialQuery.$or = [
+      { status: "Received" },
+      { approvedQuantity: { $gt: 0 } },
+    ];
+    const [matItems, matTotal] = await Promise.all([
+      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Material.countDocuments(materialQuery),
+    ]);
+
+    return {
+      materials: matItems.map((m) => ({
+        _id: m._id.toString(),
+        materialId: m.materialId,
+        projectId: m.projectId,
+        projectName: m.projectName,
+        siteId: m.siteId,
+        site: m.site,
+        name: m.name,
+        unit: m.unit,
+        requestedQuantity: m.requestedQuantity,
+        approvedQuantity: m.approvedQuantity,
+        purchasedQuantity: m.purchasedQuantity,
+        consumedQuantity: m.consumedQuantity,
+        remainingStock: m.remainingStock,
+        vendor: m.vendor,
+        poNumber: m.poNumber,
+        issuedAmount: m.issuedAmount,
+        givenAmount: (m as any).givenAmount,
+        billUrl: (m as any).billUrl,
+        requestDate: m.requestDate,
+        status: m.status === "Received" ? "Received" : "Approved",
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+      })),
+      pagination: { page, limit, total: matTotal, pages: Math.ceil(matTotal / limit) },
+    };
+  }
+
   return {
     materials: items.map((m) => ({
       _id: m._id.toString(),
@@ -686,7 +727,7 @@ export async function listMaterialsForSupervisor(
       site: m.site,
       name: m.name,
       unit: m.unit,
-      requestedQuantity: m.approvedQuantity,
+      requestedQuantity: m.requestedQuantity || m.approvedQuantity,
       approvedQuantity: m.approvedQuantity,
       purchasedQuantity: m.purchasedQuantity,
       consumedQuantity: m.consumedQuantity,
