@@ -9,6 +9,7 @@ export interface GroupedAttendance {
   site?: string;
   subcontractorName?: string;
   labourType?: string;
+  supervisorName?: string;
   workers: Array<{
     workerId: string;
     workerName: string;
@@ -44,9 +45,14 @@ export async function listGroupedAttendance(filter: {
   const pipeline = [
     { $match: match },
     {
+      $addFields: {
+        createdByObj: { $toObjectId: "$createdBy" },
+      },
+    },
+    {
       $lookup: {
         from: "users",
-        localField: "createdBy",
+        localField: "createdByObj",
         foreignField: "_id",
         as: "supervisor",
       },
@@ -62,6 +68,7 @@ export async function listGroupedAttendance(filter: {
           subcontractorName: "$subcontractorName",
           labourType: "$labourType",
         },
+        supervisorName: { $first: "$supervisor.name" },
         workers: {
           $push: {
             workerId: { $toString: "$workerId" },
@@ -107,6 +114,7 @@ export async function listGroupedAttendance(filter: {
       site: r._id.site,
       subcontractorName: r._id.subcontractorName,
       labourType: r._id.labourType,
+      supervisorName: r.supervisorName || "",
       workers,
       totalWorkers: r.totalWorkers,
       totalDailyPay: Math.round(
@@ -136,9 +144,14 @@ export async function getLabourReport(filter: {
   const results = await Attendance.aggregate([
     { $match: match as any },
     {
+      $addFields: {
+        createdByObj: { $toObjectId: "$createdBy" },
+      },
+    },
+    {
       $lookup: {
         from: "users",
-        localField: "createdBy",
+        localField: "createdByObj",
         foreignField: "_id",
         as: "supervisor",
       },

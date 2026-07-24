@@ -94,7 +94,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "project", label: "Project" },
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date" },
-      { key: "staffName", label: "Staff Name" },
+      { key: "supervisorName", label: "Supervisor Name" },
       { key: "labourTypes", label: "Labour Types" },
       { key: "notes", label: "Notes" },
       { key: "staffCount", label: "Staff Count" },
@@ -1867,6 +1867,7 @@ export class UniversalDashboardPage {
                 notes: `Attendance: ${group.date}`,
                 paymentMode: (group.paymentMode === "NEFT" ? "NEFT" : "Cash") as "NEFT" | "Cash",
                 status: "Approved" as const,
+                supervisorName: (group as any).supervisorName || "",
               } as any);
             }
           }
@@ -3101,6 +3102,7 @@ visibleRows(): TableRow[] {
       site: row.site,
       attendanceDate: "2026-06-05",
       staffName: row.party,
+      supervisorName: row["supervisorName"] || "",
       dailyWage: row.dailyWage,
       labourTypes: this.labourTypesFromRow(row),
       staffCount: row.presentCount,
@@ -3246,7 +3248,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
     if (key === "client" || key === "clientName") return this.clientNameOptions();
     if (key === "address") return this.clientAddressOptions();
     if (key === "supervisor" || key === "supervisorName" || key === "collectedBy" || key === "paidBy") return this.supervisorNameOptions();
-    if (module === "labour" && key === "staffName") return this.staffNameOptions();
+    if (module === "labour" && key === "supervisorName") return this.supervisorOptions();
     if (module === "materials" && key === "materialName") return this.materialNameOptions();
     if (module === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
     if (module === "expenses" && key === "transactionType") {
@@ -3300,7 +3302,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
         projectId: "",
         site: "",
         attendanceDate: today,
-        staffName: this.staffNameOptions()[0] ?? "",
+        supervisorName: this.supervisorOptions()[0] ?? "",
         labourTypes: "Mason: 1",
         staffCount: "1",
         attendance: "Present",
@@ -3440,7 +3442,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
     const staffCount = this.staffCountFromLabourTypes(labourTypes) || enteredStaffCount || this.moneyNumber(row["presentUnits"]) || 1;
     return {
       ...row,
-      staffName: row["staffName"] || row["labourName"] || "",
+      supervisorName: row["supervisorName"] || row["party"] || "",
       labourTypes,
       notes: labourTypes || row["notes"] || "",
       attendance,
@@ -3496,13 +3498,12 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
     ]);
   }
 
-  private staffNameOptions(): string[] {
+  private supervisorOptions(): string[] {
     const names = new Set<string>();
     for (const row of this.rowsFor("labour")) {
-      const name = String(row["staffName"] || row["labourName"] || "").trim();
+      const name = String(row["supervisorName"] || "").trim();
       if (name) names.add(name);
     }
-    ["Velu Mason Party", "Ganesh Plumbing", "Selvam Civil Works", "Balu Helper Team"].forEach((name) => names.add(name));
     return [...names].sort((a, b) => a.localeCompare(b));
   }
 
@@ -3763,7 +3764,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
       const wageFields = this.data.customFieldsFor("labour").filter((field) => this.isLabourWageField(field));
       return [
         { key: "attendanceDate", label: "Date" },
-        { key: "staffName", label: "Staff Name" },
+        { key: "supervisorName", label: "Supervisor Name" },
         { key: "labourTypes", label: "Labour Types" },
         ...wageFields,
         { key: "staffCount", label: "Staff Count" },
@@ -3895,7 +3896,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
     const staffSummary = new Map<string, { present: number; absent: number; staff: number }>();
     const wageSummary = new Map<string, { staff: number; payable: number }>();
     for (const row of rows) {
-      const name = String(row["staffName"] || row["labourName"] || "Unnamed");
+      const name = String(row["supervisorName"] || row["party"] || "Unnamed");
       const current = staffSummary.get(name) ?? { present: 0, absent: 0, staff: 0 };
       const isAbsent = String(row["attendance"] || "").toLowerCase() === "absent";
       if (isAbsent) current.absent += 1;
