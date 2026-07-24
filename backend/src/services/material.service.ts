@@ -80,7 +80,7 @@ export async function createMaterial(input: CreateMaterialInput) {
     poNumber: input.poNumber,
     requestDate: input.requestDate,
     approvalDate: input.approvedQuantity ? new Date().toISOString().slice(0, 10) : undefined,
-    status: "Not Received",
+    status: "Pending",
     createdBy: input.createdBy,
     notes: input.notes,
   });
