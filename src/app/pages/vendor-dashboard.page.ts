@@ -1332,18 +1332,66 @@ export class VendorDashboardPage {
     this.loadAvailableSites();
   }
 
+  private isValidObjectId(id: string): boolean {
+    return /^[a-f0-9]{24}$/i.test(id);
+  }
+
   assignExistingSite(site: { id: string; name: string }) {
     const vendor = this.selectedVendor();
     if (!vendor) return;
     const currentIds = vendor.siteIds ? [...vendor.siteIds] : [];
     // Avoid duplicate
     if (currentIds.includes(site.id)) {
+      this.toastController.create({
+        message: `Site "${site.name}" is already assigned to this vendor`,
+        duration: 2500,
+        color: "warning",
+        position: "top",
+      }).then(t => t.present());
       this.closeAddSitePicker();
       return;
     }
     const newSiteIds = [...currentIds, site.id];
     // Use vendor._id (MongoDB ObjectId) for the API call
     const vendorApiId = vendor._id || vendor.id;
+
+    // Debug logging
+    console.log('[assignExistingSite] Debug info:', {
+      vendorId: vendor.id,
+      vendorApiId,
+      vendorIdValid: this.isValidObjectId(vendorApiId),
+      currentSiteIds: currentIds,
+      newSiteId: site.id,
+      newSiteIdValid: this.isValidObjectId(site.id),
+      newSiteIds,
+      allSiteIdsValid: newSiteIds.every(id => this.isValidObjectId(id)),
+    });
+
+    if (!this.isValidObjectId(vendorApiId)) {
+      const msg = `Invalid vendor ID for API call: "${vendorApiId}" (expected 24-char hex ObjectId)`;
+      console.error('[assignExistingSite]', msg);
+      this.toastController.create({
+        message: msg,
+        duration: 5000,
+        color: "danger",
+        position: "top",
+      }).then(t => t.present());
+      return;
+    }
+
+    const invalidSiteIds = newSiteIds.filter(id => !this.isValidObjectId(id));
+    if (invalidSiteIds.length > 0) {
+      const msg = `Invalid site ID(s) detected: ${invalidSiteIds.join(', ')} (expected 24-char hex ObjectId)`;
+      console.error('[assignExistingSite]', msg);
+      this.toastController.create({
+        message: msg,
+        duration: 5000,
+        color: "danger",
+        position: "top",
+      }).then(t => t.present());
+      return;
+    }
+
     this.api.patchVendor(vendorApiId, { siteIds: newSiteIds }).subscribe({
       next: () => {
         const refreshed = { ...vendor, siteIds: newSiteIds };
@@ -1358,10 +1406,22 @@ export class VendorDashboardPage {
         this.closeAddSitePicker();
       },
       error: (err) => {
-        console.error("Failed to assign site", err);
+        console.error('[assignExistingSite] Error response:', err);
+        const zodDetails = err?.details?.details;
+        let message = "Failed to assign site";
+        if (zodDetails?.fieldErrors) {
+          const fieldErrors = Object.entries(zodDetails.fieldErrors)
+            .map(([field, errors]) => `${field}: ${(errors as string[]).join(', ')}`)
+            .join('; ');
+          message += ` - Validation: ${fieldErrors}`;
+        } else if (zodDetails?.formErrors?.length) {
+          message += ` - ${zodDetails.formErrors.join(', ')}`;
+        } else if (err?.message) {
+          message += `: ${err.message}`;
+        }
         this.toastController.create({
-          message: "Failed to assign site: " + (err?.error?.message || err?.message || "Unknown error"),
-          duration: 4000,
+          message,
+          duration: 5000,
           color: "danger",
           position: "top",
         }).then(t => t.present());

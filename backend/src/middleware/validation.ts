@@ -13,9 +13,19 @@ export function validate(schema: ZodSchema, source: Source = "body") {
       params: req.params,
     });
     if (!result.success) {
+      const flattened = result.error.flatten();
+      console.error('[Validation Middleware] Validation failed:', {
+        path: req.path,
+        method: req.method,
+        body: req.body,
+        params: req.params,
+        query: req.query,
+        fieldErrors: flattened.fieldErrors,
+        formErrors: flattened.formErrors,
+      });
       res.status(400).json({
         error: "Validation failed",
-        details: result.error.flatten(),
+        details: flattened,
       });
       return;
     }
