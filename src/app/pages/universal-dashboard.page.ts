@@ -1337,12 +1337,13 @@ export class UniversalDashboardPage {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
-  readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials()));
+  readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials(), this.activeSiteFilter()));
   readonly selectedInventoryCard = signal<{ materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
   readonly inventoryBreakdownRows = computed(() => {
     const card = this.selectedInventoryCard();
     if (!card) return [] as import("../../data/dashboardData").MaterialRow[];
-    return this.data.materials().filter((m) => m.name === card.materialName);
+    const site = this.activeSiteFilter();
+    return this.data.materials().filter((m) => m.name === card.materialName && (!site || site === "All" || (m.site && m.site.toLowerCase() === site.toLowerCase())));
   });
   readonly showInventoryBreakdown = signal(false);
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
@@ -1375,17 +1376,20 @@ export class UniversalDashboardPage {
     this.closeDropdowns();
     this.clearRowSelection();
 
-    // Inventory is derived from the materials collection. If we have no
-    // materials yet, kick off a backend fetch so the inventory cards
-    // populate immediately when the user opens the section.
-    if (module === "inventory" && this.data.materials().length === 0) {
+    // Inventory is derived from the materials collection. Refresh from the
+    // backend whenever the user opens the section so the cards are always
+    // current and no stale/empty data is shown.
+    if (module === "inventory") {
       this.refreshFromBackend();
     }
   }
 
-  private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[]) {
+  private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[], siteFilter?: string) {
+    const filtered = (siteFilter && siteFilter !== "All")
+      ? materials.filter((m) => m.site && m.site.toLowerCase() === siteFilter.toLowerCase())
+      : materials;
     const map = new Map<string, { qty: number; unit: string; sites: Set<string>; lastUpdated: string }>();
-    for (const m of materials) {
+    for (const m of filtered) {
       if (!m.name) continue;
       const key = m.name;
       const existing = map.get(key) || { qty: 0, unit: m.unit || "", sites: new Set<string>(), lastUpdated: "" };
@@ -1957,7 +1961,7 @@ visibleRows(): TableRow[] {
   }
 
   isUniversalSiteAware(module: DashboardModule): boolean {
-    return module === "materials" || module === "labour" || module === "expenses" || module === "subcontractors";
+    return module === "materials" || module === "labour" || module === "expenses" || module === "subcontractors" || module === "inventory";
   }
 
   siteFieldForModule(module: DashboardModule): string {
