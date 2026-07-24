@@ -1964,7 +1964,7 @@ visibleRows(): TableRow[] {
     return "site";
   }
 
-  universalSiteOptions(): { id: string; name: string }[] {
+  readonly universalSiteOptions = computed((): { id: string; name: string }[] => {
     // Dedupe by name so the chip selection stays stable even when the
     // underlying projects() / siteEntities() lists change. We use the
     // display name as both id and name so selectedSite name comparison
@@ -1981,13 +1981,13 @@ visibleRows(): TableRow[] {
       out.push({ id: name, name });
     }
     return out;
-  }
+  });
 
-  activeSiteFilter(): string {
+  readonly activeSiteFilter = computed((): string => {
     const site = this.activeSite();
     const options = this.universalSiteOptions();
     return site === "All" || options.some((o) => o.id === site) ? site : "All";
-  }
+  });
 
   selectUniversalSite(siteId: string) {
     this.activeSite.set(siteId);
