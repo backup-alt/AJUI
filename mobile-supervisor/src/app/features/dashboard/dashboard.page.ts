@@ -4,6 +4,7 @@ import {
   IonIcon,
   IonRefresher,
   IonRefresherContent,
+  IonSpinner,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
@@ -21,9 +22,12 @@ import {
   locationOutline,
   clipboardOutline,
   addOutline,
+  refreshOutline,
+  cloudOfflineOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { AuthService } from '../../core/services/auth.service';
+import { AppReadyService } from '../../core/services/app-ready.service';
 import { DashboardData, Site } from '../../shared/models';
 import { Expense } from '../../shared/models/expense.model';
 import { CurrencyPipe, DatePipe } from '@angular/common';
@@ -36,6 +40,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     IonIcon,
     IonRefresher,
     IonRefresherContent,
+    IonSpinner,
     CurrencyPipe,
     DatePipe,
   ],
@@ -45,6 +50,31 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
+      <!-- ═══ LOADING STATE ═══ -->
+      @if (loading()) {
+        <div class="state-container">
+          <ion-spinner name="crescent" class="state-spinner"></ion-spinner>
+          <span class="state-text">Loading dashboard...</span>
+        </div>
+      }
+
+      <!-- ═══ ERROR STATE ═══ -->
+      @else if (error()) {
+        <div class="state-container">
+          <div class="error-icon-wrap">
+            <ion-icon name="cloud-offline-outline"></ion-icon>
+          </div>
+          <span class="error-title">Connection failed</span>
+          <span class="error-text">Unable to load dashboard data. Check your network and try again.</span>
+          <button class="retry-btn" (click)="retryLoad()">
+            <ion-icon name="refresh-outline"></ion-icon>
+            Retry
+          </button>
+        </div>
+      }
+
+      <!-- ═══ DASHBOARD CONTENT ═══ -->
+      @else {
       <div class="dash-wrap">
 
         <!-- ═══ GREETING ═══ -->
@@ -181,6 +211,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 
         <div class="bottom-spacer"></div>
       </div>
+      }
     </ion-content>
   `,
   styles: [`
@@ -191,6 +222,74 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       --background: var(--m3-surface);
       --color: var(--m3-on-surface);
     }
+
+    /* ─────────────────────────────────────────────
+       LOADING / ERROR STATE
+       ───────────────────────────────────────────── */
+    .state-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: calc(env(safe-area-inset-top) + 80px) var(--md-space-6) var(--md-space-6);
+      text-align: center;
+      min-height: 60vh;
+    }
+    .state-spinner {
+      --color: var(--m3-primary);
+      width: 36px;
+      height: 36px;
+    }
+    .state-text {
+      font-size: 13px;
+      color: var(--m3-on-surface-muted);
+      font-weight: 500;
+    }
+    .error-icon-wrap {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--m3-error-container);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .error-icon-wrap ion-icon {
+      font-size: 28px;
+      color: var(--m3-error);
+    }
+    .error-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      margin-top: 8px;
+    }
+    .error-text {
+      font-size: 13px;
+      color: var(--m3-on-surface-muted);
+      line-height: 1.4;
+      max-width: 260px;
+    }
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: var(--md-space-2) var(--md-space-5);
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      border-radius: var(--md-radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .retry-btn:active {
+      opacity: 0.85;
+    }
+
     .dash-wrap {
       padding: 0 var(--md-space-4);
       padding-top: env(safe-area-inset-top);
@@ -619,11 +718,14 @@ export class DashboardPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private appReady = inject(AppReadyService);
 
   dashboard = signal<DashboardData | null>(null);
   sites = signal<Site[]>([]);
   todayExpenses = signal<Expense[]>([]);
   userName = signal<string>('Supervisor');
+  loading = signal<boolean>(true);
+  error = signal<boolean>(false);
 
   userInitial(): string {
     return this.userName().charAt(0).toUpperCase();
@@ -666,21 +768,25 @@ export class DashboardPage implements OnInit, OnDestroy {
       homeOutline, businessOutline, receiptOutline,
       personOutline, cashOutline, documentTextOutline,
       chevronForwardOutline, locationOutline,
-      clipboardOutline, addOutline,
+      clipboardOutline, addOutline, refreshOutline,
+      cloudOfflineOutline,
     });
-
-    await this.auth.initAfterLogin();
-    await this.loadDashboard();
 
     if (typeof window !== 'undefined') {
       window.addEventListener('agb:site-changed', this.handleSiteChange);
     }
+
+    // Load all data; signal appReady when done
+    const success = await this.loadDashboard();
+    this.appReady.resolve(success);
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:site-changed', this.handleSiteChange);
     }
+    // Ensure splash always resolves even if component is destroyed prematurely
+    this.appReady.resolve(false);
   }
 
   private handleSiteChange = (): void => {
@@ -688,59 +794,81 @@ export class DashboardPage implements OnInit, OnDestroy {
   };
 
   async refreshDashboard(event: CustomEvent): Promise<void> {
+    this.error.set(false);
     await this.loadDashboard();
     (event.target as HTMLIonRefresherElement).complete();
   }
 
-  async loadDashboard(): Promise<void> {
+  async retryLoad(): Promise<void> {
+    this.error.set(false);
+    this.loading.set(true);
+    const success = await this.loadDashboard();
+    this.appReady.resolve(success);
+  }
+
+  async loadDashboard(): Promise<boolean> {
+    this.loading.set(true);
+    this.error.set(false);
+
     try {
-      this.supervisor.getDashboard().subscribe({
-        next: (response) => {
-          this.dashboard.set(response.dashboard);
-        },
-        error: (err) => {
-          console.error('[Dashboard] failed to load', err);
-        },
-      });
+      // Fire all requests in parallel, catch each individually
+      let dashData: DashboardData | null = null;
+      let sitesData: Site[] = [];
+      let profileName: string | null = null;
+      let expensesData: Expense[] = [];
 
-      this.supervisor.getSites().subscribe({
-        next: (res) => {
-          this.sites.set(res.sites || []);
-        },
-        error: () => undefined,
-      });
+      const [dashResult, sitesResult, profileResult, expensesResult] = await Promise.all([
+        this.supervisor.getDashboard().toPromise().then(
+          (r) => { if (r) dashData = r.dashboard; return !!r; },
+          () => false
+        ),
+        this.supervisor.getSites().toPromise().then(
+          (r) => { if (r) sitesData = r.sites || []; return !!r; },
+          () => false
+        ),
+        this.supervisor.getProfile().toPromise().then(
+          (r) => { if (r) profileName = (r as { user?: { name?: string } }).user?.name || null; return !!r; },
+          () => false
+        ),
+        this.supervisor.getExpenses({
+          dateFrom: this.todayStr(),
+          dateTo: this.todayStr(),
+          limit: 5,
+        }).toPromise().then(
+          (r) => { if (r) expensesData = r.expenses || []; return !!r; },
+          () => false
+        ),
+      ]);
 
-      this.supervisor.getProfile().subscribe({
-        next: (res) => {
-          const name = (res as { user?: { name?: string } }).user?.name;
-          if (name) this.userName.set(name);
-        },
-        error: () => undefined,
-      });
+      // Dashboard is critical — if it failed, show error state
+      if (!dashResult || !dashData) {
+        console.error('[Dashboard] failed to load');
+        this.loading.set(false);
+        this.error.set(true);
+        return false;
+      }
 
-      this.loadTodayExpenses();
+      this.dashboard.set(dashData);
+      if (sitesResult) this.sites.set(sitesData);
+      if (profileResult && profileName) this.userName.set(profileName);
+      if (expensesResult) this.todayExpenses.set(expensesData);
+
+      this.loading.set(false);
+      return true;
     } catch (error) {
       console.error('Failed to load dashboard:', error);
+      this.loading.set(false);
+      this.error.set(true);
+      return false;
     }
   }
 
-  private loadTodayExpenses(): void {
+  private todayStr(): string {
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-
-    this.supervisor.getExpenses({
-      dateFrom: todayStr,
-      dateTo: todayStr,
-      limit: 5,
-    }).subscribe({
-      next: (res) => {
-        this.todayExpenses.set(res.expenses || []);
-      },
-      error: () => undefined,
-    });
+    return `${yyyy}-${mm}-${dd}`;
   }
 
   navigateTo(path: string): void {

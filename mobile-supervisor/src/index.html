@@ -105,7 +105,7 @@
 
   <script>
     // Splash is hidden by Angular after all init work completes.
-    // Safety fallback: if Angular fails to bootstrap entirely, remove splash after 10s.
+    // Safety fallback: if Angular fails to bootstrap entirely, remove splash after 15s.
     document.addEventListener('DOMContentLoaded', function() {
       var splash = document.getElementById('splash-screen');
       setTimeout(function() {
@@ -113,7 +113,7 @@
           splash.classList.add('fade-out');
           setTimeout(function() { if (splash) splash.remove(); }, 600);
         }
-      }, 10000);
+      }, 15000);
     });
   </script>
 </body>

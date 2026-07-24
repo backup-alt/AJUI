@@ -5,6 +5,7 @@ import { App as CapacitorApp, AppState } from '@capacitor/app';
 import { AuthService } from './core/services/auth.service';
 import { SupervisorService } from './core/services/supervisor.service';
 import { NotificationService } from './core/services/notification.service';
+import { AppReadyService } from './core/services/app-ready.service';
 
 @Component({
   selector: 'app-root',
@@ -20,23 +21,28 @@ export class AppComponent implements OnInit {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
   private notifications = inject(NotificationService);
+  private appReady = inject(AppReadyService);
   private router = inject(Router);
   private zone = inject(NgZone);
 
   private hasResumedOnce = false;
 
   async ngOnInit(): Promise<void> {
+    // 1. Restore auth session (token + user from Preferences)
     await this.auth.init();
 
     if (this.auth.isAuthenticated()) {
       try {
+        // 2. Fetch supervisor sites, auto-select first site
         await this.auth.initAfterLogin();
       } catch {
-        // network may be down; splash still hides
+        // network may be down; continue — dashboard will show error state
       }
     }
 
+    // 3. Hydrate selected site from Preferences
     await this.supervisor.init();
+    // 4. Load cached notifications from Preferences
     await this.notifications.initFromStorage();
 
     if (this.notifications.pushEnabled()) {
@@ -49,6 +55,21 @@ export class AppComponent implements OnInit {
 
     this.registerDeepLink();
     this.registerAppStateListener();
+
+    // 5. Wait for the first page (Dashboard) to finish loading all data.
+    //    The dashboard calls appReady.resolve() after all HTTP requests complete.
+    //    Safety timeout: if the dashboard never resolves (e.g. stuck navigation),
+    //    hide splash after 12s to prevent a frozen screen.
+    const DASHBOARD_TIMEOUT_MS = 12_000;
+    const timeoutPromise = new Promise<boolean>((resolve) =>
+      setTimeout(() => resolve(false), DASHBOARD_TIMEOUT_MS)
+    );
+
+    const ready = await Promise.race([this.appReady.appReady, timeoutPromise]);
+    if (!ready) {
+      console.warn('[App] Dashboard timed out or failed — hiding splash anyway');
+    }
+
     this.hideSplashScreen();
   }
 
