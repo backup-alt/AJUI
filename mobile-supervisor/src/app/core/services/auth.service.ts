@@ -28,6 +28,8 @@ export class AuthService {
 
   readonly currentUser = signal<User | null>(null);
   readonly isAuthenticated = signal<boolean>(false);
+  /** Emitted when a refresh attempt fails and the session is truly expired. */
+  readonly sessionExpired = signal<boolean>(false);
 
   async init(): Promise<void> {
     const token = await this.api.getAccessToken();
@@ -239,6 +241,7 @@ export class AuthService {
     await Preferences.remove({ key: 'currentUser' });
     this.currentUser.set(null);
     this.isAuthenticated.set(false);
+    this.sessionExpired.set(false);
 
     await this.router.navigate(['/auth/login']);
   }

@@ -1,5 +1,5 @@
-import { Component, OnInit, inject, NgZone } from '@angular/core';
-import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
+import { Component, OnInit, inject, NgZone, effect } from '@angular/core';
+import { IonApp, IonRouterOutlet, AlertController } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { App as CapacitorApp, AppState } from '@capacitor/app';
 import { AuthService } from './core/services/auth.service';
@@ -24,8 +24,10 @@ export class AppComponent implements OnInit {
   private appReady = inject(AppReadyService);
   private router = inject(Router);
   private zone = inject(NgZone);
+  private alertCtrl = inject(AlertController);
 
   private hasResumedOnce = false;
+  private sessionExpiredAlertShown = false;
 
   async ngOnInit(): Promise<void> {
     // 1. Restore auth session (token + user from Preferences)
@@ -55,11 +57,9 @@ export class AppComponent implements OnInit {
 
     this.registerDeepLink();
     this.registerAppStateListener();
+    this.watchSessionExpiry();
 
     // 5. Wait for the first page (Dashboard) to finish loading all data.
-    //    The dashboard calls appReady.resolve() after all HTTP requests complete.
-    //    Safety timeout: if the dashboard never resolves (e.g. stuck navigation),
-    //    hide splash after 12s to prevent a frozen screen.
     const DASHBOARD_TIMEOUT_MS = 12_000;
     const timeoutPromise = new Promise<boolean>((resolve) =>
       setTimeout(() => resolve(false), DASHBOARD_TIMEOUT_MS)
@@ -82,20 +82,57 @@ export class AppComponent implements OnInit {
   }
 
   /**
+   * Watch for session expiry signal from the interceptor.
+   * When the refresh token is expired/revoked and a refresh attempt fails,
+   * the interceptor sets auth.sessionExpired = true. We respond by showing
+   * a non-dismissible alert prompting re-login.
+   */
+  private watchSessionExpiry(): void {
+    effect(async () => {
+      const expired = this.auth.sessionExpired();
+      if (expired && !this.sessionExpiredAlertShown) {
+        this.sessionExpiredAlertShown = true;
+        await this.showSessionExpiredAlert();
+      }
+    });
+  }
+
+  private async showSessionExpiredAlert(): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Session Expired',
+      message: 'Your session has expired. Please sign in again to continue.',
+      backdropDismiss: false,
+      buttons: [
+        {
+          text: 'Sign In',
+          handler: async () => {
+            this.sessionExpiredAlertShown = false;
+            this.auth.sessionExpired.set(false);
+            await this.auth.logout();
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  /**
    * Listen for app foreground/background transitions.
    * When the app resumes, silently attempt a token refresh so the session
    * never expires while the user is active on another app or after a phone call.
-   * This prevents the random-logout bug caused by expired tokens.
    */
   private registerAppStateListener(): void {
     CapacitorApp.addListener('appStateChange', (state: AppState) => {
       if (state.isActive && this.auth.isAuthenticated()) {
-        // App just came to foreground — silently refresh the token in background.
-        // If refresh fails, do NOT logout. Only a 401 on the next API call
-        // will trigger a refresh attempt via the interceptor.
+        // Reset session expiry flag — user is back, we'll retry naturally
+        this.auth.sessionExpired.set(false);
+        this.sessionExpiredAlertShown = false;
+
+        // Silently validate the session by hitting a lightweight endpoint.
+        // The interceptor handles 401 → refresh → retry automatically.
         this.supervisor.getDashboard().subscribe({
           next: () => { /* touch endpoint to validate token */ },
-          error: () => { /* ignore — interceptor handles 401 retry */ },
+          error: () => { /* interceptor handles 401 retry; sessionExpired signal handles true expiry */ },
         });
       }
     });

@@ -218,11 +218,13 @@ export class ApiService {
   /**
    * Same as refreshAccessToken but never throws "No refresh token" - returns empty string instead.
    * This is the version the auth interceptor uses, so a missing refresh token simply
-   * triggers logout rather than an opaque error.
+   * triggers a retry failure rather than an opaque error.
    *
-   * Important: network errors and 5xx responses do NOT clear tokens. Only an
-   * explicit 401/403 from the refresh endpoint clears them, because transient
-   * failures should not log the user out.
+   * Important: This method NEVER clears tokens. Token clearing is handled only by
+   * the explicit logout() flow. Network errors, 5xx responses, and even 401/403 from
+   * the refresh endpoint do NOT clear tokens — they just return empty string so the
+   * interceptor can throw the original error. This prevents random logouts caused by
+   * transient backend issues, proxy errors, or race conditions.
    */
   async refreshAccessTokenSafely(): Promise<string> {
     const refreshToken = await this.getRefreshToken();
@@ -236,17 +238,14 @@ export class ApiService {
         body: JSON.stringify({ refreshToken }),
       });
     } catch {
-      // Network error - don't clear tokens, just fail this refresh attempt.
+      // Network error — don't clear tokens, just fail this refresh attempt.
       return '';
     }
 
     if (!response.ok) {
-      // Only clear tokens on a definitive auth failure (401/403).
-      // 5xx and other statuses leave tokens alone for retry.
-      if (response.status === 401 || response.status === 403) {
-        await this.clearTokens();
-        return '';
-      }
+      // Never clear tokens here. Return empty string so the interceptor
+      // throws the original 401 error. Only the explicit logout() flow
+      // should clear tokens.
       return '';
     }
 
@@ -255,7 +254,8 @@ export class ApiService {
       refreshToken?: string;
     };
     if (!data.accessToken) {
-      await this.clearTokens();
+      // Response was 200 but missing accessToken — likely a transient
+      // backend/proxy issue. Don't clear tokens.
       return '';
     }
 

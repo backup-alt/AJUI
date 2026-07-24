@@ -78,10 +78,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return from(refreshPromise ?? Promise.resolve('')).pipe(
           switchMap((t): Observable<HttpEvent<unknown>> => {
             if (!t) {
-              // Refresh failed — but do NOT force logout.
-              // The user stays logged in. The next request will fail again,
-              // and only then will a new refresh be attempted.
-              // The user can still explicitly logout if they want.
+              // Refresh failed — signal session expiry so the app can show
+              // a re-login prompt. Do NOT clear tokens or navigate to login
+              // here; the app component handles the UI transition.
+              auth.sessionExpired.set(true);
               return throwError(() => error);
             }
             // Retry the original request with the new access token.
