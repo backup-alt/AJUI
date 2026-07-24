@@ -104,16 +104,16 @@
   <app-root></app-root>
 
   <script>
-    // Hide splash screen once Angular has bootstrapped
+    // Splash is hidden by Angular after all init work completes.
+    // Safety fallback: if Angular fails to bootstrap entirely, remove splash after 10s.
     document.addEventListener('DOMContentLoaded', function() {
       var splash = document.getElementById('splash-screen');
-      // If Angular hasn't hidden it by 3s, force hide
       setTimeout(function() {
         if (splash && !splash.classList.contains('fade-out')) {
           splash.classList.add('fade-out');
           setTimeout(function() { if (splash) splash.remove(); }, 600);
         }
-      }, 3000);
+      }, 10000);
     });
   </script>
 </body>

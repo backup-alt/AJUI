@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, NgZone } from '@angular/core';
 import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
-import { App as CapacitorApp } from '@capacitor/app';
+import { App as CapacitorApp, AppState } from '@capacitor/app';
 import { AuthService } from './core/services/auth.service';
 import { SupervisorService } from './core/services/supervisor.service';
 import { NotificationService } from './core/services/notification.service';
@@ -23,11 +23,19 @@ export class AppComponent implements OnInit {
   private router = inject(Router);
   private zone = inject(NgZone);
 
+  private hasResumedOnce = false;
+
   async ngOnInit(): Promise<void> {
     await this.auth.init();
+
     if (this.auth.isAuthenticated()) {
-      await this.auth.initAfterLogin();
+      try {
+        await this.auth.initAfterLogin();
+      } catch {
+        // network may be down; splash still hides
+      }
     }
+
     await this.supervisor.init();
     await this.notifications.initFromStorage();
 
@@ -40,6 +48,7 @@ export class AppComponent implements OnInit {
     }
 
     this.registerDeepLink();
+    this.registerAppStateListener();
     this.hideSplashScreen();
   }
 
@@ -49,6 +58,26 @@ export class AppComponent implements OnInit {
       splash.classList.add('fade-out');
       setTimeout(() => { if (splash.parentNode) splash.remove(); }, 600);
     }
+  }
+
+  /**
+   * Listen for app foreground/background transitions.
+   * When the app resumes, silently attempt a token refresh so the session
+   * never expires while the user is active on another app or after a phone call.
+   * This prevents the random-logout bug caused by expired tokens.
+   */
+  private registerAppStateListener(): void {
+    CapacitorApp.addListener('appStateChange', (state: AppState) => {
+      if (state.isActive && this.auth.isAuthenticated()) {
+        // App just came to foreground — silently refresh the token in background.
+        // If refresh fails, do NOT logout. Only a 401 on the next API call
+        // will trigger a refresh attempt via the interceptor.
+        this.supervisor.getDashboard().subscribe({
+          next: () => { /* touch endpoint to validate token */ },
+          error: () => { /* ignore — interceptor handles 401 retry */ },
+        });
+      }
+    });
   }
 
   /**

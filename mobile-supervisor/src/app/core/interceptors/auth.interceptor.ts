@@ -24,6 +24,13 @@ function isPublicPath(url: string): boolean {
   return PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
 }
 
+/**
+ * Tracks whether a refresh is already in progress so concurrent 401s
+ * don't all fire separate refresh attempts.
+ */
+let refreshInProgress = false;
+let refreshPromise: Promise<string> | null = null;
+
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const api = inject(ApiService);
   const auth = inject(AuthService);
@@ -41,8 +48,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       return next(authReq);
     }),
     catchError((error: HttpErrorResponse): Observable<HttpEvent<unknown>> => {
-      // Network error (status 0) or server unavailable (5xx) — do NOT log out the user.
-      // These are transient failures, not auth problems.
+      // Network error (status 0) or server unavailable (5xx) — do NOT log out.
       if (error.status === 0 || error.status >= 500) {
         return throwError(() => error);
       }
@@ -51,27 +57,31 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       const isLogoutPath = req.url.includes('/auth/logout');
 
       if (isLogoutPath) {
-        // Server may be unreachable during logout; just let the caller handle it.
         return throwError(() => error);
       }
 
       if (error.status === 401 && !isRefreshPath) {
-        // Try to refresh the access token once before giving up.
-        return from(
-          (async () => {
+        // Deduplicate concurrent refresh attempts using a shared promise.
+        if (!refreshInProgress) {
+          refreshInProgress = true;
+          refreshPromise = (async () => {
             try {
-              const newToken = await api.refreshAccessTokenSafely();
-              return newToken;
+              return await api.refreshAccessTokenSafely();
             } catch {
               return '';
+            } finally {
+              refreshInProgress = false;
             }
-          })()
-        ).pipe(
+          })();
+        }
+
+        return from(refreshPromise ?? Promise.resolve('')).pipe(
           switchMap((t): Observable<HttpEvent<unknown>> => {
             if (!t) {
-              // Refresh failed: the session is truly over. Clear tokens and log out.
-              api.clearTokens().catch(() => {});
-              void auth.logout().catch(() => {});
+              // Refresh failed — but do NOT force logout.
+              // The user stays logged in. The next request will fail again,
+              // and only then will a new refresh be attempted.
+              // The user can still explicitly logout if they want.
               return throwError(() => error);
             }
             // Retry the original request with the new access token.

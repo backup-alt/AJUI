@@ -331,15 +331,19 @@ interface WageCalculation {
         @if (activeTab === 'wage') {
           <div class="tab-content">
             <div class="wage-card">
-              <h2 class="wage-title">Daily Wage</h2>
+              <h2 class="wage-title">Weekly Earnings</h2>
 
               <div class="wage-display">
-                <div class="wage-display-amount">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</div>
-                <div class="wage-display-suffix">per day</div>
+                <div class="wage-display-amount">{{ weeklyEarnings() | currency:'INR':'symbol':'1.0-0' }}</div>
+                <div class="wage-display-suffix">this week</div>
               </div>
 
               <div class="wage-divider"></div>
 
+              <div class="wage-row">
+                <span class="wage-label">Daily Wage</span>
+                <span class="wage-value">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</span>
+              </div>
               <div class="wage-row">
                 <span class="wage-label">Weekly Salary (base)</span>
                 <span class="wage-value">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}</span>
@@ -361,6 +365,31 @@ interface WageCalculation {
                 <span class="wage-value">-{{ totalLateFines() | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
             </div>
+
+            <!-- Per-day breakdown -->
+            @if (groupedAttendance().length > 0) {
+              <h3 class="breakdown-title">Daily Breakdown</h3>
+              @for (week of groupedAttendance(); track week.weekLabel) {
+                <div class="week-group">
+                  <div class="week-label">Week of {{ week.weekLabel }}</div>
+                  @for (day of week.days; track day.attendanceDate) {
+                    <div class="day-row">
+                      <div class="day-info">
+                        <span class="day-name">{{ day.dayName }}</span>
+                        <span class="day-date">{{ day.attendanceDate }}</span>
+                      </div>
+                      <div class="day-details">
+                        <span class="day-shifts">{{ day.shiftCount }} shift{{ day.shiftCount !== 1 ? 's' : '' }}</span>
+                        <span class="day-earning">{{ dayEarning(day) | currency:'INR':'symbol':'1.0-0' }}</span>
+                      </div>
+                      @if (day.lateFine > 0) {
+                        <span class="day-fine">-{{ day.lateFine | currency:'INR':'symbol':'1.0-0' }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            }
           </div>
         }
       }
@@ -857,6 +886,78 @@ interface WageCalculation {
       margin-top: 4px;
     }
 
+    .breakdown-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      margin: var(--md-space-4) 0 var(--md-space-2);
+    }
+
+    .week-group {
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      overflow: hidden;
+      margin-bottom: var(--md-space-3);
+    }
+    .week-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--m3-on-surface-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: var(--md-space-3) var(--md-space-4);
+      background: var(--m3-surface-container);
+      border-bottom: 1px solid var(--m3-outline-variant);
+    }
+    .day-row {
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-3);
+      padding: var(--md-space-3) var(--md-space-4);
+      border-bottom: 1px solid var(--m3-outline-variant);
+    }
+    .day-row:last-child { border-bottom: none; }
+    .day-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .day-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--m3-on-surface);
+    }
+    .day-date {
+      font-size: 11px;
+      color: var(--m3-on-surface-muted);
+    }
+    .day-details {
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-3);
+    }
+    .day-shifts {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--m3-on-surface-muted);
+      background: var(--m3-surface-container);
+      padding: 2px 8px;
+      border-radius: var(--md-radius-sm);
+    }
+    .day-earning {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--m3-success);
+    }
+    .day-fine {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--m3-error);
+      flex-shrink: 0;
+    }
+
     /* Ionic empty state */
     :host ::ng-deep app-empty-state {
       display: block;
@@ -895,6 +996,35 @@ export class LabourWorkerDetailPage implements OnInit {
   totalLateFines = computed(() =>
     this.attendance().reduce((sum, a) => sum + a.lateFine, 0)
   );
+
+  /**
+   * Weekly earnings: for each day, pay = dailyWage * (shiftCount / 2) - lateFine.
+   * Overtime is added on top.
+   */
+  weeklyEarnings = computed(() => {
+    const daily = this.dailyWage();
+    const attendances = this.attendance();
+    let total = 0;
+    for (const a of attendances) {
+      if (a.status === 'Present' || (a as any).attendanceStatus === 'Present') {
+        total += daily * (a.shiftCount / 2);
+      }
+      total -= a.lateFine;
+    }
+    // Add overtime: each OT hour = half daily wage
+    total += this.totalOvertime() * (daily * 0.5);
+    return Math.max(0, Math.round(total));
+  });
+
+  dayEarning(a: any): number {
+    const daily = this.dailyWage();
+    let earning = 0;
+    if (a.shiftCount > 0) {
+      earning = daily * (a.shiftCount / 2);
+    }
+    earning -= a.lateFine || 0;
+    return Math.max(0, Math.round(earning));
+  }
 
   calculatedWage = computed<WageCalculation>(() => {
     const weekly = this.weeklyPayInput() || this.worker()?.weeklyPay || 0;
@@ -1022,13 +1152,13 @@ export class LabourWorkerDetailPage implements OnInit {
       'Plumber': 'build-outline',
       'Electrician': 'flash-outline',
       'Painter': 'colorPalette-outline',
-      'Mason': 'ersh-outline',
+      'Mason': 'layers-outline',
       'Helper': 'hammer-outline',
       'Steel Fixer': 'car-outline',
       'Tiles Worker': 'grid-outline',
       'Welder': 'sparkles-outline',
-      'Civil': 'home-outline',
       'Fabricator': 'construct-outline',
+      'Civil': 'home-outline',
       'Other': 'briefcase-outline',
     };
     return icons[type] || 'briefcase-outline';

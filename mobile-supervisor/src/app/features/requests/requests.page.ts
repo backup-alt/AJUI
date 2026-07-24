@@ -78,7 +78,7 @@ interface RequestItem {
     StatusPillComponent,
   ],
   template: `
-    <ion-content class="requests-content" [scrollY]="true" [forceOverscroll]="false">
+    <ion-content class="requests-content">
       <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
@@ -451,7 +451,7 @@ export class RequestsPage implements OnInit {
       return bTime - aTime;
     });
     if (this.activeTab === 'pending') {
-      return items.filter(i => i.status === 'Pending' || i.status === 'pending');
+      return items.filter(i => i.status === 'Pending' || i.status === 'Not Received');
     }
     if (this.activeTab === 'approved') {
       return items.filter(i => i.status === 'Approved' || i.status === 'Completed' || i.status === 'Received');
@@ -459,10 +459,8 @@ export class RequestsPage implements OnInit {
     if (this.activeTab === 'declined') {
       return items.filter(i => i.status === 'Rejected' || i.status === 'Declined');
     }
-    // Upload tab: only show approved site-material expenses and approved materials that still need upload
-    return items.filter(i =>
-      i.status === 'Approved' && i.needsUpload
-    );
+    // Upload tab: show items that still need a bill uploaded
+    return items.filter(i => i.needsUpload);
   }
 
   uploadingItemId = signal<string | null>(null);
@@ -523,6 +521,8 @@ export class RequestsPage implements OnInit {
         this.supervisor.getMaterials({ limit: 200 }).subscribe({
           next: (res) => {
             for (const m of res.materials || []) {
+              const isReceived = m.status === 'Received';
+              const hasNoBill = !(m as any).billUrl;
               items.push({
                 _id: m._id,
                 type: 'material',
@@ -534,8 +534,8 @@ export class RequestsPage implements OnInit {
                 issuedAmount: m.issuedAmount,
                 givenAmount: (m as any).givenAmount,
                 billUrl: (m as any).billUrl,
-                received: (m as any).status === 'Received',
-                needsUpload: (m.status === 'Approved') && !(m as any).billUrl,
+                received: isReceived,
+                needsUpload: hasNoBill,
               });
             }
             resolve();

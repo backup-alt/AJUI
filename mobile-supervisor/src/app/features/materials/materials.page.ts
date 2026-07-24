@@ -393,8 +393,12 @@ export class MaterialsPage implements OnInit, OnDestroy {
   async loadMaterials(): Promise<void> {
     this.isLoading.set(true);
     try {
+      const siteId = this.supervisor.selectedSiteId();
+      const projectId = this.supervisor.selectedProjectId();
       this.supervisor
         .getMaterials({
+          siteId: siteId || undefined,
+          projectId: projectId || undefined,
           limit: 100,
         })
         .subscribe({

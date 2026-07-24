@@ -5,6 +5,7 @@ import { Project } from "../models/Project.js";
 import { Site } from "../models/Site.js";
 import { Material } from "../models/Material.js";
 import { Labour } from "../models/Labour.js";
+import { Worker } from "../models/Worker.js";
 import { Expense } from "../models/Expense.js";
 import { Payment } from "../models/Payment.js";
 import { Approval } from "../models/Approval.js";
@@ -347,13 +348,39 @@ export async function getAssignedSites(userId: string) {
     .sort({ createdAt: -1 })
     .lean();
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Count actual workers assigned to each site (from Worker model)
+  const workerMatch: Record<string, unknown> = {};
+  if (access.projectIds.length > 0) {
+    workerMatch.projectId = { $in: access.projectIds };
+  }
+  const siteScope = await getSiteScopeForFilter(access);
+  if (siteScope) Object.assign(workerMatch, siteScope);
 
+  const workerStats = await Worker.aggregate([
+    {
+      $match: { ...workerMatch, isActive: true },
+    },
+    {
+      $group: {
+        _id: { site: "$site", projectId: "$projectId" },
+        workerCount: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        site: "$_id.site",
+        projectId: "$_id.projectId",
+        workerCount: 1,
+      },
+    },
+  ]);
+
+  // Also get Labour-based stats for daysActive count
   const labourMatch: Record<string, unknown> = {};
   if (access.projectIds.length > 0) {
     labourMatch.projectId = { $in: access.projectIds };
   }
-  const siteScope = await getSiteScopeForFilter(access);
   if (siteScope) Object.assign(labourMatch, siteScope);
 
   const labourStats = await Labour.aggregate([
@@ -363,11 +390,6 @@ export async function getAssignedSites(userId: string) {
     {
       $group: {
         _id: { site: "$site", projectId: "$projectId" },
-        todayPresentCount: {
-          $sum: {
-            $cond: [{ $eq: ["$attendanceDate", today] }, "$presentCount", 0],
-          },
-        },
         daysActive: { $addToSet: "$attendanceDate" },
       },
     },
@@ -376,18 +398,25 @@ export async function getAssignedSites(userId: string) {
         _id: 0,
         site: "$_id.site",
         projectId: "$_id.projectId",
-        employeeCount: "$todayPresentCount",
         daysActiveCount: { $size: "$daysActive" },
       },
     },
   ]);
 
-  const labourMap = new Map<string, { employeeCount: number; daysActiveCount: number }>();
+  const workerMap = new Map<string, { workerCount: number; daysActiveCount: number }>();
+  for (const stat of workerStats) {
+    const siteName = stat.site as string;
+    const pid = (stat.projectId as Types.ObjectId).toString();
+    const key = `${siteName}__${pid}`;
+    workerMap.set(key, { workerCount: stat.workerCount, daysActiveCount: 0 });
+  }
   for (const stat of labourStats) {
     const siteName = stat.site as string;
     const pid = (stat.projectId as Types.ObjectId).toString();
     const key = `${siteName}__${pid}`;
-    labourMap.set(key, { employeeCount: stat.employeeCount, daysActiveCount: stat.daysActiveCount });
+    const existing = workerMap.get(key) || { workerCount: 0, daysActiveCount: 0 };
+    existing.daysActiveCount = stat.daysActiveCount;
+    workerMap.set(key, existing);
   }
 
   return sites.map((s) => {
@@ -396,7 +425,7 @@ export async function getAssignedSites(userId: string) {
     );
     const firstProjectId = matchingProjectId?.toString() || s.projectIds?.[0]?.toString();
     const key = `${s.name}__${firstProjectId}`;
-    const stats = labourMap.get(key) || { employeeCount: 0, daysActiveCount: 0 };
+    const stats = workerMap.get(key) || { workerCount: 0, daysActiveCount: 0 };
     return {
       id: s._id.toString(),
       siteId: s.siteId,
@@ -407,7 +436,7 @@ export async function getAssignedSites(userId: string) {
       targetEndDate: s.targetEndDate,
       projectId: firstProjectId,
       projectName: firstProjectId ? projectIdToName.get(firstProjectId) : undefined,
-      employeeCount: stats.employeeCount,
+      employeeCount: stats.workerCount,
       daysActive: stats.daysActiveCount,
     };
   });
