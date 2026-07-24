@@ -204,39 +204,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   </div>
                 }
               </section>
-
-              @if (showAddSitePicker()) {
-                <section class="form-overlay" role="presentation">
-                  <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="add-site-title">
-                    <div class="dialog-head">
-                      <div>
-                        <span>Assign Site</span>
-                        <h2 id="add-site-title">Add existing site to {{ selectedVendor()!.name }}</h2>
-                        <p>Select a site to assign to this vendor.</p>
-                      </div>
-                      <button type="button" class="icon-button" aria-label="Close site picker" (click)="closeAddSitePicker()">
-                        <ion-icon name="close-outline"></ion-icon>
-                      </button>
-                    </div>
-                    <div class="site-picker-list">
-                      @if (loadingAvailableSites()) {
-                        <p class="site-msg">Loading sites…</p>
-                      } @else if (availableSites().length === 0) {
-                        <p class="site-msg">All existing sites are already assigned to this vendor.</p>
-                      } @else {
-                        @for (site of availableSites(); track site.id) {
-                          <button type="button" class="site-picker-row" (click)="assignExistingSite(site)">
-                            <div>
-                              <strong>{{ site.name }}</strong>
-                            </div>
-                            <ion-icon name="add-circle-outline"></ion-icon>
-                          </button>
-                        }
-                      }
-                    </div>
-                  </section>
-                </section>
-              }
             } @else {
               <nav class="breadcrumb" aria-label="Breadcrumb">
                 <button type="button" class="breadcrumb-link" (click)="backToVendors()">Vendors</button>
@@ -458,6 +425,39 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
             }
           </main>
         </ion-content>
+
+        @if (showAddSitePicker()) {
+          <section class="form-overlay" role="presentation">
+            <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="add-site-title">
+              <div class="dialog-head">
+                <div>
+                  <span>Assign Site</span>
+                  <h2 id="add-site-title">Add existing site to {{ selectedVendor()!.name }}</h2>
+                  <p>Select a site to assign to this vendor.</p>
+                </div>
+                <button type="button" class="icon-button" aria-label="Close site picker" (click)="closeAddSitePicker()">
+                  <ion-icon name="close-outline"></ion-icon>
+                </button>
+              </div>
+              <div class="site-picker-list">
+                @if (loadingAvailableSites()) {
+                  <p class="site-msg">Loading sites…</p>
+                } @else if (availableSites().length === 0) {
+                  <p class="site-msg">All existing sites are already assigned to this vendor.</p>
+                } @else {
+                  @for (site of availableSites(); track site.id) {
+                    <button type="button" class="site-picker-row" (click)="assignExistingSite(site)">
+                      <div>
+                        <strong>{{ site.name }}</strong>
+                      </div>
+                      <ion-icon name="add-circle-outline"></ion-icon>
+                    </button>
+                  }
+                }
+              </div>
+            </section>
+          </section>
+        }
 
         <agb-vendor-form-dialog
           *ngIf="showVendorForm() || editingVendor()"
@@ -1289,7 +1289,7 @@ export class VendorDashboardPage {
 
   openAddSitePicker() {
     this.showAddSitePicker.set(true);
-    this.ensureSitesLoaded().then(() => this.loadAvailableSites());
+    this.loadAvailableSites();
   }
 
   async ensureSitesLoaded() {
@@ -1304,18 +1304,28 @@ export class VendorDashboardPage {
     this.availableSites.set([]);
   }
 
-  private loadAvailableSites() {
+  private async loadAvailableSites() {
     const vendor = this.selectedVendor();
     if (!vendor) return;
     this.loadingAvailableSites.set(true);
+
+    // Ensure siteEntities are populated from the backend (with real MongoDB
+    // ObjectIds). The data.sites() fallback generates composite-key IDs that
+    // are NOT valid ObjectIds and will cause backend validation to fail.
+    let siteEntities = this.data.siteEntities();
+    if (siteEntities.length === 0) {
+      await this.loadSitesFromBackend();
+      siteEntities = this.data.siteEntities();
+    }
+
+    if (siteEntities.length === 0) {
+      this.availableSites.set([]);
+      this.loadingAvailableSites.set(false);
+      return;
+    }
+
     const assignedNames = new Set(this.vendorSites().map((s) => s.name));
-    // Prefer backend-loaded siteEntities (they carry the real MongoDB _id)
-    // so newly-assigned sites round-trip correctly; fall back to the local
-    // sites() list when no entities have been fetched yet.
-    const siteEntities = this.data.siteEntities();
-    const all = siteEntities.length > 0
-      ? siteEntities.map((s) => ({ id: s._id || s.id, name: s.name }))
-      : this.data.sites();
+    const all = siteEntities.map((s) => ({ id: s._id || s.id, name: s.name }));
     // Deduplicate by site name
     const seen = new Set<string>();
     const unique = all.filter((s) => {
@@ -1339,7 +1349,9 @@ export class VendorDashboardPage {
   assignExistingSite(site: { id: string; name: string }) {
     const vendor = this.selectedVendor();
     if (!vendor) return;
-    const currentIds = vendor.siteIds ? [...vendor.siteIds] : [];
+    // Filter to only valid MongoDB ObjectIds — legacy data may contain
+    // composite-key strings from the old data.sites() fallback.
+    const currentIds = (vendor.siteIds || []).filter((id) => this.isValidObjectId(id));
     // Avoid duplicate
     if (currentIds.includes(site.id)) {
       this.toastController.create({
