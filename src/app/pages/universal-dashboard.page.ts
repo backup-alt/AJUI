@@ -1726,7 +1726,7 @@ export class UniversalDashboardPage {
     this.backendSyncMessage.set("Refreshing from backend…");
 
     let done = 0;
-    const total = 9;
+    const total = 10;
     const finishOne = () => {
       done++;
       if (done >= total) {
@@ -1839,6 +1839,47 @@ export class UniversalDashboardPage {
           const items = (r.items || []).map(mapSubcontractor);
           localStorage.setItem("agb-erp:subcontractors", JSON.stringify(items));
           this.data.subcontractors.set(items);
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Attendance (from mobile app): fetch grouped attendance and merge into labour
+    this.api.listGroupedAttendance({ limit: 500 }).subscribe({
+      next: (r) => {
+        try {
+          const attendanceRows: import("../../data/dashboardData").LabourRow[] = [];
+          for (const group of (r.items || [])) {
+            for (const worker of (group.workers || [])) {
+              attendanceRows.push({
+                id: `ATT-${worker.workerId}-${group.date}-${group.shift}`,
+                projectId: "",
+                site: group.site || "",
+                party: worker.workerName || "",
+                category: group.labourType || "",
+                dailyWage: Math.round(worker.dailyPay || 0),
+                presentDays: worker.shiftCount || 1,
+                absentDays: 0,
+                presentCount: 1,
+                overtime: worker.overtimeHours || 0,
+                lateFine: worker.lateFine || 0,
+                shift: String(group.shift || 1),
+                notes: `Attendance: ${group.date}`,
+                paymentMode: (group.paymentMode === "NEFT" ? "NEFT" : "Cash") as "NEFT" | "Cash",
+                status: "Approved" as const,
+              } as any);
+            }
+          }
+          if (attendanceRows.length > 0) {
+            const existing = this.data.labour();
+            const existingIds = new Set(existing.map((r) => r.id));
+            const newRows = attendanceRows.filter((r) => !existingIds.has(r.id));
+            if (newRows.length > 0) {
+              const merged = [...newRows, ...existing];
+              localStorage.setItem("agb-erp:labour", JSON.stringify(merged));
+              this.data.labour.set(merged);
+            }
+          }
         } catch {}
         finishOne();
       },

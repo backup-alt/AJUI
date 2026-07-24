@@ -32,50 +32,58 @@ export async function addApprovedMaterialToInventory(
   const qty = Math.max(0, Number(quantity) || 0);
   if (qty <= 0) return null;
 
-  const inventory = await Inventory.findOneAndUpdate(
-    inventoryMatchForMaterial(material),
-    {
-      $setOnInsert: {
-        projectId: material.projectId,
-        projectName: material.projectName,
-        clientId: material.clientId,
-        clientName: material.clientName,
-        siteId: material.siteId,
-        site: material.site,
-        siteKey: siteKey(material.siteId, material.site),
-        name: material.name,
-        normalizedName: normalized(material.name),
-        unit: material.unit,
-        normalizedUnit: normalized(material.unit),
-        requestedQuantity: material.requestedQuantity || 0,
-        minimumQuantity: 0,
-        consumedQuantity: 0,
-        purchaseHistory: [],
-      },
-      $inc: {
-        approvedQuantity: qty,
-        purchasedQuantity: qty,
-      },
-      $set: {
-        vendor: material.vendor,
+  const match = inventoryMatchForMaterial(material);
+  let inventory = await Inventory.findOne(match);
+  if (inventory) {
+    inventory.approvedQuantity += qty;
+    inventory.purchasedQuantity += qty;
+    inventory.vendor = material.vendor;
+    inventory.vendorId = material.vendorId;
+    inventory.poNumber = material.poNumber;
+    inventory.lastMaterialId = material._id;
+    inventory.lastUpdatedBy = updatedBy;
+    inventory.purchaseHistory = inventory.purchaseHistory || [];
+    inventory.purchaseHistory.push({
+      vendor: material.vendor || "",
+      vendorId: material.vendorId,
+      quantity: qty,
+      date: new Date(),
+      poNumber: material.poNumber,
+      materialId: material._id,
+    });
+  } else {
+    inventory = new Inventory({
+      projectId: material.projectId,
+      projectName: material.projectName,
+      clientId: material.clientId,
+      clientName: material.clientName,
+      siteId: material.siteId,
+      site: material.site,
+      siteKey: siteKey(material.siteId, material.site),
+      name: material.name,
+      normalizedName: normalized(material.name),
+      unit: material.unit,
+      normalizedUnit: normalized(material.unit),
+      requestedQuantity: material.requestedQuantity || 0,
+      minimumQuantity: 0,
+      consumedQuantity: 0,
+      approvedQuantity: qty,
+      purchasedQuantity: qty,
+      vendor: material.vendor,
+      vendorId: material.vendorId,
+      poNumber: material.poNumber,
+      lastMaterialId: material._id,
+      lastUpdatedBy: updatedBy,
+      purchaseHistory: [{
+        vendor: material.vendor || "",
         vendorId: material.vendorId,
+        quantity: qty,
+        date: new Date(),
         poNumber: material.poNumber,
-        lastMaterialId: material._id,
-        lastUpdatedBy: updatedBy,
-      },
-      $push: {
-        purchaseHistory: {
-          vendor: material.vendor || "",
-          vendorId: material.vendorId,
-          quantity: qty,
-          date: new Date(),
-          poNumber: material.poNumber,
-          materialId: material._id,
-        },
-      },
-    },
-    { upsert: true, new: true, runValidators: true }
-  );
+        materialId: material._id,
+      }],
+    });
+  }
   if (!inventory) return null;
   inventory.remainingStock = Math.max(0, inventory.purchasedQuantity - inventory.consumedQuantity);
   await inventory.save();
