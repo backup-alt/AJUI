@@ -242,11 +242,21 @@ import { Site } from '../../shared/models';
   styles: [`
     :host { display: block; }
 
+    /* ─── Menu layout ─── */
+    .agb-menu {
+      --background: var(--m3-surface-bright);
+    }
+    .agb-menu::part(container) {
+      display: flex;
+      flex-direction: column;
+    }
+
     /* ─── Menu header ─── */
     .agb-menu-header {
       background: linear-gradient(135deg, #002263 0%, #003380 100%);
       color: #ffffff;
       padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+      flex-shrink: 0;
     }
     .menu-brand {
       display: flex;
@@ -304,6 +314,7 @@ import { Site } from '../../shared/models';
       padding: var(--md-space-3) var(--md-space-4) var(--md-space-2);
       border-bottom: 1px solid var(--m3-outline-variant);
       margin: 0;
+      flex-shrink: 0;
     }
     .user-avatar {
       width: 32px;
@@ -404,6 +415,7 @@ import { Site } from '../../shared/models';
     .menu-footer {
       padding: 4px var(--md-space-3) calc(8px + env(safe-area-inset-bottom));
       border-top: 1px solid var(--m3-outline-variant);
+      flex-shrink: 0;
     }
     .menu-footer ion-item {
       --background: transparent;
