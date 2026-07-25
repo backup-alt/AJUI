@@ -1042,7 +1042,7 @@ export class LabourWorkerDetailPage implements OnInit {
 
   /**
    * Weekly earnings: each record uses its own weeklyPay snapshot (weeklyPay / 7) as daily wage.
-   * Pay = dailyWage * (shiftCount / 2) + overtimeHours * dailyWage * 0.5 - lateFine
+   * Pay = dailyWage * (shiftCount / 2) + overtimeAmount - lateFine
    */
   weeklyEarnings = computed(() => {
     const fallbackDaily = this.dailyWage();
@@ -1053,7 +1053,7 @@ export class LabourWorkerDetailPage implements OnInit {
       if (a.shiftCount > 0) {
         total += recDaily * (a.shiftCount / 2);
       }
-      total += (a.overtimeHours || 0) * recDaily * 0.5;
+      total += a.overtimeAmount || 0;
       total -= a.lateFine || 0;
     }
     return Math.max(0, Math.round(total));
@@ -1065,7 +1065,7 @@ export class LabourWorkerDetailPage implements OnInit {
     if (a.shiftCount > 0) {
       earning = recDaily * (a.shiftCount / 2);
     }
-    earning += (a.overtimeHours || 0) * recDaily * 0.5;
+    earning += a.overtimeAmount || 0;
     earning -= a.lateFine || 0;
     return Math.max(0, Math.round(earning));
   }
