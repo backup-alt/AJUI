@@ -39,7 +39,6 @@ import {
   colorPaletteOutline,
   hammerOutline,
   sparklesOutline,
-  checkmarkDoneOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Worker, Attendance } from '../../../shared/models';
@@ -207,7 +206,7 @@ interface WageCalculation {
                   <span class="info-icon"><ion-icon name="wallet-outline"></ion-icon></span>
                   <div class="info-data">
                     <span class="info-label">Weekly Salary</span>
-                    <span class="info-value highlight">{{ effectiveWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
+                    <span class="info-value highlight">{{ currentWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
                   </div>
                 </div>
                 <div class="info-row">
@@ -258,13 +257,6 @@ interface WageCalculation {
                 <span class="stat-value">{{ totalLateFines() | currency:'INR':'symbol':'1.0-0' }}</span>
                 <span class="stat-label">Late Fines</span>
               </div>
-            </div>
-
-            <div class="attendance-actions">
-              <button class="mark-attendance-btn" (click)="markAttendance()">
-                <ion-icon name="checkmark-done-outline"></ion-icon>
-                Mark Attendance
-              </button>
             </div>
 
             @if (groupedAttendance().length === 0) {
@@ -346,23 +338,23 @@ interface WageCalculation {
               </div>
               <div class="wage-row">
                 <span class="wage-label">Weekly Salary (base)</span>
-                <span class="wage-value">{{ effectiveWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
+                <span class="wage-value">{{ currentWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
 
               <div class="wage-edit-row">
-                <label class="wage-label" for="weeklyPayInput">Set Weekly Pay</label>
+                <label class="wage-label" for="dailyWageInput">Set New Daily Pay</label>
                 <div class="wage-edit-input-wrap">
                   <span class="wage-currency">₹</span>
                   <input
-                    id="weeklyPayInput"
+                    id="dailyWageInput"
                     type="number"
                     class="wage-edit-input"
-                    [value]="weeklyPayInput()"
-                    (input)="onWeeklyPayChange($event)"
+                    [value]="dailyWageInput()"
+                    (input)="onDailyWageChange($event)"
                     min="0"
                     placeholder="0"
                   />
-                  <button class="wage-save-btn" (click)="saveWeeklyPay()">Save</button>
+                  <button class="wage-save-btn" (click)="saveDailyWage()">Save</button>
                 </div>
               </div>
               <div class="wage-row">
@@ -622,27 +614,6 @@ interface WageCalculation {
     }
 
     .attendance-log { }
-    .attendance-actions {
-      margin: var(--md-space-3) 0 var(--md-space-2);
-      display: flex;
-      justify-content: flex-end;
-    }
-    .mark-attendance-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-      border: none;
-      border-radius: var(--md-radius-pill);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-    }
-    .mark-attendance-btn ion-icon { font-size: 16px; }
     .week-group { margin-bottom: var(--md-space-4); }
     .week-header {
       font-size: 11px;
@@ -1042,17 +1013,17 @@ export class LabourWorkerDetailPage implements OnInit {
   attendance = signal<Attendance[]>([]);
   isLoading = signal(true);
   activeTab: Tab = 'info';
-  weeklyPayInput = signal<number>(0);
+  dailyWageInput = signal<number>(0);
 
-  effectiveWeeklyPay = computed(() => {
-    const weeklyFromInput = this.weeklyPayInput() || 0;
-    const weeklyFromWorker = this.worker()?.weeklyPay || 0;
-    const weeklyFromAttendance = this.attendance().find(a => a.weeklyPay > 0)?.weeklyPay || 0;
-    return weeklyFromInput || weeklyFromWorker || weeklyFromAttendance;
+  currentWeeklyPay = computed(() => {
+    const inputWeekly = this.dailyWageInput() * 7;
+    const workerWeekly = this.worker()?.weeklyPay || 0;
+    const attWeekly = this.attendance().reduce((max, a) => Math.max(max, a.weeklyPay || 0), 0);
+    return inputWeekly || workerWeekly || attWeekly;
   });
 
   dailyWage = computed(() => {
-    return Math.round(this.effectiveWeeklyPay() / 7);
+    return this.dailyWageInput() || Math.round(this.currentWeeklyPay() / 7);
   });
 
   attendanceDays = computed(() => this.attendance());
@@ -1070,36 +1041,38 @@ export class LabourWorkerDetailPage implements OnInit {
   );
 
   /**
-   * Weekly earnings: for each day, pay = dailyWage * (shiftCount / 2) - lateFine.
-   * Overtime is added on top.
+   * Weekly earnings: each record uses its own weeklyPay snapshot (weeklyPay / 7) as daily wage.
+   * Pay = dailyWage * (shiftCount / 2) + overtimeHours * dailyWage * 0.5 - lateFine
    */
   weeklyEarnings = computed(() => {
-    const daily = this.dailyWage();
+    const fallbackDaily = this.dailyWage();
     const attendances = this.attendance();
     let total = 0;
     for (const a of attendances) {
+      const recDaily = Math.round((a.weeklyPay || 0) / 7) || fallbackDaily;
       if (a.shiftCount > 0) {
-        total += daily * (a.shiftCount / 2);
+        total += recDaily * (a.shiftCount / 2);
       }
+      total += (a.overtimeHours || 0) * recDaily * 0.5;
       total -= a.lateFine || 0;
     }
-    total += this.totalOvertime() * (daily * 0.5);
     return Math.max(0, Math.round(total));
   });
 
   dayEarning(a: any): number {
-    const daily = this.dailyWage();
+    const recDaily = Math.round((a.weeklyPay || 0) / 7) || this.dailyWage();
     let earning = 0;
     if (a.shiftCount > 0) {
-      earning = daily * (a.shiftCount / 2);
+      earning = recDaily * (a.shiftCount / 2);
     }
+    earning += (a.overtimeHours || 0) * recDaily * 0.5;
     earning -= a.lateFine || 0;
     return Math.max(0, Math.round(earning));
   }
 
   calculatedWage = computed<WageCalculation>(() => {
-    const weekly = this.weeklyPayInput() || this.effectiveWeeklyPay();
-    const daily = Math.round(weekly / 7);
+    const daily = this.dailyWage();
+    const weekly = daily * 7;
     const attendances = this.attendance();
     let daysWorked = 0;
     let totalShifts = 0;
@@ -1165,8 +1138,8 @@ export class LabourWorkerDetailPage implements OnInit {
       walletOutline, timeOutline, locationOutline, callOutline, businessOutline,
       checkmarkCircleOutline, closeCircleOutline, alertCircleOutline,
       constructOutline, buildOutline, flashOutline, cutOutline, homeOutline,
-      gridOutline, colorPaletteOutline, hammerOutline,
-      sparklesOutline, checkmarkDoneOutline,
+      gridOutline, colorPaletteOutline,       hammerOutline,
+      sparklesOutline,
     });
 
     this.workerId = this.route.snapshot.paramMap.get('workerId') || '';
@@ -1186,7 +1159,7 @@ export class LabourWorkerDetailPage implements OnInit {
       next: (res) => {
         console.log('[WorkerDetail] Worker loaded:', res.worker?.name, 'weeklyPay:', res.worker?.weeklyPay);
         this.worker.set(res.worker);
-        this.weeklyPayInput.set(res.worker.weeklyPay);
+        this.dailyWageInput.set(Math.round((res.worker.weeklyPay || 0) / 7));
         this.isLoading.set(false);
       },
       error: (err) => {
@@ -1207,7 +1180,7 @@ export class LabourWorkerDetailPage implements OnInit {
           console.log('[WorkerDetail]   -', a.attendanceDate, 'shifts:', a.shiftCount, 'weeklyPay:', a.weeklyPay);
         });
         this.attendance.set(items);
-        console.log('[WorkerDetail] effectiveWeeklyPay:', this.effectiveWeeklyPay(), 'dailyWage:', this.dailyWage(), 'weeklyEarnings:', this.weeklyEarnings());
+        console.log('[WorkerDetail] currentWeeklyPay:', this.currentWeeklyPay(), 'dailyWage:', this.dailyWage(), 'weeklyEarnings:', this.weeklyEarnings());
       },
       error: (err) => {
         console.error('[WorkerDetail] Error loading attendance:', err);
@@ -1262,29 +1235,30 @@ export class LabourWorkerDetailPage implements OnInit {
     return 'active';
   }
 
-  onWeeklyPayChange(event: Event): void {
+  onDailyWageChange(event: Event): void {
     const val = parseFloat((event.target as HTMLInputElement).value);
-    this.weeklyPayInput.set(isNaN(val) ? 0 : val);
+    this.dailyWageInput.set(isNaN(val) ? 0 : val);
   }
 
-  async saveWeeklyPay(): Promise<void> {
-    const newPay = this.weeklyPayInput();
-    if (newPay <= 0) return;
+  async saveDailyWage(): Promise<void> {
+    const dailyPay = this.dailyWageInput();
+    if (dailyPay <= 0) return;
+    const newWeeklyPay = dailyPay * 7;
     try {
-      await this.supervisor.updateWorkerWeeklyPay(this.workerId, newPay).toPromise();
+      await this.supervisor.updateWorkerWeeklyPay(this.workerId, newWeeklyPay).toPromise();
       const w = this.worker();
-      if (w) this.worker.set({ ...w, weeklyPay: newPay } as any);
+      if (w) this.worker.set({ ...w, weeklyPay: newWeeklyPay } as any);
       const toast = await this.toastCtrl.create({
-        message: 'Weekly pay updated',
+        message: 'Daily pay updated to ₹' + dailyPay,
         duration: 2000,
         color: 'success',
         position: 'top',
       });
       await toast.present();
     } catch (err) {
-      console.error('[WorkerDetail] Failed to update weekly pay', err);
+      console.error('[WorkerDetail] Failed to update daily pay', err);
       const toast = await this.toastCtrl.create({
-        message: 'Failed to update weekly pay',
+        message: 'Failed to update daily pay',
         duration: 2500,
         color: 'danger',
         position: 'top',
@@ -1293,8 +1267,4 @@ export class LabourWorkerDetailPage implements OnInit {
     }
   }
 
-  markAttendance(): void {
-    if (!this.workerId) return;
-    void this.router.navigate(['/tabs/labour/mark-attendance', this.workerId]);
-  }
 }
