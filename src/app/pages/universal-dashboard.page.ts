@@ -1764,7 +1764,7 @@ export class UniversalDashboardPage {
     this.api.listSites().subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapSite);
+          const items = ((r as any).sites || []).map(mapSite);
           localStorage.setItem("agb-erp:sites", JSON.stringify(items));
           this.data.siteEntities.set(items);
         } catch {}

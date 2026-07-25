@@ -473,8 +473,8 @@ export class ApiService {
   }
 
   // =================== SITES ===================
-  listSites(): Observable<PaginatedResponse<any>> {
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/sites?limit=100`, { headers: this.authHeaders() }).pipe(
+  listSites(): Observable<{ sites: any[] }> {
+    return this.http.get<{ sites: any[] }>(`${this.baseUrl}/sites?limit=100`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
     );
   }

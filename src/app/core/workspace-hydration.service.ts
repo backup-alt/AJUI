@@ -27,7 +27,7 @@ export class WorkspaceHydrationService {
     const [clients, projects, sites, vendors, supervisors, materials, labour, expenses, payments, subcontractors, invoices] = await Promise.all([
       firstValueFrom(this.api.listClients({ limit: 100 })).catch(() => ({ items: [] })),
       firstValueFrom(this.api.listProjects({ limit: 100 })).catch(() => ({ items: [] })),
-      firstValueFrom(this.api.listSites()).catch(() => ({ items: [] })),
+      firstValueFrom(this.api.listSites()).catch(() => ({ sites: [] })),
       firstValueFrom(this.api.listVendors({ limit: 100 })).catch(() => ({ items: [] })),
       firstValueFrom(this.api.listSupervisors()).catch(() => ({ items: [] })),
       firstValueFrom(this.api.listMaterials({ limit: 100 })).catch(() => ({ items: [] })),
@@ -52,7 +52,7 @@ export class WorkspaceHydrationService {
 
     this.setSignalAndStorage("projects", mappedProjects, this.erp.projects);
     this.setSignalAndStorage("clients", mappedClients, this.erp.clients);
-    this.setSignalAndStorage("sites", (sites.items || []).map(mapSite), this.erp.siteEntities);
+    this.setSignalAndStorage("sites", (sites.sites || []).map(mapSite), this.erp.siteEntities);
     this.setSignalAndStorage("vendors", (vendors.items || []).map(mapVendor), this.erp.vendors);
     this.setSignalAndStorage("supervisors", (supervisors.items || []).map(mapSupervisor), this.erp.supervisors);
     this.setSignalAndStorage("materials", (materials.items || []).map(mapMaterial), this.erp.materials);
