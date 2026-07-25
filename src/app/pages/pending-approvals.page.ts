@@ -43,6 +43,7 @@ type LabourApprovalRow = ApprovalBaseRow & {
   staffName: string;
   labourTypes: string;
   staffCount: number;
+  presentDays: number;
   shift: string;
   overtime: string;
   lateFine: string;
@@ -275,6 +276,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Supervisor</th>
                         <th>Labour Types</th>
                         <th>Staff Count</th>
+                        <th>Days</th>
                         <th>Shifts</th>
                         <th>Daily Wage</th>
                         <th>Weekly Wage</th>
@@ -293,6 +295,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ row.submittedBy || row.staffName || "-" }}</td>
                         <td><strong>{{ row.labourTypes || "-" }}</strong></td>
                         <td>{{ row.staffCount }}</td>
+                        <td>{{ row.presentDays || 1 }}</td>
                         <td>{{ row.shift }}</td>
                         <td>{{ row.dailyWage || 0 | currency:'INR':'symbol':'1.0-0' }}</td>
                         <td><strong>{{ weeklyWage(row) | currency:'INR':'symbol':'1.0-0' }}</strong></td>
@@ -656,12 +659,11 @@ export class PendingApprovalsPage implements OnInit {
 
   weeklyWage(row: LabourApprovalRow): number {
     const dailyWage = row.dailyWage || 0;
-    const shiftCount = Number(row.shift) || 0;
     const staffCount = row.staffCount || 0;
+    const presentDays = row.presentDays || 1;
     const overtime = Number(row.overtime) || 0;
     const lateFine = Number(row.lateFine) || 0;
-    const shiftMultiplier = shiftCount === 1 ? 0.5 : 1;
-    const earnings = dailyWage * shiftMultiplier * staffCount;
+    const earnings = dailyWage * presentDays * staffCount;
     const overtimeAmt = overtime * (dailyWage * 0.5) * staffCount;
     return Math.max(0, Math.round(earnings + overtimeAmt - lateFine));
   }

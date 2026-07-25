@@ -527,7 +527,7 @@ export class RequestsPage implements OnInit {
                 _id: m._id,
                 type: 'material',
                 title: m.name,
-                subtitle: `${m.requestedQuantity} ${m.unit} requested`,
+                subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
                 site: m.site,
                 date: m.requestDate,
                 status: m.status,

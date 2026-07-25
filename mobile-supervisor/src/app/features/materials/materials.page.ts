@@ -189,7 +189,7 @@ interface ConsolidatedMaterial {
                         <span class="breakdown-project">{{ item.projectName }}</span>
                       </div>
                       <div class="breakdown-stats">
-                        <span class="breakdown-qty">{{ item.requestedQuantity }} {{ item.unit }}</span>
+                        <span class="breakdown-qty">{{ item.approvedQuantity || item.requestedQuantity }} {{ item.unit }}</span>
                         <app-status-pill [tone]="getStatusTone(item.status)">{{ item.status }}</app-status-pill>
                       </div>
                       <ion-icon name="chevron-forward-outline" class="breakdown-chevron"></ion-icon>

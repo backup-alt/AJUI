@@ -417,6 +417,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             staffName: doc.partyName,
             labourTypes: doc.category,
             staffCount: doc.presentCount,
+            presentDays: doc.presentDays || 0,
             dailyWage: doc.dailyWage,
             shift: doc.shift,
             overtimeHours: doc.overtime,
