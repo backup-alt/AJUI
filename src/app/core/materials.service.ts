@@ -53,7 +53,23 @@ export class MaterialsService {
 
   createMaterial(input: Partial<MaterialRow>): Observable<MaterialRow> {
     return new Observable((observer) => {
-      this.api.createMaterial(input).subscribe({
+      const payload: any = {
+        projectId: input.projectId || undefined,
+        site: input.site,
+        name: input.name,
+        unit: input.unit,
+        requestedQuantity: input.requested ?? 0,
+        approvedQuantity: input.approved ?? 0,
+        purchasedQuantity: input.purchased ?? 0,
+        consumedQuantity: input.consumed ?? 0,
+        vendor: input.vendor,
+        poNumber: input.poNumber,
+        requestDate: input.requestDate || new Date().toISOString().slice(0, 10),
+        issuedAmount: input.issuedAmount,
+        givenAmount: input.givenAmount,
+        notes: (input as any).notes,
+      };
+      this.api.createMaterial(payload).subscribe({
         next: (res: any) => {
           const material: MaterialRow = {
             id: res.material?.materialId || res.material?._id || res.materialId || res._id,
