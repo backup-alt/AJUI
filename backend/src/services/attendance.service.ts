@@ -14,6 +14,7 @@ export interface GroupedAttendance {
     workerId: string;
     workerName: string;
     shiftCount: number;
+    weeklyPay: number;
     overtimeHours: number;
     overtimeAmount: number;
     lateFine: number;
@@ -74,6 +75,7 @@ export async function listGroupedAttendance(filter: {
             workerId: { $toString: "$workerId" },
             workerName: "$workerName",
             shiftCount: "$shiftCount",
+            weeklyPay: "$weeklyPay",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",
             lateFine: "$lateFine",
@@ -171,6 +173,7 @@ export async function getLabourReport(filter: {
             workerId: { $toString: "$workerId" },
             workerName: "$workerName",
             shiftCount: "$shiftCount",
+            weeklyPay: "$weeklyPay",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",
             lateFine: "$lateFine",
@@ -193,7 +196,7 @@ export async function getLabourReport(filter: {
 
     let groupDailyPay = 0;
     const workers = r.workers.map((w: any) => {
-      const weeklyPay = r._id.weeklyPay || 0;
+      const weeklyPay = w.weeklyPay || 0;
       const shiftMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
       const baseDaily = weeklyPay / 7;
       const dailyPay = w.shiftCount * baseDaily * shiftMultiplier - w.lateFine + w.overtimeAmount;
