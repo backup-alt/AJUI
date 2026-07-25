@@ -105,7 +105,7 @@ export async function listGroupedAttendance(filter: {
       const wPay = w.weeklyPay || 0;
       const wMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
       const wDailyBase = (wPay / 7) * wMultiplier;
-      const dailyPay = w.shiftCount * wDailyBase - w.lateFine + w.overtimeAmount;
+      const dailyPay = wDailyBase - w.lateFine + w.overtimeAmount;
       return { ...w, dailyPay: Math.round(dailyPay * 100) / 100 };
     });
 
@@ -198,8 +198,8 @@ export async function getLabourReport(filter: {
     const workers = r.workers.map((w: any) => {
       const weeklyPay = w.weeklyPay || 0;
       const shiftMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
-      const baseDaily = weeklyPay / 7;
-      const dailyPay = w.shiftCount * baseDaily * shiftMultiplier - w.lateFine + w.overtimeAmount;
+      const baseDaily = (weeklyPay / 7) * shiftMultiplier;
+      const dailyPay = baseDaily - w.lateFine + w.overtimeAmount;
       groupDailyPay += dailyPay;
       return { ...w, dailyPay: Math.round(dailyPay * 100) / 100 };
     });

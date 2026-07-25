@@ -3907,8 +3907,13 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
   private dailyWageForLabourType(row: TableRow, labourType: string, typeCount: number): number {
     const suggestedWage = this.suggestedDailyWageForLabourType(row, labourType);
     if (suggestedWage) return suggestedWage;
-    const rowWage = this.moneyNumber(row["dailyWage"]) || this.moneyNumber(row["dailyPay"]);
+    const rowWage = this.moneyNumber(row["dailyWage"]);
     if (rowWage) return rowWage;
+    const dailyPay = this.moneyNumber(row["dailyPay"]);
+    if (dailyPay) {
+      const shift = this.moneyNumber(row["shift"]) || 1;
+      return Math.round((dailyPay / (shift / 2)) * 100) / 100;
+    }
     return typeCount === 1 ? this.moneyNumber(row["weeklyPayable"]) : 0;
   }
 
