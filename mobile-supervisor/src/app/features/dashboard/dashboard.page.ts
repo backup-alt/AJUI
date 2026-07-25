@@ -149,7 +149,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
                     <div class="expense-row-details">
                       <span class="expense-row-desc">{{ expense.description }}</span>
                       <span class="expense-row-meta">
-                        {{ expense.materialVendor || expense.type }}
+                        {{ expense.materialVendor || expense.site || expense.type }}
                         <span class="meta-dot">·</span>
                         {{ expense.createdAt | date:'MMM d' }}
                         <span class="meta-dot">·</span>
