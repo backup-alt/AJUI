@@ -180,13 +180,6 @@ interface WageCalculation {
                     <span class="info-value">{{ worker()!.site }}</span>
                   </div>
                 </div>
-                <div class="info-row">
-                  <span class="info-icon"><ion-icon name="shield-checkmark-outline"></ion-icon></span>
-                  <div class="info-data">
-                    <span class="info-label">Worker ID</span>
-                    <span class="info-value mono">{{ worker()!.workerId }}</span>
-                  </div>
-                </div>
                 @if (worker()!.address) {
                   <div class="info-row">
                     <span class="info-icon"><ion-icon name="location-outline"></ion-icon></span>
@@ -203,16 +196,9 @@ interface WageCalculation {
               <h2 class="section-title">Employment Information</h2>
               <div class="info-card">
                 <div class="info-row">
-                  <span class="info-icon"><ion-icon name="wallet-outline"></ion-icon></span>
-                  <div class="info-data">
-                    <span class="info-label">Weekly Salary</span>
-                    <span class="info-value highlight">{{ currentWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
-                  </div>
-                </div>
-                <div class="info-row">
                   <span class="info-icon"><ion-icon name="time-outline"></ion-icon></span>
                   <div class="info-data">
-                    <span class="info-label">Daily Wage (calculated)</span>
+                    <span class="info-label">Daily Wage</span>
                     <span class="info-value">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</span>
                   </div>
                 </div>
@@ -335,10 +321,6 @@ interface WageCalculation {
               <div class="wage-row">
                 <span class="wage-label">Daily Wage</span>
                 <span class="wage-value">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</span>
-              </div>
-              <div class="wage-row">
-                <span class="wage-label">Weekly Salary (base)</span>
-                <span class="wage-value">{{ currentWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
 
               <div class="wage-edit-row">

@@ -1333,7 +1333,7 @@ export class UniversalDashboardPage {
   readonly selectCustomValue = signal("");
   readonly labourTypeDialogOpen = signal(false);
   readonly labourTypeRowId = signal("");
-  readonly labourTypeName = signal("Mason");
+  readonly labourTypeName = signal("Carpenter");
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
@@ -3101,7 +3101,7 @@ visibleRows(): TableRow[] {
       project: projectName(row.projectId),
       site: row.site,
       attendanceDate: "2026-06-05",
-      staffName: row.party,
+      staffName: row["supervisorName"] || row.party,
       supervisorName: row["supervisorName"] || "",
       dailyWage: row.dailyWage,
       labourTypes: this.labourTypesFromRow(row),
@@ -3303,7 +3303,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
         site: "",
         attendanceDate: today,
         supervisorName: this.supervisorOptions()[0] ?? "",
-        labourTypes: "Mason: 1",
+        labourTypes: "Carpenter: 1",
         staffCount: "1",
         attendance: "Present",
         shift: "1",
@@ -3815,8 +3815,9 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
     if (String(row["attendance"] || "").toLowerCase() === "absent") return { breakup: "Absent", total: 0, items: [] };
     const entries = this.labourTypeEntriesForRow(row);
     const shift = this.moneyNumber(row["shift"]) || 1;
+    const shiftMultiplier = shift / 2;
     const items = entries.map((entry) => {
-      const amount = entry.count * entry.wage * shift;
+      const amount = entry.count * entry.wage * shiftMultiplier;
       return { ...entry, amount };
     });
     const total = items.reduce((sum, item) => sum + item.amount, 0);

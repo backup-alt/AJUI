@@ -555,7 +555,7 @@ export class ErpDataService {
     const seededProjects = this.projects();
 
     const labourParties = ["Velu Mason Party", "Babu Labour Team", "Ravi Electrical Crew", "Ganesh Plumbing", "Selvam Civil Works"];
-    const labourTypes = ["Mason", "Helper", "Electrician", "Plumber", "Civil"];
+    const labourTypes = ["Carpenter", "Plumber", "Electrician", "Painter", "Mason", "Helper", "Steel Fixer", "Tiles Worker", "Welder", "Fabricator", "Civil", "Other"];
     if (!this.labour().some((row) => row.id.startsWith("DEMO-LAB-"))) {
       this.labour.update((rows) => [
         ...Array.from({ length: 50 }, (_, index): LabourRow => {

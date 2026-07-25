@@ -52,12 +52,12 @@ const sectionConfigs: SectionConfig[] = [
     key: "labour",
     label: "Labour",
     title: "Labour Attendance",
-    description: "Staff attendance with site, date, staff name, labour types, staff count, shift count, overtime, and fine.",
+    description: "Staff attendance with site, date, supervisor name, labour types, staff count, shift count, overtime, and fine.",
     columns: [
       { key: "client", label: "Client" },
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date", type: "date" },
-      { key: "staffName", label: "Staff Name" },
+      { key: "staffName", label: "Supervisor Name" },
       { key: "labourTypes", label: "Labour Types" },
       { key: "staffCount", label: "Staff Count", type: "number" },
       { key: "attendance", label: "Attendance" },
@@ -1091,7 +1091,7 @@ export class ProjectWorkspacePage {
   readonly selectCustomValue = signal("");
   readonly labourTypeDialogOpen = signal(false);
   readonly labourTypeRowId = signal("");
-  readonly labourTypeName = signal("Mason");
+  readonly labourTypeName = signal("Carpenter");
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly expenseOpeningEdit = signal(false);
@@ -2445,7 +2445,7 @@ export class ProjectWorkspacePage {
           client: "",
           site: group.site || "",
           attendanceDate: group.date,
-          staffName: w.workerName,
+          staffName: group.supervisorName || w.workerName,
           labourTypes: group.labourType || "",
           staffCount: 1,
           attendance: "Present",
@@ -2680,7 +2680,7 @@ export class ProjectWorkspacePage {
         site,
         attendanceDate: today,
         staffName: this.staffNameOptionsForProject()[0] ?? "",
-        labourTypes: "Mason: 1",
+        labourTypes: "Carpenter: 1",
         staffCount: "1",
         attendance: "Present",
         shift: "1",
@@ -3202,7 +3202,7 @@ export class ProjectWorkspacePage {
       const wageFields = this.data.customFieldsFor("labour").filter((field) => this.isLabourWageField(field));
       return [
         { key: "attendanceDate", label: "Date" },
-        { key: "staffName", label: "Staff Name" },
+        { key: "staffName", label: "Supervisor Name" },
         { key: "labourTypes", label: "Labour Types" },
         ...wageFields,
         { key: "staffCount", label: "Staff Count" },
@@ -3265,8 +3265,9 @@ export class ProjectWorkspacePage {
     if (String(row["attendance"] || "").toLowerCase() === "absent") return { breakup: "Absent", total: 0, items: [] };
     const entries = this.labourTypeEntriesForRow(row);
     const shift = this.moneyNumber(row["shift"]) || 1;
+    const shiftMultiplier = shift / 2;
     const items = entries.map((entry) => {
-      const amount = entry.count * entry.wage * shift;
+      const amount = entry.count * entry.wage * shiftMultiplier;
       return { ...entry, amount };
     });
     const total = items.reduce((sum, item) => sum + item.amount, 0);

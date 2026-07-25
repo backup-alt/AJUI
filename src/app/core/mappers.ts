@@ -161,6 +161,7 @@ export function mapLabour(l: any): any {
     laborTypes: l.laborTypes || [],
     notes: l.notes,
     status: l.status,
+    supervisorName: l.supervisorName || "",
   };
 }
 

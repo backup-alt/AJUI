@@ -70,7 +70,7 @@ const permissionGroups: PermissionGroup[] = [
       { key: "project", label: "Project" },
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date" },
-      { key: "staffName", label: "Staff Name" },
+      { key: "staffName", label: "Supervisor Name" },
       { key: "labourTypes", label: "Labour Types" },
       { key: "staffCount", label: "Staff Count" },
       { key: "attendance", label: "Attendance" },
