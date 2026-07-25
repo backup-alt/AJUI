@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
@@ -9,6 +9,7 @@ import { ApiService } from "../core/api.service";
 import { mapClient, mapProject, mapSite, mapVendor, mapSupervisor, mapMaterial, mapLabour, mapExpense, mapPayment, mapSubcontractor } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
+import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 
@@ -1288,11 +1289,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class UniversalDashboardPage {
+export class UniversalDashboardPage implements OnInit {
   readonly data = inject(ErpDataService);
   readonly materialsService = inject(MaterialsService);
   readonly api = inject(ApiService);
   readonly router = inject(Router);
+  readonly hydration = inject(WorkspaceHydrationService);
   readonly modules = dashboardModules;
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
@@ -1351,6 +1353,10 @@ export class UniversalDashboardPage {
     rows: this.visibleRows(),
     columns: this.columnsForActive(),
   }));
+
+  ngOnInit(): void {
+    void this.hydration.hydrateDeferred();
+  }
 
   activeProjectsCount() {
     return this.data.projects().filter((project) => project.status === "Active").length;

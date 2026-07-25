@@ -72,12 +72,14 @@ export async function createSite(req: Request, res: Response, next: NextFunction
 export async function listSites(req: Request, res: Response, next: NextFunction) {
   try {
     const scopeProjectIds = await getScopedProjectIds(req);
-    const sites = await siteService.listSites({
+    const result = await siteService.listSites({
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,
       scopeProjectIds,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 100,
     });
-    res.json({ sites });
+    res.json(result);
   } catch (e) { next(e); }
 }
 
@@ -181,12 +183,14 @@ export async function createSupervisor(req: Request, res: Response, next: NextFu
 export async function listSupervisors(req: Request, res: Response, next: NextFunction) {
   try {
     const scopeProjectIds = await getScopedProjectIds(req);
-    const supervisors = await supervisorService.listSupervisors({
+    const result = await supervisorService.listSupervisors({
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,
       scopeProjectIds,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 100,
     });
-    res.json({ supervisors });
+    res.json(result);
   } catch (e) { next(e); }
 }
 

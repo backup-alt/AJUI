@@ -10,6 +10,25 @@ declare global {
   }
 }
 
+let cachedSchedule: any = null;
+let scheduleCacheTime = 0;
+const SCHEDULE_CACHE_TTL_MS = 30_000;
+
+async function getCachedSchedule() {
+  const now = Date.now();
+  if (cachedSchedule && now - scheduleCacheTime < SCHEDULE_CACHE_TTL_MS) {
+    return cachedSchedule;
+  }
+  cachedSchedule = await AccessSchedule.findOne().lean();
+  scheduleCacheTime = now;
+  return cachedSchedule;
+}
+
+export function invalidateScheduleCache() {
+  cachedSchedule = null;
+  scheduleCacheTime = 0;
+}
+
 function getISTMinutes(): number {
   const now = new Date();
   const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
@@ -33,7 +52,7 @@ export async function checkAccessSchedule(req: Request, res: Response, next: Nex
     return;
   }
   try {
-    const schedule = await AccessSchedule.findOne().lean();
+    const schedule = await getCachedSchedule();
     if (!schedule || !schedule.enabled) {
       next();
       return;
@@ -81,7 +100,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.user = payload;
 
     if (req.user.role !== "admin") {
-      const schedule = await AccessSchedule.findOne().lean();
+      const schedule = await getCachedSchedule();
       if (schedule && schedule.enabled) {
         const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const utcMinutes = new Date().getUTCHours() * 60 + new Date().getUTCMinutes();
