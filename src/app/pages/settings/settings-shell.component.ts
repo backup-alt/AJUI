@@ -211,7 +211,7 @@ export class SettingsShellComponent {
   });
 
   readonly userEmail = computed(() => {
-    const raw = localStorage.getItem("ajui_user");
+    const raw = sessionStorage.getItem("ajui_user");
     if (!raw) return "";
     try {
       return JSON.parse(raw)?.email || "";

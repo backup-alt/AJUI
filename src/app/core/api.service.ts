@@ -63,9 +63,9 @@ export class ApiService {
     this.userSignal.set(user);
     this.expiresAtSignal.set(expiresAt);
     try {
-      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-      localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt);
+      sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+      sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      sessionStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt);
     } catch {}
   }
 
@@ -1078,11 +1078,11 @@ export class ApiService {
     this.userSignal.set(res.user);
     this.expiresAtSignal.set(res.expiresAt);
     try {
-      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
-      localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
+      sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
+      sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
+      sessionStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
       if (res.refreshToken) {
-        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
+        sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
       }
     } catch {}
   }
@@ -1092,7 +1092,7 @@ export class ApiService {
   refreshTokens(): Promise<{ accessToken: string; refreshToken?: string; expiresAt: string } | null> {
     if (this.refreshInFlight) return this.refreshInFlight;
 
-    const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    const refreshToken = sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
     if (!refreshToken) return Promise.resolve(null);
 
     this.refreshInFlight = new Promise((resolve) => {
@@ -1103,9 +1103,9 @@ export class ApiService {
           this.accessTokenSignal.set(res.accessToken);
           this.expiresAtSignal.set(res.expiresAt);
           try {
-            localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
-            localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
-            if (res.refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
+            sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
+            sessionStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
+            if (res.refreshToken) sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
           } catch {}
           this.refreshInFlight = null;
           resolve(res);
@@ -1137,13 +1137,13 @@ export class ApiService {
     this.userSignal.set(null);
     this.expiresAtSignal.set(null);
     try {
-      Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+      Object.values(STORAGE_KEYS).forEach((k) => sessionStorage.removeItem(k));
     } catch {}
   }
 
   private getStored(key: string): string | null {
     try {
-      return localStorage.getItem(key);
+      return sessionStorage.getItem(key);
     } catch {
       return null;
     }
