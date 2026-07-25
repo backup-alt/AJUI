@@ -12,6 +12,7 @@ import { ActivityLog } from "../models/ActivityLog.js";
 import { Site } from "../models/Site.js";
 import { Project } from "../models/Project.js";
 import { Material } from "../models/Material.js";
+import { Worker } from "../models/Worker.js";
 
 const deactivateSchema = z.object({
   body: z.object({
@@ -471,6 +472,15 @@ export async function listAllSites(req: Request, res: Response, next: NextFuncti
       : [];
     const projectMap = new Map(projects.map((p) => [p._id.toString(), p.name]));
 
+    const siteIds = sites.map((s) => s._id);
+    const workerCounts = siteIds.length > 0
+      ? await Worker.aggregate([
+          { $match: { siteId: { $in: siteIds } } },
+          { $group: { _id: "$siteId", count: { $sum: 1 } } },
+        ])
+      : [];
+    const workerCountMap = new Map(workerCounts.map((wc) => [wc._id.toString(), wc.count]));
+
     res.json({
       sites: sites.map((s) => ({
         id: s._id.toString(),
@@ -480,6 +490,7 @@ export async function listAllSites(req: Request, res: Response, next: NextFuncti
         supervisor: s.supervisor,
         projectIds: (s.projectIds || []).map((id: Types.ObjectId) => id.toString()),
         projectName: s.projectIds?.[0] ? projectMap.get(s.projectIds[0].toString()) : undefined,
+        workerCount: workerCountMap.get(s._id.toString()) || 0,
       })),
     });
   } catch (err) {
