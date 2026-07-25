@@ -120,7 +120,7 @@ export function mapMaterial(m: any): any {
     approved: m.approvedQuantity ?? 0,
     purchased: m.purchasedQuantity ?? 0,
     consumed: m.consumedQuantity ?? 0,
-    quantity: remainingStock,
+    quantity: m.approvedQuantity ?? remainingStock,
     remainingStock,
     vendor: m.vendor,
     vendorId: m.vendorId,

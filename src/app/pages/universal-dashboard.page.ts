@@ -1179,7 +1179,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .inventory-qty {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 8px;
     }
     .qty-label {
@@ -3070,7 +3070,7 @@ visibleRows(): TableRow[] {
       approvedQuantity: formatNumber(row.approved),
       vendor: row.vendor,
       poNumber: row.poNumber,
-      remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
+      remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
       status: row.status,
     }));
 

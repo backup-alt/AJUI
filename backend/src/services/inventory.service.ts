@@ -118,12 +118,7 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
   for (const material of materials) {
     const existing = await Inventory.findOne(inventoryMatchForMaterial(material)).lean();
     if (existing) {
-      const qty = Math.max(
-        0,
-        Number(material.approvedQuantity) || 0,
-        Number(material.purchasedQuantity) || 0,
-        Number(material.remainingStock) || 0
-      );
+      const qty = Math.max(0, Number(material.approvedQuantity) || 0);
       if (qty <= 0) continue;
       const alreadyRecorded = (existing.purchaseHistory || []).some(
         (h) => h.materialId && h.materialId.toString() === material._id.toString()
@@ -132,12 +127,7 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
       await addApprovedMaterialToInventory(material._id, qty, material.createdBy);
       continue;
     }
-    const quantity = Math.max(
-      0,
-      Number(material.approvedQuantity) || 0,
-      Number(material.purchasedQuantity) || 0,
-      Number(material.remainingStock) || 0
-    );
+    const quantity = Math.max(0, Number(material.approvedQuantity) || 0);
     if (quantity <= 0) continue;
     const inventory = new Inventory({
       projectId: material.projectId,

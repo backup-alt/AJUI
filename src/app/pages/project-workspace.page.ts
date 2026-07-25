@@ -2484,7 +2484,7 @@ export class ProjectWorkspacePage {
       vendor: row.vendor,
       poNumber: row.poNumber,
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
-      remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
+      remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
       status: row.status,
     }));
 
