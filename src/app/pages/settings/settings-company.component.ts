@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ErpDataService } from "../../data/erp-data.service";
+import { ApiService } from "../../core/api.service";
 
 const INDIAN_STATES = [
   "Tamil Nadu",
@@ -378,6 +379,7 @@ const INDIAN_STATES = [
 })
 export class SettingsCompanyComponent {
   private readonly data = inject(ErpDataService);
+  private readonly api = inject(ApiService);
 
   readonly states = INDIAN_STATES;
 
@@ -394,7 +396,7 @@ export class SettingsCompanyComponent {
   readonly message = signal<string | null>(null);
   readonly isError = signal(false);
 
-  saveCompanyProfile() {
+  async saveCompanyProfile() {
     this.isError.set(false);
     this.message.set(null);
     this.saving.set(true);
@@ -412,10 +414,16 @@ export class SettingsCompanyComponent {
 
     this.data.updateCompanyProfile(profile);
 
-    setTimeout(() => {
+    try {
+      await this.api.saveCompanyProfile(profile).toPromise();
       this.saving.set(false);
       this.message.set("Company profile saved successfully.");
       setTimeout(() => this.message.set(null), 3000);
-    }, 300);
+    } catch (err) {
+      this.saving.set(false);
+      this.isError.set(true);
+      this.message.set("Failed to save company profile. Please try again.");
+      setTimeout(() => this.message.set(null), 5000);
+    }
   }
 }

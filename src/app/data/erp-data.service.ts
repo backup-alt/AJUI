@@ -1586,6 +1586,9 @@ export class ErpDataService {
 
   updateCompanyProfile(patch: Partial<CompanyProfile>) {
     this.companyProfile.update((profile) => ({ ...profile, ...patch }));
+    this.api.saveCompanyProfile(this.companyProfile() as any).subscribe({
+      error: (err) => console.warn("[ERP] saveCompanyProfile failed:", err?.message ?? err),
+    });
   }
 
   loadCompanyProfile() {
