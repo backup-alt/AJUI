@@ -59,6 +59,7 @@ export function mapProject(p: any): any {
 
 export function mapSite(s: any): any {
   return {
+    _id: s._id,
     id: s._id || s.id,
     siteId: s.siteId,
     name: s.name,
