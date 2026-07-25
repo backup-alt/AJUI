@@ -518,20 +518,11 @@ export class SitesPage implements OnInit {
     this.isLoading.set(true);
     this.loadError.set(false);
     try {
-      this.supervisor.getSites().subscribe({
-        next: (res) => {
-          this.sites.set(res.sites || []);
-          this.isLoading.set(false);
-        },
-        error: (err) => {
-          console.error('[Sites] failed to load', err);
-          this.sites.set([]);
-          this.loadError.set(true);
-          this.isLoading.set(false);
-        },
-      });
+      const res = await this.supervisor.getSites().toPromise();
+      this.sites.set(res?.sites || []);
+      this.isLoading.set(false);
     } catch (e) {
-      console.error(e);
+      console.error('[Sites] failed to load', e);
       this.sites.set([]);
       this.loadError.set(true);
       this.isLoading.set(false);

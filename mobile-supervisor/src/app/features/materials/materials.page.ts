@@ -367,12 +367,14 @@ export class MaterialsPage implements OnInit, OnDestroy {
   expandedKey = signal<string>('');
   searchQuery = '';
   statusFilter: MaterialStatus | '' = '';
+  private loadGeneration = 0;
 
   async ngOnInit(): Promise<void> {
     addIcons({
       addOutline, cubeOutline, filterOutline, timeOutline, checkmarkCircleOutline,
       closeCircleOutline, chevronForwardOutline, chevronDownOutline, businessOutline,
     });
+    await this.supervisor.init();
     await this.loadMaterials();
 
     if (typeof window !== 'undefined') {
@@ -392,29 +394,25 @@ export class MaterialsPage implements OnInit, OnDestroy {
 
   async loadMaterials(): Promise<void> {
     this.isLoading.set(true);
+    const gen = ++this.loadGeneration;
     try {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
-      this.supervisor
+      const response = await this.supervisor
         .getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
           limit: 100,
         })
-        .subscribe({
-          next: (response) => {
-            this.materials.set(response.materials || []);
-            this.filterMaterials();
-            this.isLoading.set(false);
-          },
-          error: (err) => {
-            console.error('[Materials] failed to load', err);
-            this.filterMaterials();
-            this.isLoading.set(false);
-          },
-        });
+        .toPromise();
+      if (gen !== this.loadGeneration) return;
+      this.materials.set(response?.materials || []);
+      this.filterMaterials();
+      this.isLoading.set(false);
     } catch (error) {
-      console.error('Failed to load materials:', error);
+      if (gen !== this.loadGeneration) return;
+      console.error('[Materials] failed to load', error);
+      this.filterMaterials();
       this.isLoading.set(false);
     }
   }

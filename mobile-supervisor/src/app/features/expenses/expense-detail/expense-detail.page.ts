@@ -445,21 +445,19 @@ export class ExpenseDetailPage implements OnInit {
       this.loading.set(false);
       return;
     }
-    this.supervisor.getExpenseDetail(id).subscribe({
-      next: (res) => {
-        this.expense.set(res.expense);
-        this.loading.set(false);
-      },
-      error: async (err) => {
-        this.loading.set(false);
-        const toast = await this.toastCtrl.create({
-          message: err?.message || 'Failed to load expense',
-          duration: 3000,
-          color: 'danger',
-          position: 'top',
-        });
-        await toast.present();
-      },
-    });
+    try {
+      const res = await this.supervisor.getExpenseDetail(id).toPromise();
+      this.expense.set(res?.expense || null);
+      this.loading.set(false);
+    } catch (err: any) {
+      this.loading.set(false);
+      const toast = await this.toastCtrl.create({
+        message: err?.message || 'Failed to load expense',
+        duration: 3000,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+    }
   }
 }

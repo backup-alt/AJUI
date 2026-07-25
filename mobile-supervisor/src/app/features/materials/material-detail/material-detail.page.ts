@@ -328,37 +328,34 @@ export class MaterialDetailPage implements OnInit {
     this.load(id);
   }
 
-  load(id: string) {
+  async load(id: string) {
     this.loading.set(true);
     this.vendorLoading.set(true);
-    this.supervisor.getMaterialDetail(id).subscribe({
-      next: (res: { material: Material }) => {
-        this.material.set(res.material);
-        this.loading.set(false);
-        if (res.material.vendorId) {
-          this.loadVendor(res.material.vendorId);
-        } else {
-          this.vendorLoading.set(false);
-        }
-      },
-      error: () => {
-        this.loading.set(false);
+    try {
+      const res = await this.supervisor.getMaterialDetail(id).toPromise();
+      const material = res?.material;
+      this.material.set(material || null);
+      this.loading.set(false);
+      if (material?.vendorId) {
+        this.loadVendor(material.vendorId);
+      } else {
         this.vendorLoading.set(false);
-        void this.showToast('Failed to load material', true);
-      },
-    });
+      }
+    } catch {
+      this.loading.set(false);
+      this.vendorLoading.set(false);
+      void this.showToast('Failed to load material', true);
+    }
   }
 
-  private loadVendor(vendorId: string) {
-    this.supervisor.getVendorById(vendorId).subscribe({
-      next: (res) => {
-        this.vendor.set(res.item);
-        this.vendorLoading.set(false);
-      },
-      error: () => {
-        this.vendorLoading.set(false);
-      },
-    });
+  private async loadVendor(vendorId: string) {
+    try {
+      const res = await this.supervisor.getVendorById(vendorId).toPromise();
+      this.vendor.set(res?.item || null);
+      this.vendorLoading.set(false);
+    } catch {
+      this.vendorLoading.set(false);
+    }
   }
 
   getStatusTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {

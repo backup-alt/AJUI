@@ -314,26 +314,26 @@ export class LabourMarkAttendancePage implements OnInit {
   }
 
   async loadWorker(): Promise<void> {
-    this.supervisor.getWorkerDetail(this.workerId).subscribe({
-      next: (res) => this.worker.set(res.worker),
-      error: (err) => {
-        console.error('[MarkAttendance] failed to load worker', err);
-      },
-    });
+    try {
+      const res = await this.supervisor.getWorkerDetail(this.workerId).toPromise();
+      this.worker.set(res?.worker || null);
+    } catch (err) {
+      console.error('[MarkAttendance] failed to load worker', err);
+    }
   }
 
   async checkExistingAttendance(): Promise<void> {
     const siteId = this.selectedSiteId();
     const projectId = this.siteProjectId();
-    this.supervisor.getAttendanceForWorker(this.workerId, 1, 50).subscribe({
-      next: (res) => {
-        const existing = (res.items || []).find(
-          (a: any) => a.attendanceDate === this.attendanceDate
-        );
-        this.alreadyMarked.set(!!existing);
-      },
-      error: () => this.alreadyMarked.set(false),
-    });
+    try {
+      const res = await this.supervisor.getAttendanceForWorker(this.workerId, 1, 50).toPromise();
+      const existing = (res?.items || []).find(
+        (a: any) => a.attendanceDate === this.attendanceDate
+      );
+      this.alreadyMarked.set(!!existing);
+    } catch {
+      this.alreadyMarked.set(false);
+    }
   }
 
   isValid(): boolean {

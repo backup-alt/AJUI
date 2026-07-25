@@ -1137,38 +1137,34 @@ export class LabourWorkerDetailPage implements OnInit {
 
   private async loadWorker(): Promise<void> {
     console.log('[WorkerDetail] Loading worker:', this.workerId);
-    this.supervisor.getWorkerDetail(this.workerId).subscribe({
-      next: (res) => {
-        console.log('[WorkerDetail] Worker loaded:', res.worker?.name, 'weeklyPay:', res.worker?.weeklyPay);
-        this.worker.set(res.worker);
-        this.dailyWageInput.set(Math.round((res.worker.weeklyPay || 0) / 7));
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        console.error('[WorkerDetail] Error loading worker:', err);
-        this.worker.set(null);
-        this.isLoading.set(false);
-      },
-    });
+    try {
+      const res = await this.supervisor.getWorkerDetail(this.workerId).toPromise();
+      console.log('[WorkerDetail] Worker loaded:', res?.worker?.name, 'weeklyPay:', res?.worker?.weeklyPay);
+      this.worker.set(res?.worker || null);
+      this.dailyWageInput.set(Math.round(((res?.worker?.weeklyPay) || 0) / 7));
+      this.isLoading.set(false);
+    } catch (err) {
+      console.error('[WorkerDetail] Error loading worker:', err);
+      this.worker.set(null);
+      this.isLoading.set(false);
+    }
   }
 
   private async loadAttendance(): Promise<void> {
     console.log('[WorkerDetail] Loading attendance for worker:', this.workerId);
-    this.supervisor.getAttendanceForWorker(this.workerId).subscribe({
-      next: (res) => {
-        const items = res.items || [];
-        console.log('[WorkerDetail] Attendance loaded:', items.length, 'records');
-        items.forEach((a: any) => {
-          console.log('[WorkerDetail]   -', a.attendanceDate, 'shifts:', a.shiftCount, 'weeklyPay:', a.weeklyPay);
-        });
-        this.attendance.set(items);
-        console.log('[WorkerDetail] currentWeeklyPay:', this.currentWeeklyPay(), 'dailyWage:', this.dailyWage(), 'weeklyEarnings:', this.weeklyEarnings());
-      },
-      error: (err) => {
-        console.error('[WorkerDetail] Error loading attendance:', err);
-        this.attendance.set([]);
-      },
-    });
+    try {
+      const res = await this.supervisor.getAttendanceForWorker(this.workerId).toPromise();
+      const items = res?.items || [];
+      console.log('[WorkerDetail] Attendance loaded:', items.length, 'records');
+      items.forEach((a: any) => {
+        console.log('[WorkerDetail]   -', a.attendanceDate, 'shifts:', a.shiftCount, 'weeklyPay:', a.weeklyPay);
+      });
+      this.attendance.set(items);
+      console.log('[WorkerDetail] currentWeeklyPay:', this.currentWeeklyPay(), 'dailyWage:', this.dailyWage(), 'weeklyEarnings:', this.weeklyEarnings());
+    } catch (err) {
+      console.error('[WorkerDetail] Error loading attendance:', err);
+      this.attendance.set([]);
+    }
   }
 
   getInitials(name: string): string {

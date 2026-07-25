@@ -625,11 +625,12 @@ export class LabourPage implements OnInit, OnDestroy {
   async loadAttendance(): Promise<void> {
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
-    this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined)
-      .subscribe({
-        next: (res) => this.todayAttendance.set(res.attendances || []),
-        error: (err) => console.error('[Labour] failed to load attendance', err),
-      });
+    try {
+      const res = await this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).toPromise();
+      this.todayAttendance.set(res?.attendances || []);
+    } catch (err) {
+      console.error('[Labour] failed to load attendance', err);
+    }
   }
 
   getTypeIcon(type: string): string {

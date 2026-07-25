@@ -339,21 +339,19 @@ export class LabourDetailPage implements OnInit {
       this.loading.set(false);
       return;
     }
-    this.supervisor.getLabourDetail(id).subscribe({
-      next: (res) => {
-        this.labour.set(res.labour);
-        this.loading.set(false);
-      },
-      error: async (err) => {
-        this.loading.set(false);
-        const toast = await this.toastCtrl.create({
-          message: err?.message || 'Failed to load labour entry',
-          duration: 3000,
-          color: 'danger',
-          position: 'top',
-        });
-        await toast.present();
-      },
-    });
+    try {
+      const res = await this.supervisor.getLabourDetail(id).toPromise();
+      this.labour.set(res?.labour || null);
+      this.loading.set(false);
+    } catch (err: any) {
+      this.loading.set(false);
+      const toast = await this.toastCtrl.create({
+        message: err?.message || 'Failed to load labour entry',
+        duration: 3000,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+    }
   }
 }

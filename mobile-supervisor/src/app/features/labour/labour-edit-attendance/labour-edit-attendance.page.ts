@@ -316,9 +316,10 @@ export class LabourEditAttendancePage implements OnInit {
   }
 
   async loadAttendance(): Promise<void> {
-    this.supervisor.getAttendanceDetail(this.attendanceId).subscribe({
-      next: (res) => {
-        const att = res.attendance;
+    try {
+      const res = await this.supervisor.getAttendanceDetail(this.attendanceId).toPromise();
+      const att = res?.attendance;
+      if (att) {
         this.attendance.set(att);
         this.attendanceDate = att.attendanceDate;
         this.shiftCount = att.shiftCount;
@@ -327,26 +328,24 @@ export class LabourEditAttendancePage implements OnInit {
         this.lateFine = att.lateFine;
         this.paymentMode = att.paymentMode;
         this.notes = att.notes || '';
-        this.isLoading.set(false);
-
         if (att.workerId) {
           this.loadWorker(att.workerId);
         }
-      },
-      error: (err) => {
-        console.error('[EditAttendance] failed to load attendance', err);
-        this.isLoading.set(false);
-      },
-    });
+      }
+      this.isLoading.set(false);
+    } catch (err) {
+      console.error('[EditAttendance] failed to load attendance', err);
+      this.isLoading.set(false);
+    }
   }
 
-  loadWorker(workerId: string): void {
-    this.supervisor.getWorkerDetail(workerId).subscribe({
-      next: (res) => this.worker.set(res.worker),
-      error: (err) => {
-        console.error('[EditAttendance] failed to load worker', err);
-      },
-    });
+  async loadWorker(workerId: string) {
+    try {
+      const res = await this.supervisor.getWorkerDetail(workerId).toPromise();
+      this.worker.set(res?.worker || null);
+    } catch (err) {
+      console.error('[EditAttendance] failed to load worker', err);
+    }
   }
 
   isValid(): boolean {
