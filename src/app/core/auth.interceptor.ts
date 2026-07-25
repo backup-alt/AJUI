@@ -15,7 +15,7 @@ export const authInterceptor: HttpInterceptorFn = (
 
   let token: string | null = null;
   try {
-    token = localStorage.getItem("ajui_access_token");
+    token = sessionStorage.getItem("ajui_access_token");
   } catch {}
 
   let authReq = req;
