@@ -7,7 +7,6 @@ import {
 import { bootstrapApplication } from "@angular/platform-browser";
 import { provideIonicAngular } from "@ionic/angular/standalone";
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
-import { APP_INITIALIZER } from "@angular/core";
 import { addIcons } from "ionicons";
 import {
   addOutline,
@@ -40,24 +39,6 @@ import {
 import { AppComponent } from "./app/app.component";
 import { routes } from "./app/app.routes";
 import { authInterceptor } from "./app/core/auth.interceptor";
-import { ApiService } from "./app/core/api.service";
-import { ErpDataService } from "./app/data/erp-data.service";
-import { WorkspaceHydrationService } from "./app/core/workspace-hydration.service";
-
-export function initializeApp(
-  api: ApiService,
-  erp: ErpDataService,
-  hydration: WorkspaceHydrationService
-): () => Promise<void> {
-  return async () => {
-    if (api.isAuthenticated()) {
-      if (erp.projects().length === 0 || erp.materials().length === 0) {
-        try { localStorage.removeItem("agb-erp:materials"); } catch {}
-        await hydration.hydrateFromBackend();
-      }
-    }
-  };
-}
 
 addIcons({
   "add-outline": addOutline,
@@ -97,11 +78,5 @@ bootstrapApplication(AppComponent, {
       withHashLocation(),
     ),
     provideHttpClient(withInterceptors([authInterceptor])),
-    {
-      provide: APP_INITIALIZER,
-      useFactory: initializeApp,
-      deps: [ApiService, ErpDataService, WorkspaceHydrationService],
-      multi: true,
-    },
   ],
 }).catch((error) => console.error(error));
