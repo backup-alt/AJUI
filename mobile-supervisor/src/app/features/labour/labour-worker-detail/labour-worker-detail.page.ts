@@ -1006,12 +1006,11 @@ export class LabourWorkerDetailPage implements OnInit {
     const attendances = this.attendance();
     let total = 0;
     for (const a of attendances) {
-      if (a.status === 'Present' || (a as any).attendanceStatus === 'Present') {
+      if (a.shiftCount > 0) {
         total += daily * (a.shiftCount / 2);
       }
-      total -= a.lateFine;
+      total -= a.lateFine || 0;
     }
-    // Add overtime: each OT hour = half daily wage
     total += this.totalOvertime() * (daily * 0.5);
     return Math.max(0, Math.round(total));
   });
@@ -1034,7 +1033,7 @@ export class LabourWorkerDetailPage implements OnInit {
     let totalShifts = 0;
 
     for (const a of attendances) {
-      if (a.status === 'Present' || (a as any).attendanceStatus === 'Present') {
+      if (a.shiftCount > 0) {
         daysWorked++;
         totalShifts += a.shiftCount;
       }

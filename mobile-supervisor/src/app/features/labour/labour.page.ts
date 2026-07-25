@@ -12,7 +12,7 @@ import {
   chevronForwardOutline, closeOutline, checkmarkOutline,
   constructOutline, buildOutline, flashOutline, cutOutline,
   homeOutline, colorPaletteOutline, hammerOutline, gridOutline,
-  layersOutline, carOutline, sparklesOutline,
+  layersOutline, carOutline, sparklesOutline, briefcaseOutline,
   calendarOutline, ellipsisHorizontalOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
@@ -451,7 +451,7 @@ export class LabourPage implements OnInit, OnDestroy {
       chevronForwardOutline, closeOutline, checkmarkOutline,
       constructOutline, buildOutline, flashOutline, cutOutline,
       homeOutline, colorPaletteOutline, hammerOutline, gridOutline,
-      layersOutline, carOutline, sparklesOutline,
+      layersOutline, carOutline, sparklesOutline, briefcaseOutline,
       calendarOutline, ellipsisHorizontalOutline,
     });
     await this.loadData();
