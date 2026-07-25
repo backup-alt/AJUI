@@ -126,7 +126,6 @@ function numberToWords(num: number): string {
                   </button>
                   <div class="editor-actions">
                     <button type="button" class="btn-outline" (click)="exportToExcel()">Export Excel</button>
-                    <button type="button" class="btn-outline" (click)="quotationReport?.exportToPDF()" [disabled]="savingPdf()">Export PDF</button>
                     <button type="button" class="btn-secondary" (click)="saveQuotation('Draft')" [disabled]="savingQuote()">Save as Draft</button>
                     <button type="button" class="btn-primary" (click)="saveQuotation('Sent')" [disabled]="savingQuote()">Save & Send</button>
                     <button type="button" class="btn-outline" (click)="showQuotationPreview.set(true)" [disabled]="savingQuote()">Preview</button>
