@@ -667,16 +667,23 @@ export class ErpDataService {
     this.writeState("projects", this.projects());
   }
 
-  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus; siteIds?: string[] }): Vendor {
-    const nextNumber =
-      Math.max(
-        100,
-        ...this.vendors()
-          .map((v) => Number(v.id.replace(/\D/g, "")))
-          .filter((value) => Number.isFinite(value)),
-      ) + 1;
+  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus; siteIds?: string[]; id?: string; _id?: string }): Vendor {
+    const backendId = input.id;
+    const backendMongoId = input._id;
+    let vendorId = backendId;
+    if (!vendorId) {
+      const nextNumber =
+        Math.max(
+          100,
+          ...this.vendors()
+            .map((v) => Number(v.id.replace(/\D/g, "")))
+            .filter((value) => Number.isFinite(value)),
+        ) + 1;
+      vendorId = `VEN-${nextNumber}`;
+    }
     const vendor: Vendor = {
-      id: `VEN-${nextNumber}`,
+      id: vendorId,
+      _id: backendMongoId,
       name: input.name,
       materialType: input.materialType,
       phone: input.phone,

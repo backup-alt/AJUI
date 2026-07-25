@@ -1452,13 +1452,15 @@ export class VendorDashboardPage {
 
     try {
       const res = await this.api.createVendor(payload).toPromise();
-      const vendorId = res?.vendorId || res?._id || res?.id;
-      const serverSiteIds = Array.isArray(res?.siteIds)
-        ? res.siteIds.map((id: any) => String(id))
+      const v = res?.vendor || res;
+      const vendorId = v?.vendorId || v?._id || v?.id || `VEN-${Date.now()}`;
+      const serverSiteIds = Array.isArray(v?.siteIds)
+        ? v.siteIds.map((id: any) => String(id))
         : (value.siteIds || []).map((id) => String(id));
 
       this.data.addVendor({
         id: vendorId,
+        _id: v?._id,
         name: value.name,
         materialType: value.materialType,
         phone: value.phone,
@@ -1466,7 +1468,6 @@ export class VendorDashboardPage {
         gst: value.gst,
         status: statusValue,
         siteIds: serverSiteIds,
-        _id: res?._id,
       } as Vendor);
 
       this.showVendorForm.set(false);
@@ -1568,9 +1569,11 @@ export class VendorDashboardPage {
     };
 
     try {
-      const res = await this.api.patchVendor(vendor.id, payload).toPromise();
-      const serverSiteIds = Array.isArray(res?.siteIds)
-        ? res.siteIds.map((id: any) => String(id))
+      const apiId = vendor._id || vendor.id;
+      const res = await this.api.patchVendor(apiId, payload).toPromise();
+      const v = res?.vendor || res;
+      const serverSiteIds = Array.isArray(v?.siteIds)
+        ? v.siteIds.map((id: any) => String(id))
         : (value.siteIds || []).map((id) => String(id));
 
       this.data.updateVendor(vendor.id, {
@@ -1605,12 +1608,14 @@ export class VendorDashboardPage {
 
   deleteVendor(vendorId: string) {
     if (!confirm("Delete this vendor?")) return;
+    const vendor = this.data.vendors().find((v) => v.id === vendorId);
     this.data.vendors.update((list) => list.filter((v) => v.id !== vendorId));
     if (this.selectedVendor()?.id === vendorId) {
       this.selectedVendor.set(null);
       this.selectedSite.set(null);
     }
-    this.api.deleteVendor(vendorId).subscribe({
+    const apiId = vendor?._id || vendorId;
+    this.api.deleteVendor(apiId).subscribe({
       error: (err) => {
         console.error("Failed to delete vendor on backend", err);
       },
