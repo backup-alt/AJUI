@@ -62,26 +62,28 @@ export type VendorFormValue = {
             </select>
           </label>
 
-          <label class="span-2">
-            <span>Site Assigned</span>
-            <div class="site-field">
-              <div class="site-chips">
-                @for (siteId of selectedSiteIds; track siteId) {
-                  @let site = siteName(siteId);
-                  <span class="site-chip">
-                    {{ site || siteId }}
-                    <button type="button" class="chip-remove" (click)="toggleSite(siteId)" aria-label="Remove site">×</button>
-                  </span>
-                }
-                @if (selectedSiteIds.length === 0) {
-                  <span class="site-chip-empty">No site assigned</span>
-                }
-                <button type="button" class="site-add-btn" (click)="showPicker.set(true)">
-                  <ion-icon name="add-outline"></ion-icon> Add Site
-                </button>
+          @if (showSiteAssignment) {
+            <label class="span-2">
+              <span>Site Assigned</span>
+              <div class="site-field">
+                <div class="site-chips">
+                  @for (siteId of selectedSiteIds; track siteId) {
+                    @let site = siteName(siteId);
+                    <span class="site-chip">
+                      {{ site || siteId }}
+                      <button type="button" class="chip-remove" (click)="toggleSite(siteId)" aria-label="Remove site">×</button>
+                    </span>
+                  }
+                  @if (selectedSiteIds.length === 0) {
+                    <span class="site-chip-empty">No site assigned</span>
+                  }
+                  <button type="button" class="site-add-btn" (click)="showPicker.set(true)">
+                    <ion-icon name="add-outline"></ion-icon> Add Site
+                  </button>
+                </div>
               </div>
-            </div>
-          </label>
+            </label>
+          }
 
           <div class="dialog-actions span-2">
             <button type="button" class="secondary-action" (click)="cancel.emit()">Cancel</button>
@@ -91,7 +93,7 @@ export type VendorFormValue = {
       </section>
     </div>
 
-    @if (showPicker()) {
+    @if (showSiteAssignment && showPicker()) {
       <div class="picker-overlay" role="presentation" (click)="closePicker($event)">
         <div class="picker-panel" role="dialog" aria-modal="true" aria-labelledby="picker-title">
           <div class="picker-head">
@@ -176,6 +178,7 @@ export class VendorFormDialogComponent implements OnInit {
   @Input() title = "Add New Vendor";
   @Input() description = "Create the vendor record to track material purchases, PO numbers, and payment history.";
   @Input() submitLabel = "Create Vendor";
+  @Input() showSiteAssignment = true;
   @Input() initialValue: VendorFormValue | null = null;
   @Output() cancel = new EventEmitter<void>();
   @Output() create = new EventEmitter<VendorFormValue>();

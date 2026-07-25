@@ -1025,6 +1025,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
               [description]="editingInlineVendor() ? 'Update vendor contact, material type, GST, and address information.' : 'Create the vendor record to track material purchases and GST.'"
               [submitLabel]="editingInlineVendor() ? 'Save Changes' : 'Create Vendor'"
               [initialValue]="editingInlineVendor() ? inlineVendorEditValue() : null"
+              [showSiteAssignment]="false"
               (cancel)="closeVendorDialog()"
               (create)="editingInlineVendor() ? updateInlineVendor($event) : createInlineVendor($event)"
             ></agb-vendor-form-dialog>
