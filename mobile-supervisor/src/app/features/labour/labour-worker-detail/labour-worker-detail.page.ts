@@ -207,7 +207,7 @@ interface WageCalculation {
                   <span class="info-icon"><ion-icon name="wallet-outline"></ion-icon></span>
                   <div class="info-data">
                     <span class="info-label">Weekly Salary</span>
-                    <span class="info-value highlight">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}</span>
+                    <span class="info-value highlight">{{ effectiveWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
                   </div>
                 </div>
                 <div class="info-row">
@@ -346,7 +346,7 @@ interface WageCalculation {
               </div>
               <div class="wage-row">
                 <span class="wage-label">Weekly Salary (base)</span>
-                <span class="wage-value">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}</span>
+                <span class="wage-value">{{ effectiveWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
               <div class="wage-row">
                 <span class="wage-label">Days Worked</span>
@@ -977,10 +977,14 @@ export class LabourWorkerDetailPage implements OnInit {
   activeTab: Tab = 'info';
   weeklyPayInput = signal<number>(0);
 
+  effectiveWeeklyPay = computed(() => {
+    const weeklyFromWorker = this.worker()?.weeklyPay || 0;
+    const weeklyFromAttendance = this.attendance().find(a => a.weeklyPay > 0)?.weeklyPay || 0;
+    return weeklyFromWorker || weeklyFromAttendance;
+  });
+
   dailyWage = computed(() => {
-    const w = this.worker();
-    if (!w) return 0;
-    return Math.round(w.weeklyPay / 7);
+    return Math.round(this.effectiveWeeklyPay() / 7);
   });
 
   attendanceDays = computed(() => this.attendance());
@@ -1026,7 +1030,7 @@ export class LabourWorkerDetailPage implements OnInit {
   }
 
   calculatedWage = computed<WageCalculation>(() => {
-    const weekly = this.weeklyPayInput() || this.worker()?.weeklyPay || 0;
+    const weekly = this.weeklyPayInput() || this.effectiveWeeklyPay();
     const daily = Math.round(weekly / 7);
     const attendances = this.attendance();
     let daysWorked = 0;
