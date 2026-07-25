@@ -922,7 +922,11 @@ export async function takeApprovalActionForSupervisor(
     if (Model) {
       const doc: any = await (Model as any).findById(approval.sourceId);
       if (doc) {
-        doc.status = approval.status;
+        if (approval.sourceCollection === "Material") {
+          doc.status = "Not Received";
+        } else {
+          doc.status = approval.status;
+        }
         if (action.action === "approve") {
           doc.approvedBy = userId;
           doc.approvedAt = new Date();
