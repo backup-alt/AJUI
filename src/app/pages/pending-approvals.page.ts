@@ -256,70 +256,6 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
               </section>
               }
 
-              @if (showLabour()) {
-              <section class="operations-workbench approvals-workbench approval-section">
-                <div class="module-toolbar table-first-toolbar">
-                  <div>
-                    <h2>Labour Wage Approvals</h2>
-                    <p>Review worker attendance, daily wage, and calculated weekly earnings before approving.</p>
-                  </div>
-                  <span class="approval-count-pill">{{ labourApprovals().length }} pending</span>
-                </div>
-                <div class="table-wrap operations-table approvals-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Client</th>
-                        <th>Project</th>
-                        <th>Site</th>
-                        <th>Date</th>
-                        <th>Supervisor</th>
-                        <th>Labour Types</th>
-                        <th>Staff Count</th>
-                        <th>Days</th>
-                        <th>Shifts</th>
-                        <th>Daily Wage</th>
-                        <th>Weekly Wage</th>
-                        <th>Overtime (h)</th>
-                        <th>Late Fine</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let row of labourApprovals()">
-                        <td>{{ row.client || "-" }}</td>
-                        <td>{{ row.project || "-" }}</td>
-                        <td>{{ row.site || "-" }}</td>
-                        <td>{{ row.attendanceDate || "-" }}</td>
-                        <td>{{ row.submittedBy || row.staffName || "-" }}</td>
-                        <td><strong>{{ row.labourTypes || "-" }}</strong></td>
-                        <td>{{ row.staffCount }}</td>
-                        <td>{{ row.presentDays || 1 }}</td>
-                        <td>{{ row.shift }}</td>
-                        <td>{{ row.dailyWage || 0 | currency:'INR':'symbol':'1.0-0' }}</td>
-                        <td><strong>{{ weeklyWage(row) | currency:'INR':'symbol':'1.0-0' }}</strong></td>
-                        <td>{{ row.overtime || "0" }}</td>
-                        <td>{{ row.lateFine || "0" }}</td>
-                        <td><span class="approval-status-pill">{{ row.status }}</span></td>
-                        <td class="approval-actions">
-                          <button type="button" class="approve-action" (click)="approve(row)" aria-label="Approve labour">
-                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
-                            Approve
-                          </button>
-                          <button type="button" class="decline-action" (click)="decline(row)" aria-label="Decline labour">
-                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>
-                            Decline
-                          </button>
-                        </td>
-                      </tr>
-                      <tr *ngIf="labourApprovals().length === 0"><td class="empty-row" colspan="11"><span>No pending labour approvals.</span></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-              }
-
               @if (showSiteExpense()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
@@ -471,7 +407,6 @@ export class PendingApprovalsPage implements OnInit {
 
   async ngOnInit() {
     this.showMaterial.set(true);
-    this.showLabour.set(true);
     this.showSiteExpense.set(true);
     await this.refreshApprovals();
   }
