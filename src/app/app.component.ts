@@ -23,12 +23,9 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     if (this.api.isAuthenticated()) {
-      this.hydration.hydrateFromBackend().finally(() => {
-        this.removeSplash();
-      });
-    } else {
-      this.removeSplash();
+      void this.hydration.hydrateFromBackend();
     }
+    requestAnimationFrame(() => this.removeSplash());
     void this.materialsService.refresh();
   }
 

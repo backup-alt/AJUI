@@ -22,8 +22,6 @@ export class WorkspaceHydrationService {
   private readonly erp = inject(ErpDataService);
 
   async hydrateFromBackend(): Promise<void> {
-    this.clearWorkspaceData();
-
     const [clients, projects, sites, vendors, supervisors, materials, labour, expenses, payments, subcontractors, invoices] = await Promise.all([
       firstValueFrom(this.api.listClients({ limit: 100 })).catch(() => ({ items: [] })),
       firstValueFrom(this.api.listProjects({ limit: 100 })).catch(() => ({ items: [] })),
@@ -61,37 +59,6 @@ export class WorkspaceHydrationService {
     this.setSignalAndStorage("payments", (payments.items || []).map(mapPayment), this.erp.payments);
     this.setSignalAndStorage("subcontractors", (subcontractors.items || []).map(mapSubcontractor), this.erp.subcontractors);
     this.setSignalAndStorage("taxInvoices", (invoices.items || []).map(mapInvoice), this.erp.taxInvoices);
-  }
-
-  private clearWorkspaceData(): void {
-    this.erp.clients.set([]);
-    this.erp.projects.set([]);
-    this.erp.materials.set([]);
-    this.erp.labour.set([]);
-    this.erp.expenses.set([]);
-    this.erp.payments.set([]);
-    this.erp.vendors.set([]);
-    this.erp.supervisors.set([]);
-    this.erp.subcontractors.set([]);
-
-    this.erp.taxInvoices.set([]);
-    [
-      "clients",
-      "projects",
-      "sites",
-      "materials",
-      "labour",
-      "expenses",
-      "payments",
-      "vendors",
-      "supervisors",
-      "subcontractors",
-      "taxInvoices",
-    ].forEach((key) => {
-      try {
-        localStorage.removeItem(this.storageKey(key));
-      } catch {}
-    });
   }
 
   private setSignalAndStorage<T>(

@@ -133,7 +133,9 @@ export async function listMaterials(filter: {
     });
   }
 
-  await backfillApprovedMaterialsToInventory(query);
+  backfillApprovedMaterialsToInventory(query).catch((err: unknown) =>
+    console.error("Background backfill failed:", err)
+  );
   const stockMap = await inventoryStockMapForMaterials(items);
   items.forEach((item) => {
     const sharedStock = stockMap.get(inventoryKeyForMaterial(item));

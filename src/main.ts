@@ -2,7 +2,7 @@ import {
   provideRouter,
   withHashLocation,
   withPreloading,
-  PreloadAllModules,
+  NoPreloading,
 } from "@angular/router";
 import { bootstrapApplication } from "@angular/platform-browser";
 import { provideIonicAngular } from "@ionic/angular/standalone";
@@ -74,7 +74,7 @@ bootstrapApplication(AppComponent, {
     provideIonicAngular(),
     provideRouter(
       routes,
-      withPreloading(PreloadAllModules),
+      withPreloading(NoPreloading),
       withHashLocation(),
     ),
     provideHttpClient(withInterceptors([authInterceptor])),
