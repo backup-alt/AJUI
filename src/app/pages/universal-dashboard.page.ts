@@ -1864,7 +1864,7 @@ export class UniversalDashboardPage {
                 overtime: worker.overtimeHours || 0,
                 lateFine: worker.lateFine || 0,
                 shift: String(group.shift || 1),
-                notes: `Attendance: ${group.date}`,
+                notes: group.labourType || "",
                 paymentMode: (group.paymentMode === "NEFT" ? "NEFT" : "Cash") as "NEFT" | "Cash",
                 status: "Approved" as const,
                 supervisorName: (group as any).supervisorName || "",
@@ -3776,7 +3776,10 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
         { key: "staffCount", label: "Staff Count" },
         { key: "attendance", label: "Attendance" },
         { key: "shift", label: "Shift" },
+        { key: "paymentMode", label: "Payment Mode" },
         { key: "overtimeLate", label: "Overtime / Late" },
+        { key: "dailyPayByType", label: "Daily Pay by Labour Type" },
+        { key: "combinedDailyPay", label: "Combined Daily Pay" },
         { key: "weeklyPayByType", label: "Weekly Pay by Labour Type" },
         { key: "weeklyPayTotal", label: "Combined Weekly Pay" },
       ];
@@ -3806,15 +3809,54 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
       return [...openingRows, ...chronologicalRows];
     }
     if (module !== "labour") return rows;
-    return rows.map((row) => {
-      const weeklyPay = this.labourWeeklyPayForRow(row);
-      return {
-        ...row,
-        overtimeLate: `${row["overtime"] || "0"} overtime / ${row["lateFine"] || "0"} late fine`,
-        weeklyPayByType: weeklyPay.breakup,
-        weeklyPayTotal: formatMoney(weeklyPay.total),
-      };
-    });
+    const groups = new Map<string, TableRow[]>();
+    for (const row of rows) {
+      const key = `${row["attendanceDate"] || row["notes"] || ""}|${row["paymentMode"] || "Cash"}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(row);
+    }
+    const groupedRows: TableRow[] = [];
+    for (const groupRows of groups.values()) {
+      const first = groupRows[0];
+      const typeMap = new Map<string, { count: number; wage: number; amount: number }>();
+      let totalOvertimeHrs = 0;
+      let totalLateFine = 0;
+      let totalWeeklyPay = 0;
+      for (const row of groupRows) {
+        const entries = this.labourTypeEntriesForRow(row);
+        const shift = this.moneyNumber(row["shift"]) || 1;
+        for (const entry of entries) {
+          const existing = typeMap.get(entry.type) || { count: 0, wage: entry.wage, amount: 0 };
+          existing.count += entry.count;
+          existing.wage = existing.wage || entry.wage;
+          existing.amount += entry.count * entry.wage * (shift / 2);
+          typeMap.set(entry.type, existing);
+        }
+        totalOvertimeHrs += this.moneyNumber(String(row["overtime"] || "").replace(/[^0-9.]/g, ""));
+        totalLateFine += this.moneyNumber(String(row["lateFine"] || "").replace(/[^0-9.]/g, ""));
+        totalWeeklyPay += this.labourWeeklyPayForRow(row).total;
+      }
+      const typeBreakup = [...typeMap.entries()]
+        .map(([type, v]) => `${type}: ${v.count}`)
+        .join(", ");
+      const dailyPayBreakup = [...typeMap.entries()]
+        .map(([type, v]) => `${type}: ${formatMoney(v.amount)}`)
+        .join(", ");
+      const totalDailyAmount = [...typeMap.values()].reduce((sum, v) => sum + v.amount, 0);
+      groupedRows.push({
+        ...first,
+        labourTypes: typeBreakup || String(first["labourTypes"] || ""),
+        staffCount: [...typeMap.values()].reduce((sum, v) => sum + v.count, 0),
+        dailyPayByType: dailyPayBreakup || formatMoney(0),
+        combinedDailyPay: formatMoney(totalDailyAmount),
+        overtimeLate: `${totalOvertimeHrs} overtime / ${formatMoney(totalLateFine)} late fine`,
+        weeklyPayByType: [...typeMap.entries()]
+          .map(([type, v]) => `${type}: ${formatMoney(v.amount)}`)
+          .join(", "),
+        weeklyPayTotal: formatMoney(totalWeeklyPay),
+      });
+    }
+    return groupedRows;
   }
 
   private labourWeeklyPayForRow(row: TableRow): { breakup: string; total: number; items: Array<{ type: string; count: number; wage: number; amount: number }> } {
@@ -3835,7 +3877,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
   }
 
   private labourTypeEntriesForRow(row: TableRow): Array<{ type: string; count: number; wage: number }> {
-    const labourTypes = String(row["labourTypes"] || row["notes"] || "").trim();
+    const labourTypes = String(row["labourTypes"] || row["notes"] || row["category"] || "").trim();
     const parsed = labourTypes
       .split(/[,;\n]+/)
       .map((part) => this.parseLabourTypeEntrySafe(part))
@@ -3865,7 +3907,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
   private dailyWageForLabourType(row: TableRow, labourType: string, typeCount: number): number {
     const suggestedWage = this.suggestedDailyWageForLabourType(row, labourType);
     if (suggestedWage) return suggestedWage;
-    const rowWage = this.moneyNumber(row["dailyWage"]);
+    const rowWage = this.moneyNumber(row["dailyWage"]) || this.moneyNumber(row["dailyPay"]);
     if (rowWage) return rowWage;
     return typeCount === 1 ? this.moneyNumber(row["weeklyPayable"]) : 0;
   }
@@ -3912,12 +3954,28 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
       if (!isAbsent) current.staff += staffCount;
       staffSummary.set(name, current);
 
-      const weeklyPay = this.labourWeeklyPayForRow(row);
-      for (const item of weeklyPay.items) {
-        const summary = wageSummary.get(item.type) ?? { staff: 0, payable: 0 };
-        summary.staff += item.count;
-        summary.payable += item.amount;
-        wageSummary.set(item.type, summary);
+      const precomputedBreakup = String(row["weeklyPayByType"] || "").trim();
+      if (precomputedBreakup && precomputedBreakup !== formatMoney(0)) {
+        for (const part of precomputedBreakup.split(",")) {
+          const match = part.trim().match(/^(.+?):\s*₹?([\d,]+(?:\.\d+)?)$/);
+          if (!match) continue;
+          const type = match[1].trim();
+          const amount = this.moneyNumber(match[2]);
+          const countMatch = String(row["labourTypes"] || "").match(new RegExp(`${type.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*(\\d+)`, "i"));
+          const count = countMatch ? Number(countMatch[1]) : 1;
+          const summary = wageSummary.get(type) ?? { staff: 0, payable: 0 };
+          summary.staff += count;
+          summary.payable += amount;
+          wageSummary.set(type, summary);
+        }
+      } else {
+        const weeklyPay = this.labourWeeklyPayForRow(row);
+        for (const item of weeklyPay.items) {
+          const summary = wageSummary.get(item.type) ?? { staff: 0, payable: 0 };
+          summary.staff += item.count;
+          summary.payable += item.amount;
+          wageSummary.set(item.type, summary);
+        }
       }
     }
     if (!staffSummary.size && !wageSummary.size) return "";
