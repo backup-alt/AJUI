@@ -5,10 +5,10 @@ export type MaterialStatus = "Pending" | "Received" | "Not Received";
 export interface IMaterial extends Document {
   _id: Types.ObjectId;
   materialId: string;
-  projectId: Types.ObjectId;
-  projectName: string;
-  clientId: Types.ObjectId;
-  clientName: string;
+  projectId?: Types.ObjectId;
+  projectName?: string;
+  clientId?: Types.ObjectId;
+  clientName?: string;
   siteId?: Types.ObjectId;
   site: string;
   name: string;
@@ -43,10 +43,10 @@ export interface IMaterial extends Document {
 const materialSchema = new Schema<IMaterial>(
   {
     materialId: { type: String, required: true, unique: true, index: true },
-    projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
-    projectName: { type: String, required: true },
-    clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true, index: true },
-    clientName: { type: String, required: true },
+    projectId: { type: Schema.Types.ObjectId, ref: "Project", index: true },
+    projectName: { type: String },
+    clientId: { type: Schema.Types.ObjectId, ref: "Client", index: true },
+    clientName: { type: String },
     siteId: { type: Schema.Types.ObjectId, ref: "Site" },
     site: { type: String, required: true },
     name: { type: String, required: true, trim: true },

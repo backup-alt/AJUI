@@ -11,11 +11,16 @@ import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { backfillApprovedMaterialsToInventory, inventoryKeyForMaterial, inventoryStockMapForMaterials } from "./inventory.service.js";
 
 async function populateRefs(input: CreateMaterialInput) {
-  const project = await Project.findById(input.projectId);
-  if (!project) throw new AppError(404, "Project not found");
+  let project: any = null;
+  let client: any = null;
 
-  const client = await Client.findById(project.clientId);
-  if (!client) throw new AppError(404, "Client not found");
+  if (input.projectId) {
+    project = await Project.findById(input.projectId);
+    if (!project) throw new AppError(404, "Project not found");
+
+    client = await Client.findById(project.clientId);
+    if (!client) throw new AppError(404, "Client not found");
+  }
 
   let vendor: { name: string; vendorId?: Types.ObjectId } | undefined;
   if (input.vendorId) {
@@ -40,32 +45,34 @@ export async function createMaterial(input: CreateMaterialInput) {
   const { project, client, vendor } = await populateRefs(input);
   const siteName = await resolveSiteName(input.site, input.siteId);
 
-  const existingPending = await Material.findOne({
-    projectId: project._id,
-    site: siteName,
-    name: input.name,
-    unit: input.unit,
-    status: { $in: ["Pending", "Not Received"] },
-  });
+  if (project) {
+    const existingPending = await Material.findOne({
+      projectId: project._id,
+      site: siteName,
+      name: input.name,
+      unit: input.unit,
+      status: { $in: ["Pending", "Not Received"] },
+    });
 
-  if (existingPending) {
-    existingPending.requestedQuantity = input.requestedQuantity;
-    existingPending.notes = input.notes;
-    existingPending.vendor = input.vendor || vendor?.name;
-    existingPending.vendorId = input.vendorId ? new Types.ObjectId(input.vendorId) : vendor?.vendorId;
-    existingPending.poNumber = input.poNumber;
-    existingPending.createdBy = input.createdBy;
-    await existingPending.save();
-    return existingPending.toObject();
+    if (existingPending) {
+      existingPending.requestedQuantity = input.requestedQuantity;
+      existingPending.notes = input.notes;
+      existingPending.vendor = input.vendor || vendor?.name;
+      existingPending.vendorId = input.vendorId ? new Types.ObjectId(input.vendorId) : vendor?.vendorId;
+      existingPending.poNumber = input.poNumber;
+      existingPending.createdBy = input.createdBy;
+      await existingPending.save();
+      return existingPending.toObject();
+    }
   }
 
   const materialId = await generateId("MAT");
   const material = await Material.create({
     materialId,
-    projectId: project._id,
-    projectName: project.name,
-    clientId: client._id,
-    clientName: client.name,
+    projectId: project?._id,
+    projectName: project?.name,
+    clientId: client?._id,
+    clientName: client?.name,
     siteId: input.siteId ? new Types.ObjectId(input.siteId) : undefined,
     site: siteName,
     name: input.name,
