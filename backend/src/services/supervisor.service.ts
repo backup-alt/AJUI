@@ -126,7 +126,7 @@ export async function createSupervisor(input: CreateSupervisorInput) {
   return supervisor.toObject();
 }
 
-export async function listSupervisors(filter: { status?: string; search?: string; scopeProjectIds?: ProjectScopeIds } = {}) {
+export async function listSupervisors(filter: { status?: string; search?: string; scopeProjectIds?: ProjectScopeIds; page?: number; limit?: number } = {}) {
   const query: Record<string, unknown> = {};
   if (filter.status) query.status = filter.status;
   if (filter.search) {
@@ -137,7 +137,14 @@ export async function listSupervisors(filter: { status?: string; search?: string
     ];
   }
   applyProjectScope(query, "assignedProjects", filter.scopeProjectIds);
-  return Supervisor.find(query).sort({ createdAt: -1 }).lean();
+  const page = Math.max(1, filter.page || 1);
+  const limit = Math.min(200, Math.max(1, filter.limit || 100));
+  const skip = (page - 1) * limit;
+  const [items, total] = await Promise.all([
+    Supervisor.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Supervisor.countDocuments(query),
+  ]);
+  return { items, total, page, limit, pages: Math.ceil(total / limit) };
 }
 
 export async function getSupervisorById(id: string, scopeProjectIds?: ProjectScopeIds) {

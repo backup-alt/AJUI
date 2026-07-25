@@ -28,7 +28,7 @@ export interface ISupervisor extends Document {
 const supervisorSchema = new Schema<ISupervisor>(
   {
     supervisorId: { type: String, required: true, unique: true, index: true },
-    userId: { type: Schema.Types.ObjectId, ref: "User" },
+    userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
     name: { type: String, required: true, trim: true, index: true },
     phone: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, trim: true },

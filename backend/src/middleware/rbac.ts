@@ -13,6 +13,7 @@ declare global {
     interface Request {
       user?: AccessTokenPayload;
       scopedQuery?: Record<string, unknown>;
+      _cachedScopedProjectIds?: ProjectScopeIds;
     }
   }
 }
@@ -77,7 +78,8 @@ export async function getScopedProjectQuery(req: Request): Promise<Record<string
 }
 
 export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds> {
-  if (!req.user?.sub) return null;
+  if (req._cachedScopedProjectIds !== undefined) return req._cachedScopedProjectIds;
+  if (!req.user?.sub) { req._cachedScopedProjectIds = null; return null; }
 
   const role = req.user.role;
   const userId = new Types.ObjectId(req.user.sub);
@@ -85,11 +87,15 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   const managedProjectIds = (user?.managedProjectIds || []).map((id) => new Types.ObjectId(id));
 
   if (role === "admin" || role === "accountant") {
-    return managedProjectIds.length > 0 ? uniqueObjectIds(managedProjectIds) : null;
+    const result = managedProjectIds.length > 0 ? uniqueObjectIds(managedProjectIds) : null;
+    req._cachedScopedProjectIds = result;
+    return result;
   }
 
   if (role === "project_manager") {
-    return uniqueObjectIds(managedProjectIds);
+    const result = uniqueObjectIds(managedProjectIds);
+    req._cachedScopedProjectIds = result;
+    return result;
   }
 
   if (role === "supervisor") {
@@ -100,9 +106,12 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
         ? [new Types.ObjectId(supervisor.assignedProjectId)]
         : [];
     const projectIds = [...supervisorProjectIds, ...managedProjectIds];
-    return uniqueObjectIds(projectIds);
+    const result = uniqueObjectIds(projectIds);
+    req._cachedScopedProjectIds = result;
+    return result;
   }
 
+  req._cachedScopedProjectIds = [];
   return [];
 }
 

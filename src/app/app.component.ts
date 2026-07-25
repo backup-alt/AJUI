@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, OnInit, inject } from "@angular/cor
 import { RouterOutlet } from "@angular/router";
 import { IonApp } from "@ionic/angular/standalone";
 import { ApiService } from "./core/api.service";
-import { MaterialsService } from "./core/materials.service";
 import { WorkspaceHydrationService } from "./core/workspace-hydration.service";
 
 @Component({
@@ -18,7 +17,6 @@ import { WorkspaceHydrationService } from "./core/workspace-hydration.service";
 })
 export class AppComponent implements OnInit {
   private readonly api = inject(ApiService);
-  private readonly materialsService = inject(MaterialsService);
   private readonly hydration = inject(WorkspaceHydrationService);
 
   ngOnInit(): void {
@@ -26,7 +24,6 @@ export class AppComponent implements OnInit {
       void this.hydration.hydrateFromBackend();
     }
     requestAnimationFrame(() => this.removeSplash());
-    void this.materialsService.refresh();
   }
 
   private removeSplash(): void {

@@ -31,7 +31,7 @@ const siteSchema = new Schema<ISite>(
     supervisorId: { type: Schema.Types.ObjectId, ref: "Supervisor" },
     startDate: { type: String },
     targetEndDate: { type: String },
-    projectIds: [{ type: Schema.Types.ObjectId, ref: "Project" }],
+    projectIds: [{ type: Schema.Types.ObjectId, ref: "Project", index: true }],
     openingBalance: { type: Number, default: 0 },
     vendorIds: [{ type: Schema.Types.ObjectId, ref: "Vendor", index: true }],
   },
