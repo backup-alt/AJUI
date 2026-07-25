@@ -40,21 +40,34 @@ export interface QuotationReportData {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="invoice-overlay" role="presentation" (click)="closeIfOverlay($event)">
-      <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Quotation Report">
-        <div class="invoice-toolbar">
-          <span>Quotation Preview</span>
-          <div class="toolbar-actions">
-            <button type="button" class="btn-secondary" (click)="exportToPDF()">
-              {{ saving() ? 'Generating...' : 'Download PDF' }}
-            </button>
-            <button type="button" class="btn-close" (click)="closed.emit()">Close</button>
+    @if (!embedded) {
+      <div class="invoice-overlay" role="presentation" (click)="closeIfOverlay($event)">
+        <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Quotation Report">
+          <div class="invoice-toolbar">
+            <span>Quotation Preview</span>
+            <div class="toolbar-actions">
+              <button type="button" class="btn-secondary" (click)="exportToPDF()">
+                {{ saving() ? 'Generating...' : 'Download PDF' }}
+              </button>
+              <button type="button" class="btn-close" (click)="closed.emit()">Close</button>
+            </div>
+          </div>
+          <div class="invoice-scroll-area">
+            <div class="invoice-page" id="quotation-report-print-area">
+              <ng-container *ngTemplateOutlet="reportContent"></ng-container>
+            </div>
           </div>
         </div>
+      </div>
+    } @else {
+      <div class="invoice-scroll-area">
+        <div class="invoice-page" id="quotation-report-print-area">
+          <ng-container *ngTemplateOutlet="reportContent"></ng-container>
+        </div>
+      </div>
+    }
 
-        <div class="invoice-scroll-area">
-          <div class="invoice-page" id="quotation-report-print-area">
-
+    <ng-template #reportContent>
             <div class="inv-header">
               <div class="inv-company-block">
                 <div class="inv-company-name">{{ profile().name || 'Company Name' }}</div>
@@ -180,11 +193,7 @@ export interface QuotationReportData {
             <div class="inv-footer-note">
               This is a computer-generated Quotation. No signature required. &nbsp;|&nbsp; Page <span class="page-num">{{ currentPage() }}</span> of <span class="page-total">{{ totalPages() }}</span>
             </div>
-
-          </div>
-        </div>
-      </div>
-    </div>
+    </ng-template>
   `,
   styles: [`
     .invoice-overlay {
@@ -302,6 +311,7 @@ export interface QuotationReportData {
 })
 export class QuotationReportComponent {
   @Input() quotationData: QuotationReportData | null = null;
+  @Input() embedded = false;
   @Output() closed = new EventEmitter<void>();
 
   private readonly data = inject(ErpDataService);
