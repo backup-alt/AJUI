@@ -3584,13 +3584,19 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
     const text = value.trim();
     if (!text) return null;
     const countMatch = text.match(/^(.+?)(?:[:x-])\s*(\d+(?:\.\d+)?)/i);
-    if (!countMatch) return null;
-    const wageMatch = text.match(/(?:@|wage\s*[:=-]?)\s*(?:[^\d-]*)?([\d,]+(?:\.\d+)?)/i);
-    return {
-      type: countMatch[1].trim(),
-      count: Number(countMatch[2]),
-      wage: wageMatch ? this.moneyNumber(wageMatch[1]) : 0,
-    };
+    if (countMatch) {
+      const wageMatch = text.match(/(?:@|wage\s*[:=-]?)\s*(?:[^\d-]*)?([\d,]+(?:\.\d+)?)/i);
+      return {
+        type: countMatch[1].trim(),
+        count: Number(countMatch[2]),
+        wage: wageMatch ? this.moneyNumber(wageMatch[1]) : 0,
+      };
+    }
+    const plainType = text.replace(/\s+/g, ' ').trim();
+    if (/^[a-z\s.&]+$/i.test(plainType) && plainType.length < 50) {
+      return { type: plainType, count: 1, wage: 0 };
+    }
+    return null;
   }
 
   private parseLabourTypeEntry(value: string): { type: string; count: number; wage: number } | null {
