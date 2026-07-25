@@ -16,7 +16,7 @@ interface Site {
   targetEndDate: string;
   projectNames: string[];
   address: string;
-  employeeCount?: number;
+  workerCount?: number;
 }
 
 @Component({
@@ -89,8 +89,8 @@ interface Site {
               </div>
               <div class="settings-w11-site-stats">
                 <div class="settings-w11-stat">
-                  <span class="settings-w11-stat-value">{{ s.employeeCount ?? 0 }}</span>
-                  <span class="settings-w11-stat-label">Employees</span>
+                  <span class="settings-w11-stat-value">{{ s.workerCount ?? 0 }}</span>
+                  <span class="settings-w11-stat-label">Workers</span>
                 </div>
               </div>
               <footer class="settings-w11-site-card-foot">
@@ -206,7 +206,7 @@ export class SettingsSitesComponent implements OnInit {
     this.sites.set(localSites);
     this.loading.set(false);
 
-    // Fetch admin sites (with live employeeCount and daysActive)
+    // Fetch admin sites (with live workerCount)
     this.api.listSitesAdmin().subscribe({
       next: (res) => {
         const remoteItems = (res?.sites || []).map((row: any, index: number) => {
@@ -220,7 +220,7 @@ export class SettingsSitesComponent implements OnInit {
             targetEndDate: row.targetEndDate || row.endDate || "Not available",
             projectNames: row.projectName ? [row.projectName] : [],
             address: row.address || "Not available",
-            employeeCount: typeof row.employeeCount === "number" ? row.employeeCount : undefined,
+            workerCount: typeof row.workerCount === "number" ? row.workerCount : undefined,
           };
         });
         // Merge: local first, then remote (dedup by id)
@@ -262,7 +262,7 @@ export class SettingsSitesComponent implements OnInit {
           targetEndDate: "Not available",
           projectNames: [p.name],
           address: p.address || "Not available",
-          employeeCount: siteEmployees,
+          workerCount: siteEmployees,
         });
         counter++;
       }
