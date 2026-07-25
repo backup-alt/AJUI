@@ -105,7 +105,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
               <app-empty-state
                 icon="search-outline"
                 title="No workers found"
-                [message]="'No workers match \"' + searchQuery() + '\"'"
+                message="Try a different search term"
               ></app-empty-state>
             } @else {
               @for (worker of filteredWorkers(); track worker._id) {

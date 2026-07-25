@@ -161,6 +161,7 @@ interface RawApprovalItem {
   labourTypes?: string;
   staffCount?: number;
   dailyWage?: number;
+  presentDays?: number;
   shift?: string;
   overtimeHours?: number;
   lateFine?: string;
