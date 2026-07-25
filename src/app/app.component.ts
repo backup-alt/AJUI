@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject } from "@angular/core";
 import { RouterOutlet } from "@angular/router";
 import { IonApp } from "@ionic/angular/standalone";
+import { ApiService } from "./core/api.service";
 import { MaterialsService } from "./core/materials.service";
-
-const CACHE_VERSION = "v2-site-fix";
+import { WorkspaceHydrationService } from "./core/workspace-hydration.service";
 
 @Component({
   selector: "app-root",
@@ -17,22 +17,28 @@ const CACHE_VERSION = "v2-site-fix";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit {
+  private readonly api = inject(ApiService);
   private readonly materialsService = inject(MaterialsService);
+  private readonly hydration = inject(WorkspaceHydrationService);
 
   ngOnInit(): void {
-    if (typeof localStorage !== "undefined") {
-      const currentVersion = localStorage.getItem("agb-cache-version");
-      if (currentVersion !== CACHE_VERSION) {
-        localStorage.removeItem("agb-erp:materials");
-        localStorage.removeItem("agb-erp:labour");
-        localStorage.removeItem("agb-erp:expenses");
-        localStorage.removeItem("agb-erp:vendors");
-        localStorage.removeItem("agb-erp:supervisors");
-        localStorage.removeItem("agb-erp:subcontractors");
-        localStorage.removeItem("agb-erp:sites");
-        localStorage.setItem("agb-cache-version", CACHE_VERSION);
-      }
+    if (this.api.isAuthenticated()) {
+      this.hydration.hydrateFromBackend().finally(() => {
+        this.removeSplash();
+      });
+    } else {
+      this.removeSplash();
     }
     void this.materialsService.refresh();
+  }
+
+  private removeSplash(): void {
+    try {
+      const splash = document.getElementById("app-splash");
+      if (splash) {
+        splash.classList.add("hide");
+        setTimeout(() => splash.remove(), 400);
+      }
+    } catch {}
   }
 }
