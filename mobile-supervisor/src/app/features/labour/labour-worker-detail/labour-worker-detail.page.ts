@@ -1116,7 +1116,7 @@ export class LabourWorkerDetailPage implements OnInit {
     console.log('[WorkerDetail] Loading worker:', this.workerId);
     this.supervisor.getWorkerDetail(this.workerId).subscribe({
       next: (res) => {
-        console.log('[WorkerDetail] Worker loaded:', res.worker);
+        console.log('[WorkerDetail] Worker loaded:', res.worker?.name, 'weeklyPay:', res.worker?.weeklyPay);
         this.worker.set(res.worker);
         this.weeklyPayInput.set(res.worker.weeklyPay);
         this.isLoading.set(false);
@@ -1133,8 +1133,13 @@ export class LabourWorkerDetailPage implements OnInit {
     console.log('[WorkerDetail] Loading attendance for worker:', this.workerId);
     this.supervisor.getAttendanceForWorker(this.workerId).subscribe({
       next: (res) => {
-        console.log('[WorkerDetail] Attendance loaded:', res.items?.length || 0, 'records');
-        this.attendance.set(res.items || []);
+        const items = res.items || [];
+        console.log('[WorkerDetail] Attendance loaded:', items.length, 'records');
+        items.forEach((a: any) => {
+          console.log('[WorkerDetail]   -', a.attendanceDate, 'shifts:', a.shiftCount, 'weeklyPay:', a.weeklyPay);
+        });
+        this.attendance.set(items);
+        console.log('[WorkerDetail] effectiveWeeklyPay:', this.effectiveWeeklyPay(), 'dailyWage:', this.dailyWage(), 'weeklyEarnings:', this.weeklyEarnings());
       },
       error: (err) => {
         console.error('[WorkerDetail] Error loading attendance:', err);
