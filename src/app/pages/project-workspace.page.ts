@@ -2545,6 +2545,20 @@ export class ProjectWorkspacePage {
 
     const projectMaterials = this.data.materials().filter((row) => row.projectId === projectId);
     const vendorNamesInProject = new Set(projectMaterials.map((m) => m.vendor).filter(Boolean));
+
+    const projectSiteIds = new Set<string>();
+    for (const site of this.data.siteEntities()) {
+      if ((site as any).projectIds?.includes(projectId)) {
+        projectSiteIds.add(site.id);
+        if ((site as any)._id) projectSiteIds.add((site as any)._id);
+      }
+    }
+    for (const vendor of this.data.vendors()) {
+      if (vendor.siteIds?.some((sid) => projectSiteIds.has(sid))) {
+        vendorNamesInProject.add(vendor.name);
+      }
+    }
+
     const vendors = this.data.vendors()
       .filter((vendor) => vendorNamesInProject.has(vendor.name))
       .map((vendor) => ({
