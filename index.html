@@ -7,11 +7,11 @@
     <link rel="icon" type="image/png" href="assets/logo.png" />
     <title>Annai Golden Builders Dashboard</title>
     <style>
-      #app-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #f8fafc; z-index: 99999; transition: opacity 0.3s ease; }
+      #app-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; background: #f8fafc; z-index: 99999; transition: opacity 0.3s ease; }
       #app-splash.hide { opacity: 0; pointer-events: none; }
-      .splash-spinner { width: 36px; height: 36px; border: 3px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: splash-spin 0.8s linear infinite; }
+      .splash-spinner { width: 36px; height: 36px; border: 3px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: splash-spin 0.8s linear infinite; margin: 0 auto; }
       @keyframes splash-spin { to { transform: rotate(360deg); } }
-      .splash-text { margin-top: 16px; color: #64748b; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; }
+      .splash-text { margin-top: 16px; color: #64748b; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; text-align: center; }
     </style>
   </head>
   <body>
