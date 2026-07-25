@@ -68,9 +68,8 @@ export type VendorFormValue = {
               <div class="site-field">
                 <div class="site-chips">
                   @for (siteId of selectedSiteIds; track siteId) {
-                    @let site = siteName(siteId);
                     <span class="site-chip">
-                      {{ site || siteId }}
+                      {{ siteNameMap().get(siteId) || siteId }}
                       <button type="button" class="chip-remove" (click)="toggleSite(siteId)" aria-label="Remove site">×</button>
                     </span>
                   }
@@ -205,6 +204,16 @@ export class VendorFormDialogComponent implements OnInit {
     return source.filter((s) => !this.selectedSiteIds.includes(s.id));
   });
 
+  readonly siteNameMap = computed(() => {
+    const map = new Map<string, string>();
+    for (const e of this.allSiteEntities()) {
+      if (e.id && e.name) map.set(e.id, e.name);
+      if (e._id && e.name) map.set(e._id, e.name);
+      if (e.siteId && e.name) map.set(e.siteId, e.name);
+    }
+    return map;
+  });
+
   async ngOnInit() {
     // Load sites from backend first so siteEntities is populated for name lookup
     await this.loadSitesFromBackend();
@@ -241,54 +250,6 @@ export class VendorFormDialogComponent implements OnInit {
     } catch (e) {
       console.warn("Failed to load sites from backend for vendor dialog", e);
     }
-  }
-
-  siteName(id: string): string {
-    if (!id) return "Unassigned site";
-
-    const entities = this.allSiteEntities();
-    const directMatch = entities.find((s) =>
-      s.id === id || s._id === id || s.siteId === id
-    );
-    if (directMatch?.name) return directMatch.name;
-
-    const projectMatch = this.findSiteInProjects(id);
-    if (projectMatch) return projectMatch;
-
-    const materialMatch = this.findSiteInMaterials(id);
-    if (materialMatch) return materialMatch;
-
-    return `Site (${id.slice(0, 8)}...)`;
-  }
-
-  private findSiteInProjects(id: string): string | null {
-    for (const project of this.data.projects()) {
-      if (project?.id === id && project.name) return project.name;
-      // Check siteIds array (may contain ObjectId strings)
-      const siteIds = (project as any)?.siteIds;
-      if (Array.isArray(siteIds) && siteIds.includes(id)) {
-        // Try to find matching site name from siteNames array
-        const siteNames = (project as any)?.siteNames;
-        const idx = siteIds.indexOf(id);
-        if (Array.isArray(siteNames) && siteNames[idx]) return siteNames[idx];
-        if (project.name) return project.name;
-      }
-      if (Array.isArray(project?.sites)) {
-        for (const siteName of project.sites) {
-          if (siteName === id) return siteName;
-        }
-      }
-    }
-    return null;
-  }
-
-  private findSiteInMaterials(id: string): string | null {
-    try {
-      const materials = this.data.materials?.() ?? [];
-      const match = materials.find((m: any) => m?.site === id || m?.siteId === id);
-      if (match?.site) return match.site;
-    } catch {}
-    return null;
   }
 
   toggleSite(id: string) {
