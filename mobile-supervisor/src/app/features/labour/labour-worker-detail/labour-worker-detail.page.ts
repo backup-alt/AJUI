@@ -348,6 +348,23 @@ interface WageCalculation {
                 <span class="wage-label">Weekly Salary (base)</span>
                 <span class="wage-value">{{ effectiveWeeklyPay() | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
+
+              <div class="wage-edit-row">
+                <label class="wage-label" for="weeklyPayInput">Set Weekly Pay</label>
+                <div class="wage-edit-input-wrap">
+                  <span class="wage-currency">₹</span>
+                  <input
+                    id="weeklyPayInput"
+                    type="number"
+                    class="wage-edit-input"
+                    [value]="weeklyPayInput()"
+                    (input)="onWeeklyPayChange($event)"
+                    min="0"
+                    placeholder="0"
+                  />
+                  <button class="wage-save-btn" (click)="saveWeeklyPay()">Save</button>
+                </div>
+              </div>
               <div class="wage-row">
                 <span class="wage-label">Days Worked</span>
                 <span class="wage-value">{{ attendanceDays().length }}</span>
@@ -837,6 +854,56 @@ interface WageCalculation {
       font-weight: 800;
       color: var(--m3-primary);
     }
+    .wage-edit-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: var(--md-space-2) 0;
+      border-top: 1px solid var(--m3-outline-variant);
+      margin-top: var(--md-space-2);
+    }
+    .wage-edit-row .wage-label {
+      font-size: 12px;
+      color: var(--m3-on-surface-muted);
+    }
+    .wage-edit-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .wage-currency {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--m3-on-surface-muted);
+    }
+    .wage-edit-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-lg);
+      background: var(--m3-surface-container);
+      color: var(--m3-on-surface);
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      outline: none;
+    }
+    .wage-edit-input:focus {
+      border-color: var(--m3-primary);
+    }
+    .wage-save-btn {
+      padding: 8px 16px;
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      border-radius: var(--md-radius-lg);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .wage-save-btn:active { opacity: 0.8; }
 
     .wage-rules {
       background: var(--m3-surface-container);
@@ -978,9 +1045,10 @@ export class LabourWorkerDetailPage implements OnInit {
   weeklyPayInput = signal<number>(0);
 
   effectiveWeeklyPay = computed(() => {
+    const weeklyFromInput = this.weeklyPayInput() || 0;
     const weeklyFromWorker = this.worker()?.weeklyPay || 0;
     const weeklyFromAttendance = this.attendance().find(a => a.weeklyPay > 0)?.weeklyPay || 0;
-    return weeklyFromWorker || weeklyFromAttendance;
+    return weeklyFromInput || weeklyFromWorker || weeklyFromAttendance;
   });
 
   dailyWage = computed(() => {
@@ -1197,6 +1265,32 @@ export class LabourWorkerDetailPage implements OnInit {
   onWeeklyPayChange(event: Event): void {
     const val = parseFloat((event.target as HTMLInputElement).value);
     this.weeklyPayInput.set(isNaN(val) ? 0 : val);
+  }
+
+  async saveWeeklyPay(): Promise<void> {
+    const newPay = this.weeklyPayInput();
+    if (newPay <= 0) return;
+    try {
+      await this.supervisor.updateWorkerWeeklyPay(this.workerId, newPay).toPromise();
+      const w = this.worker();
+      if (w) this.worker.set({ ...w, weeklyPay: newPay } as any);
+      const toast = await this.toastCtrl.create({
+        message: 'Weekly pay updated',
+        duration: 2000,
+        color: 'success',
+        position: 'top',
+      });
+      await toast.present();
+    } catch (err) {
+      console.error('[WorkerDetail] Failed to update weekly pay', err);
+      const toast = await this.toastCtrl.create({
+        message: 'Failed to update weekly pay',
+        duration: 2500,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+    }
   }
 
   markAttendance(): void {

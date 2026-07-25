@@ -122,6 +122,19 @@ export async function getWorkerById(id: string) {
   return worker;
 }
 
+export async function updateWorker(id: string, updates: { weeklyPay?: number }) {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new AppError(400, "Invalid worker id");
+  }
+  const worker = await Worker.findById(id);
+  if (!worker) throw new AppError(404, "Worker not found");
+  if (updates.weeklyPay !== undefined) {
+    worker.weeklyPay = updates.weeklyPay;
+  }
+  await worker.save();
+  return worker.toObject();
+}
+
 export async function getWorkersBySite(siteId: string, labourType?: string) {
   const query: Record<string, unknown> = { siteId: new Types.ObjectId(siteId) };
   if (labourType) query.labourType = labourType;

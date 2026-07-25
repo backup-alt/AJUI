@@ -57,6 +57,7 @@ router.post("/supervisor/labour", validate(createLabourMobileSchema), ctrl.creat
 router.post("/supervisor/workers", validate(createWorkerSchema), ctrl.createWorker);
 router.get("/supervisor/workers", ctrl.listWorkers);
 router.get("/supervisor/workers/:id", ctrl.getWorker);
+router.patch("/supervisor/workers/:id", ctrl.updateWorker);
 
 // Attendance
 router.post("/supervisor/attendance", validate(markAttendanceSchema), ctrl.markAttendance);

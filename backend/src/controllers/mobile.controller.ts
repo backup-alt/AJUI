@@ -525,6 +525,13 @@ export async function getWorker(req: Request, res: Response, next: NextFunction)
   } catch (e) { next(e); }
 }
 
+export async function updateWorker(req: Request, res: Response, next: NextFunction) {
+  try {
+    const worker = await workerService.updateWorker(req.params.id, req.body);
+    res.json({ worker });
+  } catch (e) { next(e); }
+}
+
 // =================== ATTENDANCE (mobile) ===================
 export async function markAttendance(req: Request, res: Response, next: NextFunction) {
   try {
