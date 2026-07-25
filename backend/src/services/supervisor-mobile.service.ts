@@ -406,26 +406,22 @@ export async function getAssignedSites(userId: string) {
   const workerMap = new Map<string, { workerCount: number; daysActiveCount: number }>();
   for (const stat of workerStats) {
     const siteName = stat.site as string;
-    const pid = (stat.projectId as Types.ObjectId).toString();
-    const key = `${siteName}__${pid}`;
-    workerMap.set(key, { workerCount: stat.workerCount, daysActiveCount: 0 });
+    const key = siteName;
+    const existing = workerMap.get(key) || { workerCount: 0, daysActiveCount: 0 };
+    existing.workerCount += stat.workerCount;
+    workerMap.set(key, existing);
   }
   for (const stat of labourStats) {
     const siteName = stat.site as string;
-    const pid = (stat.projectId as Types.ObjectId).toString();
-    const key = `${siteName}__${pid}`;
+    const key = siteName;
     const existing = workerMap.get(key) || { workerCount: 0, daysActiveCount: 0 };
     existing.daysActiveCount = stat.daysActiveCount;
     workerMap.set(key, existing);
   }
 
   return sites.map((s) => {
-    const matchingProjectId = (s.projectIds || []).find((pid) =>
-      projectIds.length === 0 || projectIds.includes(pid.toString())
-    );
-    const firstProjectId = matchingProjectId?.toString() || s.projectIds?.[0]?.toString();
-    const key = `${s.name}__${firstProjectId}`;
-    const stats = workerMap.get(key) || { workerCount: 0, daysActiveCount: 0 };
+    const stats = workerMap.get(s.name) || { workerCount: 0, daysActiveCount: 0 };
+    const firstProjectId = s.projectIds?.[0]?.toString();
     return {
       id: s._id.toString(),
       siteId: s.siteId,

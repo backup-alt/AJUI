@@ -21,10 +21,9 @@ import {
   checkmarkCircle,
   alertCircleOutline,
   constructOutline,
-  calendarOutline,
   chevronForwardOutline,
-  layersOutline,
   searchOutline,
+  timeOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Site, Material } from '../../shared/models';
@@ -110,25 +109,13 @@ import {
                     </div>
                   </div>
                 }
-                @if (site.daysActive !== undefined) {
-                  <div class="stat">
-                    <span class="stat-tile stat-tile-gold">
-                      <ion-icon name="calendar-outline"></ion-icon>
-                    </span>
-                    <div>
-                      <div class="stat-value">{{ site.daysActive }}</div>
-                      <div class="stat-label">Day{{ site.daysActive === 1 ? '' : 's' }} active</div>
-                    </div>
-                  </div>
-                }
                 <div class="stat">
-                  <span class="stat-tile stat-tile-green">
-                    <ion-icon name="layers-outline"></ion-icon>
+                  <span class="stat-tile stat-tile-gold">
+                    <ion-icon name="time-outline"></ion-icon>
                   </span>
                   <div>
-                    <app-status-pill [tone]="getStatusTone(site.status)">
-                      {{ site.status || 'Active' }}
-                    </app-status-pill>
+                    <div class="stat-value">{{ getPendingApprovalsCount(site) }}</div>
+                    <div class="stat-label">Pending</div>
                   </div>
                 </div>
               </div>
@@ -266,7 +253,7 @@ import {
 
     .site-stats {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 8px;
       margin-bottom: var(--md-space-3);
     }
@@ -500,14 +487,31 @@ export class SitesPage implements OnInit {
     });
   });
 
+  pendingApprovals = signal<any[]>([]);
+
   async ngOnInit(): Promise<void> {
     addIcons({
       locationOutline, cubeOutline, peopleOutline, arrowForwardOutline,
       closeOutline, businessOutline, checkmarkCircle, alertCircleOutline,
-      constructOutline, calendarOutline, chevronForwardOutline, layersOutline,
-      searchOutline,
+      constructOutline, chevronForwardOutline, searchOutline, timeOutline,
     });
     await this.loadSites();
+    this.loadApprovals();
+  }
+
+  private loadApprovals(): void {
+    this.supervisor.getApprovals().subscribe({
+      next: (res) => {
+        this.pendingApprovals.set(res.approvals || []);
+      },
+      error: () => this.pendingApprovals.set([]),
+    });
+  }
+
+  getPendingApprovalsCount(site: Site): number {
+    return this.pendingApprovals().filter((a) =>
+      (a.site === site.name || a.site === site.siteId) && a.status === 'Pending'
+    ).length;
   }
 
   async loadSites(): Promise<void> {
@@ -599,15 +603,6 @@ export class SitesPage implements OnInit {
     });
     await toast.present();
     window.dispatchEvent(new CustomEvent('agb:site-changed', { detail: site.id }));
-  }
-
-  getStatusTone(status?: string): 'success' | 'warning' | 'info' | 'neutral' {
-    switch (status) {
-      case 'Active': return 'success';
-      case 'On Hold': return 'warning';
-      case 'Completed': return 'info';
-      default: return 'neutral';
-    }
   }
 
   getMaterialTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {

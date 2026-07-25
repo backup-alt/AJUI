@@ -129,6 +129,17 @@ export class NotificationService {
     this.persistNotifications();
   }
 
+  notify(title: string, body: string, data?: Record<string, string>): void {
+    this.addInApp({
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      body,
+      data,
+      receivedAt: Date.now(),
+      read: false,
+    });
+  }
+
   markAllRead(): void {
     this.notifications.update((list) => list.map((n) => ({ ...n, read: true })));
     this.unreadCount.set(0);

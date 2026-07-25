@@ -190,17 +190,10 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
           } @else {
             @for (site of sites().slice(0, 5); track site.id) {
               <button class="site-row" (click)="navigateToSite(site)">
-                <span class="status-dot"
-                  [class.dot-active]="site.status === 'Active'"
-                  [class.dot-hold]="site.status === 'On Hold'"
-                  [class.dot-done]="site.status === 'Completed'"></span>
                 <div class="site-info">
                   <span class="site-name">{{ site.name }}</span>
                   <span class="site-meta">
                     {{ site.employeeCount || 0 }} worker{{ (site.employeeCount || 0) !== 1 ? 's' : '' }}
-                    @if (site.updatedAt) {
-                      <span class="meta-dot">·</span> {{ timeAgo(site.updatedAt) }}
-                    }
                   </span>
                 </div>
                 <ion-icon name="chevron-forward-outline" class="site-arrow"></ion-icon>

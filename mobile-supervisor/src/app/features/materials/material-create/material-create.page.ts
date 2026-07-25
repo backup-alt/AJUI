@@ -25,6 +25,7 @@ import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import { locationOutline, cubeOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
+import { NotificationService } from '../../../core/services/notification.service';
 import { CustomFieldsService } from '../../../core/services/custom-fields.service';
 import { CustomField } from '../../../shared/models';
 import { Vendor } from '../../../shared/models';
@@ -339,6 +340,7 @@ export class MaterialCreatePage implements OnInit {
   private customFieldsService = inject(CustomFieldsService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
+  private notifications = inject(NotificationService);
 
   material = {
     name: '',
@@ -496,6 +498,10 @@ export class MaterialCreatePage implements OnInit {
           position: 'top',
         });
         await toast.present();
+        this.notifications.notify(
+          'Material Request Submitted',
+          `Request for ${this.material.name} has been submitted for approval.`
+        );
         this.router.navigate(['/tabs/materials']);
       },
       error: async (err) => {

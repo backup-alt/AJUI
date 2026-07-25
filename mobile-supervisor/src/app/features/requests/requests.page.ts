@@ -30,6 +30,7 @@ import {
   chevronForwardOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import {
   PageHeaderComponent,
@@ -439,6 +440,7 @@ export class RequestsPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
   private alertCtrl = inject(AlertController);
+  private notifications = inject(NotificationService);
 
   activeTab: 'pending' | 'approved' | 'declined' | 'upload' = 'pending';
   isLoading = signal(true);
@@ -687,6 +689,10 @@ export class RequestsPage implements OnInit {
       if (typeof window !== 'undefined' && item.type === 'material') {
         window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: item._id, reason: 'received' } }));
       }
+      this.notifications.notify(
+        'Material Submitted',
+        `Receipt for ${item.title || 'material'} has been uploaded successfully.`
+      );
       await this.loadAllRequests();
     } catch (err: any) {
       const toast = await this.toastCtrl.create({
