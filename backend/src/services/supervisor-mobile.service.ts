@@ -358,7 +358,7 @@ export async function getAssignedSites(userId: string) {
 
   const workerStats = await Worker.aggregate([
     {
-      $match: { ...workerMatch, isActive: true },
+      $match: { ...workerMatch },
     },
     {
       $group: {
