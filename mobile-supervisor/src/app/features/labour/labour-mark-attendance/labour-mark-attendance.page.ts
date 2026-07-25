@@ -25,6 +25,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { addIcons } from 'ionicons';
 import { locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline, alertCircleOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
+import { NotificationService } from '../../../core/services/notification.service';
 import { Worker, LabourPaymentMode } from '../../../shared/models';
 import { CurrencyPipe } from '@angular/common';
 
@@ -279,6 +280,7 @@ export class LabourMarkAttendancePage implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private toastCtrl = inject(ToastController);
+  private notifications = inject(NotificationService);
 
   worker = signal<Worker | null>(null);
 
@@ -312,26 +314,26 @@ export class LabourMarkAttendancePage implements OnInit {
   }
 
   async loadWorker(): Promise<void> {
-    this.supervisor.getWorkerDetail(this.workerId).subscribe({
-      next: (res) => this.worker.set(res.worker),
-      error: (err) => {
-        console.error('[MarkAttendance] failed to load worker', err);
-      },
-    });
+    try {
+      const res = await this.supervisor.getWorkerDetail(this.workerId).toPromise();
+      this.worker.set(res?.worker || null);
+    } catch (err) {
+      console.error('[MarkAttendance] failed to load worker', err);
+    }
   }
 
   async checkExistingAttendance(): Promise<void> {
     const siteId = this.selectedSiteId();
     const projectId = this.siteProjectId();
-    this.supervisor.getAttendanceForWorker(this.workerId, 1, 50).subscribe({
-      next: (res) => {
-        const existing = (res.items || []).find(
-          (a: any) => a.attendanceDate === this.attendanceDate
-        );
-        this.alreadyMarked.set(!!existing);
-      },
-      error: () => this.alreadyMarked.set(false),
-    });
+    try {
+      const res = await this.supervisor.getAttendanceForWorker(this.workerId, 1, 50).toPromise();
+      const existing = (res?.items || []).find(
+        (a: any) => a.attendanceDate === this.attendanceDate
+      );
+      this.alreadyMarked.set(!!existing);
+    } catch {
+      this.alreadyMarked.set(false);
+    }
   }
 
   isValid(): boolean {
@@ -395,6 +397,10 @@ export class LabourMarkAttendancePage implements OnInit {
           position: 'top',
         });
         await toast.present();
+        this.notifications.notify(
+          'Attendance Marked',
+          `Attendance for ${this.worker()?.name || 'worker'} has been submitted for approval.`
+        );
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('agb:labour-changed'));
         }

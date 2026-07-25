@@ -242,11 +242,21 @@ import { Site } from '../../shared/models';
   styles: [`
     :host { display: block; }
 
+    /* ─── Menu layout ─── */
+    .agb-menu {
+      --background: var(--m3-surface-bright);
+    }
+    .agb-menu::part(container) {
+      display: flex;
+      flex-direction: column;
+    }
+
     /* ─── Menu header ─── */
     .agb-menu-header {
       background: linear-gradient(135deg, #002263 0%, #003380 100%);
       color: #ffffff;
       padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+      flex-shrink: 0;
     }
     .menu-brand {
       display: flex;
@@ -254,9 +264,9 @@ import { Site } from '../../shared/models';
       gap: 12px;
     }
     .menu-brand-logo {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
+      width: 46px;
+      height: 46px;
+      border-radius: 10px;
       background: #ffffff;
       display: flex;
       align-items: center;
@@ -301,9 +311,10 @@ import { Site } from '../../shared/models';
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 16px 8px;
+      padding: var(--md-space-3) var(--md-space-4) var(--md-space-2);
       border-bottom: 1px solid var(--m3-outline-variant);
       margin: 0;
+      flex-shrink: 0;
     }
     .user-avatar {
       width: 32px;
@@ -345,7 +356,7 @@ import { Site } from '../../shared/models';
       color: var(--m3-on-surface-muted);
       text-transform: uppercase;
       letter-spacing: 1.2px;
-      padding: 10px var(--md-space-5) 4px;
+      padding: 14px var(--md-space-5) 6px;
     }
 
     /* ─── Menu list ─── */
@@ -361,10 +372,10 @@ import { Site } from '../../shared/models';
       --inner-border-radius: var(--md-radius-lg);
       --padding-start: var(--md-space-3);
       --padding-end: var(--md-space-3);
-      --min-height: 42px;
+      --min-height: 46px;
       font-size: 14px;
       font-weight: 600;
-      margin: 1px 0;
+      margin: 3px 0;
       border-bottom: none;
       transition: background var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
@@ -399,10 +410,12 @@ import { Site } from '../../shared/models';
     }
 
     /* ─── Spacer & Footer ─── */
-    .menu-spacer { flex: 1; min-height: 4px; max-height: 12px; }
+    .menu-spacer { flex: 0; min-height: 0; }
 
     .menu-footer {
-      padding: 8px var(--md-space-3) calc(12px + env(safe-area-inset-bottom));
+      padding: 4px var(--md-space-3) calc(8px + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--m3-outline-variant);
+      flex-shrink: 0;
     }
     .menu-footer ion-item {
       --background: transparent;
@@ -423,7 +436,7 @@ import { Site } from '../../shared/models';
       gap: var(--md-space-2);
       font-size: 10px;
       color: var(--m3-on-surface-muted);
-      margin-top: 8px;
+      margin-top: 4px;
       letter-spacing: 0.5px;
       text-transform: uppercase;
     }
@@ -437,13 +450,13 @@ import { Site } from '../../shared/models';
     .site-selector {
       display: flex;
       align-items: center;
-      gap: var(--md-space-3);
+      gap: var(--md-space-2);
       background: var(--m3-surface-container);
       border: 1px solid var(--m3-outline-variant);
-      padding: var(--md-space-1) var(--md-space-3) var(--md-space-1) var(--md-space-1);
+      padding: 6px var(--md-space-3) 6px 6px;
       border-radius: var(--md-radius-pill);
       cursor: pointer;
-      max-width: min(52vw, 240px);
+      max-width: min(55vw, 260px);
       min-width: 0;
       margin: 0 auto;
       transition:
@@ -718,6 +731,6 @@ export class ShellComponent implements OnInit {
   }
 
   async openNotifications(): Promise<void> {
-    await this.router.navigate(['/tabs/requests']);
+    await this.router.navigate(['/tabs/notifications']);
   }
 }

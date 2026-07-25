@@ -4,6 +4,7 @@ import {
   IonIcon,
   IonRefresher,
   IonRefresherContent,
+  IonSpinner,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
@@ -21,9 +22,12 @@ import {
   locationOutline,
   clipboardOutline,
   addOutline,
+  refreshOutline,
+  cloudOfflineOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { AuthService } from '../../core/services/auth.service';
+import { AppReadyService } from '../../core/services/app-ready.service';
 import { DashboardData, Site } from '../../shared/models';
 import { Expense } from '../../shared/models/expense.model';
 import { CurrencyPipe, DatePipe } from '@angular/common';
@@ -36,6 +40,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     IonIcon,
     IonRefresher,
     IonRefresherContent,
+    IonSpinner,
     CurrencyPipe,
     DatePipe,
   ],
@@ -45,6 +50,31 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
+      <!-- ═══ LOADING STATE ═══ -->
+      @if (loading()) {
+        <div class="state-container">
+          <ion-spinner name="crescent" class="state-spinner"></ion-spinner>
+          <span class="state-text">Loading dashboard...</span>
+        </div>
+      }
+
+      <!-- ═══ ERROR STATE ═══ -->
+      @else if (error()) {
+        <div class="state-container">
+          <div class="error-icon-wrap">
+            <ion-icon name="cloud-offline-outline"></ion-icon>
+          </div>
+          <span class="error-title">Connection failed</span>
+          <span class="error-text">Unable to load dashboard data. Check your network and try again.</span>
+          <button class="retry-btn" (click)="retryLoad()">
+            <ion-icon name="refresh-outline"></ion-icon>
+            Retry
+          </button>
+        </div>
+      }
+
+      <!-- ═══ DASHBOARD CONTENT ═══ -->
+      @else {
       <div class="dash-wrap">
 
         <!-- ═══ GREETING ═══ -->
@@ -118,11 +148,16 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
                     </div>
                     <div class="expense-row-details">
                       <span class="expense-row-desc">{{ expense.description }}</span>
-                      <span class="expense-row-meta">{{ expense.materialVendor || expense.type }}</span>
+                      <span class="expense-row-meta">
+                        {{ expense.materialVendor || expense.site || expense.type }}
+                        <span class="meta-dot">·</span>
+                        {{ expense.createdAt | date:'MMM d' }}
+                        <span class="meta-dot">·</span>
+                        {{ expense.createdAt | date:'shortTime' }}
+                      </span>
                     </div>
                     <div class="expense-row-right">
                       <span class="expense-row-amt">{{ expense.amount | currency:'INR':'symbol':'1.0-0' }}</span>
-                      <span class="expense-row-time">{{ expense.createdAt | date:'shortTime' }}</span>
                     </div>
                   </div>
                 }
@@ -155,17 +190,12 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
           } @else {
             @for (site of sites().slice(0, 5); track site.id) {
               <button class="site-row" (click)="navigateToSite(site)">
-                <span class="status-dot"
-                  [class.dot-active]="site.status === 'Active'"
-                  [class.dot-hold]="site.status === 'On Hold'"
-                  [class.dot-done]="site.status === 'Completed'"></span>
                 <div class="site-info">
                   <span class="site-name">{{ site.name }}</span>
                   <span class="site-meta">
                     {{ site.employeeCount || 0 }} worker{{ (site.employeeCount || 0) !== 1 ? 's' : '' }}
                   </span>
                 </div>
-                <span class="site-status-text">{{ site.status || 'Active' }}</span>
                 <ion-icon name="chevron-forward-outline" class="site-arrow"></ion-icon>
               </button>
             }
@@ -174,6 +204,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 
         <div class="bottom-spacer"></div>
       </div>
+      }
     </ion-content>
   `,
   styles: [`
@@ -184,6 +215,74 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       --background: var(--m3-surface);
       --color: var(--m3-on-surface);
     }
+
+    /* ─────────────────────────────────────────────
+       LOADING / ERROR STATE
+       ───────────────────────────────────────────── */
+    .state-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: calc(env(safe-area-inset-top) + 80px) var(--md-space-6) var(--md-space-6);
+      text-align: center;
+      min-height: 60vh;
+    }
+    .state-spinner {
+      --color: var(--m3-primary);
+      width: 36px;
+      height: 36px;
+    }
+    .state-text {
+      font-size: 13px;
+      color: var(--m3-on-surface-muted);
+      font-weight: 500;
+    }
+    .error-icon-wrap {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--m3-error-container);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .error-icon-wrap ion-icon {
+      font-size: 28px;
+      color: var(--m3-error);
+    }
+    .error-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      margin-top: 8px;
+    }
+    .error-text {
+      font-size: 13px;
+      color: var(--m3-on-surface-muted);
+      line-height: 1.4;
+      max-width: 260px;
+    }
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: var(--md-space-2) var(--md-space-5);
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      border-radius: var(--md-radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .retry-btn:active {
+      opacity: 0.85;
+    }
+
     .dash-wrap {
       padding: 0 var(--md-space-4);
       padding-top: env(safe-area-inset-top);
@@ -420,6 +519,12 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .expense-row-meta {
       font-size: 11px;
       color: var(--m3-on-surface-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .meta-dot {
+      opacity: 0.4;
     }
 
     .expense-row-right {
@@ -433,10 +538,6 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       font-size: 13px;
       font-weight: 600;
       color: var(--m3-on-surface);
-    }
-    .expense-row-time {
-      font-size: 10px;
-      color: var(--m3-on-surface-muted);
     }
 
     .expense-viewall {
@@ -543,14 +644,11 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     .site-meta {
       font-size: 12px;
       color: var(--m3-on-surface-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
-
-    .site-status-text {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--m3-on-surface-muted);
-      flex-shrink: 0;
-    }
+    .meta-dot { opacity: 0.4; }
 
     .site-arrow {
       font-size: 14px;
@@ -613,11 +711,14 @@ export class DashboardPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private appReady = inject(AppReadyService);
 
   dashboard = signal<DashboardData | null>(null);
   sites = signal<Site[]>([]);
   todayExpenses = signal<Expense[]>([]);
   userName = signal<string>('Supervisor');
+  loading = signal<boolean>(true);
+  error = signal<boolean>(false);
 
   userInitial(): string {
     return this.userName().charAt(0).toUpperCase();
@@ -638,27 +739,47 @@ export class DashboardPage implements OnInit, OnDestroy {
     return 'document-text-outline';
   }
 
+  timeAgo(dateStr: string): string {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diffMs = now - then;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d ago`;
+    const diffWk = Math.floor(diffDay / 7);
+    if (diffWk < 4) return `${diffWk}w ago`;
+    return `${Math.floor(diffDay / 30)}mo ago`;
+  }
+
   async ngOnInit(): Promise<void> {
     addIcons({
       cubeOutline, peopleOutline, constructOutline,
       homeOutline, businessOutline, receiptOutline,
       personOutline, cashOutline, documentTextOutline,
       chevronForwardOutline, locationOutline,
-      clipboardOutline, addOutline,
+      clipboardOutline, addOutline, refreshOutline,
+      cloudOfflineOutline,
     });
-
-    await this.auth.initAfterLogin();
-    await this.loadDashboard();
 
     if (typeof window !== 'undefined') {
       window.addEventListener('agb:site-changed', this.handleSiteChange);
     }
+
+    // Load all data; signal appReady when done
+    const success = await this.loadDashboard();
+    this.appReady.resolve(success);
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:site-changed', this.handleSiteChange);
     }
+    // Ensure splash always resolves even if component is destroyed prematurely
+    this.appReady.resolve(false);
   }
 
   private handleSiteChange = (): void => {
@@ -666,59 +787,81 @@ export class DashboardPage implements OnInit, OnDestroy {
   };
 
   async refreshDashboard(event: CustomEvent): Promise<void> {
+    this.error.set(false);
     await this.loadDashboard();
     (event.target as HTMLIonRefresherElement).complete();
   }
 
-  async loadDashboard(): Promise<void> {
+  async retryLoad(): Promise<void> {
+    this.error.set(false);
+    this.loading.set(true);
+    const success = await this.loadDashboard();
+    this.appReady.resolve(success);
+  }
+
+  async loadDashboard(): Promise<boolean> {
+    this.loading.set(true);
+    this.error.set(false);
+
     try {
-      this.supervisor.getDashboard().subscribe({
-        next: (response) => {
-          this.dashboard.set(response.dashboard);
-        },
-        error: (err) => {
-          console.error('[Dashboard] failed to load', err);
-        },
-      });
+      // Fire all requests in parallel, catch each individually
+      let dashData: DashboardData | null = null;
+      let sitesData: Site[] = [];
+      let profileName: string | null = null;
+      let expensesData: Expense[] = [];
 
-      this.supervisor.getSites().subscribe({
-        next: (res) => {
-          this.sites.set(res.sites || []);
-        },
-        error: () => undefined,
-      });
+      const [dashResult, sitesResult, profileResult, expensesResult] = await Promise.all([
+        this.supervisor.getDashboard().toPromise().then(
+          (r) => { if (r) dashData = r.dashboard; return !!r; },
+          () => false
+        ),
+        this.supervisor.getSites().toPromise().then(
+          (r) => { if (r) sitesData = r.sites || []; return !!r; },
+          () => false
+        ),
+        this.supervisor.getProfile().toPromise().then(
+          (r) => { if (r) profileName = (r as { user?: { name?: string } }).user?.name || null; return !!r; },
+          () => false
+        ),
+        this.supervisor.getExpenses({
+          dateFrom: this.todayStr(),
+          dateTo: this.todayStr(),
+          limit: 5,
+        }).toPromise().then(
+          (r) => { if (r) expensesData = r.expenses || []; return !!r; },
+          () => false
+        ),
+      ]);
 
-      this.supervisor.getProfile().subscribe({
-        next: (res) => {
-          const name = (res as { user?: { name?: string } }).user?.name;
-          if (name) this.userName.set(name);
-        },
-        error: () => undefined,
-      });
+      // Dashboard is critical — if it failed, show error state
+      if (!dashResult || !dashData) {
+        console.error('[Dashboard] failed to load');
+        this.loading.set(false);
+        this.error.set(true);
+        return false;
+      }
 
-      this.loadTodayExpenses();
+      this.dashboard.set(dashData);
+      if (sitesResult) this.sites.set(sitesData);
+      if (profileResult && profileName) this.userName.set(profileName);
+      if (expensesResult) this.todayExpenses.set(expensesData);
+
+      this.loading.set(false);
+      return true;
     } catch (error) {
       console.error('Failed to load dashboard:', error);
+      this.loading.set(false);
+      this.error.set(true);
+      return false;
     }
   }
 
-  private loadTodayExpenses(): void {
+  private todayStr(): string {
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-
-    this.supervisor.getExpenses({
-      dateFrom: todayStr,
-      dateTo: todayStr,
-      limit: 5,
-    }).subscribe({
-      next: (res) => {
-        this.todayExpenses.set(res.expenses || []);
-      },
-      error: () => undefined,
-    });
+    return `${yyyy}-${mm}-${dd}`;
   }
 
   navigateTo(path: string): void {

@@ -168,6 +168,7 @@ export type LabourRow = {
   notes: string;
   paymentMode: "NEFT" | "Cash";
   status: ApprovalStatus;
+  supervisorName?: string;
 };
 
 export type ExpenseRow = {

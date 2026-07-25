@@ -13,6 +13,7 @@ export interface IInventory extends Document {
   normalizedName: string;
   unit: string;
   normalizedUnit: string;
+  requestedQuantity: number;
   approvedQuantity: number;
   purchasedQuantity: number;
   consumedQuantity: number;
@@ -48,6 +49,7 @@ const inventorySchema = new Schema<IInventory>(
     normalizedName: { type: String, required: true, index: true },
     unit: { type: String, required: true },
     normalizedUnit: { type: String, required: true, index: true },
+    requestedQuantity: { type: Number, default: 0 },
     approvedQuantity: { type: Number, default: 0 },
     purchasedQuantity: { type: Number, default: 0 },
     consumedQuantity: { type: Number, default: 0 },

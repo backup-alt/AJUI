@@ -52,12 +52,12 @@ const sectionConfigs: SectionConfig[] = [
     key: "labour",
     label: "Labour",
     title: "Labour Attendance",
-    description: "Staff attendance with site, date, staff name, labour types, staff count, shift count, overtime, and fine.",
+    description: "Staff attendance with site, date, supervisor name, labour types, staff count, shift count, overtime, and fine.",
     columns: [
       { key: "client", label: "Client" },
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date", type: "date" },
-      { key: "staffName", label: "Staff Name" },
+      { key: "staffName", label: "Supervisor Name" },
       { key: "labourTypes", label: "Labour Types" },
       { key: "staffCount", label: "Staff Count", type: "number" },
       { key: "attendance", label: "Attendance" },
@@ -1091,7 +1091,7 @@ export class ProjectWorkspacePage {
   readonly selectCustomValue = signal("");
   readonly labourTypeDialogOpen = signal(false);
   readonly labourTypeRowId = signal("");
-  readonly labourTypeName = signal("Mason");
+  readonly labourTypeName = signal("Carpenter");
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly expenseOpeningEdit = signal(false);
@@ -2445,7 +2445,7 @@ export class ProjectWorkspacePage {
           client: "",
           site: group.site || "",
           attendanceDate: group.date,
-          staffName: w.workerName,
+          staffName: group.supervisorName || w.workerName,
           labourTypes: group.labourType || "",
           staffCount: 1,
           attendance: "Present",
@@ -2485,7 +2485,7 @@ export class ProjectWorkspacePage {
       vendor: row.vendor,
       poNumber: row.poNumber,
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
-      remainingStock: `${formatNumber(row.purchased - row.consumed)} ${row.unit}`,
+      remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
       status: row.status,
     }));
 
@@ -2545,6 +2545,20 @@ export class ProjectWorkspacePage {
 
     const projectMaterials = this.data.materials().filter((row) => row.projectId === projectId);
     const vendorNamesInProject = new Set(projectMaterials.map((m) => m.vendor).filter(Boolean));
+
+    const projectSiteIds = new Set<string>();
+    for (const site of this.data.siteEntities()) {
+      if ((site as any).projectIds?.includes(projectId)) {
+        projectSiteIds.add(site.id);
+        if ((site as any)._id) projectSiteIds.add((site as any)._id);
+      }
+    }
+    for (const vendor of this.data.vendors()) {
+      if (vendor.siteIds?.some((sid) => projectSiteIds.has(sid))) {
+        vendorNamesInProject.add(vendor.name);
+      }
+    }
+
     const vendors = this.data.vendors()
       .filter((vendor) => vendorNamesInProject.has(vendor.name))
       .map((vendor) => ({
@@ -2680,7 +2694,7 @@ export class ProjectWorkspacePage {
         site,
         attendanceDate: today,
         staffName: this.staffNameOptionsForProject()[0] ?? "",
-        labourTypes: "Mason: 1",
+        labourTypes: "Carpenter: 1",
         staffCount: "1",
         attendance: "Present",
         shift: "1",
@@ -2924,13 +2938,19 @@ export class ProjectWorkspacePage {
     const text = value.trim();
     if (!text) return null;
     const countMatch = text.match(/^(.+?)(?:[:x-])\s*(\d+(?:\.\d+)?)/i);
-    if (!countMatch) return null;
-    const wageMatch = text.match(/(?:@|wage\s*[:=-]?)\s*(?:[^\d-]*)?([\d,]+(?:\.\d+)?)/i);
-    return {
-      type: countMatch[1].trim(),
-      count: Number(countMatch[2]),
-      wage: wageMatch ? this.moneyNumber(wageMatch[1]) : 0,
-    };
+    if (countMatch) {
+      const wageMatch = text.match(/(?:@|wage\s*[:=-]?)\s*(?:[^\d-]*)?([\d,]+(?:\.\d+)?)/i);
+      return {
+        type: countMatch[1].trim(),
+        count: Number(countMatch[2]),
+        wage: wageMatch ? this.moneyNumber(wageMatch[1]) : 0,
+      };
+    }
+    const plainType = text.replace(/\s+/g, ' ').trim();
+    if (/^[a-z\s.&]+$/i.test(plainType) && plainType.length < 50) {
+      return { type: plainType, count: 1, wage: 0 };
+    }
+    return null;
   }
 
   private parseLabourTypeEntry(value: string): { type: string; count: number; wage: number } | null {
@@ -3202,12 +3222,13 @@ export class ProjectWorkspacePage {
       const wageFields = this.data.customFieldsFor("labour").filter((field) => this.isLabourWageField(field));
       return [
         { key: "attendanceDate", label: "Date" },
-        { key: "staffName", label: "Staff Name" },
+        { key: "staffName", label: "Supervisor Name" },
         { key: "labourTypes", label: "Labour Types" },
         ...wageFields,
         { key: "staffCount", label: "Staff Count" },
         { key: "attendance", label: "Attendance" },
         { key: "shift", label: "Shift" },
+        { key: "paymentMode", label: "Payment Mode" },
         { key: "overtimeLate", label: "Overtime / Late" },
         { key: "dailyPayByType", label: "Daily Pay by Labour Type" },
         { key: "combinedDailyPay", label: "Combined Daily Pay" },
@@ -3240,33 +3261,65 @@ export class ProjectWorkspacePage {
       return [...openingRows, ...chronologicalRows];
     }
     if (section !== "labour") return rows;
-    return rows.map((row) => {
-      const weeklyPay = this.labourWeeklyPayForRow(row);
-      const shift = this.moneyNumber(row["shift"]) || 1;
-      const dailyEntries = this.labourTypeEntriesForRow(row).map((entry) => ({
-        ...entry,
-        dailyAmount: entry.count * entry.wage,
-      }));
-      const combinedDaily = dailyEntries.reduce((sum, item) => sum + item.dailyAmount, 0);
-      return {
-        ...row,
-        overtimeLate: `${row["overtime"] || "0"} overtime / ${row["lateFine"] || "0"} late fine`,
-        dailyPayByType: dailyEntries.length
-          ? dailyEntries.map((item) => `${item.type}: ${formatMoney(item.dailyAmount)}`).join(", ")
-          : formatMoney(0),
-        combinedDailyPay: formatMoney(combinedDaily),
-        weeklyPayByType: weeklyPay.breakup,
-        weeklyPayTotal: formatMoney(weeklyPay.total),
-      };
-    });
+    const groups = new Map<string, TableRow[]>();
+    for (const row of rows) {
+      const key = `${row["attendanceDate"] || ""}|${row["paymentMode"] || "Cash"}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(row);
+    }
+    const groupedRows: TableRow[] = [];
+    for (const groupRows of groups.values()) {
+      const first = groupRows[0];
+      const typeMap = new Map<string, { count: number; wage: number; amount: number }>();
+      let totalDailyPay = 0;
+      let totalOvertimeHrs = 0;
+      let totalLateFine = 0;
+      let totalWeeklyPay = 0;
+      for (const row of groupRows) {
+        const entries = this.labourTypeEntriesForRow(row);
+        const shift = this.moneyNumber(row["shift"]) || 1;
+        for (const entry of entries) {
+          const existing = typeMap.get(entry.type) || { count: 0, wage: entry.wage, amount: 0 };
+          existing.count += entry.count;
+          existing.wage = existing.wage || entry.wage;
+          existing.amount += entry.count * entry.wage * (shift / 2);
+          typeMap.set(entry.type, existing);
+        }
+        totalDailyPay += this.moneyNumber(row["dailyPay"]) || 0;
+        totalOvertimeHrs += this.moneyNumber(String(row["overtime"] || "").replace(/[^0-9.]/g, ""));
+        totalLateFine += this.moneyNumber(String(row["lateFine"] || "").replace(/[^0-9.]/g, ""));
+        totalWeeklyPay += this.labourWeeklyPayForRow(row).total;
+      }
+      const typeBreakup = [...typeMap.entries()]
+        .map(([type, v]) => `${type}: ${v.count}`)
+        .join(", ");
+      const dailyPayBreakup = [...typeMap.entries()]
+        .map(([type, v]) => `${type}: ${formatMoney(v.amount)}`)
+        .join(", ");
+      const totalDailyAmount = [...typeMap.values()].reduce((sum, v) => sum + v.amount, 0);
+      groupedRows.push({
+        ...first,
+        labourTypes: typeBreakup || String(first["labourTypes"] || ""),
+        staffCount: [...typeMap.values()].reduce((sum, v) => sum + v.count, 0),
+        dailyPayByType: dailyPayBreakup || formatMoney(0),
+        combinedDailyPay: formatMoney(totalDailyAmount),
+        overtimeLate: `${totalOvertimeHrs} overtime / ${formatMoney(totalLateFine)} late fine`,
+        weeklyPayByType: [...typeMap.entries()]
+          .map(([type, v]) => `${type}: ${formatMoney(v.amount)}`)
+          .join(", "),
+        weeklyPayTotal: formatMoney(totalWeeklyPay),
+      });
+    }
+    return groupedRows;
   }
 
   private labourWeeklyPayForRow(row: TableRow): { breakup: string; total: number; items: Array<{ type: string; count: number; wage: number; amount: number }> } {
     if (String(row["attendance"] || "").toLowerCase() === "absent") return { breakup: "Absent", total: 0, items: [] };
     const entries = this.labourTypeEntriesForRow(row);
     const shift = this.moneyNumber(row["shift"]) || 1;
+    const shiftMultiplier = shift / 2;
     const items = entries.map((entry) => {
-      const amount = entry.count * entry.wage * shift;
+      const amount = entry.count * entry.wage * shiftMultiplier;
       return { ...entry, amount };
     });
     const total = items.reduce((sum, item) => sum + item.amount, 0);
@@ -3309,6 +3362,11 @@ export class ProjectWorkspacePage {
     if (suggestedWage) return suggestedWage;
     const rowWage = this.moneyNumber(row["dailyWage"]);
     if (rowWage) return rowWage;
+    const dailyPay = this.moneyNumber(row["dailyPay"]);
+    if (dailyPay) {
+      const shift = this.moneyNumber(row["shift"]) || 1;
+      return Math.round((dailyPay / (shift / 2)) * 100) / 100;
+    }
     return typeCount === 1 ? this.moneyNumber(row["weeklyPayable"]) : 0;
   }
 
@@ -3355,12 +3413,28 @@ export class ProjectWorkspacePage {
       if (!isAbsent) current.staff += staffCount;
       staffSummary.set(name, current);
 
-      const weeklyPay = this.labourWeeklyPayForRow(row);
-      for (const item of weeklyPay.items) {
-        const summary = wageSummary.get(item.type) ?? { staff: 0, payable: 0 };
-        summary.staff += item.count;
-        summary.payable += item.amount;
-        wageSummary.set(item.type, summary);
+      const precomputedBreakup = String(row["weeklyPayByType"] || "").trim();
+      if (precomputedBreakup && precomputedBreakup !== formatMoney(0)) {
+        for (const part of precomputedBreakup.split(",")) {
+          const match = part.trim().match(/^(.+?):\s*₹?([\d,]+(?:\.\d+)?)$/);
+          if (!match) continue;
+          const type = match[1].trim();
+          const amount = this.moneyNumber(match[2]);
+          const countMatch = String(row["labourTypes"] || "").match(new RegExp(`${type.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*(\\d+)`, "i"));
+          const count = countMatch ? Number(countMatch[1]) : 1;
+          const summary = wageSummary.get(type) ?? { staff: 0, payable: 0 };
+          summary.staff += count;
+          summary.payable += amount;
+          wageSummary.set(type, summary);
+        }
+      } else {
+        const weeklyPay = this.labourWeeklyPayForRow(row);
+        for (const item of weeklyPay.items) {
+          const summary = wageSummary.get(item.type) ?? { staff: 0, payable: 0 };
+          summary.staff += item.count;
+          summary.payable += item.amount;
+          wageSummary.set(item.type, summary);
+        }
       }
     }
     if (!staffSummary.size && !wageSummary.size) return "";

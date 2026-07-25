@@ -34,6 +34,7 @@ import {
   warningOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
+import { NotificationService } from '../../../core/services/notification.service';
 import { Vendor } from '../../../shared/models';
 
 @Component({
@@ -336,6 +337,7 @@ export class ExpenseCreatePage implements OnInit {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
+  private notifications = inject(NotificationService);
 
   expense = {
     description: '',
@@ -577,6 +579,10 @@ export class ExpenseCreatePage implements OnInit {
           position: 'top',
         });
         await toast.present();
+        this.notifications.notify(
+          'Expense Submitted',
+          isCashAdded ? 'Cash request has been submitted for approval.' : 'Purchase request has been submitted for approval.'
+        );
         this.router.navigate(['/tabs/expenses']);
       },
       error: async (err) => {

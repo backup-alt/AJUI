@@ -519,6 +519,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   searchQuery = signal('');
   sortField = signal<SortField>('name');
   sortDir = signal<SortDir>('asc');
+  private loadGeneration = 0;
 
   filteredItems = computed(() => {
     let result = [...this.items()];
@@ -593,44 +594,41 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   async loadInventory(): Promise<void> {
     this.isLoading.set(true);
+    const gen = ++this.loadGeneration;
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
 
     try {
-      this.supervisor.getMaterials({
+      const res = await this.supervisor.getMaterials({
         siteId: siteId || undefined,
         projectId: projectId || undefined,
         status: 'Approved',
         limit: 200,
-      }).subscribe({
-        next: (res) => {
-          const materials: InventoryItem[] = (res.materials || []).map((m) => ({
-            _id: m._id,
-            materialId: m.materialId,
-            name: m.name,
-            category: (m as any).category || 'General',
-            unit: m.unit,
-            currentQuantity: m.remainingStock ?? m.approvedQuantity ?? 0,
-            minimumQuantity: (m as any).minimumQuantity || 0,
-            lastUpdated: m.updatedAt || m.requestDate,
-            vendor: m.vendor || '',
-            poNumber: m.poNumber || '',
-            status: m.status,
-            projectId: m.projectId,
-            projectName: m.projectName,
-            siteId: m.siteId || '',
-            site: m.site,
-            purchaseHistory: m.purchaseHistory || [],
-          }));
-          this.items.set(materials);
-          this.isLoading.set(false);
-        },
-        error: (err) => {
-          console.error('[Inventory] failed to load', err);
-          this.isLoading.set(false);
-        },
-      });
-    } catch {
+      }).toPromise();
+      if (gen !== this.loadGeneration) return;
+      const materials: InventoryItem[] = (res?.materials || []).map((m) => ({
+        _id: m._id,
+        materialId: m.materialId,
+        name: m.name,
+        category: (m as any).category || 'General',
+        unit: m.unit,
+        currentQuantity: m.remainingStock ?? m.approvedQuantity ?? 0,
+        minimumQuantity: (m as any).minimumQuantity || 0,
+        lastUpdated: m.updatedAt || m.requestDate,
+        vendor: m.vendor || '',
+        poNumber: m.poNumber || '',
+        status: m.status,
+        projectId: m.projectId,
+        projectName: m.projectName,
+        siteId: m.siteId || '',
+        site: m.site,
+        purchaseHistory: m.purchaseHistory || [],
+      }));
+      this.items.set(materials);
+      this.isLoading.set(false);
+    } catch (err) {
+      if (gen !== this.loadGeneration) return;
+      console.error('[Inventory] failed to load', err);
       this.isLoading.set(false);
     }
   }

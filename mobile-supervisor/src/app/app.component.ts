@@ -1,10 +1,11 @@
-import { Component, OnInit, inject, NgZone } from '@angular/core';
-import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
+import { Component, OnInit, inject, NgZone, effect } from '@angular/core';
+import { IonApp, IonRouterOutlet, AlertController } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
-import { App as CapacitorApp } from '@capacitor/app';
+import { App as CapacitorApp, AppState } from '@capacitor/app';
 import { AuthService } from './core/services/auth.service';
 import { SupervisorService } from './core/services/supervisor.service';
 import { NotificationService } from './core/services/notification.service';
+import { AppReadyService } from './core/services/app-ready.service';
 
 @Component({
   selector: 'app-root',
@@ -20,15 +21,30 @@ export class AppComponent implements OnInit {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
   private notifications = inject(NotificationService);
+  private appReady = inject(AppReadyService);
   private router = inject(Router);
   private zone = inject(NgZone);
+  private alertCtrl = inject(AlertController);
+
+  private hasResumedOnce = false;
+  private sessionExpiredAlertShown = false;
 
   async ngOnInit(): Promise<void> {
+    // 1. Restore auth session (token + user from Preferences)
     await this.auth.init();
+
     if (this.auth.isAuthenticated()) {
-      await this.auth.initAfterLogin();
+      try {
+        // 2. Fetch supervisor sites, auto-select first site
+        await this.auth.initAfterLogin();
+      } catch {
+        // network may be down; continue — dashboard will show error state
+      }
     }
+
+    // 3. Hydrate selected site from Preferences
     await this.supervisor.init();
+    // 4. Load cached notifications from Preferences
     await this.notifications.initFromStorage();
 
     if (this.notifications.pushEnabled()) {
@@ -40,6 +56,20 @@ export class AppComponent implements OnInit {
     }
 
     this.registerDeepLink();
+    this.registerAppStateListener();
+    this.watchSessionExpiry();
+
+    // 5. Wait for the first page (Dashboard) to finish loading all data.
+    const DASHBOARD_TIMEOUT_MS = 12_000;
+    const timeoutPromise = new Promise<boolean>((resolve) =>
+      setTimeout(() => resolve(false), DASHBOARD_TIMEOUT_MS)
+    );
+
+    const ready = await Promise.race([this.appReady.appReady, timeoutPromise]);
+    if (!ready) {
+      console.warn('[App] Dashboard timed out or failed — hiding splash anyway');
+    }
+
     this.hideSplashScreen();
   }
 
@@ -49,6 +79,63 @@ export class AppComponent implements OnInit {
       splash.classList.add('fade-out');
       setTimeout(() => { if (splash.parentNode) splash.remove(); }, 600);
     }
+  }
+
+  /**
+   * Watch for session expiry signal from the interceptor.
+   * When the refresh token is expired/revoked and a refresh attempt fails,
+   * the interceptor sets auth.sessionExpired = true. We respond by showing
+   * a non-dismissible alert prompting re-login.
+   */
+  private watchSessionExpiry(): void {
+    effect(async () => {
+      const expired = this.auth.sessionExpired();
+      if (expired && !this.sessionExpiredAlertShown) {
+        this.sessionExpiredAlertShown = true;
+        await this.showSessionExpiredAlert();
+      }
+    });
+  }
+
+  private async showSessionExpiredAlert(): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Session Expired',
+      message: 'Your session has expired. Please sign in again to continue.',
+      backdropDismiss: false,
+      buttons: [
+        {
+          text: 'Sign In',
+          handler: async () => {
+            this.sessionExpiredAlertShown = false;
+            this.auth.sessionExpired.set(false);
+            await this.auth.logout();
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  /**
+   * Listen for app foreground/background transitions.
+   * When the app resumes, silently attempt a token refresh so the session
+   * never expires while the user is active on another app or after a phone call.
+   */
+  private registerAppStateListener(): void {
+    CapacitorApp.addListener('appStateChange', (state: AppState) => {
+      if (state.isActive && this.auth.isAuthenticated()) {
+        // Reset session expiry flag — user is back, we'll retry naturally
+        this.auth.sessionExpired.set(false);
+        this.sessionExpiredAlertShown = false;
+
+        // Silently validate the session by hitting a lightweight endpoint.
+        // The interceptor handles 401 → refresh → retry automatically.
+        this.supervisor.getDashboard().subscribe({
+          next: () => { /* touch endpoint to validate token */ },
+          error: () => { /* interceptor handles 401 retry; sessionExpired signal handles true expiry */ },
+        });
+      }
+    });
   }
 
   /**

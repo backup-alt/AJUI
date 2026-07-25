@@ -555,7 +555,7 @@ export class ErpDataService {
     const seededProjects = this.projects();
 
     const labourParties = ["Velu Mason Party", "Babu Labour Team", "Ravi Electrical Crew", "Ganesh Plumbing", "Selvam Civil Works"];
-    const labourTypes = ["Mason", "Helper", "Electrician", "Plumber", "Civil"];
+    const labourTypes = ["Carpenter", "Plumber", "Electrician", "Painter", "Mason", "Helper", "Steel Fixer", "Tiles Worker", "Welder", "Fabricator", "Civil", "Other"];
     if (!this.labour().some((row) => row.id.startsWith("DEMO-LAB-"))) {
       this.labour.update((rows) => [
         ...Array.from({ length: 50 }, (_, index): LabourRow => {
@@ -667,16 +667,23 @@ export class ErpDataService {
     this.writeState("projects", this.projects());
   }
 
-  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus; siteIds?: string[] }): Vendor {
-    const nextNumber =
-      Math.max(
-        100,
-        ...this.vendors()
-          .map((v) => Number(v.id.replace(/\D/g, "")))
-          .filter((value) => Number.isFinite(value)),
-      ) + 1;
+  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus; siteIds?: string[]; id?: string; _id?: string }): Vendor {
+    const backendId = input.id;
+    const backendMongoId = input._id;
+    let vendorId = backendId;
+    if (!vendorId) {
+      const nextNumber =
+        Math.max(
+          100,
+          ...this.vendors()
+            .map((v) => Number(v.id.replace(/\D/g, "")))
+            .filter((value) => Number.isFinite(value)),
+        ) + 1;
+      vendorId = `VEN-${nextNumber}`;
+    }
     const vendor: Vendor = {
-      id: `VEN-${nextNumber}`,
+      id: vendorId,
+      _id: backendMongoId,
       name: input.name,
       materialType: input.materialType,
       phone: input.phone,

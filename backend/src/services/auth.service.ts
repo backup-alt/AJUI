@@ -95,6 +95,7 @@ export async function issueTokens(
 
   await RefreshToken.create({
     userId: user._id,
+    jti,
     tokenHash,
     expiresAt,
     userAgent: meta.userAgent,
@@ -115,7 +116,9 @@ export async function refreshSession(
     throw new AppError(401, "Invalid refresh token");
   }
 
-  const stored = await RefreshToken.findOne({ userId: payload.sub });
+  // Match the exact token by userId + jti (not just userId, which could
+  // return a different/revoked token when multiple sessions exist).
+  const stored = await RefreshToken.findOne({ userId: payload.sub, jti: payload.jti });
   const match = stored ? await compareToken(refreshToken, stored.tokenHash) : false;
   if (!stored || !match || stored.revokedAt || stored.expiresAt < new Date()) {
     throw new AppError(401, "Refresh token revoked or expired");
@@ -135,7 +138,7 @@ export async function logout(refreshToken?: string): Promise<void> {
   if (!refreshToken) return;
   try {
     const payload = verifyRefreshToken(refreshToken);
-    const stored = await RefreshToken.findOne({ userId: payload.sub });
+    const stored = await RefreshToken.findOne({ userId: payload.sub, jti: payload.jti });
     if (stored) {
       stored.revokedAt = new Date();
       await stored.save();

@@ -34,6 +34,8 @@ export interface LabourApprovalRow {
   staffName: string;
   labourTypes: string;
   staffCount: number;
+  presentDays: number;
+  dailyWage: number;
   shift: string;
   overtime: string;
   lateFine: string;
@@ -159,6 +161,7 @@ interface RawApprovalItem {
   labourTypes?: string;
   staffCount?: number;
   dailyWage?: number;
+  presentDays?: number;
   shift?: string;
   overtimeHours?: number;
   lateFine?: string;
@@ -239,6 +242,8 @@ export class ApprovalsService {
           staffName: a.staffName || "",
           labourTypes: a.labourTypes || "",
           staffCount: a.staffCount || 0,
+          presentDays: a.presentDays || 0,
+          dailyWage: a.dailyWage || 0,
           shift: a.shift || "",
           overtime: a.overtimeHours ? String(a.overtimeHours) : "0",
           lateFine: a.lateFine || "0",

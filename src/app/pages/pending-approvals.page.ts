@@ -43,10 +43,12 @@ type LabourApprovalRow = ApprovalBaseRow & {
   staffName: string;
   labourTypes: string;
   staffCount: number;
+  presentDays: number;
   shift: string;
   overtime: string;
   lateFine: string;
   submittedBy: string;
+  dailyWage?: number;
 };
 
 type ExpenseApprovalRow = ApprovalBaseRow & {
@@ -253,8 +255,6 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                 </div>
               </section>
               }
-
-              
 
               @if (showSiteExpense()) {
               <section class="operations-workbench approvals-workbench approval-section">
@@ -590,6 +590,17 @@ export class PendingApprovalsPage implements OnInit {
    */
   hasCashAddedApproval(): boolean {
     return this._siteExpenseRows().some((row) => this.isCashAddedTransaction(row.transactionType));
+  }
+
+  weeklyWage(row: LabourApprovalRow): number {
+    const dailyWage = row.dailyWage || 0;
+    const staffCount = row.staffCount || 0;
+    const presentDays = row.presentDays || 1;
+    const overtime = Number(row.overtime) || 0;
+    const lateFine = Number(row.lateFine) || 0;
+    const earnings = dailyWage * presentDays * staffCount;
+    const overtimeAmt = overtime * (dailyWage * 0.5) * staffCount;
+    return Math.max(0, Math.round(earnings + overtimeAmt - lateFine));
   }
 
   private sortedUnique(values: string[]): string[] {

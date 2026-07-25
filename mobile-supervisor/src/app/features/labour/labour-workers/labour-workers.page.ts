@@ -145,7 +145,10 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
         } @else {
           @for (worker of workers(); track worker._id) {
             <div class="worker-card" (click)="viewWorker(worker)">
-              <div class="worker-avatar">{{ getInitials(worker.name) }}</div>
+              <div class="worker-avatar" [class]="'avatar-' + getTypeColor(worker.labourType)">
+                <span class="avatar-initials">{{ getInitials(worker.name) }}</span>
+                <span class="avatar-dot"></span>
+              </div>
               <div class="worker-body">
                 <div class="worker-name-row">
                   <h3 class="worker-name">{{ worker.name }}</h3>
@@ -166,9 +169,12 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
                   }
                 </p>
                 <div class="worker-pay">
-                  <ion-icon name="wallet-outline"></ion-icon>
-                  <span class="pay-amount">{{ worker.weeklyPay | currency:'INR':'symbol':'1.0-0' }}</span>
-                  <span class="pay-suffix">/week</span>
+                  <span class="pay-primary">
+                    <ion-icon name="wallet-outline"></ion-icon>
+                    <span class="pay-amount">{{ getDailyWage(worker) | currency:'INR':'symbol':'1.0-0' }}</span>
+                    <span class="pay-suffix">/day</span>
+                  </span>
+                  <span class="pay-secondary">{{ worker.weeklyPay | currency:'INR':'symbol':'1.0-0' }}/wk</span>
                 </div>
               </div>
               <div class="worker-actions" (click)="$event.stopPropagation()">
@@ -187,6 +193,10 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
               </div>
             </div>
           }
+          <button class="add-another-btn" (click)="addWorker()">
+            <ion-icon name="add-outline"></ion-icon>
+            Add another {{ labourType() || 'worker' }}
+          </button>
         }
       </div>
     </ion-content>
@@ -279,6 +289,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     }
     .worker-card:active { transform: scale(0.99); }
     .worker-avatar {
+      position: relative;
       width: 48px;
       height: 48px;
       border-radius: var(--md-radius-lg);
@@ -291,6 +302,31 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       font-weight: 800;
       flex-shrink: 0;
     }
+    .avatar-initials { position: relative; z-index: 1; }
+    .avatar-dot {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #22c55e;
+      border: 2px solid var(--m3-surface-bright);
+      z-index: 2;
+    }
+    .worker-avatar.avatar-helper { background: rgba(14, 165, 233, 0.15); color: #0369a1; }
+    .worker-avatar.avatar-mason { background: rgba(168, 85, 247, 0.15); color: #7e22ce; }
+    .worker-avatar.avatar-plumber { background: rgba(34, 197, 94, 0.15); color: #15803d; }
+    .worker-avatar.avatar-electrician { background: rgba(234, 179, 8, 0.15); color: #a86c02; }
+    .worker-avatar.avatar-carpenter { background: rgba(249, 115, 22, 0.15); color: #c2410c; }
+    .worker-avatar.avatar-painter { background: rgba(236, 72, 153, 0.15); color: #be185d; }
+    .worker-avatar.avatar-civil { background: rgba(156, 163, 175, 0.15); color: #4b5563; }
+    .worker-avatar.avatar-tiles { background: rgba(245, 158, 11, 0.15); color: #a16207; }
+    .worker-avatar.avatar-steel { background: rgba(100, 116, 139, 0.15); color: #475569; }
+    .worker-avatar.avatar-welder { background: rgba(239, 68, 68, 0.15); color: #b91c1c; }
+    .worker-avatar.avatar-fabricator { background: rgba(99, 102, 241, 0.15); color: #4338ca; }
+    .worker-avatar.avatar-other { background: rgba(107, 114, 128, 0.15); color: #374151; }
+    .worker-avatar.avatar-default { background: rgba(201, 162, 39, 0.15); color: #a8861f; }
     .worker-body { flex: 1; min-width: 0; }
     .worker-name-row {
       display: flex;
@@ -339,19 +375,29 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     }
     .worker-meta ion-icon { font-size: 11px; vertical-align: -1px; margin-right: 2px; }
     .worker-pay {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .pay-primary {
       display: inline-flex;
       align-items: baseline;
       gap: 2px;
       font-size: 12px;
       color: var(--m3-on-surface-muted);
     }
-    .worker-pay ion-icon { font-size: 13px; }
+    .pay-primary ion-icon { font-size: 13px; }
     .pay-amount {
       color: var(--m3-primary);
       font-weight: 800;
       font-size: 13px;
     }
     .pay-suffix { font-size: 10px; }
+    .pay-secondary {
+      font-size: 11px;
+      color: var(--m3-on-surface-muted);
+      opacity: 0.7;
+    }
 
     .worker-actions {
       display: flex;
@@ -386,6 +432,26 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       color: #16a34a;
       cursor: default;
     }
+
+    .add-another-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 14px;
+      background: transparent;
+      border: 2px dashed var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      color: var(--m3-primary);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background var(--md-motion-duration-short1);
+    }
+    .add-another-btn:active { background: var(--m3-surface-container); }
+    .add-another-btn ion-icon { font-size: 18px; }
 
     .skeleton-card {
       display: flex;
@@ -544,5 +610,9 @@ export class LabourWorkersPage implements OnInit {
 
   getTypeColor(type: string): string {
     return LABOUR_TYPE_COLORS[type] || 'default';
+  }
+
+  getDailyWage(worker: Worker): number {
+    return (worker as any).dailyWage || Math.round(((worker as any).weeklyPay || 0) / 7);
   }
 }

@@ -30,6 +30,7 @@ import {
   chevronForwardOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import {
   PageHeaderComponent,
@@ -78,7 +79,7 @@ interface RequestItem {
     StatusPillComponent,
   ],
   template: `
-    <ion-content class="requests-content" [scrollY]="true" [forceOverscroll]="false">
+    <ion-content class="requests-content">
       <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
@@ -439,6 +440,7 @@ export class RequestsPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
   private alertCtrl = inject(AlertController);
+  private notifications = inject(NotificationService);
 
   activeTab: 'pending' | 'approved' | 'declined' | 'upload' = 'pending';
   isLoading = signal(true);
@@ -451,7 +453,7 @@ export class RequestsPage implements OnInit {
       return bTime - aTime;
     });
     if (this.activeTab === 'pending') {
-      return items.filter(i => i.status === 'Pending' || i.status === 'pending');
+      return items.filter(i => i.status === 'Pending' || i.status === 'Not Received');
     }
     if (this.activeTab === 'approved') {
       return items.filter(i => i.status === 'Approved' || i.status === 'Completed' || i.status === 'Received');
@@ -459,10 +461,8 @@ export class RequestsPage implements OnInit {
     if (this.activeTab === 'declined') {
       return items.filter(i => i.status === 'Rejected' || i.status === 'Declined');
     }
-    // Upload tab: only show approved site-material expenses and approved materials that still need upload
-    return items.filter(i =>
-      i.status === 'Approved' && i.needsUpload
-    );
+    // Upload tab: show items that still need a bill uploaded
+    return items.filter(i => i.needsUpload);
   }
 
   uploadingItemId = signal<string | null>(null);
@@ -523,19 +523,21 @@ export class RequestsPage implements OnInit {
         this.supervisor.getMaterials({ limit: 200 }).subscribe({
           next: (res) => {
             for (const m of res.materials || []) {
+              const isReceived = m.status === 'Received';
+              const hasNoBill = !(m as any).billUrl;
               items.push({
                 _id: m._id,
                 type: 'material',
                 title: m.name,
-                subtitle: `${m.requestedQuantity} ${m.unit} requested`,
+                subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
                 site: m.site,
                 date: m.requestDate,
                 status: m.status,
                 issuedAmount: m.issuedAmount,
                 givenAmount: (m as any).givenAmount,
                 billUrl: (m as any).billUrl,
-                received: (m as any).status === 'Received',
-                needsUpload: (m.status === 'Approved') && !(m as any).billUrl,
+                received: isReceived,
+                needsUpload: hasNoBill,
               });
             }
             resolve();
@@ -687,6 +689,10 @@ export class RequestsPage implements OnInit {
       if (typeof window !== 'undefined' && item.type === 'material') {
         window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: item._id, reason: 'received' } }));
       }
+      this.notifications.notify(
+        'Material Submitted',
+        `Receipt for ${item.title || 'material'} has been uploaded successfully.`
+      );
       await this.loadAllRequests();
     } catch (err: any) {
       const toast = await this.toastCtrl.create({

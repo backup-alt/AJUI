@@ -65,10 +65,15 @@ export async function approveRequest(
   }
 
   const sourceUpdate: Record<string, unknown> = {
-    status: "Approved",
     approvedBy: reviewer,
     approvedAt: new Date(),
   };
+
+  if (approval.sourceCollection === "materials" || approval.sourceCollection === "Material") {
+    sourceUpdate.status = "Not Received";
+  } else {
+    sourceUpdate.status = "Approved";
+  }
 
   if (options.issuedAmount !== undefined) sourceUpdate.issuedAmount = options.issuedAmount;
   if (options.givenAmount !== undefined) sourceUpdate.givenAmount = options.givenAmount;
@@ -417,6 +422,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             staffName: doc.partyName,
             labourTypes: doc.category,
             staffCount: doc.presentCount,
+            presentDays: doc.presentDays || 0,
             dailyWage: doc.dailyWage,
             shift: doc.shift,
             overtimeHours: doc.overtime,

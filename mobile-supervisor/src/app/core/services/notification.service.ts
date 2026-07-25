@@ -58,6 +58,7 @@ export class NotificationService {
   async initFromStorage(): Promise<void> {
     const { value } = await Preferences.get({ key: 'pushEnabled' });
     this.pushEnabled.set(value === 'true');
+    await this.loadFromStorage();
   }
 
   private async register(): Promise<void> {
@@ -125,16 +126,48 @@ export class NotificationService {
   private addInApp(n: InAppNotification): void {
     this.notifications.update((list) => [n, ...list].slice(0, 50));
     this.unreadCount.update((c) => c + 1);
+    this.persistNotifications();
+  }
+
+  notify(title: string, body: string, data?: Record<string, string>): void {
+    this.addInApp({
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      body,
+      data,
+      receivedAt: Date.now(),
+      read: false,
+    });
   }
 
   markAllRead(): void {
     this.notifications.update((list) => list.map((n) => ({ ...n, read: true })));
     this.unreadCount.set(0);
+    this.persistNotifications();
   }
 
   clear(): void {
     this.notifications.set([]);
     this.unreadCount.set(0);
+    this.persistNotifications();
+  }
+
+  async loadFromStorage(): Promise<void> {
+    const { value } = await Preferences.get({ key: 'notifications' });
+    if (value) {
+      try {
+        const list = JSON.parse(value) as InAppNotification[];
+        this.notifications.set(list);
+        this.unreadCount.set(list.filter((n) => !n.read).length);
+      } catch { /* ignore */ }
+    }
+  }
+
+  private async persistNotifications(): Promise<void> {
+    await Preferences.set({
+      key: 'notifications',
+      value: JSON.stringify(this.notifications()),
+    });
   }
 
   private async persistPreference(enabled: boolean): Promise<void> {

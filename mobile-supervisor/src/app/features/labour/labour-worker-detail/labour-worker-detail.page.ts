@@ -39,7 +39,6 @@ import {
   colorPaletteOutline,
   hammerOutline,
   sparklesOutline,
-  checkmarkDoneOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Worker, Attendance } from '../../../shared/models';
@@ -181,13 +180,6 @@ interface WageCalculation {
                     <span class="info-value">{{ worker()!.site }}</span>
                   </div>
                 </div>
-                <div class="info-row">
-                  <span class="info-icon"><ion-icon name="shield-checkmark-outline"></ion-icon></span>
-                  <div class="info-data">
-                    <span class="info-label">Worker ID</span>
-                    <span class="info-value mono">{{ worker()!.workerId }}</span>
-                  </div>
-                </div>
                 @if (worker()!.address) {
                   <div class="info-row">
                     <span class="info-icon"><ion-icon name="location-outline"></ion-icon></span>
@@ -204,16 +196,9 @@ interface WageCalculation {
               <h2 class="section-title">Employment Information</h2>
               <div class="info-card">
                 <div class="info-row">
-                  <span class="info-icon"><ion-icon name="wallet-outline"></ion-icon></span>
-                  <div class="info-data">
-                    <span class="info-label">Weekly Salary</span>
-                    <span class="info-value highlight">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}</span>
-                  </div>
-                </div>
-                <div class="info-row">
                   <span class="info-icon"><ion-icon name="time-outline"></ion-icon></span>
                   <div class="info-data">
-                    <span class="info-label">Daily Wage (calculated)</span>
+                    <span class="info-label">Daily Wage</span>
                     <span class="info-value">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</span>
                   </div>
                 </div>
@@ -258,13 +243,6 @@ interface WageCalculation {
                 <span class="stat-value">{{ totalLateFines() | currency:'INR':'symbol':'1.0-0' }}</span>
                 <span class="stat-label">Late Fines</span>
               </div>
-            </div>
-
-            <div class="attendance-actions">
-              <button class="mark-attendance-btn" (click)="markAttendance()">
-                <ion-icon name="checkmark-done-outline"></ion-icon>
-                Mark Attendance
-              </button>
             </div>
 
             @if (groupedAttendance().length === 0) {
@@ -331,18 +309,35 @@ interface WageCalculation {
         @if (activeTab === 'wage') {
           <div class="tab-content">
             <div class="wage-card">
-              <h2 class="wage-title">Daily Wage</h2>
+              <h2 class="wage-title">Weekly Earnings</h2>
 
               <div class="wage-display">
-                <div class="wage-display-amount">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</div>
-                <div class="wage-display-suffix">per day</div>
+                <div class="wage-display-amount">{{ weeklyEarnings() | currency:'INR':'symbol':'1.0-0' }}</div>
+                <div class="wage-display-suffix">this week</div>
               </div>
 
               <div class="wage-divider"></div>
 
               <div class="wage-row">
-                <span class="wage-label">Weekly Salary (base)</span>
-                <span class="wage-value">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}</span>
+                <span class="wage-label">Daily Wage</span>
+                <span class="wage-value">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</span>
+              </div>
+
+              <div class="wage-edit-row">
+                <label class="wage-label" for="dailyWageInput">Set New Daily Pay</label>
+                <div class="wage-edit-input-wrap">
+                  <span class="wage-currency">₹</span>
+                  <input
+                    id="dailyWageInput"
+                    type="number"
+                    class="wage-edit-input"
+                    [value]="dailyWageInput()"
+                    (input)="onDailyWageChange($event)"
+                    min="0"
+                    placeholder="0"
+                  />
+                  <button class="wage-save-btn" (click)="saveDailyWage()">Save</button>
+                </div>
               </div>
               <div class="wage-row">
                 <span class="wage-label">Days Worked</span>
@@ -361,6 +356,31 @@ interface WageCalculation {
                 <span class="wage-value">-{{ totalLateFines() | currency:'INR':'symbol':'1.0-0' }}</span>
               </div>
             </div>
+
+            <!-- Per-day breakdown -->
+            @if (groupedAttendance().length > 0) {
+              <h3 class="breakdown-title">Daily Breakdown</h3>
+              @for (week of groupedAttendance(); track week.weekLabel) {
+                <div class="week-group">
+                  <div class="week-label">Week of {{ week.weekLabel }}</div>
+                  @for (day of week.days; track day.attendanceDate) {
+                    <div class="day-row">
+                      <div class="day-info">
+                        <span class="day-name">{{ day.dayName }}</span>
+                        <span class="day-date">{{ day.attendanceDate }}</span>
+                      </div>
+                      <div class="day-details">
+                        <span class="day-shifts">{{ day.shiftCount }} shift{{ day.shiftCount !== 1 ? 's' : '' }}</span>
+                        <span class="day-earning">{{ dayEarning(day) | currency:'INR':'symbol':'1.0-0' }}</span>
+                      </div>
+                      @if (day.lateFine > 0) {
+                        <span class="day-fine">-{{ day.lateFine | currency:'INR':'symbol':'1.0-0' }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            }
           </div>
         }
       }
@@ -576,27 +596,6 @@ interface WageCalculation {
     }
 
     .attendance-log { }
-    .attendance-actions {
-      margin: var(--md-space-3) 0 var(--md-space-2);
-      display: flex;
-      justify-content: flex-end;
-    }
-    .mark-attendance-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-      border: none;
-      border-radius: var(--md-radius-pill);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-    }
-    .mark-attendance-btn ion-icon { font-size: 16px; }
     .week-group { margin-bottom: var(--md-space-4); }
     .week-header {
       font-size: 11px;
@@ -808,6 +807,56 @@ interface WageCalculation {
       font-weight: 800;
       color: var(--m3-primary);
     }
+    .wage-edit-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: var(--md-space-2) 0;
+      border-top: 1px solid var(--m3-outline-variant);
+      margin-top: var(--md-space-2);
+    }
+    .wage-edit-row .wage-label {
+      font-size: 12px;
+      color: var(--m3-on-surface-muted);
+    }
+    .wage-edit-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .wage-currency {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--m3-on-surface-muted);
+    }
+    .wage-edit-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-lg);
+      background: var(--m3-surface-container);
+      color: var(--m3-on-surface);
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      outline: none;
+    }
+    .wage-edit-input:focus {
+      border-color: var(--m3-primary);
+    }
+    .wage-save-btn {
+      padding: 8px 16px;
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      border-radius: var(--md-radius-lg);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .wage-save-btn:active { opacity: 0.8; }
 
     .wage-rules {
       background: var(--m3-surface-container);
@@ -857,6 +906,78 @@ interface WageCalculation {
       margin-top: 4px;
     }
 
+    .breakdown-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      margin: var(--md-space-4) 0 var(--md-space-2);
+    }
+
+    .week-group {
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      overflow: hidden;
+      margin-bottom: var(--md-space-3);
+    }
+    .week-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--m3-on-surface-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: var(--md-space-3) var(--md-space-4);
+      background: var(--m3-surface-container);
+      border-bottom: 1px solid var(--m3-outline-variant);
+    }
+    .day-row {
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-3);
+      padding: var(--md-space-3) var(--md-space-4);
+      border-bottom: 1px solid var(--m3-outline-variant);
+    }
+    .day-row:last-child { border-bottom: none; }
+    .day-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .day-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--m3-on-surface);
+    }
+    .day-date {
+      font-size: 11px;
+      color: var(--m3-on-surface-muted);
+    }
+    .day-details {
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-3);
+    }
+    .day-shifts {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--m3-on-surface-muted);
+      background: var(--m3-surface-container);
+      padding: 2px 8px;
+      border-radius: var(--md-radius-sm);
+    }
+    .day-earning {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--m3-success);
+    }
+    .day-fine {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--m3-error);
+      flex-shrink: 0;
+    }
+
     /* Ionic empty state */
     :host ::ng-deep app-empty-state {
       display: block;
@@ -874,12 +995,17 @@ export class LabourWorkerDetailPage implements OnInit {
   attendance = signal<Attendance[]>([]);
   isLoading = signal(true);
   activeTab: Tab = 'info';
-  weeklyPayInput = signal<number>(0);
+  dailyWageInput = signal<number>(0);
+
+  currentWeeklyPay = computed(() => {
+    const inputWeekly = this.dailyWageInput() * 7;
+    const workerWeekly = this.worker()?.weeklyPay || 0;
+    const attWeekly = this.attendance().reduce((max, a) => Math.max(max, a.weeklyPay || 0), 0);
+    return inputWeekly || workerWeekly || attWeekly;
+  });
 
   dailyWage = computed(() => {
-    const w = this.worker();
-    if (!w) return 0;
-    return Math.round(w.weeklyPay / 7);
+    return this.dailyWageInput() || Math.round(this.currentWeeklyPay() / 7);
   });
 
   attendanceDays = computed(() => this.attendance());
@@ -896,15 +1022,45 @@ export class LabourWorkerDetailPage implements OnInit {
     this.attendance().reduce((sum, a) => sum + a.lateFine, 0)
   );
 
+  /**
+   * Weekly earnings: each record uses its own weeklyPay snapshot (weeklyPay / 7) as daily wage.
+   * Pay = dailyWage * (shiftCount / 2) + overtimeAmount - lateFine
+   */
+  weeklyEarnings = computed(() => {
+    const fallbackDaily = this.dailyWage();
+    const attendances = this.attendance();
+    let total = 0;
+    for (const a of attendances) {
+      const recDaily = Math.round((a.weeklyPay || 0) / 7) || fallbackDaily;
+      if (a.shiftCount > 0) {
+        total += recDaily * (a.shiftCount / 2);
+      }
+      total += a.overtimeAmount || 0;
+      total -= a.lateFine || 0;
+    }
+    return Math.max(0, Math.round(total));
+  });
+
+  dayEarning(a: any): number {
+    const recDaily = Math.round((a.weeklyPay || 0) / 7) || this.dailyWage();
+    let earning = 0;
+    if (a.shiftCount > 0) {
+      earning = recDaily * (a.shiftCount / 2);
+    }
+    earning += a.overtimeAmount || 0;
+    earning -= a.lateFine || 0;
+    return Math.max(0, Math.round(earning));
+  }
+
   calculatedWage = computed<WageCalculation>(() => {
-    const weekly = this.weeklyPayInput() || this.worker()?.weeklyPay || 0;
-    const daily = Math.round(weekly / 7);
+    const daily = this.dailyWage();
+    const weekly = daily * 7;
     const attendances = this.attendance();
     let daysWorked = 0;
     let totalShifts = 0;
 
     for (const a of attendances) {
-      if (a.status === 'Present' || (a as any).attendanceStatus === 'Present') {
+      if (a.shiftCount > 0) {
         daysWorked++;
         totalShifts += a.shiftCount;
       }
@@ -964,8 +1120,8 @@ export class LabourWorkerDetailPage implements OnInit {
       walletOutline, timeOutline, locationOutline, callOutline, businessOutline,
       checkmarkCircleOutline, closeCircleOutline, alertCircleOutline,
       constructOutline, buildOutline, flashOutline, cutOutline, homeOutline,
-      gridOutline, colorPaletteOutline, hammerOutline,
-      sparklesOutline, checkmarkDoneOutline,
+      gridOutline, colorPaletteOutline,       hammerOutline,
+      sparklesOutline,
     });
 
     this.workerId = this.route.snapshot.paramMap.get('workerId') || '';
@@ -981,33 +1137,34 @@ export class LabourWorkerDetailPage implements OnInit {
 
   private async loadWorker(): Promise<void> {
     console.log('[WorkerDetail] Loading worker:', this.workerId);
-    this.supervisor.getWorkerDetail(this.workerId).subscribe({
-      next: (res) => {
-        console.log('[WorkerDetail] Worker loaded:', res.worker);
-        this.worker.set(res.worker);
-        this.weeklyPayInput.set(res.worker.weeklyPay);
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        console.error('[WorkerDetail] Error loading worker:', err);
-        this.worker.set(null);
-        this.isLoading.set(false);
-      },
-    });
+    try {
+      const res = await this.supervisor.getWorkerDetail(this.workerId).toPromise();
+      console.log('[WorkerDetail] Worker loaded:', res?.worker?.name, 'weeklyPay:', res?.worker?.weeklyPay);
+      this.worker.set(res?.worker || null);
+      this.dailyWageInput.set(Math.round(((res?.worker?.weeklyPay) || 0) / 7));
+      this.isLoading.set(false);
+    } catch (err) {
+      console.error('[WorkerDetail] Error loading worker:', err);
+      this.worker.set(null);
+      this.isLoading.set(false);
+    }
   }
 
   private async loadAttendance(): Promise<void> {
     console.log('[WorkerDetail] Loading attendance for worker:', this.workerId);
-    this.supervisor.getAttendanceForWorker(this.workerId).subscribe({
-      next: (res) => {
-        console.log('[WorkerDetail] Attendance loaded:', res.items?.length || 0, 'records');
-        this.attendance.set(res.items || []);
-      },
-      error: (err) => {
-        console.error('[WorkerDetail] Error loading attendance:', err);
-        this.attendance.set([]);
-      },
-    });
+    try {
+      const res = await this.supervisor.getAttendanceForWorker(this.workerId).toPromise();
+      const items = res?.items || [];
+      console.log('[WorkerDetail] Attendance loaded:', items.length, 'records');
+      items.forEach((a: any) => {
+        console.log('[WorkerDetail]   -', a.attendanceDate, 'shifts:', a.shiftCount, 'weeklyPay:', a.weeklyPay);
+      });
+      this.attendance.set(items);
+      console.log('[WorkerDetail] currentWeeklyPay:', this.currentWeeklyPay(), 'dailyWage:', this.dailyWage(), 'weeklyEarnings:', this.weeklyEarnings());
+    } catch (err) {
+      console.error('[WorkerDetail] Error loading attendance:', err);
+      this.attendance.set([]);
+    }
   }
 
   getInitials(name: string): string {
@@ -1022,13 +1179,13 @@ export class LabourWorkerDetailPage implements OnInit {
       'Plumber': 'build-outline',
       'Electrician': 'flash-outline',
       'Painter': 'colorPalette-outline',
-      'Mason': 'ersh-outline',
+      'Mason': 'layers-outline',
       'Helper': 'hammer-outline',
       'Steel Fixer': 'car-outline',
       'Tiles Worker': 'grid-outline',
       'Welder': 'sparkles-outline',
-      'Civil': 'home-outline',
       'Fabricator': 'construct-outline',
+      'Civil': 'home-outline',
       'Other': 'briefcase-outline',
     };
     return icons[type] || 'briefcase-outline';
@@ -1056,13 +1213,36 @@ export class LabourWorkerDetailPage implements OnInit {
     return 'active';
   }
 
-  onWeeklyPayChange(event: Event): void {
+  onDailyWageChange(event: Event): void {
     const val = parseFloat((event.target as HTMLInputElement).value);
-    this.weeklyPayInput.set(isNaN(val) ? 0 : val);
+    this.dailyWageInput.set(isNaN(val) ? 0 : val);
   }
 
-  markAttendance(): void {
-    if (!this.workerId) return;
-    void this.router.navigate(['/tabs/labour/mark-attendance', this.workerId]);
+  async saveDailyWage(): Promise<void> {
+    const dailyPay = this.dailyWageInput();
+    if (dailyPay <= 0) return;
+    const newWeeklyPay = dailyPay * 7;
+    try {
+      await this.supervisor.updateWorkerWeeklyPay(this.workerId, newWeeklyPay).toPromise();
+      const w = this.worker();
+      if (w) this.worker.set({ ...w, weeklyPay: newWeeklyPay } as any);
+      const toast = await this.toastCtrl.create({
+        message: 'Daily pay updated to ₹' + dailyPay,
+        duration: 2000,
+        color: 'success',
+        position: 'top',
+      });
+      await toast.present();
+    } catch (err) {
+      console.error('[WorkerDetail] Failed to update daily pay', err);
+      const toast = await this.toastCtrl.create({
+        message: 'Failed to update daily pay',
+        duration: 2500,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+    }
   }
+
 }

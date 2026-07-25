@@ -294,7 +294,7 @@ export class LabourCreateWorkerPage implements OnInit {
       name: this.worker.name.trim(),
       address: this.worker.address?.trim() || undefined,
       labourType: this.worker.labourType,
-      weeklyPay: Number(this.worker.weeklyPay) || 0,
+      weeklyPay: (Number(this.worker.weeklyPay) || 0) * 7,
     };
 
     this.supervisor.createWorker(payload).subscribe({

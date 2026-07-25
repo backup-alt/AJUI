@@ -162,6 +162,10 @@ export class SupervisorService {
     return this.api.get<{ worker: Worker }>(`/supervisor/workers/${workerId}`);
   }
 
+  updateWorkerWeeklyPay(workerId: string, weeklyPay: number) {
+    return this.api.patch<{ worker: Worker }>(`/supervisor/workers/${workerId}`, { weeklyPay });
+  }
+
   // ---------------- Attendance ----------------
   markAttendance(request: MarkAttendanceRequest) {
     return this.api.post<{ attendance: Attendance }>('/supervisor/attendance', request);

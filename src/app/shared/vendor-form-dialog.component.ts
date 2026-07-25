@@ -232,7 +232,8 @@ export class VendorFormDialogComponent implements OnInit {
   private async loadSitesFromBackend(): Promise<void> {
     try {
       const res = await this.api.listSites().toPromise();
-      const sites = (res?.items || []).map((s: any) => ({
+      const raw = (res as any)?.sites || [];
+      const sites = raw.map((s: any) => ({
         id: s._id || s.id,
         _id: s._id,
         siteId: s.siteId,
@@ -243,7 +244,6 @@ export class VendorFormDialogComponent implements OnInit {
         targetEndDate: s.targetEndDate,
         projectIds: s.projectIds || [],
       })) as Site[];
-      // Only update if we got results and it's different from current
       if (sites.length > 0) {
         this.data.siteEntities.set(sites);
       }

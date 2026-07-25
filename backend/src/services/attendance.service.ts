@@ -9,10 +9,12 @@ export interface GroupedAttendance {
   site?: string;
   subcontractorName?: string;
   labourType?: string;
+  supervisorName?: string;
   workers: Array<{
     workerId: string;
     workerName: string;
     shiftCount: number;
+    weeklyPay: number;
     overtimeHours: number;
     overtimeAmount: number;
     lateFine: number;
@@ -44,9 +46,14 @@ export async function listGroupedAttendance(filter: {
   const pipeline = [
     { $match: match },
     {
+      $addFields: {
+        createdByObj: { $toObjectId: "$createdBy" },
+      },
+    },
+    {
       $lookup: {
         from: "users",
-        localField: "createdBy",
+        localField: "createdByObj",
         foreignField: "_id",
         as: "supervisor",
       },
@@ -62,11 +69,13 @@ export async function listGroupedAttendance(filter: {
           subcontractorName: "$subcontractorName",
           labourType: "$labourType",
         },
+        supervisorName: { $first: "$supervisor.name" },
         workers: {
           $push: {
             workerId: { $toString: "$workerId" },
             workerName: "$workerName",
             shiftCount: "$shiftCount",
+            weeklyPay: "$weeklyPay",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",
             lateFine: "$lateFine",
@@ -96,7 +105,7 @@ export async function listGroupedAttendance(filter: {
       const wPay = w.weeklyPay || 0;
       const wMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
       const wDailyBase = (wPay / 7) * wMultiplier;
-      const dailyPay = w.shiftCount * wDailyBase - w.lateFine + w.overtimeAmount;
+      const dailyPay = wDailyBase - w.lateFine + w.overtimeAmount;
       return { ...w, dailyPay: Math.round(dailyPay * 100) / 100 };
     });
 
@@ -107,6 +116,7 @@ export async function listGroupedAttendance(filter: {
       site: r._id.site,
       subcontractorName: r._id.subcontractorName,
       labourType: r._id.labourType,
+      supervisorName: r.supervisorName || "",
       workers,
       totalWorkers: r.totalWorkers,
       totalDailyPay: Math.round(
@@ -136,9 +146,14 @@ export async function getLabourReport(filter: {
   const results = await Attendance.aggregate([
     { $match: match as any },
     {
+      $addFields: {
+        createdByObj: { $toObjectId: "$createdBy" },
+      },
+    },
+    {
       $lookup: {
         from: "users",
-        localField: "createdBy",
+        localField: "createdByObj",
         foreignField: "_id",
         as: "supervisor",
       },
@@ -158,6 +173,7 @@ export async function getLabourReport(filter: {
             workerId: { $toString: "$workerId" },
             workerName: "$workerName",
             shiftCount: "$shiftCount",
+            weeklyPay: "$weeklyPay",
             overtimeHours: "$overtimeHours",
             overtimeAmount: "$overtimeAmount",
             lateFine: "$lateFine",
@@ -180,10 +196,10 @@ export async function getLabourReport(filter: {
 
     let groupDailyPay = 0;
     const workers = r.workers.map((w: any) => {
-      const weeklyPay = r._id.weeklyPay || 0;
+      const weeklyPay = w.weeklyPay || 0;
       const shiftMultiplier = r._id.shiftCount === 1 ? 0.5 : 1;
-      const baseDaily = weeklyPay / 7;
-      const dailyPay = w.shiftCount * baseDaily * shiftMultiplier - w.lateFine + w.overtimeAmount;
+      const baseDaily = (weeklyPay / 7) * shiftMultiplier;
+      const dailyPay = baseDaily - w.lateFine + w.overtimeAmount;
       groupDailyPay += dailyPay;
       return { ...w, dailyPay: Math.round(dailyPay * 100) / 100 };
     });

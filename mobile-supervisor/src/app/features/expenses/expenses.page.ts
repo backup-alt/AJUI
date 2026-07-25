@@ -301,28 +301,21 @@ export class ExpensesPage implements OnInit, OnDestroy {
   async loadExpenses(): Promise<void> {
     this.isLoading.set(true);
     try {
-      this.supervisor
+      const r = await this.supervisor
         .getExpenses({
           type: 'site',
           limit: 100,
         })
-        .subscribe({
-          next: (r) => {
-            this.expenses.set((r.expenses || []).map((expense) => ({
-              ...expense,
-              amount: Number(expense.amount) || 0,
-            })));
-            this.filterExpenses();
-            this.isLoading.set(false);
-          },
-          error: (err) => {
-            console.error('[Expenses] failed to load', err);
-            this.filterExpenses();
-            this.isLoading.set(false);
-          },
-        });
+        .toPromise();
+      this.expenses.set((r?.expenses || []).map((expense) => ({
+        ...expense,
+        amount: Number(expense.amount) || 0,
+      })));
+      this.filterExpenses();
+      this.isLoading.set(false);
     } catch (e) {
-      console.error(e);
+      console.error('[Expenses] failed to load', e);
+      this.filterExpenses();
       this.isLoading.set(false);
     }
   }

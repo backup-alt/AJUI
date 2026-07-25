@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import {
-  IonContent, IonIcon,
+  IonContent, IonIcon, IonRefresher, IonRefresherContent,
   AlertController, ToastController,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -15,10 +15,13 @@ import { SupervisorService } from '../../core/services/supervisor.service';
   selector: 'app-profile',
   standalone: true,
   imports: [
-    IonContent, IonIcon,
+    IonContent, IonIcon, IonRefresher, IonRefresherContent,
   ],
   template: `
     <ion-content class="profile-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="profile-hero">
         <div class="hero-content">
           <div class="avatar-wrap">
@@ -219,6 +222,11 @@ export class ProfilePage implements OnInit {
       logOutOutline, shieldCheckmarkOutline,
     });
     this.currentUser.set(this.auth.currentUser());
+  }
+
+  async handleRefresh(event: CustomEvent): Promise<void> {
+    this.currentUser.set(this.auth.currentUser());
+    (event.target as HTMLIonRefresherElement).complete();
   }
 
   async logout(): Promise<void> {

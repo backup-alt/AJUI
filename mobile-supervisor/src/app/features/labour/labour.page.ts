@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import {
   IonContent, IonSegment, IonSegmentButton, IonLabel,
   IonFab, IonFabButton, IonIcon, IonSkeletonText,
-  IonRefresher, IonRefresherContent,
+  IonRefresher, IonRefresherContent, IonSearchbar,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -12,8 +12,8 @@ import {
   chevronForwardOutline, closeOutline, checkmarkOutline,
   constructOutline, buildOutline, flashOutline, cutOutline,
   homeOutline, colorPaletteOutline, hammerOutline, gridOutline,
-  layersOutline, carOutline, sparklesOutline,
-  calendarOutline, ellipsisHorizontalOutline,
+  layersOutline, carOutline, sparklesOutline, briefcaseOutline,
+  calendarOutline, ellipsisHorizontalOutline, searchOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Worker, Attendance, LabourTypeCount } from '../../shared/models';
@@ -56,7 +56,8 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
   imports: [
     IonContent, IonSegment, IonSegmentButton, IonLabel,
     IonFab, IonFabButton, IonIcon, IonSkeletonText,
-    IonRefresher, IonRefresherContent, FormsModule, DatePipe, CurrencyPipe,
+    IonRefresher, IonRefresherContent, IonSearchbar,
+    FormsModule, DatePipe, CurrencyPipe,
     EmptyStateComponent,
   ],
   template: `
@@ -84,39 +85,84 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       </div>
 
       @if (activeTab === 'workers') {
-        <div class="section-header">
-          <h2>Labour Types</h2>
+        <div class="search-wrap">
+          <ion-searchbar
+            [value]="searchQuery()"
+            (ionInput)="onSearchInput($event)"
+            (ionClear)="clearSearch()"
+            placeholder="Search worker by name..."
+            mode="ios"
+          ></ion-searchbar>
         </div>
 
-        <div class="type-cards">
-          @if (isLoading() && workerTypeCounts().length === 0 && workers().length === 0) {
-            @for (i of [1,2,3,4]; track i) {
-              <div class="type-card skeleton">
-                <ion-skeleton-text animated style="width: 50%; height: 16px;"></ion-skeleton-text>
-                <ion-skeleton-text animated style="width: 30%; height: 24px; margin-top: 8px;"></ion-skeleton-text>
-              </div>
+        @if (searchQuery()) {
+          <div class="section-header">
+            <h2>Search Results</h2>
+          </div>
+
+          <div class="search-results">
+            @if (filteredWorkers().length === 0) {
+              <app-empty-state
+                icon="search-outline"
+                title="No workers found"
+                message="Try a different search term"
+              ></app-empty-state>
+            } @else {
+              @for (worker of filteredWorkers(); track worker._id) {
+                <button class="search-worker-card" (click)="viewWorker(worker)">
+                  <div class="sw-avatar" [class]="'avatar-' + getTypeColor(worker.labourType)">
+                    <span class="sw-initials">{{ getInitials(worker.name) }}</span>
+                  </div>
+                  <div class="sw-body">
+                    <h3 class="sw-name">{{ worker.name }}</h3>
+                    <p class="sw-meta">
+                      <ion-icon [name]="getTypeIcon(worker.labourType)"></ion-icon>
+                      {{ worker.labourType }}
+                      @if (worker.isSubcontract && worker.subcontractorName) {
+                        <span class="sw-sep">&bull;</span> {{ worker.subcontractorName }}
+                      }
+                    </p>
+                  </div>
+                  <ion-icon name="chevron-forward-outline" class="sw-arrow"></ion-icon>
+                </button>
+              }
             }
-          } @else if (workerTypeCounts().length === 0 && !isLoading()) {
-            <app-empty-state
-              icon="people-outline"
-              title="No workers yet"
-              message="Add your first worker to start tracking attendance."
-            ></app-empty-state>
-          } @else {
-            @for (type of workerTypeCounts(); track type.labourType) {
-              <button type="button" class="type-card" (click)="openWorkersOfType(type.labourType)">
-                <div class="type-icon" [class]="'icon-' + getTypeColor(type.labourType)">
-                  <ion-icon [name]="getTypeIcon(type.labourType)"></ion-icon>
+          </div>
+        } @else {
+          <div class="section-header">
+            <h2>Labour Types</h2>
+          </div>
+
+          <div class="type-cards">
+            @if (isLoading() && workerTypeCounts().length === 0 && workers().length === 0) {
+              @for (i of [1,2,3,4]; track i) {
+                <div class="type-card skeleton">
+                  <ion-skeleton-text animated style="width: 50%; height: 16px;"></ion-skeleton-text>
+                  <ion-skeleton-text animated style="width: 30%; height: 24px; margin-top: 8px;"></ion-skeleton-text>
                 </div>
-                <div class="type-info">
-                  <span class="type-name">{{ type.labourType }}</span>
-                  <span class="type-count">{{ type.count }} {{ type.count === 1 ? 'worker' : 'workers' }}</span>
-                </div>
-                <ion-icon name="chevron-forward-outline" class="type-arrow"></ion-icon>
-              </button>
+              }
+            } @else if (workerTypeCounts().length === 0 && !isLoading()) {
+              <app-empty-state
+                icon="people-outline"
+                title="No workers yet"
+                message="Add your first worker to start tracking attendance."
+              ></app-empty-state>
+            } @else {
+              @for (type of workerTypeCounts(); track type.labourType) {
+                <button type="button" class="type-card" (click)="openWorkersOfType(type.labourType)">
+                  <div class="type-icon" [class]="'icon-' + getTypeColor(type.labourType)">
+                    <ion-icon [name]="getTypeIcon(type.labourType)"></ion-icon>
+                  </div>
+                  <div class="type-info">
+                    <span class="type-name">{{ type.labourType }}</span>
+                    <span class="type-count">{{ type.count }} {{ type.count === 1 ? 'worker' : 'workers' }}</span>
+                  </div>
+                  <ion-icon name="chevron-forward-outline" class="type-arrow"></ion-icon>
+                </button>
+              }
             }
-          }
-        </div>
+          </div>
+        }
       }
 
       @if (activeTab === 'attendance') {
@@ -125,6 +171,13 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
             <ion-icon name="calendar-outline"></ion-icon>
             {{ todayDate | date:'EEEE, MMMM d, yyyy' }}
           </h2>
+        </div>
+
+        <div class="mark-attendance-bar">
+          <button class="mark-attendance-btn" (click)="goMarkAttendance()">
+            <ion-icon name="checkmark-circle-outline"></ion-icon>
+            Mark Attendance
+          </button>
         </div>
 
         <div class="cards">
@@ -239,12 +292,97 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     }
     .attendance-section-header h2 ion-icon { font-size: 16px; }
 
+    .mark-attendance-bar {
+      padding: 0 var(--md-space-4) var(--md-space-3);
+    }
+    .mark-attendance-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px;
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      border-radius: var(--md-radius-xl);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: var(--md-elevation-2);
+      transition: transform var(--md-motion-duration-short1);
+    }
+    .mark-attendance-btn:active { transform: scale(0.98); }
+    .mark-attendance-btn ion-icon { font-size: 20px; }
+
     .type-cards {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: var(--md-space-3);
       padding: 4px var(--md-space-4) 96px;
     }
+
+    .search-wrap {
+      padding: 0 var(--md-space-4) var(--md-space-2);
+    }
+    .search-wrap ion-searchbar {
+      --background: var(--m3-surface-bright);
+      --border-radius: var(--md-radius-xl);
+      --box-shadow: var(--md-elevation-1);
+      padding: 0;
+    }
+    .search-results {
+      padding: 0 var(--md-space-4) 96px;
+    }
+    .search-worker-card {
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-3);
+      width: 100%;
+      padding: var(--md-space-3) var(--md-space-4);
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-xl);
+      margin-bottom: var(--md-space-2);
+      cursor: pointer;
+      font-family: inherit;
+      text-align: left;
+      transition: transform var(--md-motion-duration-short1);
+    }
+    .search-worker-card:active { transform: scale(0.98); }
+    .sw-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+      background: rgba(0, 34, 99, 0.1);
+      color: var(--m3-primary);
+    }
+    .sw-initials { line-height: 1; }
+    .sw-body { flex: 1; min-width: 0; }
+    .sw-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--m3-on-surface);
+      margin: 0 0 2px;
+    }
+    .sw-meta {
+      font-size: 12px;
+      color: var(--m3-on-surface-muted);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .sw-meta ion-icon { font-size: 14px; }
+    .sw-sep { margin: 0 2px; }
+    .sw-arrow { color: var(--m3-on-surface-muted); font-size: 16px; flex-shrink: 0; }
     .type-card {
       display: flex;
       align-items: center;
@@ -393,6 +531,17 @@ export class LabourPage implements OnInit, OnDestroy {
   labourTypeCounts = signal<LabourTypeCount[]>([]);
   showWorkerSheet = signal(false);
   isLoading = signal(true);
+  searchQuery = signal('');
+
+  filteredWorkers = computed<Worker[]>(() => {
+    const q = this.searchQuery().toLowerCase().trim();
+    if (!q) return [];
+    return this.workers().filter(w =>
+      (w.name || '').toLowerCase().includes(q) ||
+      (w.labourType || '').toLowerCase().includes(q) ||
+      (w as any).subcontractorName?.toLowerCase().includes(q)
+    );
+  });
 
   workersOfType = computed<Worker[]>(() => {
     const type = this.selectedLabourType();
@@ -420,8 +569,8 @@ export class LabourPage implements OnInit, OnDestroy {
       chevronForwardOutline, closeOutline, checkmarkOutline,
       constructOutline, buildOutline, flashOutline, cutOutline,
       homeOutline, colorPaletteOutline, hammerOutline, gridOutline,
-      layersOutline, carOutline, sparklesOutline,
-      calendarOutline, ellipsisHorizontalOutline,
+      layersOutline, carOutline, sparklesOutline, briefcaseOutline,
+      calendarOutline, ellipsisHorizontalOutline, searchOutline,
     });
     await this.loadData();
 
@@ -476,11 +625,12 @@ export class LabourPage implements OnInit, OnDestroy {
   async loadAttendance(): Promise<void> {
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
-    this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined)
-      .subscribe({
-        next: (res) => this.todayAttendance.set(res.attendances || []),
-        error: (err) => console.error('[Labour] failed to load attendance', err),
-      });
+    try {
+      const res = await this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).toPromise();
+      this.todayAttendance.set(res?.attendances || []);
+    } catch (err) {
+      console.error('[Labour] failed to load attendance', err);
+    }
   }
 
   getTypeIcon(type: string): string {
@@ -506,12 +656,34 @@ export class LabourPage implements OnInit, OnDestroy {
     this.router.navigate(['/tabs/labour/create-worker']);
   }
 
+  onSearchInput(event: any): void {
+    this.searchQuery.set(event.detail.value || '');
+  }
+
+  clearSearch(): void {
+    this.searchQuery.set('');
+  }
+
+  getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  viewWorker(worker: Worker): void {
+    this.router.navigate(['/tabs/labour/worker', worker._id]);
+  }
+
   viewHistory(att: Attendance): void {
     this.router.navigate(['/tabs/labour/worker-history', att.workerId]);
   }
 
   editAttendance(att: Attendance): void {
     this.router.navigate(['/tabs/labour/edit-attendance', att._id]);
+  }
+
+  goMarkAttendance(): void {
+    this.activeTab = 'workers';
   }
 
   /**
