@@ -105,11 +105,19 @@ function numberToWords(num: number): string {
                             <span class="status-pill" [class]="inv.status.toLowerCase()">{{ inv.status }}</span>
                           </td>
                           <td>
-                            <button type="button" class="action-btn" (click)="editInvoice(inv)">Edit</button>
-                            <button type="button" class="action-btn" (click)="previewInvoice(inv)">Preview</button>
-                            <button type="button" class="action-btn danger" (click)="deleteInvoice(inv.id)">Delete</button>
+                            <button type="button" class="icon-action-btn edit" title="Edit" (click)="editInvoice(inv)">
+                              <ion-icon name="create-outline"></ion-icon>
+                            </button>
+                            <button type="button" class="icon-action-btn preview" title="Preview" (click)="previewInvoice(inv)">
+                              <ion-icon name="eye-outline"></ion-icon>
+                            </button>
+                            <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteInvoice(inv.id)">
+                              <ion-icon name="trash-outline"></ion-icon>
+                            </button>
                             @if (!inv.clientId && inv.clientName) {
-                              <button type="button" class="action-btn client-action" (click)="makeAsClient(inv)">Make as Client</button>
+                              <button type="button" class="icon-action-btn client" title="Make as Client" (click)="makeAsClient(inv)">
+                                <ion-icon name="person-add-outline"></ion-icon>
+                              </button>
                             }
                           </td>
                         </tr>
@@ -362,10 +370,17 @@ function numberToWords(num: number): string {
     .status-pill.draft { background: #fef3c7; color: #92400e; }
     .status-pill.sent { background: #dbeafe; color: #1e40af; }
     .status-pill.paid { background: #d1fae5; color: #065f46; }
-    .action-btn { padding: 4px 10px; background: #2c5cff; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px; }
-    .action-btn.danger { background: #dc2626; }
-    .action-btn.client-action { background: #059669; color: #fff; border-color: #059669; }
-    .action-btn.client-action:hover { background: #047857; }
+    .icon-action-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; margin-right: 6px; transition: background 150ms, transform 150ms; }
+    .icon-action-btn:hover { transform: scale(1.1); }
+    .icon-action-btn ion-icon { font-size: 16px; pointer-events: none; }
+    .icon-action-btn.edit { background: #e0ecff; color: #2c5cff; }
+    .icon-action-btn.edit:hover { background: #c7d9ff; }
+    .icon-action-btn.preview { background: #f1f5f9; color: #475569; }
+    .icon-action-btn.preview:hover { background: #e2e8f0; }
+    .icon-action-btn.delete { background: #fee2e2; color: #dc2626; }
+    .icon-action-btn.delete:hover { background: #fecaca; }
+    .icon-action-btn.client { background: #d1fae5; color: #059669; }
+    .icon-action-btn.client:hover { background: #a7f3d0; }
     .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #2c5cff; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .btn-secondary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #fff; color: #2c5cff; border: 1.5px solid #2c5cff; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .btn-outline { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; border-radius: 6px; cursor: pointer; font-size: 14px; }
