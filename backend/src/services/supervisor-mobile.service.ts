@@ -1,4 +1,20 @@
 import { Types } from "mongoose";
+
+interface CacheEntry<T> { data: T; expiresAt: number; }
+const queryCache = new Map<string, CacheEntry<unknown>>();
+function getCached<T>(key: string): T | null {
+  const entry = queryCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { queryCache.delete(key); return null; }
+  return entry.data as T;
+}
+function setCache(key: string, data: unknown, ttlMs = 30000): void {
+  queryCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  if (queryCache.size > 200) {
+    const oldest = queryCache.keys().next().value;
+    if (oldest) queryCache.delete(oldest);
+  }
+}
 import { User } from "../models/User.js";
 import { Supervisor } from "../models/Supervisor.js";
 import { Project } from "../models/Project.js";
@@ -645,23 +661,48 @@ export async function listMaterialsForSupervisor(
 
   console.log(`[listMaterials] query=${JSON.stringify(query, (_, v) => v instanceof Types.ObjectId ? `ObjectId(${v})` : v)}`);
 
-  const page = filters.page ?? 1;
-  const limit = filters.limit ?? 20;
-  const skip = (page - 1) * limit;
-
   if (filters.status !== "Approved") {
     if (filters.status) query.status = filters.status;
-    const qStart = Date.now();
-    console.log(`[listMaterials] running Material.find query=${JSON.stringify(query)}`);
-    const [requestItems, requestTotal] = await Promise.all([
-      Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(8000).lean(),
-      Material.countDocuments(query).maxTimeMS(8000),
-    ]);
-    console.log(`[listMaterials] Material.find in ${Date.now() - qStart}ms, found=${requestItems.length}, total=${requestTotal}`);
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+    const skip = (page - 1) * limit;
+    const cacheKey = `mat:${userId}:${JSON.stringify(query)}:${skip}:${limit}`;
 
-    return {
-      materials: requestItems.map((m) => ({
-        _id: m._id.toString(),
+    const cached = getCached<{ materials: any[]; pagination: any }>(cacheKey);
+    if (cached) {
+      console.log(`[listMaterials] cache HIT for ${cacheKey}`);
+      return cached;
+    }
+
+    const qStart = Date.now();
+    console.log(`[listMaterials] running aggregate query=${JSON.stringify(query)}`);
+    const aggPipeline: any[] = [
+      { $match: query },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ];
+    const countPipeline: any[] = [{ $match: query }, { $count: "total" }];
+
+    let requestItems: any[] = [];
+    let requestTotal = 0;
+    try {
+      const [items, countResult] = await Promise.all([
+        Material.aggregate(aggPipeline).option({ maxTimeMS: 12000 }).allowDiskUse(true),
+        Material.aggregate(countPipeline).option({ maxTimeMS: 12000 }),
+      ]);
+      requestItems = items;
+      requestTotal = countResult.length > 0 ? countResult[0].total : 0;
+    } catch (aggErr: any) {
+      console.error(`[listMaterials] aggregate failed in ${Date.now() - qStart}ms:`, aggErr?.message);
+      requestItems = [];
+      requestTotal = 0;
+    }
+    console.log(`[listMaterials] aggregate in ${Date.now() - qStart}ms, found=${requestItems.length}, total=${requestTotal}`);
+
+    const result = {
+      materials: requestItems.map((m: any) => ({
+        _id: m._id?.toString?.() ?? m._id,
         materialId: m.materialId,
         projectId: m.projectId,
         projectName: m.projectName,
@@ -677,9 +718,9 @@ export async function listMaterialsForSupervisor(
         vendor: m.vendor,
         poNumber: m.poNumber,
         issuedAmount: m.issuedAmount,
-        givenAmount: (m as any).givenAmount,
-        billUrl: (m as any).billUrl,
-        received: (m as any).status === "Received",
+        givenAmount: m.givenAmount,
+        billUrl: m.billUrl,
+        received: m.status === "Received",
         requestDate: m.requestDate,
         status: m.status,
         notes: m.notes,
@@ -689,7 +730,14 @@ export async function listMaterialsForSupervisor(
       })),
       pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
     };
+
+    setCache(cacheKey, result, 30000);
+    return result;
   }
+
+  const page = filters.page ?? 1;
+  const limit = filters.limit ?? 20;
+  const skip = (page - 1) * limit;
 
   const [items, total] = await Promise.all([
     Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).maxTimeMS(8000).lean(),
