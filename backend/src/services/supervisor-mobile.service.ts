@@ -725,21 +725,26 @@ export async function listMaterialsForSupervisor(
     const page = filters.page ?? 1;
     const limit = Math.min(filters.limit ?? 20, 50);
     const skip = (page - 1) * limit;
-    const cacheKey = `mat:${userId}:${JSON.stringify(query)}:${skip}:${limit}`;
+    const cacheKey = `mat:${userId}:${JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v)}:${skip}:${limit}`;
+    console.log(`[listMaterials] cacheKey built, trying cache for user ${userId}`);
 
     const cached = getCached<{ materials: any[]; pagination: any }>(cacheKey);
     if (cached) {
+      console.log(`[listMaterials] cache HIT for user ${userId}`);
       return cached;
     }
+    console.log(`[listMaterials] cache MISS for user ${userId}, running query`);
 
     const matT0 = Date.now();
     let items: any[];
     let total: number;
     try {
+      console.log(`[listMaterials] About to execute Material.find() and countDocuments()...`);
       [items, total] = await Promise.all([
-        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean(),
-        Material.countDocuments(query).maxTimeMS(15000),
+        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        Material.countDocuments(query),
       ]);
+      console.log(`[listMaterials] MongoDB query completed, items: ${items.length}, total: ${total}`);
     } catch (err: any) {
       console.error(`[listMaterials] MongoDB query FAILED:`, err.message, "query:", JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
       throw err;
