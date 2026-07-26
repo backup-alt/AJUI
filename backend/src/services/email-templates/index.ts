@@ -1,3 +1,5 @@
+import { env } from "../../config/env";
+
 /**
  * Centralized AGB email templates.
  *
@@ -25,7 +27,7 @@ const SHELL_HTML = (body: string): string => `<!DOCTYPE html>
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.06);">
           <tr>
             <td style="background-color:#002263;padding:28px 32px;text-align:center;">
-              <img src="https://backup-alt.github.io/AJUI/assets/logo.png" alt="Annai Golden Builders" style="width:96px;height:auto;border-radius:12px;display:block;margin:0 auto;">
+              <img src="${env.FRONTEND_URL.replace(/\/+$/, '')}/assets/logo.png" alt="Annai Golden Builders" style="width:96px;height:auto;border-radius:12px;display:block;margin:0 auto;">
               <h1 style="margin:14px 0 0;color:#ffffff;font-size:20px;font-weight:600;">Annai Golden Builders</h1>
               <p style="margin:4px 0 0;color:#9bb3e0;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;">Operations Workspace</p>
             </td>
