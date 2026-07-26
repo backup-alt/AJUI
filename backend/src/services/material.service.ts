@@ -160,6 +160,14 @@ export async function updateMaterial(id: string, patch: Partial<CreateMaterialIn
   }
   if (patch.vendorId) update.vendorId = new Types.ObjectId(patch.vendorId);
 
+  const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
+  if (customFields) {
+    delete update.customFields;
+    for (const [key, val] of Object.entries(customFields)) {
+      update[`customFields.${key}`] = val;
+    }
+  }
+
   const material = await Material.findByIdAndUpdate(id, update, { new: true });
   if (!material) throw new AppError(404, "Material not found");
   return material.toObject();

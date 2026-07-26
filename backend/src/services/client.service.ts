@@ -61,7 +61,15 @@ export async function getClientById(id: string, scopeQuery?: Record<string, unkn
 
 export async function updateClient(id: string, patch: UpdateClientInput, scopeQuery?: Record<string, unknown>) {
   await getClientById(id, scopeQuery);
-  const client = await Client.findByIdAndUpdate(id, patch, { new: true });
+  const update: Record<string, unknown> = { ...patch };
+  const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
+  if (customFields) {
+    delete update.customFields;
+    for (const [key, val] of Object.entries(customFields)) {
+      update[`customFields.${key}`] = val;
+    }
+  }
+  const client = await Client.findByIdAndUpdate(id, update, { new: true });
   if (!client) throw new AppError(404, "Client not found");
   return client.toObject();
 }

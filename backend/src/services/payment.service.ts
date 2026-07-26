@@ -88,6 +88,14 @@ export async function updatePayment(id: string, patch: Partial<CreatePaymentInpu
   if (patch.projectId) update.projectId = new Types.ObjectId(patch.projectId);
   if (patch.clientId) update.clientId = new Types.ObjectId(patch.clientId);
 
+  const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
+  if (customFields) {
+    delete update.customFields;
+    for (const [key, val] of Object.entries(customFields)) {
+      update[`customFields.${key}`] = val;
+    }
+  }
+
   const payment = await Payment.findByIdAndUpdate(id, update, { new: true });
   if (!payment) throw new AppError(404, "Payment not found");
   return payment.toObject();

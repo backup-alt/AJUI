@@ -91,6 +91,14 @@ export async function updateSubcontractor(
   if (patch.supervisorId) update.supervisorId = new Types.ObjectId(patch.supervisorId);
   if (patch.projectId) update.projectId = new Types.ObjectId(patch.projectId);
 
+  const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
+  if (customFields) {
+    delete update.customFields;
+    for (const [key, val] of Object.entries(customFields)) {
+      update[`customFields.${key}`] = val;
+    }
+  }
+
   const sub = await Subcontractor.findByIdAndUpdate(id, update, { new: true });
   if (!sub) throw new AppError(404, "Subcontractor not found");
   return sub.toObject();

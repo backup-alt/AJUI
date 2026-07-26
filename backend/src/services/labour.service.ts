@@ -100,6 +100,14 @@ export async function updateLabour(id: string, patch: Partial<CreateLabourInput>
   const update: Record<string, unknown> = { ...patch };
   if (patch.siteId) update.siteId = new Types.ObjectId(patch.siteId);
 
+  const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
+  if (customFields) {
+    delete update.customFields;
+    for (const [key, val] of Object.entries(customFields)) {
+      update[`customFields.${key}`] = val;
+    }
+  }
+
   const labour = await Labour.findByIdAndUpdate(id, update, { new: true });
   if (!labour) throw new AppError(404, "Labour record not found");
   return labour.toObject();
