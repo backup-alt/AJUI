@@ -135,7 +135,10 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
     };
     const result = await mobileService.listMaterialsForSupervisor(userId, filters);
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error(`[listMaterials] Controller error:`, e);
+    next(e);
+  }
 }
 
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {

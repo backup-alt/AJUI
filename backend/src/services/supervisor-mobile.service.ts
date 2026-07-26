@@ -228,7 +228,9 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
       or.push({ site: { $in: siteIdStrings } });
     }
     if (access.siteNames.length > 0) or.push({ site: { $in: access.siteNames } });
-    return { $or: or };
+    const result = { $or: or };
+    console.log(`[getSiteScopeForFilter] no siteId -> $or query:`, JSON.stringify(result));
+    return result;
   }
 
   const requestedSiteId = toObjectId(siteId);
@@ -699,53 +701,65 @@ export async function listMaterialsForSupervisor(
   userId: string,
   filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
 ) {
-  const { query } = await buildScopedEntityQuery(userId, {
-    projectId: filters.projectId,
-    siteId: filters.siteId,
-  });
+  try {
+    const { query, access } = await buildScopedEntityQuery(userId, {
+      projectId: filters.projectId,
+      siteId: filters.siteId,
+    });
 
-  const page = filters.page ?? 1;
-  const limit = filters.limit ?? 20;
-  const skip = (page - 1) * limit;
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+    const skip = (page - 1) * limit;
 
-  if (filters.status !== "Approved") {
-    if (filters.status) query.status = filters.status;
-    const [requestItems, requestTotal] = await Promise.all([
-      Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Material.countDocuments(query),
-    ]);
+    console.log(`[listMaterials] user=${userId} status=${filters.status} projectId=${filters.projectId} siteId=${filters.siteId} query=${JSON.stringify(query)} access_projects=${access.projectIds.length} access_sites=${access.siteIds.length} access_siteNames=${access.siteNames.length}`);
 
-    return {
-      materials: requestItems.map((m) => ({
-        _id: m._id.toString(),
-        materialId: m.materialId,
-        projectId: m.projectId,
-        projectName: m.projectName,
-        siteId: m.siteId,
-        site: m.site,
-        name: m.name,
-        unit: m.unit,
-        requestedQuantity: m.requestedQuantity,
-        approvedQuantity: m.approvedQuantity,
-        purchasedQuantity: m.purchasedQuantity,
-        consumedQuantity: m.consumedQuantity,
-        remainingStock: m.remainingStock,
-        vendor: m.vendor,
-        poNumber: m.poNumber,
-        issuedAmount: m.issuedAmount,
-        givenAmount: (m as any).givenAmount,
-        billUrl: (m as any).billUrl,
-        received: (m as any).status === "Received",
-        requestDate: m.requestDate,
-        status: m.status,
-        notes: m.notes,
-        createdBy: m.createdBy,
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-      })),
-      pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
-    };
-  }
+    if (filters.status !== "Approved") {
+      if (filters.status) query.status = filters.status;
+      console.log(`[listMaterials] executing non-Approved query: ${JSON.stringify(query)}`);
+      let requestItems;
+      let requestTotal;
+      try {
+        [requestItems, requestTotal] = await Promise.all([
+          Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+          Material.countDocuments(query),
+        ]);
+      } catch (dbErr) {
+        console.error(`[listMaterials] MongoDB error:`, dbErr);
+        throw dbErr;
+      }
+      console.log(`[listMaterials] non-Approved returned: ${requestItems.length} items, total=${requestTotal}`);
+
+      return {
+        materials: requestItems.map((m) => ({
+          _id: m._id.toString(),
+          materialId: m.materialId,
+          projectId: m.projectId,
+          projectName: m.projectName,
+          siteId: m.siteId,
+          site: m.site,
+          name: m.name,
+          unit: m.unit,
+          requestedQuantity: m.requestedQuantity,
+          approvedQuantity: m.approvedQuantity,
+          purchasedQuantity: m.purchasedQuantity,
+          consumedQuantity: m.consumedQuantity,
+          remainingStock: m.remainingStock,
+          vendor: m.vendor,
+          poNumber: m.poNumber,
+          issuedAmount: m.issuedAmount,
+          givenAmount: (m as any).givenAmount,
+          billUrl: (m as any).billUrl,
+          received: (m as any).status === "Received",
+          requestDate: m.requestDate,
+          status: m.status,
+          notes: m.notes,
+          createdBy: m.createdBy,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+        })),
+        pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
+      };
+    }
 
   await backfillApprovedMaterialsToInventory(query);
 
@@ -824,6 +838,10 @@ export async function listMaterialsForSupervisor(
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   };
+  } catch (err) {
+    console.error(`[listMaterials] ERROR user=${userId} filters=${JSON.stringify(filters)}:`, err);
+    throw err;
+  }
 }
 
 export async function listLabourForSupervisor(
