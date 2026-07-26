@@ -114,51 +114,60 @@ export async function listInventory(filter: {
 }
 
 export async function backfillApprovedMaterialsToInventory(materialQuery: Record<string, unknown>) {
-  const materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed"] } }).lean();
+  let materials;
+  try {
+    materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed"] } }).lean();
+  } catch {
+    return;
+  }
   for (const material of materials) {
-    const existing = await Inventory.findOne(inventoryMatchForMaterial(material)).lean();
-    if (existing) {
-      const qty = Math.max(0, Number(material.approvedQuantity) || 0);
-      if (qty <= 0) continue;
-      const alreadyRecorded = (existing.purchaseHistory || []).some(
-        (h) => h.materialId && h.materialId.toString() === material._id.toString()
-      );
-      if (alreadyRecorded) continue;
-      await addApprovedMaterialToInventory(material._id, qty, material.createdBy);
+    try {
+      const existing = await Inventory.findOne(inventoryMatchForMaterial(material)).lean();
+      if (existing) {
+        const qty = Math.max(0, Number(material.approvedQuantity) || 0);
+        if (qty <= 0) continue;
+        const alreadyRecorded = (existing.purchaseHistory || []).some(
+          (h) => h.materialId && h.materialId.toString() === material._id.toString()
+        );
+        if (alreadyRecorded) continue;
+        await addApprovedMaterialToInventory(material._id, qty, material.createdBy);
+        continue;
+      }
+      const quantity = Math.max(0, Number(material.approvedQuantity) || 0);
+      if (quantity <= 0) continue;
+      const inventory = new Inventory({
+        projectId: material.projectId,
+        projectName: material.projectName,
+        clientId: material.clientId,
+        clientName: material.clientName,
+        siteId: material.siteId,
+        site: material.site,
+        siteKey: siteKey(material.siteId, material.site),
+        name: material.name,
+        normalizedName: normalized(material.name),
+        unit: material.unit,
+        normalizedUnit: normalized(material.unit),
+        requestedQuantity: Number(material.requestedQuantity) || 0,
+        approvedQuantity: quantity,
+        purchasedQuantity: quantity,
+        consumedQuantity: Number(material.consumedQuantity) || 0,
+        vendor: material.vendor,
+        vendorId: material.vendorId,
+        poNumber: material.poNumber,
+        lastMaterialId: material._id,
+        purchaseHistory: [{
+          vendor: material.vendor || "",
+          vendorId: material.vendorId,
+          quantity: quantity,
+          date: new Date(),
+          poNumber: material.poNumber,
+          materialId: material._id,
+        }],
+      });
+      await inventory.save();
+    } catch {
       continue;
     }
-    const quantity = Math.max(0, Number(material.approvedQuantity) || 0);
-    if (quantity <= 0) continue;
-    const inventory = new Inventory({
-      projectId: material.projectId,
-      projectName: material.projectName,
-      clientId: material.clientId,
-      clientName: material.clientName,
-      siteId: material.siteId,
-      site: material.site,
-      siteKey: siteKey(material.siteId, material.site),
-      name: material.name,
-      normalizedName: normalized(material.name),
-      unit: material.unit,
-      normalizedUnit: normalized(material.unit),
-      requestedQuantity: Number(material.requestedQuantity) || 0,
-      approvedQuantity: quantity,
-      purchasedQuantity: quantity,
-      consumedQuantity: Number(material.consumedQuantity) || 0,
-      vendor: material.vendor,
-      vendorId: material.vendorId,
-      poNumber: material.poNumber,
-      lastMaterialId: material._id,
-      purchaseHistory: [{
-        vendor: material.vendor || "",
-        vendorId: material.vendorId,
-        quantity: quantity,
-        date: new Date(),
-        poNumber: material.poNumber,
-        materialId: material._id,
-      }],
-    });
-    await inventory.save();
   }
 }
 

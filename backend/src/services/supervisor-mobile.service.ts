@@ -663,11 +663,21 @@ export async function listMaterialsForSupervisor(
 
   // If Inventory collection is empty for this query, fall back to Material collection
   if (items.length === 0 && total === 0) {
+    const existingOr = query.$or as Record<string, unknown>[] | undefined;
+    const statusFilter = {
+      $or: [
+        { status: "Received" },
+        { status: "Approved" },
+        { approvedQuantity: { $gt: 0 } },
+      ],
+    };
     const materialQuery: Record<string, unknown> = { ...query };
-    materialQuery.$or = [
-      { status: "Received" },
-      { approvedQuantity: { $gt: 0 } },
-    ];
+    delete materialQuery.$or;
+    if (existingOr && existingOr.length > 0) {
+      materialQuery.$and = [{ $or: existingOr }, statusFilter];
+    } else {
+      Object.assign(materialQuery, statusFilter);
+    }
     const [matItems, matTotal] = await Promise.all([
       Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Material.countDocuments(materialQuery),

@@ -134,7 +134,10 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       limit: req.query.limit ? Number(req.query.limit) : 20,
     });
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error("[listMaterials] error:", e);
+    next(e);
+  }
 }
 
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {
@@ -330,7 +333,10 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       limit: req.query.limit ? Number(req.query.limit) : 20,
     });
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error("[listExpenses] error:", e);
+    next(e);
+  }
 }
 
 export async function getExpense(req: Request, res: Response, next: NextFunction) {
