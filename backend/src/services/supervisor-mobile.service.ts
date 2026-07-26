@@ -699,25 +699,22 @@ export async function listMaterialsForSupervisor(
   userId: string,
   filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
 ) {
+  const { query } = await buildScopedEntityQuery(userId, {
+    projectId: filters.projectId,
+    siteId: filters.siteId,
+  });
+
+  const page = filters.page ?? 1;
+  const limit = filters.limit ?? 20;
+  const skip = (page - 1) * limit;
+  const cacheKey = `mat:${userId}:${filters.projectId || ""}:${filters.siteId || ""}:${filters.status || ""}:${page}:${limit}`;
+
+  const cached = getCached<{ materials: unknown[]; pagination: unknown; shouldRetry?: boolean }>(cacheKey);
+  if (cached) return cached;
+
+  let result: { materials: unknown[]; pagination: unknown };
+
   try {
-    const { query, access } = await buildScopedEntityQuery(userId, {
-      projectId: filters.projectId,
-      siteId: filters.siteId,
-    });
-
-    const page = filters.page ?? 1;
-    const limit = filters.limit ?? 20;
-    const skip = (page - 1) * limit;
-
-    const cacheKey = `mat:${userId}:${filters.projectId || ""}:${filters.siteId || ""}:${filters.status || ""}:${page}:${limit}`;
-    const cached = getCached<{ materials: unknown[]; pagination: unknown }>(cacheKey);
-    if (cached) {
-      console.log(`[listMaterials] cache hit`);
-      return cached;
-    }
-
-    let result: { materials: unknown[]; pagination: unknown };
-
     if (filters.status !== "Approved") {
       if (filters.status) query.status = filters.status;
 
@@ -736,8 +733,6 @@ export async function listMaterialsForSupervisor(
       } catch {
         requestTotal = requestItems.length;
       }
-
-      console.log(`[listMaterials] returned: ${requestItems.length} items, total=${requestTotal}`);
 
       result = {
         materials: requestItems.map((m) => ({
@@ -850,8 +845,21 @@ export async function listMaterialsForSupervisor(
 
     setCache(cacheKey, result, 30000);
     return result;
-  } catch (err) {
-    console.error(`[listMaterials] ERROR user=${userId} filters=${JSON.stringify(filters)}:`, err);
+  } catch (err: any) {
+    console.error(`[listMaterials] DB error:`, err?.message);
+    const isMongoTimeout =
+      err?.errorLabel === "RetryableWriteError" ||
+      err?.name === "MongoNetworkTimeoutError" ||
+      err?.name === "MongoNetworkError";
+    if (isMongoTimeout) {
+      const fallback = {
+        materials: [] as unknown[],
+        pagination: { page, limit, total: 0, pages: 0 },
+        shouldRetry: true,
+      };
+      setCache(cacheKey, fallback, 30000);
+      return fallback;
+    }
     throw err;
   }
 }

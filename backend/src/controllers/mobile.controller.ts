@@ -134,7 +134,11 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       limit: req.query.limit ? Number(req.query.limit) : 20,
     };
     const result = await mobileService.listMaterialsForSupervisor(userId, filters);
-    res.json(result);
+    if ((result as any).shouldRetry) {
+      res.status(503).json(result);
+    } else {
+      res.json(result);
+    }
   } catch (e) {
     console.error(`[listMaterials] Controller error:`, e);
     next(e);
