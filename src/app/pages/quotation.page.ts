@@ -108,10 +108,16 @@ function numberToWords(num: number): string {
                             <span class="status-pill" [class]="quote.status.toLowerCase()">{{ quote.status }}</span>
                           </td>
                           <td>
-                            <button type="button" class="action-btn" (click)="editQuotation(quote)">Edit</button>
-                            <button type="button" class="action-btn danger" (click)="deleteQuotation(quote.id)">Delete</button>
+                            <button type="button" class="icon-action-btn edit" title="Edit" (click)="editQuotation(quote)">
+                              <ion-icon name="create-outline"></ion-icon>
+                            </button>
+                            <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteQuotation(quote.id)">
+                              <ion-icon name="trash-outline"></ion-icon>
+                            </button>
                             @if (!quote.clientId && quote.clientName) {
-                              <button type="button" class="action-btn client-action" (click)="makeAsClient(quote)">Make as Client</button>
+                              <button type="button" class="icon-action-btn client" title="Make as Client" (click)="makeAsClient(quote)">
+                                <ion-icon name="person-add-outline"></ion-icon>
+                              </button>
                             }
                           </td>
                         </tr>
@@ -476,21 +482,15 @@ function numberToWords(num: number): string {
     .status-pill.sent { background: #e0f2fe; color: #0369a1; }
     .status-pill.accepted { background: #dcfce7; color: #15803d; }
     .status-pill.rejected { background: #fee2e2; color: #dc2626; }
-    .action-btn {
-      padding: 5px 10px;
-      background: none;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 12px;
-      color: #475569;
-      cursor: pointer;
-      margin-right: 6px;
-    }
-    .action-btn:hover { background: #f8fafc; }
-    .action-btn.danger { color: #dc2626; border-color: #fecaca; }
-    .action-btn.danger:hover { background: #fef2f2; }
-    .action-btn.client-action { background: #059669; color: #fff; border-color: #059669; }
-    .action-btn.client-action:hover { background: #047857; }
+    .icon-action-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; margin-right: 6px; transition: background 150ms, transform 150ms; }
+    .icon-action-btn:hover { transform: scale(1.1); }
+    .icon-action-btn ion-icon { font-size: 16px; pointer-events: none; }
+    .icon-action-btn.edit { background: #e0ecff; color: #2c5cff; }
+    .icon-action-btn.edit:hover { background: #c7d9ff; }
+    .icon-action-btn.delete { background: #fee2e2; color: #dc2626; }
+    .icon-action-btn.delete:hover { background: #fecaca; }
+    .icon-action-btn.client { background: #d1fae5; color: #059669; }
+    .icon-action-btn.client:hover { background: #a7f3d0; }
     .editor-header {
       display: flex;
       justify-content: space-between;
@@ -835,7 +835,7 @@ function numberToWords(num: number): string {
         margin: 0;
       }
       .btn-add-row, .btn-add-col, .remove-row-btn, .add-col-inline, .back-link, .editor-actions,
-      .action-btn, .btn-edit, .btn-save, .btn-delete, .table-actions, .btn-confirm, .btn-cancel { display: none !important; }
+      .icon-action-btn, .btn-edit, .btn-save, .btn-delete, .table-actions, .btn-confirm, .btn-cancel { display: none !important; }
       .col-action { display: none !important; }
       ion-menu, ion-split-pane, ion-sidebar, ion-header, ion-toolbar { display: none !important; }
       ion-content { --background: transparent !important; }
