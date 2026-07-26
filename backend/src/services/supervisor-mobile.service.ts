@@ -209,14 +209,20 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
 async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) {
   if (!siteId) {
     if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
-    if (access.siteIds.length > 0) return { siteId: { $in: access.siteIds } };
-    return { site: { $in: access.siteNames } };
+    if (access.siteNames.length > 0) return { site: { $in: access.siteNames } };
+    if (access.siteIds.length > 0) {
+      const sites = await Site.find({ _id: { $in: access.siteIds } }).select("name").lean().maxTimeMS(5000);
+      const names = sites.map((s) => s.name).filter(Boolean);
+      if (names.length > 0) return { site: { $in: names } };
+      return { siteId: { $in: access.siteIds } };
+    }
+    return undefined;
   }
 
   const requestedSiteId = toObjectId(siteId);
   if (!requestedSiteId) throw new AppError(400, "Invalid site id");
 
-  const site = await Site.findById(requestedSiteId).select("_id name projectIds").lean();
+  const site = await Site.findById(requestedSiteId).select("_id name projectIds").lean().maxTimeMS(5000);
   if (!site) throw new AppError(404, "Site not found");
 
   const assignedBySiteId = access.siteIds.length === 0 || hasObjectId(access.siteIds, requestedSiteId);
@@ -232,7 +238,7 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     throw new AppError(403, "Not assigned to this site");
   }
 
-  return { siteId: requestedSiteId };
+  return { site: site.name };
 }
 
 async function buildScopedEntityQuery(
