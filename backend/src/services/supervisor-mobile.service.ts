@@ -700,10 +700,16 @@ export async function listMaterialsForSupervisor(
   userId: string,
   filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
 ) {
-  const { query } = await buildScopedEntityQuery(userId, {
-    projectId: filters.projectId,
-    siteId: filters.siteId,
-  });
+  let query: Record<string, unknown>;
+  try {
+    ({ query } = await buildScopedEntityQuery(userId, {
+      projectId: filters.projectId,
+      siteId: filters.siteId,
+    }));
+  } catch (err: any) {
+    console.error(`[listMaterials] buildScopedEntityQuery FAILED:`, err.message);
+    throw err;
+  }
 
   console.log(`[listMaterials] query for user ${userId}:`, JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
 
@@ -719,20 +725,23 @@ export async function listMaterialsForSupervisor(
       return cached;
     }
 
-    let requestItems: any[] = [];
-    let requestTotal = 0;
     const matT0 = Date.now();
-    const [items, total] = await Promise.all([
-      Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Material.countDocuments(query),
-    ]);
-    requestItems = items;
-    requestTotal = total;
+    let items: any[];
+    let total: number;
+    try {
+      [items, total] = await Promise.all([
+        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        Material.countDocuments(query),
+      ]);
+    } catch (err: any) {
+      console.error(`[listMaterials] MongoDB query FAILED:`, err.message, "query:", JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
+      throw err;
+    }
     const matT1 = Date.now();
-    console.log(`[listMaterials] Material query: ${matT1 - matT0}ms, items: ${requestItems.length}, total: ${requestTotal}`);
+    console.log(`[listMaterials] Material query: ${matT1 - matT0}ms, items: ${items.length}, total: ${total}`);
 
     const result = {
-      materials: requestItems.map((m: any) => ({
+      materials: items.map((m: any) => ({
         _id: m._id?.toString?.() ?? m._id,
         materialId: m.materialId,
         projectId: m.projectId,
@@ -759,7 +768,7 @@ export async function listMaterialsForSupervisor(
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
       })),
-      pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     };
 
     setCache(cacheKey, result, 30000);

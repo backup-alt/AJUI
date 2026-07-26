@@ -21,6 +21,7 @@ import quotationRoutes from "./routes/quotation.routes.js";
 import invoiceRoutes from "./routes/invoice.routes.js";
 import companyProfileRoutes from "./routes/company-profile.routes.js";
 import { ensureDefaultPermissions } from "./models/RolePermission.js";
+import { RESET_PASSWORD_HTML, SIGNUP_HTML } from "./config/pages.js";
 
 export function createApp(): express.Application {
   const app = express();
@@ -153,6 +154,13 @@ export function createApp(): express.Application {
   app.use("/api", quotationRoutes);
   app.use("/api/invoices", invoiceRoutes);
   app.use("/api", companyProfileRoutes);
+
+  app.get("/reset-password.html", (_req, res) => {
+    res.type("html").send(RESET_PASSWORD_HTML);
+  });
+  app.get("/signup.html", (_req, res) => {
+    res.type("html").send(SIGNUP_HTML);
+  });
 
   app.use(notFound);
   app.use(errorHandler);
