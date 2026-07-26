@@ -221,21 +221,14 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
 async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) {
   if (!siteId) {
     if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
-
-    // Prefer siteId lookup (uses compound index, fast) over $or across fields.
-    // The startup backfill (backfillMaterialSiteIds) ensures old documents have
-    // siteId populated, so string-based site matching is only needed when no
-    // ObjectId-based siteIds are available at all.
+    const or: Record<string, unknown>[] = [];
+    const siteIdStrings = access.siteIds.map((id) => id.toString());
     if (access.siteIds.length > 0) {
-      return { siteId: { $in: access.siteIds } };
+      or.push({ siteId: { $in: access.siteIds } });
+      or.push({ site: { $in: siteIdStrings } });
     }
-
-    // Fallback: supervisor only has site names (no ObjectId refs)
-    if (access.siteNames.length > 0) {
-      return { site: { $in: access.siteNames } };
-    }
-
-    return undefined;
+    if (access.siteNames.length > 0) or.push({ site: { $in: access.siteNames } });
+    return { $or: or };
   }
 
   const requestedSiteId = toObjectId(siteId);
@@ -257,8 +250,7 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     throw new AppError(403, "Not assigned to this site");
   }
 
-  // Direct siteId match — uses the compound index { projectId, siteId, createdAt }
-  return { siteId: requestedSiteId };
+  return { $or: [{ siteId: requestedSiteId }, { site: site.name }, { site: requestedSiteId.toString() }] };
 }
 
 async function buildScopedEntityQuery(
