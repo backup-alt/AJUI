@@ -106,6 +106,8 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   const cached = getCachedSupervisorAccess(userId);
   if (cached) return cached;
 
+  const t0 = Date.now();
+
   const user = await User.findById(userId).maxTimeMS(5000).lean();
   if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
 
@@ -121,9 +123,12 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     supervisorConditions.push({ phone: user.phone });
   }
 
+  const t1 = Date.now();
   const profile = supervisorConditions.length > 0
     ? await Supervisor.findOne({ $or: supervisorConditions }).lean().maxTimeMS(5000)
     : null;
+  const t2 = Date.now();
+  console.log(`[getSupervisorAccess] User: ${t1 - t0}ms, Supervisor: ${t2 - t1}ms`);
 
   const profileRecord = profile as Record<string, any> | null;
   const profileId = toObjectId(profileRecord?._id);
@@ -177,6 +182,8 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
       .lean()
       .maxTimeMS(5000);
   }
+  const t3 = Date.now();
+  console.log(`[getSupervisorAccess] Site: ${t3 - t2}ms`);
 
   const scopedSiteIds = scopedSites.map((site) => toObjectId(site._id));
   const scopedSiteNames = scopedSites.map((site) => site.name);
@@ -697,6 +704,7 @@ export async function listMaterialsForSupervisor(
 
     let requestItems: any[] = [];
     let requestTotal = 0;
+    const matT0 = Date.now();
     try {
       const [items, total] = await Promise.all([
         Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(10000),
@@ -708,6 +716,8 @@ export async function listMaterialsForSupervisor(
       requestItems = [];
       requestTotal = 0;
     }
+    const matT1 = Date.now();
+    console.log(`[listMaterials] Material query: ${matT1 - matT0}ms, items: ${requestItems.length}, total: ${requestTotal}`);
 
     const result = {
       materials: requestItems.map((m: any) => ({

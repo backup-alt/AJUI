@@ -133,16 +133,8 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
     };
-    try {
-      const result = await mobileService.listMaterialsForSupervisor(userId, filters);
-      res.json(result);
-    } catch (serviceErr: any) {
-      console.error(`[listMaterials] service error:`, serviceErr?.message || serviceErr);
-      res.json({
-        materials: [],
-        pagination: { page: filters.page ?? 1, limit: filters.limit ?? 20, total: 0, pages: 0 },
-      });
-    }
+    const result = await mobileService.listMaterialsForSupervisor(userId, filters);
+    res.json(result);
   } catch (e) { next(e); }
 }
 
@@ -338,16 +330,8 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
     };
-    try {
-      const result = await mobileService.listExpensesForSupervisor(userId, filters);
-      res.json(result);
-    } catch (serviceErr: any) {
-      console.error("[listExpenses] service error:", serviceErr?.message || serviceErr);
-      res.json({
-        expenses: [],
-        pagination: { page: filters.page ?? 1, limit: filters.limit ?? 20, total: 0, pages: 0 },
-      });
-    }
+    const result = await mobileService.listExpensesForSupervisor(userId, filters);
+    res.json(result);
   } catch (e) { next(e); }
 }
 
