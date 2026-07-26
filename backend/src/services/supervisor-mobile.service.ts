@@ -143,6 +143,7 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   const projectIds = uniqueObjectIds([
     ...(user.managedProjectIds || []).map(toObjectId),
     toObjectId(profileRecord?.assignedProjectId),
+    ...((profileRecord?.assignedProjects || []) as unknown[]).map(toObjectId),
   ]);
 
   const assignedSiteValues = ((profileRecord?.assignedSites || []) as unknown[]).map((value) =>
@@ -250,6 +251,8 @@ async function buildScopedEntityQuery(
     query.projectId = requestedProjectId;
   } else if (access.projectIds.length > 0) {
     query.projectId = { $in: access.projectIds };
+  } else {
+    query.projectId = { $in: [] };
   }
 
   const siteScope = await getSiteScopeForFilter(access, filters.siteId);
@@ -262,8 +265,15 @@ async function buildScopedEntityQuery(
 
 function approvalScopeQuery(access: SupervisorAccess, status?: "Pending" | "Approved" | "Rejected") {
   const query: Record<string, unknown> = {};
-  if (access.projectIds.length > 0) query.projectId = { $in: access.projectIds };
-  if (access.siteNames.length > 0) query.site = { $in: access.siteNames };
+  if (access.projectIds.length > 0) {
+    query.projectId = { $in: access.projectIds };
+  }
+  if (access.siteNames.length > 0) {
+    query.site = { $in: access.siteNames };
+  }
+  if (access.projectIds.length === 0 && access.siteNames.length === 0) {
+    query.projectId = { $in: [] };
+  }
   if (status) query.status = status;
   return query;
 }
