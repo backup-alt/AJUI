@@ -701,17 +701,12 @@ export async function listMaterialsForSupervisor(
     let requestItems: any[] = [];
     let requestTotal = 0;
     const matT0 = Date.now();
-    try {
-      const [items, total] = await Promise.all([
-        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-        Material.countDocuments(query),
-      ]);
-      requestItems = items;
-      requestTotal = total;
-    } catch (err: any) {
-      requestItems = [];
-      requestTotal = 0;
-    }
+    const [items, total] = await Promise.all([
+      Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Material.countDocuments(query),
+    ]);
+    requestItems = items;
+    requestTotal = total;
     const matT1 = Date.now();
     console.log(`[listMaterials] Material query: ${matT1 - matT0}ms, items: ${requestItems.length}, total: ${requestTotal}`);
 
