@@ -709,34 +709,28 @@ export async function listMaterialsForSupervisor(
     const limit = filters.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    console.log(`[listMaterials] user=${userId} status=${filters.status} projectId=${filters.projectId} siteId=${filters.siteId} query=${JSON.stringify(query)} access_projects=${access.projectIds.length} access_sites=${access.siteIds.length} access_siteNames=${access.siteNames.length}`);
+    console.log(`[listMaterials] user=${userId} status=${filters.status} projectId=${filters.projectId} siteId=${filters.siteId} access_projects=${access.projectIds.length} access_sites=${access.siteIds.length}`);
 
     if (filters.status !== "Approved") {
       if (filters.status) query.status = filters.status;
-      console.log(`[listMaterials] executing non-Approved query: ${JSON.stringify(query)}`);
+
       let requestItems;
       let requestTotal;
+
       try {
-        [requestItems, requestTotal] = await Promise.all([
-          Material.find(query, null, { maxTimeMS: 8000 }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-          Material.countDocuments(query, { maxTimeMS: 8000 }),
-        ]);
+        requestItems = await Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
       } catch (dbErr: any) {
-        const isTimeout = dbErr?.errorLabel === "RetryableWriteError" || dbErr?.name === "MongoNetworkTimeoutError" || dbErr?.name === "MongoNetworkError";
-        if (isTimeout && filters.siteId && (query as any).$or) {
-          console.warn(`[listMaterials] query timed out, retrying with direct siteId match`);
-          const fallbackQuery: Record<string, unknown> = { projectId: query.projectId, siteId: filters.siteId };
-          if (query.status) fallbackQuery.status = query.status;
-          [requestItems, requestTotal] = await Promise.all([
-            Material.find(fallbackQuery, null, { maxTimeMS: 8000 }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-            Material.countDocuments(fallbackQuery, { maxTimeMS: 8000 }),
-          ]);
-        } else {
-          console.error(`[listMaterials] MongoDB error:`, dbErr);
-          throw dbErr;
-        }
+        console.error(`[listMaterials] find error:`, dbErr?.message);
+        throw dbErr;
       }
-      console.log(`[listMaterials] non-Approved returned: ${requestItems.length} items, total=${requestTotal}`);
+
+      try {
+        requestTotal = await Material.countDocuments(query).maxTimeMS(5000);
+      } catch {
+        requestTotal = requestItems.length;
+      }
+
+      console.log(`[listMaterials] returned: ${requestItems.length} items, total=${requestTotal}`);
 
       return {
         materials: requestItems.map((m) => ({
@@ -770,83 +764,82 @@ export async function listMaterialsForSupervisor(
       };
     }
 
-  await backfillApprovedMaterialsToInventory(query);
+    await backfillApprovedMaterialsToInventory(query);
 
-  const [items, total] = await Promise.all([
-    Inventory.find(query, null, { maxTimeMS: 8000 }).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-    Inventory.countDocuments(query, { maxTimeMS: 8000 }),
-  ]);
-
-  // If Inventory collection is empty for this query, fall back to Material collection
-  if (items.length === 0 && total === 0) {
-    const materialQuery: Record<string, unknown> = { ...query };
-    materialQuery.$or = [
-      { status: "Received" },
-      { approvedQuantity: { $gt: 0 } },
-    ];
-    const [matItems, matTotal] = await Promise.all([
-      Material.find(materialQuery, null, { maxTimeMS: 8000 }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Material.countDocuments(materialQuery, { maxTimeMS: 8000 }),
+    const [items, total] = await Promise.all([
+      Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+      Inventory.countDocuments(query),
     ]);
 
+    if (items.length === 0 && total === 0) {
+      const materialQuery: Record<string, unknown> = { ...query };
+      materialQuery.$or = [
+        { status: "Received" },
+        { approvedQuantity: { $gt: 0 } },
+      ];
+      const [matItems, matTotal] = await Promise.all([
+        Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        Material.countDocuments(materialQuery),
+      ]);
+
+      return {
+        materials: matItems.map((m) => ({
+          _id: m._id.toString(),
+          materialId: m.materialId,
+          projectId: m.projectId,
+          projectName: m.projectName,
+          siteId: m.siteId,
+          site: m.site,
+          name: m.name,
+          unit: m.unit,
+          requestedQuantity: m.requestedQuantity,
+          approvedQuantity: m.approvedQuantity,
+          purchasedQuantity: m.purchasedQuantity,
+          consumedQuantity: m.consumedQuantity,
+          remainingStock: m.remainingStock,
+          vendor: m.vendor,
+          poNumber: m.poNumber,
+          issuedAmount: m.issuedAmount,
+          givenAmount: (m as any).givenAmount,
+          billUrl: (m as any).billUrl,
+          requestDate: m.requestDate,
+          status: m.status === "Received" ? "Received" : "Approved",
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+        })),
+        pagination: { page, limit, total: matTotal, pages: Math.ceil(matTotal / limit) },
+      };
+    }
+
     return {
-      materials: matItems.map((m) => ({
+      materials: items.map((m) => ({
         _id: m._id.toString(),
-        materialId: m.materialId,
+        materialId: m._id.toString(),
         projectId: m.projectId,
         projectName: m.projectName,
         siteId: m.siteId,
         site: m.site,
         name: m.name,
         unit: m.unit,
-        requestedQuantity: m.requestedQuantity,
+        requestedQuantity: m.requestedQuantity || m.approvedQuantity,
         approvedQuantity: m.approvedQuantity,
         purchasedQuantity: m.purchasedQuantity,
         consumedQuantity: m.consumedQuantity,
         remainingStock: m.remainingStock,
         vendor: m.vendor,
         poNumber: m.poNumber,
-        issuedAmount: m.issuedAmount,
-        givenAmount: (m as any).givenAmount,
-        billUrl: (m as any).billUrl,
-        requestDate: m.requestDate,
-        status: m.status === "Received" ? "Received" : "Approved",
+        purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
+          vendor: h.vendor,
+          quantity: h.quantity,
+          date: h.date,
+        })),
+        requestDate: m.createdAt,
+        status: "Approved",
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
       })),
-      pagination: { page, limit, total: matTotal, pages: Math.ceil(matTotal / limit) },
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     };
-  }
-
-  return {
-    materials: items.map((m) => ({
-      _id: m._id.toString(),
-      materialId: m._id.toString(),
-      projectId: m.projectId,
-      projectName: m.projectName,
-      siteId: m.siteId,
-      site: m.site,
-      name: m.name,
-      unit: m.unit,
-      requestedQuantity: m.requestedQuantity || m.approvedQuantity,
-      approvedQuantity: m.approvedQuantity,
-      purchasedQuantity: m.purchasedQuantity,
-      consumedQuantity: m.consumedQuantity,
-      remainingStock: m.remainingStock,
-      vendor: m.vendor,
-      poNumber: m.poNumber,
-      purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
-        vendor: h.vendor,
-        quantity: h.quantity,
-        date: h.date,
-      })),
-      requestDate: m.createdAt,
-      status: "Approved",
-      createdAt: m.createdAt,
-      updatedAt: m.updatedAt,
-    })),
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
-  };
   } catch (err) {
     console.error(`[listMaterials] ERROR user=${userId} filters=${JSON.stringify(filters)}:`, err);
     throw err;
