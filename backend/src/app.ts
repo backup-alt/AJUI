@@ -107,6 +107,13 @@ export function createApp(): express.Application {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
+  app.use((_req, _res, next) => {
+    if (_req.method !== "OPTIONS") {
+      console.log(`[req] ${_req.method} ${_req.url} origin=${_req.headers.origin || "none"}`);
+    }
+    next();
+  });
+
   app.get("/health", (_req: express.Request, res: express.Response) => {
     res.json({
       status: "ok",
