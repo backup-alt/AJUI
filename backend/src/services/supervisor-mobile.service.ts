@@ -245,9 +245,8 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     ? access.siteNames.some((n) => n.toLowerCase() === siteName.toLowerCase())
     : false;
   const assignedBySite = assignedBySiteId || assignedBySiteName;
-  const assignedByProject = access.projectIds.length === 0;
 
-  if (!assignedBySite || !assignedByProject) {
+  if (!assignedBySite) {
     throw new AppError(403, "Not assigned to this site");
   }
 
