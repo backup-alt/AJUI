@@ -275,6 +275,7 @@ async function buildScopedEntityQuery(
 
   const siteScope = await getSiteScopeForFilter(access, filters.siteId);
   if (siteScope) Object.assign(query, siteScope);
+  console.log(`[buildScopedEntityQuery] user=${userId} filters=${JSON.stringify(filters)} final query=${JSON.stringify(query)}`);
   if (
     !filters.projectId &&
     !filters.siteId &&
