@@ -8,6 +8,7 @@ import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardDa
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
+import { mapMaterial, mapLabour, mapExpense, mapPayment, mapVendor, mapSubcontractor } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
@@ -1124,18 +1125,18 @@ export class ProjectWorkspacePage {
   selectRow(row: TableRow, event?: MouseEvent) {
     this.positionRowToolbar(event);
     const key = this.rowKey(row);
-    if (this.selectedRowKey() !== key) {
+    const wasSelected = this.selectedRowKeys().includes(key);
+    if (wasSelected && this.selectedRowKey() === key) {
+      this.clearRowSelection();
+      return;
+    }
+    this.selectedRowKeys.set([key]);
+    this.selectedRowKey.set(key);
+    if (this.selectedRowKey() !== key || !wasSelected) {
       this.editingRowKey.set("");
       this.editingRowKeys.set([]);
       this.openSelectKey.set("");
     }
-    this.selectedRowKey.set(key);
-    if (event?.ctrlKey || event?.metaKey || event?.shiftKey) {
-      this.selectedRowKeys.update((keys) => (keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]));
-      if (!this.selectedRowKeys().length) this.selectedRowKey.set("");
-      return;
-    }
-    this.selectedRowKeys.set([key]);
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -1177,9 +1178,12 @@ export class ProjectWorkspacePage {
   toggleRowSelection(row: TableRow, event?: Event) {
     event?.stopPropagation();
     const key = this.rowKey(row);
-    this.selectedRowKeys.update((keys) => (keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]));
-    const nextKeys = this.selectedRowKeys();
-    this.selectedRowKey.set(nextKeys.includes(key) ? key : nextKeys.at(-1) ?? "");
+    if (this.selectedRowKeys().includes(key)) {
+      this.clearRowSelection();
+    } else {
+      this.selectedRowKeys.set([key]);
+      this.selectedRowKey.set(key);
+    }
     this.editingRowKey.set("");
     this.editingRowKeys.set([]);
     this.openSelectKey.set("");
@@ -1194,17 +1198,9 @@ export class ProjectWorkspacePage {
 
   toggleVisibleRowsSelection(event?: Event) {
     event?.stopPropagation();
-    const rows = this.visibleRows(this.activeSection());
-    if (this.allVisibleRowsSelected()) {
+    if (this.hasSelectedRows()) {
       this.clearRowSelection();
-      return;
     }
-    const keys = rows.map((row) => this.rowKey(row));
-    this.selectedRowKeys.set(keys);
-    this.selectedRowKey.set(keys.at(-1) ?? "");
-    this.editingRowKey.set("");
-    this.editingRowKeys.set([]);
-    this.openSelectKey.set("");
   }
 
   private selectedRows(): TableRow[] {
@@ -1225,13 +1221,60 @@ export class ProjectWorkspacePage {
     this.editingRowKeys.set(keys);
   }
 
-  deleteSelectedRows() {
+  async deleteSelectedRows() {
     const rows = this.selectedRows();
     if (!rows.length) return;
-    const label = rows.length === 1 ? "this row" : `${rows.length} rows`;
-    if (!window.confirm(`Delete ${label}?`)) return;
-    for (const row of rows) this.data.deleteSharedRow(String(row["__rowId"] || ""));
+    if (!window.confirm("Delete this row? This will permanently delete it from the backend.")) return;
+    const section = this.activeSection();
+
+    const apiDeleters: Record<string, ((id: string) => any) | null> = {
+      materials: (id) => this.api.deleteMaterial(id),
+      labour: (id) => this.api.deleteLabour(id),
+      expenses: (id) => this.api.deleteExpense(id),
+      payments: (id) => this.api.deletePayment(id),
+      vendors: (id) => this.api.deleteVendor(id),
+      subcontractors: (id) => this.api.deleteSubcontractor(id),
+    };
+    const localStorageKeys: Record<string, string> = {
+      materials: "agb-erp:materials",
+      labour: "agb-erp:labour",
+      expenses: "agb-erp:expenses",
+      payments: "agb-erp:payments",
+      vendors: "agb-erp:vendors",
+      subcontractors: "agb-erp:subcontractors",
+    };
+    const idField = "id";
+    const apiDelete = apiDeleters[section];
+    const storageKey = localStorageKeys[section];
+
+    for (const row of rows) {
+      let mongoId = String(row["_id"] || "").trim();
+      const bizId = String(row[idField] || "").trim();
+      if (!mongoId && bizId && storageKey) {
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (raw) {
+            const match = JSON.parse(raw).find((r: any) => String(r[idField] || "") === bizId);
+            if (match?._id) mongoId = String(match._id);
+          }
+        } catch {}
+      }
+      try {
+        if (apiDelete && mongoId) await firstValueFrom(apiDelete(mongoId));
+        if (storageKey && bizId) {
+          try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) {
+              const arr = JSON.parse(raw);
+              localStorage.setItem(storageKey, JSON.stringify(arr.filter((r: any) => String(r[idField] || "") !== bizId)));
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+
     this.clearRowSelection();
+    try { this.refreshFromBackend(); } catch {}
   }
 
   startRowEdit(row: TableRow, event?: Event) {
@@ -1241,6 +1284,57 @@ export class ProjectWorkspacePage {
     this.selectedRowKeys.set([key]);
     this.editingRowKey.set(key);
     this.editingRowKeys.set([key]);
+  }
+
+  refreshFromBackend() {
+    const section = this.activeSection();
+    const apiMap: Record<string, (opts: any) => any> = {
+      materials: (opts: any) => this.api.listMaterials(opts),
+      labour: (opts: any) => this.api.listLabour(opts),
+      expenses: (opts: any) => this.api.listExpenses(opts),
+      payments: (opts: any) => this.api.listPayments(opts),
+      vendors: (opts: any) => this.api.listVendors(opts),
+      subcontractors: (opts: any) => this.api.listSubcontractors(opts),
+    };
+    const mapperMap: Record<string, (x: any) => any> = {
+      materials: mapMaterial,
+      labour: mapLabour,
+      expenses: mapExpense,
+      payments: mapPayment,
+      vendors: mapVendor,
+      subcontractors: mapSubcontractor,
+    };
+    const storageMap: Record<string, string> = {
+      materials: "agb-erp:materials",
+      labour: "agb-erp:labour",
+      expenses: "agb-erp:expenses",
+      payments: "agb-erp:payments",
+      vendors: "agb-erp:vendors",
+      subcontractors: "agb-erp:subcontractors",
+    };
+    const dataMap: Record<string, any> = {
+      materials: this.data.materials,
+      labour: this.data.labour,
+      expenses: this.data.expenses,
+      payments: this.data.payments,
+      vendors: this.data.vendors,
+      subcontractors: this.data.subcontractors,
+    };
+    const apiCall = apiMap[section];
+    const mapper = mapperMap[section];
+    const storageKey = storageMap[section];
+    const dataSignal = dataMap[section];
+    if (!apiCall || !mapper || !dataSignal) return;
+    apiCall({ limit: 100 }).subscribe({
+      next: (r: any) => {
+        try {
+          const items = (r.items || []).map(mapper);
+          if (storageKey) localStorage.setItem(storageKey, JSON.stringify(items));
+          dataSignal.set(items);
+        } catch {}
+      },
+      error: () => {},
+    });
   }
 
   @HostListener("document:pointerdown", ["$event"])
@@ -1999,13 +2093,62 @@ export class ProjectWorkspacePage {
     if (section === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: cleanValue });
   }
 
-  deleteRow(row: TableRow) {
+  async deleteRow(row: TableRow) {
     const key = this.rowKey(row);
-    this.data.deleteSharedRow(String(row["__rowId"] || ""));
+    const section = this.activeSection();
+    if (!window.confirm("Delete this row? This will permanently delete it from the backend.")) return;
+
+    const apiDeleters: Record<string, ((id: string) => any) | null> = {
+      materials: (id) => this.api.deleteMaterial(id),
+      labour: (id) => this.api.deleteLabour(id),
+      expenses: (id) => this.api.deleteExpense(id),
+      payments: (id) => this.api.deletePayment(id),
+      vendors: (id) => this.api.deleteVendor(id),
+      subcontractors: (id) => this.api.deleteSubcontractor(id),
+    };
+    const localStorageKeys: Record<string, string> = {
+      materials: "agb-erp:materials",
+      labour: "agb-erp:labour",
+      expenses: "agb-erp:expenses",
+      payments: "agb-erp:payments",
+      vendors: "agb-erp:vendors",
+      subcontractors: "agb-erp:subcontractors",
+    };
+    const idField = "id";
+    const apiDelete = apiDeleters[section];
+    const storageKey = localStorageKeys[section];
+    const bizId = String(row[idField] || "").trim();
+    let mongoId = String(row["_id"] || "").trim();
+
+    if (!mongoId && bizId && storageKey) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const match = JSON.parse(raw).find((r: any) => String(r[idField] || "") === bizId);
+          if (match?._id) mongoId = String(match._id);
+        }
+      } catch {}
+    }
+
+    try {
+      if (apiDelete && mongoId) await firstValueFrom(apiDelete(mongoId));
+      if (storageKey && bizId) {
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (raw) {
+            const arr = JSON.parse(raw);
+            localStorage.setItem(storageKey, JSON.stringify(arr.filter((r: any) => String(r[idField] || "") !== bizId)));
+          }
+        } catch {}
+      }
+    } catch {}
+
     this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
     if (this.selectedRowKey() === key) this.selectedRowKey.set("");
     if (this.editingRowKey() === key) this.editingRowKey.set("");
     this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
+
+    try { this.refreshFromBackend(); } catch {}
   }
 
   selectCellKey(row: TableRow, key: string): string {
