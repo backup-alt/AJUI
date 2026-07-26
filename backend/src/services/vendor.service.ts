@@ -65,7 +65,12 @@ export async function updateVendor(id: string, patch: Partial<CreateVendorInput 
     vendor.siteIds = siteIds.map((sid: string) => new Types.ObjectId(sid));
   }
 
-  Object.assign(vendor, rest);
+  const customFields = (rest as any).customFields as Record<string, unknown> | undefined;
+  const { customFields: _, ...restWithoutCf } = rest as any;
+  Object.assign(vendor, restWithoutCf);
+  if (customFields) {
+    (vendor as any).customFields = { ...((vendor as any).customFields || {}), ...customFields };
+  }
   await vendor.save();
   return vendor.toObject();
 }

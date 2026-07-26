@@ -189,6 +189,14 @@ export async function updateExpense(id: string, patch: Partial<CreateExpenseInpu
   if (patch.supervisorId) update.supervisorId = new Types.ObjectId(patch.supervisorId);
   if (patch.projectId) update.projectId = new Types.ObjectId(patch.projectId);
 
+  const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
+  if (customFields) {
+    delete update.customFields;
+    for (const [key, val] of Object.entries(customFields)) {
+      update[`customFields.${key}`] = val;
+    }
+  }
+
   const expense = await Expense.findByIdAndUpdate(id, update, { new: true });
   if (!expense) throw new AppError(404, "Expense not found");
   return expense.toObject();
