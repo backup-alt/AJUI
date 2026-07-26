@@ -2754,11 +2754,11 @@ visibleRows(): TableRow[] {
     try {
       const module = this.activeModule();
       const fieldType = this.newFieldType();
-      this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
+      const addedField = this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
       const siteId = this.resolveEntityIdForModule(module);
       if (siteId) {
         try {
-          await this.data.persistCustomField(module, label, siteId, fieldType, false);
+          await this.data.persistCustomField(module, label, siteId, fieldType, false, addedField.key);
         } catch (err) {
           console.warn("[UniversalDashboard] failed to persist custom field", err);
         }
