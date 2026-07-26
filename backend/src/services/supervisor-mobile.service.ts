@@ -792,8 +792,8 @@ export async function listMaterialsForSupervisor(
   const skip = (page - 1) * limit;
 
   const [items, total] = await Promise.all([
-    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean(),
-    Inventory.countDocuments(query).maxTimeMS(15000),
+    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+    Inventory.countDocuments(query),
   ]);
 
   // If Inventory collection is empty for this query, fall back to Material collection
@@ -807,8 +807,8 @@ export async function listMaterialsForSupervisor(
       ],
     };
     const [matItems, matTotal] = await Promise.all([
-      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean(),
-      Material.countDocuments(materialQuery).maxTimeMS(15000),
+      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Material.countDocuments(materialQuery),
     ]);
 
     return {
