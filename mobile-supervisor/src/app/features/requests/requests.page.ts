@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSegment,
@@ -111,15 +112,7 @@ interface RequestItem {
       </div>
 
       <div class="cards">
-        @if (isLoading() && filteredItems.length === 0) {
-          @for (i of [1,2,3]; track i) {
-            <div class="skeleton-card">
-              <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
-              <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-              <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-            </div>
-          }
-        } @else if (errorMessage()) {
+        @if (errorMessage()) {
           <div class="error-state">
             <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
             <span class="error-title">Something went wrong</span>
@@ -129,6 +122,14 @@ interface RequestItem {
               Retry
             </button>
           </div>
+        } @else if (isLoading() && filteredItems.length === 0) {
+          @for (i of [1,2,3]; track i) {
+            <div class="skeleton-card">
+              <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
+              <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+              <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+            </div>
+          }
         } @else if (filteredItems.length === 0) {
           <app-empty-state
             [icon]="emptyIcon"
@@ -532,7 +533,11 @@ export class RequestsPage implements OnInit {
       imageOutline, cashOutline, chevronForwardOutline,
       cloudOfflineOutline, refreshOutline,
     });
-    await this.supervisor.init();
+    try {
+      await this.supervisor.init();
+    } catch (err) {
+      console.error('[Requests] init failed', err);
+    }
     await this.loadAllRequests();
   }
 
@@ -552,72 +557,65 @@ export class RequestsPage implements OnInit {
 
     try {
       // Load materials
-      await new Promise<void>((resolve) => {
-        this.supervisor.getMaterials({ limit: 200 }).subscribe({
-          next: (res) => {
-            for (const m of res.materials || []) {
-              const isReceived = m.status === 'Received';
-              const hasNoBill = !(m as any).billUrl;
-              items.push({
-                _id: m._id,
-                type: 'material',
-                title: m.name,
-                subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
-                site: m.site,
-                date: m.requestDate,
-                status: m.status,
-                issuedAmount: m.issuedAmount,
-                givenAmount: (m as any).givenAmount,
-                billUrl: (m as any).billUrl,
-                received: isReceived,
-                needsUpload: hasNoBill,
-              });
-            }
-            resolve();
-          },
-          error: (err) => { console.error('[Requests] materials load failed', err); resolve(); },
-        });
-      });
+      try {
+        const matRes = await firstValueFrom(this.supervisor.getMaterials({ limit: 200 }));
+        for (const m of matRes?.materials || []) {
+          const isReceived = m.status === 'Received';
+          const hasNoBill = !(m as any).billUrl;
+          items.push({
+            _id: m._id,
+            type: 'material',
+            title: m.name,
+            subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
+            site: m.site,
+            date: m.requestDate,
+            status: m.status,
+            issuedAmount: m.issuedAmount,
+            givenAmount: (m as any).givenAmount,
+            billUrl: (m as any).billUrl,
+            received: isReceived,
+            needsUpload: hasNoBill,
+          });
+        }
+      } catch (err) {
+        console.error('[Requests] materials load failed', err);
+      }
 
       // Load expenses — include ALL transaction types (Purchase + Add Cash)
-      await new Promise<void>((resolve) => {
-        this.supervisor.getExpenses({ type: 'site', limit: 200 }).subscribe({
-          next: (res) => {
-            for (const e of res.expenses || []) {
-              // Display-friendly transaction type label
-              const txLabel =
-                e.transactionType === 'Cash Added' ? 'Add Cash' :
-                (e.transactionType || 'Purchase');
+      try {
+        const expRes = await firstValueFrom(this.supervisor.getExpenses({ type: 'site', limit: 200 }));
+        for (const e of expRes?.expenses || []) {
+          const txLabel =
+            e.transactionType === 'Cash Added' ? 'Add Cash' :
+            (e.transactionType || 'Purchase');
 
-              items.push({
-                _id: e._id,
-                type: 'expense',
-                title: (e as any).isSiteMaterial
-                  ? `${(e as any).materialName || e.description}`
-                  : e.description,
-                subtitle: (e as any).isSiteMaterial
-                  ? `${(e as any).materialQuantity || ''} ${(e as any).materialUnit || ''} - ${txLabel}`
-                  : `${txLabel} expense`,
-                site: e.site || 'General',
-                date: e.date,
-                status: e.status,
-                amount: e.amount,
-                issuedAmount: e.issuedAmount,
-                givenAmount: (e as any).givenAmount,
-                billUrl: (e as any).billUrl,
-                received: (e as any).received,
-                transactionType: e.transactionType,
-                needsUpload:
-                  (e.status === 'Approved') &&
-                  !(e as any).billUrl &&
-                  ((e as any).isSiteMaterial === true),
-              });
-            }
-            resolve();
-          },
-          error: (err) => { console.error('[Requests] expenses load failed', err); resolve(); },
-        });
-      });
+          items.push({
+            _id: e._id,
+            type: 'expense',
+            title: (e as any).isSiteMaterial
+              ? `${(e as any).materialName || e.description}`
+              : e.description,
+            subtitle: (e as any).isSiteMaterial
+              ? `${(e as any).materialQuantity || ''} ${(e as any).materialUnit || ''} - ${txLabel}`
+              : `${txLabel} expense`,
+            site: e.site || 'General',
+            date: e.date,
+            status: e.status,
+            amount: e.amount,
+            issuedAmount: e.issuedAmount,
+            givenAmount: (e as any).givenAmount,
+            billUrl: (e as any).billUrl,
+            received: (e as any).received,
+            transactionType: e.transactionType,
+            needsUpload:
+              (e.status === 'Approved') &&
+              !(e as any).billUrl &&
+              ((e as any).isSiteMaterial === true),
+          });
+        }
+      } catch (err) {
+        console.error('[Requests] expenses load failed', err);
+      }
     } catch (err) {
       console.error('[Requests] Failed to load', err);
       this.errorMessage.set((err as Error)?.message || 'Failed to load requests');

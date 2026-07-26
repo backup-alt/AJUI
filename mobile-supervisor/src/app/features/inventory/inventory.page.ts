@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
@@ -111,15 +112,7 @@ type SortDir = 'asc' | 'desc';
       </div>
 
       <div class="inventory-list">
-        @if (isLoading() && items().length === 0) {
-          @for (i of [1,2,3,4]; track i) {
-            <div class="skeleton-card">
-              <ion-skeleton-text animated style="width: 55%; height: 18px;"></ion-skeleton-text>
-              <ion-skeleton-text animated style="width: 75%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-              <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-            </div>
-          }
-        } @else if (errorMessage()) {
+        @if (errorMessage()) {
           <div class="error-state">
             <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
             <span class="error-title">Something went wrong</span>
@@ -129,6 +122,14 @@ type SortDir = 'asc' | 'desc';
               Retry
             </button>
           </div>
+        } @else if (isLoading() && items().length === 0) {
+          @for (i of [1,2,3,4]; track i) {
+            <div class="skeleton-card">
+              <ion-skeleton-text animated style="width: 55%; height: 18px;"></ion-skeleton-text>
+              <ion-skeleton-text animated style="width: 75%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+              <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+            </div>
+          }
         } @else if (filteredItems().length === 0) {
           <app-empty-state
             icon="grid-outline"
@@ -599,7 +600,11 @@ export class InventoryPage implements OnInit, OnDestroy {
       checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline,
       swapVerticalOutline, cloudOfflineOutline, refreshOutline,
     });
-    await this.supervisor.init();
+    try {
+      await this.supervisor.init();
+    } catch (err) {
+      console.error('[Inventory] init failed', err);
+    }
     await this.loadInventory();
 
     if (typeof window !== 'undefined') {
@@ -631,12 +636,14 @@ export class InventoryPage implements OnInit, OnDestroy {
     const projectId = this.supervisor.selectedProjectId();
 
     try {
-      const res = await this.supervisor.getMaterials({
-        siteId: siteId || undefined,
-        projectId: projectId || undefined,
-        status: 'Approved',
-        limit: 200,
-      }).toPromise();
+      const res = await firstValueFrom(
+        this.supervisor.getMaterials({
+          siteId: siteId || undefined,
+          projectId: projectId || undefined,
+          status: 'Approved',
+          limit: 200,
+        })
+      );
       if (gen !== this.loadGeneration) return;
       const materials: InventoryItem[] = (res?.materials || []).map((m) => ({
         _id: m._id,

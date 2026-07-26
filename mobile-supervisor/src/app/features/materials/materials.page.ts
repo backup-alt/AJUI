@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
@@ -107,15 +108,7 @@ interface ConsolidatedMaterial {
       </div>
 
       <div class="cards">
-        @if (isLoading() && materials().length === 0) {
-          @for (i of [1,2,3]; track i) {
-            <div class="skeleton-card">
-              <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
-              <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-              <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
-            </div>
-          }
-        } @else if (errorMessage()) {
+        @if (errorMessage()) {
           <div class="error-state">
             <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
             <span class="error-title">Something went wrong</span>
@@ -125,6 +118,14 @@ interface ConsolidatedMaterial {
               Retry
             </button>
           </div>
+        } @else if (isLoading() && materials().length === 0) {
+          @for (i of [1,2,3]; track i) {
+            <div class="skeleton-card">
+              <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
+              <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+              <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
+            </div>
+          }
         } @else if (consolidatedMaterials().length === 0) {
           <app-empty-state
             icon="cube-outline"
@@ -407,7 +408,11 @@ export class MaterialsPage implements OnInit, OnDestroy {
       closeCircleOutline, chevronForwardOutline, chevronDownOutline, businessOutline,
       cloudOfflineOutline, refreshOutline,
     });
-    await this.supervisor.init();
+    try {
+      await this.supervisor.init();
+    } catch (err) {
+      console.error('[Materials] init failed', err);
+    }
     await this.loadMaterials();
 
     if (typeof window !== 'undefined') {
@@ -432,13 +437,13 @@ export class MaterialsPage implements OnInit, OnDestroy {
     try {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
-      const response = await this.supervisor
-        .getMaterials({
+      const response = await firstValueFrom(
+        this.supervisor.getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
           limit: 100,
         })
-        .toPromise();
+      );
       if (gen !== this.loadGeneration) return;
       this.materials.set(response?.materials || []);
       this.filterMaterials();
