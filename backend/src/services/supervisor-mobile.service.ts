@@ -36,6 +36,7 @@ type SupervisorAccess = {
   projectIds: Types.ObjectId[];
   siteIds: Types.ObjectId[];
   siteNames: string[];
+  siteIdToName: Map<string, string>;
 };
 
 function toObjectId(value: unknown): Types.ObjectId | null {
@@ -191,6 +192,12 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     ...scopedSiteIds,
   ]);
 
+  const siteIdToName = new Map<string, string>();
+  for (const site of scopedSites) {
+    const id = toObjectId(site._id);
+    if (id && site.name) siteIdToName.set(id.toString(), site.name);
+  }
+
   const result: SupervisorAccess = {
     user: user as any,
     profile: profileRecord,
@@ -200,6 +207,7 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
       ...scopedSiteNames,
       ...assignedSiteNameFallback,
     ]),
+    siteIdToName,
   };
 
   setCachedSupervisorAccess(userId, result);
@@ -211,8 +219,9 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
     if (access.siteNames.length > 0) return { site: { $in: access.siteNames } };
     if (access.siteIds.length > 0) {
-      const sites = await Site.find({ _id: { $in: access.siteIds } }).select("name").lean().maxTimeMS(5000);
-      const names = sites.map((s) => s.name).filter(Boolean);
+      const names = access.siteIds
+        .map((id) => access.siteIdToName.get(id.toString()))
+        .filter(Boolean) as string[];
       if (names.length > 0) return { site: { $in: names } };
       return { siteId: { $in: access.siteIds } };
     }
@@ -222,22 +231,23 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
   const requestedSiteId = toObjectId(siteId);
   if (!requestedSiteId) throw new AppError(400, "Invalid site id");
 
-  const site = await Site.findById(requestedSiteId).select("_id name projectIds").lean().maxTimeMS(5000);
-  if (!site) throw new AppError(404, "Site not found");
+  const siteName = access.siteIdToName.get(requestedSiteId.toString());
 
   const assignedBySiteId = access.siteIds.length === 0 || hasObjectId(access.siteIds, requestedSiteId);
-  const assignedBySiteName = access.siteNames.some(
-    (siteName) => siteName.toLowerCase() === site.name.toLowerCase()
-  );
+  const assignedBySiteName = siteName
+    ? access.siteNames.some((n) => n.toLowerCase() === siteName.toLowerCase())
+    : false;
   const assignedBySite = assignedBySiteId || assignedBySiteName;
-  const assignedByProject =
-    access.projectIds.length === 0 ||
-    (site.projectIds || []).some((projectId) => hasObjectId(access.projectIds, projectId));
+  const assignedByProject = access.projectIds.length === 0;
 
   if (!assignedBySite || !assignedByProject) {
     throw new AppError(403, "Not assigned to this site");
   }
 
+  if (siteName) return { site: siteName };
+
+  const site = await Site.findById(requestedSiteId).select("name").lean().maxTimeMS(5000);
+  if (!site) throw new AppError(404, "Site not found");
   return { site: site.name };
 }
 
