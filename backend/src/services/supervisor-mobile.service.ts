@@ -729,7 +729,7 @@ export async function listMaterialsForSupervisor(
       }
 
       try {
-        requestTotal = await Material.countDocuments(query).maxTimeMS(5000);
+        requestTotal = await Material.countDocuments(query);
       } catch {
         requestTotal = requestItems.length;
       }
