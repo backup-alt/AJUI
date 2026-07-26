@@ -6,6 +6,7 @@ export type ClientFormValue = {
   name: string;
   mobile: string;
   address: string;
+  gstNumber?: string;
   supervisor: string;
   status?: "Active" | "On Hold" | "Completed";
 };
@@ -40,6 +41,10 @@ export type ClientFormValue = {
           <label class="span-2">
             <span>Address</span>
             <textarea name="address" required rows="3" [value]="initialValue?.address || ''" placeholder="Door no, street, area, city"></textarea>
+          </label>
+          <label>
+            <span>GSTIN</span>
+            <input name="gstNumber" [value]="initialValue?.gstNumber || ''" placeholder="22AAAAA0000A1Z5" maxlength="15" />
           </label>
           <label>
             <span>Assigned Supervisor</span>
@@ -83,6 +88,7 @@ export class ClientFormDialogComponent {
       name: String(formData.get("name") ?? "").trim(),
       mobile: String(formData.get("mobile") ?? "").trim(),
       address: String(formData.get("address") ?? "").trim(),
+      gstNumber: String(formData.get("gstNumber") ?? "").trim(),
       supervisor: String(formData.get("supervisor") ?? "").trim(),
       status: status as "Active" | "On Hold" | "Completed",
     });
