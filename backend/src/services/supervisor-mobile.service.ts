@@ -221,15 +221,21 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
 async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) {
   if (!siteId) {
     if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
-    const or: Record<string, unknown>[] = [];
+
+    // Prefer siteId lookup (uses compound index, fast) over $or across fields.
+    // The startup backfill (backfillMaterialSiteIds) ensures old documents have
+    // siteId populated, so string-based site matching is only needed when no
+    // ObjectId-based siteIds are available at all.
     if (access.siteIds.length > 0) {
-      or.push({ siteId: { $in: access.siteIds } });
+      return { siteId: { $in: access.siteIds } };
     }
+
+    // Fallback: supervisor only has site names (no ObjectId refs)
     if (access.siteNames.length > 0) {
-      or.push({ site: { $in: access.siteNames } });
+      return { site: { $in: access.siteNames } };
     }
-    if (or.length === 0) return undefined;
-    return { $or: or };
+
+    return undefined;
   }
 
   const requestedSiteId = toObjectId(siteId);
@@ -251,7 +257,8 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     throw new AppError(403, "Not assigned to this site");
   }
 
-  return { $or: [{ siteId: requestedSiteId }, { site: site.name }, { site: requestedSiteId.toString() }] };
+  // Direct siteId match — uses the compound index { projectId, siteId, createdAt }
+  return { siteId: requestedSiteId };
 }
 
 async function buildScopedEntityQuery(
@@ -716,7 +723,7 @@ export async function listMaterialsForSupervisor(
   if (filters.status !== "Approved") {
     if (filters.status) query.status = filters.status;
     const page = filters.page ?? 1;
-    const limit = filters.limit ?? 20;
+    const limit = Math.min(filters.limit ?? 20, 50);
     const skip = (page - 1) * limit;
     const cacheKey = `mat:${userId}:${JSON.stringify(query)}:${skip}:${limit}`;
 
@@ -730,8 +737,8 @@ export async function listMaterialsForSupervisor(
     let total: number;
     try {
       [items, total] = await Promise.all([
-        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-        Material.countDocuments(query),
+        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean(),
+        Material.countDocuments(query).maxTimeMS(15000),
       ]);
     } catch (err: any) {
       console.error(`[listMaterials] MongoDB query FAILED:`, err.message, "query:", JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
@@ -776,34 +783,27 @@ export async function listMaterialsForSupervisor(
   }
 
   const page = filters.page ?? 1;
-  const limit = filters.limit ?? 20;
+  const limit = Math.min(filters.limit ?? 20, 50);
   const skip = (page - 1) * limit;
 
   const [items, total] = await Promise.all([
-    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-    Inventory.countDocuments(query),
+    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean(),
+    Inventory.countDocuments(query).maxTimeMS(15000),
   ]);
 
   // If Inventory collection is empty for this query, fall back to Material collection
   if (items.length === 0 && total === 0) {
-    const existingOr = query.$or as Record<string, unknown>[] | undefined;
-    const statusFilter = {
+    const materialQuery: Record<string, unknown> = {
+      ...query,
       $or: [
         { status: "Received" },
         { status: "Approved" },
         { approvedQuantity: { $gt: 0 } },
       ],
     };
-    const materialQuery: Record<string, unknown> = { ...query };
-    delete materialQuery.$or;
-    if (existingOr && existingOr.length > 0) {
-      materialQuery.$and = [{ $or: existingOr }, statusFilter];
-    } else {
-      Object.assign(materialQuery, statusFilter);
-    }
     const [matItems, matTotal] = await Promise.all([
-      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Material.countDocuments(materialQuery),
+      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean(),
+      Material.countDocuments(materialQuery).maxTimeMS(15000),
     ]);
 
     return {

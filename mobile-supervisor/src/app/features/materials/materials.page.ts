@@ -437,7 +437,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
         this.supervisor.getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
-          limit: 100,
+          limit: 20,
         })
       );
       if (gen !== this.loadGeneration) return;
