@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
-import { firstValueFrom, timeout } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
@@ -438,7 +438,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
           siteId: siteId || undefined,
           projectId: projectId || undefined,
           limit: 100,
-        }        ).pipe(timeout(120000))
+        })
       );
       if (gen !== this.loadGeneration) return;
       this.materials.set(response?.materials || []);

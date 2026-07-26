@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
-import { firstValueFrom, timeout } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
@@ -638,7 +638,7 @@ export class InventoryPage implements OnInit, OnDestroy {
           projectId: projectId || undefined,
           status: 'Approved',
           limit: 200,
-        }).pipe(timeout(120000))
+        })
       );
       if (gen !== this.loadGeneration) return;
       const materials: InventoryItem[] = (res?.materials || []).map((m) => ({
