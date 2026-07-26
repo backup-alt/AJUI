@@ -908,14 +908,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       <option value="boolean">Yes / No</option>
                     </select>
                   </label>
-                  <label class="checkbox-label">
-                    <input type="checkbox" [checked]="newFieldAskSupervisor()" (change)="newFieldAskSupervisor.set($any($event.target).checked)" />
-                    <span>Ask supervisor to fill this when creating a request</span>
-                  </label>
-                  <p class="hint" *ngIf="newFieldAskSupervisor()">
-                    The field will be saved to MongoDB and appear in the supervisor's mobile form
-                    for the {{ activeSiteFilter() === 'All' ? 'currently selected site' : 'selected site' }}.
-                  </p>
                 </div>
                 <div class="dialog-actions">
                   <button type="button" class="secondary-action" (click)="fieldDialogOpen.set(false)">Cancel</button>
@@ -1329,7 +1321,6 @@ export class UniversalDashboardPage implements OnInit {
   readonly newFieldLabel = signal("");
   readonly newFieldAfterKey = signal<string | null>(null);
   readonly newFieldType = signal<"text" | "number" | "date" | "boolean">("text");
-  readonly newFieldAskSupervisor = signal(true);
   readonly openSelectKey = signal("");
   readonly openFilterKey = signal("");
   readonly selectCustomValue = signal("");
@@ -2746,7 +2737,6 @@ visibleRows(): TableRow[] {
     this.newFieldLabel.set("");
     this.newFieldAfterKey.set(afterKey ?? null);
     this.newFieldType.set("text");
-    this.newFieldAskSupervisor.set(true);
     this.fieldDialogOpen.set(true);
   }
 
@@ -2760,12 +2750,11 @@ visibleRows(): TableRow[] {
     }
     const module = this.activeModule();
     const fieldType = this.newFieldType();
-    const askSupervisor = this.newFieldAskSupervisor();
     this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
     const siteId = this.resolveEntityIdForModule(module);
     if (siteId) {
       try {
-        await this.data.persistCustomField(module, label, siteId, fieldType, askSupervisor);
+        await this.data.persistCustomField(module, label, siteId, fieldType, false);
       } catch (err) {
         console.warn("[UniversalDashboard] failed to persist custom field", err);
       }
