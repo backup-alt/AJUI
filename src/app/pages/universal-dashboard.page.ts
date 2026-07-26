@@ -3065,6 +3065,8 @@ visibleRows(): TableRow[] {
     const clientId = (projectId: string) => this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
 
     const materials = this.data.materials().map((row) => ({
+      _id: row._id,
+      id: row.id,
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
       client: clientName(row.projectId),
@@ -3083,6 +3085,8 @@ visibleRows(): TableRow[] {
     const clients = this.data.clients().map((client) => {
       const summary = this.data.clientSummary(client);
       return {
+        _id: client._id,
+        id: client.id,
         __rowId: `client:${client.id}`,
         clientId: client.id,
         clientName: client.name,
@@ -3099,6 +3103,8 @@ visibleRows(): TableRow[] {
     });
 
     const labour = this.data.labour().map((row) => ({
+      _id: row._id,
+      id: row.id,
       __rowId: `labour:${row.id}`,
       __projectId: row.projectId,
       client: clientName(row.projectId),
@@ -3122,6 +3128,8 @@ visibleRows(): TableRow[] {
     }));
 
     const expenses = this.data.expenses().filter((row) => row.type === "Site Expense").map((row) => ({
+      _id: row._id,
+      id: row.id,
       __rowId: `expense:${row.id}`,
       __projectId: row.projectId,
       client: clientName(row.projectId),
@@ -3140,6 +3148,8 @@ visibleRows(): TableRow[] {
     }));
 
     const generalExpenses = this.data.expenses().filter((row) => row.type === "General Expense").map((row) => ({
+      _id: row._id,
+      id: row.id,
       __rowId: `general-expense:${row.id}`,
       __projectId: "",
       expenseDate: row.date,
@@ -3153,6 +3163,8 @@ visibleRows(): TableRow[] {
     }));
 
     const payments = this.data.payments().map((row) => ({
+      _id: row._id,
+      id: row.id,
       __rowId: `payment:${row.id}`,
       __projectId: row.projectId,
       client: clientName(row.projectId),
@@ -3167,6 +3179,8 @@ visibleRows(): TableRow[] {
     }));
 
     const vendors = this.data.vendors().map((vendor) => ({
+      _id: vendor._id,
+      id: vendor.id,
       __rowId: `vendor:${vendor.id}`,
       vendorId: vendor.id,
       vendorName: vendor.name,
@@ -3194,6 +3208,8 @@ visibleRows(): TableRow[] {
     const subcontractors = this.data.subcontractors().map((subcontractor) => {
       const project = projectById(subcontractor.projectId);
       return {
+        _id: subcontractor._id,
+        id: subcontractor.id,
         __rowId: `subcontractor:${subcontractor.id}`,
         __projectId: subcontractor.projectId,
         subcontractId: subcontractor.id,

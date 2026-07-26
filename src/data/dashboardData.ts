@@ -153,6 +153,7 @@ export type CompanyProfile = {
 };
 
 export type LabourRow = {
+  _id?: string;
   id: string;
   projectId: string;
   site: string;
@@ -172,6 +173,7 @@ export type LabourRow = {
 };
 
 export type ExpenseRow = {
+  _id?: string;
   id: string;
   projectId: string;
   site: string;
@@ -198,6 +200,7 @@ export type ExpenseRow = {
 };
 
 export type PaymentRow = {
+  _id?: string;
   id: string;
   projectId: string;
   date: string;
