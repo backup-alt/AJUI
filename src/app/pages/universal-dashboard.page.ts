@@ -1409,49 +1409,18 @@ export class UniversalDashboardPage implements OnInit {
   selectRow(row: TableRow, event?: MouseEvent) {
     this.positionRowToolbar(event);
     const key = this.rowKey(row);
-    // Default behavior: toggle row in selection (additive).
-    // User can hold Ctrl/Cmd/Shift to add without toggling.
     const wasSelected = this.selectedRowKeys().includes(key);
-    let nextKeys: string[];
-    if (event?.shiftKey) {
-      // Range select from last primary to this row
-      const visible = this.visibleRows().map((r) => this.rowKey(r));
-      const lastKey = this.selectedRowKey();
-      const startIdx = lastKey ? visible.indexOf(lastKey) : -1;
-      const endIdx = visible.indexOf(key);
-      if (startIdx >= 0 && endIdx >= 0) {
-        const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
-        nextKeys = visible.slice(lo, hi + 1);
-      } else {
-        nextKeys = [key];
-      }
-    } else {
-      // Toggle: if already selected and not adding, leave it; otherwise add
-      const adding = event?.ctrlKey || event?.metaKey;
-      if (adding) {
-        nextKeys = wasSelected
-          ? this.selectedRowKeys().filter((k) => k !== key)
-          : [...this.selectedRowKeys(), key];
-      } else {
-        // Plain click on a non-selected row: add to selection (additive)
-        if (wasSelected && this.selectedRowKey() === key) {
-          // Plain click on the current primary → leave selection
-          nextKeys = this.selectedRowKeys();
-        } else if (wasSelected) {
-          nextKeys = this.selectedRowKeys();
-        } else {
-          nextKeys = [...this.selectedRowKeys(), key];
-        }
-      }
+    if (wasSelected && this.selectedRowKey() === key) {
+      this.clearRowSelection();
+      return;
     }
-    this.selectedRowKeys.set(nextKeys);
+    this.selectedRowKeys.set([key]);
     this.selectedRowKey.set(key);
-    if (this.selectedRowKey() !== key || wasSelected === false) {
+    if (this.selectedRowKey() !== key || !wasSelected) {
       this.editingRowKey.set("");
       this.editingRowKeys.set([]);
       this.openSelectKey.set("");
     }
-    if (!nextKeys.length) this.selectedRowKey.set("");
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -1493,9 +1462,12 @@ export class UniversalDashboardPage implements OnInit {
   toggleRowSelection(row: TableRow, event?: Event) {
     event?.stopPropagation();
     const key = this.rowKey(row);
-    this.selectedRowKeys.update((keys) => (keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]));
-    const nextKeys = this.selectedRowKeys();
-    this.selectedRowKey.set(nextKeys.includes(key) ? key : nextKeys.at(-1) ?? "");
+    if (this.selectedRowKeys().includes(key)) {
+      this.clearRowSelection();
+    } else {
+      this.selectedRowKeys.set([key]);
+      this.selectedRowKey.set(key);
+    }
     this.editingRowKey.set("");
     this.editingRowKeys.set([]);
     this.openSelectKey.set("");
@@ -1510,17 +1482,9 @@ export class UniversalDashboardPage implements OnInit {
 
   toggleVisibleRowsSelection(event?: Event) {
     event?.stopPropagation();
-    const rows = this.visibleRows();
-    if (this.allVisibleRowsSelected()) {
+    if (this.hasSelectedRows()) {
       this.clearRowSelection();
-      return;
     }
-    const keys = rows.map((row) => this.rowKey(row));
-    this.selectedRowKeys.set(keys);
-    this.selectedRowKey.set(keys.at(-1) ?? "");
-    this.editingRowKey.set("");
-    this.editingRowKeys.set([]);
-    this.openSelectKey.set("");
   }
 
   private selectedRows(): TableRow[] {
@@ -2917,23 +2881,76 @@ visibleRows(): TableRow[] {
     if (wageField) this.data.updateSharedRowCell(rowId, wageField.key, "");
   }
 
-  deleteRow(row: TableRow) {
+  async deleteRow(row: TableRow) {
     const key = this.rowKey(row);
     const module = this.activeModule();
-    const rowId = String(row["__rowId"] || "");
-    if (module === "clients") {
-      this.data.deleteClient(String(row["clientId"] || ""));
-      this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
-      if (this.selectedRowKey() === key) this.selectedRowKey.set("");
-      if (this.editingRowKey() === key) this.editingRowKey.set("");
-      this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
-      return;
+    if (!window.confirm("Delete this row? This will permanently delete it from the backend.")) return;
+
+    const apiDeleters: Record<string, ((id: string) => any) | null> = {
+      clients: (id) => this.api.deleteClient(id),
+      materials: (id) => this.api.deleteMaterial(id),
+      labour: (id) => this.api.deleteLabour(id),
+      expenses: (id) => this.api.deleteExpense(id),
+      payments: (id) => this.api.deletePayment(id),
+      vendors: (id) => this.api.deleteVendor(id),
+      subcontractors: (id) => this.api.deleteSubcontractor(id),
+    };
+    const localStorageKeys: Record<string, string> = {
+      clients: "agb-erp:clients",
+      materials: "agb-erp:materials",
+      labour: "agb-erp:labour",
+      expenses: "agb-erp:expenses",
+      generalExpenses: "agb-erp:expenses",
+      payments: "agb-erp:payments",
+      vendors: "agb-erp:vendors",
+      subcontractors: "agb-erp:subcontractors",
+    };
+    const idFields: Record<string, string> = {
+      clients: "id", materials: "id", labour: "id", expenses: "id",
+      generalExpenses: "id", payments: "id", vendors: "id", subcontractors: "id",
+    };
+
+    const apiDelete = apiDeleters[module];
+    const storageKey = localStorageKeys[module];
+    const idField = idFields[module];
+    const bizId = String(row[idField] || "").trim();
+    let mongoId = String(row["_id"] || "").trim();
+
+    if (!mongoId && bizId && storageKey) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          const match = arr.find((r: any) => String(r[idField] || "") === bizId);
+          if (match?._id) mongoId = String(match._id);
+        }
+      } catch {}
     }
-    this.data.deleteSharedRow(rowId);
+
+    try {
+      if (apiDelete && mongoId) await firstValueFrom(apiDelete(mongoId));
+      if (storageKey && bizId) {
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (raw) {
+            const arr = JSON.parse(raw);
+            localStorage.setItem(storageKey, JSON.stringify(arr.filter((r: any) => String(r[idField] || "") !== bizId)));
+          }
+        } catch {}
+      }
+      this.backendSyncMessage.set(`Deleted 1 ${module} row`);
+      setTimeout(() => this.backendSyncMessage.set(null), 3000);
+    } catch (e: any) {
+      this.backendSyncMessage.set(`Delete failed: ${e?.error?.message || e?.message || "unknown error"}`);
+      setTimeout(() => this.backendSyncMessage.set(null), 5000);
+    }
+
     this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
     if (this.selectedRowKey() === key) this.selectedRowKey.set("");
     if (this.editingRowKey() === key) this.editingRowKey.set("");
     this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
+
+    try { this.refreshFromBackend(); } catch {}
   }
 
   exportExcel() {
