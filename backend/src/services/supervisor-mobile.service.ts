@@ -92,32 +92,35 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   const user = await User.findById(userId);
   if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
 
-  let profile = user.supervisorProfileId
-    ? await Supervisor.findById(user.supervisorProfileId).lean()
+  const supervisorConditions: Record<string, unknown>[] = [];
+  if (user.supervisorProfileId) {
+    supervisorConditions.push({ _id: user.supervisorProfileId });
+  }
+  supervisorConditions.push({ userId: user._id });
+  if (user.email) {
+    supervisorConditions.push({ email: user.email.toLowerCase() });
+  }
+  if (user.phone) {
+    supervisorConditions.push({ phone: user.phone });
+  }
+
+  const profile = supervisorConditions.length > 0
+    ? await Supervisor.findOne({ $or: supervisorConditions }).lean()
     : null;
-  if (!profile) {
-    profile = await Supervisor.findOne({ userId: user._id }).lean();
-  }
-  if (!profile && user.email) {
-    profile = await Supervisor.findOne({ email: user.email.toLowerCase() }).lean();
-  }
-  if (!profile && user.phone) {
-    profile = await Supervisor.findOne({ phone: user.phone }).lean();
-  }
 
   const profileRecord = profile as Record<string, any> | null;
   const profileId = toObjectId(profileRecord?._id);
   if (profileId) {
-    try {
-      if (!user.supervisorProfileId || user.supervisorProfileId.toString() !== profileId.toString()) {
-        user.supervisorProfileId = profileId;
-        await user.save();
+    const needsProfileLink =
+      !user.supervisorProfileId || user.supervisorProfileId.toString() !== profileId.toString();
+    const needsUserLink =
+      String(profileRecord?.userId || "") !== user._id.toString();
+    if (needsProfileLink || needsUserLink) {
+      user.supervisorProfileId = profileId;
+      user.save().catch(() => {});
+      if (needsUserLink) {
+        Supervisor.updateOne({ _id: profileId }, { $set: { userId: user._id } }).catch(() => {});
       }
-      if (String(profileRecord?.userId || "") !== user._id.toString()) {
-        await Supervisor.updateOne({ _id: profileId }, { $set: { userId: user._id } });
-      }
-    } catch {
-      // Profile linkage failure is non-fatal — continue with access resolution
     }
   }
 
@@ -139,24 +142,23 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     assignedSiteValues.filter((value) => !Types.ObjectId.isValid(value))
   );
 
-  let scopedSites: Array<{ _id: Types.ObjectId; name: string; projectIds?: Types.ObjectId[] }> = [];
+  const siteConditions: Record<string, unknown>[] = [];
   if (explicitSiteIds.length > 0) {
-    scopedSites = await Site.find({ _id: { $in: explicitSiteIds } })
-      .select("_id name projectIds")
-      .lean();
+    siteConditions.push({ _id: { $in: explicitSiteIds } });
   }
-  if (scopedSites.length === 0 && profileId) {
-    scopedSites = await Site.find({ supervisorId: profileId })
-      .select("_id name projectIds")
-      .lean();
+  if (profileId) {
+    siteConditions.push({ supervisorId: profileId });
   }
-  if (scopedSites.length === 0 && assignedSiteNameFallback.length > 0) {
-    scopedSites = await Site.find({ name: { $in: assignedSiteNameFallback } })
-      .select("_id name projectIds")
-      .lean();
+  if (assignedSiteNameFallback.length > 0) {
+    siteConditions.push({ name: { $in: assignedSiteNameFallback } });
   }
-  if (scopedSites.length === 0 && projectIds.length > 0) {
-    scopedSites = await Site.find({ projectIds: { $in: projectIds } })
+  if (projectIds.length > 0) {
+    siteConditions.push({ projectIds: { $in: projectIds } });
+  }
+
+  let scopedSites: Array<{ _id: Types.ObjectId; name: string; projectIds?: Types.ObjectId[] }> = [];
+  if (siteConditions.length > 0) {
+    scopedSites = await Site.find({ $or: siteConditions })
       .select("_id name projectIds")
       .lean();
   }
@@ -489,11 +491,14 @@ export async function getActionableApprovals(
 }
 
 export async function getSupervisorDashboard(userId: string) {
-  const projects = await getAssignedProjects(userId);
-  const sites = await getAssignedSites(userId);
-  const approvals = await getActionableApprovals(userId);
+  const [projects, sites, approvals, scopedAccess] = await Promise.all([
+    getAssignedProjects(userId),
+    getAssignedSites(userId),
+    getActionableApprovals(userId),
+    buildScopedEntityQuery(userId),
+  ]);
 
-  const { query: entityScope } = await buildScopedEntityQuery(userId);
+  const entityScope = scopedAccess.query;
   const siteExpenseScope = { ...entityScope, type: "site" };
   const today = new Date().toISOString().slice(0, 10);
 
