@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Inventory } from "../models/Inventory.js";
 import { IMaterial, Material } from "../models/Material.js";
+import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
@@ -216,4 +217,37 @@ export async function inventoryStockMapForMaterials(materials: Array<Pick<IMater
 export function inventoryKeyForMaterial(material: Pick<IMaterial, "projectId" | "siteId" | "site" | "name" | "unit">) {
   const match = inventoryMatchForMaterial(material);
   return `${match.projectId}__${match.siteKey}__${match.normalizedName}__${match.normalizedUnit}`;
+}
+
+let siteIdBackfillDone = false;
+
+export async function backfillMaterialSiteIds(): Promise<void> {
+  if (siteIdBackfillDone) return;
+  try {
+    const materials = await Material.find({ siteId: { $exists: false } }).lean();
+    if (materials.length === 0) {
+      siteIdBackfillDone = true;
+      return;
+    }
+
+    const siteNameToId = new Map<string, Types.ObjectId>();
+    const sites = await Site.find({}).select("_id name").lean();
+    for (const s of sites) {
+      if (s.name) siteNameToId.set(s.name.toLowerCase(), s._id);
+    }
+
+    let updated = 0;
+    for (const m of materials) {
+      const siteId = siteNameToId.get((m.site || "").toLowerCase());
+      if (siteId) {
+        await Material.updateOne({ _id: m._id }, { $set: { siteId } });
+        updated++;
+      }
+    }
+
+    console.log(`[Startup] backfillMaterialSiteIds: updated ${updated}/${materials.length} materials`);
+    siteIdBackfillDone = true;
+  } catch (err: any) {
+    console.error("[Startup] backfillMaterialSiteIds failed (non-fatal):", err?.message || err);
+  }
 }

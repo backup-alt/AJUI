@@ -114,7 +114,7 @@ export function createApp(): express.Application {
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "9a81e60-fix",
+      deploy: "fix-materials",
     });
   });
 
@@ -175,9 +175,12 @@ export async function bootstrap(): Promise<void> {
   const { ensureWorkersCollection } = await import("./utils/ensure-collections.js");
   await ensureWorkersCollection();
 
-  const { backfillApprovedMaterialsToInventory } = await import("./services/inventory.service.js");
+  const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
   backfillApprovedMaterialsToInventory({}).catch((err: any) =>
     console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
+  );
+  backfillMaterialSiteIds().catch((err: any) =>
+    console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
   );
 
   const app = createApp();
