@@ -1661,17 +1661,46 @@ export class UniversalDashboardPage implements OnInit {
     const failed: string[] = [];
     let deleted = 0;
 
+    // Fallback: build a bizId → _id lookup from the raw data source for this module
+    const rawKey = localStorageKeys[module];
+    const bizIdToMongoId = new Map<string, string>();
+    try {
+      const raw = localStorage.getItem(rawKey);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        for (const r of arr) {
+          const bid = String(r[idField] || r["materialId"] || r["labourId"] || r["vendorId"] || r["clientId"] || "").trim();
+          const mid = String(r["_id"] || "").trim();
+          if (bid && mid) bizIdToMongoId.set(bid, mid);
+        }
+      }
+    } catch {}
+
+    console.log(`[Delete] Starting delete of ${rows.length} ${module} rows`, rows.map((r) => ({ _id: r["_id"], id: r[idField], __rowId: r["__rowId"] })));
+    console.log(`[Delete] bizId→_id lookup has ${bizIdToMongoId.size} entries from localStorage`);
+
     for (const row of rows) {
-      const mongoId = String(row["_id"] || "").trim();
+      let mongoId = String(row["_id"] || "").trim();
       const bizId = String(row[idField] || "").trim();
+
+      // If _id is missing on the row, look it up from the raw data
+      if (!mongoId && bizId && bizIdToMongoId.has(bizId)) {
+        mongoId = bizIdToMongoId.get(bizId)!;
+        console.log(`[Delete] Resolved _id=${mongoId} for bizId=${bizId} via fallback lookup`);
+      }
+
       if (!mongoId && !bizId) {
-        failed.push("(no id)");
+        console.warn(`[Delete] Skipping row — no _id or ${idField}`, row);
+        failed.push(bizId || "(no id)");
         continue;
       }
       try {
         if (apiDelete && mongoId) {
-          // Await backend delete using MongoDB _id (matches route param)
+          console.log(`[Delete] Calling DELETE ${module}/${mongoId} for bizId=${bizId}`);
           await firstValueFrom(apiDelete(mongoId));
+          console.log(`[Delete] SUCCESS for ${bizId} (_id=${mongoId})`);
+        } else if (apiDelete && !mongoId) {
+          console.warn(`[Delete] No _id for ${bizId} — skipping backend delete`);
         }
         // Optimistic localStorage removal by business ID
         try {
@@ -1684,16 +1713,19 @@ export class UniversalDashboardPage implements OnInit {
         } catch {}
         deleted++;
       } catch (e: any) {
-        console.warn(`[Delete] Backend delete failed for ${bizId} (_id=${mongoId}):`, e?.error?.message || e?.message || e);
+        console.error(`[Delete] FAILED for ${bizId} (_id=${mongoId}):`, e?.error?.message || e?.message || e);
         failed.push(bizId);
       }
     }
 
-    console.log(`[Delete] Removed ${deleted}/${rows.length} rows from ${module}`, failed.length ? `(failed: ${failed.join(", ")})` : "");
+    console.log(`[Delete] Result: ${deleted}/${rows.length} deleted from ${module}`, failed.length ? `(failed: ${failed.join(", ")})` : "(all succeeded)");
 
     if (failed.length) {
       this.backendSyncMessage.set(`Deleted ${deleted}, failed ${failed.length}: ${failed[0]}${failed.length > 1 ? "…" : ""}`);
       setTimeout(() => this.backendSyncMessage.set(null), 5000);
+    } else {
+      this.backendSyncMessage.set(`Deleted ${deleted} ${module} row(s)`);
+      setTimeout(() => this.backendSyncMessage.set(null), 3000);
     }
 
     this.clearRowSelection();
