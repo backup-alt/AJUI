@@ -28,6 +28,15 @@ import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Inventory } from "../models/Inventory.js";
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`[withTimeout] ${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
 import { backfillApprovedMaterialsToInventory } from "./inventory.service.js";
 
 type SupervisorAccess = {
@@ -740,10 +749,14 @@ export async function listMaterialsForSupervisor(
     let total: number;
     try {
       console.log(`[listMaterials] About to execute Material.find() and countDocuments()...`);
-      [items, total] = await Promise.all([
-        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-        Material.countDocuments(query),
-      ]);
+      [items, total] = await withTimeout(
+        Promise.all([
+          Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+          Material.countDocuments(query),
+        ]),
+        10000,
+        "Material.find+count"
+      );
       console.log(`[listMaterials] MongoDB query completed, items: ${items.length}, total: ${total}`);
     } catch (err: any) {
       console.error(`[listMaterials] MongoDB query FAILED:`, err.message, "query:", JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
@@ -791,10 +804,14 @@ export async function listMaterialsForSupervisor(
   const limit = Math.min(filters.limit ?? 20, 50);
   const skip = (page - 1) * limit;
 
-  const [items, total] = await Promise.all([
-    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-    Inventory.countDocuments(query),
-  ]);
+  const [items, total] = await withTimeout(
+    Promise.all([
+      Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+      Inventory.countDocuments(query),
+    ]),
+    10000,
+    "Inventory.find+count"
+  );
 
   // If Inventory collection is empty for this query, fall back to Material collection
   if (items.length === 0 && total === 0) {
@@ -806,10 +823,14 @@ export async function listMaterialsForSupervisor(
         { approvedQuantity: { $gt: 0 } },
       ],
     };
-    const [matItems, matTotal] = await Promise.all([
-      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Material.countDocuments(materialQuery),
-    ]);
+    const [matItems, matTotal] = await withTimeout(
+      Promise.all([
+        Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        Material.countDocuments(materialQuery),
+      ]),
+      10000,
+      "Material.find+count(fallback)"
+    );
 
     return {
       materials: matItems.map((m) => ({
