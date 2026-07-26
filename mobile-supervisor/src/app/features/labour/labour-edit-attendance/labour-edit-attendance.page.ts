@@ -96,6 +96,7 @@ import { EmptyStateComponent } from '../../../shared/components';
               <ion-label position="stacked">Date *</ion-label>
               <ion-input
                 type="date"
+                [max]="todayDate"
                 [(ngModel)]="attendanceDate"
               ></ion-input>
             </ion-item>
@@ -292,6 +293,7 @@ export class LabourEditAttendancePage implements OnInit {
 
   attendanceId = '';
   attendanceDate = '';
+  todayDate = new Date().toISOString().slice(0, 10);
   shiftCount = 1;
   overtimeHours = 0;
   overtimeAmount = 0;
@@ -349,6 +351,7 @@ export class LabourEditAttendancePage implements OnInit {
   }
 
   isValid(): boolean {
+    if (this.attendanceDate > this.todayDate) return false;
     const sc = Number(this.shiftCount);
     return !!(
       this.attendanceId &&

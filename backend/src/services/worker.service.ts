@@ -161,6 +161,10 @@ export async function markAttendance(input: {
   if (!Types.ObjectId.isValid(input.projectId)) {
     throw new AppError(400, "Invalid project id");
   }
+  const today = new Date().toISOString().slice(0, 10);
+  if (input.attendanceDate > today) {
+    throw new AppError(400, "Attendance cannot be marked for future dates");
+  }
   const worker = await Worker.findById(input.workerId).lean();
   if (!worker) throw new AppError(404, "Worker not found");
 

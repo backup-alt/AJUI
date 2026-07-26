@@ -104,6 +104,7 @@ import { CurrencyPipe } from '@angular/common';
             <ion-label position="stacked">Date *</ion-label>
             <ion-input
               type="date"
+              [max]="todayDate"
               [ngModel]="attendanceDate"
               (ngModelChange)="onDateChange($event)"
             ></ion-input>
@@ -286,6 +287,7 @@ export class LabourMarkAttendancePage implements OnInit {
 
   workerId = '';
   attendanceDate = new Date().toISOString().slice(0, 10);
+  todayDate = new Date().toISOString().slice(0, 10);
   shiftCount = 1;
   overtimeHours = 0;
   overtimeAmount = 0;
@@ -338,6 +340,7 @@ export class LabourMarkAttendancePage implements OnInit {
 
   isValid(): boolean {
     if (this.alreadyMarked()) return false;
+    if (this.attendanceDate > this.todayDate) return false;
     const sc = Number(this.shiftCount);
     return !!(
       this.workerId &&
@@ -347,9 +350,20 @@ export class LabourMarkAttendancePage implements OnInit {
     );
   }
 
-  onDateChange(value: string): void {
+  async onDateChange(value: string): Promise<void> {
     this.attendanceDate = value;
     this.alreadyMarked.set(false);
+    if (value > this.todayDate) {
+      const toast = await this.toastCtrl.create({
+        message: 'Cannot mark attendance for future dates',
+        duration: 2500,
+        color: 'warning',
+        position: 'top',
+      });
+      await toast.present();
+      this.attendanceDate = this.todayDate;
+      return;
+    }
     this.checkExistingAttendance();
   }
 

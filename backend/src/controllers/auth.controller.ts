@@ -288,9 +288,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       expiresAt,
     });
 
-    // Use BACKEND_PUBLIC_URL or FRONTEND_URL; strip trailing slash
-    const baseUrl = (process.env.BACKEND_PUBLIC_URL || process.env.FRONTEND_URL || "https://backup-alt.github.io/AJUI")
-      .replace(/\/+$/, "");
+    const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
     // Deep link for mobile app
     const deepLink = `agb-supervisor://reset-password?token=${rawToken}`;
     // Web fallback route (hash-based Angular route)
