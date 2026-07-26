@@ -82,6 +82,7 @@ export type Quotation = {
   companyAddress: string;
   state: string;
   gstin: string;
+  clientId?: string;
   clientName: string;
   clientAddress: string;
   clientState: string;
@@ -121,6 +122,7 @@ export type TaxInvoice = {
   companyAddress: string;
   state: string;
   gstin: string;
+  clientId?: string;
   clientName: string;
   clientAddress: string;
   clientState: string;

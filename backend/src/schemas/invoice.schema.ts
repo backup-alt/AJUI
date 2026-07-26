@@ -18,6 +18,7 @@ export const createInvoiceSchema = z.object({
     companyAddress: z.string().optional(),
     state: z.string().optional(),
     gstin: z.string().optional(),
+    clientId: z.string().optional(),
     clientName: z.string().trim().min(1),
     clientAddress: z.string().optional(),
     clientState: z.string().optional(),

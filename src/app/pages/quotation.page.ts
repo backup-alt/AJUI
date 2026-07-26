@@ -110,6 +110,9 @@ function numberToWords(num: number): string {
                           <td>
                             <button type="button" class="action-btn" (click)="editQuotation(quote)">Edit</button>
                             <button type="button" class="action-btn danger" (click)="deleteQuotation(quote.id)">Delete</button>
+                            @if (!quote.clientId && quote.clientName) {
+                              <button type="button" class="action-btn client-action" (click)="makeAsClient(quote)">Make as Client</button>
+                            }
                           </td>
                         </tr>
                       }
@@ -164,17 +167,14 @@ function numberToWords(num: number): string {
                     <div class="client-form-grid">
                       <div class="form-field client-search-wrapper">
                         <label>Client Name</label>
-                        <div class="client-search-row">
-                          <input
-                            type="text"
-                            [value]="clientSearchTerm()"
-                            (input)="onClientSearchInput($event)"
-                            (focus)="onClientSearchFocus()"
-                            placeholder="Search or enter client name"
-                            class="client-search-input"
-                          />
-                          <button type="button" class="add-client-btn" (click)="openAddClientDialog()" title="Add New Client">+</button>
-                        </div>
+                        <input
+                          type="text"
+                          [value]="clientSearchTerm()"
+                          (input)="onClientSearchInput($event)"
+                          (focus)="onClientSearchFocus()"
+                          placeholder="Search or enter client name"
+                          class="client-search-input"
+                        />
                         @if (showClientDropdown()) {
                           <div class="client-dropdown">
                             @for (client of filteredClients(); track client.id) {
@@ -189,9 +189,6 @@ function numberToWords(num: number): string {
                             } @empty {
                               <div class="client-dropdown-empty">No clients found</div>
                             }
-                            <div class="client-dropdown-add" (mousedown)="openAddClientDialog()">
-                              <ion-icon name="add-circle-outline"></ion-icon> Add New Client
-                            </div>
                           </div>
                         }
                       </div>
@@ -355,10 +352,14 @@ function numberToWords(num: number): string {
       </div>
     }
 
-    @if (showClientForm()) {
+    @if (showMakeClientDialog()) {
       <agb-client-form-dialog
-        (cancel)="showClientForm.set(false)"
-        (create)="onClientCreated($event)"
+        [initialValue]="makeClientInitialValue()"
+        [title]="'Convert to Client'"
+        [description]="'Create a client record from this quotation details.'"
+        [submitLabel]="'Create Client'"
+        (cancel)="showMakeClientDialog.set(false)"
+        (create)="onMakeClientCreated($event)"
       ></agb-client-form-dialog>
     }
   `,
@@ -488,6 +489,8 @@ function numberToWords(num: number): string {
     .action-btn:hover { background: #f8fafc; }
     .action-btn.danger { color: #dc2626; border-color: #fecaca; }
     .action-btn.danger:hover { background: #fef2f2; }
+    .action-btn.client-action { background: #059669; color: #fff; border-color: #059669; }
+    .action-btn.client-action:hover { background: #047857; }
     .editor-header {
       display: flex;
       justify-content: space-between;
@@ -958,11 +961,8 @@ function numberToWords(num: number): string {
       background: #e2e8f0;
     }
     .client-search-wrapper { position: relative; }
-    .client-search-row { display: flex; gap: 0; }
-    .client-search-input { flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px 0 0 6px; font-size: 13px; color: #1e293b; background: #fff; outline: none; transition: border-color 140ms; }
+    .client-search-input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #1e293b; background: #fff; outline: none; transition: border-color 140ms; box-sizing: border-box; }
     .client-search-input:focus { border-color: #2c5cff; box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.1); }
-    .add-client-btn { padding: 8px 12px; background: #2c5cff; color: #fff; border: 1px solid #2c5cff; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 16px; font-weight: 700; line-height: 1; }
-    .add-client-btn:hover { background: #1e4ae8; border-color: #1e4ae8; }
     .client-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 100; max-height: 220px; overflow-y: auto; margin-top: 4px; }
     .client-dropdown-item { padding: 8px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid #f1f5f9; }
     .client-dropdown-item:last-child { border-bottom: none; }
@@ -971,8 +971,6 @@ function numberToWords(num: number): string {
     .client-dropdown-name { font-size: 13px; font-weight: 600; color: #1e293b; }
     .client-dropdown-meta { font-size: 11px; color: #64748b; }
     .client-dropdown-empty { padding: 12px; text-align: center; color: #94a3b8; font-size: 13px; }
-    .client-dropdown-add { padding: 8px 12px; color: #2c5cff; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; border-top: 1px solid #e2e8f0; }
-    .client-dropdown-add:hover { background: #f0f6ff; }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -995,7 +993,21 @@ readonly savingPdf = signal(false);
   readonly clientSearchTerm = signal("");
   readonly showClientDropdown = signal(false);
   readonly selectedClientId = signal<string | null>(null);
-  readonly showClientForm = signal(false);
+  readonly showMakeClientDialog = signal(false);
+  readonly makeClientData = signal<{ clientName: string; clientAddress: string; clientState: string; clientGstin: string; sourceId: string } | null>(null);
+
+  readonly makeClientInitialValue = computed<ClientFormValue | null>(() => {
+    const d = this.makeClientData();
+    if (!d) return null;
+    return {
+      name: d.clientName,
+      mobile: "",
+      address: d.clientAddress,
+      gstNumber: d.clientGstin,
+      supervisor: "",
+      status: "Active",
+    };
+  });
 
   readonly filteredClients = computed(() => {
     const term = this.clientSearchTerm().toLowerCase().trim();
@@ -1110,13 +1122,33 @@ readonly savingPdf = signal(false);
     this.showClientDropdown.set(false);
   }
 
-  openAddClientDialog() {
-    this.showClientDropdown.set(false);
-    this.showClientForm.set(true);
+  makeAsClient(quote: Quotation) {
+    const existing = this.data.clients().find(
+      c => c.name.toLowerCase() === quote.clientName.toLowerCase()
+    );
+    if (existing) {
+      this.api.patchQuotation(quote.id, { clientId: existing._id || existing.id }).subscribe({
+        next: () => {
+          alert("Client already exists. Quotation linked to existing client.");
+          this.loadQuotationsFromBackend();
+        },
+        error: () => {},
+      });
+      return;
+    }
+    this.makeClientData.set({
+      clientName: quote.clientName,
+      clientAddress: quote.clientAddress,
+      clientState: quote.clientState,
+      clientGstin: quote.clientGstin,
+      sourceId: quote.id,
+    });
+    this.showMakeClientDialog.set(true);
   }
 
-  onClientCreated(value: ClientFormValue) {
-    if (!value.name || !value.mobile || !value.address) return;
+  onMakeClientCreated(value: ClientFormValue) {
+    const data = this.makeClientData();
+    if (!data) return;
     this.api.createClient({
       name: value.name,
       mobile: value.mobile,
@@ -1126,14 +1158,17 @@ readonly savingPdf = signal(false);
       status: value.status || "Active",
     }).subscribe({
       next: (res: any) => {
-        const clientId = res?.clientId || res?.client?.clientId || res?.id;
-        const client = this.data.addClient({
-          ...value,
-          id: clientId,
-          gstNumber: value.gstNumber || "",
-        } as any);
-        this.selectClient(client);
-        this.showClientForm.set(false);
+        const clientId = res?.client?.clientId || res?.clientId || res?.id;
+        const mongoId = res?.client?._id || res?._id;
+        this.data.addClient({ ...value, id: clientId, gstNumber: value.gstNumber || "" } as any);
+        this.api.patchQuotation(data.sourceId, { clientId: mongoId || clientId }).subscribe({
+          next: () => {
+            this.showMakeClientDialog.set(false);
+            this.makeClientData.set(null);
+            this.loadQuotationsFromBackend();
+          },
+          error: () => {},
+        });
       },
       error: (err: any) => {
         console.error("Failed to create client", err);
@@ -1156,6 +1191,7 @@ readonly savingPdf = signal(false);
           id: q._id,
           quotationNumber: q.quotationNumber,
           date: q.date,
+          clientId: q.clientId || "",
           clientName: q.clientName,
           clientAddress: q.clientAddress,
           clientState: q.clientState,
