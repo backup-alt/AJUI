@@ -554,7 +554,7 @@ export class RequestsPage implements OnInit {
     try {
       // Load materials
       try {
-        const matRes = await firstValueFrom(this.supervisor.getMaterials({ limit: 200 }).pipe(timeout(30000)));
+        const matRes = await firstValueFrom(this.supervisor.getMaterials({ limit: 200 }).pipe(timeout(60000)));
         for (const m of matRes?.materials || []) {
           const isReceived = m.status === 'Received';
           const hasNoBill = !(m as any).billUrl;
@@ -579,7 +579,7 @@ export class RequestsPage implements OnInit {
 
       // Load expenses — include ALL transaction types (Purchase + Add Cash)
       try {
-        const expRes = await firstValueFrom(this.supervisor.getExpenses({ type: 'site', limit: 200 }).pipe(timeout(30000)));
+        const expRes = await firstValueFrom(this.supervisor.getExpenses({ type: 'site', limit: 200 }).pipe(timeout(60000)));
         for (const e of expRes?.expenses || []) {
           const txLabel =
             e.transactionType === 'Cash Added' ? 'Add Cash' :

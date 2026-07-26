@@ -105,7 +105,7 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   const cached = getCachedSupervisorAccess(userId);
   if (cached) return cached;
 
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).maxTimeMS(5000).lean();
   if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
 
   const supervisorConditions: Record<string, unknown>[] = [];
@@ -121,7 +121,7 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   }
 
   const profile = supervisorConditions.length > 0
-    ? await Supervisor.findOne({ $or: supervisorConditions }).lean()
+    ? await Supervisor.findOne({ $or: supervisorConditions }).lean().maxTimeMS(5000)
     : null;
 
   const profileRecord = profile as Record<string, any> | null;
@@ -132,8 +132,7 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     const needsUserLink =
       String(profileRecord?.userId || "") !== user._id.toString();
     if (needsProfileLink || needsUserLink) {
-      user.supervisorProfileId = profileId;
-      user.save().catch(() => {});
+      User.updateOne({ _id: user._id }, { $set: { supervisorProfileId: profileId } }).catch(() => {});
       if (needsUserLink) {
         Supervisor.updateOne({ _id: profileId }, { $set: { userId: user._id } }).catch(() => {});
       }
@@ -169,16 +168,17 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   if (assignedSiteNameFallback.length > 0) {
     siteConditions.push({ name: { $in: assignedSiteNameFallback } });
   }
-  if (projectIds.length > 0) {
-    siteConditions.push({ projectIds: { $in: projectIds } });
-  }
 
   let scopedSites: Array<{ _id: Types.ObjectId; name: string; projectIds?: Types.ObjectId[] }> = [];
   if (siteConditions.length > 0) {
     scopedSites = await Site.find({ $or: siteConditions })
       .select("_id name projectIds")
-      .lean();
+      .lean()
+      .maxTimeMS(5000);
   }
+
+  const scopedSiteIds = scopedSites.map((site) => toObjectId(site._id));
+  const scopedSiteNames = scopedSites.map((site) => site.name);
 
   for (const site of scopedSites) {
     for (const pid of site.projectIds || []) {
@@ -188,16 +188,16 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
 
   const siteIds = uniqueObjectIds([
     ...explicitSiteIds,
-    ...scopedSites.map((site) => toObjectId(site._id)),
+    ...scopedSiteIds,
   ]);
 
   const result: SupervisorAccess = {
-    user,
+    user: user as any,
     profile: profileRecord,
     projectIds: uniqueObjectIds(projectIds),
     siteIds,
     siteNames: uniqueStrings([
-      ...scopedSites.map((site) => site.name),
+      ...scopedSiteNames,
       ...assignedSiteNameFallback,
     ]),
   };
@@ -376,13 +376,11 @@ export async function getAssignedSites(userId: string) {
   const projectIdToName = new Map<string, string>();
   for (const p of projects) projectIdToName.set(p.id, p.name);
 
-  let siteQuery: Record<string, unknown>;
+  const siteQuery: Record<string, unknown> = {};
   if (access.siteIds.length > 0) {
-    siteQuery = { _id: { $in: access.siteIds } };
+    siteQuery._id = { $in: access.siteIds };
   } else if (access.siteNames.length > 0) {
-    siteQuery = { name: { $in: access.siteNames } };
-  } else if (access.projectIds.length > 0) {
-    siteQuery = { projectIds: { $in: access.projectIds } };
+    siteQuery.name = { $in: access.siteNames };
   } else {
     return [];
   }
@@ -669,8 +667,6 @@ export async function listMaterialsForSupervisor(
     siteId: filters.siteId,
   });
 
-  console.log(`[listMaterials] query=${JSON.stringify(query, (_, v) => v instanceof Types.ObjectId ? `ObjectId(${v})` : v)}`);
-
   if (filters.status !== "Approved") {
     if (filters.status) query.status = filters.status;
     const page = filters.page ?? 1;
@@ -680,35 +676,22 @@ export async function listMaterialsForSupervisor(
 
     const cached = getCached<{ materials: any[]; pagination: any }>(cacheKey);
     if (cached) {
-      console.log(`[listMaterials] cache HIT for ${cacheKey}`);
       return cached;
     }
-
-    const qStart = Date.now();
-    console.log(`[listMaterials] running aggregate query=${JSON.stringify(query)}`);
-    const aggPipeline: any[] = [
-      { $match: query },
-      { $sort: { createdAt: -1 } },
-      { $skip: skip },
-      { $limit: limit },
-    ];
-    const countPipeline: any[] = [{ $match: query }, { $count: "total" }];
 
     let requestItems: any[] = [];
     let requestTotal = 0;
     try {
-      const [items, countResult] = await Promise.all([
-        Material.aggregate(aggPipeline).option({ maxTimeMS: 12000 }).allowDiskUse(true),
-        Material.aggregate(countPipeline).option({ maxTimeMS: 12000 }),
+      const [items, total] = await Promise.all([
+        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(10000),
+        Material.countDocuments(query).maxTimeMS(10000),
       ]);
       requestItems = items;
-      requestTotal = countResult.length > 0 ? countResult[0].total : 0;
-    } catch (aggErr: any) {
-      console.error(`[listMaterials] aggregate failed in ${Date.now() - qStart}ms:`, aggErr?.message);
+      requestTotal = total;
+    } catch (err: any) {
       requestItems = [];
       requestTotal = 0;
     }
-    console.log(`[listMaterials] aggregate in ${Date.now() - qStart}ms, found=${requestItems.length}, total=${requestTotal}`);
 
     const result = {
       materials: requestItems.map((m: any) => ({

@@ -438,7 +438,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
           siteId: siteId || undefined,
           projectId: projectId || undefined,
           limit: 100,
-        }        ).pipe(timeout(30000))
+        }        ).pipe(timeout(60000))
       );
       if (gen !== this.loadGeneration) return;
       this.materials.set(response?.materials || []);
