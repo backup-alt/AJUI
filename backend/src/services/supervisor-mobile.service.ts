@@ -228,9 +228,7 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
       or.push({ site: { $in: siteIdStrings } });
     }
     if (access.siteNames.length > 0) or.push({ site: { $in: access.siteNames } });
-    const result = { $or: or };
-    console.log(`[getSiteScopeForFilter] no siteId -> $or query:`, JSON.stringify(result));
-    return result;
+    return { $or: or };
   }
 
   const requestedSiteId = toObjectId(siteId);
@@ -252,7 +250,7 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     throw new AppError(403, "Not assigned to this site");
   }
 
-  return { $or: [{ siteId: requestedSiteId }, { site: site.name }, { site: requestedSiteId.toString() }] };
+  return { siteId: requestedSiteId };
 }
 
 async function buildScopedEntityQuery(
@@ -275,7 +273,6 @@ async function buildScopedEntityQuery(
 
   const siteScope = await getSiteScopeForFilter(access, filters.siteId);
   if (siteScope) Object.assign(query, siteScope);
-  console.log(`[buildScopedEntityQuery] user=${userId} filters=${JSON.stringify(filters)} final query=${JSON.stringify(query)}`);
   if (
     !filters.projectId &&
     !filters.siteId &&
@@ -721,12 +718,23 @@ export async function listMaterialsForSupervisor(
       let requestTotal;
       try {
         [requestItems, requestTotal] = await Promise.all([
-          Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-          Material.countDocuments(query),
+          Material.find(query, null, { maxTimeMS: 8000 }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+          Material.countDocuments(query, { maxTimeMS: 8000 }),
         ]);
-      } catch (dbErr) {
-        console.error(`[listMaterials] MongoDB error:`, dbErr);
-        throw dbErr;
+      } catch (dbErr: any) {
+        const isTimeout = dbErr?.errorLabel === "RetryableWriteError" || dbErr?.name === "MongoNetworkTimeoutError" || dbErr?.name === "MongoNetworkError";
+        if (isTimeout && filters.siteId && (query as any).$or) {
+          console.warn(`[listMaterials] query timed out, retrying with direct siteId match`);
+          const fallbackQuery: Record<string, unknown> = { projectId: query.projectId, siteId: filters.siteId };
+          if (query.status) fallbackQuery.status = query.status;
+          [requestItems, requestTotal] = await Promise.all([
+            Material.find(fallbackQuery, null, { maxTimeMS: 8000 }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+            Material.countDocuments(fallbackQuery, { maxTimeMS: 8000 }),
+          ]);
+        } else {
+          console.error(`[listMaterials] MongoDB error:`, dbErr);
+          throw dbErr;
+        }
       }
       console.log(`[listMaterials] non-Approved returned: ${requestItems.length} items, total=${requestTotal}`);
 
@@ -765,8 +773,8 @@ export async function listMaterialsForSupervisor(
   await backfillApprovedMaterialsToInventory(query);
 
   const [items, total] = await Promise.all([
-    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-    Inventory.countDocuments(query),
+    Inventory.find(query, null, { maxTimeMS: 8000 }).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+    Inventory.countDocuments(query, { maxTimeMS: 8000 }),
   ]);
 
   // If Inventory collection is empty for this query, fall back to Material collection
@@ -777,8 +785,8 @@ export async function listMaterialsForSupervisor(
       { approvedQuantity: { $gt: 0 } },
     ];
     const [matItems, matTotal] = await Promise.all([
-      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Material.countDocuments(materialQuery),
+      Material.find(materialQuery, null, { maxTimeMS: 8000 }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Material.countDocuments(materialQuery, { maxTimeMS: 8000 }),
     ]);
 
     return {
