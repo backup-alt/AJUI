@@ -265,6 +265,7 @@ export function mapInvoice(i: any): TaxInvoice {
     companyAddress: i.companyAddress || "",
     state: i.state || "",
     gstin: i.gstin || "",
+    clientId: i.clientId || "",
     clientName: i.clientName || "",
     clientAddress: i.clientAddress || "",
     clientState: i.clientState || "",

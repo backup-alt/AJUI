@@ -20,6 +20,7 @@ export interface IInvoice extends Document {
   companyAddress: string;
   state: string;
   gstin: string;
+  clientId?: Types.ObjectId;
   clientName: string;
   clientAddress: string;
   clientState: string;
@@ -62,6 +63,7 @@ const invoiceSchema = new Schema<IInvoice>(
     companyAddress: { type: String, default: "" },
     state: { type: String, default: "" },
     gstin: { type: String, default: "" },
+    clientId: { type: Schema.Types.ObjectId, ref: "Client", default: null },
     clientName: { type: String, default: "" },
     clientAddress: { type: String, default: "" },
     clientState: { type: String, default: "" },

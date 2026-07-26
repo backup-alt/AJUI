@@ -20,6 +20,7 @@ export interface IQuotation extends Document {
   companyAddress: string;
   state: string;
   gstin: string;
+  clientId?: Types.ObjectId;
   clientName: string;
   clientAddress: string;
   clientState: string;
@@ -61,6 +62,7 @@ const quotationSchema = new Schema<IQuotation>(
     companyAddress: { type: String, default: "" },
     state: { type: String, default: "" },
     gstin: { type: String, default: "" },
+    clientId: { type: Schema.Types.ObjectId, ref: "Client", default: null },
     clientName: { type: String, default: "" },
     clientAddress: { type: String, default: "" },
     clientState: { type: String, default: "" },
