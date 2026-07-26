@@ -230,7 +230,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
           title="Project Workspace"
           eyebrow="Project Operations"
           metaLabel="Site records"
-          [blurred]="recordDialogOpen() || fieldDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm() || showVendorDialog() || !!editingInlineVendor()"
+          [blurred]="recordDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm() || showVendorDialog() || !!editingInlineVendor()"
           [showTitle]="false"
           searchPlaceholder="Search"
         />
@@ -410,7 +410,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     </svg>
                     {{ selectedRowCount() === 1 ? 'Delete Row' : 'Delete Rows' }}
                   </button>
-                  <button type="button" *ngIf="!tableViewExpanded()" (click)="openFieldDialog()">Add Field</button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
                   <button type="button" class="view-table-action" *ngIf="!tableViewExpanded()" (click)="openTableView()">
@@ -542,18 +541,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       <th *ngFor="let column of tableState.columns; trackBy: trackColumn">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
-                          <button
-                            type="button"
-                            class="column-insert-action"
-                            aria-label="Add column after this column"
-                            title="Add column after {{ column.label }}"
-                            (click)="openFieldDialog(column.key, $event)"
-                          >
-                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                              <path d="M10 4v12" />
-                              <path d="M4 10h12" />
-                            </svg>
-                          </button>
                           <button type="button" class="column-hide-action" aria-label="Hide column" title="Hide column" (click)="hideField(activeSection(), column.key, $event)">
                             <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                               <path d="m5.5 5.5 9 9" />
@@ -901,40 +888,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
               </form>
             </section>
 
-            <section class="form-overlay" *ngIf="fieldDialogOpen()">
-              <form class="erp-dialog field-dialog" (submit)="saveField($event)">
-                <div class="dialog-head">
-                  <div>
-                    <span>{{ activeConfig().label }}</span>
-                    <h2>Add Field</h2>
-                    <p *ngIf="newFieldAfterLabel()">Inserted after {{ newFieldAfterLabel() }}.</p>
-                  </div>
-                  <button type="button" class="icon-button" (click)="fieldDialogOpen.set(false)">
-                    <ion-icon name="close-outline"></ion-icon>
-                  </button>
-                </div>
-                <div class="erp-form">
-                  <label class="span-2">
-                    <span>Field Name</span>
-                    <input [value]="newFieldLabel()" (input)="newFieldLabel.set($any($event.target).value)" placeholder="Example: Bill Checked By" />
-                  </label>
-                  <label>
-                    <span>Field Type</span>
-                    <select [value]="newFieldType()" (change)="newFieldType.set($any($event.target).value)">
-                      <option value="text">Text</option>
-                      <option value="number">Number</option>
-                      <option value="date">Date</option>
-                      <option value="boolean">Yes / No</option>
-                    </select>
-                  </label>
-                </div>
-                <div class="dialog-actions">
-                  <button type="button" class="secondary-action" (click)="fieldDialogOpen.set(false)">Cancel</button>
-                  <button type="submit" class="primary-action">Add Field</button>
-                </div>
-              </form>
-            </section>
-
             <section class="form-overlay" *ngIf="labourTypeDialogOpen()">
               <form class="erp-dialog labour-type-dialog" (submit)="saveLabourType($event)">
                 <div class="dialog-head">
@@ -1069,11 +1022,6 @@ export class ProjectWorkspacePage {
   readonly recordDialogOpen = signal(false);
   readonly showVendorDialog = signal(false);
   readonly editingInlineVendor = signal<{ id: string; vendorName: string; materialType: string; phoneNumber: string; address: string; gstNumber: string } | null>(null);
-  readonly fieldDialogOpen = signal(false);
-  readonly newFieldLabel = signal("");
-  readonly newFieldAfterKey = signal<string | null>(null);
-  readonly newFieldType = signal<"text" | "number" | "date" | "boolean">("text");
-  readonly savingField = signal(false);
   readonly draftRow = signal<TableRow>({});
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
@@ -2021,43 +1969,6 @@ export class ProjectWorkspacePage {
     if (updatedProject && this.activeSite() === site) this.activeSite.set("All");
   }
 
-  openFieldDialog(afterKey?: string, event?: Event) {
-    event?.stopPropagation();
-    this.newFieldLabel.set("");
-    this.newFieldAfterKey.set(afterKey ?? null);
-    this.newFieldType.set("text");
-    this.fieldDialogOpen.set(true);
-  }
-
-  async saveField(event: Event) {
-    event.preventDefault();
-    if (this.savingField()) return;
-    const label = this.newFieldLabel().trim();
-    if (!label) return;
-    if (this.isGeneratedClientIdField(label)) {
-      window.alert("Client ID is generated automatically and cannot be created manually.");
-      return;
-    }
-    this.savingField.set(true);
-    try {
-      const section = this.activeSection();
-      const fieldType = this.newFieldType();
-      const addedField = this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
-      const siteId = this.resolveEntityIdForSection(section);
-      if (siteId) {
-        try {
-          await this.data.persistCustomField(section, label, siteId, fieldType, false, addedField.key);
-        } catch (err) {
-          console.warn("[ProjectWorkspace] failed to persist custom field", err);
-        }
-      }
-      this.newFieldAfterKey.set(null);
-      this.fieldDialogOpen.set(false);
-    } finally {
-      this.savingField.set(false);
-    }
-  }
-
   private resolveEntityIdForSection(_section: ModuleKey): string | null {
     const activeSite = this.activeSiteFilter();
     if (activeSite && activeSite !== "All") {
@@ -2065,20 +1976,6 @@ export class ProjectWorkspacePage {
     }
     const firstSite = this.data.siteEntities()[0];
     return firstSite?._id ?? null;
-  }
-
-  private isGeneratedClientIdField(label: string): boolean {
-    const normalized = label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-    return normalized === "client-id";
-  }
-
-  newFieldAfterLabel(): string {
-    const afterKey = this.newFieldAfterKey();
-    if (!afterKey) return "";
-    return this.columnsFor(this.activeSection()).find((column) => column.key === afterKey)?.label ?? "";
   }
 
   updateCell(section: ModuleKey, visibleIndex: number, key: string, value: string) {
