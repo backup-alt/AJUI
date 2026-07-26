@@ -1584,7 +1584,9 @@ export class UniversalDashboardPage implements OnInit {
 
   private selectedRows(): TableRow[] {
     const selected = new Set(this.selectedRowKeys());
-    return this.visibleRows().filter((row) => selected.has(this.rowKey(row)));
+    const module = this.activeModule();
+    const allRows = this.withComputedRows(module, this.rowsFor(module));
+    return allRows.filter((row) => selected.has(this.rowKey(row)));
   }
 
   editSelectedRows() {
