@@ -152,7 +152,7 @@ export async function createInvite(params: CreateInviteParams): Promise<{
     // Send deep link email instead of OTP email
     const separator = env.QR_BASE_URL.includes("?") ? "&" : "?";
     const deepLink = `${env.QR_BASE_URL}${separator}token=${encodeURIComponent(token)}`;
-const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/signup.html?token=${encodeURIComponent(token)}`;
+const webFallbackUrl = `${(env.BACKEND_PUBLIC_URL || env.FRONTEND_URL).replace(/\/+$/, "")}/signup.html?token=${encodeURIComponent(token)}`;
 
     const { subject, html, text } = buildSupervisorInviteEmail({
       name: params.supervisorName,
@@ -242,8 +242,8 @@ export async function createEmployeeInvite(
   invite.otpHash = otpHash;
   await invite.save();
 
-  const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
-  const inviteUrl = `${baseUrl}/signup.html?token=${token}`;
+  const backendUrl = (env.BACKEND_PUBLIC_URL || env.FRONTEND_URL).replace(/\/+$/, "");
+  const inviteUrl = `${backendUrl}/signup.html?token=${token}`;
 
   const { subject, html, text } = buildEmployeeInviteEmail({
     name: params.name,
@@ -439,7 +439,7 @@ export async function sendSupervisorInviteEmail(
   const deepLink = `${env.QR_BASE_URL}${separator}token=${encodeURIComponent(token)}`;
 
   // Web fallback URL for browsers that can't open the deep link
-  const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/signup.html?token=${encodeURIComponent(token)}`;
+  const webFallbackUrl = `${(env.BACKEND_PUBLIC_URL || env.FRONTEND_URL).replace(/\/+$/, "")}/signup.html?token=${encodeURIComponent(token)}`;
 
   const name = extractSupervisorName(invite);
   const expiryMinutes = Math.max(
