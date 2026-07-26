@@ -291,8 +291,8 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
     // Deep link for mobile app
     const deepLink = `agb-supervisor://reset-password?token=${rawToken}`;
-    // Web fallback route (hash-based Angular route)
-    const webResetUrl = `${baseUrl}/#/auth/reset-password?token=${rawToken}`;
+    // Web fallback (static page hosted on GitHub Pages)
+    const webResetUrl = `${baseUrl}/reset-password.html?token=${rawToken}`;
 
     const { subject, html, text } = buildResetPasswordEmail({
       name: user.name,
@@ -916,7 +916,7 @@ export async function employeeResendOtp(
     if (invite.inviteeEmail) {
       const name = inviteService.extractInviteeName(invite);
       const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
-      const inviteUrl = `${baseUrl}/#/signup/employee?token=${encodeURIComponent(token)}`;
+      const inviteUrl = `${baseUrl}/signup.html?token=${encodeURIComponent(token)}`;
       const roleLabel =
         invite.role === "project_manager"
           ? "Project Manager"
