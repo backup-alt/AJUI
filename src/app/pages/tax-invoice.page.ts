@@ -202,7 +202,7 @@ function numberToWords(num: number): string {
                           <th class="col-hsn">HSN Code</th>
                           <th class="col-unit">Unit</th>
                           <th class="col-qty">Qty</th>
-                          <th class="col-rate">Rate (₹)</th>
+                          <th class="col-rate">Rate / Item (₹)</th>
                           <th class="col-amount">Amount (₹)</th>
                           <th class="col-action"></th>
                         </tr>
@@ -236,9 +236,6 @@ function numberToWords(num: number): string {
                               <td colspan="8">
                                 <button type="button" class="add-item-btn" (click)="addRow()">
                                   <ion-icon name="add-outline"></ion-icon> Add Item
-                                </button>
-                                <button type="button" class="add-item-btn secondary" (click)="addSectionHeader()">
-                                  <ion-icon name="remove-outline"></ion-icon> Add Section
                                 </button>
                               </td>
                             </tr>
