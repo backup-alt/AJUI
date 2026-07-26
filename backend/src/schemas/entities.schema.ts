@@ -25,6 +25,7 @@ export const updateClientSchema = z.object({
     status: z.enum(["Active", "On Hold", "Completed"]).optional(),
     supervisor: z.string().trim().optional(),
     supervisorId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
+    customFields: z.record(z.unknown()).optional(),
   }),
   params: idSchema,
 });

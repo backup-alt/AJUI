@@ -24,6 +24,7 @@ export interface ISubcontractor extends Document {
   paymentStatus: PaymentSubStatus;
   approvedBy?: string;
   approvedAt?: Date;
+  customFields?: Record<string, string | number | boolean | null>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +59,7 @@ const subcontractorSchema = new Schema<ISubcontractor>(
     },
     approvedBy: { type: String },
     approvedAt: { type: Date },
+    customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

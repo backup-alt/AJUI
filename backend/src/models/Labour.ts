@@ -35,6 +35,7 @@ export interface ILabour extends Document {
   submittedBy?: string;
   approvedBy?: string;
   approvedAt?: Date;
+  customFields?: Record<string, string | number | boolean | null>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,6 +88,7 @@ const labourSchema = new Schema<ILabour>(
     submittedBy: { type: String },
     approvedBy: { type: String },
     approvedAt: { type: Date },
+    customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );
