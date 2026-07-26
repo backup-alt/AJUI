@@ -106,29 +106,21 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   const cached = getCachedSupervisorAccess(userId);
   if (cached) return cached;
 
-  const t0 = Date.now();
-
-  const user = await User.findById(userId).maxTimeMS(5000).lean();
+  const user = await User.findById(userId);
   if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
 
-  const supervisorConditions: Record<string, unknown>[] = [];
-  if (user.supervisorProfileId) {
-    supervisorConditions.push({ _id: user.supervisorProfileId });
-  }
-  supervisorConditions.push({ userId: user._id });
-  if (user.email) {
-    supervisorConditions.push({ email: user.email.toLowerCase() });
-  }
-  if (user.phone) {
-    supervisorConditions.push({ phone: user.phone });
-  }
-
-  const t1 = Date.now();
-  const profile = supervisorConditions.length > 0
-    ? await Supervisor.findOne({ $or: supervisorConditions }).lean().maxTimeMS(5000)
+  let profile = user.supervisorProfileId
+    ? await Supervisor.findById(user.supervisorProfileId).lean()
     : null;
-  const t2 = Date.now();
-  console.log(`[getSupervisorAccess] User: ${t1 - t0}ms, Supervisor: ${t2 - t1}ms`);
+  if (!profile) {
+    profile = await Supervisor.findOne({ userId: user._id }).lean();
+  }
+  if (!profile && user.email) {
+    profile = await Supervisor.findOne({ email: user.email.toLowerCase() }).lean();
+  }
+  if (!profile && user.phone) {
+    profile = await Supervisor.findOne({ phone: user.phone }).lean();
+  }
 
   const profileRecord = profile as Record<string, any> | null;
   const profileId = toObjectId(profileRecord?._id);
@@ -164,26 +156,27 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     assignedSiteValues.filter((value) => !Types.ObjectId.isValid(value))
   );
 
-  const siteConditions: Record<string, unknown>[] = [];
-  if (explicitSiteIds.length > 0) {
-    siteConditions.push({ _id: { $in: explicitSiteIds } });
-  }
-  if (profileId) {
-    siteConditions.push({ supervisorId: profileId });
-  }
-  if (assignedSiteNameFallback.length > 0) {
-    siteConditions.push({ name: { $in: assignedSiteNameFallback } });
-  }
-
   let scopedSites: Array<{ _id: Types.ObjectId; name: string; projectIds?: Types.ObjectId[] }> = [];
-  if (siteConditions.length > 0) {
-    scopedSites = await Site.find({ $or: siteConditions })
+  if (explicitSiteIds.length > 0) {
+    scopedSites = await Site.find({ _id: { $in: explicitSiteIds } })
       .select("_id name projectIds")
-      .lean()
-      .maxTimeMS(5000);
+      .lean();
   }
-  const t3 = Date.now();
-  console.log(`[getSupervisorAccess] Site: ${t3 - t2}ms`);
+  if (scopedSites.length === 0 && profileId) {
+    scopedSites = await Site.find({ supervisorId: profileId })
+      .select("_id name projectIds")
+      .lean();
+  }
+  if (scopedSites.length === 0 && assignedSiteNameFallback.length > 0) {
+    scopedSites = await Site.find({ name: { $in: assignedSiteNameFallback } })
+      .select("_id name projectIds")
+      .lean();
+  }
+  if (scopedSites.length === 0 && projectIds.length > 0) {
+    scopedSites = await Site.find({ projectIds: { $in: projectIds } })
+      .select("_id name projectIds")
+      .lean();
+  }
 
   const scopedSiteIds = scopedSites.map((site) => toObjectId(site._id));
   const scopedSiteNames = scopedSites.map((site) => site.name);
@@ -224,37 +217,36 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
 async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) {
   if (!siteId) {
     if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
-    if (access.siteNames.length > 0) return { site: { $in: access.siteNames } };
+    const or: Record<string, unknown>[] = [];
+    const siteIdStrings = access.siteIds.map((id) => id.toString());
     if (access.siteIds.length > 0) {
-      const names = access.siteIds
-        .map((id) => access.siteIdToName.get(id.toString()))
-        .filter(Boolean) as string[];
-      if (names.length > 0) return { site: { $in: names } };
-      return { siteId: { $in: access.siteIds } };
+      or.push({ siteId: { $in: access.siteIds } });
+      or.push({ site: { $in: siteIdStrings } });
     }
-    return undefined;
+    if (access.siteNames.length > 0) or.push({ site: { $in: access.siteNames } });
+    return { $or: or };
   }
 
   const requestedSiteId = toObjectId(siteId);
   if (!requestedSiteId) throw new AppError(400, "Invalid site id");
 
-  const siteName = access.siteIdToName.get(requestedSiteId.toString());
+  const site = await Site.findById(requestedSiteId).select("_id name projectIds").lean();
+  if (!site) throw new AppError(404, "Site not found");
 
   const assignedBySiteId = access.siteIds.length === 0 || hasObjectId(access.siteIds, requestedSiteId);
-  const assignedBySiteName = siteName
-    ? access.siteNames.some((n) => n.toLowerCase() === siteName.toLowerCase())
-    : false;
+  const assignedBySiteName = access.siteNames.some(
+    (siteName) => siteName.toLowerCase() === site.name.toLowerCase()
+  );
   const assignedBySite = assignedBySiteId || assignedBySiteName;
+  const assignedByProject =
+    access.projectIds.length === 0 ||
+    (site.projectIds || []).some((projectId) => hasObjectId(access.projectIds, projectId));
 
-  if (!assignedBySite) {
+  if (!assignedBySite || !assignedByProject) {
     throw new AppError(403, "Not assigned to this site");
   }
 
-  if (siteName) return { site: siteName };
-
-  const site = await Site.findById(requestedSiteId).select("name").lean().maxTimeMS(5000);
-  if (!site) throw new AppError(404, "Site not found");
-  return { site: site.name };
+  return { $or: [{ siteId: requestedSiteId }, { site: site.name }, { site: requestedSiteId.toString() }] };
 }
 
 async function buildScopedEntityQuery(
@@ -273,12 +265,19 @@ async function buildScopedEntityQuery(
     query.projectId = requestedProjectId;
   } else if (access.projectIds.length > 0) {
     query.projectId = { $in: access.projectIds };
-  } else {
-    query.projectId = { $in: [] };
   }
 
   const siteScope = await getSiteScopeForFilter(access, filters.siteId);
   if (siteScope) Object.assign(query, siteScope);
+  if (
+    !filters.projectId &&
+    !filters.siteId &&
+    access.projectIds.length === 0 &&
+    access.siteIds.length === 0 &&
+    access.siteNames.length === 0
+  ) {
+    query._id = { $exists: false };
+  }
   if (filters.status) query.status = filters.status;
   if (filters.type) query.type = filters.type;
 
@@ -287,14 +286,10 @@ async function buildScopedEntityQuery(
 
 function approvalScopeQuery(access: SupervisorAccess, status?: "Pending" | "Approved" | "Rejected") {
   const query: Record<string, unknown> = {};
-  if (access.projectIds.length > 0) {
-    query.projectId = { $in: access.projectIds };
-  }
-  if (access.siteNames.length > 0) {
-    query.site = { $in: access.siteNames };
-  }
+  if (access.projectIds.length > 0) query.projectId = { $in: access.projectIds };
+  if (access.siteNames.length > 0) query.site = { $in: access.siteNames };
   if (access.projectIds.length === 0 && access.siteNames.length === 0) {
-    query.projectId = { $in: [] };
+    query._id = { $exists: false };
   }
   if (status) query.status = status;
   return query;
@@ -398,11 +393,13 @@ export async function getAssignedSites(userId: string) {
   const projectIdToName = new Map<string, string>();
   for (const p of projects) projectIdToName.set(p.id, p.name);
 
-  const siteQuery: Record<string, unknown> = {};
+  let siteQuery: Record<string, unknown>;
   if (access.siteIds.length > 0) {
-    siteQuery._id = { $in: access.siteIds };
+    siteQuery = { _id: { $in: access.siteIds } };
   } else if (access.siteNames.length > 0) {
-    siteQuery.name = { $in: access.siteNames };
+    siteQuery = { name: { $in: access.siteNames } };
+  } else if (access.projectIds.length > 0) {
+    siteQuery = { projectIds: { $in: access.projectIds } };
   } else {
     return [];
   }
@@ -706,8 +703,8 @@ export async function listMaterialsForSupervisor(
     const matT0 = Date.now();
     try {
       const [items, total] = await Promise.all([
-        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(10000),
-        Material.countDocuments(query).maxTimeMS(10000),
+        Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        Material.countDocuments(query),
       ]);
       requestItems = items;
       requestTotal = total;
@@ -758,8 +755,8 @@ export async function listMaterialsForSupervisor(
   const skip = (page - 1) * limit;
 
   const [items, total] = await Promise.all([
-    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).maxTimeMS(8000).lean(),
-    Inventory.countDocuments(query).maxTimeMS(8000),
+    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+    Inventory.countDocuments(query),
   ]);
 
   // If Inventory collection is empty for this query, fall back to Material collection
@@ -780,8 +777,8 @@ export async function listMaterialsForSupervisor(
       Object.assign(materialQuery, statusFilter);
     }
     const [matItems, matTotal] = await Promise.all([
-      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(8000).lean(),
-      Material.countDocuments(materialQuery).maxTimeMS(8000),
+      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Material.countDocuments(materialQuery),
     ]);
 
     return {
