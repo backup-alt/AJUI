@@ -1,12 +1,13 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, inject, signal, computed, ViewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostListener, inject, signal, computed, ViewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
-import { ErpDataService } from "../data/erp-data.service";
+import { ErpDataService, type Client } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { QuotationReportComponent, QuotationReportData } from "../shared/quotation-report.component";
+import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
 import { formatMoney } from "../shared/format";
 import type { Quotation, QuotationRow } from "../../data/dashboardData";
 import { jsPDF } from "jspdf";
@@ -50,7 +51,7 @@ function numberToWords(num: number): string {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, QuotationReportComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, QuotationReportComponent, ClientFormDialogComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="quotations"></agb-enterprise-sidebar>
@@ -161,9 +162,38 @@ function numberToWords(num: number): string {
                   <div class="client-section">
                     <h3 class="section-label">Bill To</h3>
                     <div class="client-form-grid">
-                      <div class="form-field">
+                      <div class="form-field client-search-wrapper">
                         <label>Client Name</label>
-                        <input type="text" [(ngModel)]="clientName" placeholder="Enter client name" />
+                        <div class="client-search-row">
+                          <input
+                            type="text"
+                            [value]="clientSearchTerm()"
+                            (input)="onClientSearchInput($event)"
+                            (focus)="onClientSearchFocus()"
+                            placeholder="Search or enter client name"
+                            class="client-search-input"
+                          />
+                          <button type="button" class="add-client-btn" (click)="openAddClientDialog()" title="Add New Client">+</button>
+                        </div>
+                        @if (showClientDropdown()) {
+                          <div class="client-dropdown">
+                            @for (client of filteredClients(); track client.id) {
+                              <div
+                                class="client-dropdown-item"
+                                [class.selected]="selectedClientId() === client.id"
+                                (mousedown)="selectClient(client)"
+                              >
+                                <span class="client-dropdown-name">{{ client.name }}</span>
+                                <span class="client-dropdown-meta">{{ client.address }}</span>
+                              </div>
+                            } @empty {
+                              <div class="client-dropdown-empty">No clients found</div>
+                            }
+                            <div class="client-dropdown-add" (mousedown)="openAddClientDialog()">
+                              <ion-icon name="add-circle-outline"></ion-icon> Add New Client
+                            </div>
+                          </div>
+                        }
                       </div>
                       <div class="form-field">
                         <label>State</label>
@@ -323,6 +353,13 @@ function numberToWords(num: number): string {
           </div>
         </section>
       </div>
+    }
+
+    @if (showClientForm()) {
+      <agb-client-form-dialog
+        (cancel)="showClientForm.set(false)"
+        (create)="onClientCreated($event)"
+      ></agb-client-form-dialog>
     }
   `,
   styles: [`
@@ -920,6 +957,22 @@ function numberToWords(num: number): string {
     .dialog-actions .secondary-action:hover {
       background: #e2e8f0;
     }
+    .client-search-wrapper { position: relative; }
+    .client-search-row { display: flex; gap: 0; }
+    .client-search-input { flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px 0 0 6px; font-size: 13px; color: #1e293b; background: #fff; outline: none; transition: border-color 140ms; }
+    .client-search-input:focus { border-color: #2c5cff; box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.1); }
+    .add-client-btn { padding: 8px 12px; background: #2c5cff; color: #fff; border: 1px solid #2c5cff; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 16px; font-weight: 700; line-height: 1; }
+    .add-client-btn:hover { background: #1e4ae8; border-color: #1e4ae8; }
+    .client-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 100; max-height: 220px; overflow-y: auto; margin-top: 4px; }
+    .client-dropdown-item { padding: 8px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid #f1f5f9; }
+    .client-dropdown-item:last-child { border-bottom: none; }
+    .client-dropdown-item:hover { background: #f0f6ff; }
+    .client-dropdown-item.selected { background: #e0ecff; }
+    .client-dropdown-name { font-size: 13px; font-weight: 600; color: #1e293b; }
+    .client-dropdown-meta { font-size: 11px; color: #64748b; }
+    .client-dropdown-empty { padding: 12px; text-align: center; color: #94a3b8; font-size: 13px; }
+    .client-dropdown-add { padding: 8px 12px; color: #2c5cff; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; border-top: 1px solid #e2e8f0; }
+    .client-dropdown-add:hover { background: #f0f6ff; }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -938,6 +991,23 @@ readonly savingPdf = signal(false);
   readonly quotationRows = signal<QuotationRow[]>([]);
   readonly customColumns = signal<string[]>([]);
   readonly showQuotationPreview = signal(false);
+
+  readonly clientSearchTerm = signal("");
+  readonly showClientDropdown = signal(false);
+  readonly selectedClientId = signal<string | null>(null);
+  readonly showClientForm = signal(false);
+
+  readonly filteredClients = computed(() => {
+    const term = this.clientSearchTerm().toLowerCase().trim();
+    const all = this.data.clients();
+    const sorted = [...all].sort((a, b) => a.name.localeCompare(b.name));
+    if (!term) return sorted;
+    return sorted.filter(c =>
+      c.name.toLowerCase().includes(term) ||
+      c.mobile.includes(term) ||
+      c.address.toLowerCase().includes(term)
+    );
+  });
 
   @ViewChild('quotationReport') quotationReport!: QuotationReportComponent;
 
@@ -1019,6 +1089,66 @@ readonly savingPdf = signal(false);
     this.loadQuotationsFromBackend();
   }
 
+  onClientSearchInput(event: Event) {
+    const value = (event.target as HTMLInputElement).value;
+    this.clientSearchTerm.set(value);
+    this.selectedClientId.set(null);
+    this.showClientDropdown.set(true);
+    this.clientName = value;
+  }
+
+  onClientSearchFocus() {
+    this.showClientDropdown.set(true);
+  }
+
+  selectClient(client: Client) {
+    this.clientName = client.name;
+    this.clientAddress = client.address;
+    this.clientGstin = client.gstNumber || "";
+    this.clientSearchTerm.set(client.name);
+    this.selectedClientId.set(client.id);
+    this.showClientDropdown.set(false);
+  }
+
+  openAddClientDialog() {
+    this.showClientDropdown.set(false);
+    this.showClientForm.set(true);
+  }
+
+  onClientCreated(value: ClientFormValue) {
+    if (!value.name || !value.mobile || !value.address) return;
+    this.api.createClient({
+      name: value.name,
+      mobile: value.mobile,
+      address: value.address,
+      gstNumber: value.gstNumber || "",
+      supervisor: value.supervisor || "",
+      status: value.status || "Active",
+    }).subscribe({
+      next: (res: any) => {
+        const clientId = res?.clientId || res?.client?.clientId || res?.id;
+        const client = this.data.addClient({
+          ...value,
+          id: clientId,
+          gstNumber: value.gstNumber || "",
+        } as any);
+        this.selectClient(client);
+        this.showClientForm.set(false);
+      },
+      error: (err: any) => {
+        console.error("Failed to create client", err);
+      },
+    });
+  }
+
+  @HostListener("document:pointerdown", ["$event"])
+  onDocumentClick(event: PointerEvent) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && !target.closest(".client-search-wrapper")) {
+      this.showClientDropdown.set(false);
+    }
+  }
+
   private loadQuotationsFromBackend() {
     this.api.listQuotations({ limit: 100 }).subscribe({
       next: (res) => {
@@ -1056,6 +1186,8 @@ readonly savingPdf = signal(false);
     this.clientAddress = "";
     this.clientState = "Tamil Nadu";
     this.clientGstin = "";
+    this.clientSearchTerm.set("");
+    this.selectedClientId.set(null);
     this.cgstPercent = 9;
     this.sgstPercent = 9;
     this.roundOff = 0;
@@ -1070,6 +1202,8 @@ readonly savingPdf = signal(false);
     this.clientAddress = quote.clientAddress;
     this.clientState = quote.clientState || "Tamil Nadu";
     this.clientGstin = quote.clientGstin;
+    this.clientSearchTerm.set(quote.clientName);
+    this.selectedClientId.set(this.findClientIdByName(quote.clientName));
     this.cgstPercent = quote.cgstPercent;
     this.sgstPercent = quote.sgstPercent;
     this.roundOff = quote.roundOff;
@@ -1091,6 +1225,11 @@ readonly savingPdf = signal(false);
       rate: 0,
       amount: 0,
     };
+  }
+
+  private findClientIdByName(name: string): string | null {
+    const match = this.data.clients().find(c => c.name.toLowerCase() === name.toLowerCase());
+    return match?.id || null;
   }
 
   addRow() {

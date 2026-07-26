@@ -30,6 +30,7 @@ export type Client = {
   name: string;
   mobile: string;
   address: string;
+  gstNumber?: string;
   status: ClientStatus;
   projectIds: string[];
   supervisor: string;
@@ -591,7 +592,7 @@ export class ErpDataService {
     this.writeState(seedKey, true);
   }
 
-  addClient(input: { name: string; mobile: string; address: string; supervisor: string; status?: ClientStatus }): Client {
+  addClient(input: { name: string; mobile: string; address: string; gstNumber?: string; supervisor: string; status?: ClientStatus }): Client {
     const nextNumber =
       Math.max(
         1000,
@@ -611,6 +612,7 @@ export class ErpDataService {
       name: input.name,
       mobile: input.mobile,
       address: input.address,
+      gstNumber: input.gstNumber || "",
       status: input.status ?? "Active",
       projectIds: [],
       supervisor: input.supervisor,
