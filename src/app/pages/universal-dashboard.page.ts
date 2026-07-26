@@ -1357,6 +1357,7 @@ export class UniversalDashboardPage implements OnInit {
 
   ngOnInit(): void {
     void this.hydration.hydrateDeferred();
+    void this.data.loadCustomFieldsFromBackend();
   }
 
   activeProjectsCount() {
@@ -1926,6 +1927,8 @@ export class UniversalDashboardPage implements OnInit {
       },
       error: finishOne,
     });
+
+    void this.data.loadCustomFieldsFromBackend();
   }
 
   @HostListener("document:pointerdown", ["$event"])
@@ -2759,27 +2762,25 @@ visibleRows(): TableRow[] {
     const fieldType = this.newFieldType();
     const askSupervisor = this.newFieldAskSupervisor();
     this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
-    if (askSupervisor) {
-      const siteId = this.resolveEntityIdForModule(module);
-      if (siteId) {
-        try {
-          await this.data.persistCustomField(module, label, siteId, fieldType, askSupervisor);
-        } catch (err) {
-          console.warn("[UniversalDashboard] failed to persist custom field", err);
-        }
-      } else {
-        window.alert("Select a specific site first to enable supervisor input for this field.");
+    const siteId = this.resolveEntityIdForModule(module);
+    if (siteId) {
+      try {
+        await this.data.persistCustomField(module, label, siteId, fieldType, askSupervisor);
+      } catch (err) {
+        console.warn("[UniversalDashboard] failed to persist custom field", err);
       }
     }
     this.newFieldAfterKey.set(null);
     this.fieldDialogOpen.set(false);
   }
 
-  private resolveEntityIdForModule(module: SharedModuleKey): string | null {
+  private resolveEntityIdForModule(_module: SharedModuleKey): string | null {
     const activeSite = this.activeSiteFilter();
-    if (activeSite && activeSite !== "All") return activeSite;
-    const sites = this.data.sites();
-    return sites[0]?.id ?? null;
+    if (activeSite && activeSite !== "All") {
+      return this.data.resolveSiteNameToId(activeSite);
+    }
+    const firstSite = this.data.siteEntities()[0];
+    return firstSite?._id ?? null;
   }
 
   private isGeneratedClientIdField(label: string): boolean {

@@ -1117,6 +1117,7 @@ export class ProjectWorkspacePage {
   readonly activeConfig = computed(() => sectionConfigs.find((section) => section.key === this.activeSection()) ?? sectionConfigs[0]);
 
   constructor() {
+    void this.data.loadCustomFieldsFromBackend();
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.data.touchProject(projectId);
@@ -2049,27 +2050,25 @@ export class ProjectWorkspacePage {
     const fieldType = this.newFieldType();
     const askSupervisor = this.newFieldAskSupervisor();
     this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
-    if (askSupervisor) {
-      const siteId = this.resolveEntityIdForSection(section);
-      if (siteId) {
-        try {
-          await this.data.persistCustomField(section, label, siteId, fieldType, askSupervisor);
-        } catch (err) {
-          console.warn("[ProjectWorkspace] failed to persist custom field", err);
-        }
-      } else {
-        window.alert("Select a specific site first to enable supervisor input for this field.");
+    const siteId = this.resolveEntityIdForSection(section);
+    if (siteId) {
+      try {
+        await this.data.persistCustomField(section, label, siteId, fieldType, askSupervisor);
+      } catch (err) {
+        console.warn("[ProjectWorkspace] failed to persist custom field", err);
       }
     }
     this.newFieldAfterKey.set(null);
     this.fieldDialogOpen.set(false);
   }
 
-  private resolveEntityIdForSection(section: ModuleKey): string | null {
+  private resolveEntityIdForSection(_section: ModuleKey): string | null {
     const activeSite = this.activeSiteFilter();
-    if (activeSite && activeSite !== "All") return activeSite;
-    const sites = this.data.sites();
-    return sites[0]?.id ?? null;
+    if (activeSite && activeSite !== "All") {
+      return this.data.resolveSiteNameToId(activeSite);
+    }
+    const firstSite = this.data.siteEntities()[0];
+    return firstSite?._id ?? null;
   }
 
   private isGeneratedClientIdField(label: string): boolean {

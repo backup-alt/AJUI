@@ -20,7 +20,7 @@ import {
 import { CustomFieldsService } from "../core/custom-fields.service";
 import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
-import type { CustomField as ApiCustomField } from "../core/custom-fields.service";
+import type { CustomField as ApiCustomField, CustomFieldEntityType } from "../core/custom-fields.service";
 
 export type ClientStatus = "Active" | "On Hold" | "Completed";
 
@@ -1137,6 +1137,60 @@ export class ErpDataService {
       console.warn(`[ErpData] failed to persist custom field to backend`, err);
       return null;
     }
+  }
+
+  resolveSiteNameToId(siteName: string): string | null {
+    const match = this.siteEntities().find(
+      (s) => (s.name || "").trim().toLowerCase() === siteName.trim().toLowerCase()
+    );
+    return match?._id ?? null;
+  }
+
+  async loadCustomFieldsFromBackend(): Promise<void> {
+    const siteEntities = this.siteEntities();
+    if (!siteEntities.length) return;
+
+    const modules: SharedModuleKey[] = [
+      "clients", "materials", "labour", "expenses",
+      "payments", "vendors", "subcontractors",
+    ];
+    const merged: Record<SharedModuleKey, SharedTableField[]> = { ...this.customTableFields() };
+
+    const promises = modules.map(async (module) => {
+      const entityType = this.entityTypeForModule(module) as CustomFieldEntityType;
+      const allFields = new Map<string, SharedTableField>();
+
+      for (const site of siteEntities) {
+        const entityId = site._id;
+        if (!entityId) continue;
+        try {
+          const result = await new Promise<{ fields: ApiCustomField[] }>((resolve, reject) => {
+            this.customFieldsService
+              .list(entityType, entityId)
+              .subscribe({ next: resolve, error: reject });
+          });
+          for (const f of result.fields) {
+            if (!allFields.has(f.key)) {
+              allFields.set(f.key, { key: f.key, label: f.label });
+            }
+          }
+        } catch {
+          // silently skip — site may not have fields for this entityType
+        }
+      }
+
+      if (allFields.size > 0) {
+        const backendFields = Array.from(allFields.values());
+        const existingKeys = new Set(merged[module]?.map((f) => f.key) ?? []);
+        const newFields = backendFields.filter((f) => !existingKeys.has(f.key));
+        if (newFields.length) {
+          merged[module] = [...(merged[module] ?? []), ...newFields];
+        }
+      }
+    });
+
+    await Promise.allSettled(promises);
+    this.customTableFields.set(merged);
   }
 
   private entityTypeForModule(module: SharedModuleKey): "clients" | "projects" | "materials" | "labour" | "expenses" | "payments" | "vendors" | "subcontractors" {
