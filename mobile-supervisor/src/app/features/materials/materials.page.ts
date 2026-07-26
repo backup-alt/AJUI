@@ -25,6 +25,8 @@ import {
   chevronForwardOutline,
   chevronDownOutline,
   businessOutline,
+  cloudOfflineOutline,
+  refreshOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
@@ -113,6 +115,16 @@ interface ConsolidatedMaterial {
               <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
             </div>
           }
+        } @else if (errorMessage()) {
+          <div class="error-state">
+            <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
+            <span class="error-title">Something went wrong</span>
+            <span class="error-text">{{ errorMessage() }}</span>
+            <button class="retry-btn" (click)="loadMaterials()">
+              <ion-icon name="refresh-outline"></ion-icon>
+              Retry
+            </button>
+          </div>
         } @else if (consolidatedMaterials().length === 0) {
           <app-empty-state
             icon="cube-outline"
@@ -354,6 +366,25 @@ interface ConsolidatedMaterial {
       padding: var(--md-space-4);
       margin-bottom: var(--md-space-2);
     }
+
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--md-space-8) var(--md-space-4);
+      text-align: center;
+    }
+    .error-icon { font-size: 48px; color: var(--m3-error); opacity: 0.7; margin-bottom: var(--md-space-3); }
+    .error-title { font-size: 16px; font-weight: 700; color: var(--m3-on-surface); margin-bottom: var(--md-space-1); }
+    .error-text { font-size: 13px; color: var(--m3-on-surface-muted); margin-bottom: var(--md-space-4); max-width: 280px; }
+    .retry-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; border-radius: var(--md-radius-pill);
+      background: var(--m3-primary); color: var(--m3-on-primary);
+      border: none; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .retry-btn ion-icon { font-size: 16px; }
+
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
   `],
 })
@@ -364,6 +395,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
   materials = signal<Material[]>([]);
   consolidatedMaterials = signal<ConsolidatedMaterial[]>([]);
   isLoading = signal(true);
+  errorMessage = signal<string>('');
   expandedKey = signal<string>('');
   searchQuery = '';
   statusFilter: MaterialStatus | '' = '';
@@ -373,6 +405,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
     addIcons({
       addOutline, cubeOutline, filterOutline, timeOutline, checkmarkCircleOutline,
       closeCircleOutline, chevronForwardOutline, chevronDownOutline, businessOutline,
+      cloudOfflineOutline, refreshOutline,
     });
     await this.supervisor.init();
     await this.loadMaterials();
@@ -394,6 +427,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
 
   async loadMaterials(): Promise<void> {
     this.isLoading.set(true);
+    this.errorMessage.set('');
     const gen = ++this.loadGeneration;
     try {
       const siteId = this.supervisor.selectedSiteId();
@@ -412,6 +446,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
     } catch (error) {
       if (gen !== this.loadGeneration) return;
       console.error('[Materials] failed to load', error);
+      this.errorMessage.set((error as Error)?.message || 'Failed to load materials');
       this.filterMaterials();
       this.isLoading.set(false);
     }

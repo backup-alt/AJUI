@@ -210,15 +210,6 @@ async function buildScopedEntityQuery(
 
   const siteScope = await getSiteScopeForFilter(access, filters.siteId);
   if (siteScope) Object.assign(query, siteScope);
-  if (
-    !filters.projectId &&
-    !filters.siteId &&
-    access.projectIds.length === 0 &&
-    access.siteIds.length === 0 &&
-    access.siteNames.length === 0
-  ) {
-    query._id = { $exists: false };
-  }
   if (filters.status) query.status = filters.status;
   if (filters.type) query.type = filters.type;
 
@@ -229,9 +220,6 @@ function approvalScopeQuery(access: SupervisorAccess, status?: "Pending" | "Appr
   const query: Record<string, unknown> = {};
   if (access.projectIds.length > 0) query.projectId = { $in: access.projectIds };
   if (access.siteNames.length > 0) query.site = { $in: access.siteNames };
-  if (access.projectIds.length === 0 && access.siteNames.length === 0) {
-    query._id = { $exists: false };
-  }
   if (status) query.status = status;
   return query;
 }

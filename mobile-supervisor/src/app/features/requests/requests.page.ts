@@ -28,6 +28,8 @@ import {
   imageOutline,
   cashOutline,
   chevronForwardOutline,
+  cloudOfflineOutline,
+  refreshOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -117,6 +119,16 @@ interface RequestItem {
               <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
             </div>
           }
+        } @else if (errorMessage()) {
+          <div class="error-state">
+            <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
+            <span class="error-title">Something went wrong</span>
+            <span class="error-text">{{ errorMessage() }}</span>
+            <button class="retry-btn" (click)="loadAllRequests()">
+              <ion-icon name="refresh-outline"></ion-icon>
+              Retry
+            </button>
+          </div>
         } @else if (filteredItems.length === 0) {
           <app-empty-state
             [icon]="emptyIcon"
@@ -434,6 +446,24 @@ interface RequestItem {
       padding: var(--md-space-4);
       margin-bottom: var(--md-space-2);
     }
+
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--md-space-8) var(--md-space-4);
+      text-align: center;
+    }
+    .error-icon { font-size: 48px; color: var(--m3-error); opacity: 0.7; margin-bottom: var(--md-space-3); }
+    .error-title { font-size: 16px; font-weight: 700; color: var(--m3-on-surface); margin-bottom: var(--md-space-1); }
+    .error-text { font-size: 13px; color: var(--m3-on-surface-muted); margin-bottom: var(--md-space-4); max-width: 280px; }
+    .retry-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; border-radius: var(--md-radius-pill);
+      background: var(--m3-primary); color: var(--m3-on-primary);
+      border: none; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .retry-btn ion-icon { font-size: 16px; }
   `],
 })
 export class RequestsPage implements OnInit {
@@ -444,6 +474,7 @@ export class RequestsPage implements OnInit {
 
   activeTab: 'pending' | 'approved' | 'declined' | 'upload' = 'pending';
   isLoading = signal(true);
+  errorMessage = signal<string>('');
 
   allItems = signal<RequestItem[]>([]);
   get filteredItems() {
@@ -499,6 +530,7 @@ export class RequestsPage implements OnInit {
       checkmarkCircleOutline, closeCircleOutline, cloudUploadOutline,
       documentOutline, cubeOutline, cartOutline, timeOutline,
       imageOutline, cashOutline, chevronForwardOutline,
+      cloudOfflineOutline, refreshOutline,
     });
     await this.supervisor.init();
     await this.loadAllRequests();
@@ -515,6 +547,7 @@ export class RequestsPage implements OnInit {
 
   async loadAllRequests(): Promise<void> {
     this.isLoading.set(true);
+    this.errorMessage.set('');
     const items: RequestItem[] = [];
 
     try {
@@ -542,7 +575,7 @@ export class RequestsPage implements OnInit {
             }
             resolve();
           },
-          error: () => resolve(),
+          error: (err) => { console.error('[Requests] materials load failed', err); resolve(); },
         });
       });
 
@@ -582,11 +615,12 @@ export class RequestsPage implements OnInit {
             }
             resolve();
           },
-          error: () => resolve(),
+          error: (err) => { console.error('[Requests] expenses load failed', err); resolve(); },
         });
       });
     } catch (err) {
       console.error('[Requests] Failed to load', err);
+      this.errorMessage.set((err as Error)?.message || 'Failed to load requests');
     }
 
     this.allItems.set(items);

@@ -26,6 +26,8 @@ import {
   pencilOutline,
   closeOutline,
   swapVerticalOutline,
+  cloudOfflineOutline,
+  refreshOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
@@ -117,6 +119,16 @@ type SortDir = 'asc' | 'desc';
               <ion-skeleton-text animated style="width: 40%; height: 14px; margin-top: 8px;"></ion-skeleton-text>
             </div>
           }
+        } @else if (errorMessage()) {
+          <div class="error-state">
+            <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
+            <span class="error-title">Something went wrong</span>
+            <span class="error-text">{{ errorMessage() }}</span>
+            <button class="retry-btn" (click)="loadInventory()">
+              <ion-icon name="refresh-outline"></ion-icon>
+              Retry
+            </button>
+          </div>
         } @else if (filteredItems().length === 0) {
           <app-empty-state
             icon="grid-outline"
@@ -506,6 +518,24 @@ type SortDir = 'asc' | 'desc';
       margin-bottom: var(--md-space-3);
     }
 
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--md-space-8) var(--md-space-4);
+      text-align: center;
+    }
+    .error-icon { font-size: 48px; color: var(--m3-error); opacity: 0.7; margin-bottom: var(--md-space-3); }
+    .error-title { font-size: 16px; font-weight: 700; color: var(--m3-on-surface); margin-bottom: var(--md-space-1); }
+    .error-text { font-size: 13px; color: var(--m3-on-surface-muted); margin-bottom: var(--md-space-4); max-width: 280px; }
+    .retry-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; border-radius: var(--md-radius-pill);
+      background: var(--m3-primary); color: var(--m3-on-primary);
+      border: none; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .retry-btn ion-icon { font-size: 16px; }
+
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
   `],
 })
@@ -516,6 +546,7 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   items = signal<InventoryItem[]>([]);
   isLoading = signal(true);
+  errorMessage = signal<string>('');
   searchQuery = signal('');
   sortField = signal<SortField>('name');
   sortDir = signal<SortDir>('asc');
@@ -566,7 +597,7 @@ export class InventoryPage implements OnInit, OnDestroy {
       gridOutline, searchOutline, addOutline,
       chevronDownOutline, timeOutline, businessOutline, documentTextOutline,
       checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline,
-      swapVerticalOutline,
+      swapVerticalOutline, cloudOfflineOutline, refreshOutline,
     });
     await this.supervisor.init();
     await this.loadInventory();
@@ -594,6 +625,7 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   async loadInventory(): Promise<void> {
     this.isLoading.set(true);
+    this.errorMessage.set('');
     const gen = ++this.loadGeneration;
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
@@ -629,6 +661,7 @@ export class InventoryPage implements OnInit, OnDestroy {
     } catch (err) {
       if (gen !== this.loadGeneration) return;
       console.error('[Inventory] failed to load', err);
+      this.errorMessage.set((err as Error)?.message || 'Failed to load inventory');
       this.isLoading.set(false);
     }
   }
