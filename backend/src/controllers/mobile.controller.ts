@@ -133,11 +133,16 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
     };
+    console.log(`[listMaterials] userId=${userId} filters=${JSON.stringify(filters)}`);
+    const start = Date.now();
     try {
       const result = await mobileService.listMaterialsForSupervisor(userId, filters);
+      const elapsed = Date.now() - start;
+      console.log(`[listMaterials] OK in ${elapsed}ms, materials=${result.materials?.length}, total=${result.pagination?.total}`);
       res.json(result);
     } catch (serviceErr: any) {
-      console.error("[listMaterials] service error:", serviceErr?.message || serviceErr);
+      const elapsed = Date.now() - start;
+      console.error(`[listMaterials] service error in ${elapsed}ms:`, serviceErr?.message || serviceErr);
       res.json({
         materials: [],
         pagination: { page: filters.page ?? 1, limit: filters.limit ?? 20, total: 0, pages: 0 },

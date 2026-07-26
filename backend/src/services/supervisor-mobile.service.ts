@@ -649,16 +649,20 @@ export async function listMaterialsForSupervisor(
     siteId: filters.siteId,
   });
 
+  console.log(`[listMaterials] query=${JSON.stringify(query, (_, v) => v instanceof Types.ObjectId ? `ObjectId(${v})` : v)}`);
+
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
   const skip = (page - 1) * limit;
 
   if (filters.status !== "Approved") {
     if (filters.status) query.status = filters.status;
+    const qStart = Date.now();
     const [requestItems, requestTotal] = await Promise.all([
       Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Material.countDocuments(query),
     ]);
+    console.log(`[listMaterials] Material.find in ${Date.now() - qStart}ms, found=${requestItems.length}, total=${requestTotal}`);
 
     return {
       materials: requestItems.map((m) => ({
