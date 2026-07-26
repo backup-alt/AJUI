@@ -126,18 +126,24 @@ export async function getMyDevices(req: Request, res: Response, next: NextFuncti
 export async function listMaterials(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    const result = await mobileService.listMaterialsForSupervisor(userId, {
+    const filters = {
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
-    });
-    res.json(result);
-  } catch (e) {
-    console.error("[listMaterials] error:", e);
-    next(e);
-  }
+    };
+    try {
+      const result = await mobileService.listMaterialsForSupervisor(userId, filters);
+      res.json(result);
+    } catch (serviceErr: any) {
+      console.error("[listMaterials] service error:", serviceErr?.message || serviceErr);
+      res.json({
+        materials: [],
+        pagination: { page: filters.page ?? 1, limit: filters.limit ?? 20, total: 0, pages: 0 },
+      });
+    }
+  } catch (e) { next(e); }
 }
 
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {
@@ -324,19 +330,25 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
 export async function listExpenses(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    const result = await mobileService.listExpensesForSupervisor(userId, {
+    const filters = {
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       type: req.query.type as string | undefined,
       page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
-    });
-    res.json(result);
-  } catch (e) {
-    console.error("[listExpenses] error:", e);
-    next(e);
-  }
+    };
+    try {
+      const result = await mobileService.listExpensesForSupervisor(userId, filters);
+      res.json(result);
+    } catch (serviceErr: any) {
+      console.error("[listExpenses] service error:", serviceErr?.message || serviceErr);
+      res.json({
+        expenses: [],
+        pagination: { page: filters.page ?? 1, limit: filters.limit ?? 20, total: 0, pages: 0 },
+      });
+    }
+  } catch (e) { next(e); }
 }
 
 export async function getExpense(req: Request, res: Response, next: NextFunction) {

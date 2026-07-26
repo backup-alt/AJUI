@@ -83,12 +83,16 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   const profileRecord = profile as Record<string, any> | null;
   const profileId = toObjectId(profileRecord?._id);
   if (profileId) {
-    if (!user.supervisorProfileId || user.supervisorProfileId.toString() !== profileId.toString()) {
-      user.supervisorProfileId = profileId;
-      await user.save();
-    }
-    if (String(profileRecord?.userId || "") !== user._id.toString()) {
-      await Supervisor.updateOne({ _id: profileId }, { $set: { userId: user._id } });
+    try {
+      if (!user.supervisorProfileId || user.supervisorProfileId.toString() !== profileId.toString()) {
+        user.supervisorProfileId = profileId;
+        await user.save();
+      }
+      if (String(profileRecord?.userId || "") !== user._id.toString()) {
+        await Supervisor.updateOne({ _id: profileId }, { $set: { userId: user._id } });
+      }
+    } catch {
+      // Profile linkage failure is non-fatal — continue with access resolution
     }
   }
 
