@@ -692,8 +692,6 @@ export async function listMaterialsForSupervisor(
     };
   }
 
-  await backfillApprovedMaterialsToInventory(query);
-
   const [items, total] = await Promise.all([
     Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
     Inventory.countDocuments(query),

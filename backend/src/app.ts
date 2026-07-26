@@ -175,6 +175,11 @@ export async function bootstrap(): Promise<void> {
   const { ensureWorkersCollection } = await import("./utils/ensure-collections.js");
   await ensureWorkersCollection();
 
+  const { backfillApprovedMaterialsToInventory } = await import("./services/inventory.service.js");
+  backfillApprovedMaterialsToInventory({}).catch((err: any) =>
+    console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
+  );
+
   const app = createApp();
   app.listen(env.PORT, () => {
     console.log(`[Server] AJUI backend listening on port ${env.PORT} (${env.NODE_ENV})`);
