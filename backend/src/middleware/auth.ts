@@ -89,7 +89,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith("Bearer ")) {
-    console.log(`[auth] 401 - no header on ${req.method} ${req.path}`);
     res.status(401).json({ error: "Missing or invalid Authorization header" });
     return;
   }

@@ -107,13 +107,6 @@ export function createApp(): express.Application {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  app.use((_req, _res, next) => {
-    if (_req.method !== "OPTIONS") {
-      console.log(`[req] ${_req.method} ${_req.url} origin=${_req.headers.origin || "none"}`);
-    }
-    next();
-  });
-
   app.get("/health", (_req: express.Request, res: express.Response) => {
     res.json({
       status: "ok",
@@ -189,6 +182,15 @@ export async function bootstrap(): Promise<void> {
   backfillMaterialSiteIds().catch((err: any) =>
     console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
   );
+
+  try {
+    const { Material } = await import("./models/Material.js");
+    await Material.collection.createIndex({ projectId: 1, siteId: 1, createdAt: -1 }, { background: true });
+    await Material.collection.createIndex({ projectId: 1, site: 1, createdAt: -1 }, { background: true });
+    console.log("[Startup] Material compound indexes ensured");
+  } catch (e: any) {
+    console.error("[Startup] Material compound index creation failed (non-fatal):", e?.message || e);
+  }
 
   const app = createApp();
   app.listen(env.PORT, () => {
