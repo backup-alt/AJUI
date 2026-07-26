@@ -122,6 +122,8 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     profile = await Supervisor.findOne({ phone: user.phone }).lean();
   }
 
+  console.log(`[getSupervisorAccess] user=${userId} profileFound=${!!profile} profileId=${(profile as any)?._id || "none"}`);
+
   const profileRecord = profile as Record<string, any> | null;
   const profileId = toObjectId(profileRecord?._id);
   if (profileId) {
@@ -210,6 +212,8 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     siteIdToName,
   };
 
+  console.log(`[getSupervisorAccess] resolved: projectIds=${result.projectIds.length} siteIds=${result.siteIds.length} siteNames=${result.siteNames.length} scopedSites=${scopedSites.length}`);
+
   setCachedSupervisorAccess(userId, result);
   return result;
 }
@@ -218,12 +222,13 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
   if (!siteId) {
     if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
     const or: Record<string, unknown>[] = [];
-    const siteIdStrings = access.siteIds.map((id) => id.toString());
     if (access.siteIds.length > 0) {
       or.push({ siteId: { $in: access.siteIds } });
-      or.push({ site: { $in: siteIdStrings } });
     }
-    if (access.siteNames.length > 0) or.push({ site: { $in: access.siteNames } });
+    if (access.siteNames.length > 0) {
+      or.push({ site: { $in: access.siteNames } });
+    }
+    if (or.length === 0) return undefined;
     return { $or: or };
   }
 
@@ -276,6 +281,7 @@ async function buildScopedEntityQuery(
     access.siteIds.length === 0 &&
     access.siteNames.length === 0
   ) {
+    console.warn(`[buildScopedEntityQuery] No access resolved for user ${userId} — returning empty`);
     query._id = { $exists: false };
   }
   if (filters.status) query.status = filters.status;
@@ -288,7 +294,20 @@ function approvalScopeQuery(access: SupervisorAccess, status?: "Pending" | "Appr
   const query: Record<string, unknown> = {};
   if (access.projectIds.length > 0) query.projectId = { $in: access.projectIds };
   if (access.siteNames.length > 0) query.site = { $in: access.siteNames };
-  if (access.projectIds.length === 0 && access.siteNames.length === 0) {
+  if (access.siteIds.length > 0) {
+    if (query.site) {
+      // Already filtering by site names, also include siteId matches
+      query.$or = [
+        { site: { $in: access.siteNames } },
+        { siteId: { $in: access.siteIds } },
+      ];
+      delete query.site;
+    } else {
+      query.siteId = { $in: access.siteIds };
+    }
+  }
+  if (access.projectIds.length === 0 && access.siteIds.length === 0 && access.siteNames.length === 0) {
+    console.warn(`[approvalScopeQuery] No access resolved — returning empty`);
     query._id = { $exists: false };
   }
   if (status) query.status = status;
@@ -685,6 +704,8 @@ export async function listMaterialsForSupervisor(
     projectId: filters.projectId,
     siteId: filters.siteId,
   });
+
+  console.log(`[listMaterials] query for user ${userId}:`, JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
 
   if (filters.status !== "Approved") {
     if (filters.status) query.status = filters.status;
