@@ -28,15 +28,6 @@ import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Inventory } from "../models/Inventory.js";
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`[withTimeout] ${label} timed out after ${ms}ms`)), ms)
-    ),
-  ]);
-}
 import { backfillApprovedMaterialsToInventory } from "./inventory.service.js";
 
 type SupervisorAccess = {
@@ -716,55 +707,25 @@ export async function listMaterialsForSupervisor(
   userId: string,
   filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
 ) {
-  let query: Record<string, unknown>;
-  try {
-    ({ query } = await buildScopedEntityQuery(userId, {
-      projectId: filters.projectId,
-      siteId: filters.siteId,
-    }));
-  } catch (err: any) {
-    console.error(`[listMaterials] buildScopedEntityQuery FAILED:`, err.message);
-    throw err;
-  }
+  const { query } = await buildScopedEntityQuery(userId, {
+    projectId: filters.projectId,
+    siteId: filters.siteId,
+  });
 
-  console.log(`[listMaterials] query for user ${userId}:`, JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
+  const page = filters.page ?? 1;
+  const limit = filters.limit ?? 20;
+  const skip = (page - 1) * limit;
 
   if (filters.status !== "Approved") {
     if (filters.status) query.status = filters.status;
-    const page = filters.page ?? 1;
-    const limit = Math.min(filters.limit ?? 20, 50);
-    const skip = (page - 1) * limit;
-    const cacheKey = `mat:${userId}:${JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v)}:${skip}:${limit}`;
-    console.log(`[listMaterials] cacheKey built, trying cache for user ${userId}`);
+    const [requestItems, requestTotal] = await Promise.all([
+      Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Material.countDocuments(query),
+    ]);
 
-    const cached = getCached<{ materials: any[]; pagination: any }>(cacheKey);
-    if (cached) {
-      console.log(`[listMaterials] cache HIT for user ${userId}`);
-      return cached;
-    }
-    console.log(`[listMaterials] cache MISS for user ${userId}, running query`);
-
-    const matT0 = Date.now();
-    let items: any[];
-    let total: number;
-    try {
-      console.log(`[listMaterials] About to execute Material.find()...`);
-      // Drop sort on M0 free tier — createdAt desc adds ~5-10s overhead
-      // on slow cold-start queries. App doesn't strictly need sorted results.
-      const findQ = Material.find(query).skip(skip).limit(limit).lean();
-      const countQ = Material.countDocuments(query);
-      [items, total] = await withTimeout(Promise.all([findQ, countQ]), 30000, "Material.find+count");
-      console.log(`[listMaterials] Material query: ${Date.now() - matT0}ms, items: ${items.length}, total: ${total}`);
-    } catch (err: any) {
-      console.error(`[listMaterials] MongoDB query FAILED:`, err.message, "query:", JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
-      throw err;
-    }
-    const matT1 = Date.now();
-    console.log(`[listMaterials] Material query: ${matT1 - matT0}ms, items: ${items.length}, total: ${total}`);
-
-    const result = {
-      materials: items.map((m: any) => ({
-        _id: m._id?.toString?.() ?? m._id,
+    return {
+      materials: requestItems.map((m) => ({
+        _id: m._id.toString(),
         materialId: m.materialId,
         projectId: m.projectId,
         projectName: m.projectName,
@@ -780,9 +741,9 @@ export async function listMaterialsForSupervisor(
         vendor: m.vendor,
         poNumber: m.poNumber,
         issuedAmount: m.issuedAmount,
-        givenAmount: m.givenAmount,
-        billUrl: m.billUrl,
-        received: m.status === "Received",
+        givenAmount: (m as any).givenAmount,
+        billUrl: (m as any).billUrl,
+        received: (m as any).status === "Received",
         requestDate: m.requestDate,
         status: m.status,
         notes: m.notes,
@@ -790,44 +751,28 @@ export async function listMaterialsForSupervisor(
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
       })),
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
     };
-
-    setCache(cacheKey, result, 30000);
-    return result;
   }
 
-  const page = filters.page ?? 1;
-  const limit = Math.min(filters.limit ?? 20, 50);
-  const skip = (page - 1) * limit;
+  await backfillApprovedMaterialsToInventory(query);
 
-  const [items, total] = await withTimeout(
-    Promise.all([
-      Inventory.find(query).skip(skip).limit(limit).lean(),
-      Inventory.countDocuments(query),
-    ]),
-    30000,
-    "Inventory.find+count"
-  );
+  const [items, total] = await Promise.all([
+    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+    Inventory.countDocuments(query),
+  ]);
 
   // If Inventory collection is empty for this query, fall back to Material collection
   if (items.length === 0 && total === 0) {
-    const materialQuery: Record<string, unknown> = {
-      ...query,
-      $or: [
-        { status: "Received" },
-        { status: "Approved" },
-        { approvedQuantity: { $gt: 0 } },
-      ],
-    };
-    const [matItems, matTotal] = await withTimeout(
-      Promise.all([
-        Material.find(materialQuery).skip(skip).limit(limit).lean(),
-        Material.countDocuments(materialQuery),
-      ]),
-      30000,
-      "Material.find+count(fallback)"
-    );
+    const materialQuery: Record<string, unknown> = { ...query };
+    materialQuery.$or = [
+      { status: "Received" },
+      { approvedQuantity: { $gt: 0 } },
+    ];
+    const [matItems, matTotal] = await Promise.all([
+      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Material.countDocuments(materialQuery),
+    ]);
 
     return {
       materials: matItems.map((m) => ({
@@ -875,7 +820,7 @@ export async function listMaterialsForSupervisor(
       remainingStock: m.remainingStock,
       vendor: m.vendor,
       poNumber: m.poNumber,
-      purchaseHistory: (m.purchaseHistory || []).map((h) => ({
+      purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
         vendor: h.vendor,
         quantity: h.quantity,
         date: h.date,
