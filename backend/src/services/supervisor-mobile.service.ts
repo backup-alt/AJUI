@@ -221,7 +221,7 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     throw new AppError(403, "Not assigned to this site");
   }
 
-  return { $or: [{ siteId: requestedSiteId }, { site: site.name }, { site: requestedSiteId.toString() }] };
+  return { siteId: requestedSiteId };
 }
 
 async function buildScopedEntityQuery(
