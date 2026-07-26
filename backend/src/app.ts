@@ -114,7 +114,7 @@ export function createApp(): express.Application {
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "d795d52",
+      deploy: "9a81e60",
     });
   });
 
