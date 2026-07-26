@@ -709,7 +709,14 @@ export async function listMaterialsForSupervisor(
     const limit = filters.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    console.log(`[listMaterials] user=${userId} status=${filters.status} projectId=${filters.projectId} siteId=${filters.siteId} access_projects=${access.projectIds.length} access_sites=${access.siteIds.length}`);
+    const cacheKey = `mat:${userId}:${filters.projectId || ""}:${filters.siteId || ""}:${filters.status || ""}:${page}:${limit}`;
+    const cached = getCached<{ materials: unknown[]; pagination: unknown }>(cacheKey);
+    if (cached) {
+      console.log(`[listMaterials] cache hit`);
+      return cached;
+    }
+
+    let result: { materials: unknown[]; pagination: unknown };
 
     if (filters.status !== "Approved") {
       if (filters.status) query.status = filters.status;
@@ -732,7 +739,7 @@ export async function listMaterialsForSupervisor(
 
       console.log(`[listMaterials] returned: ${requestItems.length} items, total=${requestTotal}`);
 
-      return {
+      result = {
         materials: requestItems.map((m) => ({
           _id: m._id.toString(),
           materialId: m.materialId,
@@ -762,84 +769,87 @@ export async function listMaterialsForSupervisor(
         })),
         pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
       };
-    }
+    } else {
+      await backfillApprovedMaterialsToInventory(query);
 
-    await backfillApprovedMaterialsToInventory(query);
-
-    const [items, total] = await Promise.all([
-      Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-      Inventory.countDocuments(query),
-    ]);
-
-    if (items.length === 0 && total === 0) {
-      const materialQuery: Record<string, unknown> = { ...query };
-      materialQuery.$or = [
-        { status: "Received" },
-        { approvedQuantity: { $gt: 0 } },
-      ];
-      const [matItems, matTotal] = await Promise.all([
-        Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-        Material.countDocuments(materialQuery),
+      const [items, total] = await Promise.all([
+        Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+        Inventory.countDocuments(query),
       ]);
 
-      return {
-        materials: matItems.map((m) => ({
-          _id: m._id.toString(),
-          materialId: m.materialId,
-          projectId: m.projectId,
-          projectName: m.projectName,
-          siteId: m.siteId,
-          site: m.site,
-          name: m.name,
-          unit: m.unit,
-          requestedQuantity: m.requestedQuantity,
-          approvedQuantity: m.approvedQuantity,
-          purchasedQuantity: m.purchasedQuantity,
-          consumedQuantity: m.consumedQuantity,
-          remainingStock: m.remainingStock,
-          vendor: m.vendor,
-          poNumber: m.poNumber,
-          issuedAmount: m.issuedAmount,
-          givenAmount: (m as any).givenAmount,
-          billUrl: (m as any).billUrl,
-          requestDate: m.requestDate,
-          status: m.status === "Received" ? "Received" : "Approved",
-          createdAt: m.createdAt,
-          updatedAt: m.updatedAt,
-        })),
-        pagination: { page, limit, total: matTotal, pages: Math.ceil(matTotal / limit) },
-      };
+      if (items.length === 0 && total === 0) {
+        const materialQuery: Record<string, unknown> = { ...query };
+        materialQuery.$or = [
+          { status: "Received" },
+          { approvedQuantity: { $gt: 0 } },
+        ];
+        const [matItems, matTotal] = await Promise.all([
+          Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+          Material.countDocuments(materialQuery),
+        ]);
+
+        result = {
+          materials: matItems.map((m) => ({
+            _id: m._id.toString(),
+            materialId: m.materialId,
+            projectId: m.projectId,
+            projectName: m.projectName,
+            siteId: m.siteId,
+            site: m.site,
+            name: m.name,
+            unit: m.unit,
+            requestedQuantity: m.requestedQuantity,
+            approvedQuantity: m.approvedQuantity,
+            purchasedQuantity: m.purchasedQuantity,
+            consumedQuantity: m.consumedQuantity,
+            remainingStock: m.remainingStock,
+            vendor: m.vendor,
+            poNumber: m.poNumber,
+            issuedAmount: m.issuedAmount,
+            givenAmount: (m as any).givenAmount,
+            billUrl: (m as any).billUrl,
+            requestDate: m.requestDate,
+            status: m.status === "Received" ? "Received" : "Approved",
+            createdAt: m.createdAt,
+            updatedAt: m.updatedAt,
+          })),
+          pagination: { page, limit, total: matTotal, pages: Math.ceil(matTotal / limit) },
+        };
+      } else {
+        result = {
+          materials: items.map((m) => ({
+            _id: m._id.toString(),
+            materialId: m._id.toString(),
+            projectId: m.projectId,
+            projectName: m.projectName,
+            siteId: m.siteId,
+            site: m.site,
+            name: m.name,
+            unit: m.unit,
+            requestedQuantity: m.requestedQuantity || m.approvedQuantity,
+            approvedQuantity: m.approvedQuantity,
+            purchasedQuantity: m.purchasedQuantity,
+            consumedQuantity: m.consumedQuantity,
+            remainingStock: m.remainingStock,
+            vendor: m.vendor,
+            poNumber: m.poNumber,
+            purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
+              vendor: h.vendor,
+              quantity: h.quantity,
+              date: h.date,
+            })),
+            requestDate: m.createdAt,
+            status: "Approved",
+            createdAt: m.createdAt,
+            updatedAt: m.updatedAt,
+          })),
+          pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        };
+      }
     }
 
-    return {
-      materials: items.map((m) => ({
-        _id: m._id.toString(),
-        materialId: m._id.toString(),
-        projectId: m.projectId,
-        projectName: m.projectName,
-        siteId: m.siteId,
-        site: m.site,
-        name: m.name,
-        unit: m.unit,
-        requestedQuantity: m.requestedQuantity || m.approvedQuantity,
-        approvedQuantity: m.approvedQuantity,
-        purchasedQuantity: m.purchasedQuantity,
-        consumedQuantity: m.consumedQuantity,
-        remainingStock: m.remainingStock,
-        vendor: m.vendor,
-        poNumber: m.poNumber,
-        purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
-          vendor: h.vendor,
-          quantity: h.quantity,
-          date: h.date,
-        })),
-        requestDate: m.createdAt,
-        status: "Approved",
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-      })),
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
-    };
+    setCache(cacheKey, result, 30000);
+    return result;
   } catch (err) {
     console.error(`[listMaterials] ERROR user=${userId} filters=${JSON.stringify(filters)}:`, err);
     throw err;
