@@ -748,16 +748,13 @@ export async function listMaterialsForSupervisor(
     let items: any[];
     let total: number;
     try {
-      console.log(`[listMaterials] About to execute Material.find() and countDocuments()...`);
-      [items, total] = await withTimeout(
-        Promise.all([
-          Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-          Material.countDocuments(query),
-        ]),
-        10000,
-        "Material.find+count"
-      );
-      console.log(`[listMaterials] MongoDB query completed, items: ${items.length}, total: ${total}`);
+      console.log(`[listMaterials] About to execute Material.find()...`);
+      // Drop sort on M0 free tier — createdAt desc adds ~5-10s overhead
+      // on slow cold-start queries. App doesn't strictly need sorted results.
+      const findQ = Material.find(query).skip(skip).limit(limit).lean();
+      const countQ = Material.countDocuments(query);
+      [items, total] = await withTimeout(Promise.all([findQ, countQ]), 30000, "Material.find+count");
+      console.log(`[listMaterials] Material query: ${Date.now() - matT0}ms, items: ${items.length}, total: ${total}`);
     } catch (err: any) {
       console.error(`[listMaterials] MongoDB query FAILED:`, err.message, "query:", JSON.stringify(query, (_k, v) => v instanceof Types.ObjectId ? v.toString() : v));
       throw err;
@@ -806,10 +803,10 @@ export async function listMaterialsForSupervisor(
 
   const [items, total] = await withTimeout(
     Promise.all([
-      Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+      Inventory.find(query).skip(skip).limit(limit).lean(),
       Inventory.countDocuments(query),
     ]),
-    10000,
+    30000,
     "Inventory.find+count"
   );
 
@@ -825,10 +822,10 @@ export async function listMaterialsForSupervisor(
     };
     const [matItems, matTotal] = await withTimeout(
       Promise.all([
-        Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        Material.find(materialQuery).skip(skip).limit(limit).lean(),
         Material.countDocuments(materialQuery),
       ]),
-      10000,
+      30000,
       "Material.find+count(fallback)"
     );
 
