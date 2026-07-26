@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
@@ -408,11 +408,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
       closeCircleOutline, chevronForwardOutline, chevronDownOutline, businessOutline,
       cloudOfflineOutline, refreshOutline,
     });
-    try {
-      await this.supervisor.init();
-    } catch (err) {
-      console.error('[Materials] init failed', err);
-    }
+    this.supervisor.init().catch(() => {});
     await this.loadMaterials();
 
     if (typeof window !== 'undefined') {
@@ -442,7 +438,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
           siteId: siteId || undefined,
           projectId: projectId || undefined,
           limit: 100,
-        })
+        }).pipe(timeout(15000))
       );
       if (gen !== this.loadGeneration) return;
       this.materials.set(response?.materials || []);

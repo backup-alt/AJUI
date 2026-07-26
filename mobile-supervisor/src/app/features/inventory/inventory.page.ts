@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
@@ -600,11 +600,7 @@ export class InventoryPage implements OnInit, OnDestroy {
       checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline,
       swapVerticalOutline, cloudOfflineOutline, refreshOutline,
     });
-    try {
-      await this.supervisor.init();
-    } catch (err) {
-      console.error('[Inventory] init failed', err);
-    }
+    this.supervisor.init().catch(() => {});
     await this.loadInventory();
 
     if (typeof window !== 'undefined') {
@@ -642,7 +638,7 @@ export class InventoryPage implements OnInit, OnDestroy {
           projectId: projectId || undefined,
           status: 'Approved',
           limit: 200,
-        })
+        }).pipe(timeout(15000))
       );
       if (gen !== this.loadGeneration) return;
       const materials: InventoryItem[] = (res?.materials || []).map((m) => ({

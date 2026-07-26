@@ -232,13 +232,17 @@ export class ApiService {
 
     let response: Response;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       response = await fetch(`${this.baseUrl}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
     } catch {
-      // Network error — don't clear tokens, just fail this refresh attempt.
+      // Network error or timeout — don't clear tokens, just fail this refresh attempt.
       return '';
     }
 
