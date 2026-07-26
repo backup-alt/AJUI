@@ -170,6 +170,7 @@ export type LabourRow = {
   paymentMode: "NEFT" | "Cash";
   status: ApprovalStatus;
   supervisorName?: string;
+  customFields?: Record<string, string | number | boolean | null>;
 };
 
 export type ExpenseRow = {
@@ -197,6 +198,7 @@ export type ExpenseRow = {
   issuedAmount?: number;
   givenAmount?: number;
   approvedAmount?: number;
+  customFields?: Record<string, string | number | boolean | null>;
 };
 
 export type PaymentRow = {
@@ -210,6 +212,7 @@ export type PaymentRow = {
   reference: string;
   collectedBy: string;
   status: ApprovalStatus;
+  customFields?: Record<string, string | number | boolean | null>;
 };
 
 export const roles: Role[] = ["Admin", "Project Manager", "Accountant", "Supervisor"];

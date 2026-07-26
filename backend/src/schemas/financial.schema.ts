@@ -25,7 +25,9 @@ export const createMaterialSchema = z.object({
 });
 
 export const updateMaterialSchema = z.object({
-  body: createMaterialSchema.shape.body.partial(),
+  body: createMaterialSchema.shape.body.partial().extend({
+    customFields: z.record(z.unknown()).optional(),
+  }),
   params: z.object({ id: objectIdSchema }),
 });
 
@@ -72,7 +74,9 @@ export const createLabourSchema = z.object({
 });
 
 export const updateLabourSchema = z.object({
-  body: createLabourSchema.shape.body.partial(),
+  body: createLabourSchema.shape.body.partial().extend({
+    customFields: z.record(z.unknown()).optional(),
+  }),
   params: z.object({ id: objectIdSchema }),
 });
 
@@ -134,7 +138,9 @@ export const createExpenseSchema = z.object({
 });
 
 export const updateExpenseSchema = z.object({
-  body: expenseBaseSchema.partial(),
+  body: expenseBaseSchema.partial().extend({
+    customFields: z.record(z.unknown()).optional(),
+  }),
   params: z.object({ id: objectIdSchema }),
 });
 
@@ -176,7 +182,9 @@ export const createPaymentSchema = z.object({
 });
 
 export const updatePaymentSchema = z.object({
-  body: createPaymentSchema.shape.body.partial(),
+  body: createPaymentSchema.shape.body.partial().extend({
+    customFields: z.record(z.unknown()).optional(),
+  }),
   params: z.object({ id: objectIdSchema }),
 });
 
@@ -211,6 +219,7 @@ export const createVendorSchema = z.object({
 export const updateVendorSchema = z.object({
   body: createVendorSchema.shape.body.partial().extend({
     siteIds: z.array(objectIdSchema).min(0).optional(),
+    customFields: z.record(z.unknown()).optional(),
   }),
   params: z.object({ id: objectIdSchema }),
 });
@@ -245,6 +254,7 @@ export const updateSubcontractorSchema = z.object({
   body: createSubcontractorSchema.shape.body.partial().extend({
     approvalStatus: z.enum(["Pending", "Approved", "Rejected"]).optional(),
     paymentStatus: z.enum(["Not Started", "Part Paid", "Paid"]).optional(),
+    customFields: z.record(z.unknown()).optional(),
   }),
   params: z.object({ id: objectIdSchema }),
 });

@@ -18,6 +18,7 @@ export interface IClient extends Document {
   amountReceived: number;
   pendingBalance: number;
   activeSites: number;
+  customFields?: Record<string, string | number | boolean | null>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +44,7 @@ const clientSchema = new Schema<IClient>(
     amountReceived: { type: Number, default: 0 },
     pendingBalance: { type: Number, default: 0 },
     activeSites: { type: Number, default: 0 },
+    customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

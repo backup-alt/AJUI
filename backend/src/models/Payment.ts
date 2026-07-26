@@ -20,6 +20,7 @@ export interface IPayment extends Document {
   approvedBy?: string;
   approvedAt?: Date;
   notes?: string;
+  customFields?: Record<string, string | number | boolean | null>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +51,7 @@ const paymentSchema = new Schema<IPayment>(
     approvedBy: { type: String },
     approvedAt: { type: Date },
     notes: { type: String },
+    customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

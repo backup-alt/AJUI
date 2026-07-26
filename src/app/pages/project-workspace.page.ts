@@ -1073,6 +1073,7 @@ export class ProjectWorkspacePage {
   readonly newFieldLabel = signal("");
   readonly newFieldAfterKey = signal<string | null>(null);
   readonly newFieldType = signal<"text" | "number" | "date" | "boolean">("text");
+  readonly savingField = signal(false);
   readonly draftRow = signal<TableRow>({});
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
@@ -2030,25 +2031,31 @@ export class ProjectWorkspacePage {
 
   async saveField(event: Event) {
     event.preventDefault();
+    if (this.savingField()) return;
     const label = this.newFieldLabel().trim();
     if (!label) return;
     if (this.isGeneratedClientIdField(label)) {
       window.alert("Client ID is generated automatically and cannot be created manually.");
       return;
     }
-    const section = this.activeSection();
-    const fieldType = this.newFieldType();
-    this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
-    const siteId = this.resolveEntityIdForSection(section);
-    if (siteId) {
-      try {
-        await this.data.persistCustomField(section, label, siteId, fieldType, false);
-      } catch (err) {
-        console.warn("[ProjectWorkspace] failed to persist custom field", err);
+    this.savingField.set(true);
+    try {
+      const section = this.activeSection();
+      const fieldType = this.newFieldType();
+      this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
+      const siteId = this.resolveEntityIdForSection(section);
+      if (siteId) {
+        try {
+          await this.data.persistCustomField(section, label, siteId, fieldType, false);
+        } catch (err) {
+          console.warn("[ProjectWorkspace] failed to persist custom field", err);
+        }
       }
+      this.newFieldAfterKey.set(null);
+      this.fieldDialogOpen.set(false);
+    } finally {
+      this.savingField.set(false);
     }
-    this.newFieldAfterKey.set(null);
-    this.fieldDialogOpen.set(false);
   }
 
   private resolveEntityIdForSection(_section: ModuleKey): string | null {

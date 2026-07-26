@@ -34,6 +34,7 @@ export type Client = {
   projectIds: string[];
   supervisor: string;
   _id?: string;
+  customFields?: Record<string, string | number | boolean | null>;
 };
 
 export type VendorStatus = "Active" | "Not Active";
@@ -48,6 +49,7 @@ export type Vendor = {
   status?: VendorStatus;
   _id?: string;
   siteIds?: string[];
+  customFields?: Record<string, string | number | boolean | null>;
 };
 
 export type Supervisor = {
@@ -78,6 +80,7 @@ export type Subcontractor = {
   approvalStatus: "Pending" | "Approved" | "Rejected";
   paymentStatus: "Not Started" | "Part Paid" | "Paid";
   _id?: string;
+  customFields?: Record<string, string | number | boolean | null>;
 };
 
 export type Site = {

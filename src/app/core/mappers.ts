@@ -26,6 +26,7 @@ export function mapClient(c: any): Client {
     status: (c.status || "Active") as ClientStatus,
     projectIds: c.projectIds || [],
     supervisor: c.supervisor || "",
+    customFields: c.customFields || {},
   };
 }
 
@@ -82,6 +83,7 @@ export function mapVendor(v: any): Vendor {
     gst: v.gstNumber || "",
     status: v.status === "Not Active" ? "Not Active" : "Active",
     siteIds: Array.isArray(v.siteIds) ? v.siteIds.map((id: any) => String(id)) : [],
+    customFields: v.customFields || {},
   };
 }
 
@@ -133,6 +135,7 @@ export function mapMaterial(m: any): any {
     approvalDate: m.approvalDate,
     notes: m.notes || "",
     status: m.status,
+    customFields: m.customFields || {},
   };
 }
 
@@ -162,6 +165,7 @@ export function mapLabour(l: any): any {
     notes: l.notes,
     status: l.status,
     supervisorName: l.supervisorName || "",
+    customFields: l.customFields || {},
   };
 }
 
@@ -208,6 +212,7 @@ export function mapExpense(e: any): any {
     submittedBy: e.submittedBy,
     approvedBy: e.approvedBy,
     approvedAt: e.approvedAt,
+    customFields: e.customFields || {},
   };
 }
 
@@ -227,6 +232,7 @@ export function mapPayment(p: any): any {
     transactionReference: p.transactionReference,
     collectedBy: p.collectedBy,
     status: p.status,
+    customFields: p.customFields || {},
   };
 }
 
@@ -245,6 +251,7 @@ export function mapSubcontractor(s: any): Subcontractor {
     supervisor: s.supervisor,
     approvalStatus: s.approvalStatus || "Pending",
     paymentStatus: s.paymentStatus || "Not Started",
+    customFields: s.customFields || {},
   };
 }
 

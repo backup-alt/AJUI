@@ -1321,6 +1321,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly newFieldLabel = signal("");
   readonly newFieldAfterKey = signal<string | null>(null);
   readonly newFieldType = signal<"text" | "number" | "date" | "boolean">("text");
+  readonly savingField = signal(false);
   readonly openSelectKey = signal("");
   readonly openFilterKey = signal("");
   readonly selectCustomValue = signal("");
@@ -2742,25 +2743,31 @@ visibleRows(): TableRow[] {
 
   async saveField(event: Event) {
     event.preventDefault();
+    if (this.savingField()) return;
     const label = this.newFieldLabel().trim();
     if (!label) return;
     if (this.isGeneratedClientIdField(label)) {
       window.alert("Client ID is generated automatically and cannot be created manually.");
       return;
     }
-    const module = this.activeModule();
-    const fieldType = this.newFieldType();
-    this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
-    const siteId = this.resolveEntityIdForModule(module);
-    if (siteId) {
-      try {
-        await this.data.persistCustomField(module, label, siteId, fieldType, false);
-      } catch (err) {
-        console.warn("[UniversalDashboard] failed to persist custom field", err);
+    this.savingField.set(true);
+    try {
+      const module = this.activeModule();
+      const fieldType = this.newFieldType();
+      this.data.addCustomFieldAfter(module, label, this.newFieldAfterKey(), this.columnsForActive());
+      const siteId = this.resolveEntityIdForModule(module);
+      if (siteId) {
+        try {
+          await this.data.persistCustomField(module, label, siteId, fieldType, false);
+        } catch (err) {
+          console.warn("[UniversalDashboard] failed to persist custom field", err);
+        }
       }
+      this.newFieldAfterKey.set(null);
+      this.fieldDialogOpen.set(false);
+    } finally {
+      this.savingField.set(false);
     }
-    this.newFieldAfterKey.set(null);
-    this.fieldDialogOpen.set(false);
   }
 
   private resolveEntityIdForModule(_module: SharedModuleKey): string | null {
@@ -2832,7 +2839,12 @@ visibleRows(): TableRow[] {
     };
 
     // Map of UI key → backend field per module. Most map 1:1 with columnKey.
-    const backendPayload: Record<string, unknown> = { [columnKey]: value };
+    // If the key is NOT a base column, it's a custom field and must be wrapped.
+    const baseColumnKeys = new Set(this.activeConfig().columns.map((c: any) => c.key));
+    const isCustomField = !baseColumnKeys.has(columnKey);
+    const backendPayload: Record<string, unknown> = isCustomField
+      ? { customFields: { [columnKey]: value } }
+      : { [columnKey]: value };
 
     // For labour, labour types are nested → send notes/partyName depending on column.
     // For now, send the raw value; backend accepts most fields as-is.
@@ -2890,7 +2902,10 @@ visibleRows(): TableRow[] {
       status: "status",
     };
     const backendKey = keyMap[columnKey] || columnKey;
-    const payload: Record<string, unknown> = { [backendKey]: value };
+    const isCustomField = !(columnKey in keyMap);
+    const payload: Record<string, unknown> = isCustomField
+      ? { customFields: { [columnKey]: value } }
+      : { [backendKey]: value };
 
     // Persist locally
     try {
@@ -3104,6 +3119,7 @@ visibleRows(): TableRow[] {
       poNumber: row.poNumber,
       remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
       status: row.status,
+      ...(row.customFields || {}),
     }));
 
     const clients = this.data.clients().map((client) => {
@@ -3123,6 +3139,7 @@ visibleRows(): TableRow[] {
         pendingBalance: formatMoney(summary.pending),
         supervisor: client.supervisor,
         status: client.status,
+        ...(client.customFields || {}),
       };
     });
 
@@ -3149,6 +3166,7 @@ visibleRows(): TableRow[] {
       presentUnits: row.presentDays * row.presentCount,
       paymentMode: row.paymentMode,
       status: row.status,
+      ...(row.customFields || {}),
     }));
 
     const expenses = this.data.expenses().filter((row) => row.type === "Site Expense").map((row) => ({
@@ -3169,6 +3187,7 @@ visibleRows(): TableRow[] {
       cashIssued: formatMoney(row.cashIssued || row.received || 0),
       reference: row.reference,
       approvalStatus: row.status,
+      ...(row.customFields || {}),
     }));
 
     const generalExpenses = this.data.expenses().filter((row) => row.type === "General Expense").map((row) => ({
@@ -3184,6 +3203,7 @@ visibleRows(): TableRow[] {
       paidBy: row.supervisor,
       reference: row.reference,
       approvalStatus: row.status,
+      ...(row.customFields || {}),
     }));
 
     const payments = this.data.payments().map((row) => ({
@@ -3200,6 +3220,7 @@ visibleRows(): TableRow[] {
       receiptNumber: row.receipt,
       collectedBy: row.collectedBy,
       approvalStatus: row.status,
+      ...(row.customFields || {}),
     }));
 
     const vendors = this.data.vendors().map((vendor) => ({
@@ -3213,6 +3234,7 @@ visibleRows(): TableRow[] {
       phoneNumber: vendor.phone,
       address: vendor.address,
       gstNumber: vendor.gst,
+      ...(vendor.customFields || {}),
     }));
 
     const supervisors = this.data.supervisors().map((supervisor) => ({
@@ -3250,6 +3272,7 @@ visibleRows(): TableRow[] {
         supervisor: subcontractor.supervisor,
         approvalStatus: subcontractor.approvalStatus,
         paymentStatus: subcontractor.paymentStatus,
+        ...(subcontractor.customFields || {}),
       };
     });
 
