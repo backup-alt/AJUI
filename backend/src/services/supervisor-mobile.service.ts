@@ -63,7 +63,32 @@ function hasObjectId(ids: Types.ObjectId[], value: Types.ObjectId): boolean {
   return ids.some((id) => id.toString() === key);
 }
 
+const accessCache = new Map<string, { data: SupervisorAccess; expiresAt: number }>();
+const ACCESS_CACHE_TTL_MS = 60_000;
+
+function getCachedSupervisorAccess(userId: string): SupervisorAccess | null {
+  const entry = accessCache.get(userId);
+  if (entry && Date.now() < entry.expiresAt) return entry.data;
+  if (entry) accessCache.delete(userId);
+  return null;
+}
+
+function setCachedSupervisorAccess(userId: string, data: SupervisorAccess): void {
+  accessCache.set(userId, { data, expiresAt: Date.now() + ACCESS_CACHE_TTL_MS });
+}
+
+export function invalidateAccessCache(userId?: string): void {
+  if (userId) {
+    accessCache.delete(userId);
+  } else {
+    accessCache.clear();
+  }
+}
+
 async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
+  const cached = getCachedSupervisorAccess(userId);
+  if (cached) return cached;
+
   const user = await User.findById(userId);
   if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
 
@@ -147,7 +172,7 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     ...scopedSites.map((site) => toObjectId(site._id)),
   ]);
 
-  return {
+  const result: SupervisorAccess = {
     user,
     profile: profileRecord,
     projectIds: uniqueObjectIds(projectIds),
@@ -157,6 +182,9 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
       ...assignedSiteNameFallback,
     ]),
   };
+
+  setCachedSupervisorAccess(userId, result);
+  return result;
 }
 
 async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) {
@@ -285,6 +313,7 @@ export async function updateSupervisorProfile(
     }
   }
 
+  invalidateAccessCache(userId);
   return getSupervisorByUserId(userId);
 }
 
