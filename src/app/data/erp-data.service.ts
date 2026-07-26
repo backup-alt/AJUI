@@ -1113,13 +1113,14 @@ export class ErpDataService {
     label: string,
     siteId: string | null,
     fieldType: "text" | "number" | "date" | "boolean" = "text",
-    askSupervisor = true
+    askSupervisor = true,
+    keyOverride?: string
   ): Promise<SharedTableField | null> {
     if (!siteId) {
       return null;
     }
     const entityType = this.entityTypeForModule(module);
-    const key = this.fieldKey(label, this.customFieldsFor(module));
+    const key = keyOverride || this.fieldKey(label, this.customFieldsFor(module));
     try {
       const result = await new Promise<{ field: ApiCustomField }>((resolve, reject) => {
         this.customFieldsService
@@ -1193,7 +1194,17 @@ export class ErpDataService {
     });
 
     await Promise.allSettled(promises);
-    this.customTableFields.set(merged);
+    const current = this.customTableFields();
+    const next: Record<SharedModuleKey, SharedTableField[]> = { ...current };
+    for (const module of modules) {
+      const backendFields = merged[module] ?? [];
+      const existingKeys = new Set((current[module] ?? []).map((f) => f.key));
+      const newFields = backendFields.filter((f) => !existingKeys.has(f.key));
+      if (newFields.length) {
+        next[module] = [...(current[module] ?? []), ...newFields];
+      }
+    }
+    this.customTableFields.set(next);
   }
 
   private entityTypeForModule(module: SharedModuleKey): "clients" | "projects" | "materials" | "labour" | "expenses" | "payments" | "vendors" | "subcontractors" {

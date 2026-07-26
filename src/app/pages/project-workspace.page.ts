@@ -2042,11 +2042,11 @@ export class ProjectWorkspacePage {
     try {
       const section = this.activeSection();
       const fieldType = this.newFieldType();
-      this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
+      const addedField = this.data.addCustomFieldAfter(section, label, this.newFieldAfterKey(), this.columnsFor(section));
       const siteId = this.resolveEntityIdForSection(section);
       if (siteId) {
         try {
-          await this.data.persistCustomField(section, label, siteId, fieldType, false);
+          await this.data.persistCustomField(section, label, siteId, fieldType, false, addedField.key);
         } catch (err) {
           console.warn("[ProjectWorkspace] failed to persist custom field", err);
         }
