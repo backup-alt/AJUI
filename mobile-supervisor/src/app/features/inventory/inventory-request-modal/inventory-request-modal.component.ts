@@ -73,7 +73,7 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
 
         <div class="form-group">
           <label class="form-label">Material Name *</label>
-          <div class="search-wrap" (click)="onSearchWrapClick($event)">
+          <div class="search-wrap" (pointerdown)="onSearchWrapClick($event)">
             <ion-input
               class="form-input"
               [(ngModel)]="name"

@@ -151,7 +151,7 @@ import { Vendor } from '../../../shared/models';
             @if (expenseType() === 'Purchase' && isSiteMaterial) {
               <ion-item class="form-item">
                 <ion-label position="stacked">Material Name *</ion-label>
-                <div class="search-wrap" (click)="onMaterialSearchWrapClick($event)">
+                <div class="search-wrap" (pointerdown)="onMaterialSearchWrapClick($event)">
                   <ion-input
                     placeholder="Search or enter material name"
                     [(ngModel)]="expense.materialName"
