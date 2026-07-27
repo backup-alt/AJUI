@@ -149,8 +149,8 @@ import { Vendor } from '../../../shared/models';
             }
 
             @if (expenseType() === 'Purchase' && isSiteMaterial) {
-              <ion-item class="form-item">
-                <ion-label position="stacked">Material Name *</ion-label>
+              <div class="form-group">
+                <label class="form-label">Material Name *</label>
                 <div class="search-wrap" (pointerdown)="onMaterialSearchWrapClick($event)">
                   <ion-input
                     placeholder="Search or enter material name"
@@ -169,7 +169,7 @@ import { Vendor } from '../../../shared/models';
                     </div>
                   }
                 </div>
-              </ion-item>
+              </div>
 
               <ion-item class="form-item">
                 <ion-label position="stacked">Unit *</ion-label>
@@ -346,6 +346,8 @@ import { Vendor } from '../../../shared/models';
     .toggle-sub { font-size: 12px; color: #6b7280; }
     ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --thumb-background: #fff; --thumb-background-checked: #fff; --border-color: #ccc; --border-color-checked: #002263; }
     .form-actions { padding: 20px 0; }
+    .form-group { margin-bottom: 0; }
+    .form-label { display: block; font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
     .search-wrap { position: relative; }
     .suggestions-list {
       position: absolute;
