@@ -703,50 +703,44 @@ export async function listMaterialsForSupervisor(
   const skip = (page - 1) * limit;
 
   if (filters.status === "Approved") {
+    const invQuery = { ...query };
+    delete invQuery.status;
+
     const [items, total] = await Promise.all([
-      Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-      Inventory.countDocuments(query),
+      Inventory.find(invQuery).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+      Inventory.countDocuments(invQuery),
     ]);
 
-    const linkedIds = items.filter((m) => m.lastMaterialId).map((m) => m.lastMaterialId!);
-    const linkedDocs = linkedIds.length > 0
-      ? await Material.find({ _id: { $in: linkedIds } }).select("billUrl receiptImage receiptImageMimeType").lean()
-      : [];
-    const linkedMap = new Map(linkedDocs.map((d) => [d._id.toString(), d]));
-
     return {
-      materials: items.map((m) => {
-        const linked = m.lastMaterialId ? linkedMap.get(m.lastMaterialId.toString()) : undefined;
-        return {
-          _id: m._id.toString(),
-          materialId: m._id.toString(),
-          projectId: m.projectId,
-          projectName: m.projectName,
-          siteId: m.siteId,
-          site: m.site,
-          name: m.name,
-          unit: m.unit,
-          requestedQuantity: m.requestedQuantity || m.approvedQuantity,
-          approvedQuantity: m.approvedQuantity,
-          purchasedQuantity: m.purchasedQuantity,
-          consumedQuantity: m.consumedQuantity,
-          remainingStock: m.remainingStock,
-          vendor: m.vendor,
-          poNumber: m.poNumber,
-          billUrl: linked?.billUrl,
-          receiptImage: linked?.receiptImage,
-          purchaseHistory: (m.purchaseHistory || []).map((h) => ({
-            vendor: h.vendor,
-            quantity: h.quantity,
-            date: h.date,
-            poNumber: h.poNumber,
-          })),
-          requestDate: m.createdAt,
-          status: "Approved" as const,
-          createdAt: m.createdAt,
-          updatedAt: m.updatedAt,
-        };
-      }),
+      materials: items.map((m) => ({
+        _id: m._id.toString(),
+        materialId: m._id.toString(),
+        projectId: m.projectId,
+        projectName: m.projectName,
+        siteId: m.siteId,
+        site: m.site,
+        name: m.name,
+        unit: m.unit,
+        requestedQuantity: m.requestedQuantity || m.approvedQuantity,
+        approvedQuantity: m.approvedQuantity,
+        purchasedQuantity: m.purchasedQuantity,
+        consumedQuantity: m.consumedQuantity,
+        remainingStock: m.remainingStock,
+        vendor: m.vendor,
+        poNumber: m.poNumber,
+        billUrl: (m as any).billUrl,
+        receiptImage: (m as any).receiptImage,
+        purchaseHistory: (m.purchaseHistory || []).map((h) => ({
+          vendor: h.vendor,
+          quantity: h.quantity,
+          date: h.date,
+          poNumber: h.poNumber,
+        })),
+        requestDate: m.createdAt,
+        status: "Approved" as const,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+      })),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     };
   }

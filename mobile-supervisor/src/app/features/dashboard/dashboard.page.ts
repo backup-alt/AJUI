@@ -92,12 +92,12 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
             <span class="stat-val">{{ dashboard()?.counts?.sites || 0 }}</span>
             <span class="stat-label">Sites</span>
           </button>
-          <button class="stat-card" (click)="navigateTo('/tabs/materials')">
+          <button class="stat-card" (click)="navigateTo('/tabs/inventory')">
             <div class="stat-icon si-gold">
               <ion-icon name="cube-outline"></ion-icon>
             </div>
             <span class="stat-val">{{ dashboard()?.counts?.pendingMaterials || 0 }}</span>
-            <span class="stat-label">Materials</span>
+            <span class="stat-label">Inventory</span>
           </button>
           <button class="stat-card" (click)="navigateTo('/tabs/labour')">
             <div class="stat-icon si-navy">
