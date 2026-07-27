@@ -760,8 +760,6 @@ export async function listMaterialsForSupervisor(
         pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
       };
     } else {
-      await backfillApprovedMaterialsToInventory(query);
-
       const [items, total] = await Promise.all([
         Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
         Inventory.countDocuments(query),

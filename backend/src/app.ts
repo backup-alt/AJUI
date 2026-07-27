@@ -184,12 +184,12 @@ export async function bootstrap(): Promise<void> {
   await ensureWorkersCollection();
 
   const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
-  backfillApprovedMaterialsToInventory({}).catch((err: any) =>
-    console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
-  );
-  backfillMaterialSiteIds().catch((err: any) =>
-    console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
-  );
+  await backfillMaterialSiteIds();
+  try {
+    await backfillApprovedMaterialsToInventory({});
+  } catch (err: any) {
+    console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err);
+  }
 
   try {
     const { Material } = await import("./models/Material.js");

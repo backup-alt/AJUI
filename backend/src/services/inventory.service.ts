@@ -236,16 +236,19 @@ export async function backfillMaterialSiteIds(): Promise<void> {
       if (s.name) siteNameToId.set(s.name.toLowerCase(), s._id);
     }
 
-    let updated = 0;
+    const bulkOps: any[] = [];
     for (const m of materials) {
       const siteId = siteNameToId.get((m.site || "").toLowerCase());
       if (siteId) {
-        await Material.updateOne({ _id: m._id }, { $set: { siteId } });
-        updated++;
+        bulkOps.push({ updateOne: { filter: { _id: m._id }, update: { $set: { siteId } } } });
       }
     }
 
-    console.log(`[Startup] backfillMaterialSiteIds: updated ${updated}/${materials.length} materials`);
+    if (bulkOps.length > 0) {
+      await Material.bulkWrite(bulkOps, { ordered: false });
+    }
+
+    console.log(`[Startup] backfillMaterialSiteIds: updated ${bulkOps.length}/${materials.length} materials`);
     siteIdBackfillDone = true;
   } catch (err: any) {
     console.error("[Startup] backfillMaterialSiteIds failed (non-fatal):", err?.message || err);
