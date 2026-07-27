@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -151,13 +151,11 @@ import { Vendor } from '../../../shared/models';
             @if (expenseType() === 'Purchase' && isSiteMaterial) {
               <ion-item class="form-item">
                 <ion-label position="stacked">Material Name *</ion-label>
-                <div class="search-wrap">
+                <div class="search-wrap" (click)="onMaterialSearchWrapClick($event)">
                   <ion-input
                     placeholder="Search or enter material name"
                     [(ngModel)]="expense.materialName"
                     (ionInput)="onMaterialNameInput($event)"
-                    (ionFocus)="showMaterialSuggestions.set(true)"
-                    (ionBlur)="hideMaterialSuggestionsDelayed()"
                     [clearInput]="true"
                   ></ion-input>
                   @if (filteredMaterialNames().length > 0 && showMaterialSuggestions()) {
@@ -340,13 +338,13 @@ import { Vendor } from '../../../shared/models';
     .balance-warning { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #dc2626; font-weight: 600; }
     .block-notice { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff5f5; border: 1px solid #fca5a5; border-radius: 8px; color: #dc2626; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
     .form-list { background: transparent; padding: 0; }
-    .form-item { --background: #ffffff; --border-radius: 0 !important; --inner-border-radius: 0 !important; --padding-start: 14px; --padding-end: 14px; --min-height: 64px; border: 1px solid #e5e7eb; border-bottom: none; margin-bottom: 0; }
+    .form-item { --background: #ffffff; --border-radius: 0 !important; --inner-border-radius: 0 !important; --padding-start: 14px; --padding-end: 14px; --min-height: 64px; border: 1px solid #e5e7eb; border-bottom: none; margin-bottom: 0; --highlight-color-checked: transparent; }
     .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
     .toggle-row { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 0; }
     .toggle-info { display: flex; flex-direction: column; gap: 2px; }
     .toggle-label { font-size: 14px; font-weight: 600; color: #111827; }
     .toggle-sub { font-size: 12px; color: #6b7280; }
-    ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --thumb-background: #fff; --thumb-background-checked: #fff; }
+    ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --thumb-background: #fff; --thumb-background-checked: #fff; --border-color: #ccc; --border-color-checked: #002263; }
     .form-actions { padding: 20px 0; }
     .search-wrap { position: relative; }
     .suggestions-list {
@@ -378,7 +376,7 @@ import { Vendor } from '../../../shared/models';
     .suggestion-item ion-icon { font-size: 14px; color: #6b7280; flex-shrink: 0; }
   `],
 })
-export class ExpenseCreatePage implements OnInit {
+export class ExpenseCreatePage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
@@ -433,7 +431,20 @@ export class ExpenseCreatePage implements OnInit {
     this.siteProjectId.set(this.supervisor.selectedProjectId());
     await this.loadVendors();
     this.loadMaterialNames();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('click', this.onDocClick);
+    }
   }
+
+  ngOnDestroy(): void {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('click', this.onDocClick);
+    }
+  }
+
+  private onDocClick = (): void => {
+    this.showMaterialSuggestions.set(false);
+  };
 
   selectType(type: 'Purchase' | 'Add Cash') {
     this.expenseType.set(type);
@@ -464,12 +475,21 @@ export class ExpenseCreatePage implements OnInit {
 
   onMaterialNameInput(event: Event): void {
     const value = (event as CustomEvent).detail?.value?.toLowerCase() || '';
+    this.showMaterialSuggestions.set(true);
     if (!value) {
       this.filteredMaterialNames.set(this.materialNames().slice(0, 10));
     } else {
       this.filteredMaterialNames.set(
         this.materialNames().filter(n => n.toLowerCase().includes(value)).slice(0, 10)
       );
+    }
+  }
+
+  onMaterialSearchWrapClick(event: Event): void {
+    event.stopPropagation();
+    this.showMaterialSuggestions.set(true);
+    if (this.filteredMaterialNames().length === 0) {
+      this.filteredMaterialNames.set(this.materialNames().slice(0, 10));
     }
   }
 

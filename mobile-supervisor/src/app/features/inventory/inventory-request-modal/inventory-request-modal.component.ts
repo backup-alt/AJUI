@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, Input } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -73,15 +73,13 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
 
         <div class="form-group">
           <label class="form-label">Material Name *</label>
-          <div class="search-wrap">
+          <div class="search-wrap" (click)="onSearchWrapClick($event)">
             <ion-input
               class="form-input"
               [(ngModel)]="name"
               [clearInput]="true"
               placeholder="Search or enter material name"
               (ionInput)="onNameInput($event)"
-              (ionFocus)="showSuggestions.set(true)"
-              (ionBlur)="hideSuggestionsDelayed()"
             ></ion-input>
             @if (filteredNames().length > 0 && showSuggestions()) {
               <div class="suggestions-list">
@@ -279,7 +277,7 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
     .suggestion-item ion-icon { font-size: 14px; color: var(--m3-on-surface-muted); flex-shrink: 0; }
   `],
 })
-export class InventoryRequestModalComponent implements OnInit {
+export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   private modalCtrl = inject(ModalController);
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
@@ -309,7 +307,20 @@ export class InventoryRequestModalComponent implements OnInit {
     }
     this.loadVendors();
     this.loadMaterialNames();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('click', this.onDocClick);
+    }
   }
+
+  ngOnDestroy(): void {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('click', this.onDocClick);
+    }
+  }
+
+  private onDocClick = (): void => {
+    this.showSuggestions.set(false);
+  };
 
   loadMaterialNames(): void {
     this.supervisor.getMaterialNames().subscribe({
@@ -320,12 +331,21 @@ export class InventoryRequestModalComponent implements OnInit {
 
   onNameInput(event: Event): void {
     const value = (event as CustomEvent).detail?.value?.toLowerCase() || '';
+    this.showSuggestions.set(true);
     if (!value) {
       this.filteredNames.set(this.materialNames().slice(0, 10));
     } else {
       this.filteredNames.set(
         this.materialNames().filter(n => n.toLowerCase().includes(value)).slice(0, 10)
       );
+    }
+  }
+
+  onSearchWrapClick(event: Event): void {
+    event.stopPropagation();
+    this.showSuggestions.set(true);
+    if (this.filteredNames().length === 0) {
+      this.filteredNames.set(this.materialNames().slice(0, 10));
     }
   }
 
