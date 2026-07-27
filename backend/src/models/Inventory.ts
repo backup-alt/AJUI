@@ -32,6 +32,12 @@ export interface IInventory extends Document {
     poNumber?: string;
     materialId?: Types.ObjectId;
   }>;
+  consumptionHistory?: Array<{
+    quantity: number;
+    date: Date;
+    updatedBy?: string;
+    notes?: string;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -68,6 +74,15 @@ const inventorySchema = new Schema<IInventory>(
         date: { type: Date, default: Date.now },
         poNumber: { type: String, trim: true },
         materialId: { type: Schema.Types.ObjectId, ref: "Material" },
+      }],
+      default: undefined,
+    },
+    consumptionHistory: {
+      type: [{
+        quantity: { type: Number, required: true },
+        date: { type: Date, default: Date.now },
+        updatedBy: { type: String },
+        notes: { type: String, trim: true },
       }],
       default: undefined,
     },

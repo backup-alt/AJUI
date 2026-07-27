@@ -33,6 +33,7 @@ import {
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { PageHeaderComponent, EmptyStateComponent } from '../../shared/components';
 import { InventoryEditModalComponent } from './inventory-edit-modal/inventory-edit-modal.component';
 import { InventoryRequestModalComponent } from './inventory-request-modal/inventory-request-modal.component';
@@ -140,7 +141,7 @@ type SortDir = 'asc' | 'desc';
           ></app-empty-state>
         } @else {
           @for (item of filteredItems(); track item.materialId) {
-            <div class="inventory-card" [class.low-stock]="item.currentQuantity <= item.minimumQuantity">
+            <div class="inventory-card" [class.low-stock]="item.currentQuantity <= item.minimumQuantity" (click)="openDetail(item._id)">
               <header class="card-header">
                 <div class="material-icon" [class.low]="item.currentQuantity <= item.minimumQuantity">
                   <ion-icon name="cube-outline"></ion-icon>
@@ -167,7 +168,7 @@ type SortDir = 'asc' | 'desc';
                 </div>
                 <div class="qty-meta">
                   <span class="qty-min">Min: {{ item.minimumQuantity }} {{ item.unit }}</span>
-                  <button class="edit-qty-btn" (click)="openEditQuantity(item)">
+                  <button class="edit-qty-btn" (click)="openEditQuantity(item); $event.stopPropagation()">
                     <ion-icon name="pencil-outline"></ion-icon>
                     Update
                   </button>
@@ -210,7 +211,7 @@ type SortDir = 'asc' | 'desc';
               }
 
               <footer class="card-footer">
-                <button class="request-btn" (click)="raiseRequest(item)">
+                <button class="request-btn" (click)="raiseRequest(item); $event.stopPropagation()">
                   <ion-icon name="add-outline"></ion-icon>
                   Raise Request
                 </button>
@@ -295,6 +296,7 @@ type SortDir = 'asc' | 'desc';
       padding: var(--md-space-4);
       margin-bottom: var(--md-space-3);
       box-shadow: var(--md-elevation-1);
+      cursor: pointer;
       transition: box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard),
                   transform var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
@@ -544,6 +546,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
+  private router = inject(Router);
 
   items = signal<InventoryItem[]>([]);
   isLoading = signal(true);
@@ -700,6 +703,10 @@ export class InventoryPage implements OnInit, OnDestroy {
     if (data?.updated) {
       await this.loadInventory();
     }
+  }
+
+  openDetail(id: string): void {
+    this.router.navigate(['/tabs/inventory', id]);
   }
 
   async raiseRequest(item: InventoryItem | null): Promise<void> {

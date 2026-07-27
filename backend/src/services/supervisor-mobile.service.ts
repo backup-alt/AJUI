@@ -887,6 +887,14 @@ export async function updateMaterialStockForSupervisor(
   }
   if (updates.consumedQuantity !== undefined) {
     inventory.consumedQuantity = Math.max(0, inventory.consumedQuantity + updates.consumedQuantity);
+    if (updates.consumedQuantity > 0) {
+      inventory.consumptionHistory = inventory.consumptionHistory || [];
+      inventory.consumptionHistory.push({
+        quantity: updates.consumedQuantity,
+        date: new Date(),
+        updatedBy: userId,
+      });
+    }
   }
   await inventory.save();
 

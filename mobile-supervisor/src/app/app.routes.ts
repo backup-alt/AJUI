@@ -122,6 +122,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'inventory/:id',
+        loadComponent: () =>
+          import('./features/inventory/inventory-detail/inventory-detail.page').then(
+            (m) => m.InventoryDetailPage
+          ),
+      },
+      {
         path: 'expenses',
         loadComponent: () =>
           import('./features/expenses/expenses.page').then((m) => m.ExpensesPage),
