@@ -21,6 +21,7 @@ export interface MaterialApprovalRow {
   sourceId: string;
   issuedAmount?: number;
   givenAmount?: number;
+  notes?: string;
 }
 
 export interface LabourApprovalRow {
@@ -69,6 +70,7 @@ export interface ExpenseApprovalRow {
   approvedAmount?: number;
   billUrl?: string;
   poNumber?: string;
+  notes?: string;
 }
 
 export interface GeneralExpenseApprovalRow {
@@ -178,6 +180,7 @@ interface RawApprovalItem {
   issuedAmount?: number;
   givenAmount?: number;
   billUrl?: string;
+  notes?: string;
 }
 
 @Injectable({ providedIn: "root" })
@@ -232,6 +235,7 @@ export class ApprovalsService {
           poNumber: a.poNumber || "",
           issuedAmount: a.issuedAmount,
           givenAmount: a.givenAmount,
+          notes: a.notes || "",
         } as MaterialApprovalRow;
 
       case "labour":
@@ -272,6 +276,7 @@ export class ApprovalsService {
             givenAmount: a.givenAmount,
             billUrl: a.billUrl,
             poNumber: a.poNumber,
+            notes: a.notes || "",
           } as ExpenseApprovalRow;
         }
         return {

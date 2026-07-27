@@ -412,6 +412,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             supervisorName: d.supervisorName,
             issuedAmount: d.issuedAmount,
             givenAmount: d.givenAmount,
+            notes: d.notes,
           };
         }
       } else if (sourceCollection === "Labour" || sourceCollection === "labour") {
@@ -450,6 +451,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
             givenAmount: doc.givenAmount,
             billUrl: doc.billUrl,
             poNumber: doc.poNumber,
+            notes: doc.notes,
           };
         }
       }

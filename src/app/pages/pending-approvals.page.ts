@@ -36,6 +36,7 @@ type MaterialApprovalRow = ApprovalBaseRow & {
   issuedAmount?: number;
   givenAmount?: number;
   sourceId?: string;
+  notes?: string;
 };
 
 type LabourApprovalRow = ApprovalBaseRow & {
@@ -69,6 +70,7 @@ type ExpenseApprovalRow = ApprovalBaseRow & {
   approvedAmount?: number;
   billUrl?: string;
   poNumber?: string;
+  notes?: string;
 };
 
 type SubcontractApprovalRow = ApprovalBaseRow & {
@@ -180,6 +182,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Issued Amt</th>
                         <th>Given Amt</th>
                         <th>PO Number</th>
+                        <th>Notes</th>
                         <th>Status</th>
                         <th>Actions</th>
                       </tr>
@@ -237,6 +240,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                             aria-label="PO Number"
                           />
                         </td>
+                        <td>{{ row.notes || "-" }}</td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
                         <td class="approval-actions">
                           <button type="button" class="approve-action" (click)="approve(row)" aria-label="Approve material">
@@ -249,7 +253,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           </button>
                         </td>
                       </tr>
-                      <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" colspan="11"><span>No pending material approvals.</span></td></tr>
+                      <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" colspan="15"><span>No pending material approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -280,6 +284,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Given Amt</th>
                         <th>PO Number</th>
                         <th>Supervisor</th>
+                        <th>Notes</th>
                         <th>Bill / Reference</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -338,6 +343,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           </td>
                         }
                         <td>{{ row.supervisor || "-" }}</td>
+                        <td>{{ row.notes || "-" }}</td>
                         <td>
                           @if (row.billUrl) {
                             @if (isDataUrl(row.billUrl)) {
@@ -355,7 +361,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <button type="button" class="decline-action" (click)="decline(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>Decline</button>
                         </td>
                       </tr>
-                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="14"><span>No pending site expense approvals.</span></td></tr>
+                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="15"><span>No pending site expense approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>
