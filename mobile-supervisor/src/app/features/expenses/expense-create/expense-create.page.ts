@@ -161,7 +161,7 @@ import { Vendor } from '../../../shared/models';
                   @if (filteredMaterialNames().length > 0 && showMaterialSuggestions()) {
                     <div class="suggestions-list">
                       @for (n of filteredMaterialNames(); track n) {
-                        <div class="suggestion-item" (mousedown)="selectMaterialName(n)">
+                        <div class="suggestion-item" (pointerdown)="selectMaterialName(n)">
                           <ion-icon name="search-outline"></ion-icon>
                           {{ n }}
                         </div>
@@ -432,13 +432,13 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
     await this.loadVendors();
     this.loadMaterialNames();
     if (typeof document !== 'undefined') {
-      document.addEventListener('click', this.onDocClick);
+      document.addEventListener('pointerdown', this.onDocClick);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof document !== 'undefined') {
-      document.removeEventListener('click', this.onDocClick);
+      document.removeEventListener('pointerdown', this.onDocClick);
     }
   }
 
