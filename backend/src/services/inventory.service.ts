@@ -204,6 +204,40 @@ export async function adjustInventoryStock(
   return inventory.toObject();
 }
 
+export async function uploadInventoryReceipt(
+  id: string,
+  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number; received?: boolean }
+) {
+  const inventory = await Inventory.findById(id);
+  if (!inventory) throw new AppError(404, "Inventory item not found");
+
+  const { uploadToPCloud } = await import("./pcloud.service.js");
+
+  try {
+    const pcloudResult = await uploadToPCloud(
+      payload.data,
+      payload.fileName || `receipt_inv_${inventory.name.replace(/\s+/g, "_")}.${payload.mimeType.split("/")[1] || "jpg"}`,
+      payload.mimeType
+    );
+    inventory.billUrl = pcloudResult.fileUrl;
+  } catch (err) {
+    console.warn("[pCloud] Upload failed for inventory item, falling back to base64 storage:", err);
+    inventory.receiptImage = payload.data;
+    inventory.receiptImageMimeType = payload.mimeType;
+    inventory.receiptImageName = payload.fileName;
+    inventory.billUrl = `data:${payload.mimeType};base64,${payload.data}`;
+  }
+
+  if (payload.givenAmount !== undefined) {
+    inventory.received = true;
+  } else if (payload.received !== undefined) {
+    inventory.received = payload.received;
+  }
+
+  await inventory.save();
+  return inventory.toObject();
+}
+
 export async function inventoryStockMapForMaterials(materials: Array<Pick<IMaterial, "projectId" | "siteId" | "site" | "name" | "unit">>) {
   if (materials.length === 0) return new Map<string, number>();
   const ors = materials.map(inventoryMatchForMaterial);

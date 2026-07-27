@@ -732,8 +732,9 @@ export async function listMaterialsForSupervisor(
         remainingStock: m.remainingStock,
         vendor: m.vendor,
         poNumber: m.poNumber,
-        billUrl: (m as any).billUrl,
-        receiptImage: (m as any).receiptImage,
+        billUrl: m.billUrl,
+        receiptImage: m.receiptImage,
+        received: m.received,
         purchaseHistory: (m.purchaseHistory || []).map((h) => ({
           vendor: h.vendor,
           quantity: h.quantity,

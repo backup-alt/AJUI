@@ -24,6 +24,11 @@ export interface IInventory extends Document {
   poNumber?: string;
   lastMaterialId?: Types.ObjectId;
   lastUpdatedBy?: string;
+  billUrl?: string;
+  receiptImage?: string;
+  receiptImageMimeType?: string;
+  receiptImageName?: string;
+  received?: boolean;
   purchaseHistory?: Array<{
     vendor: string;
     vendorId?: Types.ObjectId;
@@ -66,6 +71,11 @@ const inventorySchema = new Schema<IInventory>(
     poNumber: { type: String, trim: true },
     lastMaterialId: { type: Schema.Types.ObjectId, ref: "Material" },
     lastUpdatedBy: { type: String },
+    billUrl: { type: String },
+    receiptImage: { type: String },
+    receiptImageMimeType: { type: String },
+    receiptImageName: { type: String },
+    received: { type: Boolean, default: false },
     purchaseHistory: {
       type: [{
         vendor: { type: String, trim: true },

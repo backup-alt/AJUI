@@ -448,17 +448,38 @@ export async function uploadMaterialReceipt(req: Request, res: Response, next: N
   try {
     const userId = requireSupervisor(req);
     const { Material } = await import("../models/Material.js");
-    const mat = await Material.findById(req.params.id).lean();
-    if (!mat) throw new AppError(404, "Material not found");
-    await mobileService.ensureSupervisorSiteAccess(userId, mat.projectId?.toString(), mat.siteId?.toString());
-    const { uploadMaterialReceipt } = await import("../services/material.service.js");
-    const updated = await uploadMaterialReceipt(req.params.id, {
-      data: req.body.data,
-      mimeType: req.body.mimeType,
-      fileName: req.body.fileName,
-      givenAmount: req.body.givenAmount,
-    });
-    res.json({ material: updated });
+    let mat = await Material.findById(req.params.id).lean();
+
+    if (mat) {
+      await mobileService.ensureSupervisorSiteAccess(userId, mat.projectId?.toString(), mat.siteId?.toString());
+      const { uploadMaterialReceipt } = await import("../services/material.service.js");
+      const updated = await uploadMaterialReceipt(req.params.id, {
+        data: req.body.data,
+        mimeType: req.body.mimeType,
+        fileName: req.body.fileName,
+        givenAmount: req.body.givenAmount,
+      });
+      res.json({ material: updated });
+      return;
+    }
+
+    const { Inventory } = await import("../models/Inventory.js");
+    const inv = await Inventory.findById(req.params.id).lean();
+    if (inv) {
+      await mobileService.ensureSupervisorSiteAccess(userId, inv.projectId?.toString(), inv.siteId?.toString());
+      const { uploadInventoryReceipt } = await import("../services/inventory.service.js");
+      const updated = await uploadInventoryReceipt(req.params.id, {
+        data: req.body.data,
+        mimeType: req.body.mimeType,
+        fileName: req.body.fileName,
+        givenAmount: req.body.givenAmount,
+        received: req.body.received,
+      });
+      res.json({ material: updated });
+      return;
+    }
+
+    throw new AppError(404, "Material not found");
   } catch (e) { next(e); }
 }
 

@@ -197,6 +197,7 @@ interface RequestItem {
                     <div class="upload-field checkbox-field">
                       <ion-checkbox
                         [(ngModel)]="isReceivedInput"
+                        [disabled]="isUploading()"
                         class="received-checkbox"
                         aria-label="Received materials reached the site"
                       ></ion-checkbox>
@@ -737,6 +738,9 @@ export class RequestsPage implements OnInit {
     };
     if (item.type === 'expense') {
       payload.givenAmount = this.givenAmountInput!;
+    }
+    if (item.type === 'material') {
+      payload.received = this.isReceivedInput;
     }
 
     try {
