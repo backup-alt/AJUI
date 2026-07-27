@@ -19,7 +19,7 @@ import {
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
-import { closeOutline, checkmarkOutline } from 'ionicons/icons';
+import { closeOutline, checkmarkOutline, searchOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { InventoryItem } from '../inventory.page';
 import { ModalController } from '@ionic/angular/standalone';
@@ -73,12 +73,27 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
 
         <div class="form-group">
           <label class="form-label">Material Name *</label>
-          <ion-input
-            class="form-input"
-            [(ngModel)]="name"
-            [clearInput]="true"
-            placeholder="Enter material name"
-          ></ion-input>
+          <div class="search-wrap">
+            <ion-input
+              class="form-input"
+              [(ngModel)]="name"
+              [clearInput]="true"
+              placeholder="Search or enter material name"
+              (ionInput)="onNameInput($event)"
+              (ionFocus)="showSuggestions.set(true)"
+              (ionBlur)="hideSuggestionsDelayed()"
+            ></ion-input>
+            @if (filteredNames().length > 0 && showSuggestions()) {
+              <div class="suggestions-list">
+                @for (n of filteredNames(); track n) {
+                  <div class="suggestion-item" (mousedown)="selectName(n)">
+                    <ion-icon name="search-outline"></ion-icon>
+                    {{ n }}
+                  </div>
+                }
+              </div>
+            }
+          </div>
         </div>
 
         <div class="form-row">
@@ -233,6 +248,35 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
       gap: var(--md-space-3);
       margin-top: var(--md-space-2);
     }
+
+    .search-wrap { position: relative; }
+    .suggestions-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: var(--m3-surface-bright);
+      border: 1px solid var(--m3-outline-variant);
+      border-top: none;
+      border-radius: 0 0 var(--md-radius-lg) var(--md-radius-lg);
+      max-height: 180px;
+      overflow-y: auto;
+      box-shadow: var(--md-elevation-2);
+    }
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px var(--md-space-4);
+      font-size: 14px;
+      color: var(--m3-on-surface);
+      cursor: pointer;
+    }
+    .suggestion-item:hover, .suggestion-item:active {
+      background: var(--m3-primary-container);
+    }
+    .suggestion-item ion-icon { font-size: 14px; color: var(--m3-on-surface-muted); flex-shrink: 0; }
   `],
 })
 export class InventoryRequestModalComponent implements OnInit {
@@ -251,15 +295,48 @@ export class InventoryRequestModalComponent implements OnInit {
   unitOptions = MATERIAL_UNITS;
   vendors = signal<Vendor[]>([]);
   isSubmitting = signal(false);
+  materialNames = signal<string[]>([]);
+  filteredNames = signal<string[]>([]);
+  showSuggestions = signal(false);
+  private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit(): void {
-    addIcons({ closeOutline, checkmarkOutline });
+    addIcons({ closeOutline, checkmarkOutline, searchOutline });
     if (this.preSelected) {
       this.name = this.preSelected.name;
       this.unit = this.preSelected.unit;
       this.vendorName = this.preSelected.vendor || '';
     }
     this.loadVendors();
+    this.loadMaterialNames();
+  }
+
+  loadMaterialNames(): void {
+    this.supervisor.getMaterialNames().subscribe({
+      next: (res) => this.materialNames.set(res.names || []),
+      error: () => this.materialNames.set([]),
+    });
+  }
+
+  onNameInput(event: Event): void {
+    const value = (event as CustomEvent).detail?.value?.toLowerCase() || '';
+    if (!value) {
+      this.filteredNames.set(this.materialNames().slice(0, 10));
+    } else {
+      this.filteredNames.set(
+        this.materialNames().filter(n => n.toLowerCase().includes(value)).slice(0, 10)
+      );
+    }
+  }
+
+  selectName(n: string): void {
+    this.name = n;
+    this.showSuggestions.set(false);
+    this.filteredNames.set([]);
+  }
+
+  hideSuggestionsDelayed(): void {
+    this.hideTimer = setTimeout(() => this.showSuggestions.set(false), 150);
   }
 
   isValid(): boolean {

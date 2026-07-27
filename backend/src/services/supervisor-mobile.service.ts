@@ -1005,3 +1005,13 @@ export async function getApprovalDetailForSupervisor(userId: string, approvalId:
   if (!approval) throw new AppError(404, "Approval not found or not accessible");
   return approval;
 }
+
+export async function listMaterialNames(userId: string, search?: string) {
+  const { query } = await buildScopedEntityQuery(userId);
+  const matchStage: Record<string, unknown> = { ...query };
+  if (search) {
+    matchStage.name = { $regex: search, $options: "i" };
+  }
+  const names = await Inventory.distinct("name", matchStage);
+  return names.sort();
+}

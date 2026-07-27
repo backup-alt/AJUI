@@ -94,6 +94,10 @@ export class SupervisorService {
     return this.api.get<MaterialsListResponse>('/supervisor/materials', filters);
   }
 
+  getMaterialNames(search?: string) {
+    return this.api.get<{ names: string[] }>('/supervisor/material-names', search ? { search } : undefined);
+  }
+
   getMaterialDetail(materialId: string) {
     return this.api.get<{ material: Material }>(`/supervisor/materials/${materialId}`);
   }

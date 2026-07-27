@@ -573,11 +573,10 @@ export class RequestsPage implements OnInit {
     const items: RequestItem[] = [];
 
     try {
-      // Load materials
+      // Load APPROVED materials from Inventory (fast on M0 — avoids Material.find() timeout)
       try {
-        const matRes = await firstValueFrom(this.supervisor.getMaterials({ limit: 200 }));
-        for (const m of matRes?.materials || []) {
-          const isReceived = m.status === 'Received';
+        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ status: 'Approved', limit: 200 }));
+        for (const m of approvedMatRes?.materials || []) {
           const hasNoBill = !(m as any).billUrl;
           items.push({
             _id: m._id,
@@ -590,12 +589,38 @@ export class RequestsPage implements OnInit {
             issuedAmount: m.issuedAmount,
             givenAmount: (m as any).givenAmount,
             billUrl: (m as any).billUrl,
-            received: isReceived,
+            received: m.status === 'Received',
             needsUpload: hasNoBill,
           });
         }
       } catch (err) {
-        console.error('[Requests] materials load failed', err);
+        console.error('[Requests] approved materials load failed', err);
+      }
+
+          // Load PENDING/DECLINED materials from Material collection (may timeout on M0 — non-critical)
+      try {
+        const otherMatRes = await firstValueFrom(this.supervisor.getMaterials({ limit: 200 }));
+        const approvedIds = new Set(items.filter(i => i.type === 'material').map(i => i._id));
+        for (const m of otherMatRes?.materials || []) {
+          if (approvedIds.has(m._id)) continue;
+          const isApproved = m.status === 'Approved' || m.status === 'Completed' || m.status === 'Received';
+          items.push({
+            _id: m._id,
+            type: 'material',
+            title: m.name,
+            subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
+            site: m.site,
+            date: m.requestDate,
+            status: m.status,
+            issuedAmount: m.issuedAmount,
+            givenAmount: (m as any).givenAmount,
+            billUrl: (m as any).billUrl,
+            received: m.status === 'Received',
+            needsUpload: isApproved && !(m as any).billUrl,
+          });
+        }
+      } catch (err) {
+        console.error('[Requests] other materials load failed (non-critical)', err);
       }
 
       // Load expenses — include ALL transaction types (Purchase + Add Cash)

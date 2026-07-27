@@ -122,6 +122,15 @@ export async function getMyDevices(req: Request, res: Response, next: NextFuncti
   } catch (e) { next(e); }
 }
 
+// =================== MATERIAL NAMES ===================
+export async function listMaterialNames(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const names = await mobileService.listMaterialNames(userId, req.query.search as string | undefined);
+    res.json({ names });
+  } catch (e) { next(e); }
+}
+
 // =================== MATERIALS (mobile) ===================
 export async function listMaterials(req: Request, res: Response, next: NextFunction) {
   try {
