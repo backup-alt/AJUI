@@ -248,6 +248,13 @@ interface RequestItem {
                   {{ item.type === 'expense' ? 'Bill uploaded & Given amount recorded' : 'Bill uploaded' }}
                 </div>
               }
+
+              @if (item.billUrl) {
+                <div class="bill-thumb-wrap" (click)="openBillImage(item.billUrl!)">
+                  <img [src]="item.billUrl" alt="Bill" class="bill-thumb" />
+                  <span class="bill-thumb-label">View Bill</span>
+                </div>
+              }
             </div>
           }
         }
@@ -440,6 +447,20 @@ interface RequestItem {
     }
     .completed-notice ion-icon { font-size: 16px; }
 
+    .bill-thumb-wrap {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: var(--md-space-2); padding: 8px;
+      background: var(--m3-surface-container); border-radius: var(--md-radius-lg);
+      cursor: pointer; border: 1px solid var(--m3-outline-variant);
+    }
+    .bill-thumb {
+      width: 48px; height: 48px; border-radius: var(--md-radius-md);
+      object-fit: cover; flex-shrink: 0;
+    }
+    .bill-thumb-label {
+      font-size: 12px; font-weight: 600; color: var(--m3-primary);
+    }
+
     .skeleton-card {
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
@@ -626,6 +647,10 @@ export class RequestsPage implements OnInit {
     if (status === 'Pending') return 'warning';
     if (status === 'Rejected') return 'danger';
     return 'neutral';
+  }
+
+  openBillImage(url: string): void {
+    window.open(url, '_blank');
   }
 
   startUpload(item: RequestItem): void {

@@ -5,7 +5,7 @@ import {
   IonSpinner, IonIcon, IonButton,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { cubeOutline, timeOutline, businessOutline, alertCircleOutline, refreshOutline, swapVerticalOutline } from 'ionicons/icons';
+import { cubeOutline, timeOutline, businessOutline, alertCircleOutline, refreshOutline, swapVerticalOutline, documentTextOutline, imageOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { DatePipe } from '@angular/common';
 
@@ -69,7 +69,7 @@ import { DatePipe } from '@angular/common';
 
           <div class="card">
             <h3 class="card-title">
-              <ion-icon name="time-outline"></ion-icon>
+              <ion-icon name="swap-vertical-outline"></ion-icon>
               Consumption Log
             </h3>
             @if (consumptionLog().length === 0) {
@@ -80,7 +80,7 @@ import { DatePipe } from '@angular/common';
               <div class="log-list">
                 @for (entry of consumptionLog(); track $index) {
                   <div class="log-entry">
-                    <div class="log-icon">
+                    <div class="log-icon consumed-icon">
                       <ion-icon name="swap-vertical-outline"></ion-icon>
                     </div>
                     <div class="log-info">
@@ -95,6 +95,44 @@ import { DatePipe } from '@angular/common';
               </div>
             }
           </div>
+
+          @if (purchaseHistory().length > 0) {
+            <div class="card">
+              <h3 class="card-title">
+                <ion-icon name="document-text-outline"></ion-icon>
+                Purchase History (PO Numbers)
+              </h3>
+              <div class="log-list">
+                @for (entry of purchaseHistory(); track $index) {
+                  <div class="log-entry">
+                    <div class="log-icon purchase-icon">
+                      <ion-icon name="document-text-outline"></ion-icon>
+                    </div>
+                    <div class="log-info">
+                      <span class="log-qty">+{{ entry.quantity }} {{ item()!.unit }}</span>
+                      <span class="log-vendor">{{ entry.vendor || 'Unknown Vendor' }}</span>
+                      @if (entry.poNumber) {
+                        <span class="log-po">PO: {{ entry.poNumber }}</span>
+                      }
+                      <span class="log-date">{{ entry.date | date:'MMM d, yyyy' }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (billImageUrl()) {
+            <div class="card">
+              <h3 class="card-title">
+                <ion-icon name="image-outline"></ion-icon>
+                Bill / Reference Image
+              </h3>
+              <div class="bill-image-wrap">
+                <img [src]="billImageUrl()" alt="Bill/Receipt" class="bill-image" (click)="openImage()" />
+              </div>
+            </div>
+          }
 
           @if (item()!.vendor) {
             <div class="card">
@@ -186,14 +224,28 @@ import { DatePipe } from '@angular/common';
     }
     .log-icon {
       width: 36px; height: 36px; border-radius: 50%;
-      background: rgba(220, 38, 38, 0.08); color: var(--m3-error);
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
+    .consumed-icon { background: rgba(220, 38, 38, 0.08); color: var(--m3-error); }
+    .purchase-icon { background: rgba(16, 185, 129, 0.08); color: var(--m3-success); }
     .log-icon ion-icon { font-size: 18px; }
     .log-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-    .log-qty { font-size: 15px; font-weight: 700; color: var(--m3-error); }
+    .log-qty { font-size: 15px; font-weight: 700; }
+    .log-qty { color: var(--m3-error); }
+    .log-entry:nth-child(n) .log-qty { color: var(--m3-on-surface); }
+    .log-vendor { font-size: 13px; font-weight: 600; color: var(--m3-on-surface); }
+    .log-po { font-size: 12px; font-family: var(--m3-font-mono); font-weight: 700; color: var(--m3-success); }
     .log-date { font-size: 12px; color: var(--m3-on-surface-muted); }
     .log-notes { font-size: 12px; color: var(--m3-on-surface-variant); font-style: italic; }
+
+    .bill-image-wrap {
+      border-radius: var(--md-radius-lg); overflow: hidden;
+      border: 1px solid var(--m3-outline-variant);
+    }
+    .bill-image {
+      width: 100%; max-height: 300px; object-fit: contain;
+      display: block; cursor: pointer; background: var(--m3-surface-container);
+    }
 
     .kv-list { display: flex; flex-direction: column; gap: var(--md-space-2); }
     .kv { display: flex; justify-content: space-between; align-items: center; }
@@ -210,9 +262,11 @@ export class InventoryDetailPage implements OnInit {
   loading = signal(true);
 
   consumptionLog = signal<Array<{ quantity: number; date: string; updatedBy?: string; notes?: string }>>([]);
+  purchaseHistory = signal<Array<{ vendor: string; quantity: number; date: string; poNumber?: string }>>([]);
+  billImageUrl = signal<string>('');
 
   ngOnInit(): void {
-    addIcons({ cubeOutline, timeOutline, businessOutline, alertCircleOutline, refreshOutline, swapVerticalOutline });
+    addIcons({ cubeOutline, timeOutline, businessOutline, alertCircleOutline, refreshOutline, swapVerticalOutline, documentTextOutline, imageOutline });
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) this.loadItem(id);
@@ -227,14 +281,27 @@ export class InventoryDetailPage implements OnInit {
       const res = await this.supervisor.getMaterialDetail(itemId).toPromise();
       const mat = res?.material;
       this.item.set(mat);
+
       const log = (mat as any)?.consumptionHistory || [];
       this.consumptionLog.set(
         [...log].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
       );
+
+      const history = (mat as any)?.purchaseHistory || [];
+      this.purchaseHistory.set(
+        [...history].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      );
+
+      this.billImageUrl.set((mat as any)?.billUrl || (mat as any)?.receiptImage || '');
     } catch {
       this.item.set(null);
     } finally {
       this.loading.set(false);
     }
+  }
+
+  openImage(): void {
+    const url = this.billImageUrl();
+    if (url) window.open(url, '_blank');
   }
 }

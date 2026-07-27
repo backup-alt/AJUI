@@ -708,33 +708,45 @@ export async function listMaterialsForSupervisor(
       Inventory.countDocuments(query),
     ]);
 
+    const linkedIds = items.filter((m) => m.lastMaterialId).map((m) => m.lastMaterialId!);
+    const linkedDocs = linkedIds.length > 0
+      ? await Material.find({ _id: { $in: linkedIds } }).select("billUrl receiptImage receiptImageMimeType").lean()
+      : [];
+    const linkedMap = new Map(linkedDocs.map((d) => [d._id.toString(), d]));
+
     return {
-      materials: items.map((m) => ({
-        _id: m._id.toString(),
-        materialId: m._id.toString(),
-        projectId: m.projectId,
-        projectName: m.projectName,
-        siteId: m.siteId,
-        site: m.site,
-        name: m.name,
-        unit: m.unit,
-        requestedQuantity: m.requestedQuantity || m.approvedQuantity,
-        approvedQuantity: m.approvedQuantity,
-        purchasedQuantity: m.purchasedQuantity,
-        consumedQuantity: m.consumedQuantity,
-        remainingStock: m.remainingStock,
-        vendor: m.vendor,
-        poNumber: m.poNumber,
-        purchaseHistory: (m.purchaseHistory || []).map((h) => ({
-          vendor: h.vendor,
-          quantity: h.quantity,
-          date: h.date,
-        })),
-        requestDate: m.createdAt,
-        status: "Approved" as const,
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-      })),
+      materials: items.map((m) => {
+        const linked = m.lastMaterialId ? linkedMap.get(m.lastMaterialId.toString()) : undefined;
+        return {
+          _id: m._id.toString(),
+          materialId: m._id.toString(),
+          projectId: m.projectId,
+          projectName: m.projectName,
+          siteId: m.siteId,
+          site: m.site,
+          name: m.name,
+          unit: m.unit,
+          requestedQuantity: m.requestedQuantity || m.approvedQuantity,
+          approvedQuantity: m.approvedQuantity,
+          purchasedQuantity: m.purchasedQuantity,
+          consumedQuantity: m.consumedQuantity,
+          remainingStock: m.remainingStock,
+          vendor: m.vendor,
+          poNumber: m.poNumber,
+          billUrl: linked?.billUrl,
+          receiptImage: linked?.receiptImage,
+          purchaseHistory: (m.purchaseHistory || []).map((h) => ({
+            vendor: h.vendor,
+            quantity: h.quantity,
+            date: h.date,
+            poNumber: h.poNumber,
+          })),
+          requestDate: m.createdAt,
+          status: "Approved" as const,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+        };
+      }),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     };
   }
@@ -870,7 +882,22 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
     await Inventory.findOne({ ...query, _id: materialId }).lean() ||
     await Material.findOne({ ...query, _id: materialId }).lean();
   if (!material) throw new AppError(404, "Material not found or not accessible");
-  return material;
+
+  const result: any = material;
+
+  const linkedId = (material as any).lastMaterialId;
+  if (linkedId) {
+    try {
+      const linked = await Material.findById(linkedId).select("billUrl receiptImage receiptImageMimeType poNumber vendor").lean();
+      if (linked) {
+        result.billUrl = linked.billUrl || result.billUrl;
+        result.receiptImage = linked.receiptImage || result.receiptImage;
+        result.receiptImageMimeType = linked.receiptImageMimeType || result.receiptImageMimeType;
+      }
+    } catch {}
+  }
+
+  return result;
 }
 
 export async function updateMaterialStockForSupervisor(
