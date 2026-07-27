@@ -280,7 +280,6 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Transaction Type</th>
                         <th>Description</th>
                         <th>Amount</th>
-                        <th>Issued Amt</th>
                         <th>Given Amt</th>
                         <th>PO Number</th>
                         <th>Supervisor</th>
@@ -300,7 +299,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td><strong>{{ row.description || "-" }}</strong></td>
                         <td>{{ row.amount || "-" }}</td>
                         @if (isCashAddedTransaction(row.transactionType)) {
-                          <td colspan="2">
+                          <td>
                             <input
                               class="approval-table-input"
                               inputmode="decimal"
@@ -312,16 +311,6 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           </td>
                           <td>-</td>
                         } @else {
-                          <td>
-                            <input
-                              class="approval-table-input"
-                              inputmode="decimal"
-                              type="number"
-                              [(ngModel)]="row.issuedAmount"
-                              aria-label="Issued amount"
-                              min="0"
-                            />
-                          </td>
                           <td>
                             <input
                               class="approval-table-input"
