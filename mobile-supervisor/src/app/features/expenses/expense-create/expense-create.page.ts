@@ -345,7 +345,7 @@ import { Vendor } from '../../../shared/models';
     .toggle-info { display: flex; flex-direction: column; gap: 2px; }
     .toggle-label { font-size: 14px; font-weight: 600; color: #111827; }
     .toggle-sub { font-size: 12px; color: #6b7280; }
-    ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --thumb-background: #fff; --thumb-background-checked: #fff; --border-color: #ccc; --border-color-checked: #002263; }
+    ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --handle-background: #fff; --handle-background-checked: #fff; --handle-box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
     .form-actions { padding: 20px 0; }
     .form-group { margin: 0; padding: 10px 14px; background: #ffffff; border: 1px solid #e5e7eb; }
     .form-group:first-of-type { border-radius: 8px 8px 0 0; }
