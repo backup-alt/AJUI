@@ -716,14 +716,15 @@ export async function listMaterialsForSupervisor(
       let requestTotal;
 
       try {
-        requestItems = await Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
+        console.log(`[listMaterials] query:`, JSON.stringify(query));
+        requestItems = await Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean();
       } catch (dbErr: any) {
         console.error(`[listMaterials] find error:`, dbErr?.message);
         throw dbErr;
       }
 
       try {
-        requestTotal = await Material.countDocuments(query);
+        requestTotal = await Material.countDocuments(query).maxTimeMS(10000);
       } catch {
         requestTotal = requestItems.length;
       }
@@ -773,8 +774,8 @@ export async function listMaterialsForSupervisor(
           { approvedQuantity: { $gt: 0 } },
         ];
         const [matItems, matTotal] = await Promise.all([
-          Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-          Material.countDocuments(materialQuery),
+          Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean(),
+          Material.countDocuments(materialQuery).maxTimeMS(10000),
         ]);
 
         result = {
