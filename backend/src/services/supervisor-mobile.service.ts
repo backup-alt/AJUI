@@ -722,7 +722,7 @@ export async function listMaterialsForSupervisor(
       let requestTotal;
 
       try {
-        requestItems = await Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().hint({ projectId: 1, siteId: 1, createdAt: -1 });
+        requestItems = await Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
       } catch (dbErr: any) {
         console.error(`[listMaterials] find error:`, dbErr?.message);
         throw dbErr;
