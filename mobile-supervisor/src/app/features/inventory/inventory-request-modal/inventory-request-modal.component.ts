@@ -84,7 +84,7 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
             @if (filteredNames().length > 0 && showSuggestions()) {
               <div class="suggestions-list">
                 @for (n of filteredNames(); track n) {
-                  <div class="suggestion-item" (pointerdown)="selectName(n)">
+                  <div class="suggestion-item" (pointerdown)="onSelectSuggestion($event, n)">
                     <ion-icon name="search-outline"></ion-icon>
                     {{ n }}
                   </div>
@@ -357,6 +357,11 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
     this.showSuggestions.set(false);
     this.filteredNames.set([]);
     setTimeout(() => { this.selectingName = false; }, 100);
+  }
+
+  onSelectSuggestion(event: Event, n: string): void {
+    event.stopPropagation();
+    this.selectName(n);
   }
 
   hideSuggestionsDelayed(): void {

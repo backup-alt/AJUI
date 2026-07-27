@@ -161,7 +161,7 @@ import { Vendor } from '../../../shared/models';
                   @if (filteredMaterialNames().length > 0 && showMaterialSuggestions()) {
                     <div class="suggestions-list">
                       @for (n of filteredMaterialNames(); track n) {
-                        <div class="suggestion-item" (pointerdown)="selectMaterialName(n)">
+                        <div class="suggestion-item" (pointerdown)="onSelectMaterialSuggestion($event, n)">
                           <ion-icon name="search-outline"></ion-icon>
                           {{ n }}
                         </div>
@@ -506,6 +506,11 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
     this.showMaterialSuggestions.set(false);
     this.filteredMaterialNames.set([]);
     setTimeout(() => { this.selectingMaterial = false; }, 100);
+  }
+
+  onSelectMaterialSuggestion(event: Event, n: string): void {
+    event.stopPropagation();
+    this.selectMaterialName(n);
   }
 
   hideMaterialSuggestionsDelayed(): void {
