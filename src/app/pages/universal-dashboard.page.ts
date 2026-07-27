@@ -3094,7 +3094,7 @@ visibleRows(): TableRow[] {
       supervisor: row.supervisor,
       cashIssued: formatMoney(row.cashIssued || row.received || 0),
       reference: row.reference,
-      billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
+      billUrl: row.billUrl,
       approvalStatus: row.status,
       ...(row.customFields || {}),
     }));
@@ -3111,7 +3111,7 @@ visibleRows(): TableRow[] {
       amount: formatMoney(row.spent),
       paidBy: row.supervisor,
       reference: row.reference,
-      billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
+      billUrl: row.billUrl,
       approvalStatus: row.status,
       ...(row.customFields || {}),
     }));
