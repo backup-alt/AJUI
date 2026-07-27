@@ -652,8 +652,7 @@ export class RequestsPage implements OnInit {
             transactionType: e.transactionType,
             needsUpload:
               (e.status === 'Approved') &&
-              !(e as any).billUrl &&
-              ((e as any).isSiteMaterial === true),
+              !(e as any).billUrl,
           });
         }
       } catch (err) {
@@ -718,8 +717,11 @@ export class RequestsPage implements OnInit {
   }
 
   canSubmitUpload(item: RequestItem): boolean {
-    if (!this.selectedFileData() || !this.isReceivedInput || this.isUploading()) {
+    if (!this.selectedFileData() || this.isUploading()) {
       return false;
+    }
+    if (item.type === 'material') {
+      return !!this.isReceivedInput;
     }
     if (item.type === 'expense') {
       return this.givenAmountInput !== null && this.givenAmountInput > 0;

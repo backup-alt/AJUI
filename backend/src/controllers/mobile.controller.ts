@@ -428,9 +428,11 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
 export async function uploadExpenseReceipt(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
+    console.log(`[uploadExpenseReceipt] id=${req.params.id} user=${userId} hasData=${!!req.body.data} mimeType=${req.body.mimeType} givenAmount=${req.body.givenAmount}`);
     const { Expense } = await import("../models/Expense.js");
     const expense = await Expense.findById(req.params.id).lean();
     if (!expense) throw new AppError(404, "Expense not found");
+    console.log(`[uploadExpenseReceipt] expense found: status=${expense.status} type=${expense.type} site=${expense.site} hasBillUrl=${!!expense.billUrl}`);
     const { Project } = await import("../models/Project.js");
     await mobileService.ensureSupervisorSiteAccess(userId, expense.projectId?.toString(), expense.siteId?.toString());
     const { uploadExpenseReceipt } = await import("../services/expense.service.js");
@@ -440,8 +442,9 @@ export async function uploadExpenseReceipt(req: Request, res: Response, next: Ne
       fileName: req.body.fileName,
       givenAmount: req.body.givenAmount,
     });
+    console.log(`[uploadExpenseReceipt] success: billUrl=${updated.billUrl?.substring(0, 60)}`);
     res.json({ expense: updated });
-  } catch (e) { next(e); }
+  } catch (e) { console.error(`[uploadExpenseReceipt] FAILED:`, e); next(e); }
 }
 
 export async function uploadMaterialReceipt(req: Request, res: Response, next: NextFunction) {
