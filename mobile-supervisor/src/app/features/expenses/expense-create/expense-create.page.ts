@@ -346,9 +346,12 @@ import { Vendor } from '../../../shared/models';
     .toggle-sub { font-size: 12px; color: #6b7280; }
     ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --thumb-background: #fff; --thumb-background-checked: #fff; --border-color: #ccc; --border-color-checked: #002263; }
     .form-actions { padding: 20px 0; }
-    .form-group { margin-bottom: 0; }
-    .form-label { display: block; font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .form-group { margin: 0; padding: 10px 14px; background: #ffffff; border: 1px solid #e5e7eb; }
+    .form-group:first-of-type { border-radius: 8px 8px 0 0; }
+    .form-group:last-of-type { border-radius: 0 0 8px 8px; border-bottom: 1px solid #e5e7eb; }
+    .form-label { display: block; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
     .search-wrap { position: relative; }
+    .search-wrap ion-input { --background: transparent; --border-radius: 0; --padding-start: 0; --padding-end: 0; --min-height: 36px; border: none; font-size: 15px; color: #111827; }
     .suggestions-list {
       position: absolute;
       top: 100%;
@@ -411,6 +414,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   materialNames = signal<string[]>([]);
   filteredMaterialNames = signal<string[]>([]);
   showMaterialSuggestions = signal(false);
+  private selectingMaterial = false;
   private hideMaterialTimer: ReturnType<typeof setTimeout> | null = null;
 
   private actionSheetCtrl = inject(ActionSheetController);
@@ -476,6 +480,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   }
 
   onMaterialNameInput(event: Event): void {
+    if (this.selectingMaterial) return;
     const value = (event as CustomEvent).detail?.value?.toLowerCase() || '';
     this.showMaterialSuggestions.set(true);
     if (!value) {
@@ -496,9 +501,11 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   }
 
   selectMaterialName(n: string): void {
+    this.selectingMaterial = true;
     this.expense.materialName = n;
     this.showMaterialSuggestions.set(false);
     this.filteredMaterialNames.set([]);
+    setTimeout(() => { this.selectingMaterial = false; }, 100);
   }
 
   hideMaterialSuggestionsDelayed(): void {

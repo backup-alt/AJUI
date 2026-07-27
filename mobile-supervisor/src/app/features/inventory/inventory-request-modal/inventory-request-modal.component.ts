@@ -296,6 +296,7 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   materialNames = signal<string[]>([]);
   filteredNames = signal<string[]>([]);
   showSuggestions = signal(false);
+  private selectingName = false;
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit(): void {
@@ -330,6 +331,7 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   }
 
   onNameInput(event: Event): void {
+    if (this.selectingName) return;
     const value = (event as CustomEvent).detail?.value?.toLowerCase() || '';
     this.showSuggestions.set(true);
     if (!value) {
@@ -350,9 +352,11 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   }
 
   selectName(n: string): void {
+    this.selectingName = true;
     this.name = n;
     this.showSuggestions.set(false);
     this.filteredNames.set([]);
+    setTimeout(() => { this.selectingName = false; }, 100);
   }
 
   hideSuggestionsDelayed(): void {
