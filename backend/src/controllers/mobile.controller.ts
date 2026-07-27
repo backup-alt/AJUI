@@ -380,6 +380,11 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
     }
 
     const expenseId = await generateId("EXP");
+
+    const { User } = await import("../models/User.js");
+    const supervisorUser = await User.findById(userId).select("name").lean();
+    const supervisorName = supervisorUser?.name || "";
+
     const expense = await Expense.create({
       ...req.body,
       expenseId,
@@ -387,6 +392,7 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
       clientId,
       clientName,
       site: siteName,
+      supervisor: req.body.supervisor || supervisorName,
       status: "Pending",
       submittedBy: userId,
     });

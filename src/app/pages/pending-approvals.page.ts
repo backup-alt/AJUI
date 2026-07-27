@@ -230,11 +230,11 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         </td>
                         <td>
                           <input
-                            class="approval-table-input"
+                            class="approval-table-input readonly-field"
                             type="text"
-                            [(ngModel)]="row.poNumber"
+                            [value]="row.poNumber || 'AUTO GENERATED'"
+                            readonly
                             aria-label="PO Number"
-                            placeholder="Auto-generate"
                           />
                         </td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
@@ -334,11 +334,11 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           </td>
                           <td>
                             <input
-                              class="approval-table-input"
+                              class="approval-table-input readonly-field"
                               type="text"
-                              [(ngModel)]="row.poNumber"
+                              [value]="row.poNumber || 'AUTO GENERATED'"
+                              readonly
                               aria-label="PO Number"
-                              placeholder="Auto-generate"
                             />
                           </td>
                         }
@@ -510,7 +510,6 @@ export class PendingApprovalsPage implements OnInit {
               if (expenseRow.issuedAmount !== undefined) payload.issuedAmount = expenseRow.issuedAmount;
               if (expenseRow.givenAmount !== undefined) payload.givenAmount = expenseRow.givenAmount;
             }
-            if (expenseRow.poNumber !== undefined && expenseRow.poNumber.trim() !== '') payload.poNumber = expenseRow.poNumber;
           }
         } else if (row.module === "materials") {
           const materialRow = this._materialRows().find((r) => r.rowId === row.rowId);
@@ -519,7 +518,6 @@ export class PendingApprovalsPage implements OnInit {
             if (materialRow.vendor !== undefined && materialRow.vendor.trim() !== '') payload.vendor = materialRow.vendor;
             if (materialRow.issuedAmount !== undefined) payload.issuedAmount = materialRow.issuedAmount;
             if (materialRow.givenAmount !== undefined) payload.givenAmount = materialRow.givenAmount;
-            if (materialRow.poNumber !== undefined && materialRow.poNumber.trim() !== '') payload.poNumber = materialRow.poNumber;
           }
         }
         await firstValueFrom(this.approvalsService.approve(row.rowId, payload));

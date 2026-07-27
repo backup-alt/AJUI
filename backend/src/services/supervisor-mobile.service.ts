@@ -550,7 +550,9 @@ export async function getSupervisorDashboard(userId: string) {
   const siteExpenseScope = { ...entityScope, type: "site" };
   const today = new Date().toISOString().slice(0, 10);
 
-  const [pendingMaterials, pendingLabour, pendingExpenses, todayExpenses] = await Promise.all([
+  const [inventoryCount, labourCount, pendingMaterials, pendingLabour, pendingExpenses, todayExpenses] = await Promise.all([
+    Inventory.countDocuments({ projectId: { $in: scopedAccess.access.projectIds }, siteId: { $in: scopedAccess.access.siteIds } }),
+    Labour.countDocuments({ projectId: { $in: scopedAccess.access.projectIds } }),
     Material.countDocuments({ ...entityScope, status: "Pending" }),
     Labour.countDocuments({ ...entityScope, status: "Pending" }),
     Expense.countDocuments({ ...siteExpenseScope, status: "Pending" }),
@@ -574,6 +576,8 @@ Expense.aggregate([
       pendingMaterials,
       pendingLabour,
       pendingExpenses,
+      inventory: inventoryCount,
+      labour: labourCount,
     },
     todayExpense: {
       total: todayExpenses[0]?.total ?? 0,

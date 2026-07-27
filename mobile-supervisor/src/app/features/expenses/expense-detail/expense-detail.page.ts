@@ -115,13 +115,6 @@ import { Expense } from '../../../shared/models';
             </div>
           </div>
 
-          @if (expense()!.poNumber) {
-            <div class="po-number-block">
-              <div class="po-label">PO Number</div>
-              <div class="po-value">{{ expense()!.poNumber }}</div>
-            </div>
-          }
-
           @if (canUploadReceipt()) {
             <div class="upload-receipt-card">
               <div class="upload-receipt-info">

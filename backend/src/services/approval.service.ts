@@ -468,7 +468,7 @@ async function enrichApprovalWithSource(approval: Record<string, unknown>): Prom
     }
   }
 
-  return { ...approval, ...sourceData, supervisorName: supervisorName || sourceData?.["supervisorName"] };
+  return { ...approval, ...sourceData, supervisorName: supervisorName || sourceData?.["supervisorName"] || "" };
 }
 
 export async function getApprovalById(id: string) {

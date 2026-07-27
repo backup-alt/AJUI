@@ -54,6 +54,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "vendor", label: "Vendor" },
       { key: "poNumber", label: "PO Number" },
       { key: "remainingStock", label: "Remaining Stock" },
+      { key: "notes", label: "Notes" },
       { key: "status", label: "Status" },
     ],
     filters: [
@@ -129,6 +130,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "siteMaterial", label: "Site Material" },
       { key: "runningBalance", label: "Balance" },
       { key: "poNumber", label: "PO Number" },
+      { key: "notes", label: "Notes" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
     filters: [
