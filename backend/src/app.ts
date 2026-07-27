@@ -184,30 +184,19 @@ export async function bootstrap(): Promise<void> {
   await ensureWorkersCollection();
 
   const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
-  await backfillMaterialSiteIds();
-  try {
-    await backfillApprovedMaterialsToInventory({});
-  } catch (err: any) {
-    console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err);
-  }
+  backfillMaterialSiteIds().catch((err: any) =>
+    console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
+  );
+  backfillApprovedMaterialsToInventory({}).catch((err: any) =>
+    console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
+  );
 
   try {
     const { Material } = await import("./models/Material.js");
     await Material.collection.createIndex({ projectId: 1, siteId: 1, createdAt: -1 }, { background: true });
     console.log("[Startup] Material compound index ensured");
-    const redundantIndexes = [
-      { projectId: 1, site: 1, createdAt: -1 } as const,
-      { site: 1 } as const,
-      { clientId: 1 } as const,
-    ];
-    for (const key of redundantIndexes) {
-      try {
-        await Material.collection.dropIndex(key as any);
-        console.log(`[Startup] Dropped redundant Material index:`, key);
-      } catch {}
-    }
   } catch (e: any) {
-    console.error("[Startup] Material index maintenance failed (non-fatal):", e?.message || e);
+    console.error("[Startup] Material compound index creation failed (non-fatal):", e?.message || e);
   }
 
   const app = createApp();
