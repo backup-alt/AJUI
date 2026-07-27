@@ -28,7 +28,6 @@ import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Inventory } from "../models/Inventory.js";
-import { backfillApprovedMaterialsToInventory } from "./inventory.service.js";
 
 type SupervisorAccess = {
   user: Awaited<ReturnType<typeof User.findById>>;
@@ -697,164 +696,47 @@ export async function listMaterialsForSupervisor(
     projectId: filters.projectId,
     siteId: filters.siteId,
   });
+  if (filters.status) query.status = filters.status;
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
   const skip = (page - 1) * limit;
-  const cacheKey = `mat:${userId}:${filters.projectId || ""}:${filters.siteId || ""}:${filters.status || ""}:${page}:${limit}`;
 
-  const cached = getCached<{ materials: unknown[]; pagination: unknown; shouldRetry?: boolean }>(cacheKey);
-  if (cached) return cached;
+  const [items, total] = await Promise.all([
+    Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Material.countDocuments(query),
+  ]);
 
-  let result: { materials: unknown[]; pagination: unknown };
-
-  try {
-    if (filters.status !== "Approved") {
-      if (filters.status) query.status = filters.status;
-
-      let requestItems;
-      let requestTotal;
-
-      try {
-        console.log(`[listMaterials] query:`, JSON.stringify(query));
-        requestItems = await Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean();
-      } catch (dbErr: any) {
-        console.error(`[listMaterials] find error:`, dbErr?.message);
-        throw dbErr;
-      }
-
-      try {
-        requestTotal = await Material.countDocuments(query).maxTimeMS(10000);
-      } catch {
-        requestTotal = requestItems.length;
-      }
-
-      result = {
-        materials: requestItems.map((m) => ({
-          _id: m._id.toString(),
-          materialId: m.materialId,
-          projectId: m.projectId,
-          projectName: m.projectName,
-          siteId: m.siteId,
-          site: m.site,
-          name: m.name,
-          unit: m.unit,
-          requestedQuantity: m.requestedQuantity,
-          approvedQuantity: m.approvedQuantity,
-          purchasedQuantity: m.purchasedQuantity,
-          consumedQuantity: m.consumedQuantity,
-          remainingStock: m.remainingStock,
-          vendor: m.vendor,
-          poNumber: m.poNumber,
-          issuedAmount: m.issuedAmount,
-          givenAmount: (m as any).givenAmount,
-          billUrl: (m as any).billUrl,
-          received: (m as any).status === "Received",
-          requestDate: m.requestDate,
-          status: m.status,
-          notes: m.notes,
-          createdBy: m.createdBy,
-          createdAt: m.createdAt,
-          updatedAt: m.updatedAt,
-        })),
-        pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
-      };
-    } else {
-      const [items, total] = await Promise.all([
-        Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-        Inventory.countDocuments(query),
-      ]);
-
-      if (items.length === 0 && total === 0) {
-        const materialQuery: Record<string, unknown> = { ...query };
-        materialQuery.$or = [
-          { status: "Received" },
-          { approvedQuantity: { $gt: 0 } },
-        ];
-        const [matItems, matTotal] = await Promise.all([
-          Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).maxTimeMS(15000).lean(),
-          Material.countDocuments(materialQuery).maxTimeMS(10000),
-        ]);
-
-        result = {
-          materials: matItems.map((m) => ({
-            _id: m._id.toString(),
-            materialId: m.materialId,
-            projectId: m.projectId,
-            projectName: m.projectName,
-            siteId: m.siteId,
-            site: m.site,
-            name: m.name,
-            unit: m.unit,
-            requestedQuantity: m.requestedQuantity,
-            approvedQuantity: m.approvedQuantity,
-            purchasedQuantity: m.purchasedQuantity,
-            consumedQuantity: m.consumedQuantity,
-            remainingStock: m.remainingStock,
-            vendor: m.vendor,
-            poNumber: m.poNumber,
-            issuedAmount: m.issuedAmount,
-            givenAmount: (m as any).givenAmount,
-            billUrl: (m as any).billUrl,
-            requestDate: m.requestDate,
-            status: m.status === "Received" ? "Received" : "Approved",
-            createdAt: m.createdAt,
-            updatedAt: m.updatedAt,
-          })),
-          pagination: { page, limit, total: matTotal, pages: Math.ceil(matTotal / limit) },
-        };
-      } else {
-        result = {
-          materials: items.map((m) => ({
-            _id: m._id.toString(),
-            materialId: m._id.toString(),
-            projectId: m.projectId,
-            projectName: m.projectName,
-            siteId: m.siteId,
-            site: m.site,
-            name: m.name,
-            unit: m.unit,
-            requestedQuantity: m.requestedQuantity || m.approvedQuantity,
-            approvedQuantity: m.approvedQuantity,
-            purchasedQuantity: m.purchasedQuantity,
-            consumedQuantity: m.consumedQuantity,
-            remainingStock: m.remainingStock,
-            vendor: m.vendor,
-            poNumber: m.poNumber,
-            purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
-              vendor: h.vendor,
-              quantity: h.quantity,
-              date: h.date,
-            })),
-            requestDate: m.createdAt,
-            status: "Approved",
-            createdAt: m.createdAt,
-            updatedAt: m.updatedAt,
-          })),
-          pagination: { page, limit, total, pages: Math.ceil(total / limit) },
-        };
-      }
-    }
-
-    setCache(cacheKey, result, 30000);
-    return result;
-  } catch (err: any) {
-    console.error(`[listMaterials] DB error:`, err?.message);
-    const isMongoTimeout =
-      err?.errorLabel === "RetryableWriteError" ||
-      err?.name === "MongoNetworkTimeoutError" ||
-      err?.name === "MongoNetworkError";
-    if (isMongoTimeout) {
-      const fallback = {
-        materials: [] as unknown[],
-        pagination: { page, limit, total: 0, pages: 0 },
-        shouldRetry: true,
-      };
-      setCache(cacheKey, fallback, 30000);
-      return fallback;
-    }
-    throw err;
-  }
+  return {
+    materials: items.map((m) => ({
+      _id: m._id.toString(),
+      materialId: m.materialId,
+      projectId: m.projectId,
+      projectName: m.projectName,
+      siteId: m.siteId,
+      site: m.site,
+      name: m.name,
+      unit: m.unit,
+      requestedQuantity: m.requestedQuantity,
+      approvedQuantity: m.approvedQuantity,
+      purchasedQuantity: m.purchasedQuantity,
+      consumedQuantity: m.consumedQuantity,
+      remainingStock: m.remainingStock,
+      vendor: m.vendor,
+      poNumber: m.poNumber,
+      issuedAmount: m.issuedAmount,
+      givenAmount: (m as any).givenAmount,
+      billUrl: (m as any).billUrl,
+      received: (m as any).status === "Received",
+      requestDate: m.requestDate,
+      status: m.status,
+      notes: m.notes,
+      createdBy: m.createdBy,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+    })),
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  };
 }
 
 export async function listLabourForSupervisor(

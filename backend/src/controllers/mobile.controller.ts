@@ -126,23 +126,15 @@ export async function getMyDevices(req: Request, res: Response, next: NextFuncti
 export async function listMaterials(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    const filters = {
+    const result = await mobileService.listMaterialsForSupervisor(userId, {
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
-    };
-    const result = await mobileService.listMaterialsForSupervisor(userId, filters);
-    if ((result as any).shouldRetry) {
-      res.status(503).json(result);
-    } else {
-      res.json(result);
-    }
-  } catch (e) {
-    console.error(`[listMaterials] Controller error:`, e);
-    next(e);
-  }
+    });
+    res.json(result);
+  } catch (e) { next(e); }
 }
 
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {
