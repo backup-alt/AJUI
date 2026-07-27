@@ -235,6 +235,23 @@ export async function uploadInventoryReceipt(
   }
 
   await inventory.save();
+
+  if (inventory.billUrl) {
+    try {
+      const { Material } = await import("../models/Material.js");
+      if (inventory.lastMaterialId) {
+        await Material.updateOne({ _id: inventory.lastMaterialId }, { $set: { billUrl: inventory.billUrl } });
+      } else {
+        await Material.updateOne(
+          { projectId: inventory.projectId, name: inventory.name, unit: inventory.unit },
+          { $set: { billUrl: inventory.billUrl } }
+        );
+      }
+    } catch (err) {
+      console.warn("[Inventory] Failed to propagate billUrl to Material:", err);
+    }
+  }
+
   return inventory.toObject();
 }
 
