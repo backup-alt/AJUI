@@ -276,14 +276,9 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Transaction Type</th>
                         <th>Description</th>
                         <th>Amount</th>
-                        @if (hasCashAddedApproval()) {
-                          <th>Approved Amt</th>
-                          <th>PO Number</th>
-                        } @else {
-                          <th>Issued Amt</th>
-                          <th>Given Amt</th>
-                          <th>PO Number</th>
-                        }
+                        <th>Issued Amt</th>
+                        <th>Given Amt</th>
+                        <th>PO Number</th>
                         <th>Supervisor</th>
                         <th>Bill / Reference</th>
                         <th>Status</th>
@@ -360,7 +355,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <button type="button" class="decline-action" (click)="decline(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>Decline</button>
                         </td>
                       </tr>
-                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="13"><span>No pending site expense approvals.</span></td></tr>
+                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="14"><span>No pending site expense approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>
