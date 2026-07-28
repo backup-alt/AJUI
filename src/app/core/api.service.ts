@@ -548,6 +548,31 @@ export class ApiService {
     );
   }
 
+  // =================== INVENTORY ===================
+  listInventory(params?: { projectId?: string; siteId?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/inventory${query}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  getMissingMaterials(siteId: string): Observable<{ site: any; materials: any[] }> {
+    return this.http.get<{ site: any; materials: any[] }>(`${this.baseUrl}/inventory/missing?siteId=${encodeURIComponent(siteId)}`, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  initializeInventory(payload: { siteId: string; items: Array<{ materialId: string; quantity: number }> }): Observable<{ site: any; results: any[] }> {
+    return this.http.post<{ site: any; results: any[] }>(`${this.baseUrl}/inventory/initialize`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== LABOUR ===================
   listLabour(params?: { projectId?: string; siteId?: string; category?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";

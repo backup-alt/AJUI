@@ -7,6 +7,7 @@ import * as paymentService from "../services/payment.service.js";
 import * as vendorService from "../services/vendor.service.js";
 import * as subcontractorService from "../services/subcontractor.service.js";
 import * as approvalService from "../services/approval.service.js";
+import * as inventoryService from "../services/inventory.service.js";
 import { getScopedProjectIds } from "../middleware/rbac.js";
 import { User } from "../models/User.js";
 import { ActivityLog } from "../models/ActivityLog.js";
@@ -93,6 +94,44 @@ export async function getPendingMaterials(req: Request, res: Response, next: Nex
     const scopeProjectIds = await getScopedProjectIds(req);
     const materials = await materialService.getPendingMaterials(scopeProjectIds);
     res.json({ materials });
+  } catch (e) { next(e); }
+}
+
+// =================== INVENTORY ===================
+export async function listInventory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const result = await inventoryService.listInventory({
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      search: req.query.search as string | undefined,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 20,
+      scopeProjectIds,
+    });
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getMissingMaterials(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const result = await inventoryService.getMissingMaterialsForSite(req.query.siteId as string);
+    if (Array.isArray(scopeProjectIds) && result.materials.length > 0) {
+      const allowed = new Set(scopeProjectIds.map((id) => String(id)));
+      result.materials = result.materials.filter((m) => m.projectId && allowed.has(String(m.projectId)));
+    }
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function initializeInventory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const updatedBy = user?.username || user?.email || user?._id?.toString();
+    const { siteId, items } = req.body;
+    const result = await inventoryService.initializeSiteInventory(siteId, items, updatedBy);
+    res.status(201).json(result);
   } catch (e) { next(e); }
 }
 

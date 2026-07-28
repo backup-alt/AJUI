@@ -295,6 +295,32 @@ export const listApprovalsSchema = z.object({
   }),
 });
 
+export const listInventorySchema = z.object({
+  query: z.object({
+    projectId: objectIdSchema.optional(),
+    siteId: objectIdSchema.optional(),
+    search: z.string().trim().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  }),
+});
+
+export const missingMaterialsForSiteSchema = z.object({
+  query: z.object({
+    siteId: objectIdSchema,
+  }),
+});
+
+export const initializeInventorySchema = z.object({
+  body: z.object({
+    siteId: objectIdSchema,
+    items: z.array(z.object({
+      materialId: objectIdSchema,
+      quantity: z.coerce.number().nonnegative(),
+    })).min(1),
+  }),
+});
+
 export type CreateMaterialInput = z.infer<typeof createMaterialSchema>["body"];
 export type CreateLabourInput = z.infer<typeof createLabourSchema>["body"];
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>["body"];

@@ -25,6 +25,9 @@ import {
   updateSubcontractorSchema,
   listSubcontractorsSchema,
   listApprovalsSchema,
+  listInventorySchema,
+  missingMaterialsForSiteSchema,
+  initializeInventorySchema,
 } from "../schemas/financial.schema.js";
 
 const router = Router();
@@ -43,6 +46,21 @@ router.get("/materials/:id", ctrl.getMaterial);
 router.patch("/materials/:id", validate(updateMaterialSchema), ctrl.updateMaterial);
 router.post("/materials/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadMaterialReceipt);
 router.delete("/materials/:id", requireRole("admin", "project_manager"), ctrl.deleteMaterial);
+
+// =================== INVENTORY ===================
+router.get("/inventory", validate(listInventorySchema, "query"), ctrl.listInventory);
+router.get(
+  "/inventory/missing",
+  validate(missingMaterialsForSiteSchema, "query"),
+  requireRole("admin", "project_manager", "supervisor"),
+  ctrl.getMissingMaterials
+);
+router.post(
+  "/inventory/initialize",
+  validate(initializeInventorySchema),
+  requireRole("admin", "project_manager"),
+  ctrl.initializeInventory
+);
 
 // =================== LABOUR ===================
 router.post(
