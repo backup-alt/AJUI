@@ -30,8 +30,10 @@ import {
   locationOutline,
   menuOutline,
   pencilOutline,
+  idCardOutline,
   peopleOutline,
   receiptOutline,
+  trash,
   searchOutline,
   settingsOutline,
   storefrontOutline,
@@ -60,6 +62,7 @@ addIcons({
   "funnel-outline": funnelOutline,
   "grid-outline": gridOutline,
   "hammer-outline": hammerOutline,
+  "id-card-outline": idCardOutline,
   "location-outline": locationOutline,
   "menu-outline": menuOutline,
   "pencil-outline": pencilOutline,
@@ -68,6 +71,7 @@ addIcons({
   "search-outline": searchOutline,
   "settings-outline": settingsOutline,
   "storefront-outline": storefrontOutline,
+  "trash": trash,
   "wallet-outline": walletOutline,
 });
 
