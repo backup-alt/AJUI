@@ -278,7 +278,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
       <agb-enterprise-sidebar active="dashboard"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        @if (backendSyncMessage()) {
+        @if (false) {
           <div class="backend-sync-banner" role="status">
             <span class="spinner" [class.spinning]="backendSyncing()"></span>
             <span>{{ backendSyncMessage() }}</span>
@@ -360,7 +360,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
                   >
                     <ion-icon [name]="selectedRowCount() ? 'create-outline' : 'add-outline'"></ion-icon>
-                    {{ selectedRowCount() ? 'Edit ' + selectedRowCount() + ' Row(s)' : 'Add Row' }}
+                    {{ selectedRowCount()
+                       ? 'Edit ' + selectedRowCount() + ' Row(s)'
+                       : (activeModule() === 'inventory' ? 'Add Materials' : 'Add Row') }}
                   </button>
                   <button
                     *ngIf="!tableViewExpanded() && selectedRowCount()"
