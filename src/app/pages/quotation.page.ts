@@ -109,7 +109,7 @@ function numberToWords(num: number): string {
                           </td>
                           <td>
                             <button type="button" class="icon-action-btn edit" title="Edit" (click)="editQuotation(quote)">
-                              <ion-icon name="create-outline"></ion-icon>
+                              <ion-icon name="pencil-outline"></ion-icon>
                             </button>
                             <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteQuotation(quote.id)">
                               <ion-icon name="trash-outline"></ion-icon>
