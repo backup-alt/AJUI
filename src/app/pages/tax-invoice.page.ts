@@ -829,6 +829,7 @@ export class TaxInvoicePage {
       companyAddress: this.companyProfile().address,
       state: this.companyProfile().state,
       gstin: this.companyProfile().gstin,
+      clientId: this.selectedClientId() || "",
       clientName: this.clientName.trim(),
       clientAddress: this.clientAddress.trim(),
       clientState: this.clientState,

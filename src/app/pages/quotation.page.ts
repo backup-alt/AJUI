@@ -1330,6 +1330,7 @@ readonly savingPdf = signal(false);
       companyAddress: this.companyProfile().address,
       state: this.companyProfile().state,
       gstin: this.companyProfile().gstin,
+      clientId: this.selectedClientId() || "",
       clientName: this.clientName,
       clientAddress: this.clientAddress,
       clientState: this.clientState,
