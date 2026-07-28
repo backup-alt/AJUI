@@ -583,8 +583,9 @@
 }
 
 .settings-w11-btn-invite:hover:not(:disabled) {
-  background: #001233 !important;
-  border-color: #001233 !important;
+  /* Subtle hover: slight brightness lift, no jarring color change */
+  background: #2a3a6e !important;
+  border-color: #2a3a6e !important;
 }
 
 .settings-w11-btn-invite:disabled {

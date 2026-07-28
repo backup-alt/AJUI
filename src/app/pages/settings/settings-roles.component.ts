@@ -602,44 +602,32 @@ type CombinedInvite = {
 
           @if (supervisorStep() === 3) {
             <div class="settings-w11-form">
-              <p class="settings-w11-step-hint">How would you like to send the invite?</p>
-              <div class="settings-w11-invite-method-choice">
-                <!-- Send via Email method card: temporarily hidden (email invite disabled for supervisor) -->
-                <button
-                  type="button"
-                  class="settings-w11-method-card"
-                  [class.selected]="inviteMethod() === 'email'"
-                  (click)="setInviteMethod('email')"
-                  [style.display]="'none'"
-                >
-                  <div class="settings-w11-method-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                  </div>
-                  <div class="settings-w11-method-info">
-                    <strong>Send via Email</strong>
-                    <span>Send a deep link email that opens the AGB app directly. Supervisor taps the link, enters OTP, and creates their account.</span>
-                  </div>
-                  <div class="settings-w11-method-check" [class.visible]="inviteMethod() === 'email'">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  class="settings-w11-method-card"
-                  [class.selected]="inviteMethod() === 'qr'"
-                  (click)="setInviteMethod('qr')"
-                >
-                  <div class="settings-w11-method-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                  </div>
-                  <div class="settings-w11-method-info">
-                    <strong>Generate QR Code</strong>
-                    <span>Create a time-limited QR code. Supervisor scans it from the AGB app welcome screen and enters the OTP sent to their email.</span>
-                  </div>
-                  <div class="settings-w11-method-check" [class.visible]="inviteMethod() === 'qr'">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  </div>
-                </button>
+              <div class="settings-w11-qr-generation-card">
+                <div class="settings-w11-qr-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                    <line x1="5" y1="5" x2="5.01" y2="5"/>
+                    <line x1="19" y1="5" x2="19.01" y2="5"/>
+                    <line x1="19" y1="19" x2="19.01" y2="19"/>
+                    <line x1="5" y1="19" x2="5.01" y2="19"/>
+                  </svg>
+                </div>
+                <h3 class="settings-w11-qr-title">QR Code Invitation</h3>
+                <p class="settings-w11-qr-description">
+                  A time-limited QR code will be generated. The supervisor scans it from the
+                  <strong>AGB Supervisor</strong> app welcome screen, then enters the verification
+                  code sent to their email to activate their account.
+                </p>
+                <div class="settings-w11-qr-expiry">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  <span>This invite expires in <strong>5 minutes</strong> after generation</span>
+                </div>
               </div>
               @if (supervisorError()) {
                 <div class="settings-w11-message error">{{ supervisorError() }}</div>
@@ -649,10 +637,16 @@ type CombinedInvite = {
                 <button
                   type="button"
                   class="settings-w11-btn settings-w11-btn-primary"
-                  [disabled]="supervisorLoading() || !inviteMethod()"
+                  [disabled]="supervisorLoading()"
                   (click)="createInviteWithMethod()"
                 >
-                  {{ supervisorLoading() ? 'Creating…' : (inviteMethod() === 'email' ? 'Send Email Invite' : 'Generate QR Code') }}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;margin-right:6px;vertical-align:-3px;">
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                  </svg>
+                  {{ supervisorLoading() ? 'Generating…' : 'Generate QR Code' }}
                 </button>
               </div>
             </div>
@@ -822,6 +816,69 @@ type CombinedInvite = {
       font-size: 12px;
       line-height: 1.4;
       color: #64748b;
+    }
+
+    /* QR Generation card (Step 3) */
+    .settings-w11-qr-generation-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 28px 24px;
+      border: 1px solid #d8dee8;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f7f9ff 0%, #ffffff 100%);
+      text-align: center;
+    }
+    .settings-w11-qr-icon {
+      width: 56px;
+      height: 56px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      background: #002263;
+      color: #ffffff;
+    }
+    .settings-w11-qr-icon svg {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+    .settings-w11-qr-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #002263;
+    }
+    .settings-w11-qr-description {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #475467;
+      max-width: 360px;
+    }
+    .settings-w11-qr-description strong {
+      color: #002263;
+    }
+    .settings-w11-qr-expiry {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #fff7e6;
+      border: 1px solid #ffd591;
+      color: #874d00;
+      font-size: 12px;
+    }
+    .settings-w11-qr-expiry svg {
+      width: 14px;
+      height: 14px;
+      display: block;
+    }
+    .settings-w11-qr-expiry strong {
+      color: #874d00;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,

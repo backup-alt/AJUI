@@ -630,10 +630,20 @@ const adminCreateEmployeeInviteSchema = z.object({
   email: z.string().email("Valid email is required").transform((v) => v.toLowerCase()),
   phone: z.string().trim().min(8).max(20).optional(),
   role: z.enum(["admin", "project_manager", "accountant"]),
+  // projectIds is optional in the schema so admin can be created without
+  // selecting projects, but the controller below enforces at least one
+  // project for PM/accountant (they cannot see everything).
   projectIds: z
     .array(z.string().trim().min(1, "Invalid project id"))
-    .min(1, "Select at least one project for this employee")
     .optional(),
+}).superRefine((data, ctx) => {
+  if (data.role !== "admin" && (!data.projectIds || data.projectIds.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["projectIds"],
+      message: "Select at least one project for this employee",
+    });
+  }
 });
 
 async function resolveProjectObjectIds(projectIds: string[]): Promise<string[]> {

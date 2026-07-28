@@ -86,13 +86,15 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   const user = await User.findById(userId).select("managedProjectIds").lean();
   const managedProjectIds = (user?.managedProjectIds || []).map((id) => new Types.ObjectId(id));
 
-  if (role === "admin" || role === "accountant") {
-    const result = managedProjectIds.length > 0 ? uniqueObjectIds(managedProjectIds) : null;
-    req._cachedScopedProjectIds = result;
-    return result;
+  if (role === "admin") {
+    // Admin sees everything regardless of managedProjectIds
+    req._cachedScopedProjectIds = null;
+    return null;
   }
 
-  if (role === "project_manager") {
+  // For PM/accountant, ALWAYS scope to their assigned projects.
+  // Empty managedProjectIds means they see nothing (not everything).
+  if (role === "project_manager" || role === "accountant") {
     const result = uniqueObjectIds(managedProjectIds);
     req._cachedScopedProjectIds = result;
     return result;
