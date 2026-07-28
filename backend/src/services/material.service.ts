@@ -117,30 +117,39 @@ export async function listMaterials(filter: {
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
-    Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Material.countDocuments(query),
+    Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
+    Material.countDocuments(query).maxTimeMS(8000),
   ]);
 
-  // Resolve site names for items that have siteId but site field is ObjectId or missing
-  const siteIds = [...new Set(items.map(m => m.siteId?.toString()).filter(Boolean))];
-  if (siteIds.length > 0) {
-    const sites = await Site.find({ _id: { $in: siteIds.map(id => new Types.ObjectId(id)) } }).lean();
-    const siteNameMap = new Map(sites.map(s => [s._id.toString(), s.name]));
-    items.forEach(item => {
-      if (item.siteId && (!item.site || typeof item.site === "object")) {
-        item.site = siteNameMap.get(item.siteId.toString()) || item.site;
-      }
-    });
+  // Aux queries are best-effort — if they time out on M0 we still want to
+  // return the main results rather than failing the entire request.
+  try {
+    const siteIds = [...new Set(items.map((m) => m.siteId?.toString()).filter(Boolean))];
+    if (siteIds.length > 0) {
+      const sites = await Site.find({ _id: { $in: siteIds.map((id) => new Types.ObjectId(id)) } }).lean();
+      const siteNameMap = new Map(sites.map((s) => [s._id.toString(), s.name]));
+      items.forEach((item) => {
+        if (item.siteId && (!item.site || typeof item.site === "object")) {
+          item.site = siteNameMap.get(item.siteId.toString()) || item.site;
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("[listMaterials] site-name lookup failed (returning items anyway):", (err as Error).message);
   }
 
-  backfillApprovedMaterialsToInventory(query).catch((err: unknown) =>
-    console.error("Background backfill failed:", err)
-  );
-  const stockMap = await inventoryStockMapForMaterials(items);
-  items.forEach((item) => {
-    const sharedStock = stockMap.get(inventoryKeyForMaterial(item));
-    if (sharedStock !== undefined) item.remainingStock = sharedStock;
-  });
+  try {
+    backfillApprovedMaterialsToInventory(query).catch((err: unknown) =>
+      console.warn("Background backfill failed:", err)
+    );
+    const stockMap = await inventoryStockMapForMaterials(items);
+    items.forEach((item) => {
+      const sharedStock = stockMap.get(inventoryKeyForMaterial(item));
+      if (sharedStock !== undefined) item.remainingStock = sharedStock;
+    });
+  } catch (err) {
+    console.warn("[listMaterials] inventory stock lookup failed (returning items anyway):", (err as Error).message);
+  }
 
   return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }

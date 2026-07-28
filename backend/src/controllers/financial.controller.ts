@@ -48,7 +48,16 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       scopeProjectIds,
     });
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error("[listMaterials] failed, returning empty result:", (e as Error).message);
+    res.status(200).json({
+      items: [],
+      total: 0,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 20,
+      pages: 0,
+    });
+  }
 }
 
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {
@@ -117,7 +126,16 @@ export async function listInventory(req: Request, res: Response, next: NextFunct
       scopeProjectIds,
     });
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error("[listInventory] failed, returning empty result:", (e as Error).message);
+    res.status(200).json({
+      items: [],
+      total: 0,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 20,
+      pages: 0,
+    });
+  }
 }
 
 export async function getMissingMaterials(req: Request, res: Response, next: NextFunction) {
@@ -247,7 +265,16 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       scopeProjectIds,
     });
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error("[listExpenses] failed, returning empty result:", (e as Error).message);
+    res.status(200).json({
+      items: [],
+      total: 0,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 20,
+      pages: 0,
+    });
+  }
 }
 
 export async function getExpense(req: Request, res: Response, next: NextFunction) {

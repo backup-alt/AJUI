@@ -83,14 +83,23 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
 
   const role = req.user.role;
   const userId = new Types.ObjectId(req.user.sub);
-  const user = await User.findById(userId).select("managedProjectIds").lean();
-  const managedProjectIds = (user?.managedProjectIds || []).map((id) => new Types.ObjectId(id));
 
+  // Admin short-circuit — don't even hit the DB, admins see everything.
   if (role === "admin") {
-    // Admin sees everything regardless of managedProjectIds
     req._cachedScopedProjectIds = null;
     return null;
   }
+
+  // For non-admin, fetch the user's managedProjectIds. Wrap in a timeout so
+  // a slow MongoDB call doesn't block the request indefinitely on M0.
+  let user: { managedProjectIds?: unknown[] } | null = null;
+  try {
+    const userQuery = User.findById(userId).select("managedProjectIds").lean().maxTimeMS(3000);
+    user = await userQuery;
+  } catch (err) {
+    console.warn("[rbac] User lookup timed out, treating as no managed projects:", (err as Error).message);
+  }
+  const managedProjectIds = (user?.managedProjectIds || []).map((id) => new Types.ObjectId(id));
 
   // For PM/accountant, ALWAYS scope to their assigned projects.
   // Empty managedProjectIds means they see nothing (not everything).
@@ -101,11 +110,19 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   }
 
   if (role === "supervisor") {
-    const supervisor = await Supervisor.findOne({ userId }).select("assignedProjects assignedProjectId").lean();
-    const supervisorProjectIds = supervisor?.assignedProjects?.length
-      ? supervisor.assignedProjects.map((id) => new Types.ObjectId(id.toString()))
+    let supervisor: { assignedProjects?: unknown[]; assignedProjectId?: unknown } | null = null;
+    try {
+      supervisor = await Supervisor.findOne({ userId })
+        .select("assignedProjects assignedProjectId")
+        .lean()
+        .maxTimeMS(3000);
+    } catch (err) {
+      console.warn("[rbac] Supervisor lookup timed out:", (err as Error).message);
+    }
+    const supervisorProjectIds = (supervisor?.assignedProjects as unknown[])?.length
+      ? (supervisor!.assignedProjects as unknown[]).map((id) => new Types.ObjectId((id as { toString(): string }).toString()))
       : supervisor?.assignedProjectId
-        ? [new Types.ObjectId(supervisor.assignedProjectId)]
+        ? [new Types.ObjectId(supervisor.assignedProjectId as string)]
         : [];
     const projectIds = [...supervisorProjectIds, ...managedProjectIds];
     const result = uniqueObjectIds(projectIds);

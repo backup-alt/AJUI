@@ -171,8 +171,8 @@ export async function listExpenses(filter: {
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
-    Expense.find(query).sort({ date: -1, createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Expense.countDocuments(query),
+    Expense.find(query).sort({ date: -1, createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
+    Expense.countDocuments(query).maxTimeMS(8000),
   ]);
   return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }

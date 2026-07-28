@@ -107,8 +107,8 @@ export async function listInventory(filter: {
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
-    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Inventory.countDocuments(query),
+    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
+    Inventory.countDocuments(query).maxTimeMS(8000),
   ]);
 
   return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
