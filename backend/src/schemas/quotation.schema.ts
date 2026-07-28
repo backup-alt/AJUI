@@ -19,7 +19,7 @@ export const createQuotationSchema = z.object({
     companyAddress: z.string().trim().max(500).default(""),
     state: z.string().trim().max(100).default(""),
     gstin: z.string().trim().max(40).default(""),
-    clientId: z.string().optional(),
+    clientId: z.string().optional().nullable(),
     clientName: z.string().trim().max(200).default(""),
     clientAddress: z.string().trim().max(500).default(""),
     clientState: z.string().trim().max(100).default(""),
