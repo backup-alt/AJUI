@@ -801,7 +801,24 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
               document.getElementById('success-message').textContent = 'Account created! Redirecting you to the login page...';
               // Redirect to the web admin login page after a short delay
               var loginUrl = '${env.FRONTEND_URL.replace(/\/+$/, "")}/#/login';
-              setTimeout(function () { window.location.href = loginUrl; }, 2500);
+              // Hardcoded fallback in case FRONTEND_URL env var is misconfigured.
+              // The web admin is always deployed at backup-alt.github.io/AJUI/.
+              // After the redirect, if the URL doesn't work, the user can still
+              // navigate manually to https://backup-alt.github.io/AJUI/#/login
+              setTimeout(function () {
+                try {
+                  window.location.href = loginUrl;
+                  // Safety net: if the redirect doesn't work within 3 seconds,
+                  // try the hardcoded correct URL as a last resort.
+                  setTimeout(function () {
+                    if (window.location.href.indexOf('login') === -1) {
+                      window.location.href = 'https://backup-alt.github.io/AJUI/#/login';
+                    }
+                  }, 3000);
+                } catch (e) {
+                  window.location.href = 'https://backup-alt.github.io/AJUI/#/login';
+                }
+              }, 2500);
             } else {
               document.getElementById('success-message').textContent = 'You can now sign in to the AGB Supervisor app with your phone number and password.';
             }
