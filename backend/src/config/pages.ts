@@ -589,9 +589,9 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
           <input type="email" id="email" placeholder="your@email.com" autocomplete="email" />
         </label>
 
-        <label class="form-field">
+        <label class="form-field" id="otp-field">
           <span>Verification code (6 digits)</span>
-          <input type="text" id="otp" placeholder="Enter the 6-digit code from your email" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required />
+          <input type="text" id="otp" placeholder="Enter the 6-digit code from your email" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
         </label>
 
         <label class="form-field">
@@ -733,8 +733,21 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
           if (emailText) document.getElementById('email').value = emailText;
         }
 
+        // Employee invites (admin/PM/accountant) don't require a verification code
+        if (inviteType === 'employee') {
+          document.getElementById('otp-field').style.display = 'none';
+          document.getElementById('otp').required = false;
+        } else {
+          document.getElementById('otp-field').style.display = 'flex';
+          document.getElementById('otp').required = true;
+        }
+
         document.getElementById('signup-title').textContent = 'Welcome, ' + (name || 'there');
-        document.getElementById('signup-subtitle').textContent = 'Review your details, enter the verification code from your email, and choose a password.';
+        if (inviteType === 'employee') {
+          document.getElementById('signup-subtitle').textContent = 'Review your details and choose a password to activate your account.';
+        } else {
+          document.getElementById('signup-subtitle').textContent = 'Review your details, enter the verification code from your email, and choose a password.';
+        }
 
         setLoading(false);
       }
@@ -749,12 +762,13 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
 
         if (!n || n.length < 2) { showErr('Please enter your full name.'); return; }
         if (!ph || ph.length < 8) { showErr('Please enter a valid phone number (at least 8 digits).'); return; }
-        if (!otp || otp.length !== 6) { showErr('Please enter the 6-digit verification code from your email.'); return; }
+        if (inviteType === 'supervisor' && (!otp || otp.length !== 6)) { showErr('Please enter the 6-digit verification code from your email.'); return; }
         if (!pw || pw.length < 6) { showErr('Password must be at least 6 characters.'); return; }
         if (pw !== cf) { showErr('Passwords do not match.'); return; }
 
-        var payload = { token: token, otp: otp, name: n, phone: ph, password: pw };
+        var payload = { token: token, name: n, phone: ph, password: pw };
         if (inviteType === 'supervisor') {
+          payload.otp = otp;
           var em = document.getElementById('email').value.trim();
           if (!em) { showErr('Email is required.'); return; }
           payload.email = em;

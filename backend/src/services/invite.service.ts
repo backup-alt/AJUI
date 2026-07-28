@@ -220,9 +220,7 @@ export async function createEmployeeInvite(
   }
 
   const token = generateToken();
-  const otp = generateOtp();
   const expiresAt = new Date(Date.now() + INVITE_EXPIRY_MINUTES * 60 * 1000);
-  const otpExpiresAt = expiresAt;
 
   const invite = await InviteToken.create({
     token,
@@ -236,13 +234,11 @@ export async function createEmployeeInvite(
       inviteeName: params.name,
       allocatedProjectIds: params.projectIds || [],
     },
+    // Employee invites (admin/PM/accountant) don't require OTP —
+    // the admin already verified the email when creating the invite.
     otpHash: "",
-    otpExpiresAt,
+    otpExpiresAt: undefined,
   });
-
-  const otpHash = await hashToken(otp);
-  invite.otpHash = otpHash;
-  await invite.save();
 
   const backendUrl = resolveBackendBaseUrl(params.req);
   const inviteUrl = `${backendUrl}/signup.html?token=${token}`;

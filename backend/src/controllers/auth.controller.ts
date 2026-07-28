@@ -793,7 +793,9 @@ export async function verifyEmployeeInvite(
 
 const employeeSignupSchema = z.object({
   token: z.string().min(1),
-  otp: z.string().length(6, "OTP must be 6 digits"),
+  // OTP is optional — employee invites (admin/PM/accountant) don't require OTP.
+  // The endpoint only validates OTP if the invite has an otpHash stored.
+  otp: z.string().length(6, "OTP must be 6 digits").optional(),
   name: z.string().trim().min(2).max(100),
   phone: z.string().trim().min(8).max(20),
   password: z.string().min(6).max(128),
@@ -992,8 +994,9 @@ export async function employeeSignup(
       if (invite.otpExpiresAt && invite.otpExpiresAt < new Date()) {
         throw new AppError(410, "OTP has expired. Please request a new code.");
       }
+      if (!input.otp) throw new AppError(400, "Verification code is required for this invite");
       const valid = await compareToken(input.otp, invite.otpHash);
-      if (!valid) throw new AppError(400, "Invalid OTP");
+      if (!valid) throw new AppError(400, "Invalid verification code");
     }
 
     const fallbackEmail = invite.inviteeEmail || "";
