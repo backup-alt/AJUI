@@ -63,9 +63,13 @@ export class ApiService {
     this.userSignal.set(user);
     this.expiresAtSignal.set(expiresAt);
     try {
-      sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-      sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-      sessionStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt);
+      // Use localStorage so the session survives browser/tab close.
+      // sessionStorage was wiping sessions on every Render redeploy
+      // (which forced the user back to the dashboard with no token),
+      // causing every list endpoint to 401.
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt);
     } catch {}
   }
 
@@ -1116,11 +1120,15 @@ export class ApiService {
     this.userSignal.set(res.user);
     this.expiresAtSignal.set(res.expiresAt);
     try {
-      sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
-      sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
-      sessionStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
+      // localStorage so the session survives browser/tab close.
+      // sessionStorage wiped the session on every Render redeploy,
+      // sending the user back to the dashboard with no token and
+      // causing every list endpoint to 401.
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
+      localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
       if (res.refreshToken) {
-        sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
+        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
       }
     } catch {}
   }
@@ -1130,7 +1138,8 @@ export class ApiService {
   refreshTokens(): Promise<{ accessToken: string; refreshToken?: string; expiresAt: string } | null> {
     if (this.refreshInFlight) return this.refreshInFlight;
 
-    const refreshToken = sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    // localStorage so the refresh token survives browser/tab close.
+    const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
     if (!refreshToken) return Promise.resolve(null);
 
     this.refreshInFlight = new Promise((resolve) => {
@@ -1141,9 +1150,9 @@ export class ApiService {
           this.accessTokenSignal.set(res.accessToken);
           this.expiresAtSignal.set(res.expiresAt);
           try {
-            sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
-            sessionStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
-            if (res.refreshToken) sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
+            localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
+            localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, res.expiresAt);
+            if (res.refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
           } catch {}
           this.refreshInFlight = null;
           resolve(res);
@@ -1175,13 +1184,23 @@ export class ApiService {
     this.userSignal.set(null);
     this.expiresAtSignal.set(null);
     try {
-      Object.values(STORAGE_KEYS).forEach((k) => sessionStorage.removeItem(k));
+      Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
     } catch {}
   }
 
   private getStored(key: string): string | null {
     try {
-      return sessionStorage.getItem(key);
+      // localStorage so the token survives browser/tab close. We migrate
+      // from any prior sessionStorage entry on the fly.
+      const fromLocal = localStorage.getItem(key);
+      if (fromLocal) return fromLocal;
+      const fromSession = sessionStorage.getItem(key);
+      if (fromSession) {
+        localStorage.setItem(key, fromSession);
+        sessionStorage.removeItem(key);
+        return fromSession;
+      }
+      return null;
     } catch {
       return null;
     }

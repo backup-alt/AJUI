@@ -7,14 +7,16 @@ export async function connectDatabase(): Promise<void> {
 
     await mongoose.connect(env.MONGODB_URI, {
       serverSelectionTimeoutMS: 15000,
-      // M0 free-tier cluster can only handle ~3-5 concurrent ops reliably.
-      // Capping the pool prevents the connection pool from being marked
-      // as unhealthy when concurrent hydration requests exceed capacity.
-      maxPoolSize: 5,
+      // Cap the pool at a sustainable size for M0 free tier — too high and
+      // every concurrent request times out; too low and the wait queue
+      // fills up before requests can complete.
+      maxPoolSize: 10,
       minPoolSize: 1,
-      socketTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
       heartbeatFrequencyMS: 10000,
-      waitQueueTimeoutMS: 20000,
+      // Long wait queue timeout lets in-flight requests finish instead of
+      // getting rejected with WaitQueueTimeoutError.
+      waitQueueTimeoutMS: 60000,
       retryWrites: true,
       retryReads: true,
     });

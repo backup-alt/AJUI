@@ -33,7 +33,16 @@ export const authInterceptor: HttpInterceptorFn = (
 
   let token: string | null = null;
   try {
-    token = sessionStorage.getItem("ajui_access_token");
+    token = localStorage.getItem("ajui_access_token");
+    if (!token) {
+      // Migrate any older sessionStorage entry so existing users don't
+      // get logged out by this change.
+      token = sessionStorage.getItem("ajui_access_token");
+      if (token) {
+        localStorage.setItem("ajui_access_token", token);
+        sessionStorage.removeItem("ajui_access_token");
+      }
+    }
   } catch {}
 
   let authReq = req;
