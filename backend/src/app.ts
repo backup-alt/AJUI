@@ -193,6 +193,8 @@ export async function bootstrap(): Promise<void> {
   await seedDefaultAdmin();
   const { ensureWorkersCollection } = await import("./utils/ensure-collections.js");
   await ensureWorkersCollection();
+  const { migrateCompanyName } = await import("./services/company-profile.service.js");
+  await migrateCompanyName();
 
   const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
   backfillMaterialSiteIds().catch((err: any) =>

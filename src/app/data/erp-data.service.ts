@@ -400,7 +400,7 @@ export class ErpDataService {
 
   readonly companyProfile = signal<CompanyProfile>(
     this.readState<CompanyProfile>("companyProfile", {
-      name: "Annai Golden Builders",
+      name: "Annai Golden Builders Pvt Ltd",
       address: "",
       state: "Tamil Nadu",
       gstin: "",
