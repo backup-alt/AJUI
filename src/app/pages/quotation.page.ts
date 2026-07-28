@@ -112,11 +112,11 @@ function numberToWords(num: number): string {
                               <ion-icon name="pencil-outline"></ion-icon>
                             </button>
                             <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteQuotation(quote.id)">
-                              <ion-icon name="trash-outline"></ion-icon>
+                              <ion-icon name="trash"></ion-icon>
                             </button>
                             @if (!quote.clientId && quote.clientName) {
                               <button type="button" class="icon-action-btn client" title="Make as Client" (click)="makeAsClient(quote)">
-                                <ion-icon name="person-add-outline"></ion-icon>
+                                <ion-icon name="id-card-outline"></ion-icon>
                               </button>
                             }
                           </td>
