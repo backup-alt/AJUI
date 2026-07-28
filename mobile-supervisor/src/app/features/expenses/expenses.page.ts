@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent, IonSearchbar,
@@ -321,7 +321,7 @@ import {
     }
   `],
 })
-export class ExpensesPage implements OnInit, OnDestroy {
+export class ExpensesPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -379,10 +379,6 @@ export class ExpensesPage implements OnInit, OnDestroy {
         this.selectedSiteName.set(this.supervisor.selectedSiteName());
         void this.loadExpenses();
       });
-  }
-
-  ngOnDestroy(): void {
-    // takeUntilDestroyed handles cleanup automatically
   }
 
   async loadExpenses(): Promise<void> {

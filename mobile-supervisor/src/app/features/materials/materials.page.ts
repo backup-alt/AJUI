@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -390,7 +390,7 @@ interface ConsolidatedMaterial {
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
   `],
 })
-export class MaterialsPage implements OnInit, OnDestroy {
+export class MaterialsPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -415,10 +415,6 @@ export class MaterialsPage implements OnInit, OnDestroy {
     this.supervisor.siteChanged$
       .pipe(takeUntilDestroyed())
       .subscribe(() => void this.loadMaterials());
-  }
-
-  ngOnDestroy(): void {
-    // takeUntilDestroyed handles cleanup automatically
   }
 
   async loadMaterials(): Promise<void> {

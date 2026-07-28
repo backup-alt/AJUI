@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -543,7 +543,7 @@ interface RequestItem {
     }
   `],
 })
-export class RequestsPage implements OnInit, OnDestroy {
+export class RequestsPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
   private alertCtrl = inject(AlertController);
@@ -626,10 +626,6 @@ export class RequestsPage implements OnInit, OnDestroy {
     this.supervisor.siteChanged$
       .pipe(takeUntilDestroyed())
       .subscribe(() => void this.loadAllRequests());
-  }
-
-  ngOnDestroy(): void {
-    // takeUntilDestroyed handles cleanup automatically
   }
 
   onTabChange(): void {
