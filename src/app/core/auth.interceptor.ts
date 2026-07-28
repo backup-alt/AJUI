@@ -38,6 +38,8 @@ export const authInterceptor: HttpInterceptorFn = (
         return from(api.refreshTokens()).pipe(
           switchMap((res) => {
             if (!res) {
+              api.clearSession();
+              window.location.href = "/#/login";
               return throwError(() => err);
             }
             const retryReq = req.clone({
@@ -45,7 +47,11 @@ export const authInterceptor: HttpInterceptorFn = (
             });
             return next(retryReq);
           }),
-          catchError(() => throwError(() => err)),
+          catchError(() => {
+            api.clearSession();
+            window.location.href = "/#/login";
+            return throwError(() => err);
+          }),
         );
       }
 

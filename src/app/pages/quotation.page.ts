@@ -186,7 +186,7 @@ function numberToWords(num: number): string {
                             @for (client of filteredClients(); track client.id) {
                               <div
                                 class="client-dropdown-item"
-                                [class.selected]="selectedClientId() === client.id"
+                                [class.selected]="selectedClientId() === client._id"
                                 (mousedown)="selectClient(client)"
                               >
                                 <span class="client-dropdown-name">{{ client.name }}</span>
@@ -1118,7 +1118,7 @@ readonly savingPdf = signal(false);
     this.clientAddress = client.address;
     this.clientGstin = client.gstNumber || "";
     this.clientSearchTerm.set(client.name);
-    this.selectedClientId.set(client.id);
+    this.selectedClientId.set(client._id || "");
     this.showClientDropdown.set(false);
   }
 
@@ -1265,7 +1265,7 @@ readonly savingPdf = signal(false);
 
   private findClientIdByName(name: string): string | null {
     const match = this.data.clients().find(c => c.name.toLowerCase() === name.toLowerCase());
-    return match?.id || null;
+    return match?._id || null;
   }
 
   addRow() {
