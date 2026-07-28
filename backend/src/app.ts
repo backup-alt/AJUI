@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -154,6 +155,10 @@ export function createApp(): express.Application {
   app.use("/api", quotationRoutes);
   app.use("/api/invoices", invoiceRoutes);
   app.use("/api", companyProfileRoutes);
+
+  // Static assets (logo for email templates and auth pages)
+  // Resolve relative to project root (process.cwd() = backend/ when running npm start)
+  app.use("/assets", express.static(path.join(process.cwd(), "public/assets"), { maxAge: "7d" }));
 
   app.get("/reset-password.html", (_req, res) => {
     res.type("html").send(RESET_PASSWORD_HTML);
