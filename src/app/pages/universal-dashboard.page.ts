@@ -355,8 +355,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     type="button"
                     class="primary-table-action add-row-action"
                     *ngIf="!tableViewExpanded() && activeModule() !== 'vendors' && (selectedRowCount() > 0 || !isNoCreateModule())"
-                    [title]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
-                    [attr.aria-label]="selectedRowCount() ? 'Edit ' + selectedRowCount() + ' selected row(s)' : 'Add row'"
+                    [title]="selectedRowCount()
+                       ? 'Edit ' + selectedRowCount() + ' selected row(s)'
+                       : (activeModule() === 'inventory' ? 'Add materials' : 'Add row')"
+                    [attr.aria-label]="selectedRowCount()
+                       ? 'Edit ' + selectedRowCount() + ' selected row(s)'
+                       : (activeModule() === 'inventory' ? 'Add materials' : 'Add row')"
                     (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
                   >
                     <ion-icon [name]="selectedRowCount() ? 'create-outline' : 'add-outline'"></ion-icon>
@@ -1001,113 +1005,124 @@ const siteMaterialDetailFields: FieldSchema[] = [
             <section class="erp-dialog inventory-init-dialog" role="dialog" aria-modal="true" aria-labelledby="inv-init-title">
               <div class="dialog-head">
                 <div>
-                  <span>Initialize Inventory</span>
-                  <h2 id="inv-init-title">Set up site stock</h2>
-                  <p>Pick a site, choose materials not yet in inventory, and enter starting quantities.</p>
+                  <span>Add Materials</span>
+                  <h2 id="inv-init-title">Add a material to this site</h2>
+                  <p>Pick a site, then enter the material name, unit, and starting stock. New material names are saved automatically.</p>
                 </div>
-                <button type="button" class="icon-button" aria-label="Close initialize dialog" (click)="closeInventoryInitDialog()">
+                <button type="button" class="icon-button" aria-label="Close add material dialog" (click)="closeInventoryInitDialog()">
                   <ion-icon name="close-outline"></ion-icon>
                 </button>
               </div>
 
               <div class="inventory-init-body">
-                <div class="inventory-init-row">
+                @if (addMaterialToast()) {
+                  <div class="inventory-init-toast">{{ addMaterialToast() }}</div>
+                }
+                @if (addMaterialError()) {
+                  <div class="inventory-init-error">{{ addMaterialError() }}</div>
+                }
+
+                <label class="inventory-init-label inventory-init-label-wide">
+                  <span>Site <em class="required">*</em></span>
+                  <select
+                    class="inventory-init-select"
+                    [value]="addMaterialForm().siteId"
+                    (change)="patchAddMaterialForm({ siteId: $any($event.target).value })"
+                    aria-label="Select site"
+                    required
+                  >
+                    <option value="" disabled>Select a site…</option>
+                    @for (site of addMaterialSiteOptions(); track site.id) {
+                      <option [value]="site.id">{{ site.name }}</option>
+                    }
+                  </select>
+                </label>
+
+                <label class="inventory-init-label inventory-init-label-wide">
+                  <span>Material Name <em class="required">*</em></span>
+                  <input
+                    type="text"
+                    class="inventory-init-input"
+                    list="inventory-material-name-list"
+                    placeholder="Choose or type a new material name"
+                    [value]="addMaterialForm().name"
+                    (input)="patchAddMaterialForm({ name: $any($event.target).value })"
+                    autocomplete="off"
+                    required
+                  />
+                  <datalist id="inventory-material-name-list">
+                    @for (name of materialNameSuggestions(); track name) {
+                      <option [value]="name"></option>
+                    }
+                  </datalist>
+                </label>
+
+                <label class="inventory-init-label inventory-init-label-wide">
+                  <span>Unit <em class="required">*</em></span>
+                  <input
+                    type="text"
+                    class="inventory-init-input"
+                    list="inventory-unit-list"
+                    placeholder="Choose or type a unit"
+                    [value]="addMaterialForm().unit"
+                    (input)="patchAddMaterialForm({ unit: $any($event.target).value })"
+                    autocomplete="off"
+                    required
+                  />
+                  <datalist id="inventory-unit-list">
+                    @for (u of addMaterialAllowedUnits; track u) {
+                      <option [value]="u"></option>
+                    }
+                  </datalist>
+                </label>
+
+                <div class="inventory-init-row inventory-init-row-2">
                   <label class="inventory-init-label">
-                    <span>Site</span>
-                    <select
-                      class="inventory-init-select"
-                      [value]="inventoryInitSiteId()"
-                      (change)="onInventoryInitSiteChange($any($event.target).value)"
-                      aria-label="Select site"
-                    >
-                      <option value="" disabled>Select a site…</option>
-                      @for (site of inventoryInitSiteOptions(); track site.id) {
-                        <option [value]="site.id">{{ site.name }}</option>
-                      }
-                    </select>
-                  </label>
-                  <label class="inventory-init-label inventory-init-search-field">
-                    <span>Search materials</span>
+                    <span>Quantity / Current Stock <em class="required">*</em></span>
                     <input
-                      type="search"
+                      type="number"
+                      min="0"
+                      step="0.01"
                       class="inventory-init-input"
-                      placeholder="Type to filter…"
-                      [value]="inventoryInitSearch()"
-                      (input)="inventoryInitSearch.set($any($event.target).value)"
-                      [disabled]="!inventoryInitSiteId()"
+                      [value]="addMaterialForm().quantity"
+                      (input)="patchAddMaterialForm({ quantity: $any($event.target).value })"
+                      required
+                    />
+                  </label>
+                  <label class="inventory-init-label">
+                    <span>Minimum Stock</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="inventory-init-input"
+                      [value]="addMaterialForm().minimumStock"
+                      (input)="patchAddMaterialForm({ minimumStock: $any($event.target).value })"
                     />
                   </label>
                 </div>
 
-                @if (inventoryInitToast()) {
-                  <div class="inventory-init-toast">{{ inventoryInitToast() }}</div>
-                }
-                @if (inventoryInitError()) {
-                  <div class="inventory-init-error">{{ inventoryInitError() }}</div>
-                }
-
-                <div class="inventory-init-list" [class.is-loading]="inventoryInitLoading()">
-                  @if (!inventoryInitSiteId()) {
-                    <div class="inventory-init-empty">Select a site to load available materials.</div>
-                  } @else if (inventoryInitLoading()) {
-                    <div class="inventory-init-empty">Loading materials…</div>
-                  } @else if (inventoryInitFilteredMaterials().length === 0) {
-                    <div class="inventory-init-empty">
-                      @if (inventoryInitMaterials().length === 0) {
-                        All materials for this site are already in inventory.
-                      } @else {
-                        No materials match your search.
-                      }
-                    </div>
-                  } @else {
-                    @for (m of inventoryInitFilteredMaterials(); track m._id) {
-                      <article class="inventory-init-row-item" [class.selected]="isInventoryInitSelected(m._id)">
-                        <label class="inventory-init-checkbox">
-                          <input
-                            type="checkbox"
-                            [checked]="isInventoryInitSelected(m._id)"
-                            (change)="toggleInventoryInitMaterial(m._id)"
-                            [attr.aria-label]="'Select ' + m.name"
-                          />
-                          <span class="inventory-init-item-info">
-                            <strong>{{ m.name }}</strong>
-                            <small>
-                              @if (m.materialId) { {{ m.materialId }} · }
-                              {{ m.unit }}
-                              @if (m.vendor) { · {{ m.vendor }} }
-                            </small>
-                          </span>
-                        </label>
-                        @if (isInventoryInitSelected(m._id)) {
-                          <label class="inventory-init-qty-label">
-                            <span>Qty</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              class="inventory-init-qty-input"
-                              [value]="getInventoryInitQty(m._id)"
-                              (input)="setInventoryInitQty(m._id, $any($event.target).value)"
-                              [attr.aria-label]="'Quantity for ' + m.name"
-                            />
-                            <span class="inventory-init-qty-unit">{{ m.unit }}</span>
-                          </label>
-                        }
-                      </article>
-                    }
-                  }
-                </div>
+                <label class="inventory-init-label inventory-init-label-wide">
+                  <span>Remarks</span>
+                  <textarea
+                    class="inventory-init-input inventory-init-textarea"
+                    rows="3"
+                    placeholder="Optional notes"
+                    [value]="addMaterialForm().remarks"
+                    (input)="patchAddMaterialForm({ remarks: $any($event.target).value })"
+                  ></textarea>
+                </label>
               </div>
 
               <div class="dialog-actions">
-                <button type="button" class="secondary-action" (click)="closeInventoryInitDialog()" [disabled]="inventoryInitSaving()">Cancel</button>
+                <button type="button" class="secondary-action" (click)="closeInventoryInitDialog()" [disabled]="addMaterialSaving()">Cancel</button>
                 <button
                   type="button"
                   class="primary-action"
-                  (click)="submitInventoryInit()"
-                  [disabled]="!canSubmitInventoryInit()"
+                  (click)="submitAddMaterial()"
+                  [disabled]="!canSubmitAddMaterial()"
                 >
-                  {{ inventoryInitSaving() ? 'Saving…' : 'Initialize (' + inventoryInitSelectedCount() + ')' }}
+                  {{ addMaterialSaving() ? 'Saving…' : 'Save Material' }}
                 </button>
               </div>
             </section>
@@ -1382,7 +1397,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
     /* ============== Inventory Init Dialog ============== */
     .inventory-init-dialog {
-      max-width: 760px;
+      max-width: 560px;
       width: 96%;
       max-height: 90vh;
       display: flex;
@@ -1400,8 +1415,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
       grid-template-columns: 1fr 1fr;
       gap: 16px;
     }
+    .inventory-init-row-2 {
+      grid-template-columns: 1fr 1fr;
+    }
     @media (max-width: 640px) {
-      .inventory-init-row {
+      .inventory-init-row,
+      .inventory-init-row-2 {
         grid-template-columns: 1fr;
       }
     }
@@ -1414,6 +1433,14 @@ const siteMaterialDetailFields: FieldSchema[] = [
       color: #64748b;
       text-transform: uppercase;
       letter-spacing: 0.4px;
+    }
+    .inventory-init-label-wide {
+      width: 100%;
+    }
+    .inventory-init-label .required {
+      color: #b3341c;
+      font-style: normal;
+      margin-left: 2px;
     }
     .inventory-init-label input[disabled] {
       background: #f5f7fb;
@@ -1441,6 +1468,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .inventory-init-search-field {
       min-width: 0;
+    }
+    .inventory-init-textarea {
+      resize: vertical;
+      min-height: 72px;
+      font-family: inherit;
+      line-height: 1.4;
     }
     .inventory-init-toast {
       padding: 10px 14px;
@@ -1678,22 +1711,41 @@ export class UniversalDashboardPage implements OnInit {
   });
   readonly showInventoryBreakdown = signal(false);
   readonly showInventoryInitDialog = signal(false);
-  readonly inventoryInitSiteOptions = signal<Array<{ id: string; name: string }>>([]);
-  readonly inventoryInitSiteId = signal("");
-  readonly inventoryInitSearch = signal("");
-  readonly inventoryInitMaterials = signal<Array<{ _id: string; materialId?: string; name: string; unit: string; vendor?: string; poNumber?: string; purchasedQuantity?: number; approvedQuantity?: number }>>([]);
-  readonly inventoryInitSelections = signal<Record<string, number>>({});
-  readonly inventoryInitLoading = signal(false);
-  readonly inventoryInitSaving = signal(false);
-  readonly inventoryInitError = signal<string | null>(null);
-  readonly inventoryInitToast = signal<string | null>(null);
-  readonly inventoryInitSelectedCount = computed(() => Object.keys(this.inventoryInitSelections()).length);
-  readonly inventoryInitFilteredMaterials = computed(() => {
-    const term = this.inventoryInitSearch().trim().toLowerCase();
-    const all = this.inventoryInitMaterials();
-    if (!term) return all;
-    return all.filter((m) => (m.name || "").toLowerCase().includes(term) || (m.materialId || "").toLowerCase().includes(term));
+  readonly addMaterialForm = signal<{ siteId: string; name: string; unit: string; quantity: number; minimumStock: number; remarks: string }>({
+    siteId: "",
+    name: "",
+    unit: "",
+    quantity: 0,
+    minimumStock: 0,
+    remarks: "",
   });
+  readonly addMaterialSaving = signal(false);
+  readonly addMaterialError = signal<string | null>(null);
+  readonly addMaterialToast = signal<string | null>(null);
+  readonly addMaterialSiteOptions = computed((): Array<{ id: string; name: string }> => {
+    const raw = this.data.sites();
+    const seen = new Set<string>();
+    const out: Array<{ id: string; name: string }> = [];
+    for (const r of raw) {
+      const name = ((r as any).name || r.id || "").trim();
+      const id = (r as any).id || (r as any)._id || name;
+      if (!id || !name) continue;
+      const key = `${id}__${name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ id, name });
+    }
+    return out;
+  });
+  readonly materialNameSuggestions = computed((): string[] => {
+    const set = new Set<string>();
+    for (const m of this.data.materials()) {
+      const n = (m as any).name;
+      if (n) set.add(n.trim());
+    }
+    return [...set].filter(Boolean).sort();
+  });
+  readonly addMaterialAllowedUnits = ["Nos", "Bag", "Kg", "Ton", "Load", "Cubic Feet", "Cubic Meter", "Meter", "Litre", "Roll", "Bundle", "Piece", "Box"];
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
   readonly dashboardRows = computed(() => this.buildRows());
   readonly tableState = computed(() => ({
@@ -1771,135 +1823,92 @@ export class UniversalDashboardPage implements OnInit {
   }
 
   openInventoryInitDialog() {
-    this.inventoryInitError.set(null);
-    this.inventoryInitToast.set(null);
-    this.inventoryInitSiteId.set(this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : "");
-    this.inventoryInitSearch.set("");
-    this.inventoryInitMaterials.set([]);
-    this.inventoryInitSelections.set({});
-    const siteOptions = this.data.sites().map((s) => {
-      const name = (s as any).name || s.id;
-      return { id: (s as any).id || (s as any)._id || name, name };
-    }).filter((s) => s.id && s.name);
-    const seen = new Set<string>();
-    const unique: Array<{ id: string; name: string }> = [];
-    for (const opt of siteOptions) {
-      const key = `${opt.id}__${opt.name.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      unique.push(opt);
-    }
-    this.inventoryInitSiteOptions.set(unique);
+    this.addMaterialError.set(null);
+    this.addMaterialToast.set(null);
+    const presetSite = this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : "";
+    this.addMaterialForm.set({
+      siteId: presetSite,
+      name: "",
+      unit: "",
+      quantity: 0,
+      minimumStock: 0,
+      remarks: "",
+    });
     this.showInventoryInitDialog.set(true);
-    if (this.inventoryInitSiteId()) {
-      this.loadInventoryInitMaterials();
-    }
   }
 
   closeInventoryInitDialog() {
     this.showInventoryInitDialog.set(false);
-    this.inventoryInitError.set(null);
+    this.addMaterialError.set(null);
+    this.addMaterialToast.set(null);
+    this.addMaterialForm.set({
+      siteId: "",
+      name: "",
+      unit: "",
+      quantity: 0,
+      minimumStock: 0,
+      remarks: "",
+    });
   }
 
-  onInventoryInitSiteChange(siteId: string) {
-    this.inventoryInitSiteId.set(siteId);
-    this.inventoryInitMaterials.set([]);
-    this.inventoryInitSelections.set({});
-    if (siteId) {
-      this.loadInventoryInitMaterials();
+  patchAddMaterialForm(patch: Partial<{ siteId: string; name: string; unit: string; quantity: number; minimumStock: number; remarks: string }>) {
+    this.addMaterialForm.update((form) => ({ ...form, ...patch }));
+    if (patch.name !== undefined || patch.unit !== undefined || patch.quantity !== undefined || patch.minimumStock !== undefined || patch.siteId !== undefined) {
+      if (this.addMaterialError()) this.addMaterialError.set(null);
     }
   }
 
-  loadInventoryInitMaterials() {
-    const siteId = this.inventoryInitSiteId();
-    if (!siteId) return;
-    this.inventoryInitLoading.set(true);
-    this.inventoryInitError.set(null);
-    this.api.getMissingMaterials(siteId).subscribe({
-      next: (res) => {
-        const items = (res?.materials || []).map((m: any) => ({
-          _id: m._id || m.id,
-          materialId: m.materialId,
-          name: m.name,
-          unit: m.unit,
-          vendor: m.vendor,
-          poNumber: m.poNumber,
-          purchasedQuantity: m.purchasedQuantity,
-          approvedQuantity: m.approvedQuantity,
-        }));
-        this.inventoryInitMaterials.set(items);
-        this.inventoryInitLoading.set(false);
-      },
-      error: (err) => {
-        this.inventoryInitLoading.set(false);
-        this.inventoryInitError.set(err?.error?.error || err?.error?.message || err?.message || "Failed to load materials.");
-      },
-    });
+  canSubmitAddMaterial(): boolean {
+    const f = this.addMaterialForm();
+    return Boolean(f.siteId) && f.name.trim().length > 0 && f.unit.trim().length > 0 && !this.addMaterialSaving();
   }
 
-  toggleInventoryInitMaterial(materialId: string) {
-    this.inventoryInitSelections.update((sel) => {
-      const next = { ...sel };
-      if (next[materialId] !== undefined) {
-        delete next[materialId];
-      } else {
-        next[materialId] = 0;
-      }
-      return next;
-    });
-  }
-
-  setInventoryInitQty(materialId: string, qty: number | string) {
-    const num = Number(qty);
-    if (Number.isNaN(num) || num < 0) return;
-    this.inventoryInitSelections.update((sel) => {
-      const next = { ...sel };
-      if (next[materialId] === undefined) return sel;
-      next[materialId] = num;
-      return next;
-    });
-  }
-
-  isInventoryInitSelected(materialId: string): boolean {
-    return this.inventoryInitSelections()[materialId] !== undefined;
-  }
-
-  getInventoryInitQty(materialId: string): number {
-    return this.inventoryInitSelections()[materialId] ?? 0;
-  }
-
-  canSubmitInventoryInit(): boolean {
-    return this.inventoryInitSelectedCount() > 0 && !this.inventoryInitSaving() && Boolean(this.inventoryInitSiteId());
-  }
-
-  submitInventoryInit() {
-    const siteId = this.inventoryInitSiteId();
-    if (!siteId) return;
-    const selections = this.inventoryInitSelections();
-    const items = Object.entries(selections)
-      .filter(([, qty]) => Number(qty) > 0)
-      .map(([materialId, quantity]) => ({ materialId, quantity: Number(quantity) }));
-    if (items.length === 0) {
-      this.inventoryInitError.set("Add at least one material with a quantity greater than zero.");
+  submitAddMaterial() {
+    const form = this.addMaterialForm();
+    if (!form.siteId) {
+      this.addMaterialError.set("Please choose a site.");
       return;
     }
-    this.inventoryInitSaving.set(true);
-    this.inventoryInitError.set(null);
-    this.api.initializeInventory({ siteId, items }).subscribe({
-      next: (res) => {
-        this.inventoryInitSaving.set(false);
-        const created = (res?.results || []).filter((r: any) => r.created).length;
-        const updated = (res?.results || []).filter((r: any) => !r.created).length;
-        this.inventoryInitToast.set(`Initialized ${created} new and updated ${updated} inventory item(s).`);
+    const name = form.name.trim();
+    const unit = form.unit.trim();
+    if (!name) {
+      this.addMaterialError.set("Material name is required.");
+      return;
+    }
+    if (!unit) {
+      this.addMaterialError.set("Unit is required.");
+      return;
+    }
+    const quantity = Number(form.quantity) || 0;
+    if (quantity < 0) {
+      this.addMaterialError.set("Quantity cannot be negative.");
+      return;
+    }
+    const minimumStock = Number(form.minimumStock) || 0;
+    const remarks = form.remarks.trim() || undefined;
+    const payload = {
+      siteId: form.siteId,
+      name,
+      unit,
+      quantity,
+      minimumStock,
+      remarks,
+    };
+    this.addMaterialSaving.set(true);
+    this.addMaterialError.set(null);
+    this.api.addInventoryMaterial(payload).subscribe({
+      next: (res: any) => {
+        this.addMaterialSaving.set(false);
+        const created = res?.created !== false;
+        this.addMaterialToast.set(created ? "Material added." : "Existing material updated.");
         this.refreshFromBackend();
         setTimeout(() => {
           this.closeInventoryInitDialog();
-          this.inventoryInitToast.set(null);
-        }, 1800);
+        }, 1200);
       },
       error: (err) => {
-        this.inventoryInitSaving.set(false);
-        this.inventoryInitError.set(err?.error?.error || err?.error?.message || err?.message || "Failed to initialize inventory.");
+        this.addMaterialSaving.set(false);
+        this.addMaterialError.set(err?.error?.error || err?.error?.message || err?.message || "Failed to save material.");
       },
     });
   }

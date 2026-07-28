@@ -387,6 +387,112 @@ export async function initializeSiteInventory(
   return { site, results };
 }
 
+export async function addInventoryMaterial(
+  input: {
+    siteId: string;
+    name: string;
+    unit: string;
+    quantity?: number;
+    minimumStock?: number;
+    remarks?: string;
+    requestDate?: string;
+  },
+  updatedBy?: string
+) {
+  const site = await Site.findById(input.siteId).lean();
+  if (!site) throw new AppError(404, "Site not found");
+
+  const trimmedName = String(input.name || "").trim();
+  const trimmedUnit = String(input.unit || "").trim();
+  if (!trimmedName) throw new AppError(400, "Material name is required");
+  if (!trimmedUnit) throw new AppError(400, "Unit is required");
+
+  const normalizedName = normalized(trimmedName);
+  const normalizedUnit = normalized(trimmedUnit);
+  const siteObjectId = new Types.ObjectId(input.siteId);
+  const siteKeyValue = siteKey(input.siteId, site.name);
+
+  const { Project } = await import("../models/Project.js");
+  let projectId: Types.ObjectId | undefined;
+  let projectName: string | undefined;
+  let clientId: Types.ObjectId | undefined;
+  let clientName: string | undefined;
+  const projectIds = (site as any).projectIds || [];
+  if (projectIds.length > 0) {
+    const project = await Project.findById(projectIds[0]).lean();
+    if (project) {
+      projectId = project._id;
+      projectName = project.name;
+      if ((project as any).clientId) {
+        clientId = (project as any).clientId;
+        const { Client } = await import("../models/Client.js");
+        const client = await Client.findById(clientId).lean();
+        if (client) clientName = (client as any).name;
+      }
+    }
+  }
+
+  const quantity = Math.max(0, Number(input.quantity) || 0);
+  const minimumStockRaw = input.minimumStock !== undefined && input.minimumStock !== null
+    ? Number(input.minimumStock)
+    : undefined;
+  const minimumStock = minimumStockRaw !== undefined && !Number.isNaN(minimumStockRaw)
+    ? Math.max(0, minimumStockRaw)
+    : undefined;
+  const remarks = input.remarks ? String(input.remarks).trim() : undefined;
+  const requestDate = input.requestDate || new Date().toISOString().slice(0, 10);
+
+  const existing = await Material.findOne({
+    siteId: siteObjectId,
+    name: { $regex: new RegExp(`^${trimmedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+    unit: { $regex: new RegExp(`^${trimmedUnit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+  });
+
+  if (existing) {
+    if (quantity > 0) {
+      existing.approvedQuantity = Math.max(0, Number(existing.approvedQuantity) || 0) + quantity;
+      existing.purchasedQuantity = Math.max(0, Number(existing.purchasedQuantity) || 0) + quantity;
+      existing.remainingStock = Math.max(0, existing.purchasedQuantity - (Number(existing.consumedQuantity) || 0));
+    }
+    if (minimumStock !== undefined) {
+      (existing as any).minimumQuantity = minimumStock;
+    }
+    if (remarks) {
+      existing.notes = remarks;
+    }
+    (existing as any).createdBy = updatedBy;
+    await existing.save();
+    return { material: existing.toObject(), created: false };
+  }
+
+  const { generateId } = await import("./id-generator.service.js");
+  const newMaterialId = await generateId("MAT");
+
+  const created = await Material.create({
+    materialId: newMaterialId,
+    projectId,
+    projectName,
+    clientId,
+    clientName,
+    siteId: siteObjectId,
+    site: site.name,
+    name: trimmedName,
+    unit: trimmedUnit,
+    requestedQuantity: quantity,
+    approvedQuantity: quantity,
+    purchasedQuantity: quantity,
+    consumedQuantity: 0,
+    remainingStock: quantity,
+    ...(minimumStock !== undefined ? { minimumQuantity: minimumStock } : {}),
+    status: "Not Received",
+    requestDate,
+    notes: remarks,
+    createdBy: updatedBy,
+  });
+
+  return { material: created.toObject(), created: true };
+}
+
 let siteIdBackfillDone = false;
 
 export async function backfillMaterialSiteIds(): Promise<void> {

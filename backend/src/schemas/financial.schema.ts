@@ -321,6 +321,18 @@ export const initializeInventorySchema = z.object({
   }),
 });
 
+export const addInventoryMaterialSchema = z.object({
+  body: z.object({
+    siteId: objectIdSchema,
+    name: z.string().trim().min(1).max(200),
+    unit: z.string().trim().min(1).max(50),
+    quantity: z.coerce.number().nonnegative().default(0),
+    minimumStock: z.coerce.number().nonnegative().optional(),
+    remarks: z.string().trim().max(2000).optional(),
+    requestDate: z.string().min(1).optional(),
+  }),
+});
+
 export type CreateMaterialInput = z.infer<typeof createMaterialSchema>["body"];
 export type CreateLabourInput = z.infer<typeof createLabourSchema>["body"];
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>["body"];
