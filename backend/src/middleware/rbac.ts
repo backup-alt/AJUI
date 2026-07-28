@@ -5,6 +5,7 @@ import { User, UserRole } from "../models/User.js";
 import { Project } from "../models/Project.js";
 import { Supervisor } from "../models/Supervisor.js";
 import { ProjectScopeIds, uniqueObjectIds } from "../utils/scope.js";
+import { withRetry } from "../utils/retry.js";
 
 import { AccessTokenPayload } from "../utils/jwt.js";
 
@@ -94,10 +95,12 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   // a slow MongoDB call doesn't block the request indefinitely on M0.
   let user: { managedProjectIds?: Types.ObjectId[] } | null = null;
   try {
-    const userQuery = User.findById(userId).select("managedProjectIds").lean().maxTimeMS(3000);
-    user = await userQuery;
+    user = await withRetry(
+      () => User.findById(userId).select("managedProjectIds").lean().maxTimeMS(3000),
+      { label: "rbac.userLookup" }
+    );
   } catch (err) {
-    console.warn("[rbac] User lookup timed out, treating as no managed projects:", (err as Error).message);
+    console.warn("[rbac] User lookup failed after retries:", (err as Error).message);
   }
   const managedProjectIds: Types.ObjectId[] = (user?.managedProjectIds || []).map(
     (id) => new Types.ObjectId(String(id))
@@ -114,12 +117,16 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   if (role === "supervisor") {
     let supervisor: { assignedProjects?: Types.ObjectId[]; assignedProjectId?: Types.ObjectId } | null = null;
     try {
-      supervisor = await Supervisor.findOne({ userId })
-        .select("assignedProjects assignedProjectId")
-        .lean()
-        .maxTimeMS(3000);
+      supervisor = await withRetry(
+        () =>
+          Supervisor.findOne({ userId })
+            .select("assignedProjects assignedProjectId")
+            .lean()
+            .maxTimeMS(3000),
+        { label: "rbac.supervisorLookup" }
+      );
     } catch (err) {
-      console.warn("[rbac] Supervisor lookup timed out:", (err as Error).message);
+      console.warn("[rbac] Supervisor lookup failed after retries:", (err as Error).message);
     }
     const supervisorProjectIds: Types.ObjectId[] = supervisor?.assignedProjects?.length
       ? supervisor.assignedProjects.map((id) => new Types.ObjectId(id.toString()))

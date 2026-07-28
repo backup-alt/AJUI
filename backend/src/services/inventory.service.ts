@@ -4,6 +4,7 @@ import { IMaterial, Material } from "../models/Material.js";
 import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { withRetry } from "../utils/retry.js";
 
 function normalized(value: unknown): string {
   return String(value || "").trim().toLowerCase();
@@ -106,10 +107,25 @@ export async function listInventory(filter: {
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
-    Inventory.countDocuments(query).maxTimeMS(8000),
-  ]);
+  type InventoryLike = { [k: string]: unknown };
+  let items: InventoryLike[] = [];
+  let total = 0;
+  try {
+    const [foundItems, foundTotal] = await Promise.all([
+      withRetry(
+        () => Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
+        { label: "listInventory.find" }
+      ),
+      withRetry(
+        () => Inventory.countDocuments(query).maxTimeMS(8000),
+        { label: "listInventory.count" }
+      ),
+    ]);
+    items = foundItems as unknown as InventoryLike[];
+    total = foundTotal;
+  } catch (err) {
+    console.error("[listInventory] main query failed, returning empty:", (err as Error).message);
+  }
 
   return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }

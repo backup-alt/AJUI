@@ -49,25 +49,32 @@ export class WorkspaceHydrationService {
   }
 
   async hydrateDeferred(): Promise<void> {
-    const [sites, materials, labour, expenses, payments, subcontractors, invoices, inventory] = await Promise.all([
-      this.safeList(() => this.api.listSites(), "sites"),
-      this.safeList(() => this.api.listMaterials({ limit: 100 }), "materials"),
-      this.safeList(() => this.api.listLabour({ limit: 100 }), "labour"),
-      this.safeList(() => this.api.listExpenses({ limit: 100 }), "expenses"),
-      this.safeList(() => this.api.listPayments({ limit: 100 }), "payments"),
-      this.safeList(() => this.api.listSubcontractors({ limit: 100 }), "subcontractors"),
-      this.safeList(() => this.api.listInvoices({ limit: 100 }), "invoices"),
-      this.safeList(() => this.api.listInventory({ limit: 100 }), "inventory"),
-    ]);
-
+    // M0 free-tier MongoDB pool can only handle a few concurrent ops at a
+    // time. Chaining these calls (instead of Promise.all of 8) keeps the
+    // pool healthy and prevents every call from timing out simultaneously.
+    const sites = await this.safeList(() => this.api.listSites(), "sites");
     this.setSignalAndStorage("sites", (sites?.items || []).map(mapSite), this.erp.siteEntities);
+
+    const materials = await this.safeList(() => this.api.listMaterials({ limit: 100 }), "materials");
     this.setSignalAndStorage("materials", (materials?.items || []).map(mapMaterial), this.erp.materials);
-    this.setSignalAndStorage("labour", (labour?.items || []).map(mapLabour), this.erp.labour);
-    this.setSignalAndStorage("expenses", (expenses?.items || []).map(mapExpense), this.erp.expenses);
-    this.setSignalAndStorage("payments", (payments?.items || []).map(mapPayment), this.erp.payments);
-    this.setSignalAndStorage("subcontractors", (subcontractors?.items || []).map(mapSubcontractor), this.erp.subcontractors);
-    this.setSignalAndStorage("taxInvoices", (invoices?.items || []).map(mapInvoice), this.erp.taxInvoices);
+
+    const inventory = await this.safeList(() => this.api.listInventory({ limit: 100 }), "inventory");
     this.setSignalAndStorage("inventory", (inventory?.items || []).map(mapInventory), this.erp.inventory);
+
+    const expenses = await this.safeList(() => this.api.listExpenses({ limit: 100 }), "expenses");
+    this.setSignalAndStorage("expenses", (expenses?.items || []).map(mapExpense), this.erp.expenses);
+
+    const labour = await this.safeList(() => this.api.listLabour({ limit: 100 }), "labour");
+    this.setSignalAndStorage("labour", (labour?.items || []).map(mapLabour), this.erp.labour);
+
+    const payments = await this.safeList(() => this.api.listPayments({ limit: 100 }), "payments");
+    this.setSignalAndStorage("payments", (payments?.items || []).map(mapPayment), this.erp.payments);
+
+    const subcontractors = await this.safeList(() => this.api.listSubcontractors({ limit: 100 }), "subcontractors");
+    this.setSignalAndStorage("subcontractors", (subcontractors?.items || []).map(mapSubcontractor), this.erp.subcontractors);
+
+    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 100 }), "invoices");
+    this.setSignalAndStorage("taxInvoices", (invoices?.items || []).map(mapInvoice), this.erp.taxInvoices);
   }
 
   async hydrateFromBackend(): Promise<void> {

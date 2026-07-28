@@ -8,6 +8,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { CreateMaterialInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { withRetry } from "../utils/retry.js";
 import { backfillApprovedMaterialsToInventory, inventoryKeyForMaterial, inventoryStockMapForMaterials } from "./inventory.service.js";
 
 async function populateRefs(input: CreateMaterialInput) {
@@ -116,10 +117,33 @@ export async function listMaterials(filter: {
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
-    Material.countDocuments(query).maxTimeMS(8000),
-  ]);
+  type MaterialLike = {
+    projectId?: unknown;
+    siteId?: unknown;
+    site?: unknown;
+    name?: unknown;
+    unit?: unknown;
+    remainingStock?: unknown;
+    [k: string]: unknown;
+  };
+  let items: MaterialLike[] = [];
+  let total = 0;
+  try {
+    const [foundItems, foundTotal] = await Promise.all([
+      withRetry(
+        () => Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
+        { label: "listMaterials.find" }
+      ),
+      withRetry(
+        () => Material.countDocuments(query).maxTimeMS(8000),
+        { label: "listMaterials.count" }
+      ),
+    ]);
+    items = foundItems as unknown as MaterialLike[];
+    total = foundTotal;
+  } catch (err) {
+    console.error("[listMaterials] main query failed, returning empty:", (err as Error).message);
+  }
 
   // Aux queries are best-effort — if they time out on M0 we still want to
   // return the main results rather than failing the entire request.
@@ -142,9 +166,9 @@ export async function listMaterials(filter: {
     backfillApprovedMaterialsToInventory(query).catch((err: unknown) =>
       console.warn("Background backfill failed:", err)
     );
-    const stockMap = await inventoryStockMapForMaterials(items);
+    const stockMap = await inventoryStockMapForMaterials(items as unknown as Array<Pick<import("../models/Material.js").IMaterial, "projectId" | "siteId" | "site" | "name" | "unit">>);
     items.forEach((item) => {
-      const sharedStock = stockMap.get(inventoryKeyForMaterial(item));
+      const sharedStock = stockMap.get(inventoryKeyForMaterial(item as unknown as Parameters<typeof inventoryKeyForMaterial>[0]));
       if (sharedStock !== undefined) item.remainingStock = sharedStock;
     });
   } catch (err) {

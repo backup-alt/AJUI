@@ -6,11 +6,17 @@ export async function connectDatabase(): Promise<void> {
     mongoose.set("strictQuery", true);
 
     await mongoose.connect(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      maxPoolSize: 20,
-      minPoolSize: 2,
+      serverSelectionTimeoutMS: 15000,
+      // M0 free-tier cluster can only handle ~3-5 concurrent ops reliably.
+      // Capping the pool prevents the connection pool from being marked
+      // as unhealthy when concurrent hydration requests exceed capacity.
+      maxPoolSize: 5,
+      minPoolSize: 1,
       socketTimeoutMS: 30000,
       heartbeatFrequencyMS: 10000,
+      waitQueueTimeoutMS: 20000,
+      retryWrites: true,
+      retryReads: true,
     });
 
     console.log(`[DB] Connected to MongoDB (${isProduction ? "production" : "development"})`);

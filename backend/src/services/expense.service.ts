@@ -7,6 +7,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { CreateExpenseInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { withRetry } from "../utils/retry.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
 import { uploadToPCloud } from "./pcloud.service.js";
 
@@ -170,10 +171,25 @@ export async function listExpenses(filter: {
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Expense.find(query).sort({ date: -1, createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
-    Expense.countDocuments(query).maxTimeMS(8000),
-  ]);
+  type ExpenseLike = { [k: string]: unknown };
+  let items: ExpenseLike[] = [];
+  let total = 0;
+  try {
+    const [foundItems, foundTotal] = await Promise.all([
+      withRetry(
+        () => Expense.find(query).sort({ date: -1, createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
+        { label: "listExpenses.find" }
+      ),
+      withRetry(
+        () => Expense.countDocuments(query).maxTimeMS(8000),
+        { label: "listExpenses.count" }
+      ),
+    ]);
+    items = foundItems as unknown as ExpenseLike[];
+    total = foundTotal;
+  } catch (err) {
+    console.error("[listExpenses] main query failed, returning empty:", (err as Error).message);
+  }
   return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }
 
