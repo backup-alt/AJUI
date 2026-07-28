@@ -344,138 +344,50 @@ type CombinedInvite = {
       </aside>
     }
 
-    <!-- Invite Employee modal (admin/PM/accountant) -->
+    <!-- Invite Employee modal (admin/PM/accountant) — single step -->
     @if (showInvite()) {
       <div class="settings-w11-modal-backdrop" (click)="closeInvite()" aria-hidden="true"></div>
       <div class="settings-w11-modal" role="dialog" aria-label="Invite employee">
         <header class="settings-w11-modal-head">
           <div>
             <h2>Invite Employee</h2>
-            <small class="settings-w11-step-label">Step {{ inviteStep() }} of 2</small>
+            <small class="settings-w11-modal-subtitle">Send an invite email with a setup link</small>
           </div>
           <button type="button" class="settings-w11-icon-btn" (click)="closeInvite()" aria-label="Close">
             <svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
         </header>
         <div class="settings-w11-modal-body">
-
-          @if (inviteStep() === 1) {
-            <!-- Step 1: Basic details -->
-            <div class="settings-w11-field">
-              <label>Name</label>
-              <input type="text" placeholder="Full name" [value]="inviteName()" (input)="inviteName.set($any($event.target).value)" />
-            </div>
-            <div class="settings-w11-field">
-              <label>Email</label>
-              <input type="email" placeholder="email@agbuilders.com" [value]="inviteEmail()" (input)="inviteEmail.set($any($event.target).value)" />
-            </div>
-            <div class="settings-w11-field">
-              <label>Phone</label>
-              <input type="tel" placeholder="+91 98765 43210" [value]="invitePhone()" (input)="invitePhone.set($any($event.target).value)" />
-            </div>
-            <div class="settings-w11-field">
-              <label>Role</label>
-              <select [value]="inviteRole()" (change)="inviteRole.set($any($event.target).value)">
-                <option value="Admin">Admin</option>
-                <option value="Project Manager">Project Manager</option>
-                <option value="Accountant">Accountant</option>
-              </select>
-            </div>
-          }
-
-          @if (inviteStep() === 2) {
-            <!-- Step 2: Project allocation -->
-            <div class="settings-w11-field">
-              <label>
-                Allocate projects
-                <small class="settings-w11-hint-inline">Choose which projects this person can access once they sign up</small>
-              </label>
-
-              <!-- Active / On Hold Section -->
-              <div class="settings-w11-project-group">
-                <div class="settings-w11-project-group-header">
-                  <label class="settings-w11-select-all">
-                    <input
-                      type="checkbox"
-                      [checked]="allActiveOnHoldSelected()"
-                      [indeterminate]="someActiveOnHoldSelected()"
-                      (change)="toggleAllActiveOnHold()"
-                    />
-                    <span>Active / On Hold</span>
-                    <strong>({{ activeOnHoldProjects().length }})</strong>
-                  </label>
-                </div>
-                <div class="settings-w11-project-grid">
-                  @for (p of activeOnHoldProjects(); track p.id) {
-                    <label class="settings-w11-project-card" [class.checked]="isProjectSelected(p.id)">
-                      <input
-                        type="checkbox"
-                        [checked]="isProjectSelected(p.id)"
-                        (change)="toggleProject(p.id)"
-                      />
-                      <div class="settings-w11-project-card-inner">
-                        <span class="settings-w11-project-name">{{ p.name }}</span>
-                        <small class="settings-w11-project-meta">{{ p.client || p.address || '—' }}</small>
-                      </div>
-                    </label>
-                  } @empty {
-                    <div class="settings-w11-empty-inline">No active/on-hold projects.</div>
-                  }
-                </div>
-              </div>
-
-              <!-- Completed Section -->
-              <div class="settings-w11-project-group">
-                <div class="settings-w11-project-group-header">
-                  <label class="settings-w11-select-all">
-                    <input
-                      type="checkbox"
-                      [checked]="allCompletedSelected()"
-                      [indeterminate]="someCompletedSelected()"
-                      (change)="toggleAllCompleted()"
-                    />
-                    <span>Completed</span>
-                    <strong>({{ completedProjects().length }})</strong>
-                  </label>
-                </div>
-                <div class="settings-w11-project-grid">
-                  @for (p of completedProjects(); track p.id) {
-                    <label class="settings-w11-project-card" [class.checked]="isProjectSelected(p.id)">
-                      <input
-                        type="checkbox"
-                        [checked]="isProjectSelected(p.id)"
-                        (change)="toggleProject(p.id)"
-                      />
-                      <div class="settings-w11-project-card-inner">
-                        <span class="settings-w11-project-name">{{ p.name }}</span>
-                        <small class="settings-w11-project-meta">{{ p.client || p.address || '—' }}</small>
-                      </div>
-                    </label>
-                  } @empty {
-                    <div class="settings-w11-empty-inline">No completed projects.</div>
-                  }
-                </div>
-              </div>
-            </div>
-          }
+          <div class="settings-w11-field">
+            <label>Name</label>
+            <input type="text" placeholder="Full name" [value]="inviteName()" (input)="inviteName.set($any($event.target).value)" />
+          </div>
+          <div class="settings-w11-field">
+            <label>Email</label>
+            <input type="email" placeholder="email@agbuilders.com" [value]="inviteEmail()" (input)="inviteEmail.set($any($event.target).value)" />
+          </div>
+          <div class="settings-w11-field">
+            <label>Phone <small class="settings-w11-hint-inline">(optional)</small></label>
+            <input type="tel" placeholder="+91 98765 43210" [value]="invitePhone()" (input)="invitePhone.set($any($event.target).value)" />
+          </div>
+          <div class="settings-w11-field">
+            <label>Role</label>
+            <select [value]="inviteRole()" (change)="inviteRole.set($any($event.target).value)">
+              <option value="Admin">Admin</option>
+              <option value="Project Manager">Project Manager</option>
+              <option value="Accountant">Accountant</option>
+            </select>
+          </div>
 
           @if (inviteError()) {
             <div class="settings-w11-message error">{{ inviteError() }}</div>
           }
         </div>
         <footer class="settings-w11-modal-foot">
-          @if (inviteStep() === 1) {
-            <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="closeInvite()">Cancel</button>
-            <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="nextInviteStep()">
-              Next
-            </button>
-          }
-          @if (inviteStep() === 2) {
-            <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="backInviteStep()">Back</button>
-            <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="sendInvite()" [disabled]="inviteSending()">
-              {{ inviteSending() ? 'Sending…' : 'Send invite' }}
-            </button>
-          }
+          <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="closeInvite()">Cancel</button>
+          <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="sendInvite()" [disabled]="inviteSending()">
+            {{ inviteSending() ? 'Sending…' : 'Send invite' }}
+          </button>
         </footer>
       </div>
     }
@@ -901,7 +813,6 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly invitePhone = signal("");
   readonly inviteRole = signal<Role>("Project Manager");
   readonly inviteProjectIds = signal<string[]>([]);
-  readonly inviteStep = signal<1 | 2>(1);
   readonly projects = signal<{ id: string; name: string; client?: string; address?: string; status?: string }[]>([]);
 
   readonly activeOnHoldProjects = computed(() => {
@@ -1318,7 +1229,6 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.invitePhone.set("");
     this.inviteRole.set("Project Manager");
     this.inviteProjectIds.set([]);
-    this.inviteStep.set(1);
     this.inviteError.set(null);
   }
   closeInvite() {
@@ -1326,31 +1236,6 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.inviteError.set(null);
   }
 
-  nextInviteStep() {
-    const name = this.inviteName().trim();
-    const email = this.inviteEmail().trim();
-    const phone = this.invitePhone().trim();
-
-    this.inviteError.set(null);
-    if (name.length < 2) {
-      this.inviteError.set("Please enter a name.");
-      return;
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      this.inviteError.set("Please enter a valid email address.");
-      return;
-    }
-    if (this.inviteRole() === "Admin") {
-      this.sendInvite();
-      return;
-    }
-    this.inviteStep.set(2);
-  }
-
-  backInviteStep() {
-    this.inviteStep.set(1);
-    this.inviteError.set(null);
-  }
   sendInvite() {
     const name = this.inviteName().trim();
     const email = this.inviteEmail().trim();
@@ -1359,6 +1244,17 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     const projectIds = this.inviteProjectIds();
 
     this.inviteError.set(null);
+
+    // Validate basic fields
+    if (name.length < 2) {
+      this.inviteError.set("Please enter a name.");
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.inviteError.set("Please enter a valid email address.");
+      return;
+    }
+
     // projectIds is optional — admin can invite PM/accountant without
     // selecting projects. They can assign projects later from the
     // employee detail page. If no projects, the employee simply sees
