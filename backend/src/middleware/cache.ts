@@ -14,6 +14,10 @@ import { Request, Response, NextFunction } from "express";
  *
  * Cache is invalidated on any non-GET request to the same path prefix
  * (POST/PATCH/DELETE writes bust the cache).
+ *
+ * IMPORTANT: All cached responses include Cache-Control: no-store so the
+ * BROWSER doesn't cache them independently. Without this, newly created
+ * records wouldn't appear in lists until the user did a hard refresh.
  */
 
 interface CacheEntry {
@@ -61,6 +65,16 @@ export function invalidateAllCache(): void {
   store.clear();
 }
 
+/**
+ * Force-clear all cached entries on server startup. This prevents stale
+ * data from being served after a deploy if the in-memory state somehow
+ * persists (it shouldn't, but just in case).
+ */
+if (process.env.NODE_ENV !== "test") {
+  store.clear();
+  console.log("[Cache] In-memory response cache initialized (empty)");
+}
+
 export function cache(ttlSeconds: number) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (req.method !== "GET") {
@@ -73,11 +87,19 @@ export function cache(ttlSeconds: number) {
     if (cached) {
       res.setHeader("X-Cache", "HIT");
       res.setHeader("X-Cache-TTL", String(Math.round((cached.expiresAt - Date.now()) / 1000)));
+      // Prevent browser from caching — forces fresh data on next request
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.status(cached.status).type(cached.contentType).send(cached.body);
       return;
     }
 
     res.setHeader("X-Cache", "MISS");
+    // Prevent browser from caching — forces fresh data on next request
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     const originalSend = res.send.bind(res);
     res.send = function (body?: unknown): Response {
       const contentType = res.getHeader("Content-Type") || "application/json; charset=utf-8";
