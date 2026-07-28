@@ -217,6 +217,29 @@ export type PaymentRow = {
   customFields?: Record<string, string | number | boolean | null>;
 };
 
+export type InventoryRow = {
+  _id?: string;
+  id: string;
+  projectId: string;
+  projectName?: string;
+  clientId?: string;
+  siteId?: string;
+  site?: string;
+  name: string;
+  normalizedName?: string;
+  unit: string;
+  normalizedUnit?: string;
+  requestedQuantity: number;
+  approvedQuantity: number;
+  purchasedQuantity: number;
+  consumedQuantity: number;
+  remainingStock: number;
+  minimumQuantity: number;
+  vendor?: string;
+  poNumber?: string;
+  customFields?: Record<string, string | number | boolean | null>;
+};
+
 export const roles: Role[] = ["Admin", "Project Manager", "Accountant", "Supervisor"];
 
 export const projects: Project[] = [

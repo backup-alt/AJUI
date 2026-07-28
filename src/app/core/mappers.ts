@@ -305,3 +305,29 @@ function getInitials(name: string): string {
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("") || "AG";
 }
+
+export function mapInventory(i: any): any {
+  return {
+    _id: i._id,
+    id: i._id || `${i.projectId}-${i.siteKey || (i.siteId ? i.siteId.toString() : (i.site || ""))}-${i.normalizedName || (i.name || "").toLowerCase()}`,
+    projectId: i.projectId,
+    projectName: i.projectName,
+    clientId: i.clientId,
+    siteId: i.siteId,
+    site: i.site,
+    siteKey: i.siteKey,
+    name: i.name,
+    normalizedName: i.normalizedName,
+    unit: i.unit,
+    normalizedUnit: i.normalizedUnit,
+    requestedQuantity: i.requestedQuantity ?? 0,
+    approvedQuantity: i.approvedQuantity ?? 0,
+    purchasedQuantity: i.purchasedQuantity ?? 0,
+    consumedQuantity: i.consumedQuantity ?? 0,
+    remainingStock: i.remainingStock ?? 0,
+    minimumQuantity: i.minimumQuantity ?? 0,
+    vendor: i.vendor,
+    poNumber: i.poNumber,
+    customFields: i.customFields || {},
+  };
+}

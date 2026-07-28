@@ -6,7 +6,7 @@ import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
-import { mapClient, mapProject, mapSite, mapVendor, mapSupervisor, mapMaterial, mapLabour, mapExpense, mapPayment, mapSubcontractor } from "../core/mappers";
+import { mapClient, mapProject, mapSite, mapVendor, mapSupervisor, mapMaterial, mapLabour, mapExpense, mapPayment, mapSubcontractor, mapInventory } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
@@ -2220,7 +2220,7 @@ export class UniversalDashboardPage implements OnInit {
     this.backendSyncMessage.set("Refreshing from backend…");
 
     let done = 0;
-    const total = 10;
+    const total = 11;
     const finishOne = () => {
       done++;
       if (done >= total) {
@@ -2333,6 +2333,18 @@ export class UniversalDashboardPage implements OnInit {
           const items = (r.items || []).map(mapSubcontractor);
           localStorage.setItem("agb-erp:subcontractors", JSON.stringify(items));
           this.data.subcontractors.set(items);
+        } catch {}
+        finishOne();
+      },
+      error: finishOne,
+    });
+    // Inventory: pipe through mapper
+    this.api.listInventory({ limit: 100 }).subscribe({
+      next: (r) => {
+        try {
+          const items = (r.items || []).map(mapInventory);
+          localStorage.setItem("agb-erp:inventory", JSON.stringify(items));
+          this.data.inventory.set(items);
         } catch {}
         finishOne();
       },
@@ -3754,7 +3766,26 @@ visibleRows(): TableRow[] {
       exportFormat,
     }));
 
-return { materials, clients, labour, expenses, generalExpenses, payments, vendors, subcontractors, inventory: [], reports };
+const inventory = this.data.inventory().map((row) => ({
+      __rowId: `inventory:${row.id}`,
+      __projectId: row.projectId,
+      projectId: row.projectId,
+      site: row.site,
+      materialName: row.name,
+      unit: row.unit,
+      requestedQuantity: formatNumber(row.requestedQuantity),
+      approvedQuantity: formatNumber(row.approvedQuantity),
+      purchasedQuantity: formatNumber(row.purchasedQuantity),
+      consumedQuantity: formatNumber(row.consumedQuantity),
+      remainingStock: `${formatNumber(row.remainingStock)} ${row.unit}`,
+      minimumQuantity: formatNumber(row.minimumQuantity),
+      vendor: row.vendor,
+      poNumber: row.poNumber,
+      project: projectName(row.projectId),
+      client: clientName(row.projectId),
+    }));
+
+    return { materials, clients, labour, expenses, generalExpenses, payments, vendors, subcontractors, inventory, reports };
   }
 
   private rowsFor(module: DashboardModule): TableRow[] {

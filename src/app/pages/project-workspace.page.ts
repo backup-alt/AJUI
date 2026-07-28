@@ -8,7 +8,8 @@ import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardDa
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
-import { mapMaterial, mapLabour, mapExpense, mapPayment, mapVendor, mapSubcontractor } from "../core/mappers";
+import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
+import { mapMaterial, mapLabour, mapExpense, mapPayment, mapVendor, mapSubcontractor, mapInventory } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
@@ -137,6 +138,25 @@ const sectionConfigs: SectionConfig[] = [
       { key: "supervisor", label: "Supervisor" },
       { key: "approvalStatus", label: "Approval Status" },
       { key: "paymentStatus", label: "Payment Status" },
+    ],
+  },
+  {
+    key: "inventory",
+    label: "Inventory",
+    title: "Inventory by Site",
+    description: "Approved materials, purchased/consumed quantities, and remaining stock per site.",
+    columns: [
+      { key: "site", label: "Site" },
+      { key: "materialName", label: "Material Name" },
+      { key: "unit", label: "Unit" },
+      { key: "requestedQuantity", label: "Requested", type: "number" },
+      { key: "approvedQuantity", label: "Approved", type: "number" },
+      { key: "purchasedQuantity", label: "Purchased", type: "number" },
+      { key: "consumedQuantity", label: "Consumed", type: "number" },
+      { key: "remainingStock", label: "Remaining Stock" },
+      { key: "minimumQuantity", label: "Min Qty", type: "number" },
+      { key: "vendor", label: "Vendor" },
+      { key: "poNumber", label: "PO Number" },
     ],
   },
   {
@@ -995,6 +1015,7 @@ export class ProjectWorkspacePage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly materialsService = inject(MaterialsService);
+  readonly hydration = inject(WorkspaceHydrationService);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
   readonly paramMap = toSignal(this.route.paramMap, { initialValue: this.route.snapshot.paramMap });
@@ -1061,6 +1082,7 @@ export class ProjectWorkspacePage {
 
   constructor() {
     void this.data.loadCustomFieldsFromBackend();
+    void this.hydration.hydrateDeferred();
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.data.touchProject(projectId);
@@ -1297,6 +1319,7 @@ export class ProjectWorkspacePage {
       payments: (opts: any) => this.api.listPayments(opts),
       vendors: (opts: any) => this.api.listVendors(opts),
       subcontractors: (opts: any) => this.api.listSubcontractors(opts),
+      inventory: (opts: any) => this.api.listInventory(opts),
     };
     const mapperMap: Record<string, (x: any) => any> = {
       materials: mapMaterial,
@@ -1305,6 +1328,7 @@ export class ProjectWorkspacePage {
       payments: mapPayment,
       vendors: mapVendor,
       subcontractors: mapSubcontractor,
+      inventory: mapInventory,
     };
     const storageMap: Record<string, string> = {
       materials: "agb-erp:materials",
@@ -1313,6 +1337,7 @@ export class ProjectWorkspacePage {
       payments: "agb-erp:payments",
       vendors: "agb-erp:vendors",
       subcontractors: "agb-erp:subcontractors",
+      inventory: "agb-erp:inventory",
     };
     const dataMap: Record<string, any> = {
       materials: this.data.materials,
@@ -1321,6 +1346,7 @@ export class ProjectWorkspacePage {
       payments: this.data.payments,
       vendors: this.data.vendors,
       subcontractors: this.data.subcontractors,
+      inventory: this.data.inventory,
     };
     const apiCall = apiMap[section];
     const mapper = mapperMap[section];
@@ -2645,6 +2671,23 @@ export class ProjectWorkspacePage {
       exportFormat,
     }));
 
+    const inventory = this.data.inventory().filter((row) => String(row.projectId) === projectId).map((row) => ({
+      __rowId: `inventory:${row.id}`,
+      __projectId: row.projectId,
+      projectId: row.projectId,
+      site: row.site,
+      materialName: row.name,
+      unit: row.unit,
+      requestedQuantity: formatNumber(row.requestedQuantity),
+      approvedQuantity: formatNumber(row.approvedQuantity),
+      purchasedQuantity: formatNumber(row.purchasedQuantity),
+      consumedQuantity: formatNumber(row.consumedQuantity),
+      remainingStock: `${formatNumber(row.remainingStock)} ${row.unit}`,
+      minimumQuantity: formatNumber(row.minimumQuantity),
+      vendor: row.vendor,
+      poNumber: row.poNumber,
+    }));
+
     return {
       materials,
       labour,
@@ -2652,7 +2695,7 @@ export class ProjectWorkspacePage {
       payments,
       vendors,
       subcontractors,
-      inventory: [],
+      inventory,
       reports,
     };
   }

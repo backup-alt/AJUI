@@ -6,6 +6,7 @@ import {
   payments,
   projects,
   type ExpenseRow,
+  type InventoryRow,
   type LabourRow,
   type MaterialRow,
   type PaymentRow,
@@ -222,6 +223,7 @@ export class ErpDataService {
   readonly labour = signal<LabourRow[]>(this.readState<LabourRow[]>("labour", labour));
   readonly expenses = signal<ExpenseRow[]>(this.readState<ExpenseRow[]>("expenses", []));
   readonly payments = signal<PaymentRow[]>(this.readState<PaymentRow[]>("payments", payments));
+  readonly inventory = signal<InventoryRow[]>(this.readState<InventoryRow[]>("inventory", []));
   readonly vendors = signal<Vendor[]>(
     this.readState<Vendor[]>("vendors", [
     {
@@ -421,6 +423,7 @@ export class ErpDataService {
     effect(() => this.writeState("labour", this.labour()));
     effect(() => this.writeState("expenses", this.expenses()));
     effect(() => this.writeState("payments", this.payments()));
+    effect(() => this.writeState("inventory", this.inventory()));
     effect(() => this.writeState("vendors", this.vendors()));
     effect(() => this.writeState("supervisors", this.supervisors()));
     effect(() => this.writeState("subcontractors", this.subcontractors()));
