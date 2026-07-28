@@ -1032,6 +1032,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         <path d="M5.5 7.5 10 12l4.5-4.5" />
                       </svg>
                     </button>
+                    <small class="inventory-init-site-count" *ngIf="addMaterialSiteOptions().length > 0">
+                      {{ addMaterialSiteOptions().length }} site{{ addMaterialSiteOptions().length === 1 ? '' : 's' }} available
+                    </small>
                     <div class="erp-select-panel" *ngIf="addMaterialOpenMenu() === 'site'">
                       <input
                         type="text"
@@ -1043,12 +1046,16 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         autocomplete="off"
                       />
                       <button
-                        *ngFor="let site of filteredAddMaterialSites(); track site.id"
+                        *ngFor="let site of filteredAddMaterialSites(); trackBy: trackAddMaterialSiteById"
                         type="button"
                         [class.selected]="addMaterialForm().siteId === site.id"
                         (click)="pickAddMaterialFromMenu('siteId', site.id)"
+                        [attr.data-site-id]="site.id"
                       >{{ site.name }}</button>
-                      <div *ngIf="addMaterialSiteOptions().length === 0" class="inventory-init-menu-empty inventory-init-menu-empty--friendly">No sites available. Please create a site first.</div>
+                      <div *ngIf="addMaterialSiteOptions().length === 0" class="inventory-init-menu-empty inventory-init-menu-empty--friendly">
+                        <strong>No sites available.</strong>
+                        <span class="inventory-init-menu-empty-help">0 sites returned from MongoDB for your access scope. Sites in the database that aren't linked to your assigned projects are hidden by role-based filtering. Ask an admin to assign you to a project so its sites become visible here.</span>
+                      </div>
                       <div *ngIf="addMaterialSiteOptions().length > 0 && filteredAddMaterialSites().length === 0" class="inventory-init-menu-empty">No sites match.</div>
                     </div>
                   </div>
@@ -1619,6 +1626,33 @@ const siteMaterialDetailFields: FieldSchema[] = [
       background: #f8fafc;
       border-radius: 8px;
       margin: 4px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .inventory-init-menu-empty--friendly strong {
+      display: block;
+      color: #1a2540;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .inventory-init-menu-empty-help {
+      display: block;
+      font-size: 12px;
+      color: #4a5578;
+      line-height: 1.45;
+    }
+    .inventory-init-site-count {
+      display: inline-block;
+      align-self: flex-start;
+      font-size: 11px;
+      font-weight: 600;
+      color: #2c5cff;
+      background: #f0f6ff;
+      border-radius: 20px;
+      padding: 2px 10px;
+      margin: 6px 0 0;
+      letter-spacing: 0.3px;
     }
     .inventory-init-menu-confirm {
       width: 100%;
@@ -2048,10 +2082,26 @@ export class UniversalDashboardPage implements OnInit {
           const items = ((r as any).items || (r as any).sites || []).map(mapSite);
           localStorage.setItem("agb-erp:sites", JSON.stringify(items));
           this.data.siteEntities.set(items);
-        } catch {}
+          if (items.length === 0) {
+            console.warn(
+              "[addInventoryMaterial] /api/sites returned 0 items. " +
+                "The Site dropdown will appear empty. Check that (1) the MongoDB Sites collection has records, " +
+                "(2) your role's RBAC scope includes those sites' projectIds."
+            );
+          } else {
+            console.info(`[addInventoryMaterial] /api/sites returned ${items.length} sites`);
+          }
+        } catch (err) {
+          console.error("[addInventoryMaterial] Failed to parse site list", err);
+        }
+      },
+      error: (err) => {
+        console.error("[addInventoryMaterial] /api/sites request failed", err);
       },
     });
   }
+
+  trackAddMaterialSiteById = (_: number, site: { id: string }) => site.id;
 
   closeInventoryInitDialog() {
     this.showInventoryInitDialog.set(false);
