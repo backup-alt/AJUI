@@ -1,7 +1,7 @@
 import { CompanyProfile } from "../models/CompanyProfile.js";
 
 const DEFAULT_PROFILE = {
-  name: "Annai Golden Builders",
+  name: "Annai Golden Builders Pvt Ltd",
   address: "",
   state: "Tamil Nadu",
   gstin: "",
@@ -35,4 +35,11 @@ export async function saveCompanyProfile(patch: Partial<typeof DEFAULT_PROFILE>)
     { new: true, runValidators: true, upsert: true, includeResultMetadata: false },
   ).lean();
   return updated;
+}
+
+export async function migrateCompanyName(): Promise<void> {
+  await CompanyProfile.updateMany(
+    { name: "Annai Golden Builders" },
+    { $set: { name: "Annai Golden Builders Pvt Ltd" } }
+  );
 }
