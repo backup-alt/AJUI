@@ -1,16 +1,28 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Preferences } from '@capacitor/preferences';
-import { Observable, throwError } from 'rxjs';
+import { Observable, throwError, timeout } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
+
+/**
+ * Default request timeout for list/data endpoints.
+ * M0 MongoDB can be slow on cold queries; 25s gives it a fair chance while
+ * still surfacing "request failed" feedback to the user instead of hanging.
+ */
+const DEFAULT_TIMEOUT_MS = 25000;
+
+/**
+ * Timeout for the auth refresh call — should be fast or fail fast.
+ */
+const REFRESH_TIMEOUT_MS = 10000;
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
   readonly baseUrl = environment.apiUrl;
 
-  get<T>(path: string, params?: Record<string, string | number | boolean>): Observable<T> {
+  get<T>(path: string, params?: Record<string, string | number | boolean>, timeoutMs: number = DEFAULT_TIMEOUT_MS): Observable<T> {
     let httpParams = new HttpParams();
     if (params) {
       for (const [k, v] of Object.entries(params)) {
@@ -21,43 +33,64 @@ export class ApiService {
     }
     return this.http
       .get<T>(`${this.baseUrl}${path}`, { params: httpParams })
-      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
+      .pipe(
+        timeout(timeoutMs),
+        catchError((err) => throwError(() => this.toAppError(err)))
+      );
   }
 
-  post<T>(path: string, body: unknown): Observable<T> {
+  post<T>(path: string, body: unknown, timeoutMs: number = DEFAULT_TIMEOUT_MS): Observable<T> {
     return this.http
       .post<T>(`${this.baseUrl}${path}`, body)
-      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
+      .pipe(
+        timeout(timeoutMs),
+        catchError((err) => throwError(() => this.toAppError(err)))
+      );
   }
 
-  patch<T>(path: string, body: unknown): Observable<T> {
+  patch<T>(path: string, body: unknown, timeoutMs: number = DEFAULT_TIMEOUT_MS): Observable<T> {
     return this.http
       .patch<T>(`${this.baseUrl}${path}`, body)
-      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
+      .pipe(
+        timeout(timeoutMs),
+        catchError((err) => throwError(() => this.toAppError(err)))
+      );
   }
 
-  put<T>(path: string, body: unknown): Observable<T> {
+  put<T>(path: string, body: unknown, timeoutMs: number = DEFAULT_TIMEOUT_MS): Observable<T> {
     return this.http
       .put<T>(`${this.baseUrl}${path}`, body)
-      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
+      .pipe(
+        timeout(timeoutMs),
+        catchError((err) => throwError(() => this.toAppError(err)))
+      );
   }
 
-  delete<T>(path: string): Observable<T> {
+  delete<T>(path: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): Observable<T> {
     return this.http
       .delete<T>(`${this.baseUrl}${path}`)
-      .pipe(catchError((err) => throwError(() => this.toAppError(err))));
+      .pipe(
+        timeout(timeoutMs),
+        catchError((err) => throwError(() => this.toAppError(err)))
+      );
   }
 
   /** Canonical HTTP error → AppError converter. */
-  toAppError(error: HttpErrorResponse): Error {
-    if (error.error instanceof ErrorEvent) {
-      return new Error(error.error.message || 'Network error');
+  toAppError(error: HttpErrorResponse | { name?: string; message?: string }): Error {
+    // RxJS TimeoutError — request took too long
+    if (error && (error.name === 'TimeoutError' || error.message?.includes('Timeout'))) {
+      return new Error('Request is taking longer than expected. Please try again — your data will load as soon as the server responds.');
     }
-    if (error.status === 0) {
+    // Narrow: HttpErrorResponse has .error and .status; the plain object branch doesn't.
+    const httpErr = error as HttpErrorResponse;
+    if (httpErr.error instanceof ErrorEvent) {
+      return new Error(httpErr.error.message || 'Network error');
+    }
+    if (httpErr.status === 0) {
       return new Error('Unable to connect to server. Please check your internet connection.');
     }
 
-    const body = (typeof error.error === 'object' && error.error) || {};
+    const body = (typeof httpErr.error === 'object' && httpErr.error) || {};
 
     const firstFieldError = (() => {
       const fields = (body as { details?: { fieldErrors?: Record<string, string[]> } }).details?.fieldErrors;
@@ -75,7 +108,7 @@ export class ApiService {
       ((body as { error?: string }).error);
 
     const appError: Error & { details?: unknown } = new Error(
-      serverMessage || this.fallbackMessage(error.status)
+      serverMessage || this.fallbackMessage(httpErr.status)
     );
     if ((body as { details?: unknown }).details) {
       appError.details = (body as { details?: unknown }).details;

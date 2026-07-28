@@ -205,9 +205,45 @@ export async function bootstrap(): Promise<void> {
   try {
     const { Material } = await import("./models/Material.js");
     await Material.collection.createIndex({ projectId: 1, siteId: 1, createdAt: -1 }, { background: true });
-    console.log("[Startup] Material compound index ensured");
+    await Material.collection.createIndex({ siteId: 1, status: 1, createdAt: -1 }, { background: true });
+    console.log("[Startup] Material compound indexes ensured");
   } catch (e: any) {
-    console.error("[Startup] Material compound index creation failed (non-fatal):", e?.message || e);
+    console.error("[Startup] Material index creation failed (non-fatal):", e?.message || e);
+  }
+
+  try {
+    const { Expense } = await import("./models/Expense.js");
+    await Expense.collection.createIndex({ siteId: 1, type: 1, status: 1, date: -1 }, { background: true });
+    await Expense.collection.createIndex({ siteId: 1, date: -1 }, { background: true });
+    console.log("[Startup] Expense compound indexes ensured");
+  } catch (e: any) {
+    console.error("[Startup] Expense index creation failed (non-fatal):", e?.message || e);
+  }
+
+  try {
+    const { Labour } = await import("./models/Labour.js");
+    await Labour.collection.createIndex({ siteId: 1, status: 1, createdAt: -1 }, { background: true });
+    await Labour.collection.createIndex({ projectId: 1, createdAt: -1 }, { background: true });
+    console.log("[Startup] Labour compound indexes ensured");
+  } catch (e: any) {
+    console.error("[Startup] Labour index creation failed (non-fatal):", e?.message || e);
+  }
+
+  try {
+    const { Approval } = await import("./models/Approval.js");
+    await Approval.collection.createIndex({ site: 1, status: 1, submittedAt: -1 }, { background: true });
+    await Approval.collection.createIndex({ status: 1, submittedAt: -1 }, { background: true });
+    console.log("[Startup] Approval compound indexes ensured");
+  } catch (e: any) {
+    console.error("[Startup] Approval index creation failed (non-fatal):", e?.message || e);
+  }
+
+  try {
+    const { Inventory } = await import("./models/Inventory.js");
+    await Inventory.collection.createIndex({ siteId: 1, createdAt: -1 }, { background: true });
+    console.log("[Startup] Inventory compound index ensured");
+  } catch (e: any) {
+    console.error("[Startup] Inventory index creation failed (non-fatal):", e?.message || e);
   }
 
   const app = createApp();
