@@ -578,7 +578,6 @@ export class ApiService {
     name: string;
     unit: string;
     quantity: number;
-    minimumStock?: number;
     remarks?: string;
     requestDate?: string;
   }): Observable<{ material: any; created: boolean }> {

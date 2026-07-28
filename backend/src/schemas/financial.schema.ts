@@ -327,7 +327,6 @@ export const addInventoryMaterialSchema = z.object({
     name: z.string().trim().min(1).max(200),
     unit: z.string().trim().min(1).max(50),
     quantity: z.coerce.number().nonnegative().default(0),
-    minimumStock: z.coerce.number().nonnegative().optional(),
     remarks: z.string().trim().max(2000).optional(),
     requestDate: z.string().min(1).optional(),
   }),
