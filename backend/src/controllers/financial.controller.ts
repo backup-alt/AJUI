@@ -12,6 +12,7 @@ import { getScopedProjectIds } from "../middleware/rbac.js";
 import { User } from "../models/User.js";
 import { ActivityLog } from "../models/ActivityLog.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { invalidateCachePrefix } from "../middleware/cache.js";
 
 // =================== MATERIALS ===================
 export async function createMaterial(req: Request, res: Response, next: NextFunction) {
@@ -26,6 +27,8 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
     }
 
     const material = await materialService.createMaterial(body);
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.status(201).json({ material });
   } catch (e) { next(e); }
 }
@@ -66,6 +69,8 @@ export async function updateMaterial(req: Request, res: Response, next: NextFunc
     }
 
     const material = await materialService.updateMaterial(req.params.id, body);
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ material });
   } catch (e) { next(e); }
 }
@@ -73,6 +78,8 @@ export async function updateMaterial(req: Request, res: Response, next: NextFunc
 export async function deleteMaterial(req: Request, res: Response, next: NextFunction) {
   try {
     await materialService.deleteMaterial(req.params.id);
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ success: true });
   } catch (e) { next(e); }
 }
@@ -139,6 +146,8 @@ export async function initializeInventory(req: Request, res: Response, next: Nex
 export async function createLabour(req: Request, res: Response, next: NextFunction) {
   try {
     const labour = await labourService.createLabour(req.body);
+    invalidateCachePrefix("/api/labour");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.status(201).json({ labour });
   } catch (e) { next(e); }
 }
@@ -172,6 +181,8 @@ export async function getLabour(req: Request, res: Response, next: NextFunction)
 export async function updateLabour(req: Request, res: Response, next: NextFunction) {
   try {
     const labour = await labourService.updateLabour(req.params.id, req.body);
+    invalidateCachePrefix("/api/labour");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ labour });
   } catch (e) { next(e); }
 }
@@ -179,6 +190,8 @@ export async function updateLabour(req: Request, res: Response, next: NextFuncti
 export async function deleteLabour(req: Request, res: Response, next: NextFunction) {
   try {
     await labourService.deleteLabour(req.params.id);
+    invalidateCachePrefix("/api/labour");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ success: true });
   } catch (e) { next(e); }
 }
@@ -203,6 +216,8 @@ export async function getPendingLabour(req: Request, res: Response, next: NextFu
 export async function createExpense(req: Request, res: Response, next: NextFunction) {
   try {
     const expense = await expenseService.createExpense(req.body);
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.status(201).json({ expense });
   } catch (e) { next(e); }
 }
@@ -236,6 +251,8 @@ export async function getExpense(req: Request, res: Response, next: NextFunction
 export async function updateExpense(req: Request, res: Response, next: NextFunction) {
   try {
     const expense = await expenseService.updateExpense(req.params.id, req.body);
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ expense });
   } catch (e) { next(e); }
 }
@@ -261,6 +278,8 @@ export async function markAsReceived(req: Request, res: Response, next: NextFunc
 export async function deleteExpense(req: Request, res: Response, next: NextFunction) {
   try {
     await expenseService.deleteExpense(req.params.id);
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ success: true });
   } catch (e) { next(e); }
 }
@@ -285,6 +304,8 @@ export async function getPendingExpenses(req: Request, res: Response, next: Next
 export async function createPayment(req: Request, res: Response, next: NextFunction) {
   try {
     const payment = await paymentService.createPayment(req.body);
+    invalidateCachePrefix("/api/payments");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.status(201).json({ payment });
   } catch (e) { next(e); }
 }
@@ -317,6 +338,8 @@ export async function getPayment(req: Request, res: Response, next: NextFunction
 export async function updatePayment(req: Request, res: Response, next: NextFunction) {
   try {
     const payment = await paymentService.updatePayment(req.params.id, req.body);
+    invalidateCachePrefix("/api/payments");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ payment });
   } catch (e) { next(e); }
 }
@@ -324,6 +347,8 @@ export async function updatePayment(req: Request, res: Response, next: NextFunct
 export async function deletePayment(req: Request, res: Response, next: NextFunction) {
   try {
     await paymentService.deletePayment(req.params.id);
+    invalidateCachePrefix("/api/payments");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ success: true });
   } catch (e) { next(e); }
 }
@@ -353,6 +378,8 @@ export async function getPendingPayments(req: Request, res: Response, next: Next
 export async function createVendor(req: Request, res: Response, next: NextFunction) {
   try {
     const vendor = await vendorService.createVendor(req.body);
+    invalidateCachePrefix("/api/vendors");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.status(201).json({ vendor });
   } catch (e) { next(e); }
 }
@@ -380,6 +407,8 @@ export async function getVendor(req: Request, res: Response, next: NextFunction)
 export async function updateVendor(req: Request, res: Response, next: NextFunction) {
   try {
     const vendor = await vendorService.updateVendor(req.params.id, req.body);
+    invalidateCachePrefix("/api/vendors");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ vendor });
   } catch (e) { next(e); }
 }
@@ -387,6 +416,8 @@ export async function updateVendor(req: Request, res: Response, next: NextFuncti
 export async function deleteVendor(req: Request, res: Response, next: NextFunction) {
   try {
     await vendorService.deleteVendor(req.params.id);
+    invalidateCachePrefix("/api/vendors");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ success: true });
   } catch (e) { next(e); }
 }
@@ -402,6 +433,8 @@ export async function getVendorPurchaseHistory(req: Request, res: Response, next
 export async function createSubcontractor(req: Request, res: Response, next: NextFunction) {
   try {
     const sub = await subcontractorService.createSubcontractor(req.body);
+    invalidateCachePrefix("/api/subcontractors");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.status(201).json({ subcontractor: sub });
   } catch (e) { next(e); }
 }
@@ -433,6 +466,8 @@ export async function getSubcontractor(req: Request, res: Response, next: NextFu
 export async function updateSubcontractor(req: Request, res: Response, next: NextFunction) {
   try {
     const sub = await subcontractorService.updateSubcontractor(req.params.id, req.body);
+    invalidateCachePrefix("/api/subcontractors");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ subcontractor: sub });
   } catch (e) { next(e); }
 }
@@ -440,6 +475,8 @@ export async function updateSubcontractor(req: Request, res: Response, next: Nex
 export async function deleteSubcontractor(req: Request, res: Response, next: NextFunction) {
   try {
     await subcontractorService.deleteSubcontractor(req.params.id);
+    invalidateCachePrefix("/api/subcontractors");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ success: true });
   } catch (e) { next(e); }
 }
