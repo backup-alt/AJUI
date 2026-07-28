@@ -135,6 +135,15 @@ export async function initializeInventory(req: Request, res: Response, next: Nex
   } catch (e) { next(e); }
 }
 
+export async function addInventoryMaterial(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const updatedBy = user?.username || user?.email || user?._id?.toString();
+    const result = await inventoryService.addInventoryMaterial(req.body, updatedBy);
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
 // =================== LABOUR ===================
 export async function createLabour(req: Request, res: Response, next: NextFunction) {
   try {

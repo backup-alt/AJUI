@@ -573,6 +573,20 @@ export class ApiService {
     );
   }
 
+  addInventoryMaterial(payload: {
+    siteId: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    minimumStock?: number;
+    remarks?: string;
+    requestDate?: string;
+  }): Observable<{ material: any; created: boolean }> {
+    return this.http.post<{ material: any; created: boolean }>(`${this.baseUrl}/inventory/material`, payload, { headers: this.authHeaders() }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
   // =================== LABOUR ===================
   listLabour(params?: { projectId?: string; siteId?: string; category?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";

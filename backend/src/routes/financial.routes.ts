@@ -28,6 +28,7 @@ import {
   listInventorySchema,
   missingMaterialsForSiteSchema,
   initializeInventorySchema,
+  addInventoryMaterialSchema,
 } from "../schemas/financial.schema.js";
 
 const router = Router();
@@ -60,6 +61,12 @@ router.post(
   validate(initializeInventorySchema),
   requireRole("admin", "project_manager"),
   ctrl.initializeInventory
+);
+router.post(
+  "/inventory/material",
+  validate(addInventoryMaterialSchema),
+  requireRole("admin", "project_manager", "supervisor"),
+  ctrl.addInventoryMaterial
 );
 
 // =================== LABOUR ===================
