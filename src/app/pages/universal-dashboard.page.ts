@@ -2037,8 +2037,20 @@ export class UniversalDashboardPage implements OnInit {
       quantity: 0,
       remarks: "",
     });
-    this.refreshFromBackend();
+    this.refreshSitesForInventoryDialog();
     this.showInventoryInitDialog.set(true);
+  }
+
+  private refreshSitesForInventoryDialog() {
+    this.api.listSites().subscribe({
+      next: (r: any) => {
+        try {
+          const items = ((r as any).items || (r as any).sites || []).map(mapSite);
+          localStorage.setItem("agb-erp:sites", JSON.stringify(items));
+          this.data.siteEntities.set(items);
+        } catch {}
+      },
+    });
   }
 
   closeInventoryInitDialog() {
