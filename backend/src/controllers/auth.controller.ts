@@ -691,10 +691,9 @@ function allocatedProjectObjectIds(invite: { metadata?: unknown }): Types.Object
     .filter((id) => typeof id === "string" && Types.ObjectId.isValid(id))
     .map((id) => new Types.ObjectId(id));
 
-  if (ids.length === 0) {
-    throw new AppError(400, "This invite does not have any project access assigned");
-  }
-
+  // Returns empty array if no projects assigned — callers handle the empty case.
+  // PM/accountant with no projects simply have no project scope until
+  // projects are assigned later from the employee detail page.
   return ids;
 }
 
