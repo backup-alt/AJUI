@@ -54,6 +54,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "vendor", label: "Vendor" },
       { key: "poNumber", label: "PO Number" },
       { key: "remainingStock", label: "Remaining Stock" },
+      { key: "notes", label: "Notes" },
       { key: "status", label: "Status" },
     ],
     filters: [
@@ -129,6 +130,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "siteMaterial", label: "Site Material" },
       { key: "runningBalance", label: "Balance" },
       { key: "poNumber", label: "PO Number" },
+      { key: "notes", label: "Notes" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
     filters: [
@@ -3562,6 +3564,7 @@ visibleRows(): TableRow[] {
       approvedQuantity: formatNumber(row.approved),
       vendor: row.vendor,
       poNumber: row.poNumber,
+      billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
       status: row.status,
       ...(row.customFields || {}),
@@ -3631,6 +3634,7 @@ visibleRows(): TableRow[] {
       supervisor: row.supervisor,
       cashIssued: formatMoney(row.cashIssued || row.received || 0),
       reference: row.reference,
+      billUrl: row.billUrl,
       approvalStatus: row.status,
       ...(row.customFields || {}),
     }));
@@ -3647,6 +3651,7 @@ visibleRows(): TableRow[] {
       amount: formatMoney(row.spent),
       paidBy: row.supervisor,
       reference: row.reference,
+      billUrl: row.billUrl,
       approvalStatus: row.status,
       ...(row.customFields || {}),
     }));

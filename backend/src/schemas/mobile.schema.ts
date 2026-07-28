@@ -104,6 +104,7 @@ export const uploadExpenseReceiptMobileSchema = z.object({
     mimeType: z.string().min(1).max(120),
     fileName: z.string().max(200).optional(),
     givenAmount: z.coerce.number().nonnegative().optional(),
+    received: z.boolean().optional(),
   }),
 });
 
@@ -143,7 +144,15 @@ export const markAttendanceSchema = z.object({
     projectId: objectIdSchema,
     siteId: objectIdSchema.optional(),
     site: z.string().trim().min(1).max(200),
-    attendanceDate: z.string().min(1),
+    attendanceDate: z.string().min(1).refine(
+      (val) => {
+        const date = new Date(val + "T00:00:00");
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        return !isNaN(date.getTime()) && date <= today;
+      },
+      { message: "Attendance cannot be marked for future dates" }
+    ),
     shiftCount: z.coerce.number().int().min(1).max(2).default(1),
     overtimeHours: z.coerce.number().nonnegative().default(0),
     overtimeAmount: z.coerce.number().nonnegative().default(0),

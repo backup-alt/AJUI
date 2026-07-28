@@ -35,25 +35,6 @@ export const routes: Routes = [
           import('./features/sites/sites.page').then((m) => m.SitesPage),
       },
       {
-        path: 'materials',
-        loadComponent: () =>
-          import('./features/materials/materials.page').then((m) => m.MaterialsPage),
-      },
-      {
-        path: 'materials/create',
-        loadComponent: () =>
-          import('./features/materials/material-create/material-create.page').then(
-            (m) => m.MaterialCreatePage
-          ),
-      },
-      {
-        path: 'materials/:id',
-        loadComponent: () =>
-          import('./features/materials/material-detail/material-detail.page').then(
-            (m) => m.MaterialDetailPage
-          ),
-      },
-      {
         path: 'labour',
         loadComponent: () =>
           import('./features/labour/labour.page').then((m) => m.LabourPage),
@@ -119,6 +100,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/inventory/inventory.page').then(
             (m) => m.InventoryPage
+          ),
+      },
+      {
+        path: 'inventory/:id',
+        loadComponent: () =>
+          import('./features/inventory/inventory-detail/inventory-detail.page').then(
+            (m) => m.InventoryDetailPage
           ),
       },
       {

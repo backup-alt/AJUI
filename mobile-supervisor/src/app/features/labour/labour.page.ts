@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent, IonSegment, IonSegmentButton, IonLabel,
   IonFab, IonFabButton, IonIcon, IonSkeletonText,
@@ -574,20 +575,22 @@ export class LabourPage implements OnInit, OnDestroy {
     });
     await this.loadData();
 
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => void this.loadData());
+
     if (typeof window !== 'undefined') {
-      window.addEventListener('agb:site-changed', this.handleSiteChange);
-      window.addEventListener('agb:labour-changed', this.handleSiteChange);
+      window.addEventListener('agb:labour-changed', this.handleLabourChange);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:site-changed', this.handleSiteChange);
-      window.removeEventListener('agb:labour-changed', this.handleSiteChange);
+      window.removeEventListener('agb:labour-changed', this.handleLabourChange);
     }
   }
 
-  private handleSiteChange = (): void => {
+  private handleLabourChange = (): void => {
     void this.loadData();
   };
 
@@ -613,7 +616,7 @@ export class LabourPage implements OnInit, OnDestroy {
 
   async refreshAll(event: CustomEvent): Promise<void> {
     await this.loadData();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   onTabChange() {

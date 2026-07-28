@@ -16,6 +16,8 @@ import {
   IonList,
   IonSpinner,
   IonIcon,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -53,6 +55,8 @@ import { Labour } from '../../../shared/models';
     IonList,
     IonSpinner,
     IonIcon,
+    IonRefresher,
+    IonRefresherContent,
     DatePipe,
     CurrencyPipe,
     TitleCasePipe,
@@ -68,6 +72,9 @@ import { Labour } from '../../../shared/models';
     </ion-header>
 
     <ion-content class="detail-content">
+      <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       @if (loading()) {
         <div class="loading">
           <ion-spinner name="crescent"></ion-spinner>
@@ -353,5 +360,10 @@ export class LabourDetailPage implements OnInit {
       });
       await toast.present();
     }
+  }
+
+  async refresh(event?: CustomEvent): Promise<void> {
+    await this.load();
+    if (event) setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

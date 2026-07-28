@@ -233,7 +233,7 @@ export class LabourWorkerHistoryPage implements OnInit {
 
   async refreshAll(event: CustomEvent): Promise<void> {
     await this.loadData();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   editAttendance(att: Attendance): void {

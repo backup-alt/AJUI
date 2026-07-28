@@ -1,4 +1,20 @@
 import { Types } from "mongoose";
+
+interface CacheEntry<T> { data: T; expiresAt: number; }
+const queryCache = new Map<string, CacheEntry<unknown>>();
+function getCached<T>(key: string): T | null {
+  const entry = queryCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { queryCache.delete(key); return null; }
+  return entry.data as T;
+}
+function setCache(key: string, data: unknown, ttlMs = 30000): void {
+  queryCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  if (queryCache.size > 200) {
+    const oldest = queryCache.keys().next().value;
+    if (oldest) queryCache.delete(oldest);
+  }
+}
 import { User } from "../models/User.js";
 import { Supervisor } from "../models/Supervisor.js";
 import { Project } from "../models/Project.js";
@@ -12,7 +28,6 @@ import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Inventory } from "../models/Inventory.js";
-import { backfillApprovedMaterialsToInventory } from "./inventory.service.js";
 
 type SupervisorAccess = {
   user: Awaited<ReturnType<typeof User.findById>>;
@@ -20,6 +35,7 @@ type SupervisorAccess = {
   projectIds: Types.ObjectId[];
   siteIds: Types.ObjectId[];
   siteNames: string[];
+  siteIdToName: Map<string, string>;
 };
 
 function toObjectId(value: unknown): Types.ObjectId | null {
@@ -63,7 +79,32 @@ function hasObjectId(ids: Types.ObjectId[], value: Types.ObjectId): boolean {
   return ids.some((id) => id.toString() === key);
 }
 
+const accessCache = new Map<string, { data: SupervisorAccess; expiresAt: number }>();
+const ACCESS_CACHE_TTL_MS = 60_000;
+
+function getCachedSupervisorAccess(userId: string): SupervisorAccess | null {
+  const entry = accessCache.get(userId);
+  if (entry && Date.now() < entry.expiresAt) return entry.data;
+  if (entry) accessCache.delete(userId);
+  return null;
+}
+
+function setCachedSupervisorAccess(userId: string, data: SupervisorAccess): void {
+  accessCache.set(userId, { data, expiresAt: Date.now() + ACCESS_CACHE_TTL_MS });
+}
+
+export function invalidateAccessCache(userId?: string): void {
+  if (userId) {
+    accessCache.delete(userId);
+  } else {
+    accessCache.clear();
+  }
+}
+
 async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
+  const cached = getCachedSupervisorAccess(userId);
+  if (cached) return cached;
+
   const user = await User.findById(userId);
   if (!user || user.role !== "supervisor") throw new AppError(403, "Not a supervisor user");
 
@@ -80,21 +121,27 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
     profile = await Supervisor.findOne({ phone: user.phone }).lean();
   }
 
+  console.log(`[getSupervisorAccess] user=${userId} profileFound=${!!profile} profileId=${(profile as any)?._id || "none"}`);
+
   const profileRecord = profile as Record<string, any> | null;
   const profileId = toObjectId(profileRecord?._id);
   if (profileId) {
-    if (!user.supervisorProfileId || user.supervisorProfileId.toString() !== profileId.toString()) {
-      user.supervisorProfileId = profileId;
-      await user.save();
-    }
-    if (String(profileRecord?.userId || "") !== user._id.toString()) {
-      await Supervisor.updateOne({ _id: profileId }, { $set: { userId: user._id } });
+    const needsProfileLink =
+      !user.supervisorProfileId || user.supervisorProfileId.toString() !== profileId.toString();
+    const needsUserLink =
+      String(profileRecord?.userId || "") !== user._id.toString();
+    if (needsProfileLink || needsUserLink) {
+      User.updateOne({ _id: user._id }, { $set: { supervisorProfileId: profileId } }).catch(() => {});
+      if (needsUserLink) {
+        Supervisor.updateOne({ _id: profileId }, { $set: { userId: user._id } }).catch(() => {});
+      }
     }
   }
 
   const projectIds = uniqueObjectIds([
     ...(user.managedProjectIds || []).map(toObjectId),
     toObjectId(profileRecord?.assignedProjectId),
+    ...((profileRecord?.assignedProjects || []) as unknown[]).map(toObjectId),
   ]);
 
   const assignedSiteValues = ((profileRecord?.assignedSites || []) as unknown[]).map((value) =>
@@ -132,6 +179,9 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
       .lean();
   }
 
+  const scopedSiteIds = scopedSites.map((site) => toObjectId(site._id));
+  const scopedSiteNames = scopedSites.map((site) => site.name);
+
   for (const site of scopedSites) {
     for (const pid of site.projectIds || []) {
       projectIds.push(new Types.ObjectId(pid));
@@ -140,32 +190,38 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
 
   const siteIds = uniqueObjectIds([
     ...explicitSiteIds,
-    ...scopedSites.map((site) => toObjectId(site._id)),
+    ...scopedSiteIds,
   ]);
 
-  return {
-    user,
+  const siteIdToName = new Map<string, string>();
+  for (const site of scopedSites) {
+    const id = toObjectId(site._id);
+    if (id && site.name) siteIdToName.set(id.toString(), site.name);
+  }
+
+  const result: SupervisorAccess = {
+    user: user as any,
     profile: profileRecord,
     projectIds: uniqueObjectIds(projectIds),
     siteIds,
     siteNames: uniqueStrings([
-      ...scopedSites.map((site) => site.name),
+      ...scopedSiteNames,
       ...assignedSiteNameFallback,
     ]),
+    siteIdToName,
   };
+
+  console.log(`[getSupervisorAccess] resolved: projectIds=${result.projectIds.length} siteIds=${result.siteIds.length} siteNames=${result.siteNames.length} scopedSites=${scopedSites.length}`);
+
+  setCachedSupervisorAccess(userId, result);
+  return result;
 }
 
 async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) {
   if (!siteId) {
     if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
-    const or: Record<string, unknown>[] = [];
-    const siteIdStrings = access.siteIds.map((id) => id.toString());
-    if (access.siteIds.length > 0) {
-      or.push({ siteId: { $in: access.siteIds } });
-      or.push({ site: { $in: siteIdStrings } });
-    }
-    if (access.siteNames.length > 0) or.push({ site: { $in: access.siteNames } });
-    return { $or: or };
+    if (access.siteIds.length > 0) return { siteId: { $in: access.siteIds } };
+    return { site: { $in: access.siteNames } };
   }
 
   const requestedSiteId = toObjectId(siteId);
@@ -187,7 +243,7 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     throw new AppError(403, "Not assigned to this site");
   }
 
-  return { $or: [{ siteId: requestedSiteId }, { site: site.name }, { site: requestedSiteId.toString() }] };
+  return { siteId: requestedSiteId };
 }
 
 async function buildScopedEntityQuery(
@@ -217,6 +273,7 @@ async function buildScopedEntityQuery(
     access.siteIds.length === 0 &&
     access.siteNames.length === 0
   ) {
+    console.warn(`[buildScopedEntityQuery] No access resolved for user ${userId} — returning empty`);
     query._id = { $exists: false };
   }
   if (filters.status) query.status = filters.status;
@@ -229,7 +286,20 @@ function approvalScopeQuery(access: SupervisorAccess, status?: "Pending" | "Appr
   const query: Record<string, unknown> = {};
   if (access.projectIds.length > 0) query.projectId = { $in: access.projectIds };
   if (access.siteNames.length > 0) query.site = { $in: access.siteNames };
-  if (access.projectIds.length === 0 && access.siteNames.length === 0) {
+  if (access.siteIds.length > 0) {
+    if (query.site) {
+      // Already filtering by site names, also include siteId matches
+      query.$or = [
+        { site: { $in: access.siteNames } },
+        { siteId: { $in: access.siteIds } },
+      ];
+      delete query.site;
+    } else {
+      query.siteId = { $in: access.siteIds };
+    }
+  }
+  if (access.projectIds.length === 0 && access.siteIds.length === 0 && access.siteNames.length === 0) {
+    console.warn(`[approvalScopeQuery] No access resolved — returning empty`);
     query._id = { $exists: false };
   }
   if (status) query.status = status;
@@ -293,6 +363,7 @@ export async function updateSupervisorProfile(
     }
   }
 
+  invalidateAccessCache(userId);
   return getSupervisorByUserId(userId);
 }
 
@@ -467,46 +538,91 @@ export async function getActionableApprovals(
   }));
 }
 
-export async function getSupervisorDashboard(userId: string) {
-  const projects = await getAssignedProjects(userId);
-  const sites = await getAssignedSites(userId);
-  const approvals = await getActionableApprovals(userId);
+export async function getSupervisorDashboard(
+  userId: string,
+  filters: { siteId?: string; projectId?: string } = {}
+) {
+  const [projects, sites, approvals, scopedAccess] = await Promise.all([
+    getAssignedProjects(userId),
+    getAssignedSites(userId),
+    getActionableApprovals(userId),
+    buildScopedEntityQuery(userId, filters),
+  ]);
 
-  const { query: entityScope } = await buildScopedEntityQuery(userId);
+  const entityScope = scopedAccess.query;
   const siteExpenseScope = { ...entityScope, type: "site" };
   const today = new Date().toISOString().slice(0, 10);
 
-  const [pendingMaterials, pendingLabour, pendingExpenses, todayExpenses] = await Promise.all([
-    Material.countDocuments({ ...entityScope, status: "Pending" }),
-    Labour.countDocuments({ ...entityScope, status: "Pending" }),
-    Expense.countDocuments({ ...siteExpenseScope, status: "Pending" }),
-Expense.aggregate([
-        {
-          $match: {
-            ...siteExpenseScope,
-            date: today,
-            transactionType: { $ne: "Cash Added" },
-          },
-        },
-        { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
-      ]),
+  // Use indexed fields directly for counts when siteId is provided —
+  // avoids the slow entityScope spread on M0. When siteId is NOT provided,
+  // fall back to the scoped query (user-assigned sites).
+  const inventoryQuery = filters.siteId
+    ? { siteId: filters.siteId }
+    : { projectId: { $in: scopedAccess.access.projectIds }, siteId: { $in: scopedAccess.access.siteIds } };
+  const labourQuery = filters.siteId
+    ? { siteId: filters.siteId }
+    : { projectId: { $in: scopedAccess.access.projectIds } };
+  const pendingMaterialsQuery = filters.siteId
+    ? { siteId: filters.siteId, status: "Pending" }
+    : { ...entityScope, status: "Pending" };
+  const pendingLabourQuery = filters.siteId
+    ? { siteId: filters.siteId, status: "Pending" }
+    : { ...entityScope, status: "Pending" };
+  const pendingExpensesQuery = filters.siteId
+    ? { siteId: filters.siteId, type: "site", status: "Pending" }
+    : { ...siteExpenseScope, status: "Pending" };
+  const todayExpensesQuery = filters.siteId
+    ? { siteId: filters.siteId, type: "site", date: today, transactionType: { $ne: "Cash Added" } }
+    : { ...siteExpenseScope, date: today, transactionType: { $ne: "Cash Added" } };
+
+  const [inventoryCount, labourCount, pendingMaterials, pendingLabour, pendingExpenses, todayExpenses] = await Promise.all([
+    Inventory.countDocuments(inventoryQuery),
+    Labour.countDocuments(labourQuery),
+    Material.countDocuments(pendingMaterialsQuery),
+    Labour.countDocuments(pendingLabourQuery),
+    Expense.countDocuments(pendingExpensesQuery),
+    Expense.aggregate([
+      { $match: todayExpensesQuery },
+      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
+    ]),
   ]);
+
+  // Filter projects and approvals by the selected site if provided
+  let filteredProjects = projects;
+  let filteredApprovals = approvals;
+  if (filters.siteId) {
+    filteredProjects = projects.filter((p: any) =>
+      !filters.projectId || p.id?.toString() === filters.projectId || p._id?.toString() === filters.projectId
+    );
+    filteredApprovals = approvals.filter((a: any) =>
+      a.siteId === filters.siteId || a.projectId?.toString() === filters.projectId
+    );
+  } else if (filters.projectId) {
+    filteredProjects = projects.filter((p: any) =>
+      p.id?.toString() === filters.projectId || p._id?.toString() === filters.projectId
+    );
+    filteredApprovals = approvals.filter((a: any) =>
+      a.projectId?.toString() === filters.projectId
+    );
+  }
 
   return {
     counts: {
-      projects: projects.length,
+      projects: filteredProjects.length,
       sites: sites.length,
-      pendingApprovals: approvals.length,
+      pendingApprovals: filteredApprovals.length,
       pendingMaterials,
       pendingLabour,
       pendingExpenses,
+      inventory: inventoryCount,
+      labour: labourCount,
     },
     todayExpense: {
       total: todayExpenses[0]?.total ?? 0,
       count: todayExpenses[0]?.count ?? 0,
     },
-    projects: projects.slice(0, 10),
-    pendingApprovals: approvals.slice(0, 20),
+    projects: filteredProjects.slice(0, 10),
+    pendingApprovals: filteredApprovals.slice(0, 20),
   };
 }
 
@@ -622,122 +738,100 @@ export async function listMaterialsForSupervisor(
     projectId: filters.projectId,
     siteId: filters.siteId,
   });
+  if (filters.status) query.status = filters.status;
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
   const skip = (page - 1) * limit;
 
-  if (filters.status !== "Approved") {
-    if (filters.status) query.status = filters.status;
-    const [requestItems, requestTotal] = await Promise.all([
-      Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Material.countDocuments(query),
+  if (filters.status === "Approved") {
+    const invQuery = { ...query };
+    delete invQuery.status;
+
+    const [items, total] = await Promise.all([
+      Inventory.find(invQuery).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+      Inventory.countDocuments(invQuery),
     ]);
 
+    // Batch-fetch billUrl for purchaseHistory entries across all items
+    const allMatIds = items.flatMap((m) =>
+      (m.purchaseHistory || []).filter((h: any) => h.materialId).map((h: any) => h.materialId)
+    );
+    let billMap = new Map<string, string>();
+    if (allMatIds.length > 0) {
+      try {
+        const linkedMats = await Material.find({ _id: { $in: allMatIds } }).select("_id billUrl").lean();
+        billMap = new Map(linkedMats.map((m: any) => [m._id.toString(), m.billUrl || '']));
+      } catch {}
+    }
+
     return {
-      materials: requestItems.map((m) => ({
+      materials: items.map((m) => ({
         _id: m._id.toString(),
-        materialId: m.materialId,
+        materialId: m._id.toString(),
         projectId: m.projectId,
         projectName: m.projectName,
         siteId: m.siteId,
         site: m.site,
         name: m.name,
         unit: m.unit,
-        requestedQuantity: m.requestedQuantity,
+        requestedQuantity: m.requestedQuantity || m.approvedQuantity,
         approvedQuantity: m.approvedQuantity,
         purchasedQuantity: m.purchasedQuantity,
         consumedQuantity: m.consumedQuantity,
         remainingStock: m.remainingStock,
         vendor: m.vendor,
         poNumber: m.poNumber,
-        issuedAmount: m.issuedAmount,
-        givenAmount: (m as any).givenAmount,
-        billUrl: (m as any).billUrl,
-        received: (m as any).status === "Received",
-        requestDate: m.requestDate,
-        status: m.status,
-        notes: m.notes,
-        createdBy: m.createdBy,
+        billUrl: m.billUrl,
+        receiptImage: m.receiptImage,
+        received: m.received,
+        purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
+          vendor: h.vendor,
+          quantity: h.quantity,
+          date: h.date,
+          poNumber: h.poNumber,
+          materialId: h.materialId,
+          billUrl: h.materialId ? (billMap.get(h.materialId.toString()) || '') : '',
+        })),
+        requestDate: m.createdAt,
+        status: "Approved" as const,
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
       })),
-      pagination: { page, limit, total: requestTotal, pages: Math.ceil(requestTotal / limit) },
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     };
   }
-
-  await backfillApprovedMaterialsToInventory(query);
 
   const [items, total] = await Promise.all([
-    Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-    Inventory.countDocuments(query),
+    Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Material.countDocuments(query),
   ]);
-
-  // If Inventory collection is empty for this query, fall back to Material collection
-  if (items.length === 0 && total === 0) {
-    const materialQuery: Record<string, unknown> = { ...query };
-    materialQuery.$or = [
-      { status: "Received" },
-      { approvedQuantity: { $gt: 0 } },
-    ];
-    const [matItems, matTotal] = await Promise.all([
-      Material.find(materialQuery).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Material.countDocuments(materialQuery),
-    ]);
-
-    return {
-      materials: matItems.map((m) => ({
-        _id: m._id.toString(),
-        materialId: m.materialId,
-        projectId: m.projectId,
-        projectName: m.projectName,
-        siteId: m.siteId,
-        site: m.site,
-        name: m.name,
-        unit: m.unit,
-        requestedQuantity: m.requestedQuantity,
-        approvedQuantity: m.approvedQuantity,
-        purchasedQuantity: m.purchasedQuantity,
-        consumedQuantity: m.consumedQuantity,
-        remainingStock: m.remainingStock,
-        vendor: m.vendor,
-        poNumber: m.poNumber,
-        issuedAmount: m.issuedAmount,
-        givenAmount: (m as any).givenAmount,
-        billUrl: (m as any).billUrl,
-        requestDate: m.requestDate,
-        status: m.status === "Received" ? "Received" : "Approved",
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-      })),
-      pagination: { page, limit, total: matTotal, pages: Math.ceil(matTotal / limit) },
-    };
-  }
 
   return {
     materials: items.map((m) => ({
       _id: m._id.toString(),
-      materialId: m._id.toString(),
+      materialId: m.materialId,
       projectId: m.projectId,
       projectName: m.projectName,
       siteId: m.siteId,
       site: m.site,
       name: m.name,
       unit: m.unit,
-      requestedQuantity: m.requestedQuantity || m.approvedQuantity,
+      requestedQuantity: m.requestedQuantity,
       approvedQuantity: m.approvedQuantity,
       purchasedQuantity: m.purchasedQuantity,
       consumedQuantity: m.consumedQuantity,
       remainingStock: m.remainingStock,
       vendor: m.vendor,
       poNumber: m.poNumber,
-      purchaseHistory: (m.purchaseHistory || []).map((h) => ({
-        vendor: h.vendor,
-        quantity: h.quantity,
-        date: h.date,
-      })),
-      requestDate: m.createdAt,
-      status: "Approved",
+      issuedAmount: m.issuedAmount,
+      givenAmount: (m as any).givenAmount,
+      billUrl: (m as any).billUrl,
+      received: (m as any).status === "Received",
+      requestDate: m.requestDate,
+      status: m.status,
+      notes: m.notes,
+      createdBy: m.createdBy,
       createdAt: m.createdAt,
       updatedAt: m.updatedAt,
     })),
@@ -839,7 +933,43 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
     await Inventory.findOne({ ...query, _id: materialId }).lean() ||
     await Material.findOne({ ...query, _id: materialId }).lean();
   if (!material) throw new AppError(404, "Material not found or not accessible");
-  return material;
+
+  const result: any = material;
+
+  const linkedId = (material as any).lastMaterialId;
+  if (linkedId) {
+    try {
+      const linked = await Material.findById(linkedId).select("billUrl receiptImage receiptImageMimeType poNumber vendor").lean();
+      if (linked) {
+        result.billUrl = linked.billUrl || result.billUrl;
+        result.receiptImage = linked.receiptImage || result.receiptImage;
+        result.receiptImageMimeType = linked.receiptImageMimeType || result.receiptImageMimeType;
+      }
+    } catch {}
+  }
+
+  // Enrich purchaseHistory entries with billUrl from their linked Material documents
+  const history = (result as any).purchaseHistory;
+  if (Array.isArray(history) && history.length > 0) {
+    const matIds = history
+      .filter((h: any) => h.materialId)
+      .map((h: any) => h.materialId);
+    if (matIds.length > 0) {
+      try {
+        const linkedMats = await Material.find({ _id: { $in: matIds } })
+          .select("_id billUrl")
+          .lean();
+        const billMap = new Map(linkedMats.map((m: any) => [m._id.toString(), m.billUrl]));
+        for (const entry of history) {
+          if (entry.materialId) {
+            entry.billUrl = billMap.get(entry.materialId.toString()) || '';
+          }
+        }
+      } catch {}
+    }
+  }
+
+  return result;
 }
 
 export async function updateMaterialStockForSupervisor(
@@ -856,6 +986,14 @@ export async function updateMaterialStockForSupervisor(
   }
   if (updates.consumedQuantity !== undefined) {
     inventory.consumedQuantity = Math.max(0, inventory.consumedQuantity + updates.consumedQuantity);
+    if (updates.consumedQuantity > 0) {
+      inventory.consumptionHistory = inventory.consumptionHistory || [];
+      inventory.consumptionHistory.push({
+        quantity: updates.consumedQuantity,
+        date: new Date(),
+        updatedBy: userId,
+      });
+    }
   }
   await inventory.save();
 
@@ -944,4 +1082,39 @@ export async function getApprovalDetailForSupervisor(userId: string, approvalId:
   const approval = await Approval.findOne({ ...approvalScopeQuery(access), _id: approvalId }).lean();
   if (!approval) throw new AppError(404, "Approval not found or not accessible");
   return approval;
+}
+
+export async function listMaterialNames(userId: string, search?: string) {
+  const { query } = await buildScopedEntityQuery(userId);
+  const matchStage: Record<string, unknown> = { ...query };
+  if (search) {
+    matchStage.name = { $regex: search, $options: "i" };
+  }
+  const names = await Inventory.distinct("name", matchStage);
+  return names.sort();
+}
+
+export async function getRecentNotificationsForSupervisor(userId: string, limit: number) {
+  const access = await getSupervisorAccess(userId);
+  const query = approvalScopeQuery(access);
+  // Fetch approved and rejected approvals (not pending) owned by this supervisor
+  query.status = { $in: ["Approved", "Rejected"] };
+  query.owner = userId;
+
+  const approvals = await Approval.find(query)
+    .sort({ reviewedAt: -1, submittedAt: -1 })
+    .limit(limit)
+    .lean();
+
+  return approvals.map((a) => ({
+    id: a._id.toString(),
+    title: a.title,
+    body: a.status === "Approved"
+      ? `Approved${a.detail ? ' - ' + a.detail : ''}${a.amount ? ' (₹' + Number(a.amount).toLocaleString('en-IN') + ')' : ''}${a.poNumber ? '. PO: ' + a.poNumber : ''}`
+      : `Rejected${a.detail ? ' - ' + a.detail : ''}${a.amount ? ' (₹' + Number(a.amount).toLocaleString('en-IN') + ')' : ''}`,
+    type: a.type,
+    status: a.status,
+    receivedAt: (a.reviewedAt || a.submittedAt)?.getTime() || Date.now(),
+    read: false,
+  }));
 }

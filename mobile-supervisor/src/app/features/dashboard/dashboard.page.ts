@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent,
   IonIcon,
@@ -92,18 +93,18 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
             <span class="stat-val">{{ dashboard()?.counts?.sites || 0 }}</span>
             <span class="stat-label">Sites</span>
           </button>
-          <button class="stat-card" (click)="navigateTo('/tabs/materials')">
+          <button class="stat-card" (click)="navigateTo('/tabs/inventory')">
             <div class="stat-icon si-gold">
               <ion-icon name="cube-outline"></ion-icon>
             </div>
-            <span class="stat-val">{{ dashboard()?.counts?.pendingMaterials || 0 }}</span>
-            <span class="stat-label">Materials</span>
+            <span class="stat-val">{{ dashboard()?.counts?.inventory || 0 }}</span>
+            <span class="stat-label">Inventory</span>
           </button>
           <button class="stat-card" (click)="navigateTo('/tabs/labour')">
             <div class="stat-icon si-navy">
               <ion-icon name="people-outline"></ion-icon>
             </div>
-            <span class="stat-val">{{ dashboard()?.counts?.pendingLabour || 0 }}</span>
+            <span class="stat-val">{{ dashboard()?.counts?.labour || 0 }}</span>
             <span class="stat-label">Labour</span>
           </button>
           <button class="stat-card" (click)="navigateTo('/tabs/requests')">
@@ -766,7 +767,9 @@ export class DashboardPage implements OnInit, OnDestroy {
     });
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('agb:site-changed', this.handleSiteChange);
+      this.supervisor.siteChanged$
+        .pipe(takeUntilDestroyed())
+        .subscribe(() => void this.loadDashboard());
     }
 
     // Load all data; signal appReady when done
@@ -775,21 +778,14 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:site-changed', this.handleSiteChange);
-    }
     // Ensure splash always resolves even if component is destroyed prematurely
     this.appReady.resolve(false);
   }
 
-  private handleSiteChange = (): void => {
-    void this.loadDashboard();
-  };
-
   async refreshDashboard(event: CustomEvent): Promise<void> {
     this.error.set(false);
     await this.loadDashboard();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   async retryLoad(): Promise<void> {
@@ -811,7 +807,10 @@ export class DashboardPage implements OnInit, OnDestroy {
       let expensesData: Expense[] = [];
 
       const [dashResult, sitesResult, profileResult, expensesResult] = await Promise.all([
-        this.supervisor.getDashboard().toPromise().then(
+        this.supervisor.getDashboard({
+          siteId: this.supervisor.selectedSiteId() || undefined,
+          projectId: this.supervisor.selectedProjectId() || undefined,
+        }).toPromise().then(
           (r) => { if (r) dashData = r.dashboard; return !!r; },
           () => false
         ),
@@ -824,6 +823,8 @@ export class DashboardPage implements OnInit, OnDestroy {
           () => false
         ),
         this.supervisor.getExpenses({
+          siteId: this.supervisor.selectedSiteId() || undefined,
+          projectId: this.supervisor.selectedProjectId() || undefined,
           dateFrom: this.todayStr(),
           dateTo: this.todayStr(),
           limit: 5,
@@ -869,10 +870,10 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   navigateToSite(site: Site): void {
-    this.supervisor.setSelectedSite(
-      site.siteId,
+    void this.supervisor.setSelectedSite(
+      site.id,
       site.projectId || '',
-      site.projectName || '',
+      site.projectName || site.name,
       site.name,
     );
     this.router.navigate(['/tabs/sites']);

@@ -1,4 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
@@ -25,11 +27,15 @@ import {
   alertCircleOutline,
   pencilOutline,
   closeOutline,
+  close,
   swapVerticalOutline,
+  cloudOfflineOutline,
+  refreshOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { PageHeaderComponent, EmptyStateComponent } from '../../shared/components';
 import { InventoryEditModalComponent } from './inventory-edit-modal/inventory-edit-modal.component';
 import { InventoryRequestModalComponent } from './inventory-request-modal/inventory-request-modal.component';
@@ -50,10 +56,13 @@ export interface InventoryItem {
   projectName: string;
   siteId: string;
   site: string;
+  billUrl?: string;
   purchaseHistory?: Array<{
     vendor: string;
     quantity: number;
     date: string;
+    materialId?: string;
+    billUrl?: string;
   }>;
 }
 
@@ -109,7 +118,17 @@ type SortDir = 'asc' | 'desc';
       </div>
 
       <div class="inventory-list">
-        @if (isLoading() && items().length === 0) {
+        @if (errorMessage()) {
+          <div class="error-state">
+            <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
+            <span class="error-title">Something went wrong</span>
+            <span class="error-text">{{ errorMessage() }}</span>
+            <button class="retry-btn" (click)="loadInventory()">
+              <ion-icon name="refresh-outline"></ion-icon>
+              Retry
+            </button>
+          </div>
+        } @else if (isLoading() && items().length === 0) {
           @for (i of [1,2,3,4]; track i) {
             <div class="skeleton-card">
               <ion-skeleton-text animated style="width: 55%; height: 18px;"></ion-skeleton-text>
@@ -127,7 +146,7 @@ type SortDir = 'asc' | 'desc';
           ></app-empty-state>
         } @else {
           @for (item of filteredItems(); track item.materialId) {
-            <div class="inventory-card" [class.low-stock]="item.currentQuantity <= item.minimumQuantity">
+            <div class="inventory-card" [class.low-stock]="item.currentQuantity <= item.minimumQuantity" (click)="openDetail(item._id)">
               <header class="card-header">
                 <div class="material-icon" [class.low]="item.currentQuantity <= item.minimumQuantity">
                   <ion-icon name="cube-outline"></ion-icon>
@@ -154,7 +173,7 @@ type SortDir = 'asc' | 'desc';
                 </div>
                 <div class="qty-meta">
                   <span class="qty-min">Min: {{ item.minimumQuantity }} {{ item.unit }}</span>
-                  <button class="edit-qty-btn" (click)="openEditQuantity(item)">
+                  <button class="edit-qty-btn" (click)="openEditQuantity(item); $event.stopPropagation()">
                     <ion-icon name="pencil-outline"></ion-icon>
                     Update
                   </button>
@@ -191,13 +210,19 @@ type SortDir = 'asc' | 'desc';
                       <span class="vh-vendor">{{ entry.vendor || 'Unknown' }}</span>
                       <span class="vh-qty">{{ entry.quantity }} {{ item.unit }}</span>
                       <span class="vh-date">{{ entry.date | date:'MMM d, yyyy' }}</span>
+                      @if (entry.billUrl) {
+                        <button class="vh-bill-btn" (click)="openBillViewer(entry.billUrl!); $event.stopPropagation()">
+                          <ion-icon name="document-text-outline"></ion-icon>
+                          View Bill
+                        </button>
+                      }
                     </div>
                   }
                 </div>
               }
 
               <footer class="card-footer">
-                <button class="request-btn" (click)="raiseRequest(item)">
+                <button class="request-btn" (click)="raiseRequest(item); $event.stopPropagation()">
                   <ion-icon name="add-outline"></ion-icon>
                   Raise Request
                 </button>
@@ -212,6 +237,28 @@ type SortDir = 'asc' | 'desc';
           <ion-icon name="add-outline"></ion-icon>
         </ion-fab-button>
       </ion-fab>
+
+      @if (viewerUrl()) {
+        <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
+          <button class="bill-viewer-close" (click)="closeBillViewer($event)">
+            <ion-icon name="close"></ion-icon>
+          </button>
+          <div class="bill-viewer-img-wrap"
+               (touchstart)="onPinchStart($event)"
+               (touchmove)="onPinchMove($event)"
+               (touchend)="onPinchEnd($event)"
+               (touchcancel)="onPinchEnd($event)"
+               (mousedown)="onDragStart($event)"
+               (mousemove)="onDragMove($event)"
+               (mouseup)="onDragEnd()"
+               (mouseleave)="onDragEnd()"
+               (dblclick)="toggleZoom($event)">
+            <img [src]="viewerUrl()" alt="Bill" class="bill-viewer-img"
+                 [style.transform]="'translate(' + panX + 'px,' + panY + 'px) scale(' + zoomScale + ')'"
+                 (dragstart)="$event.preventDefault()" />
+          </div>
+        </div>
+      }
     </ion-content>
   `,
   styles: [`
@@ -282,6 +329,7 @@ type SortDir = 'asc' | 'desc';
       padding: var(--md-space-4);
       margin-bottom: var(--md-space-3);
       box-shadow: var(--md-elevation-1);
+      cursor: pointer;
       transition: box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard),
                   transform var(--md-motion-duration-short1) var(--md-motion-easing-standard);
     }
@@ -470,7 +518,7 @@ type SortDir = 'asc' | 'desc';
     .vendor-history-entry {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 8px;
       padding: 6px 0;
       border-bottom: 1px solid var(--m3-outline-variant);
@@ -498,6 +546,19 @@ type SortDir = 'asc' | 'desc';
       flex-shrink: 0;
     }
 
+    .vh-bill-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: var(--md-radius-pill);
+      background: rgba(0, 34, 99, 0.06);
+      color: var(--m3-primary);
+      border: 1px solid rgba(0, 34, 99, 0.15);
+      font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .vh-bill-btn:active { background: rgba(0, 34, 99, 0.12); }
+    .vh-bill-btn ion-icon { font-size: 12px; }
+
     .skeleton-card {
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
@@ -506,20 +567,80 @@ type SortDir = 'asc' | 'desc';
       margin-bottom: var(--md-space-3);
     }
 
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--md-space-8) var(--md-space-4);
+      text-align: center;
+    }
+    .error-icon { font-size: 48px; color: var(--m3-error); opacity: 0.7; margin-bottom: var(--md-space-3); }
+    .error-title { font-size: 16px; font-weight: 700; color: var(--m3-on-surface); margin-bottom: var(--md-space-1); }
+    .error-text { font-size: 13px; color: var(--m3-on-surface-muted); margin-bottom: var(--md-space-4); max-width: 280px; }
+    .retry-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; border-radius: var(--md-radius-pill);
+      background: var(--m3-primary); color: var(--m3-on-primary);
+      border: none; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .retry-btn ion-icon { font-size: 16px; }
+
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
+
+    .bill-viewer-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.92);
+      display: flex; align-items: center; justify-content: center;
+      animation: billFadeIn 0.2s ease;
+    }
+    @keyframes billFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .bill-viewer-close {
+      position: absolute; top: 12px; right: 12px; z-index: 10;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #fff;
+    }
+    .bill-viewer-close ion-icon { font-size: 24px; }
+    .bill-viewer-img-wrap {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    .bill-viewer-img {
+      max-width: 92vw; max-height: 88vh;
+      object-fit: contain; border-radius: 4px;
+      transition: transform 0.15s ease;
+      transform-origin: center center;
+      will-change: transform;
+      pointer-events: none;
+    }
   `],
 })
 export class InventoryPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
+  private router = inject(Router);
 
   items = signal<InventoryItem[]>([]);
   isLoading = signal(true);
+  errorMessage = signal<string>('');
   searchQuery = signal('');
   sortField = signal<SortField>('name');
   sortDir = signal<SortDir>('asc');
   private loadGeneration = 0;
+
+  viewerUrl = signal<string | null>(null);
+  zoomScale = 1;
+  panX = 0;
+  panY = 0;
+  private pinchStartDist = 0;
+  private pinchStartScale = 1;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private isDragging = false;
 
   filteredItems = computed(() => {
     let result = [...this.items()];
@@ -565,28 +686,26 @@ export class InventoryPage implements OnInit, OnDestroy {
     addIcons({
       gridOutline, searchOutline, addOutline,
       chevronDownOutline, timeOutline, businessOutline, documentTextOutline,
-      checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline,
-      swapVerticalOutline,
+      checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline, close,
+      swapVerticalOutline, cloudOfflineOutline, refreshOutline,
     });
-    await this.supervisor.init();
+    this.supervisor.init().catch(() => {});
     await this.loadInventory();
 
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => void this.loadInventory());
+
     if (typeof window !== 'undefined') {
-      window.addEventListener('agb:site-changed', this.handleSiteChange);
       window.addEventListener('agb:inventory-changed', this.handleInventoryChange);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:site-changed', this.handleSiteChange);
       window.removeEventListener('agb:inventory-changed', this.handleInventoryChange);
     }
   }
-
-  private handleSiteChange = (): void => {
-    void this.loadInventory();
-  };
 
   private handleInventoryChange = (): void => {
     void this.loadInventory();
@@ -594,17 +713,20 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   async loadInventory(): Promise<void> {
     this.isLoading.set(true);
+    this.errorMessage.set('');
     const gen = ++this.loadGeneration;
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
 
     try {
-      const res = await this.supervisor.getMaterials({
-        siteId: siteId || undefined,
-        projectId: projectId || undefined,
-        status: 'Approved',
-        limit: 200,
-      }).toPromise();
+      const res = await firstValueFrom(
+        this.supervisor.getMaterials({
+          siteId: siteId || undefined,
+          projectId: projectId || undefined,
+          status: 'Approved',
+          limit: 200,
+        })
+      );
       if (gen !== this.loadGeneration) return;
       const materials: InventoryItem[] = (res?.materials || []).map((m) => ({
         _id: m._id,
@@ -622,6 +744,7 @@ export class InventoryPage implements OnInit, OnDestroy {
         projectName: m.projectName,
         siteId: m.siteId || '',
         site: m.site,
+        billUrl: (m as any).billUrl || '',
         purchaseHistory: m.purchaseHistory || [],
       }));
       this.items.set(materials);
@@ -629,13 +752,14 @@ export class InventoryPage implements OnInit, OnDestroy {
     } catch (err) {
       if (gen !== this.loadGeneration) return;
       console.error('[Inventory] failed to load', err);
+      this.errorMessage.set((err as Error)?.message || 'Failed to load inventory');
       this.isLoading.set(false);
     }
   }
 
   async refreshInventory(event: CustomEvent): Promise<void> {
     await this.loadInventory();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   applyFilters(): void {
@@ -666,6 +790,10 @@ export class InventoryPage implements OnInit, OnDestroy {
     }
   }
 
+  openDetail(id: string): void {
+    this.router.navigate(['/tabs/inventory', id]);
+  }
+
   async raiseRequest(item: InventoryItem | null): Promise<void> {
     const modal = await this.modalCtrl.create({
       component: InventoryRequestModalComponent,
@@ -683,5 +811,83 @@ export class InventoryPage implements OnInit, OnDestroy {
       });
       await toast.present();
     }
+  }
+
+  openBillViewer(url: string): void {
+    this.viewerUrl.set(url);
+    this.resetZoom();
+  }
+
+  closeBillViewer(event: Event): void {
+    event.stopPropagation();
+    this.viewerUrl.set(null);
+    this.resetZoom();
+  }
+
+  private resetZoom(): void {
+    this.zoomScale = 1;
+    this.panX = 0;
+    this.panY = 0;
+  }
+
+  toggleZoom(event: Event): void {
+    event.stopPropagation();
+    if (this.zoomScale > 1) {
+      this.resetZoom();
+    } else {
+      this.zoomScale = 2.5;
+    }
+  }
+
+  onPinchStart(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      this.pinchStartDist = this.getTouchDistance(event.touches);
+      this.pinchStartScale = this.zoomScale;
+    }
+  }
+
+  onPinchMove(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = this.getTouchDistance(event.touches);
+      const ratio = dist / this.pinchStartDist;
+      this.zoomScale = Math.min(Math.max(this.pinchStartScale * ratio, 0.5), 5);
+      if (this.zoomScale <= 1) {
+        this.panX = 0;
+        this.panY = 0;
+      }
+    }
+  }
+
+  onPinchEnd(event: TouchEvent): void {
+    if (event.touches.length < 2 && this.zoomScale < 1) {
+      this.resetZoom();
+    }
+  }
+
+  private getTouchDistance(touches: TouchList): number {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  onDragStart(event: MouseEvent): void {
+    if (this.zoomScale <= 1) return;
+    event.preventDefault();
+    this.isDragging = true;
+    this.dragStartX = event.clientX - this.panX;
+    this.dragStartY = event.clientY - this.panY;
+  }
+
+  onDragMove(event: MouseEvent): void {
+    if (!this.isDragging) return;
+    event.preventDefault();
+    this.panX = event.clientX - this.dragStartX;
+    this.panY = event.clientY - this.dragStartY;
+  }
+
+  onDragEnd(): void {
+    this.isDragging = false;
   }
 }

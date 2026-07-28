@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { Types } from "mongoose";
 import { InviteToken, IInviteToken, InviteRole } from "../models/InviteToken.js";
-import { env } from "../config/env.js";
+import { env, resolveBackendBaseUrl } from "../config/env.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { compareToken, hashToken } from "../utils/password.js";
 import { sendEmail } from "../config/email.js";
@@ -79,6 +79,7 @@ export interface CreateInviteParams {
   metadata?: Record<string, unknown>;
   expiryMinutes?: number;
   sendEmail?: boolean; // if true, send deep link email; if false, generate QR only
+  req?: { protocol?: string; get?: (h: string) => string | undefined };
 }
 
 export interface CreateEmployeeInviteParams {
@@ -88,6 +89,7 @@ export interface CreateEmployeeInviteParams {
   phone?: string;
   role: InviteRole;
   projectIds?: string[];
+  req?: { protocol?: string; get?: (h: string) => string | undefined };
 }
 
 export interface CreateEmployeeInviteResult {
@@ -152,7 +154,7 @@ export async function createInvite(params: CreateInviteParams): Promise<{
     // Send deep link email instead of OTP email
     const separator = env.QR_BASE_URL.includes("?") ? "&" : "?";
     const deepLink = `${env.QR_BASE_URL}${separator}token=${encodeURIComponent(token)}`;
-const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/#/signup/employee?token=${encodeURIComponent(token)}`;
+const webFallbackUrl = `${resolveBackendBaseUrl(params.req)}/signup.html?token=${encodeURIComponent(token)}`;
 
     const { subject, html, text } = buildSupervisorInviteEmail({
       name: params.supervisorName,
@@ -218,9 +220,7 @@ export async function createEmployeeInvite(
   }
 
   const token = generateToken();
-  const otp = generateOtp();
   const expiresAt = new Date(Date.now() + INVITE_EXPIRY_MINUTES * 60 * 1000);
-  const otpExpiresAt = expiresAt;
 
   const invite = await InviteToken.create({
     token,
@@ -234,16 +234,14 @@ export async function createEmployeeInvite(
       inviteeName: params.name,
       allocatedProjectIds: params.projectIds || [],
     },
+    // Employee invites (admin/PM/accountant) don't require OTP —
+    // the admin already verified the email when creating the invite.
     otpHash: "",
-    otpExpiresAt,
+    otpExpiresAt: undefined,
   });
 
-  const otpHash = await hashToken(otp);
-  invite.otpHash = otpHash;
-  await invite.save();
-
-  const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
-  const inviteUrl = `${baseUrl}/#/signup/employee?token=${token}`;
+  const backendUrl = resolveBackendBaseUrl(params.req);
+  const inviteUrl = `${backendUrl}/signup.html?token=${token}`;
 
   const { subject, html, text } = buildEmployeeInviteEmail({
     name: params.name,
@@ -420,7 +418,8 @@ export async function resendOtp(token: string): Promise<{ otp: string; emailSent
  * invite token. Also provides a web fallback URL.
  */
 export async function sendSupervisorInviteEmail(
-  token: string
+  token: string,
+  req?: { protocol?: string; get?: (h: string) => string | undefined }
 ): Promise<{ emailSent: boolean; recipient: string | null; deepLink: string }> {
   const invite = await InviteToken.findOne({ token });
   if (!invite) throw new AppError(404, "Invite token not found");
@@ -439,7 +438,7 @@ export async function sendSupervisorInviteEmail(
   const deepLink = `${env.QR_BASE_URL}${separator}token=${encodeURIComponent(token)}`;
 
   // Web fallback URL for browsers that can't open the deep link
-  const webFallbackUrl = `${env.FRONTEND_URL.replace(/\/+$/, "")}/#/signup/employee?token=${encodeURIComponent(token)}`;
+  const webFallbackUrl = `${resolveBackendBaseUrl(req)}/signup.html?token=${encodeURIComponent(token)}`;
 
   const name = extractSupervisorName(invite);
   const expiryMinutes = Math.max(

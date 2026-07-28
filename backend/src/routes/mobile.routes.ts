@@ -42,6 +42,7 @@ router.get("/supervisor/approvals/:id", ctrl.getApprovalDetail);
 router.patch("/supervisor/approvals/:id", validate(approvalActionSchema), ctrl.takeApprovalAction);
 
 // Materials
+router.get("/supervisor/material-names", ctrl.listMaterialNames);
 router.get("/supervisor/materials", ctrl.listMaterials);
 router.get("/supervisor/materials/:id", ctrl.getMaterial);
 router.post("/supervisor/materials", validate(createMaterialMobileSchema), ctrl.createMaterial);
@@ -84,5 +85,8 @@ router.get("/supervisor/devices", ctrl.getMyDevices);
 
 // Vendors
 router.get("/supervisor/vendors", ctrl.listVendorsForSupervisor);
+
+// Notifications
+router.get("/supervisor/notifications/recent", ctrl.getRecentNotifications);
 
 export default router;

@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -21,6 +22,7 @@ import quotationRoutes from "./routes/quotation.routes.js";
 import invoiceRoutes from "./routes/invoice.routes.js";
 import companyProfileRoutes from "./routes/company-profile.routes.js";
 import { ensureDefaultPermissions } from "./models/RolePermission.js";
+import { RESET_PASSWORD_HTML, SIGNUP_HTML } from "./config/pages.js";
 
 export function createApp(): express.Application {
   const app = express();
@@ -47,7 +49,13 @@ export function createApp(): express.Application {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'"],
+          // 'unsafe-inline' is required because reset-password.html and signup.html
+          // use inline <script> tags and onclick= handlers (served as raw HTML
+          // strings from this backend). These auth pages are served from the same
+          // origin so there's no cross-origin XSS risk from these specific inline
+          // scripts/handlers.
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrcAttr: ["'unsafe-inline'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", "data:", "https:"],
           connectSrc: ["'self'"],
@@ -114,6 +122,7 @@ export function createApp(): express.Application {
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
+      deploy: "fix-materials",
     });
   });
 
@@ -153,6 +162,17 @@ export function createApp(): express.Application {
   app.use("/api/invoices", invoiceRoutes);
   app.use("/api", companyProfileRoutes);
 
+  // Static assets (logo for email templates and auth pages)
+  // Resolve relative to project root (process.cwd() = backend/ when running npm start)
+  app.use("/assets", express.static(path.join(process.cwd(), "public/assets"), { maxAge: "7d" }));
+
+  app.get("/reset-password.html", (_req, res) => {
+    res.type("html").send(RESET_PASSWORD_HTML);
+  });
+  app.get("/signup.html", (_req, res) => {
+    res.type("html").send(SIGNUP_HTML);
+  });
+
   app.use(notFound);
   app.use(errorHandler);
 
@@ -175,6 +195,58 @@ export async function bootstrap(): Promise<void> {
   await ensureWorkersCollection();
   const { migrateCompanyName } = await import("./services/company-profile.service.js");
   await migrateCompanyName();
+
+  const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
+  backfillMaterialSiteIds().catch((err: any) =>
+    console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
+  );
+  backfillApprovedMaterialsToInventory({}).catch((err: any) =>
+    console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
+  );
+
+  try {
+    const { Material } = await import("./models/Material.js");
+    await Material.collection.createIndex({ projectId: 1, siteId: 1, createdAt: -1 }, { background: true });
+    await Material.collection.createIndex({ siteId: 1, status: 1, createdAt: -1 }, { background: true });
+    console.log("[Startup] Material compound indexes ensured");
+  } catch (e: any) {
+    console.error("[Startup] Material index creation failed (non-fatal):", e?.message || e);
+  }
+
+  try {
+    const { Expense } = await import("./models/Expense.js");
+    await Expense.collection.createIndex({ siteId: 1, type: 1, status: 1, date: -1 }, { background: true });
+    await Expense.collection.createIndex({ siteId: 1, date: -1 }, { background: true });
+    console.log("[Startup] Expense compound indexes ensured");
+  } catch (e: any) {
+    console.error("[Startup] Expense index creation failed (non-fatal):", e?.message || e);
+  }
+
+  try {
+    const { Labour } = await import("./models/Labour.js");
+    await Labour.collection.createIndex({ siteId: 1, status: 1, createdAt: -1 }, { background: true });
+    await Labour.collection.createIndex({ projectId: 1, createdAt: -1 }, { background: true });
+    console.log("[Startup] Labour compound indexes ensured");
+  } catch (e: any) {
+    console.error("[Startup] Labour index creation failed (non-fatal):", e?.message || e);
+  }
+
+  try {
+    const { Approval } = await import("./models/Approval.js");
+    await Approval.collection.createIndex({ site: 1, status: 1, submittedAt: -1 }, { background: true });
+    await Approval.collection.createIndex({ status: 1, submittedAt: -1 }, { background: true });
+    console.log("[Startup] Approval compound indexes ensured");
+  } catch (e: any) {
+    console.error("[Startup] Approval index creation failed (non-fatal):", e?.message || e);
+  }
+
+  try {
+    const { Inventory } = await import("./models/Inventory.js");
+    await Inventory.collection.createIndex({ siteId: 1, createdAt: -1 }, { background: true });
+    console.log("[Startup] Inventory compound index ensured");
+  } catch (e: any) {
+    console.error("[Startup] Inventory index creation failed (non-fatal):", e?.message || e);
+  }
 
   const app = createApp();
   app.listen(env.PORT, () => {

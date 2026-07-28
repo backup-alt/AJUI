@@ -20,6 +20,7 @@
           "options": {
             "outputPath": "dist/annai-builders-dashboard",
             "index": "index.html",
+            "baseHref": "/AJUI/",
             "browser": "src/main.ts",
             "polyfills": [
               "zone.js"

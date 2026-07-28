@@ -206,11 +206,13 @@ export async function uploadExpenseReceipt(
   id: string,
   payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
 ) {
+  console.log(`[uploadExpenseReceipt svc] id=${id} givenAmount=${payload.givenAmount}`);
   const expense = await Expense.findById(id);
   if (!expense) throw new AppError(404, "Expense not found");
   if (expense.status !== "Pending" && expense.status !== "Approved" && expense.status !== "Completed") {
     throw new AppError(400, "Receipt upload is not allowed for this expense");
   }
+  console.log(`[uploadExpenseReceipt svc] status=${expense.status} type=${expense.type} site=${expense.site}`);
 
   try {
     const pcloudResult = await uploadToPCloud(
@@ -220,8 +222,9 @@ export async function uploadExpenseReceipt(
     );
     expense.billUrl = pcloudResult.fileUrl;
     expense.receiptImageName = pcloudResult.fileName;
+    console.log(`[uploadExpenseReceipt svc] pCloud OK: ${pcloudResult.fileUrl?.substring(0, 60)}`);
   } catch (err) {
-    console.warn("[pCloud] Upload failed, falling back to base64 storage:", err);
+    console.warn("[uploadExpenseReceipt svc] pCloud failed, falling back to base64:", err);
     expense.receiptImage = payload.data;
     expense.receiptImageMimeType = payload.mimeType;
     expense.receiptImageName = payload.fileName;
@@ -236,9 +239,12 @@ export async function uploadExpenseReceipt(
 
   expense.receiptUploadedAt = new Date();
   await expense.save();
+  console.log(`[uploadExpenseReceipt svc] saved`);
 
   if (expense.type === "site" && expense.projectId && expense.site) {
+    console.log(`[uploadExpenseReceipt svc] recomputing ledger for ${expense.projectId}/${expense.site}`);
     await recomputeSiteLedger(expense.projectId, expense.site);
+    console.log(`[uploadExpenseReceipt svc] ledger done`);
   }
 
   if (expense.poNumber && expense.billUrl) {

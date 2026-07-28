@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -30,6 +30,7 @@ import {
   checkmarkCircleOutline,
   cubeOutline,
   locationOutline,
+  searchOutline,
   walletOutline,
   warningOutline,
 } from 'ionicons/icons';
@@ -136,7 +137,7 @@ import { Vendor } from '../../../shared/models';
 
           <ion-list lines="none" class="form-list">
             @if (expenseType() === 'Purchase') {
-              <ion-item class="form-item">
+              <div class="form-item toggle-item">
                 <div class="toggle-row">
                   <div class="toggle-info">
                     <div class="toggle-label">Includes Site Material</div>
@@ -144,18 +145,31 @@ import { Vendor } from '../../../shared/models';
                   </div>
                   <ion-toggle [(ngModel)]="isSiteMaterial" (ionChange)="onSiteMaterialToggle()"></ion-toggle>
                 </div>
-              </ion-item>
+              </div>
             }
 
             @if (expenseType() === 'Purchase' && isSiteMaterial) {
-              <ion-item class="form-item">
-                <ion-label position="stacked">Material Name *</ion-label>
-                <ion-input
-                  placeholder="e.g., Cement, Sand, Bricks"
-                  [(ngModel)]="expense.materialName"
-                  [clearInput]="true"
-                ></ion-input>
-              </ion-item>
+              <div class="form-group">
+                <label class="form-label">Material Name *</label>
+                <div class="search-wrap" (pointerdown)="onMaterialSearchWrapClick($event)">
+                  <ion-input
+                    placeholder="Search or enter material name"
+                    [(ngModel)]="expense.materialName"
+                    (ionInput)="onMaterialNameInput($event)"
+                    [clearInput]="true"
+                  ></ion-input>
+                  @if (filteredMaterialNames().length > 0 && showMaterialSuggestions()) {
+                    <div class="suggestions-list">
+                      @for (n of filteredMaterialNames(); track n) {
+                        <div class="suggestion-item" (pointerdown)="onSelectMaterialSuggestion($event, n)">
+                          <ion-icon name="search-outline"></ion-icon>
+                          {{ n }}
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
 
               <ion-item class="form-item">
                 <ion-label position="stacked">Unit *</ion-label>
@@ -324,16 +338,51 @@ import { Vendor } from '../../../shared/models';
     .balance-warning { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #dc2626; font-weight: 600; }
     .block-notice { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff5f5; border: 1px solid #fca5a5; border-radius: 8px; color: #dc2626; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
     .form-list { background: transparent; padding: 0; }
-    .form-item { --background: #ffffff; --border-radius: 0 !important; --inner-border-radius: 0 !important; --padding-start: 14px; --padding-end: 14px; --min-height: 64px; border: 1px solid #e5e7eb; border-bottom: none; margin-bottom: 0; }
+    .form-item { --background: #ffffff; --background-hover: #ffffff; --background-focused: #ffffff; --background-checked: #ffffff; --border-radius: 0 !important; --inner-border-radius: 0 !important; --padding-start: 14px; --padding-end: 14px; --min-height: 64px; border: 1px solid #e5e7eb; border-bottom: none; margin-bottom: 0; --highlight-color-checked: transparent; --highlight-color-focused: transparent; --highlight-color-valid: transparent; --highlight-color-invalid: transparent; }
+    .toggle-item { background: #ffffff; border: 1px solid #e5e7eb; border-bottom: none; padding: 14px; margin-bottom: 0; min-height: 64px; box-sizing: border-box; }
     .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
     .toggle-row { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 0; }
     .toggle-info { display: flex; flex-direction: column; gap: 2px; }
     .toggle-label { font-size: 14px; font-weight: 600; color: #111827; }
     .toggle-sub { font-size: 12px; color: #6b7280; }
+    ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --handle-background: #fff; --handle-background-checked: #fff; --handle-box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
     .form-actions { padding: 20px 0; }
+    .form-group { margin: 0; padding: 10px 14px; background: #ffffff; border: 1px solid #e5e7eb; }
+    .form-group:first-of-type { border-radius: 8px 8px 0 0; }
+    .form-group:last-of-type { border-radius: 0 0 8px 8px; border-bottom: 1px solid #e5e7eb; }
+    .form-label { display: block; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .search-wrap { position: relative; }
+    .search-wrap ion-input { --background: transparent; --border-radius: 0; --padding-start: 0; --padding-end: 0; --min-height: 36px; border: none; font-size: 15px; color: #111827; }
+    .suggestions-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #111827;
+      cursor: pointer;
+    }
+    .suggestion-item:hover, .suggestion-item:active {
+      background: #f0f4ff;
+    }
+    .suggestion-item ion-icon { font-size: 14px; color: #6b7280; flex-shrink: 0; }
   `],
 })
-export class ExpenseCreatePage implements OnInit {
+export class ExpenseCreatePage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
@@ -363,6 +412,11 @@ export class ExpenseCreatePage implements OnInit {
   siteProjectId = signal<string | null>(null);
   currentBalance = signal<number | null>(null);
   vendors = signal<Vendor[]>([]);
+  materialNames = signal<string[]>([]);
+  filteredMaterialNames = signal<string[]>([]);
+  showMaterialSuggestions = signal(false);
+  private selectingMaterial = false;
+  private hideMaterialTimer: ReturnType<typeof setTimeout> | null = null;
 
   private actionSheetCtrl = inject(ActionSheetController);
 
@@ -374,6 +428,7 @@ export class ExpenseCreatePage implements OnInit {
       checkmarkCircleOutline,
       cubeOutline,
       locationOutline,
+      searchOutline,
       walletOutline,
       warningOutline,
     });
@@ -382,7 +437,21 @@ export class ExpenseCreatePage implements OnInit {
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
     await this.loadVendors();
+    this.loadMaterialNames();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('pointerdown', this.onDocClick);
+    }
   }
+
+  ngOnDestroy(): void {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('pointerdown', this.onDocClick);
+    }
+  }
+
+  private onDocClick = (): void => {
+    this.showMaterialSuggestions.set(false);
+  };
 
   selectType(type: 'Purchase' | 'Add Cash') {
     this.expenseType.set(type);
@@ -402,6 +471,51 @@ export class ExpenseCreatePage implements OnInit {
       next: (res) => this.vendors.set(res.items || []),
       error: () => this.vendors.set([]),
     });
+  }
+
+  loadMaterialNames(): void {
+    this.supervisor.getMaterialNames().subscribe({
+      next: (res) => this.materialNames.set(res.names || []),
+      error: () => this.materialNames.set([]),
+    });
+  }
+
+  onMaterialNameInput(event: Event): void {
+    if (this.selectingMaterial) return;
+    const value = (event as CustomEvent).detail?.value?.toLowerCase() || '';
+    this.showMaterialSuggestions.set(true);
+    if (!value) {
+      this.filteredMaterialNames.set(this.materialNames().slice(0, 10));
+    } else {
+      this.filteredMaterialNames.set(
+        this.materialNames().filter(n => n.toLowerCase().includes(value)).slice(0, 10)
+      );
+    }
+  }
+
+  onMaterialSearchWrapClick(event: Event): void {
+    event.stopPropagation();
+    this.showMaterialSuggestions.set(true);
+    if (this.filteredMaterialNames().length === 0) {
+      this.filteredMaterialNames.set(this.materialNames().slice(0, 10));
+    }
+  }
+
+  selectMaterialName(n: string): void {
+    this.selectingMaterial = true;
+    this.expense.materialName = n;
+    this.showMaterialSuggestions.set(false);
+    this.filteredMaterialNames.set([]);
+    setTimeout(() => { this.selectingMaterial = false; }, 100);
+  }
+
+  onSelectMaterialSuggestion(event: Event, n: string): void {
+    event.stopPropagation();
+    this.selectMaterialName(n);
+  }
+
+  hideMaterialSuggestionsDelayed(): void {
+    this.hideMaterialTimer = setTimeout(() => this.showMaterialSuggestions.set(false), 150);
   }
 
   async openVendorActionSheet() {
@@ -579,9 +693,11 @@ export class ExpenseCreatePage implements OnInit {
           position: 'top',
         });
         await toast.present();
+        const expType = isCashAdded ? 'Cash Added' : 'Purchase';
+        const expAmt = this.expense.amount || 0;
         this.notifications.notify(
           'Expense Submitted',
-          isCashAdded ? 'Cash request has been submitted for approval.' : 'Purchase request has been submitted for approval.'
+          `${expType}: ${this.expense.description || 'N/A'} - ₹${expAmt.toLocaleString('en-IN')} submitted for approval.`
         );
         this.router.navigate(['/tabs/expenses']);
       },

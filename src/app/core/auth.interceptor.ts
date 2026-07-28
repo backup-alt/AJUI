@@ -6,6 +6,24 @@ import { Observable } from "rxjs";
 import { ApiService } from "./api.service";
 import { AccessRestrictionService } from "./access-restriction.service";
 
+/**
+ * Returns the full login URL for the current deployment.
+ * On GitHub Pages at /AJUI/, this returns "https://backup-alt.github.io/AJUI/#/login".
+ * On localhost:4200, it returns "http://localhost:4200/#/login".
+ * Uses window.location to auto-detect the base path from the deployed Angular app.
+ */
+function getLoginUrl(): string {
+  // window.location.pathname gives us the current path (e.g. "/AJUI/dashboard")
+  // We need to preserve the base path (e.g. "/AJUI") and append "#/login"
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  // The first segment is typically the base path (e.g. "AJUI") for GitHub Pages project sites
+  // For root deployments, pathParts is empty
+  const basePath = pathParts.length > 0 && pathParts[0] !== 'index.html'
+    ? '/' + pathParts[0]
+    : '';
+  return window.location.origin + basePath + '/#/login';
+}
+
 export const authInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
@@ -39,7 +57,7 @@ export const authInterceptor: HttpInterceptorFn = (
           switchMap((res) => {
             if (!res) {
               api.clearSession();
-              window.location.href = "/#/login";
+              window.location.href = getLoginUrl();
               return throwError(() => err);
             }
             const retryReq = req.clone({
@@ -49,7 +67,7 @@ export const authInterceptor: HttpInterceptorFn = (
           }),
           catchError(() => {
             api.clearSession();
-            window.location.href = "/#/login";
+            window.location.href = getLoginUrl();
             return throwError(() => err);
           }),
         );

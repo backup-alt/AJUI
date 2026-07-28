@@ -1,4 +1,6 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
@@ -25,6 +27,8 @@ import {
   chevronForwardOutline,
   chevronDownOutline,
   businessOutline,
+  cloudOfflineOutline,
+  refreshOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
@@ -105,7 +109,17 @@ interface ConsolidatedMaterial {
       </div>
 
       <div class="cards">
-        @if (isLoading() && materials().length === 0) {
+        @if (errorMessage()) {
+          <div class="error-state">
+            <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
+            <span class="error-title">Something went wrong</span>
+            <span class="error-text">{{ errorMessage() }}</span>
+            <button class="retry-btn" (click)="loadMaterials()">
+              <ion-icon name="refresh-outline"></ion-icon>
+              Retry
+            </button>
+          </div>
+        } @else if (isLoading() && materials().length === 0) {
           @for (i of [1,2,3]; track i) {
             <div class="skeleton-card">
               <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
@@ -354,16 +368,36 @@ interface ConsolidatedMaterial {
       padding: var(--md-space-4);
       margin-bottom: var(--md-space-2);
     }
+
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--md-space-8) var(--md-space-4);
+      text-align: center;
+    }
+    .error-icon { font-size: 48px; color: var(--m3-error); opacity: 0.7; margin-bottom: var(--md-space-3); }
+    .error-title { font-size: 16px; font-weight: 700; color: var(--m3-on-surface); margin-bottom: var(--md-space-1); }
+    .error-text { font-size: 13px; color: var(--m3-on-surface-muted); margin-bottom: var(--md-space-4); max-width: 280px; }
+    .retry-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; border-radius: var(--md-radius-pill);
+      background: var(--m3-primary); color: var(--m3-on-primary);
+      border: none; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .retry-btn ion-icon { font-size: 16px; }
+
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
   `],
 })
-export class MaterialsPage implements OnInit, OnDestroy {
+export class MaterialsPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
   materials = signal<Material[]>([]);
   consolidatedMaterials = signal<ConsolidatedMaterial[]>([]);
   isLoading = signal(true);
+  errorMessage = signal<string>('');
   expandedKey = signal<string>('');
   searchQuery = '';
   statusFilter: MaterialStatus | '' = '';
@@ -373,38 +407,30 @@ export class MaterialsPage implements OnInit, OnDestroy {
     addIcons({
       addOutline, cubeOutline, filterOutline, timeOutline, checkmarkCircleOutline,
       closeCircleOutline, chevronForwardOutline, chevronDownOutline, businessOutline,
+      cloudOfflineOutline, refreshOutline,
     });
-    await this.supervisor.init();
+    this.supervisor.init().catch(() => {});
     await this.loadMaterials();
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('agb:site-changed', this.handleSiteChange);
-    }
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => void this.loadMaterials());
   }
-
-  ngOnDestroy(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:site-changed', this.handleSiteChange);
-    }
-  }
-
-  private handleSiteChange = (): void => {
-    void this.loadMaterials();
-  };
 
   async loadMaterials(): Promise<void> {
     this.isLoading.set(true);
+    this.errorMessage.set('');
     const gen = ++this.loadGeneration;
     try {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
-      const response = await this.supervisor
-        .getMaterials({
+      const response = await firstValueFrom(
+        this.supervisor.getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
-          limit: 100,
+          limit: 20,
         })
-        .toPromise();
+      );
       if (gen !== this.loadGeneration) return;
       this.materials.set(response?.materials || []);
       this.filterMaterials();
@@ -412,6 +438,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
     } catch (error) {
       if (gen !== this.loadGeneration) return;
       console.error('[Materials] failed to load', error);
+      this.errorMessage.set((error as Error)?.message || 'Failed to load materials');
       this.filterMaterials();
       this.isLoading.set(false);
     }
@@ -419,7 +446,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
 
   async refreshMaterials(event: CustomEvent): Promise<void> {
     await this.loadMaterials();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   filterMaterials(): void {

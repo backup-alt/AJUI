@@ -36,6 +36,7 @@ type MaterialApprovalRow = ApprovalBaseRow & {
   issuedAmount?: number;
   givenAmount?: number;
   sourceId?: string;
+  notes?: string;
 };
 
 type LabourApprovalRow = ApprovalBaseRow & {
@@ -69,6 +70,7 @@ type ExpenseApprovalRow = ApprovalBaseRow & {
   approvedAmount?: number;
   billUrl?: string;
   poNumber?: string;
+  notes?: string;
 };
 
 type SubcontractApprovalRow = ApprovalBaseRow & {
@@ -180,6 +182,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Issued Amt</th>
                         <th>Given Amt</th>
                         <th>PO Number</th>
+                        <th>Notes</th>
                         <th>Status</th>
                         <th>Actions</th>
                       </tr>
@@ -230,13 +233,14 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         </td>
                         <td>
                           <input
-                            class="approval-table-input"
+                            class="approval-table-input readonly-field"
                             type="text"
-                            [(ngModel)]="row.poNumber"
+                            [value]="row.poNumber || 'AUTO GENERATED'"
+                            readonly
                             aria-label="PO Number"
-                            placeholder="Auto-generate"
                           />
                         </td>
+                        <td>{{ row.notes || "-" }}</td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
                         <td class="approval-actions">
                           <button type="button" class="approve-action" (click)="approve(row)" aria-label="Approve material">
@@ -249,7 +253,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           </button>
                         </td>
                       </tr>
-                      <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" colspan="11"><span>No pending material approvals.</span></td></tr>
+                      <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" colspan="15"><span>No pending material approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -276,15 +280,10 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <th>Transaction Type</th>
                         <th>Description</th>
                         <th>Amount</th>
-                        @if (hasCashAddedApproval()) {
-                          <th>Approved Amt</th>
-                          <th>PO Number</th>
-                        } @else {
-                          <th>Issued Amt</th>
-                          <th>Given Amt</th>
-                          <th>PO Number</th>
-                        }
+                        <th>Given Amt</th>
+                        <th>PO Number</th>
                         <th>Supervisor</th>
+                        <th>Notes</th>
                         <th>Bill / Reference</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -300,7 +299,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td><strong>{{ row.description || "-" }}</strong></td>
                         <td>{{ row.amount || "-" }}</td>
                         @if (isCashAddedTransaction(row.transactionType)) {
-                          <td colspan="2">
+                          <td>
                             <input
                               class="approval-table-input"
                               inputmode="decimal"
@@ -317,16 +316,6 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                               class="approval-table-input"
                               inputmode="decimal"
                               type="number"
-                              [(ngModel)]="row.issuedAmount"
-                              aria-label="Issued amount"
-                              min="0"
-                            />
-                          </td>
-                          <td>
-                            <input
-                              class="approval-table-input"
-                              inputmode="decimal"
-                              type="number"
                               [(ngModel)]="row.givenAmount"
                               aria-label="Given amount"
                               min="0"
@@ -334,15 +323,16 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           </td>
                           <td>
                             <input
-                              class="approval-table-input"
+                              class="approval-table-input readonly-field"
                               type="text"
-                              [(ngModel)]="row.poNumber"
+                              [value]="row.poNumber || 'AUTO GENERATED'"
+                              readonly
                               aria-label="PO Number"
-                              placeholder="Auto-generate"
                             />
                           </td>
                         }
                         <td>{{ row.supervisor || "-" }}</td>
+                        <td>{{ row.notes || "-" }}</td>
                         <td>
                           @if (row.billUrl) {
                             @if (isDataUrl(row.billUrl)) {
@@ -360,7 +350,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                           <button type="button" class="decline-action" (click)="decline(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>Decline</button>
                         </td>
                       </tr>
-                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="13"><span>No pending site expense approvals.</span></td></tr>
+                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="15"><span>No pending site expense approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -510,7 +500,6 @@ export class PendingApprovalsPage implements OnInit {
               if (expenseRow.issuedAmount !== undefined) payload.issuedAmount = expenseRow.issuedAmount;
               if (expenseRow.givenAmount !== undefined) payload.givenAmount = expenseRow.givenAmount;
             }
-            if (expenseRow.poNumber !== undefined && expenseRow.poNumber.trim() !== '') payload.poNumber = expenseRow.poNumber;
           }
         } else if (row.module === "materials") {
           const materialRow = this._materialRows().find((r) => r.rowId === row.rowId);
@@ -519,7 +508,6 @@ export class PendingApprovalsPage implements OnInit {
             if (materialRow.vendor !== undefined && materialRow.vendor.trim() !== '') payload.vendor = materialRow.vendor;
             if (materialRow.issuedAmount !== undefined) payload.issuedAmount = materialRow.issuedAmount;
             if (materialRow.givenAmount !== undefined) payload.givenAmount = materialRow.givenAmount;
-            if (materialRow.poNumber !== undefined && materialRow.poNumber.trim() !== '') payload.poNumber = materialRow.poNumber;
           }
         }
         await firstValueFrom(this.approvalsService.approve(row.rowId, payload));

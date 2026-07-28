@@ -1,4 +1,6 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSegment,
@@ -20,6 +22,7 @@ import { addIcons } from 'ionicons';
 import {
   checkmarkCircleOutline,
   closeCircleOutline,
+  close,
   cloudUploadOutline,
   documentOutline,
   cubeOutline,
@@ -28,6 +31,8 @@ import {
   imageOutline,
   cashOutline,
   chevronForwardOutline,
+  cloudOfflineOutline,
+  refreshOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -109,7 +114,17 @@ interface RequestItem {
       </div>
 
       <div class="cards">
-        @if (isLoading() && filteredItems.length === 0) {
+        @if (errorMessage()) {
+          <div class="error-state">
+            <ion-icon name="cloud-offline-outline" class="error-icon"></ion-icon>
+            <span class="error-title">Something went wrong</span>
+            <span class="error-text">{{ errorMessage() }}</span>
+            <button class="retry-btn" (click)="loadAllRequests()">
+              <ion-icon name="refresh-outline"></ion-icon>
+              Retry
+            </button>
+          </div>
+        } @else if (isLoading() && filteredItems.length === 0) {
           @for (i of [1,2,3]; track i) {
             <div class="skeleton-card">
               <ion-skeleton-text animated style="width: 60%; height: 18px;"></ion-skeleton-text>
@@ -184,6 +199,7 @@ interface RequestItem {
                     <div class="upload-field checkbox-field">
                       <ion-checkbox
                         [(ngModel)]="isReceivedInput"
+                        [disabled]="isUploading()"
                         class="received-checkbox"
                         aria-label="Received materials reached the site"
                       ></ion-checkbox>
@@ -235,10 +251,39 @@ interface RequestItem {
                   {{ item.type === 'expense' ? 'Bill uploaded & Given amount recorded' : 'Bill uploaded' }}
                 </div>
               }
+
+              @if (item.billUrl) {
+                <div class="bill-thumb-wrap" (click)="openBillImage(item.billUrl!)">
+                  <img [src]="item.billUrl" alt="Bill" class="bill-thumb" />
+                  <span class="bill-thumb-label">View Bill</span>
+                </div>
+              }
             </div>
           }
         }
       </div>
+
+      @if (viewImageUrl()) {
+        <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
+          <button class="bill-viewer-close" (click)="closeBillViewer($event)">
+            <ion-icon name="close"></ion-icon>
+          </button>
+          <div class="bill-viewer-img-wrap"
+               (touchstart)="onPinchStart($event)"
+               (touchmove)="onPinchMove($event)"
+               (touchend)="onPinchEnd($event)"
+               (touchcancel)="onPinchEnd($event)"
+               (mousedown)="onDragStart($event)"
+               (mousemove)="onDragMove($event)"
+               (mouseup)="onDragEnd($event)"
+               (mouseleave)="onDragEnd($event)"
+               (dblclick)="toggleZoom($event)">
+            <img [src]="viewImageUrl()" alt="Bill" class="bill-viewer-img"
+                 [style.transform]="'translate(' + panX + 'px,' + panY + 'px) scale(' + zoomScale + ')'"
+                 (dragstart)="$event.preventDefault()" />
+          </div>
+        </div>
+      }
     </ion-content>
   `,
   styles: [`
@@ -427,12 +472,74 @@ interface RequestItem {
     }
     .completed-notice ion-icon { font-size: 16px; }
 
+    .bill-thumb-wrap {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: var(--md-space-2); padding: 8px;
+      background: var(--m3-surface-container); border-radius: var(--md-radius-lg);
+      cursor: pointer; border: 1px solid var(--m3-outline-variant);
+    }
+    .bill-thumb {
+      width: 48px; height: 48px; border-radius: var(--md-radius-md);
+      object-fit: cover; flex-shrink: 0;
+    }
+    .bill-thumb-label {
+      font-size: 12px; font-weight: 600; color: var(--m3-primary);
+    }
+
     .skeleton-card {
       background: var(--m3-surface-bright);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-xl);
       padding: var(--md-space-4);
       margin-bottom: var(--md-space-2);
+    }
+
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--md-space-8) var(--md-space-4);
+      text-align: center;
+    }
+    .error-icon { font-size: 48px; color: var(--m3-error); opacity: 0.7; margin-bottom: var(--md-space-3); }
+    .error-title { font-size: 16px; font-weight: 700; color: var(--m3-on-surface); margin-bottom: var(--md-space-1); }
+    .error-text { font-size: 13px; color: var(--m3-on-surface-muted); margin-bottom: var(--md-space-4); max-width: 280px; }
+    .retry-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; border-radius: var(--md-radius-pill);
+      background: var(--m3-primary); color: var(--m3-on-primary);
+      border: none; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .retry-btn ion-icon { font-size: 16px; }
+
+    .bill-viewer-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.92);
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .bill-viewer-close {
+      position: absolute; top: 12px; right: 12px; z-index: 10;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #fff;
+    }
+    .bill-viewer-close ion-icon { font-size: 24px; }
+    .bill-viewer-img-wrap {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    .bill-viewer-img {
+      max-width: 92vw; max-height: 88vh;
+      object-fit: contain; border-radius: 4px;
+      transition: transform 0.15s ease;
+      transform-origin: center center;
+      will-change: transform;
+      pointer-events: none;
     }
   `],
 })
@@ -444,6 +551,7 @@ export class RequestsPage implements OnInit {
 
   activeTab: 'pending' | 'approved' | 'declined' | 'upload' = 'pending';
   isLoading = signal(true);
+  errorMessage = signal<string>('');
 
   allItems = signal<RequestItem[]>([]);
   get filteredItems() {
@@ -473,6 +581,18 @@ export class RequestsPage implements OnInit {
   isReceivedInput: boolean = false;
   isUploading = signal(false);
 
+  viewImageUrl = signal<string | null>(null);
+  zoomScale = 1;
+  private pinchStartDist = 0;
+  private pinchStartScale = 1;
+  panX = 0;
+  panY = 0;
+  private lastPanX = 0;
+  private lastPanY = 0;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private isDragging = false;
+
   get emptyIcon() {
     if (this.activeTab === 'approved') return 'checkmark-circle-outline';
     if (this.activeTab === 'declined') return 'close-circle-outline';
@@ -496,12 +616,16 @@ export class RequestsPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      checkmarkCircleOutline, closeCircleOutline, cloudUploadOutline,
+      checkmarkCircleOutline, closeCircleOutline, close, cloudUploadOutline,
       documentOutline, cubeOutline, cartOutline, timeOutline,
       imageOutline, cashOutline, chevronForwardOutline,
+      cloudOfflineOutline, refreshOutline,
     });
-    await this.supervisor.init();
+    this.supervisor.init().catch(() => {});
     await this.loadAllRequests();
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => void this.loadAllRequests());
   }
 
   onTabChange(): void {
@@ -510,83 +634,105 @@ export class RequestsPage implements OnInit {
 
   async handleRefresh(event: CustomEvent): Promise<void> {
     await this.loadAllRequests();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   async loadAllRequests(): Promise<void> {
     this.isLoading.set(true);
+    this.errorMessage.set('');
     const items: RequestItem[] = [];
+    const siteId = this.supervisor.selectedSiteId();
+    const projectId = this.supervisor.selectedProjectId();
+    const siteFilter = { siteId: siteId || undefined, projectId: projectId || undefined };
 
     try {
-      // Load materials
-      await new Promise<void>((resolve) => {
-        this.supervisor.getMaterials({ limit: 200 }).subscribe({
-          next: (res) => {
-            for (const m of res.materials || []) {
-              const isReceived = m.status === 'Received';
-              const hasNoBill = !(m as any).billUrl;
-              items.push({
-                _id: m._id,
-                type: 'material',
-                title: m.name,
-                subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
-                site: m.site,
-                date: m.requestDate,
-                status: m.status,
-                issuedAmount: m.issuedAmount,
-                givenAmount: (m as any).givenAmount,
-                billUrl: (m as any).billUrl,
-                received: isReceived,
-                needsUpload: hasNoBill,
-              });
-            }
-            resolve();
-          },
-          error: () => resolve(),
-        });
-      });
+      // Load APPROVED materials from Inventory (fast on M0 — avoids Material.find() timeout)
+      try {
+        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 200 }));
+        for (const m of approvedMatRes?.materials || []) {
+          const hasNoBill = !(m as any).billUrl;
+          items.push({
+            _id: m._id,
+            type: 'material',
+            title: m.name,
+            subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
+            site: m.site,
+            date: m.requestDate,
+            status: m.status,
+            issuedAmount: m.issuedAmount,
+            givenAmount: (m as any).givenAmount,
+            billUrl: (m as any).billUrl,
+            received: m.status === 'Received',
+            needsUpload: hasNoBill,
+          });
+        }
+      } catch (err) {
+        console.error('[Requests] approved materials load failed', err);
+      }
+
+          // Load PENDING/DECLINED materials from Material collection (may timeout on M0 — non-critical)
+      try {
+        const otherMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, limit: 200 }));
+        const approvedIds = new Set(items.filter(i => i.type === 'material').map(i => i._id));
+        for (const m of otherMatRes?.materials || []) {
+          if (approvedIds.has(m._id)) continue;
+          const isApproved = m.status === 'Approved' || m.status === 'Completed' || m.status === 'Received';
+          items.push({
+            _id: m._id,
+            type: 'material',
+            title: m.name,
+            subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
+            site: m.site,
+            date: m.requestDate,
+            status: m.status,
+            issuedAmount: m.issuedAmount,
+            givenAmount: (m as any).givenAmount,
+            billUrl: (m as any).billUrl,
+            received: m.status === 'Received',
+            needsUpload: isApproved && !(m as any).billUrl,
+          });
+        }
+      } catch (err) {
+        console.error('[Requests] other materials load failed (non-critical)', err);
+      }
 
       // Load expenses — include ALL transaction types (Purchase + Add Cash)
-      await new Promise<void>((resolve) => {
-        this.supervisor.getExpenses({ type: 'site', limit: 200 }).subscribe({
-          next: (res) => {
-            for (const e of res.expenses || []) {
-              // Display-friendly transaction type label
-              const txLabel =
-                e.transactionType === 'Cash Added' ? 'Add Cash' :
-                (e.transactionType || 'Purchase');
+      try {
+        const expRes = await firstValueFrom(this.supervisor.getExpenses({ ...siteFilter, type: 'site', limit: 200 }));
+        for (const e of expRes?.expenses || []) {
+          const txLabel =
+            e.transactionType === 'Cash Added' ? 'Add Cash' :
+            (e.transactionType || 'Purchase');
 
-              items.push({
-                _id: e._id,
-                type: 'expense',
-                title: (e as any).isSiteMaterial
-                  ? `${(e as any).materialName || e.description}`
-                  : e.description,
-                subtitle: (e as any).isSiteMaterial
-                  ? `${(e as any).materialQuantity || ''} ${(e as any).materialUnit || ''} - ${txLabel}`
-                  : `${txLabel} expense`,
-                site: e.site || 'General',
-                date: e.date,
-                status: e.status,
-                amount: e.amount,
-                issuedAmount: e.issuedAmount,
-                givenAmount: (e as any).givenAmount,
-                billUrl: (e as any).billUrl,
-                received: (e as any).received,
-                transactionType: e.transactionType,
-                needsUpload:
-                  (e.status === 'Approved') &&
-                  !(e as any).billUrl &&
-                  ((e as any).isSiteMaterial === true),
-              });
-            }
-            resolve();
-          },
-          error: () => resolve(),
-        });
-      });
+          items.push({
+            _id: e._id,
+            type: 'expense',
+            title: (e as any).isSiteMaterial
+              ? `${(e as any).materialName || e.description}`
+              : e.description,
+            subtitle: (e as any).isSiteMaterial
+              ? `${(e as any).materialQuantity || ''} ${(e as any).materialUnit || ''} - ${txLabel}`
+              : `${txLabel} expense`,
+            site: e.site || 'General',
+            date: e.date,
+            status: e.status,
+            amount: e.amount,
+            issuedAmount: e.issuedAmount,
+            givenAmount: (e as any).givenAmount,
+            billUrl: (e as any).billUrl,
+            received: (e as any).received,
+            transactionType: e.transactionType,
+            needsUpload:
+              (e.status === 'Approved') &&
+              !(e as any).billUrl,
+          });
+        }
+      } catch (err) {
+        console.error('[Requests] expenses load failed', err);
+      }
     } catch (err) {
       console.error('[Requests] Failed to load', err);
+      this.errorMessage.set((err as Error)?.message || 'Failed to load requests');
     }
 
     this.allItems.set(items);
@@ -598,6 +744,86 @@ export class RequestsPage implements OnInit {
     if (status === 'Pending') return 'warning';
     if (status === 'Rejected') return 'danger';
     return 'neutral';
+  }
+
+  openBillImage(url: string): void {
+    this.viewImageUrl.set(url);
+    this.resetZoom();
+  }
+
+  closeBillViewer(event: Event): void {
+    event.stopPropagation();
+    this.viewImageUrl.set(null);
+    this.resetZoom();
+  }
+
+  private resetZoom(): void {
+    this.zoomScale = 1;
+    this.panX = 0;
+    this.panY = 0;
+  }
+
+  toggleZoom(event: Event): void {
+    event.stopPropagation();
+    if (this.zoomScale > 1) {
+      this.resetZoom();
+    } else {
+      this.zoomScale = 2.5;
+    }
+  }
+
+  onPinchStart(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      this.pinchStartDist = this.getTouchDistance(event.touches);
+      this.pinchStartScale = this.zoomScale;
+    }
+  }
+
+  onPinchMove(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = this.getTouchDistance(event.touches);
+      const ratio = dist / this.pinchStartDist;
+      this.zoomScale = Math.min(Math.max(this.pinchStartScale * ratio, 0.5), 5);
+      if (this.zoomScale <= 1) {
+        this.panX = 0;
+        this.panY = 0;
+      }
+    }
+  }
+
+  onPinchEnd(event: TouchEvent): void {
+    if (event.touches.length < 2) {
+      if (this.zoomScale < 1) {
+        this.resetZoom();
+      }
+    }
+  }
+
+  private getTouchDistance(touches: TouchList): number {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  onDragStart(event: MouseEvent): void {
+    if (this.zoomScale <= 1) return;
+    event.preventDefault();
+    this.isDragging = true;
+    this.dragStartX = event.clientX - this.panX;
+    this.dragStartY = event.clientY - this.panY;
+  }
+
+  onDragMove(event: MouseEvent): void {
+    if (!this.isDragging) return;
+    event.preventDefault();
+    this.panX = event.clientX - this.dragStartX;
+    this.panY = event.clientY - this.dragStartY;
+  }
+
+  onDragEnd(event: MouseEvent): void {
+    this.isDragging = false;
   }
 
   startUpload(item: RequestItem): void {
@@ -639,8 +865,11 @@ export class RequestsPage implements OnInit {
   }
 
   canSubmitUpload(item: RequestItem): boolean {
-    if (!this.selectedFileData() || !this.isReceivedInput || this.isUploading()) {
+    if (!this.selectedFileData() || this.isUploading()) {
       return false;
+    }
+    if (item.type === 'material') {
+      return !!this.isReceivedInput;
     }
     if (item.type === 'expense') {
       return this.givenAmountInput !== null && this.givenAmountInput > 0;
@@ -659,6 +888,9 @@ export class RequestsPage implements OnInit {
     };
     if (item.type === 'expense') {
       payload.givenAmount = this.givenAmountInput!;
+    }
+    if (item.type === 'material') {
+      payload.received = this.isReceivedInput;
     }
 
     try {

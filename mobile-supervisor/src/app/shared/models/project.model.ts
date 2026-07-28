@@ -65,6 +65,8 @@ export interface DashboardData {
     pendingMaterials: number;
     pendingLabour: number;
     pendingExpenses: number;
+    inventory: number;
+    labour: number;
   };
   todayExpense: { total: number; count: number };
   projects: Project[];

@@ -17,7 +17,7 @@ import { hashPassword, verifyPassword, compareToken } from "../utils/password.js
 import { AppError } from "../middleware/errorHandler.js";
 import { generateQRDataURL } from "../utils/qr-code.js";
 import { sendEmail } from "../config/email.js";
-import { env } from "../config/env.js";
+import { resolveBackendBaseUrl } from "../config/env.js";
 import { PasswordResetToken } from "../models/PasswordResetToken.js";
 import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
@@ -288,13 +288,11 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       expiresAt,
     });
 
-    // Use BACKEND_PUBLIC_URL or FRONTEND_URL; strip trailing slash
-    const baseUrl = (process.env.BACKEND_PUBLIC_URL || process.env.FRONTEND_URL || "https://backup-alt.github.io/AJUI")
-      .replace(/\/+$/, "");
+    const backendUrl = resolveBackendBaseUrl(req);
     // Deep link for mobile app
     const deepLink = `agb-supervisor://reset-password?token=${rawToken}`;
-    // Web fallback route (hash-based Angular route)
-    const webResetUrl = `${baseUrl}/#/auth/reset-password?token=${rawToken}`;
+    // Web fallback (served from backend)
+    const webResetUrl = `${backendUrl}/reset-password.html?token=${rawToken}`;
 
     const { subject, html, text } = buildResetPasswordEmail({
       name: user.name,
@@ -515,6 +513,7 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       metadata: body.metadata,
       expiryMinutes: 5,
       sendEmail: body.sendEmail,
+      req,
     });
 
     const qrDataUrl = await generateQRDataURL(JSON.stringify(qrPayload));
@@ -728,6 +727,7 @@ const projectIds = body.role === "admin" ? [] : await resolveProjectObjectIds(bo
       phone: body.phone,
       role: body.role,
       projectIds,
+      req,
     });
 
     res.status(201).json({
@@ -755,7 +755,7 @@ export async function sendSupervisorInviteEmail(
     const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
     if (!req.user?.sub) throw new AppError(401, "Not authenticated");
 
-    const result = await inviteService.sendSupervisorInviteEmail(token);
+    const result = await inviteService.sendSupervisorInviteEmail(token, req);
     res.json({
       success: true,
       emailSent: result.emailSent,
@@ -793,7 +793,9 @@ export async function verifyEmployeeInvite(
 
 const employeeSignupSchema = z.object({
   token: z.string().min(1),
-  otp: z.string().length(6, "OTP must be 6 digits"),
+  // OTP is optional — employee invites (admin/PM/accountant) don't require OTP.
+  // The endpoint only validates OTP if the invite has an otpHash stored.
+  otp: z.string().length(6, "OTP must be 6 digits").optional(),
   name: z.string().trim().min(2).max(100),
   phone: z.string().trim().min(8).max(20),
   password: z.string().min(6).max(128),
@@ -917,8 +919,8 @@ export async function employeeResendOtp(
     let emailSent = false;
     if (invite.inviteeEmail) {
       const name = inviteService.extractInviteeName(invite);
-      const baseUrl = env.FRONTEND_URL.replace(/\/+$/, "");
-      const inviteUrl = `${baseUrl}/#/signup/employee?token=${encodeURIComponent(token)}`;
+      const backendUrl = resolveBackendBaseUrl(req);
+      const inviteUrl = `${backendUrl}/signup.html?token=${encodeURIComponent(token)}`;
       const roleLabel =
         invite.role === "project_manager"
           ? "Project Manager"
@@ -992,8 +994,9 @@ export async function employeeSignup(
       if (invite.otpExpiresAt && invite.otpExpiresAt < new Date()) {
         throw new AppError(410, "OTP has expired. Please request a new code.");
       }
+      if (!input.otp) throw new AppError(400, "Verification code is required for this invite");
       const valid = await compareToken(input.otp, invite.otpHash);
-      if (!valid) throw new AppError(400, "Invalid OTP");
+      if (!valid) throw new AppError(400, "Invalid verification code");
     }
 
     const fallbackEmail = invite.inviteeEmail || "";

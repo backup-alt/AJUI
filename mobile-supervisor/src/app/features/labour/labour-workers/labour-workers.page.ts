@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent,
   IonHeader,
@@ -535,6 +536,13 @@ export class LabourWorkersPage implements OnInit {
     this.labourType.set(decodeURIComponent(this.route.snapshot.paramMap.get('type') || ''));
     this.selectedSiteName.set(this.supervisor.selectedSiteName() || '');
 
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => {
+        this.selectedSiteName.set(this.supervisor.selectedSiteName() || '');
+        void this.loadWorkers();
+      });
+
     if (this.labourType()) {
       void this.loadWorkers();
     }
@@ -577,7 +585,7 @@ export class LabourWorkersPage implements OnInit {
 
   async refresh(event: CustomEvent): Promise<void> {
     await this.loadWorkers();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   viewWorker(worker: Worker): void {

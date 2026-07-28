@@ -10636,6 +10636,13 @@ th:hover .column-hide-action,
   box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.12);
 }
 
+.approval-table-input.readonly-field {
+  background: #f1f5f9;
+  color: #667085;
+  font-style: italic;
+  cursor: default;
+}
+
 .approval-section .empty-row {
   height: 96px !important;
   color: #667085 !important;
@@ -13767,7 +13774,7 @@ ion-menu.enterprise-sidebar .sidebar-project-scroll {
 
 
 /* ============================================
-   FORCE LIGHT MODE — Disable dark mode permanently
+   FORCE LIGHT MODE ï¿½ Disable dark mode permanently
    ============================================ */
 @media (prefers-color-scheme: dark) {
   :root {

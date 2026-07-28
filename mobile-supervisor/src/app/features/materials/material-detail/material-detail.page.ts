@@ -4,7 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-  IonSpinner, IonIcon,
+  IonSpinner, IonIcon, IonRefresher, IonRefresherContent,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline, gridOutline, callOutline, locationOutline, documentTextOutline } from 'ionicons/icons';
@@ -19,7 +19,7 @@ import { StatusPillComponent } from '../../../shared/components';
   imports: [
     FormsModule, DatePipe, RouterLink,
     IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-    IonSpinner, IonIcon,
+    IonSpinner, IonIcon, IonRefresher, IonRefresherContent,
     StatusPillComponent,
   ],
   template: `
@@ -32,6 +32,9 @@ import { StatusPillComponent } from '../../../shared/components';
       </ion-toolbar>
     </ion-header>
     <ion-content class="detail-content">
+      <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       @if (loading()) {
         <div class="loading-wrap"><ion-spinner name="crescent"></ion-spinner></div>
       } @else if (!material()) {
@@ -356,6 +359,12 @@ export class MaterialDetailPage implements OnInit {
     } catch {
       this.vendorLoading.set(false);
     }
+  }
+
+  async refresh(event?: CustomEvent): Promise<void> {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) await this.load(id);
+    if (event) setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   getStatusTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {

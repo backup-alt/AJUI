@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Annai Golden Builders Dashboard</title>
+  <script>
+    // GitHub Pages SPA redirect: when GitHub Pages serves this 404.html for a
+    // deep link, preserve the hash route and redirect to index.html so Angular
+    // can pick it up. Also handles the case where the user comes from an old
+    // cached 404 — we always redirect to the index with the hash preserved.
+    (function () {
+      var l = window.location;
+      var path = l.pathname;
+      var search = l.search;
+      var hash = l.hash;
+
+      // If we're already at the index page, do nothing.
+      if (path.endsWith('/index.html') || path === '/' || path.match(/\/AJUI\/?$/)) {
+        return;
+      }
+
+      // Build the redirect URL: same origin, index.html path, preserve hash.
+      var indexPath = path.replace(/\/[^/]*$/, '/') + 'index.html';
+      l.replace(l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') + indexPath + search + hash);
+    })();
+  </script>
+</head>
+<body>
+  <noscript>
+    <p>JavaScript is required. <a href="index.html">Go to the app</a>.</p>
+  </noscript>
+</body>
+</html>

@@ -13,7 +13,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16, "JWT_REFRESH_SECRET must be at least 16 chars"),
   JWT_ACCESS_EXPIRY: z.string().default("4h"),
   JWT_REFRESH_EXPIRY: z.string().default("7d"),
-  
+
 
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().optional(),
@@ -42,3 +42,30 @@ export const env = parsed.data;
 
 export const isProduction = env.NODE_ENV === "production";
 export const isDevelopment = env.NODE_ENV === "development";
+
+/**
+ * Resolve the backend base URL for email links.
+ *
+ * Email links that point to backend-served HTML pages (e.g. /reset-password.html,
+ * /signup.html) MUST use the backend's public URL — not the frontend URL.
+ *
+ * Priority:
+ *   1. Request origin (most reliable — works regardless of env misconfiguration)
+ *   2. BACKEND_PUBLIC_URL env var (if request is unavailable, e.g. background jobs)
+ *   3. FRONTEND_URL as last resort (may be wrong if misconfigured, but better than nothing)
+ *
+ * Use this whenever building links that should open on the backend-served pages.
+ */
+export function resolveBackendBaseUrl(req?: { protocol?: string; get?: (h: string) => string | undefined }): string {
+  if (req && req.protocol && req.get) {
+    const host = req.get("host");
+    if (host) {
+      const proto = req.protocol;
+      return `${proto}://${host}`.replace(/\/+$/, "");
+    }
+  }
+  if (env.BACKEND_PUBLIC_URL) {
+    return env.BACKEND_PUBLIC_URL.replace(/\/+$/, "");
+  }
+  return env.FRONTEND_URL.replace(/\/+$/, "");
+}

@@ -24,6 +24,11 @@ export interface IInventory extends Document {
   poNumber?: string;
   lastMaterialId?: Types.ObjectId;
   lastUpdatedBy?: string;
+  billUrl?: string;
+  receiptImage?: string;
+  receiptImageMimeType?: string;
+  receiptImageName?: string;
+  received?: boolean;
   purchaseHistory?: Array<{
     vendor: string;
     vendorId?: Types.ObjectId;
@@ -31,6 +36,12 @@ export interface IInventory extends Document {
     date: Date;
     poNumber?: string;
     materialId?: Types.ObjectId;
+  }>;
+  consumptionHistory?: Array<{
+    quantity: number;
+    date: Date;
+    updatedBy?: string;
+    notes?: string;
   }>;
   createdAt: Date;
   updatedAt: Date;
@@ -60,6 +71,11 @@ const inventorySchema = new Schema<IInventory>(
     poNumber: { type: String, trim: true },
     lastMaterialId: { type: Schema.Types.ObjectId, ref: "Material" },
     lastUpdatedBy: { type: String },
+    billUrl: { type: String },
+    receiptImage: { type: String },
+    receiptImageMimeType: { type: String },
+    receiptImageName: { type: String },
+    received: { type: Boolean, default: false },
     purchaseHistory: {
       type: [{
         vendor: { type: String, trim: true },
@@ -68,6 +84,15 @@ const inventorySchema = new Schema<IInventory>(
         date: { type: Date, default: Date.now },
         poNumber: { type: String, trim: true },
         materialId: { type: Schema.Types.ObjectId, ref: "Material" },
+      }],
+      default: undefined,
+    },
+    consumptionHistory: {
+      type: [{
+        quantity: { type: Number, required: true },
+        date: { type: Date, default: Date.now },
+        updatedBy: { type: String },
+        notes: { type: String, trim: true },
       }],
       default: undefined,
     },

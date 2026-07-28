@@ -1,4 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { Subject } from 'rxjs';
 import { ApiService } from './api.service';
 import {
   DashboardData,
@@ -39,6 +40,8 @@ export class SupervisorService {
   private api = inject(ApiService);
   private _selection = signal<SiteSelection | null>(null);
   readonly selection = this._selection.asReadonly();
+  private _siteChanged$ = new Subject<SiteSelection>();
+  readonly siteChanged$ = this._siteChanged$.asObservable();
 
   async init(): Promise<void> {
     const [siteId, projectId, projectName, siteName] = await Promise.all([
@@ -58,8 +61,11 @@ export class SupervisorService {
   }
 
   // ---------------- Dashboard ----------------
-  getDashboard() {
-    return this.api.get<{ dashboard: DashboardData }>('/supervisor/dashboard');
+  getDashboard(filters?: { siteId?: string; projectId?: string }) {
+    const params: Record<string, string> = {};
+    if (filters?.siteId) params['siteId'] = filters.siteId;
+    if (filters?.projectId) params['projectId'] = filters.projectId;
+    return this.api.get<{ dashboard: DashboardData }>('/supervisor/dashboard', params);
   }
 
   // ---------------- Sites ----------------
@@ -92,6 +98,10 @@ export class SupervisorService {
     limit?: number;
   }) {
     return this.api.get<MaterialsListResponse>('/supervisor/materials', filters);
+  }
+
+  getMaterialNames(search?: string) {
+    return this.api.get<{ names: string[] }>('/supervisor/material-names', search ? { search } : undefined);
   }
 
   getMaterialDetail(materialId: string) {
@@ -256,6 +266,7 @@ export class SupervisorService {
       siteName: siteName || projectName,
     };
     this._selection.set(sel);
+    this._siteChanged$.next(sel);
     await this.api.setSelectedSiteId(siteId);
     await this.api.setSelectedProjectId(projectId);
     await this.api.setSelectedProjectName(projectName);
@@ -296,5 +307,18 @@ export class SupervisorService {
 
   getVendorById(vendorId: string) {
     return this.api.get<{ item: Vendor }>(`/supervisor/vendors/${vendorId}`);
+  }
+
+  // ---------------- Notifications ----------------
+  getRecentNotifications(limit = 30) {
+    return this.api.get<{ notifications: Array<{
+      id: string;
+      title: string;
+      body: string;
+      type: string;
+      status: string;
+      receivedAt: number;
+      read: boolean;
+    }> }>('/supervisor/notifications/recent', { limit });
   }
 }

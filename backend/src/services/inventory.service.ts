@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Inventory } from "../models/Inventory.js";
 import { IMaterial, Material } from "../models/Material.js";
+import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
@@ -114,51 +115,60 @@ export async function listInventory(filter: {
 }
 
 export async function backfillApprovedMaterialsToInventory(materialQuery: Record<string, unknown>) {
-  const materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed"] } }).lean();
+  let materials;
+  try {
+    materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed"] } }).lean();
+  } catch {
+    return;
+  }
   for (const material of materials) {
-    const existing = await Inventory.findOne(inventoryMatchForMaterial(material)).lean();
-    if (existing) {
-      const qty = Math.max(0, Number(material.approvedQuantity) || 0);
-      if (qty <= 0) continue;
-      const alreadyRecorded = (existing.purchaseHistory || []).some(
-        (h) => h.materialId && h.materialId.toString() === material._id.toString()
-      );
-      if (alreadyRecorded) continue;
-      await addApprovedMaterialToInventory(material._id, qty, material.createdBy);
+    try {
+      const existing = await Inventory.findOne(inventoryMatchForMaterial(material)).lean();
+      if (existing) {
+        const qty = Math.max(0, Number(material.approvedQuantity) || 0);
+        if (qty <= 0) continue;
+        const alreadyRecorded = (existing.purchaseHistory || []).some(
+          (h) => h.materialId && h.materialId.toString() === material._id.toString()
+        );
+        if (alreadyRecorded) continue;
+        await addApprovedMaterialToInventory(material._id, qty, material.createdBy);
+        continue;
+      }
+      const quantity = Math.max(0, Number(material.approvedQuantity) || 0);
+      if (quantity <= 0) continue;
+      const inventory = new Inventory({
+        projectId: material.projectId,
+        projectName: material.projectName,
+        clientId: material.clientId,
+        clientName: material.clientName,
+        siteId: material.siteId,
+        site: material.site,
+        siteKey: siteKey(material.siteId, material.site),
+        name: material.name,
+        normalizedName: normalized(material.name),
+        unit: material.unit,
+        normalizedUnit: normalized(material.unit),
+        requestedQuantity: Number(material.requestedQuantity) || 0,
+        approvedQuantity: quantity,
+        purchasedQuantity: quantity,
+        consumedQuantity: Number(material.consumedQuantity) || 0,
+        vendor: material.vendor,
+        vendorId: material.vendorId,
+        poNumber: material.poNumber,
+        lastMaterialId: material._id,
+        purchaseHistory: [{
+          vendor: material.vendor || "",
+          vendorId: material.vendorId,
+          quantity: quantity,
+          date: new Date(),
+          poNumber: material.poNumber,
+          materialId: material._id,
+        }],
+      });
+      await inventory.save();
+    } catch {
       continue;
     }
-    const quantity = Math.max(0, Number(material.approvedQuantity) || 0);
-    if (quantity <= 0) continue;
-    const inventory = new Inventory({
-      projectId: material.projectId,
-      projectName: material.projectName,
-      clientId: material.clientId,
-      clientName: material.clientName,
-      siteId: material.siteId,
-      site: material.site,
-      siteKey: siteKey(material.siteId, material.site),
-      name: material.name,
-      normalizedName: normalized(material.name),
-      unit: material.unit,
-      normalizedUnit: normalized(material.unit),
-      requestedQuantity: Number(material.requestedQuantity) || 0,
-      approvedQuantity: quantity,
-      purchasedQuantity: quantity,
-      consumedQuantity: Number(material.consumedQuantity) || 0,
-      vendor: material.vendor,
-      vendorId: material.vendorId,
-      poNumber: material.poNumber,
-      lastMaterialId: material._id,
-      purchaseHistory: [{
-        vendor: material.vendor || "",
-        vendorId: material.vendorId,
-        quantity: quantity,
-        date: new Date(),
-        poNumber: material.poNumber,
-        materialId: material._id,
-      }],
-    });
-    await inventory.save();
   }
 }
 
@@ -194,6 +204,57 @@ export async function adjustInventoryStock(
   return inventory.toObject();
 }
 
+export async function uploadInventoryReceipt(
+  id: string,
+  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number; received?: boolean }
+) {
+  const inventory = await Inventory.findById(id);
+  if (!inventory) throw new AppError(404, "Inventory item not found");
+
+  const { uploadToPCloud } = await import("./pcloud.service.js");
+
+  try {
+    const pcloudResult = await uploadToPCloud(
+      payload.data,
+      payload.fileName || `receipt_inv_${inventory.name.replace(/\s+/g, "_")}.${payload.mimeType.split("/")[1] || "jpg"}`,
+      payload.mimeType
+    );
+    inventory.billUrl = pcloudResult.fileUrl;
+  } catch (err) {
+    console.warn("[pCloud] Upload failed for inventory item, falling back to base64 storage:", err);
+    inventory.receiptImage = payload.data;
+    inventory.receiptImageMimeType = payload.mimeType;
+    inventory.receiptImageName = payload.fileName;
+    inventory.billUrl = `data:${payload.mimeType};base64,${payload.data}`;
+  }
+
+  if (payload.givenAmount !== undefined) {
+    inventory.received = true;
+  } else if (payload.received !== undefined) {
+    inventory.received = payload.received;
+  }
+
+  await inventory.save();
+
+  if (inventory.billUrl) {
+    try {
+      const { Material } = await import("../models/Material.js");
+      if (inventory.lastMaterialId) {
+        await Material.updateOne({ _id: inventory.lastMaterialId }, { $set: { billUrl: inventory.billUrl } });
+      } else {
+        await Material.updateOne(
+          { projectId: inventory.projectId, name: inventory.name, unit: inventory.unit },
+          { $set: { billUrl: inventory.billUrl } }
+        );
+      }
+    } catch (err) {
+      console.warn("[Inventory] Failed to propagate billUrl to Material:", err);
+    }
+  }
+
+  return inventory.toObject();
+}
+
 export async function inventoryStockMapForMaterials(materials: Array<Pick<IMaterial, "projectId" | "siteId" | "site" | "name" | "unit">>) {
   if (materials.length === 0) return new Map<string, number>();
   const ors = materials.map(inventoryMatchForMaterial);
@@ -210,7 +271,6 @@ export function inventoryKeyForMaterial(material: Pick<IMaterial, "projectId" | 
 }
 
 export async function getMissingMaterialsForSite(siteId: string) {
-  const { Site } = await import("../models/Site.js");
   const site = await Site.findById(siteId).lean();
   if (!site) throw new AppError(404, "Site not found");
 
@@ -257,7 +317,6 @@ export async function initializeSiteInventory(
   items: Array<{ materialId: string; quantity: number }>,
   updatedBy?: string
 ) {
-  const { Site } = await import("../models/Site.js");
   const site = await Site.findById(siteId).lean();
   if (!site) throw new AppError(404, "Site not found");
 
@@ -326,4 +385,40 @@ export async function initializeSiteInventory(
   }
 
   return { site, results };
+}
+
+let siteIdBackfillDone = false;
+
+export async function backfillMaterialSiteIds(): Promise<void> {
+  if (siteIdBackfillDone) return;
+  try {
+    const materials = await Material.find({ siteId: { $exists: false } }).lean();
+    if (materials.length === 0) {
+      siteIdBackfillDone = true;
+      return;
+    }
+
+    const siteNameToId = new Map<string, Types.ObjectId>();
+    const sites = await Site.find({}).select("_id name").lean();
+    for (const s of sites) {
+      if (s.name) siteNameToId.set(s.name.toLowerCase(), s._id);
+    }
+
+    const bulkOps: any[] = [];
+    for (const m of materials) {
+      const siteId = siteNameToId.get((m.site || "").toLowerCase());
+      if (siteId) {
+        bulkOps.push({ updateOne: { filter: { _id: m._id }, update: { $set: { siteId } } } });
+      }
+    }
+
+    if (bulkOps.length > 0) {
+      await Material.bulkWrite(bulkOps, { ordered: false });
+    }
+
+    console.log(`[Startup] backfillMaterialSiteIds: updated ${bulkOps.length}/${materials.length} materials`);
+    siteIdBackfillDone = true;
+  } catch (err: any) {
+    console.error("[Startup] backfillMaterialSiteIds failed (non-fatal):", err?.message || err);
+  }
 }

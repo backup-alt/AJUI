@@ -35,7 +35,9 @@ export async function updateOwnProfile(req: Request, res: Response, next: NextFu
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    const dashboard = await mobileService.getSupervisorDashboard(userId);
+    const siteId = typeof req.query.siteId === "string" ? req.query.siteId : undefined;
+    const projectId = typeof req.query.projectId === "string" ? req.query.projectId : undefined;
+    const dashboard = await mobileService.getSupervisorDashboard(userId, { siteId, projectId });
     res.json({ dashboard });
   } catch (e) { next(e); }
 }
@@ -119,6 +121,15 @@ export async function getMyDevices(req: Request, res: Response, next: NextFuncti
     const userId = requireSupervisor(req);
     const devices = await deviceService.getUserDevices(userId);
     res.json({ devices });
+  } catch (e) { next(e); }
+}
+
+// =================== MATERIAL NAMES ===================
+export async function listMaterialNames(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const names = await mobileService.listMaterialNames(userId, req.query.search as string | undefined);
+    res.json({ names });
   } catch (e) { next(e); }
 }
 
@@ -321,14 +332,15 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
 export async function listExpenses(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    const result = await mobileService.listExpensesForSupervisor(userId, {
+    const filters = {
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       type: req.query.type as string | undefined,
       page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
-    });
+    };
+    const result = await mobileService.listExpensesForSupervisor(userId, filters);
     res.json(result);
   } catch (e) { next(e); }
 }
@@ -370,6 +382,11 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
     }
 
     const expenseId = await generateId("EXP");
+
+    const { User } = await import("../models/User.js");
+    const supervisorUser = await User.findById(userId).select("name").lean();
+    const supervisorName = supervisorUser?.name || "";
+
     const expense = await Expense.create({
       ...req.body,
       expenseId,
@@ -377,6 +394,7 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
       clientId,
       clientName,
       site: siteName,
+      supervisor: req.body.supervisor || supervisorName,
       status: "Pending",
       submittedBy: userId,
     });
@@ -412,9 +430,11 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
 export async function uploadExpenseReceipt(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
+    console.log(`[uploadExpenseReceipt] id=${req.params.id} user=${userId} hasData=${!!req.body.data} mimeType=${req.body.mimeType} givenAmount=${req.body.givenAmount}`);
     const { Expense } = await import("../models/Expense.js");
     const expense = await Expense.findById(req.params.id).lean();
     if (!expense) throw new AppError(404, "Expense not found");
+    console.log(`[uploadExpenseReceipt] expense found: status=${expense.status} type=${expense.type} site=${expense.site} hasBillUrl=${!!expense.billUrl}`);
     const { Project } = await import("../models/Project.js");
     await mobileService.ensureSupervisorSiteAccess(userId, expense.projectId?.toString(), expense.siteId?.toString());
     const { uploadExpenseReceipt } = await import("../services/expense.service.js");
@@ -424,25 +444,47 @@ export async function uploadExpenseReceipt(req: Request, res: Response, next: Ne
       fileName: req.body.fileName,
       givenAmount: req.body.givenAmount,
     });
+    console.log(`[uploadExpenseReceipt] success: billUrl=${updated.billUrl?.substring(0, 60)}`);
     res.json({ expense: updated });
-  } catch (e) { next(e); }
+  } catch (e) { console.error(`[uploadExpenseReceipt] FAILED:`, e); next(e); }
 }
 
 export async function uploadMaterialReceipt(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
     const { Material } = await import("../models/Material.js");
-    const mat = await Material.findById(req.params.id).lean();
-    if (!mat) throw new AppError(404, "Material not found");
-    await mobileService.ensureSupervisorSiteAccess(userId, mat.projectId?.toString(), mat.siteId?.toString());
-    const { uploadMaterialReceipt } = await import("../services/material.service.js");
-    const updated = await uploadMaterialReceipt(req.params.id, {
-      data: req.body.data,
-      mimeType: req.body.mimeType,
-      fileName: req.body.fileName,
-      givenAmount: req.body.givenAmount,
-    });
-    res.json({ material: updated });
+    let mat = await Material.findById(req.params.id).lean();
+
+    if (mat) {
+      await mobileService.ensureSupervisorSiteAccess(userId, mat.projectId?.toString(), mat.siteId?.toString());
+      const { uploadMaterialReceipt } = await import("../services/material.service.js");
+      const updated = await uploadMaterialReceipt(req.params.id, {
+        data: req.body.data,
+        mimeType: req.body.mimeType,
+        fileName: req.body.fileName,
+        givenAmount: req.body.givenAmount,
+      });
+      res.json({ material: updated });
+      return;
+    }
+
+    const { Inventory } = await import("../models/Inventory.js");
+    const inv = await Inventory.findById(req.params.id).lean();
+    if (inv) {
+      await mobileService.ensureSupervisorSiteAccess(userId, inv.projectId?.toString(), inv.siteId?.toString());
+      const { uploadInventoryReceipt } = await import("../services/inventory.service.js");
+      const updated = await uploadInventoryReceipt(req.params.id, {
+        data: req.body.data,
+        mimeType: req.body.mimeType,
+        fileName: req.body.fileName,
+        givenAmount: req.body.givenAmount,
+        received: req.body.received,
+      });
+      res.json({ material: updated });
+      return;
+    }
+
+    throw new AppError(404, "Material not found");
   } catch (e) { next(e); }
 }
 
@@ -606,5 +648,15 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
       req.query.siteId as string | undefined
     );
     res.json({ subcontractors: subs });
+  } catch (e) { next(e); }
+}
+
+// =================== NOTIFICATIONS (mobile) ===================
+export async function getRecentNotifications(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const limit = Math.min(Number(req.query.limit) || 30, 50);
+    const notifications = await mobileService.getRecentNotificationsForSupervisor(userId, limit);
+    res.json({ notifications });
   } catch (e) { next(e); }
 }

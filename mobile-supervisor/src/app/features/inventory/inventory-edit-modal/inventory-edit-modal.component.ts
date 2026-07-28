@@ -66,17 +66,6 @@ import { InventoryItem } from '../inventory.page';
         </div>
 
         <div class="form-group">
-          <label class="form-label">New Purchased Quantity (add to stock)</label>
-          <ion-input
-            type="number"
-            [(ngModel)]="purchasedQty"
-            [clearInput]="true"
-            placeholder="0"
-            class="form-input"
-          ></ion-input>
-        </div>
-
-        <div class="form-group">
           <label class="form-label">Consumed Quantity (deduct from stock)</label>
           <ion-input
             type="number"
@@ -222,15 +211,13 @@ export class InventoryEditModalComponent implements OnInit {
   private toastCtrl = inject(ToastController);
 
   @Input() item!: InventoryItem;
-  purchasedQty: number | null = null;
   consumedQty: number | null = null;
   isSubmitting = signal(false);
 
   get newStock(): number {
     const current = this.item.currentQuantity;
-    const add = this.purchasedQty || 0;
     const sub = this.consumedQty || 0;
-    return current + add - sub;
+    return current - sub;
   }
 
   ngOnInit(): void {
@@ -238,7 +225,7 @@ export class InventoryEditModalComponent implements OnInit {
   }
 
   isValid(): boolean {
-    return this.newStock >= 0 && (this.purchasedQty !== null || this.consumedQty !== null);
+    return this.newStock >= 0 && this.consumedQty !== null && this.consumedQty > 0;
   }
 
   dismiss(): void {
@@ -250,7 +237,6 @@ export class InventoryEditModalComponent implements OnInit {
     this.isSubmitting.set(true);
 
     this.supervisor.updateMaterialStock(this.item._id, {
-      purchasedQuantity: this.purchasedQty || undefined,
       consumedQuantity: this.consumedQty || undefined,
     }).subscribe({
       next: async () => {
