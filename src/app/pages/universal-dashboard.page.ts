@@ -491,7 +491,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
               <section class="inventory-cards-section" *ngIf="!tableViewExpanded() && activeModule() === 'inventory'">
                 <div class="inventory-grid">
-                  @for (card of inventoryCards(); track card.materialName) {
+                  @for (card of inventoryCards(); track card.siteKey + '::' + card.materialName) {
                     <article class="inventory-card" role="button" tabindex="0" (click)="openInventoryBreakdown(card)" (keydown.enter)="openInventoryBreakdown(card)">
                       <div class="inventory-card-head">
                         <div class="inventory-material-icon">
@@ -500,6 +500,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         <div class="inventory-material-info">
                           <h3>{{ card.materialName }}</h3>
                           <span class="inventory-unit">{{ card.unit }}</span>
+                          <span class="inventory-card-site">{{ card.siteName }}</span>
                         </div>
                         <span class="inventory-site-count">{{ card.siteCount }} site{{ card.siteCount !== 1 ? 's' : '' }}</span>
                       </div>
@@ -980,7 +981,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <span>Site</span>
                   <span>Qty</span>
                   <span>Unit</span>
-                  <span>Quality / Grade</span>
                   <span>Last Updated</span>
                 </div>
                 @for (row of inventoryBreakdownRows(); track row.id) {
@@ -988,7 +988,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     <span>{{ row.site || 'Unknown Site' }}</span>
                     <strong>{{ row.quantity ?? 0 }}</strong>
                     <span>{{ row.unit }}</span>
-                    <span>-</span>
                     <span>{{ row.requestDate || 'N/A' }}</span>
                   </div>
                 }
@@ -1246,6 +1245,21 @@ const siteMaterialDetailFields: FieldSchema[] = [
       font-size: 12px;
       color: #64748b;
     }
+    .inventory-card-site {
+      display: inline-block;
+      font-size: 10px;
+      background: #f0f6ff;
+      color: #2c5cff;
+      border-radius: 20px;
+      padding: 2px 8px;
+      font-weight: 500;
+      margin-top: 4px;
+      letter-spacing: 0.3px;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .inventory-site-count {
       font-size: 11px;
       background: #f0f6ff;
@@ -1347,7 +1361,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .breakdown-table-head {
       display: grid;
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
       gap: 12px;
       padding: 10px 12px;
       background: #f3f6ff;
@@ -1370,7 +1384,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .breakdown-table-row {
       display: grid;
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
       gap: 12px;
       padding: 12px;
       border-bottom: 1px solid #f0f4ff;
@@ -1702,12 +1716,14 @@ export class UniversalDashboardPage implements OnInit {
   readonly labourTypeDailyWage = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials(), this.activeSiteFilter()));
-  readonly selectedInventoryCard = signal<{ materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
+  readonly selectedInventoryCard = signal<{ siteKey: string; siteName: string; materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
   readonly inventoryBreakdownRows = computed(() => {
     const card = this.selectedInventoryCard();
     if (!card) return [] as import("../../data/dashboardData").MaterialRow[];
-    const site = this.activeSiteFilter();
-    return this.data.materials().filter((m) => m.name === card.materialName && (!site || site === "All" || (m.site && m.site.toLowerCase() === site.toLowerCase())));
+    return this.data.materials().filter((m) =>
+      m.name === card.materialName &&
+      (m.site || "").toLowerCase() === (card.siteKey || "").toLowerCase()
+    );
   });
   readonly showInventoryBreakdown = signal(false);
   readonly showInventoryInitDialog = signal(false);
@@ -1793,26 +1809,45 @@ export class UniversalDashboardPage implements OnInit {
     const filtered = (siteFilter && siteFilter !== "All")
       ? materials.filter((m) => m.site && m.site.toLowerCase() === siteFilter.toLowerCase())
       : materials;
-    const map = new Map<string, { qty: number; unit: string; sites: Set<string>; lastUpdated: string }>();
+    const map = new Map<string, { qty: number; unit: string; siteName: string; lastUpdated: string; siteCount: number }>();
     for (const m of filtered) {
       if (!m.name) continue;
-      const key = m.name;
-      const existing = map.get(key) || { qty: 0, unit: m.unit || "", sites: new Set<string>(), lastUpdated: "" };
-      existing.qty += m.quantity ?? 0;
-      if (m.site) existing.sites.add(m.site);
+      const siteName = (m.site || "").trim() || "Unassigned";
+      const key = `${siteName.toLowerCase()}::${m.name.toLowerCase()}`;
+      const existing = map.get(key) || {
+        qty: 0,
+        unit: m.unit || "",
+        siteName,
+        lastUpdated: "",
+        siteCount: 1,
+      };
+      const incomingQty = Math.max(0, Number(m.quantity) || 0);
+      existing.qty = Math.max(existing.qty, incomingQty);
+      existing.unit = m.unit || existing.unit;
       if (m.requestDate && m.requestDate > existing.lastUpdated) existing.lastUpdated = m.requestDate;
       map.set(key, existing);
     }
-    return [...map.entries()].map(([materialName, v]) => ({
-      materialName,
-      totalQty: v.qty,
-      unit: v.unit,
-      siteCount: v.sites.size,
-      lastUpdated: v.lastUpdated,
-    })).sort((a, b) => a.materialName.localeCompare(b.materialName));
+    return [...map.entries()].map(([key, v]) => {
+      const sepIndex = key.indexOf("::");
+      const siteName = sepIndex >= 0 ? key.slice(0, sepIndex) : v.siteName;
+      const materialName = sepIndex >= 0 ? key.slice(sepIndex + 2) : "";
+      return {
+        siteKey: siteName,
+        siteName: v.siteName,
+        materialName,
+        totalQty: v.qty,
+        unit: v.unit,
+        siteCount: v.siteCount,
+        lastUpdated: v.lastUpdated,
+      };
+    }).sort((a, b) => {
+      const siteCmp = (a.siteName || "").localeCompare(b.siteName || "");
+      if (siteCmp !== 0) return siteCmp;
+      return a.materialName.localeCompare(b.materialName);
+    });
   }
 
-  openInventoryBreakdown(card: { materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string }) {
+  openInventoryBreakdown(card: { siteKey: string; siteName: string; materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string }) {
     this.selectedInventoryCard.set(card);
     this.showInventoryBreakdown.set(true);
   }
