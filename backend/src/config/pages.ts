@@ -1,3 +1,5 @@
+import { env } from "./env.js";
+
 export const RESET_PASSWORD_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -796,7 +798,10 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
             document.getElementById('success-view').style.display = 'block';
             document.getElementById('copy-signup').style.display = 'none';
             if (inviteType === 'employee') {
-              document.getElementById('success-message').textContent = 'You can now sign in to the AGB web workspace with your email and password.';
+              document.getElementById('success-message').textContent = 'Account created! Redirecting you to the login page...';
+              // Redirect to the web admin login page after a short delay
+              var loginUrl = '${env.FRONTEND_URL.replace(/\/+$/, "")}/#/login';
+              setTimeout(function () { window.location.href = loginUrl; }, 2500);
             } else {
               document.getElementById('success-message').textContent = 'You can now sign in to the AGB Supervisor app with your phone number and password.';
             }
