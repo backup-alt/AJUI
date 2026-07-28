@@ -208,3 +208,122 @@ export function inventoryKeyForMaterial(material: Pick<IMaterial, "projectId" | 
   const match = inventoryMatchForMaterial(material);
   return `${match.projectId}__${match.siteKey}__${match.normalizedName}__${match.normalizedUnit}`;
 }
+
+export async function getMissingMaterialsForSite(siteId: string) {
+  const { Site } = await import("../models/Site.js");
+  const site = await Site.findById(siteId).lean();
+  if (!site) throw new AppError(404, "Site not found");
+
+  const allMaterials = await Material.find({
+    siteId: new Types.ObjectId(siteId),
+    status: { $in: ["Approved", "Received", "Completed"] },
+  }).lean();
+
+  if (allMaterials.length === 0) return { materials: [], site };
+
+  const ors = allMaterials.map(inventoryMatchForMaterial);
+  const existingInventory = await Inventory.find({ $or: ors }).lean();
+  const existingKeys = new Set(
+    existingInventory.map((item) =>
+      `${item.projectId}__${item.siteKey}__${item.normalizedName}__${item.normalizedUnit}`
+    )
+  );
+
+  const missing = allMaterials.filter((m) => {
+    const key = inventoryKeyForMaterial(m);
+    return !existingKeys.has(key);
+  });
+
+  return {
+    site,
+    materials: missing.map((m) => ({
+      _id: m._id,
+      materialId: m.materialId,
+      name: m.name,
+      unit: m.unit,
+      projectId: m.projectId,
+      projectName: m.projectName,
+      vendor: m.vendor,
+      poNumber: m.poNumber,
+      purchasedQuantity: m.purchasedQuantity,
+      consumedQuantity: m.consumedQuantity,
+      approvedQuantity: m.approvedQuantity,
+    })),
+  };
+}
+
+export async function initializeSiteInventory(
+  siteId: string,
+  items: Array<{ materialId: string; quantity: number }>,
+  updatedBy?: string
+) {
+  const { Site } = await import("../models/Site.js");
+  const site = await Site.findById(siteId).lean();
+  if (!site) throw new AppError(404, "Site not found");
+
+  const results: Array<{ materialId: string; inventory: unknown; created: boolean }> = [];
+
+  for (const item of items) {
+    const material = await Material.findById(item.materialId).lean();
+    if (!material) throw new AppError(404, `Material ${item.materialId} not found`);
+
+    const qty = Math.max(0, Number(item.quantity) || 0);
+    if (qty <= 0) continue;
+
+    const match = inventoryMatchForMaterial(material);
+    const existing = await Inventory.findOne(match);
+    if (existing) {
+      existing.purchasedQuantity += qty;
+      existing.approvedQuantity = Math.max(existing.approvedQuantity, existing.purchasedQuantity);
+      existing.lastUpdatedBy = updatedBy;
+      existing.purchaseHistory = existing.purchaseHistory || [];
+      existing.purchaseHistory.push({
+        vendor: material.vendor || "",
+        vendorId: material.vendorId,
+        quantity: qty,
+        date: new Date(),
+        poNumber: material.poNumber,
+        materialId: material._id,
+      });
+      existing.remainingStock = Math.max(0, existing.purchasedQuantity - existing.consumedQuantity);
+      await existing.save();
+      results.push({ materialId: item.materialId, inventory: existing.toObject(), created: false });
+    } else {
+      const inventory = new Inventory({
+        projectId: material.projectId,
+        projectName: material.projectName,
+        clientId: material.clientId,
+        clientName: material.clientName,
+        siteId: material.siteId,
+        site: material.site || site.name,
+        siteKey: siteKey(material.siteId || siteId, material.site || site.name),
+        name: material.name,
+        normalizedName: normalized(material.name),
+        unit: material.unit,
+        normalizedUnit: normalized(material.unit),
+        requestedQuantity: material.requestedQuantity || 0,
+        minimumQuantity: 0,
+        consumedQuantity: 0,
+        approvedQuantity: qty,
+        purchasedQuantity: qty,
+        vendor: material.vendor,
+        vendorId: material.vendorId,
+        poNumber: material.poNumber,
+        lastMaterialId: material._id,
+        lastUpdatedBy: updatedBy,
+        purchaseHistory: [{
+          vendor: material.vendor || "",
+          vendorId: material.vendorId,
+          quantity: qty,
+          date: new Date(),
+          poNumber: material.poNumber,
+          materialId: material._id,
+        }],
+      });
+      await inventory.save();
+      results.push({ materialId: item.materialId, inventory: inventory.toObject(), created: true });
+    }
+  }
+
+  return { site, results };
+}

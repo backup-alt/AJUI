@@ -991,6 +991,124 @@ const siteMaterialDetailFields: FieldSchema[] = [
             </section>
           </section>
         }
+
+        @if (showInventoryInitDialog()) {
+          <section class="form-overlay" role="presentation">
+            <section class="erp-dialog inventory-init-dialog" role="dialog" aria-modal="true" aria-labelledby="inv-init-title">
+              <div class="dialog-head">
+                <div>
+                  <span>Initialize Inventory</span>
+                  <h2 id="inv-init-title">Set up site stock</h2>
+                  <p>Pick a site, choose materials not yet in inventory, and enter starting quantities.</p>
+                </div>
+                <button type="button" class="icon-button" aria-label="Close initialize dialog" (click)="closeInventoryInitDialog()">
+                  <ion-icon name="close-outline"></ion-icon>
+                </button>
+              </div>
+
+              <div class="inventory-init-body">
+                <div class="inventory-init-row">
+                  <label class="inventory-init-label">
+                    <span>Site</span>
+                    <select
+                      class="inventory-init-select"
+                      [value]="inventoryInitSiteId()"
+                      (change)="onInventoryInitSiteChange($any($event.target).value)"
+                      aria-label="Select site"
+                    >
+                      <option value="" disabled>Select a site…</option>
+                      @for (site of inventoryInitSiteOptions(); track site.id) {
+                        <option [value]="site.id">{{ site.name }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label class="inventory-init-label inventory-init-search-field">
+                    <span>Search materials</span>
+                    <input
+                      type="search"
+                      class="inventory-init-input"
+                      placeholder="Type to filter…"
+                      [value]="inventoryInitSearch()"
+                      (input)="inventoryInitSearch.set($any($event.target).value)"
+                      [disabled]="!inventoryInitSiteId()"
+                    />
+                  </label>
+                </div>
+
+                @if (inventoryInitToast()) {
+                  <div class="inventory-init-toast">{{ inventoryInitToast() }}</div>
+                }
+                @if (inventoryInitError()) {
+                  <div class="inventory-init-error">{{ inventoryInitError() }}</div>
+                }
+
+                <div class="inventory-init-list" [class.is-loading]="inventoryInitLoading()">
+                  @if (!inventoryInitSiteId()) {
+                    <div class="inventory-init-empty">Select a site to load available materials.</div>
+                  } @else if (inventoryInitLoading()) {
+                    <div class="inventory-init-empty">Loading materials…</div>
+                  } @else if (inventoryInitFilteredMaterials().length === 0) {
+                    <div class="inventory-init-empty">
+                      @if (inventoryInitMaterials().length === 0) {
+                        All materials for this site are already in inventory.
+                      } @else {
+                        No materials match your search.
+                      }
+                    </div>
+                  } @else {
+                    @for (m of inventoryInitFilteredMaterials(); track m._id) {
+                      <article class="inventory-init-row-item" [class.selected]="isInventoryInitSelected(m._id)">
+                        <label class="inventory-init-checkbox">
+                          <input
+                            type="checkbox"
+                            [checked]="isInventoryInitSelected(m._id)"
+                            (change)="toggleInventoryInitMaterial(m._id)"
+                            [attr.aria-label]="'Select ' + m.name"
+                          />
+                          <span class="inventory-init-item-info">
+                            <strong>{{ m.name }}</strong>
+                            <small>
+                              @if (m.materialId) { {{ m.materialId }} · }
+                              {{ m.unit }}
+                              @if (m.vendor) { · {{ m.vendor }} }
+                            </small>
+                          </span>
+                        </label>
+                        @if (isInventoryInitSelected(m._id)) {
+                          <label class="inventory-init-qty-label">
+                            <span>Qty</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              class="inventory-init-qty-input"
+                              [value]="getInventoryInitQty(m._id)"
+                              (input)="setInventoryInitQty(m._id, $any($event.target).value)"
+                              [attr.aria-label]="'Quantity for ' + m.name"
+                            />
+                            <span class="inventory-init-qty-unit">{{ m.unit }}</span>
+                          </label>
+                        }
+                      </article>
+                    }
+                  }
+                </div>
+              </div>
+
+              <div class="dialog-actions">
+                <button type="button" class="secondary-action" (click)="closeInventoryInitDialog()" [disabled]="inventoryInitSaving()">Cancel</button>
+                <button
+                  type="button"
+                  class="primary-action"
+                  (click)="submitInventoryInit()"
+                  [disabled]="!canSubmitInventoryInit()"
+                >
+                  {{ inventoryInitSaving() ? 'Saving…' : 'Initialize (' + inventoryInitSelectedCount() + ')' }}
+                </button>
+              </div>
+            </section>
+          </section>
+        }
       </div>
     </ion-split-pane>
   `,
@@ -1165,17 +1283,25 @@ const siteMaterialDetailFields: FieldSchema[] = [
       margin-bottom: 12px;
     }
     .inventory-breakdown-dialog {
-      max-width: 680px;
-      width: 95%;
+      max-width: 720px;
+      width: 96%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .inventory-breakdown-dialog .dialog-head {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid #e5eaf1;
     }
     .inventory-breakdown-summary {
       display: flex;
-      gap: 24px;
+      flex-wrap: wrap;
+      gap: 20px 32px;
       padding: 16px 24px;
       background: #f8faff;
       border-bottom: 1px solid #e5eaf1;
-      margin: -20px -24px 0;
-      border-radius: 12px 12px 0 0;
+      margin: 0;
+      border-radius: 0;
     }
     .breakdown-stat {
       display: flex;
@@ -1194,15 +1320,17 @@ const siteMaterialDetailFields: FieldSchema[] = [
       color: #1a2540;
     }
     .inventory-breakdown-table {
-      margin-top: 16px;
-      max-height: 360px;
+      margin: 16px 0 0;
+      padding: 0 24px;
+      flex: 1 1 auto;
       overflow-y: auto;
+      min-height: 0;
     }
     .breakdown-table-head {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
-      gap: 8px;
-      padding: 8px 12px;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
+      gap: 12px;
+      padding: 10px 12px;
       background: #f3f6ff;
       border-radius: 6px;
       font-size: 11px;
@@ -1211,12 +1339,21 @@ const siteMaterialDetailFields: FieldSchema[] = [
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 8px;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .breakdown-table-head > span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .breakdown-table-row {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
-      gap: 8px;
-      padding: 10px 12px;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
+      gap: 12px;
+      padding: 12px;
       border-bottom: 1px solid #f0f4ff;
       font-size: 13px;
       align-items: center;
@@ -1224,12 +1361,260 @@ const siteMaterialDetailFields: FieldSchema[] = [
     .breakdown-table-row:last-child {
       border-bottom: none;
     }
+    .breakdown-table-row > span,
+    .breakdown-table-row > strong {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .breakdown-table-head span,
     .breakdown-table-row span {
       color: #4a5578;
     }
     .breakdown-table-row strong {
       color: #1a2540;
       font-weight: 600;
+    }
+
+    /* ============== Inventory Init Dialog ============== */
+    .inventory-init-dialog {
+      max-width: 760px;
+      width: 96%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .inventory-init-body {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .inventory-init-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 640px) {
+      .inventory-init-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    .inventory-init-label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .inventory-init-label input[disabled] {
+      background: #f5f7fb;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+    .inventory-init-select,
+    .inventory-init-input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #d6deeb;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 400;
+      color: #1a2540;
+      background: #fff;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+    .inventory-init-select:focus,
+    .inventory-init-input:focus {
+      outline: none;
+      border-color: #2c5cff;
+      box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.12);
+    }
+    .inventory-init-search-field {
+      min-width: 0;
+    }
+    .inventory-init-toast {
+      padding: 10px 14px;
+      background: #e7f8ee;
+      color: #16794a;
+      border: 1px solid #b6e5c9;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .inventory-init-error {
+      padding: 10px 14px;
+      background: #fdecec;
+      color: #b3341c;
+      border: 1px solid #f1b6ad;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .inventory-init-list {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      border: 1px solid #e5eaf1;
+      border-radius: 10px;
+      background: #fcfdff;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 220px;
+      max-height: 360px;
+    }
+    .inventory-init-list.is-loading {
+      opacity: 0.7;
+    }
+    .inventory-init-empty {
+      padding: 28px 16px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+    .inventory-init-row-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid #e5eaf1;
+    }
+    .inventory-init-row-item.selected {
+      background: #f3f6ff;
+      border-color: #b9c8f7;
+    }
+    .inventory-init-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1 1 auto;
+      min-width: 0;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .inventory-init-checkbox input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      cursor: pointer;
+      accent-color: #2c5cff;
+    }
+    .inventory-init-item-info {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .inventory-init-item-info strong {
+      color: #1a2540;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .inventory-init-item-info small {
+      color: #64748b;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .inventory-init-qty-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .inventory-init-qty-input {
+      width: 90px;
+      padding: 7px 10px;
+      border: 1px solid #d6deeb;
+      border-radius: 6px;
+      font-size: 14px;
+      color: #1a2540;
+      text-align: right;
+      text-transform: none;
+      letter-spacing: normal;
+      font-weight: 500;
+    }
+    .inventory-init-qty-input:focus {
+      outline: none;
+      border-color: #2c5cff;
+      box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.12);
+    }
+    .inventory-init-qty-unit {
+      font-size: 12px;
+      color: #4a5578;
+      font-weight: 500;
+      letter-spacing: normal;
+      text-transform: none;
+    }
+
+    .inventory-init-dialog .dialog-actions {
+      padding: 16px 24px 20px;
+      border-top: 1px solid #e5eaf1;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin: 0;
+    }
+    .inventory-breakdown-dialog .dialog-actions {
+      padding: 16px 24px 20px;
+      border-top: 1px solid #e5eaf1;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin: 0;
+    }
+    .dialog-actions .primary-action,
+    .dialog-actions .secondary-action {
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 160ms ease;
+      border: 1px solid transparent;
+    }
+    .dialog-actions .primary-action {
+      background: #2c5cff;
+      color: #fff;
+      border-color: #2c5cff;
+    }
+    .dialog-actions .primary-action:hover:not(:disabled) {
+      background: #1e48d9;
+      border-color: #1e48d9;
+    }
+    .dialog-actions .primary-action:disabled {
+      background: #9bb3f1;
+      border-color: #9bb3f1;
+      cursor: not-allowed;
+      opacity: 0.85;
+    }
+    .dialog-actions .secondary-action {
+      background: #fff;
+      color: #1a2540;
+      border-color: #d6deeb;
+    }
+    .dialog-actions .secondary-action:hover:not(:disabled) {
+      background: #f3f6ff;
+      border-color: #b9c8f7;
+    }
+    .dialog-actions .secondary-action:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -1288,6 +1673,23 @@ export class UniversalDashboardPage implements OnInit {
     return this.data.materials().filter((m) => m.name === card.materialName && (!site || site === "All" || (m.site && m.site.toLowerCase() === site.toLowerCase())));
   });
   readonly showInventoryBreakdown = signal(false);
+  readonly showInventoryInitDialog = signal(false);
+  readonly inventoryInitSiteOptions = signal<Array<{ id: string; name: string }>>([]);
+  readonly inventoryInitSiteId = signal("");
+  readonly inventoryInitSearch = signal("");
+  readonly inventoryInitMaterials = signal<Array<{ _id: string; materialId?: string; name: string; unit: string; vendor?: string; poNumber?: string; purchasedQuantity?: number; approvedQuantity?: number }>>([]);
+  readonly inventoryInitSelections = signal<Record<string, number>>({});
+  readonly inventoryInitLoading = signal(false);
+  readonly inventoryInitSaving = signal(false);
+  readonly inventoryInitError = signal<string | null>(null);
+  readonly inventoryInitToast = signal<string | null>(null);
+  readonly inventoryInitSelectedCount = computed(() => Object.keys(this.inventoryInitSelections()).length);
+  readonly inventoryInitFilteredMaterials = computed(() => {
+    const term = this.inventoryInitSearch().trim().toLowerCase();
+    const all = this.inventoryInitMaterials();
+    if (!term) return all;
+    return all.filter((m) => (m.name || "").toLowerCase().includes(term) || (m.materialId || "").toLowerCase().includes(term));
+  });
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
   readonly dashboardRows = computed(() => this.buildRows());
   readonly tableState = computed(() => ({
@@ -1362,6 +1764,140 @@ export class UniversalDashboardPage implements OnInit {
   closeInventoryBreakdown() {
     this.showInventoryBreakdown.set(false);
     this.selectedInventoryCard.set(null);
+  }
+
+  openInventoryInitDialog() {
+    this.inventoryInitError.set(null);
+    this.inventoryInitToast.set(null);
+    this.inventoryInitSiteId.set(this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : "");
+    this.inventoryInitSearch.set("");
+    this.inventoryInitMaterials.set([]);
+    this.inventoryInitSelections.set({});
+    const siteOptions = this.data.sites().map((s) => {
+      const name = (s as any).name || s.id;
+      return { id: (s as any).id || (s as any)._id || name, name };
+    }).filter((s) => s.id && s.name);
+    const seen = new Set<string>();
+    const unique: Array<{ id: string; name: string }> = [];
+    for (const opt of siteOptions) {
+      const key = `${opt.id}__${opt.name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(opt);
+    }
+    this.inventoryInitSiteOptions.set(unique);
+    this.showInventoryInitDialog.set(true);
+    if (this.inventoryInitSiteId()) {
+      this.loadInventoryInitMaterials();
+    }
+  }
+
+  closeInventoryInitDialog() {
+    this.showInventoryInitDialog.set(false);
+    this.inventoryInitError.set(null);
+  }
+
+  onInventoryInitSiteChange(siteId: string) {
+    this.inventoryInitSiteId.set(siteId);
+    this.inventoryInitMaterials.set([]);
+    this.inventoryInitSelections.set({});
+    if (siteId) {
+      this.loadInventoryInitMaterials();
+    }
+  }
+
+  loadInventoryInitMaterials() {
+    const siteId = this.inventoryInitSiteId();
+    if (!siteId) return;
+    this.inventoryInitLoading.set(true);
+    this.inventoryInitError.set(null);
+    this.api.getMissingMaterials(siteId).subscribe({
+      next: (res) => {
+        const items = (res?.materials || []).map((m: any) => ({
+          _id: m._id || m.id,
+          materialId: m.materialId,
+          name: m.name,
+          unit: m.unit,
+          vendor: m.vendor,
+          poNumber: m.poNumber,
+          purchasedQuantity: m.purchasedQuantity,
+          approvedQuantity: m.approvedQuantity,
+        }));
+        this.inventoryInitMaterials.set(items);
+        this.inventoryInitLoading.set(false);
+      },
+      error: (err) => {
+        this.inventoryInitLoading.set(false);
+        this.inventoryInitError.set(err?.error?.error || err?.error?.message || err?.message || "Failed to load materials.");
+      },
+    });
+  }
+
+  toggleInventoryInitMaterial(materialId: string) {
+    this.inventoryInitSelections.update((sel) => {
+      const next = { ...sel };
+      if (next[materialId] !== undefined) {
+        delete next[materialId];
+      } else {
+        next[materialId] = 0;
+      }
+      return next;
+    });
+  }
+
+  setInventoryInitQty(materialId: string, qty: number | string) {
+    const num = Number(qty);
+    if (Number.isNaN(num) || num < 0) return;
+    this.inventoryInitSelections.update((sel) => {
+      const next = { ...sel };
+      if (next[materialId] === undefined) return sel;
+      next[materialId] = num;
+      return next;
+    });
+  }
+
+  isInventoryInitSelected(materialId: string): boolean {
+    return this.inventoryInitSelections()[materialId] !== undefined;
+  }
+
+  getInventoryInitQty(materialId: string): number {
+    return this.inventoryInitSelections()[materialId] ?? 0;
+  }
+
+  canSubmitInventoryInit(): boolean {
+    return this.inventoryInitSelectedCount() > 0 && !this.inventoryInitSaving() && Boolean(this.inventoryInitSiteId());
+  }
+
+  submitInventoryInit() {
+    const siteId = this.inventoryInitSiteId();
+    if (!siteId) return;
+    const selections = this.inventoryInitSelections();
+    const items = Object.entries(selections)
+      .filter(([, qty]) => Number(qty) > 0)
+      .map(([materialId, quantity]) => ({ materialId, quantity: Number(quantity) }));
+    if (items.length === 0) {
+      this.inventoryInitError.set("Add at least one material with a quantity greater than zero.");
+      return;
+    }
+    this.inventoryInitSaving.set(true);
+    this.inventoryInitError.set(null);
+    this.api.initializeInventory({ siteId, items }).subscribe({
+      next: (res) => {
+        this.inventoryInitSaving.set(false);
+        const created = (res?.results || []).filter((r: any) => r.created).length;
+        const updated = (res?.results || []).filter((r: any) => !r.created).length;
+        this.inventoryInitToast.set(`Initialized ${created} new and updated ${updated} inventory item(s).`);
+        this.refreshFromBackend();
+        setTimeout(() => {
+          this.closeInventoryInitDialog();
+          this.inventoryInitToast.set(null);
+        }, 1800);
+      },
+      error: (err) => {
+        this.inventoryInitSaving.set(false);
+        this.inventoryInitError.set(err?.error?.error || err?.error?.message || err?.message || "Failed to initialize inventory.");
+      },
+    });
   }
 
   rowKey(row: TableRow): string {
@@ -2348,6 +2884,10 @@ visibleRows(): TableRow[] {
     if (this.activeModule() === "vendors") {
       this.editingInlineVendor.set(null);
       this.showVendorDialog.set(true);
+      return;
+    }
+    if (this.activeModule() === "inventory") {
+      this.openInventoryInitDialog();
       return;
     }
     const row: TableRow = { ...this.defaultRowFor(this.activeModule()) };
@@ -3676,7 +4216,7 @@ return { materials, clients, labour, expenses, generalExpenses, payments, vendor
 
   isNoCreateModule(): boolean {
     const m = this.activeModule();
-    return m === "expenses" || m === "materials" || m === "generalExpenses" || m === "inventory";
+    return m === "expenses" || m === "materials" || m === "generalExpenses";
   }
 
   private ensureExpenseOpeningForInput(row: TableRow) {
