@@ -35,7 +35,9 @@ export async function updateOwnProfile(req: Request, res: Response, next: NextFu
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    const dashboard = await mobileService.getSupervisorDashboard(userId);
+    const siteId = typeof req.query.siteId === "string" ? req.query.siteId : undefined;
+    const projectId = typeof req.query.projectId === "string" ? req.query.projectId : undefined;
+    const dashboard = await mobileService.getSupervisorDashboard(userId, { siteId, projectId });
     res.json({ dashboard });
   } catch (e) { next(e); }
 }

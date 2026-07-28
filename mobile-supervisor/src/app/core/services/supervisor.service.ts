@@ -61,8 +61,11 @@ export class SupervisorService {
   }
 
   // ---------------- Dashboard ----------------
-  getDashboard() {
-    return this.api.get<{ dashboard: DashboardData }>('/supervisor/dashboard');
+  getDashboard(filters?: { siteId?: string; projectId?: string }) {
+    const params: Record<string, string> = {};
+    if (filters?.siteId) params['siteId'] = filters.siteId;
+    if (filters?.projectId) params['projectId'] = filters.projectId;
+    return this.api.get<{ dashboard: DashboardData }>('/supervisor/dashboard', params);
   }
 
   // ---------------- Sites ----------------

@@ -807,7 +807,10 @@ export class DashboardPage implements OnInit, OnDestroy {
       let expensesData: Expense[] = [];
 
       const [dashResult, sitesResult, profileResult, expensesResult] = await Promise.all([
-        this.supervisor.getDashboard().toPromise().then(
+        this.supervisor.getDashboard({
+          siteId: this.supervisor.selectedSiteId() || undefined,
+          projectId: this.supervisor.selectedProjectId() || undefined,
+        }).toPromise().then(
           (r) => { if (r) dashData = r.dashboard; return !!r; },
           () => false
         ),

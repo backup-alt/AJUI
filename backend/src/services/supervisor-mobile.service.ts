@@ -538,41 +538,79 @@ export async function getActionableApprovals(
   }));
 }
 
-export async function getSupervisorDashboard(userId: string) {
+export async function getSupervisorDashboard(
+  userId: string,
+  filters: { siteId?: string; projectId?: string } = {}
+) {
   const [projects, sites, approvals, scopedAccess] = await Promise.all([
     getAssignedProjects(userId),
     getAssignedSites(userId),
     getActionableApprovals(userId),
-    buildScopedEntityQuery(userId),
+    buildScopedEntityQuery(userId, filters),
   ]);
 
   const entityScope = scopedAccess.query;
   const siteExpenseScope = { ...entityScope, type: "site" };
   const today = new Date().toISOString().slice(0, 10);
 
+  // Use indexed fields directly for counts when siteId is provided —
+  // avoids the slow entityScope spread on M0. When siteId is NOT provided,
+  // fall back to the scoped query (user-assigned sites).
+  const inventoryQuery = filters.siteId
+    ? { siteId: filters.siteId }
+    : { projectId: { $in: scopedAccess.access.projectIds }, siteId: { $in: scopedAccess.access.siteIds } };
+  const labourQuery = filters.siteId
+    ? { siteId: filters.siteId }
+    : { projectId: { $in: scopedAccess.access.projectIds } };
+  const pendingMaterialsQuery = filters.siteId
+    ? { siteId: filters.siteId, status: "Pending" }
+    : { ...entityScope, status: "Pending" };
+  const pendingLabourQuery = filters.siteId
+    ? { siteId: filters.siteId, status: "Pending" }
+    : { ...entityScope, status: "Pending" };
+  const pendingExpensesQuery = filters.siteId
+    ? { siteId: filters.siteId, type: "site", status: "Pending" }
+    : { ...siteExpenseScope, status: "Pending" };
+  const todayExpensesQuery = filters.siteId
+    ? { siteId: filters.siteId, type: "site", date: today, transactionType: { $ne: "Cash Added" } }
+    : { ...siteExpenseScope, date: today, transactionType: { $ne: "Cash Added" } };
+
   const [inventoryCount, labourCount, pendingMaterials, pendingLabour, pendingExpenses, todayExpenses] = await Promise.all([
-    Inventory.countDocuments({ projectId: { $in: scopedAccess.access.projectIds }, siteId: { $in: scopedAccess.access.siteIds } }),
-    Labour.countDocuments({ projectId: { $in: scopedAccess.access.projectIds } }),
-    Material.countDocuments({ ...entityScope, status: "Pending" }),
-    Labour.countDocuments({ ...entityScope, status: "Pending" }),
-    Expense.countDocuments({ ...siteExpenseScope, status: "Pending" }),
-Expense.aggregate([
-        {
-          $match: {
-            ...siteExpenseScope,
-            date: today,
-            transactionType: { $ne: "Cash Added" },
-          },
-        },
-        { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
-      ]),
+    Inventory.countDocuments(inventoryQuery),
+    Labour.countDocuments(labourQuery),
+    Material.countDocuments(pendingMaterialsQuery),
+    Labour.countDocuments(pendingLabourQuery),
+    Expense.countDocuments(pendingExpensesQuery),
+    Expense.aggregate([
+      { $match: todayExpensesQuery },
+      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
+    ]),
   ]);
+
+  // Filter projects and approvals by the selected site if provided
+  let filteredProjects = projects;
+  let filteredApprovals = approvals;
+  if (filters.siteId) {
+    filteredProjects = projects.filter((p: any) =>
+      !filters.projectId || p.id?.toString() === filters.projectId || p._id?.toString() === filters.projectId
+    );
+    filteredApprovals = approvals.filter((a: any) =>
+      a.siteId === filters.siteId || a.projectId?.toString() === filters.projectId
+    );
+  } else if (filters.projectId) {
+    filteredProjects = projects.filter((p: any) =>
+      p.id?.toString() === filters.projectId || p._id?.toString() === filters.projectId
+    );
+    filteredApprovals = approvals.filter((a: any) =>
+      a.projectId?.toString() === filters.projectId
+    );
+  }
 
   return {
     counts: {
-      projects: projects.length,
+      projects: filteredProjects.length,
       sites: sites.length,
-      pendingApprovals: approvals.length,
+      pendingApprovals: filteredApprovals.length,
       pendingMaterials,
       pendingLabour,
       pendingExpenses,
@@ -583,8 +621,8 @@ Expense.aggregate([
       total: todayExpenses[0]?.total ?? 0,
       count: todayExpenses[0]?.count ?? 0,
     },
-    projects: projects.slice(0, 10),
-    pendingApprovals: approvals.slice(0, 20),
+    projects: filteredProjects.slice(0, 10),
+    pendingApprovals: filteredApprovals.slice(0, 20),
   };
 }
 
