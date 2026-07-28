@@ -437,6 +437,16 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
       font-size: 13px;
       line-height: 1.5;
     }
+    .login-info {
+      margin: 0;
+      padding: 12px 14px;
+      background: #eef3ff;
+      border: 1px solid #b8c5e8;
+      border-radius: 8px;
+      color: #2c5cff;
+      font-size: 13px;
+      line-height: 1.5;
+    }
     .login-loading {
       margin: 0;
       padding: 12px 14px;
@@ -484,6 +494,10 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
       outline: none;
       border-color: #2c5cff;
       box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.12);
+    }
+    .form-field input:read-only {
+      background: #f8fbff;
+      color: #475467;
     }
     .password-row {
       position: relative;
@@ -544,11 +558,21 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
 
     <div class="auth-copy" id="copy-signup">
       <span>Account activation</span>
-      <h1>Complete your signup</h1>
-      <p>Set up your password to activate your AGB account and access the workspace.</p>
+      <h1 id="signup-title">Complete your signup</h1>
+      <p id="signup-subtitle">Set up your password to activate your AGB account and access the workspace.</p>
     </div>
 
-    <div id="form-view">
+    <div id="loading-init" class="login-loading">
+      <span class="spinner"></span>
+      <span>Loading your invite details...</span>
+    </div>
+
+    <div id="form-view" style="display:none">
+      <div id="invite-info" class="login-info" style="display:none">
+        <strong id="invite-role-label"></strong>
+        <span id="invite-email" style="display:block;margin-top:4px;"></span>
+      </div>
+
       <form class="auth-form" id="signup-form">
         <label class="form-field">
           <span>Full name</span>
@@ -560,11 +584,21 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
           <input type="tel" id="phone" placeholder="+91 XXXXXXXXXX" autocomplete="tel" required />
         </label>
 
+        <label class="form-field" id="email-field" style="display:none">
+          <span>Email</span>
+          <input type="email" id="email" placeholder="your@email.com" autocomplete="email" />
+        </label>
+
+        <label class="form-field">
+          <span>Verification code (6 digits)</span>
+          <input type="text" id="otp" placeholder="Enter the 6-digit code from your email" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required />
+        </label>
+
         <label class="form-field">
           <span>Password</span>
           <div class="password-row">
             <input type="password" id="password" placeholder="At least 6 characters" autocomplete="new-password" required />
-            <button type="button" class="eye-btn" onclick="togglePw('password', this)" aria-label="Toggle password visibility">Show</button>
+            <button type="button" class="eye-btn" id="pw-toggle" aria-label="Toggle password visibility">Show</button>
           </div>
         </label>
 
@@ -572,22 +606,17 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
           <span>Confirm password</span>
           <div class="password-row">
             <input type="password" id="confirm" placeholder="Re-enter your password" autocomplete="new-password" required />
-            <button type="button" class="eye-btn" onclick="togglePw('confirm', this)" aria-label="Toggle password visibility">Show</button>
+            <button type="button" class="eye-btn" id="cf-toggle" aria-label="Toggle confirm password visibility">Show</button>
           </div>
         </label>
 
-        <button type="submit" class="auth-primary" id="submit-btn">Complete signup</button>
+        <button type="submit" class="auth-primary" id="submit-btn">Create account</button>
       </form>
     </div>
 
     <div id="success-view" style="display:none">
-      <div class="login-success"><strong>Signup complete</strong></div>
-      <p style="margin-top:12px;color:#475467;font-size:14px;line-height:1.5;">You can now log in to the AGB app with your phone number and password.</p>
-    </div>
-
-    <div id="loading-view" class="login-loading" style="display:none">
-      <span class="spinner"></span>
-      <span>Activating your account...</span>
+      <div class="login-success"><strong>Account created</strong></div>
+      <p style="margin-top:12px;color:#475467;font-size:14px;line-height:1.5;" id="success-message">You can now sign in to the AGB app.</p>
     </div>
 
     <p class="footer-note">
@@ -597,67 +626,180 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
   </section>
 
   <script>
-    var API = window.location.origin + '/api';
-    var params = new URLSearchParams(window.location.search);
-    var token = params.get('token');
+    (function () {
+      var API = window.location.origin + '/api';
+      var params = new URLSearchParams(window.location.search);
+      var token = params.get('token');
 
-    function togglePw(id, btn) {
-      var el = document.getElementById(id);
-      if (el.type === 'password') { el.type = 'text'; btn.textContent = 'Hide'; }
-      else { el.type = 'password'; btn.textContent = 'Show'; }
-    }
+      var inviteType = null; // 'supervisor' | 'employee'
+      var inviteData = null;
 
-    function showErr(m) {
-      var formView = document.getElementById('form-view');
-      var existing = formView.querySelector('.login-error');
-      if (existing) existing.remove();
-      var inline = document.createElement('div');
-      inline.className = 'login-error';
-      inline.style.marginBottom = '12px';
-      inline.textContent = m;
-      formView.insertBefore(inline, formView.firstChild);
-    }
-
-    if (!token) {
-      showErr('Invalid or missing invite link. Please contact your administrator.');
-    }
-
-    document.getElementById('signup-form').addEventListener('submit', async function (e) {
-      e.preventDefault();
-      var n = document.getElementById('name').value.trim();
-      var ph = document.getElementById('phone').value.trim();
-      var pw = document.getElementById('password').value;
-      var cf = document.getElementById('confirm').value;
-      if (!n) { showErr('Please enter your name.'); return; }
-      if (!ph) { showErr('Please enter your phone number.'); return; }
-      if (!pw || pw.length < 6) { showErr('Password must be at least 6 characters.'); return; }
-      if (pw !== cf) { showErr('Passwords do not match.'); return; }
-
-      document.getElementById('form-view').style.display = 'none';
-      document.getElementById('loading-view').style.display = 'flex';
-
-      try {
-        var r = await fetch(API + '/auth/supervisor/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: token, name: n, phone: ph, password: pw })
-        });
-        var d = await r.json();
-        if (r.ok && d.success) {
-          document.getElementById('loading-view').style.display = 'none';
-          document.getElementById('success-view').style.display = 'block';
-          document.getElementById('copy-signup').style.display = 'none';
-        } else {
-          document.getElementById('loading-view').style.display = 'none';
-          document.getElementById('form-view').style.display = 'block';
-          showErr(d.error || d.message || 'Signup failed. The invite may have expired.');
-        }
-      } catch (err) {
-        document.getElementById('loading-view').style.display = 'none';
-        document.getElementById('form-view').style.display = 'block';
-        showErr('Network error. Please try again.');
+      function showErr(m) {
+        var formView = document.getElementById('form-view');
+        var existing = formView.querySelector('.login-error');
+        if (existing) existing.remove();
+        var inline = document.createElement('div');
+        inline.className = 'login-error';
+        inline.style.marginBottom = '12px';
+        inline.textContent = m;
+        formView.insertBefore(inline, formView.firstChild);
       }
-    });
+
+      function setLoading(loading) {
+        document.getElementById('loading-init').style.display = loading ? 'flex' : 'none';
+        document.getElementById('form-view').style.display = loading ? 'none' : 'block';
+      }
+
+      function togglePw(inputId, btn) {
+        var el = document.getElementById(inputId);
+        if (el.type === 'password') { el.type = 'text'; btn.textContent = 'Hide'; }
+        else { el.type = 'password'; btn.textContent = 'Show'; }
+      }
+
+      document.getElementById('pw-toggle').addEventListener('click', function () {
+        togglePw('password', this);
+      });
+      document.getElementById('cf-toggle').addEventListener('click', function () {
+        togglePw('confirm', this);
+      });
+
+      async function loadInvite() {
+        if (!token) {
+          setLoading(false);
+          document.getElementById('form-view').innerHTML = '<div class="login-error">Invalid or missing invite link. Please contact your administrator.</div>';
+          return;
+        }
+
+        // Try employee verify first (most common for admin/PM/accountant invites)
+        try {
+          var r = await fetch(API + '/auth/employee/verify/' + encodeURIComponent(token));
+          if (r.ok) {
+            var d = await r.json();
+            inviteType = 'employee';
+            inviteData = d;
+            renderInvite();
+            return;
+          }
+        } catch (e) { /* fall through */ }
+
+        // Fall back to supervisor verify
+        try {
+          var r2 = await fetch(API + '/auth/supervisor/verify/' + encodeURIComponent(token));
+          if (r2.ok) {
+            var d2 = await r2.json();
+            inviteType = 'supervisor';
+            inviteData = d2;
+            renderInvite();
+            return;
+          } else {
+            var errBody = await r2.json().catch(function () { return {}; });
+            setLoading(false);
+            document.getElementById('form-view').innerHTML = '<div class="login-error">' + (errBody.error || errBody.message || 'This invite link is invalid or has expired.') + '</div>';
+          }
+        } catch (e) {
+          setLoading(false);
+          document.getElementById('form-view').innerHTML = '<div class="login-error">Network error. Please check your connection and try again.</div>';
+        }
+      }
+
+      function renderInvite() {
+        var d = inviteData;
+        var role = d.role || (inviteType === 'supervisor' ? 'supervisor' : 'employee');
+        var roleLabel = role === 'supervisor' ? 'Site Supervisor'
+          : role === 'project_manager' ? 'Project Manager'
+          : role === 'admin' ? 'Admin'
+          : role === 'accountant' ? 'Accountant'
+          : 'Team Member';
+
+        document.getElementById('invite-role-label').textContent = roleLabel + ' account';
+        var emailText = (d.email || d.supervisorEmail || '');
+        if (emailText) {
+          document.getElementById('invite-email').textContent = 'Invited: ' + emailText;
+        } else {
+          document.getElementById('invite-email').style.display = 'none';
+        }
+        document.getElementById('invite-info').style.display = 'block';
+
+        // Pre-fill name and phone (editable)
+        var name = d.name || d.supervisorName || '';
+        var phone = d.phone || d.supervisorPhone || '';
+        document.getElementById('name').value = name;
+        document.getElementById('phone').value = phone;
+
+        // For supervisor invites, email field is also required
+        if (inviteType === 'supervisor') {
+          document.getElementById('email-field').style.display = 'flex';
+          document.getElementById('email').required = true;
+          if (emailText) document.getElementById('email').value = emailText;
+        }
+
+        document.getElementById('signup-title').textContent = 'Welcome, ' + (name || 'there');
+        document.getElementById('signup-subtitle').textContent = 'Review your details, enter the verification code from your email, and choose a password.';
+
+        setLoading(false);
+      }
+
+      document.getElementById('signup-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var n = document.getElementById('name').value.trim();
+        var ph = document.getElementById('phone').value.trim();
+        var otp = document.getElementById('otp').value.trim();
+        var pw = document.getElementById('password').value;
+        var cf = document.getElementById('confirm').value;
+
+        if (!n || n.length < 2) { showErr('Please enter your full name.'); return; }
+        if (!ph || ph.length < 8) { showErr('Please enter a valid phone number (at least 8 digits).'); return; }
+        if (!otp || otp.length !== 6) { showErr('Please enter the 6-digit verification code from your email.'); return; }
+        if (!pw || pw.length < 6) { showErr('Password must be at least 6 characters.'); return; }
+        if (pw !== cf) { showErr('Passwords do not match.'); return; }
+
+        var payload = { token: token, otp: otp, name: n, phone: ph, password: pw };
+        if (inviteType === 'supervisor') {
+          var em = document.getElementById('email').value.trim();
+          if (!em) { showErr('Email is required.'); return; }
+          payload.email = em;
+        }
+
+        document.getElementById('form-view').style.display = 'none';
+        var loadingDiv = document.createElement('div');
+        loadingDiv.className = 'login-loading';
+        loadingDiv.id = 'submit-loading';
+        loadingDiv.innerHTML = '<span class="spinner"></span><span>Creating your account...</span>';
+        document.getElementById('signup-form').parentNode.insertBefore(loadingDiv, document.getElementById('signup-form'));
+
+        try {
+          var endpoint = inviteType === 'supervisor'
+            ? API + '/auth/supervisor/signup'
+            : API + '/auth/employee/signup';
+          var r = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          var d = await r.json();
+          if (r.ok && d.success) {
+            document.getElementById('submit-loading').remove();
+            document.getElementById('success-view').style.display = 'block';
+            document.getElementById('copy-signup').style.display = 'none';
+            if (inviteType === 'employee') {
+              document.getElementById('success-message').textContent = 'You can now sign in to the AGB web workspace with your email and password.';
+            } else {
+              document.getElementById('success-message').textContent = 'You can now sign in to the AGB Supervisor app with your phone number and password.';
+            }
+          } else {
+            document.getElementById('submit-loading').remove();
+            document.getElementById('form-view').style.display = 'block';
+            showErr(d.error || d.message || 'Signup failed. The invite may have expired.');
+          }
+        } catch (err) {
+          document.getElementById('submit-loading').remove();
+          document.getElementById('form-view').style.display = 'block';
+          showErr('Network error. Please try again.');
+        }
+      });
+
+      loadInvite();
+    })();
   </script>
 </body>
 </html>`;
