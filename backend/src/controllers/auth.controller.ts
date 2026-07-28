@@ -722,7 +722,14 @@ export async function adminCreateEmployeeInvite(
       return;
     }
 
-const projectIds = body.role === "admin" ? [] : await resolveProjectObjectIds(body.projectIds || []);
+// projectIds is optional — admin can invite without selecting projects.
+// PM/accountant with no projects simply have no project scope until
+// projects are assigned later from the employee detail page.
+const projectIds = body.role === "admin"
+  ? []
+  : (body.projectIds && body.projectIds.length > 0
+      ? await resolveProjectObjectIds(body.projectIds)
+      : []);
     const result = await inviteService.createEmployeeInvite({
       createdByAdmin: req.user.sub,
       name: body.name,
