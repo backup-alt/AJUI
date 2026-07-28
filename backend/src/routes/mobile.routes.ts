@@ -86,4 +86,7 @@ router.get("/supervisor/devices", ctrl.getMyDevices);
 // Vendors
 router.get("/supervisor/vendors", ctrl.listVendorsForSupervisor);
 
+// Notifications
+router.get("/supervisor/notifications/recent", ctrl.getRecentNotifications);
+
 export default router;

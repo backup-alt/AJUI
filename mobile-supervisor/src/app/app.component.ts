@@ -46,6 +46,8 @@ export class AppComponent implements OnInit {
     await this.supervisor.init();
     // 4. Load cached notifications from Preferences
     await this.notifications.initFromStorage();
+    // 4b. Fetch approval/decline notifications from backend
+    this.notifications.fetchFromBackend();
 
     if (this.notifications.pushEnabled()) {
       try {

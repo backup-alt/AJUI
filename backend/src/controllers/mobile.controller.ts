@@ -648,3 +648,13 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
     res.json({ subcontractors: subs });
   } catch (e) { next(e); }
 }
+
+// =================== NOTIFICATIONS (mobile) ===================
+export async function getRecentNotifications(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const limit = Math.min(Number(req.query.limit) || 30, 50);
+    const notifications = await mobileService.getRecentNotificationsForSupervisor(userId, limit);
+    res.json({ notifications });
+  } catch (e) { next(e); }
+}

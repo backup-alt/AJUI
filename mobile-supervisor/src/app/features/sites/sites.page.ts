@@ -531,7 +531,7 @@ export class SitesPage implements OnInit {
 
   async refreshSites(event: CustomEvent): Promise<void> {
     await this.loadSites();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   openSite(site: Site): void {
@@ -593,7 +593,6 @@ export class SitesPage implements OnInit {
       position: 'top',
     });
     await toast.present();
-    window.dispatchEvent(new CustomEvent('agb:site-changed', { detail: site.id }));
   }
 
   getMaterialTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {

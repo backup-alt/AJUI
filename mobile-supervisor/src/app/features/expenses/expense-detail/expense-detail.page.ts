@@ -17,6 +17,8 @@ import {
   IonSpinner,
   IonIcon,
   IonButton,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
   ActionSheetController,
 } from '@ionic/angular/standalone';
@@ -59,6 +61,8 @@ import { Expense } from '../../../shared/models';
     IonSpinner,
     IonIcon,
     IonButton,
+    IonRefresher,
+    IonRefresherContent,
     DatePipe,
     CurrencyPipe,
     TitleCasePipe,
@@ -74,6 +78,9 @@ import { Expense } from '../../../shared/models';
     </ion-header>
 
     <ion-content class="detail-content">
+      <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       @if (loading()) {
         <div class="loading">
           <ion-spinner name="crescent"></ion-spinner>
@@ -452,5 +459,10 @@ export class ExpenseDetailPage implements OnInit {
       });
       await toast.present();
     }
+  }
+
+  async refresh(event?: CustomEvent): Promise<void> {
+    await this.load();
+    if (event) setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

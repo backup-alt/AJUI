@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent, IonSearchbar,
   IonSegment, IonSegmentButton, IonLabel, IonFab, IonFabButton,
@@ -10,6 +11,7 @@ import { addIcons } from 'ionicons';
 import {
   addOutline, walletOutline, timeOutline, receiptOutline,
   chevronForwardOutline, cashOutline, cardOutline, locationOutline,
+  close, documentTextOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Expense, ExpenseStatus } from '../../shared/models';
@@ -129,6 +131,16 @@ import {
                 </div>
               </div>
 
+              @if (expense.billUrl) {
+                <div class="expense-bill-thumb" (click)="openBillViewer(expense.billUrl!); $event.stopPropagation(); $event.preventDefault()">
+                  <img [src]="expense.billUrl" alt="Bill" class="expense-bill-img" />
+                  <span class="expense-bill-label">
+                    <ion-icon name="document-text-outline"></ion-icon>
+                    View Bill
+                  </span>
+                </div>
+              }
+
               <footer class="expense-footer">
                 <div class="expense-date">
                   <ion-icon name="time-outline"></ion-icon>
@@ -149,6 +161,28 @@ import {
           <ion-icon name="add-outline"></ion-icon>
         </ion-fab-button>
       </ion-fab>
+
+      @if (viewerUrl()) {
+        <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
+          <button class="bill-viewer-close" (click)="closeBillViewer($event)">
+            <ion-icon name="close"></ion-icon>
+          </button>
+          <div class="bill-viewer-img-wrap"
+               (touchstart)="onPinchStart($event)"
+               (touchmove)="onPinchMove($event)"
+               (touchend)="onPinchEnd($event)"
+               (touchcancel)="onPinchEnd($event)"
+               (mousedown)="onDragStart($event)"
+               (mousemove)="onDragMove($event)"
+               (mouseup)="onDragEnd()"
+               (mouseleave)="onDragEnd()"
+               (dblclick)="toggleZoom($event)">
+            <img [src]="viewerUrl()" alt="Bill" class="bill-viewer-img"
+                 [style.transform]="'translate(' + panX + 'px,' + panY + 'px) scale(' + zoomScale + ')'"
+                 (dragstart)="$event.preventDefault()" />
+          </div>
+        </div>
+      }
     </ion-content>
   `,
   styles: [`
@@ -238,6 +272,53 @@ import {
       margin-bottom: 10px;
     }
     ion-fab-button { --background: #002263; --color: #ffffff; }
+
+    .expense-bill-thumb {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px; padding: 8px;
+      background: #f8f9fb; border-radius: 12px;
+      border: 1px solid #eef0f3; cursor: pointer;
+    }
+    .expense-bill-thumb:active { background: #eef0f3; }
+    .expense-bill-img {
+      width: 44px; height: 44px; border-radius: 8px;
+      object-fit: cover; flex-shrink: 0;
+    }
+    .expense-bill-label {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; font-weight: 600; color: #002263;
+    }
+    .expense-bill-label ion-icon { font-size: 14px; }
+
+    .bill-viewer-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.92);
+      display: flex; align-items: center; justify-content: center;
+      animation: expBillFadeIn 0.2s ease;
+    }
+    @keyframes expBillFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .bill-viewer-close {
+      position: absolute; top: 12px; right: 12px; z-index: 10;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #fff;
+    }
+    .bill-viewer-close ion-icon { font-size: 24px; }
+    .bill-viewer-img-wrap {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    .bill-viewer-img {
+      max-width: 92vw; max-height: 88vh;
+      object-fit: contain; border-radius: 4px;
+      transition: transform 0.15s ease;
+      transform-origin: center center;
+      will-change: transform;
+      pointer-events: none;
+    }
   `],
 })
 export class ExpensesPage implements OnInit, OnDestroy {
@@ -250,6 +331,16 @@ export class ExpensesPage implements OnInit, OnDestroy {
   searchQuery = '';
   statusFilter: ExpenseStatus | '' = '';
   selectedSiteName = signal<string | null>(null);
+
+  viewerUrl = signal<string | null>(null);
+  zoomScale = 1;
+  panX = 0;
+  panY = 0;
+  private pinchStartDist = 0;
+  private pinchStartScale = 1;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private isDragging = false;
 
   /**
    * Cash Added balance: only counts Cash Added expenses that have been
@@ -276,33 +367,33 @@ export class ExpensesPage implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     addIcons({
       addOutline, walletOutline, timeOutline, receiptOutline, chevronForwardOutline,
-      cashOutline, cardOutline, locationOutline,
+      cashOutline, cardOutline, locationOutline, close, documentTextOutline,
     });
     await this.supervisor.init();
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     await this.loadExpenses();
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('agb:site-changed', this.handleSiteChange);
-    }
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => {
+        this.selectedSiteName.set(this.supervisor.selectedSiteName());
+        void this.loadExpenses();
+      });
   }
 
   ngOnDestroy(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:site-changed', this.handleSiteChange);
-    }
+    // takeUntilDestroyed handles cleanup automatically
   }
-
-  private handleSiteChange = (): void => {
-    this.selectedSiteName.set(this.supervisor.selectedSiteName());
-    void this.loadExpenses();
-  };
 
   async loadExpenses(): Promise<void> {
     this.isLoading.set(true);
     try {
+      const siteId = this.supervisor.selectedSiteId();
+      const projectId = this.supervisor.selectedProjectId();
       const r = await this.supervisor
         .getExpenses({
+          siteId: siteId || undefined,
+          projectId: projectId || undefined,
           type: 'site',
           limit: 100,
         })
@@ -322,7 +413,7 @@ export class ExpensesPage implements OnInit, OnDestroy {
 
   async refreshExpenses(event: CustomEvent): Promise<void> {
     await this.loadExpenses();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   filterExpenses(): void {
@@ -340,5 +431,83 @@ export class ExpensesPage implements OnInit, OnDestroy {
 
   getStatusTone(status: ExpenseStatus): 'success' | 'warning' | 'danger' | 'neutral' {
     return status === 'Pending' ? 'warning' : status === 'Approved' ? 'success' : status === 'Rejected' ? 'danger' : 'neutral';
+  }
+
+  openBillViewer(url: string): void {
+    this.viewerUrl.set(url);
+    this.resetZoom();
+  }
+
+  closeBillViewer(event: Event): void {
+    event.stopPropagation();
+    this.viewerUrl.set(null);
+    this.resetZoom();
+  }
+
+  private resetZoom(): void {
+    this.zoomScale = 1;
+    this.panX = 0;
+    this.panY = 0;
+  }
+
+  toggleZoom(event: Event): void {
+    event.stopPropagation();
+    if (this.zoomScale > 1) {
+      this.resetZoom();
+    } else {
+      this.zoomScale = 2.5;
+    }
+  }
+
+  onPinchStart(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      this.pinchStartDist = this.getTouchDistance(event.touches);
+      this.pinchStartScale = this.zoomScale;
+    }
+  }
+
+  onPinchMove(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = this.getTouchDistance(event.touches);
+      const ratio = dist / this.pinchStartDist;
+      this.zoomScale = Math.min(Math.max(this.pinchStartScale * ratio, 0.5), 5);
+      if (this.zoomScale <= 1) {
+        this.panX = 0;
+        this.panY = 0;
+      }
+    }
+  }
+
+  onPinchEnd(event: TouchEvent): void {
+    if (event.touches.length < 2 && this.zoomScale < 1) {
+      this.resetZoom();
+    }
+  }
+
+  private getTouchDistance(touches: TouchList): number {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  onDragStart(event: MouseEvent): void {
+    if (this.zoomScale <= 1) return;
+    event.preventDefault();
+    this.isDragging = true;
+    this.dragStartX = event.clientX - this.panX;
+    this.dragStartY = event.clientY - this.panY;
+  }
+
+  onDragMove(event: MouseEvent): void {
+    if (!this.isDragging) return;
+    event.preventDefault();
+    this.panX = event.clientX - this.dragStartX;
+    this.panY = event.clientY - this.dragStartY;
+  }
+
+  onDragEnd(): void {
+    this.isDragging = false;
   }
 }

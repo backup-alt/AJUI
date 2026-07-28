@@ -16,6 +16,8 @@ import {
   peopleOutline,
   alertCircleOutline,
   trashOutline,
+  cardOutline,
+  cashOutline,
 } from 'ionicons/icons';
 import { NotificationService, InAppNotification } from '../../core/services/notification.service';
 import { DatePipe } from '@angular/common';
@@ -224,20 +226,22 @@ export class NotificationsPage implements OnInit {
 
   notifications = signal<InAppNotification[]>([]);
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     addIcons({
       notificationsOutline, checkmarkCircleOutline, closeCircleOutline,
       timeOutline, cubeOutline, walletOutline, peopleOutline,
-      alertCircleOutline, trashOutline,
+      alertCircleOutline, trashOutline, cardOutline, cashOutline,
     });
+    await this.notifService.fetchFromBackend();
     this.notifications.set(this.notifService.notifications());
     this.notifService.markAllRead();
   }
 
-  handleRefresh(event: CustomEvent): void {
+  async handleRefresh(event: CustomEvent): Promise<void> {
+    await this.notifService.fetchFromBackend();
     this.notifications.set(this.notifService.notifications());
     this.notifService.markAllRead();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   markRead(notif: InAppNotification): void {
@@ -255,8 +259,11 @@ export class NotificationsPage implements OnInit {
     const body = (notif.body || '').toLowerCase();
     if (title.includes('approved') || body.includes('approved')) return 'checkmark-circle-outline';
     if (title.includes('rejected') || body.includes('rejected')) return 'close-circle-outline';
+    if (title.includes('cash added') || body.includes('cash added')) return 'cash-outline';
+    if (title.includes('expense') || title.includes('site expense') || body.includes('expense')) return 'wallet-outline';
     if (title.includes('wage') || body.includes('wage')) return 'wallet-outline';
     if (title.includes('material') || body.includes('material')) return 'cube-outline';
+    if (title.includes('labour') || title.includes('attendance') || body.includes('labour') || body.includes('attendance')) return 'people-outline';
     if (title.includes('inventory') || body.includes('inventory')) return 'alert-circle-outline';
     return 'notifications-outline';
   }
@@ -266,6 +273,7 @@ export class NotificationsPage implements OnInit {
     const body = (notif.body || '').toLowerCase();
     if (title.includes('approved') || body.includes('approved')) return 'notif-icon icon-success';
     if (title.includes('rejected') || body.includes('rejected')) return 'notif-icon icon-danger';
+    if (title.includes('cash added') || title.includes('expense') || body.includes('expense')) return 'notif-icon icon-warning';
     if (title.includes('wage') || body.includes('wage')) return 'notif-icon icon-warning';
     return 'notif-icon icon-info';
   }

@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { PushNotifications, Token, DeliveredNotifications } from '@capacitor/push-notifications';
 import { Preferences } from '@capacitor/preferences';
 import { ApiService } from './api.service';
+import { SupervisorService } from './supervisor.service';
 import { environment } from '../../../environments/environment';
 
 export interface InAppNotification {
@@ -16,6 +17,7 @@ export interface InAppNotification {
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
   private api = inject(ApiService);
+  private supervisor = inject(SupervisorService);
 
   readonly pushEnabled = signal<boolean>(false);
   readonly fcmToken = signal<string | null>(null);
@@ -160,6 +162,33 @@ export class NotificationService {
         this.notifications.set(list);
         this.unreadCount.set(list.filter((n) => !n.read).length);
       } catch { /* ignore */ }
+    }
+  }
+
+  async fetchFromBackend(): Promise<void> {
+    try {
+      const res = await this.supervisor.getRecentNotifications(30).toPromise();
+      const backendNotifs = (res?.notifications || []).map((n) => ({
+        id: `backend-${n.id}`,
+        title: n.title,
+        body: n.body,
+        data: { type: n.type, status: n.status },
+        receivedAt: n.receivedAt,
+        read: false,
+      }));
+      if (backendNotifs.length === 0) return;
+
+      const existing = this.notifications();
+      const existingIds = new Set(existing.map((n) => n.id));
+      const newNotifs = backendNotifs.filter((n) => !existingIds.has(n.id));
+
+      if (newNotifs.length > 0) {
+        this.notifications.update((list) => [...newNotifs, ...list].slice(0, 50));
+        this.unreadCount.update((c) => c + newNotifs.length);
+        this.persistNotifications();
+      }
+    } catch (err) {
+      console.error('[Notification] failed to fetch from backend', err);
     }
   }
 

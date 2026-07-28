@@ -240,6 +240,11 @@ export async function approveRequest(
   // Send push notification to project supervisors and owner (non-blocking best-effort)
   try {
     const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
+    const notifDetail = approval.detail ? ` - ${approval.detail}` : '';
+    const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString('en-IN')})` : '';
+    const approvalBody = generatedPoNumber
+      ? `Approved${notifDetail}${notifAmount}. PO: ${generatedPoNumber}`
+      : `Approved${notifDetail}${notifAmount}`;
     const notificationData = {
       approvalId: approval.approvalId,
       type: approval.type,
@@ -251,9 +256,7 @@ export async function approveRequest(
       await notifyProjectSupervisors(
         projectId,
         `${approval.title} - Approved`,
-        generatedPoNumber
-          ? `Your ${approval.type} request has been approved. PO: ${generatedPoNumber}`
-          : `Your ${approval.type} request has been approved`,
+        approvalBody,
         notificationData
       );
     }
@@ -262,9 +265,7 @@ export async function approveRequest(
       await notifyUserOfApproval(
         approval.owner,
         `${approval.title} - Approved`,
-        generatedPoNumber
-          ? `Your ${approval.type} request has been approved. PO: ${generatedPoNumber}`
-          : `Your ${approval.type} request has been approved`,
+        approvalBody,
         notificationData
       );
     }
@@ -324,10 +325,13 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
   // Send push notification to project supervisors and owner
   try {
     const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
+    const notifDetail = approval.detail ? ` - ${approval.detail}` : '';
+    const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString('en-IN')})` : '';
+    const rejectBody = `Rejected${notifDetail}${notifAmount}`;
     await notifyProjectSupervisors(
       approval.projectId || "",
       `${approval.title} - Rejected`,
-      `Your ${approval.type} request has been rejected`,
+      rejectBody,
       {
         approvalId: approval.approvalId,
         type: approval.type,
@@ -340,7 +344,7 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
       await notifyUserOfApproval(
         approval.owner,
         `${approval.title} - Rejected`,
-        `Your ${approval.type} request has been rejected`,
+        rejectBody,
         {
           approvalId: approval.approvalId,
           type: approval.type,

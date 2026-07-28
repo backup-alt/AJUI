@@ -693,9 +693,11 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
           position: 'top',
         });
         await toast.present();
+        const expType = isCashAdded ? 'Cash Added' : 'Purchase';
+        const expAmt = this.expense.amount || 0;
         this.notifications.notify(
           'Expense Submitted',
-          isCashAdded ? 'Cash request has been submitted for approval.' : 'Purchase request has been submitted for approval.'
+          `${expType}: ${this.expense.description || 'N/A'} - ₹${expAmt.toLocaleString('en-IN')} submitted for approval.`
         );
         this.router.navigate(['/tabs/expenses']);
       },

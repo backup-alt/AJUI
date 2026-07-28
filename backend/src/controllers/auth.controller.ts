@@ -17,7 +17,7 @@ import { hashPassword, verifyPassword, compareToken } from "../utils/password.js
 import { AppError } from "../middleware/errorHandler.js";
 import { generateQRDataURL } from "../utils/qr-code.js";
 import { sendEmail } from "../config/email.js";
-import { env } from "../config/env.js";
+import { resolveBackendBaseUrl } from "../config/env.js";
 import { PasswordResetToken } from "../models/PasswordResetToken.js";
 import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
@@ -288,7 +288,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       expiresAt,
     });
 
-    const backendUrl = (env.BACKEND_PUBLIC_URL || env.FRONTEND_URL).replace(/\/+$/, "");
+    const backendUrl = resolveBackendBaseUrl(req);
     // Deep link for mobile app
     const deepLink = `agb-supervisor://reset-password?token=${rawToken}`;
     // Web fallback (served from backend)
@@ -513,6 +513,7 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       metadata: body.metadata,
       expiryMinutes: 5,
       sendEmail: body.sendEmail,
+      req,
     });
 
     const qrDataUrl = await generateQRDataURL(JSON.stringify(qrPayload));
@@ -726,6 +727,7 @@ const projectIds = body.role === "admin" ? [] : await resolveProjectObjectIds(bo
       phone: body.phone,
       role: body.role,
       projectIds,
+      req,
     });
 
     res.status(201).json({
@@ -753,7 +755,7 @@ export async function sendSupervisorInviteEmail(
     const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
     if (!req.user?.sub) throw new AppError(401, "Not authenticated");
 
-    const result = await inviteService.sendSupervisorInviteEmail(token);
+    const result = await inviteService.sendSupervisorInviteEmail(token, req);
     res.json({
       success: true,
       emailSent: result.emailSent,
@@ -915,7 +917,7 @@ export async function employeeResendOtp(
     let emailSent = false;
     if (invite.inviteeEmail) {
       const name = inviteService.extractInviteeName(invite);
-      const backendUrl = (env.BACKEND_PUBLIC_URL || env.FRONTEND_URL).replace(/\/+$/, "");
+      const backendUrl = resolveBackendBaseUrl(req);
       const inviteUrl = `${backendUrl}/signup.html?token=${encodeURIComponent(token)}`;
       const roleLabel =
         invite.role === "project_manager"

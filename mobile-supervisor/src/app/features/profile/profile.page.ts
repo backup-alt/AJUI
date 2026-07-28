@@ -226,7 +226,7 @@ export class ProfilePage implements OnInit {
 
   async handleRefresh(event: CustomEvent): Promise<void> {
     this.currentUser.set(this.auth.currentUser());
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   async logout(): Promise<void> {

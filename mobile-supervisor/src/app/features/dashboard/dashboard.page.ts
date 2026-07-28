@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent,
   IonIcon,
@@ -766,7 +767,9 @@ export class DashboardPage implements OnInit, OnDestroy {
     });
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('agb:site-changed', this.handleSiteChange);
+      this.supervisor.siteChanged$
+        .pipe(takeUntilDestroyed())
+        .subscribe(() => void this.loadDashboard());
     }
 
     // Load all data; signal appReady when done
@@ -775,21 +778,14 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:site-changed', this.handleSiteChange);
-    }
     // Ensure splash always resolves even if component is destroyed prematurely
     this.appReady.resolve(false);
   }
 
-  private handleSiteChange = (): void => {
-    void this.loadDashboard();
-  };
-
   async refreshDashboard(event: CustomEvent): Promise<void> {
     this.error.set(false);
     await this.loadDashboard();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   async retryLoad(): Promise<void> {
@@ -824,6 +820,8 @@ export class DashboardPage implements OnInit, OnDestroy {
           () => false
         ),
         this.supervisor.getExpenses({
+          siteId: this.supervisor.selectedSiteId() || undefined,
+          projectId: this.supervisor.selectedProjectId() || undefined,
           dateFrom: this.todayStr(),
           dateTo: this.todayStr(),
           limit: 5,
@@ -869,10 +867,10 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   navigateToSite(site: Site): void {
-    this.supervisor.setSelectedSite(
-      site.siteId,
+    void this.supervisor.setSelectedSite(
+      site.id,
       site.projectId || '',
-      site.projectName || '',
+      site.projectName || site.name,
       site.name,
     );
     this.router.navigate(['/tabs/sites']);

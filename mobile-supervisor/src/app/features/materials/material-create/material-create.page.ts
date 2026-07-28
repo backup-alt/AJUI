@@ -500,7 +500,7 @@ export class MaterialCreatePage implements OnInit {
         await toast.present();
         this.notifications.notify(
           'Material Request Submitted',
-          `Request for ${this.material.name} has been submitted for approval.`
+          `Material: ${this.material.name} - ${this.material.requestedQuantity || 0} ${this.material.unit || ''} requested for approval.`
         );
         this.router.navigate(['/tabs/materials']);
       },

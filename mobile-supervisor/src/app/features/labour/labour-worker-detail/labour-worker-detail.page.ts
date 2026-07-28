@@ -1132,7 +1132,7 @@ export class LabourWorkerDetailPage implements OnInit {
 
   async refresh(event: CustomEvent): Promise<void> {
     await Promise.all([this.loadWorker(), this.loadAttendance()]);
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   private async loadWorker(): Promise<void> {

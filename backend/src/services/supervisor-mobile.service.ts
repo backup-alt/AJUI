@@ -715,6 +715,18 @@ export async function listMaterialsForSupervisor(
       Inventory.countDocuments(invQuery),
     ]);
 
+    // Batch-fetch billUrl for purchaseHistory entries across all items
+    const allMatIds = items.flatMap((m) =>
+      (m.purchaseHistory || []).filter((h: any) => h.materialId).map((h: any) => h.materialId)
+    );
+    let billMap = new Map<string, string>();
+    if (allMatIds.length > 0) {
+      try {
+        const linkedMats = await Material.find({ _id: { $in: allMatIds } }).select("_id billUrl").lean();
+        billMap = new Map(linkedMats.map((m: any) => [m._id.toString(), m.billUrl || '']));
+      } catch {}
+    }
+
     return {
       materials: items.map((m) => ({
         _id: m._id.toString(),
@@ -735,11 +747,13 @@ export async function listMaterialsForSupervisor(
         billUrl: m.billUrl,
         receiptImage: m.receiptImage,
         received: m.received,
-        purchaseHistory: (m.purchaseHistory || []).map((h) => ({
+        purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
           vendor: h.vendor,
           quantity: h.quantity,
           date: h.date,
           poNumber: h.poNumber,
+          materialId: h.materialId,
+          billUrl: h.materialId ? (billMap.get(h.materialId.toString()) || '') : '',
         })),
         requestDate: m.createdAt,
         status: "Approved" as const,
@@ -896,6 +910,27 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
     } catch {}
   }
 
+  // Enrich purchaseHistory entries with billUrl from their linked Material documents
+  const history = (result as any).purchaseHistory;
+  if (Array.isArray(history) && history.length > 0) {
+    const matIds = history
+      .filter((h: any) => h.materialId)
+      .map((h: any) => h.materialId);
+    if (matIds.length > 0) {
+      try {
+        const linkedMats = await Material.find({ _id: { $in: matIds } })
+          .select("_id billUrl")
+          .lean();
+        const billMap = new Map(linkedMats.map((m: any) => [m._id.toString(), m.billUrl]));
+        for (const entry of history) {
+          if (entry.materialId) {
+            entry.billUrl = billMap.get(entry.materialId.toString()) || '';
+          }
+        }
+      } catch {}
+    }
+  }
+
   return result;
 }
 
@@ -1019,4 +1054,29 @@ export async function listMaterialNames(userId: string, search?: string) {
   }
   const names = await Inventory.distinct("name", matchStage);
   return names.sort();
+}
+
+export async function getRecentNotificationsForSupervisor(userId: string, limit: number) {
+  const access = await getSupervisorAccess(userId);
+  const query = approvalScopeQuery(access);
+  // Fetch approved and rejected approvals (not pending) owned by this supervisor
+  query.status = { $in: ["Approved", "Rejected"] };
+  query.owner = userId;
+
+  const approvals = await Approval.find(query)
+    .sort({ reviewedAt: -1, submittedAt: -1 })
+    .limit(limit)
+    .lean();
+
+  return approvals.map((a) => ({
+    id: a._id.toString(),
+    title: a.title,
+    body: a.status === "Approved"
+      ? `Approved${a.detail ? ' - ' + a.detail : ''}${a.amount ? ' (₹' + Number(a.amount).toLocaleString('en-IN') + ')' : ''}${a.poNumber ? '. PO: ' + a.poNumber : ''}`
+      : `Rejected${a.detail ? ' - ' + a.detail : ''}${a.amount ? ' (₹' + Number(a.amount).toLocaleString('en-IN') + ')' : ''}`,
+    type: a.type,
+    status: a.status,
+    receivedAt: (a.reviewedAt || a.submittedAt)?.getTime() || Date.now(),
+    read: false,
+  }));
 }

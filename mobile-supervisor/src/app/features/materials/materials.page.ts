@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
@@ -411,20 +412,14 @@ export class MaterialsPage implements OnInit, OnDestroy {
     this.supervisor.init().catch(() => {});
     await this.loadMaterials();
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('agb:site-changed', this.handleSiteChange);
-    }
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => void this.loadMaterials());
   }
 
   ngOnDestroy(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:site-changed', this.handleSiteChange);
-    }
+    // takeUntilDestroyed handles cleanup automatically
   }
-
-  private handleSiteChange = (): void => {
-    void this.loadMaterials();
-  };
 
   async loadMaterials(): Promise<void> {
     this.isLoading.set(true);
@@ -455,7 +450,7 @@ export class MaterialsPage implements OnInit, OnDestroy {
 
   async refreshMaterials(event: CustomEvent): Promise<void> {
     await this.loadMaterials();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   filterMaterials(): void {

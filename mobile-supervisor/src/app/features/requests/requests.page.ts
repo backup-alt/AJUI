@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
@@ -21,6 +22,7 @@ import { addIcons } from 'ionicons';
 import {
   checkmarkCircleOutline,
   closeCircleOutline,
+  close,
   cloudUploadOutline,
   documentOutline,
   cubeOutline,
@@ -260,6 +262,28 @@ interface RequestItem {
           }
         }
       </div>
+
+      @if (viewImageUrl()) {
+        <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
+          <button class="bill-viewer-close" (click)="closeBillViewer($event)">
+            <ion-icon name="close"></ion-icon>
+          </button>
+          <div class="bill-viewer-img-wrap"
+               (touchstart)="onPinchStart($event)"
+               (touchmove)="onPinchMove($event)"
+               (touchend)="onPinchEnd($event)"
+               (touchcancel)="onPinchEnd($event)"
+               (mousedown)="onDragStart($event)"
+               (mousemove)="onDragMove($event)"
+               (mouseup)="onDragEnd($event)"
+               (mouseleave)="onDragEnd($event)"
+               (dblclick)="toggleZoom($event)">
+            <img [src]="viewImageUrl()" alt="Bill" class="bill-viewer-img"
+                 [style.transform]="'translate(' + panX + 'px,' + panY + 'px) scale(' + zoomScale + ')'"
+                 (dragstart)="$event.preventDefault()" />
+          </div>
+        </div>
+      }
     </ion-content>
   `,
   styles: [`
@@ -487,9 +511,39 @@ interface RequestItem {
       border: none; font-size: 14px; font-weight: 600; cursor: pointer;
     }
     .retry-btn ion-icon { font-size: 16px; }
+
+    .bill-viewer-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.92);
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .bill-viewer-close {
+      position: absolute; top: 12px; right: 12px; z-index: 10;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #fff;
+    }
+    .bill-viewer-close ion-icon { font-size: 24px; }
+    .bill-viewer-img-wrap {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    .bill-viewer-img {
+      max-width: 92vw; max-height: 88vh;
+      object-fit: contain; border-radius: 4px;
+      transition: transform 0.15s ease;
+      transform-origin: center center;
+      will-change: transform;
+      pointer-events: none;
+    }
   `],
 })
-export class RequestsPage implements OnInit {
+export class RequestsPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
   private alertCtrl = inject(AlertController);
@@ -527,6 +581,18 @@ export class RequestsPage implements OnInit {
   isReceivedInput: boolean = false;
   isUploading = signal(false);
 
+  viewImageUrl = signal<string | null>(null);
+  zoomScale = 1;
+  private pinchStartDist = 0;
+  private pinchStartScale = 1;
+  panX = 0;
+  panY = 0;
+  private lastPanX = 0;
+  private lastPanY = 0;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private isDragging = false;
+
   get emptyIcon() {
     if (this.activeTab === 'approved') return 'checkmark-circle-outline';
     if (this.activeTab === 'declined') return 'close-circle-outline';
@@ -550,13 +616,20 @@ export class RequestsPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      checkmarkCircleOutline, closeCircleOutline, cloudUploadOutline,
+      checkmarkCircleOutline, closeCircleOutline, close, cloudUploadOutline,
       documentOutline, cubeOutline, cartOutline, timeOutline,
       imageOutline, cashOutline, chevronForwardOutline,
       cloudOfflineOutline, refreshOutline,
     });
     this.supervisor.init().catch(() => {});
     await this.loadAllRequests();
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => void this.loadAllRequests());
+  }
+
+  ngOnDestroy(): void {
+    // takeUntilDestroyed handles cleanup automatically
   }
 
   onTabChange(): void {
@@ -565,18 +638,21 @@ export class RequestsPage implements OnInit {
 
   async handleRefresh(event: CustomEvent): Promise<void> {
     await this.loadAllRequests();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   async loadAllRequests(): Promise<void> {
     this.isLoading.set(true);
     this.errorMessage.set('');
     const items: RequestItem[] = [];
+    const siteId = this.supervisor.selectedSiteId();
+    const projectId = this.supervisor.selectedProjectId();
+    const siteFilter = { siteId: siteId || undefined, projectId: projectId || undefined };
 
     try {
       // Load APPROVED materials from Inventory (fast on M0 — avoids Material.find() timeout)
       try {
-        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ status: 'Approved', limit: 200 }));
+        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 200 }));
         for (const m of approvedMatRes?.materials || []) {
           const hasNoBill = !(m as any).billUrl;
           items.push({
@@ -600,7 +676,7 @@ export class RequestsPage implements OnInit {
 
           // Load PENDING/DECLINED materials from Material collection (may timeout on M0 — non-critical)
       try {
-        const otherMatRes = await firstValueFrom(this.supervisor.getMaterials({ limit: 200 }));
+        const otherMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, limit: 200 }));
         const approvedIds = new Set(items.filter(i => i.type === 'material').map(i => i._id));
         for (const m of otherMatRes?.materials || []) {
           if (approvedIds.has(m._id)) continue;
@@ -626,7 +702,7 @@ export class RequestsPage implements OnInit {
 
       // Load expenses — include ALL transaction types (Purchase + Add Cash)
       try {
-        const expRes = await firstValueFrom(this.supervisor.getExpenses({ type: 'site', limit: 200 }));
+        const expRes = await firstValueFrom(this.supervisor.getExpenses({ ...siteFilter, type: 'site', limit: 200 }));
         for (const e of expRes?.expenses || []) {
           const txLabel =
             e.transactionType === 'Cash Added' ? 'Add Cash' :
@@ -675,7 +751,83 @@ export class RequestsPage implements OnInit {
   }
 
   openBillImage(url: string): void {
-    window.open(url, '_blank');
+    this.viewImageUrl.set(url);
+    this.resetZoom();
+  }
+
+  closeBillViewer(event: Event): void {
+    event.stopPropagation();
+    this.viewImageUrl.set(null);
+    this.resetZoom();
+  }
+
+  private resetZoom(): void {
+    this.zoomScale = 1;
+    this.panX = 0;
+    this.panY = 0;
+  }
+
+  toggleZoom(event: Event): void {
+    event.stopPropagation();
+    if (this.zoomScale > 1) {
+      this.resetZoom();
+    } else {
+      this.zoomScale = 2.5;
+    }
+  }
+
+  onPinchStart(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      this.pinchStartDist = this.getTouchDistance(event.touches);
+      this.pinchStartScale = this.zoomScale;
+    }
+  }
+
+  onPinchMove(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = this.getTouchDistance(event.touches);
+      const ratio = dist / this.pinchStartDist;
+      this.zoomScale = Math.min(Math.max(this.pinchStartScale * ratio, 0.5), 5);
+      if (this.zoomScale <= 1) {
+        this.panX = 0;
+        this.panY = 0;
+      }
+    }
+  }
+
+  onPinchEnd(event: TouchEvent): void {
+    if (event.touches.length < 2) {
+      if (this.zoomScale < 1) {
+        this.resetZoom();
+      }
+    }
+  }
+
+  private getTouchDistance(touches: TouchList): number {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  onDragStart(event: MouseEvent): void {
+    if (this.zoomScale <= 1) return;
+    event.preventDefault();
+    this.isDragging = true;
+    this.dragStartX = event.clientX - this.panX;
+    this.dragStartY = event.clientY - this.panY;
+  }
+
+  onDragMove(event: MouseEvent): void {
+    if (!this.isDragging) return;
+    event.preventDefault();
+    this.panX = event.clientX - this.dragStartX;
+    this.panY = event.clientY - this.dragStartY;
+  }
+
+  onDragEnd(event: MouseEvent): void {
+    this.isDragging = false;
   }
 
   startUpload(item: RequestItem): void {

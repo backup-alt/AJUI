@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
@@ -26,6 +27,7 @@ import {
   alertCircleOutline,
   pencilOutline,
   closeOutline,
+  close,
   swapVerticalOutline,
   cloudOfflineOutline,
   refreshOutline,
@@ -54,10 +56,13 @@ export interface InventoryItem {
   projectName: string;
   siteId: string;
   site: string;
+  billUrl?: string;
   purchaseHistory?: Array<{
     vendor: string;
     quantity: number;
     date: string;
+    materialId?: string;
+    billUrl?: string;
   }>;
 }
 
@@ -205,6 +210,12 @@ type SortDir = 'asc' | 'desc';
                       <span class="vh-vendor">{{ entry.vendor || 'Unknown' }}</span>
                       <span class="vh-qty">{{ entry.quantity }} {{ item.unit }}</span>
                       <span class="vh-date">{{ entry.date | date:'MMM d, yyyy' }}</span>
+                      @if (entry.billUrl) {
+                        <button class="vh-bill-btn" (click)="openBillViewer(entry.billUrl!); $event.stopPropagation()">
+                          <ion-icon name="document-text-outline"></ion-icon>
+                          View Bill
+                        </button>
+                      }
                     </div>
                   }
                 </div>
@@ -226,6 +237,28 @@ type SortDir = 'asc' | 'desc';
           <ion-icon name="add-outline"></ion-icon>
         </ion-fab-button>
       </ion-fab>
+
+      @if (viewerUrl()) {
+        <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
+          <button class="bill-viewer-close" (click)="closeBillViewer($event)">
+            <ion-icon name="close"></ion-icon>
+          </button>
+          <div class="bill-viewer-img-wrap"
+               (touchstart)="onPinchStart($event)"
+               (touchmove)="onPinchMove($event)"
+               (touchend)="onPinchEnd($event)"
+               (touchcancel)="onPinchEnd($event)"
+               (mousedown)="onDragStart($event)"
+               (mousemove)="onDragMove($event)"
+               (mouseup)="onDragEnd()"
+               (mouseleave)="onDragEnd()"
+               (dblclick)="toggleZoom($event)">
+            <img [src]="viewerUrl()" alt="Bill" class="bill-viewer-img"
+                 [style.transform]="'translate(' + panX + 'px,' + panY + 'px) scale(' + zoomScale + ')'"
+                 (dragstart)="$event.preventDefault()" />
+          </div>
+        </div>
+      }
     </ion-content>
   `,
   styles: [`
@@ -485,7 +518,7 @@ type SortDir = 'asc' | 'desc';
     .vendor-history-entry {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 8px;
       padding: 6px 0;
       border-bottom: 1px solid var(--m3-outline-variant);
@@ -512,6 +545,19 @@ type SortDir = 'asc' | 'desc';
       color: var(--m3-on-surface-muted);
       flex-shrink: 0;
     }
+
+    .vh-bill-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: var(--md-radius-pill);
+      background: rgba(0, 34, 99, 0.06);
+      color: var(--m3-primary);
+      border: 1px solid rgba(0, 34, 99, 0.15);
+      font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .vh-bill-btn:active { background: rgba(0, 34, 99, 0.12); }
+    .vh-bill-btn ion-icon { font-size: 12px; }
 
     .skeleton-card {
       background: var(--m3-surface-bright);
@@ -540,6 +586,36 @@ type SortDir = 'asc' | 'desc';
     .retry-btn ion-icon { font-size: 16px; }
 
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
+
+    .bill-viewer-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.92);
+      display: flex; align-items: center; justify-content: center;
+      animation: billFadeIn 0.2s ease;
+    }
+    @keyframes billFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .bill-viewer-close {
+      position: absolute; top: 12px; right: 12px; z-index: 10;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #fff;
+    }
+    .bill-viewer-close ion-icon { font-size: 24px; }
+    .bill-viewer-img-wrap {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    .bill-viewer-img {
+      max-width: 92vw; max-height: 88vh;
+      object-fit: contain; border-radius: 4px;
+      transition: transform 0.15s ease;
+      transform-origin: center center;
+      will-change: transform;
+      pointer-events: none;
+    }
   `],
 })
 export class InventoryPage implements OnInit, OnDestroy {
@@ -555,6 +631,16 @@ export class InventoryPage implements OnInit, OnDestroy {
   sortField = signal<SortField>('name');
   sortDir = signal<SortDir>('asc');
   private loadGeneration = 0;
+
+  viewerUrl = signal<string | null>(null);
+  zoomScale = 1;
+  panX = 0;
+  panY = 0;
+  private pinchStartDist = 0;
+  private pinchStartScale = 1;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private isDragging = false;
 
   filteredItems = computed(() => {
     let result = [...this.items()];
@@ -600,28 +686,26 @@ export class InventoryPage implements OnInit, OnDestroy {
     addIcons({
       gridOutline, searchOutline, addOutline,
       chevronDownOutline, timeOutline, businessOutline, documentTextOutline,
-      checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline,
+      checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline, close,
       swapVerticalOutline, cloudOfflineOutline, refreshOutline,
     });
     this.supervisor.init().catch(() => {});
     await this.loadInventory();
 
+    this.supervisor.siteChanged$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => void this.loadInventory());
+
     if (typeof window !== 'undefined') {
-      window.addEventListener('agb:site-changed', this.handleSiteChange);
       window.addEventListener('agb:inventory-changed', this.handleInventoryChange);
     }
   }
 
   ngOnDestroy(): void {
     if (typeof window !== 'undefined') {
-      window.removeEventListener('agb:site-changed', this.handleSiteChange);
       window.removeEventListener('agb:inventory-changed', this.handleInventoryChange);
     }
   }
-
-  private handleSiteChange = (): void => {
-    void this.loadInventory();
-  };
 
   private handleInventoryChange = (): void => {
     void this.loadInventory();
@@ -660,6 +744,7 @@ export class InventoryPage implements OnInit, OnDestroy {
         projectName: m.projectName,
         siteId: m.siteId || '',
         site: m.site,
+        billUrl: (m as any).billUrl || '',
         purchaseHistory: m.purchaseHistory || [],
       }));
       this.items.set(materials);
@@ -674,7 +759,7 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   async refreshInventory(event: CustomEvent): Promise<void> {
     await this.loadInventory();
-    (event.target as HTMLIonRefresherElement).complete();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   applyFilters(): void {
@@ -726,5 +811,83 @@ export class InventoryPage implements OnInit, OnDestroy {
       });
       await toast.present();
     }
+  }
+
+  openBillViewer(url: string): void {
+    this.viewerUrl.set(url);
+    this.resetZoom();
+  }
+
+  closeBillViewer(event: Event): void {
+    event.stopPropagation();
+    this.viewerUrl.set(null);
+    this.resetZoom();
+  }
+
+  private resetZoom(): void {
+    this.zoomScale = 1;
+    this.panX = 0;
+    this.panY = 0;
+  }
+
+  toggleZoom(event: Event): void {
+    event.stopPropagation();
+    if (this.zoomScale > 1) {
+      this.resetZoom();
+    } else {
+      this.zoomScale = 2.5;
+    }
+  }
+
+  onPinchStart(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      this.pinchStartDist = this.getTouchDistance(event.touches);
+      this.pinchStartScale = this.zoomScale;
+    }
+  }
+
+  onPinchMove(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = this.getTouchDistance(event.touches);
+      const ratio = dist / this.pinchStartDist;
+      this.zoomScale = Math.min(Math.max(this.pinchStartScale * ratio, 0.5), 5);
+      if (this.zoomScale <= 1) {
+        this.panX = 0;
+        this.panY = 0;
+      }
+    }
+  }
+
+  onPinchEnd(event: TouchEvent): void {
+    if (event.touches.length < 2 && this.zoomScale < 1) {
+      this.resetZoom();
+    }
+  }
+
+  private getTouchDistance(touches: TouchList): number {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  onDragStart(event: MouseEvent): void {
+    if (this.zoomScale <= 1) return;
+    event.preventDefault();
+    this.isDragging = true;
+    this.dragStartX = event.clientX - this.panX;
+    this.dragStartY = event.clientY - this.panY;
+  }
+
+  onDragMove(event: MouseEvent): void {
+    if (!this.isDragging) return;
+    event.preventDefault();
+    this.panX = event.clientX - this.dragStartX;
+    this.panY = event.clientY - this.dragStartY;
+  }
+
+  onDragEnd(): void {
+    this.isDragging = false;
   }
 }
