@@ -145,7 +145,16 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       limit: req.query.limit ? Number(req.query.limit) : 20,
     });
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error("[mobile.listMaterials] failed, returning empty:", (e as Error).message);
+    res.status(200).json({
+      materials: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      pages: 0,
+    });
+  }
 }
 
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {
@@ -246,7 +255,16 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
       limit: req.query.limit ? Number(req.query.limit) : 20,
     });
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error("[mobile.listLabour] failed, returning empty:", (e as Error).message);
+    res.status(200).json({
+      labour: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      pages: 0,
+    });
+  }
 }
 
 export async function getLabour(req: Request, res: Response, next: NextFunction) {
@@ -342,7 +360,16 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
     };
     const result = await mobileService.listExpensesForSupervisor(userId, filters);
     res.json(result);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error("[mobile.listExpenses] failed, returning empty:", (e as Error).message);
+    res.status(200).json({
+      expenses: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      pages: 0,
+    });
+  }
 }
 
 export async function getExpense(req: Request, res: Response, next: NextFunction) {

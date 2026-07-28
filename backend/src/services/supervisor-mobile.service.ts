@@ -28,6 +28,7 @@ import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Inventory } from "../models/Inventory.js";
+import { withRetry } from "../utils/retry.js";
 
 type SupervisorAccess = {
   user: Awaited<ReturnType<typeof User.findById>>;
@@ -749,9 +750,18 @@ export async function listMaterialsForSupervisor(
     delete invQuery.status;
 
     const [items, total] = await Promise.all([
-      Inventory.find(invQuery).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-      Inventory.countDocuments(invQuery),
-    ]);
+      withRetry(
+        () => Inventory.find(invQuery).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(8000),
+        { label: "mobile.listMaterials.inv.find" }
+      ),
+      withRetry(
+        () => Inventory.countDocuments(invQuery).maxTimeMS(8000),
+        { label: "mobile.listMaterials.inv.count" }
+      ),
+    ]).catch((err) => {
+      console.error("[mobile.listMaterials] inventory query failed:", (err as Error).message);
+      return [[], 0] as [unknown[], number];
+    });
 
     // Batch-fetch billUrl for purchaseHistory entries across all items
     const allMatIds = items.flatMap((m) =>
@@ -803,9 +813,18 @@ export async function listMaterialsForSupervisor(
   }
 
   const [items, total] = await Promise.all([
-    Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Material.countDocuments(query),
-  ]);
+    withRetry(
+      () => Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(8000),
+      { label: "mobile.listMaterials.find" }
+    ),
+    withRetry(
+      () => Material.countDocuments(query).maxTimeMS(8000),
+      { label: "mobile.listMaterials.count" }
+    ),
+  ]).catch((err) => {
+    console.error("[mobile.listMaterials] main query failed:", (err as Error).message);
+    return [[], 0] as [unknown[], number];
+  });
 
   return {
     materials: items.map((m) => ({
@@ -888,9 +907,18 @@ export async function listExpensesForSupervisor(
   const skip = (page - 1) * limit;
 
   const [items, total] = await Promise.all([
-    Expense.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Expense.countDocuments(query),
-  ]);
+    withRetry(
+      () => Expense.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(8000),
+      { label: "mobile.listExpenses.find" }
+    ),
+    withRetry(
+      () => Expense.countDocuments(query).maxTimeMS(8000),
+      { label: "mobile.listExpenses.count" }
+    ),
+  ]).catch((err) => {
+    console.error("[mobile.listExpenses] main query failed:", (err as Error).message);
+    return [[], 0] as [unknown[], number];
+  });
 
   return {
     expenses: items.map((e) => ({
