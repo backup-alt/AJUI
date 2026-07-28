@@ -3,6 +3,7 @@ import * as ctrl from "../controllers/entities.controller.js";
 import { validate } from "../middleware/validation.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
+import { cache, invalidateCachePrefix } from "../middleware/cache.js";
 import {
   createClientSchema,
   updateClientSchema,
@@ -48,9 +49,9 @@ router.use(requireAuth);
  *     summary: Create client (Admin + PM)
  */
 router.post("/clients", validate(createClientSchema), requireRole("admin", "project_manager"), ctrl.createClient);
-router.get("/clients", validate(listClientsSchema, "query"), ctrl.listClients);
-router.get("/clients/:id/summary", ctrl.getClientSummary);
-router.get("/clients/:id", ctrl.getClient);
+router.get("/clients", validate(listClientsSchema, "query"), cache(20), ctrl.listClients);
+router.get("/clients/:id/summary", cache(20), ctrl.getClientSummary);
+router.get("/clients/:id", cache(30), ctrl.getClient);
 router.patch("/clients/:id", validate(updateClientSchema), requireRole("admin", "project_manager"), ctrl.updateClient);
 router.delete("/clients/:id", requireRole("admin"), ctrl.deleteClient);
 
@@ -65,10 +66,10 @@ router.delete("/clients/:id", requireRole("admin"), ctrl.deleteClient);
  *     summary: Create project (Admin + PM)
  */
 router.post("/projects", validate(createProjectSchema), requireRole("admin", "project_manager"), ctrl.createProject);
-router.get("/projects", validate(listProjectsSchema, "query"), ctrl.listProjects);
-router.get("/projects/summary", ctrl.getProjectsSummary);
-router.get("/projects/:id/ledger", ctrl.getProjectLedger);
-router.get("/projects/:id", ctrl.getProject);
+router.get("/projects", validate(listProjectsSchema, "query"), cache(20), ctrl.listProjects);
+router.get("/projects/summary", cache(20), ctrl.getProjectsSummary);
+router.get("/projects/:id/ledger", cache(15), ctrl.getProjectLedger);
+router.get("/projects/:id", cache(30), ctrl.getProject);
 router.patch("/projects/:id", validate(updateProjectSchema), requireRole("admin", "project_manager"), ctrl.updateProject);
 router.delete("/projects/:id", requireRole("admin"), ctrl.deleteProject);
 
@@ -83,8 +84,8 @@ router.delete("/projects/:id", requireRole("admin"), ctrl.deleteProject);
  *     summary: Create site (Admin + PM)
  */
 router.post("/sites", validate(createSiteSchema), requireRole("admin", "project_manager"), ctrl.createSite);
-router.get("/sites", ctrl.listSites);
-router.get("/sites/:id", ctrl.getSite);
+router.get("/sites", cache(30), ctrl.listSites);
+router.get("/sites/:id", cache(30), ctrl.getSite);
 router.patch("/sites/:id", validate(updateSiteSchema), requireRole("admin", "project_manager"), ctrl.updateSite);
 router.delete("/sites/:id", requireRole("admin"), ctrl.deleteSite);
 
