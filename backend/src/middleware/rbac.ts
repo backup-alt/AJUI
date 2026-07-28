@@ -92,14 +92,16 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
 
   // For non-admin, fetch the user's managedProjectIds. Wrap in a timeout so
   // a slow MongoDB call doesn't block the request indefinitely on M0.
-  let user: { managedProjectIds?: unknown[] } | null = null;
+  let user: { managedProjectIds?: Types.ObjectId[] } | null = null;
   try {
     const userQuery = User.findById(userId).select("managedProjectIds").lean().maxTimeMS(3000);
     user = await userQuery;
   } catch (err) {
     console.warn("[rbac] User lookup timed out, treating as no managed projects:", (err as Error).message);
   }
-  const managedProjectIds = (user?.managedProjectIds || []).map((id) => new Types.ObjectId(id));
+  const managedProjectIds: Types.ObjectId[] = (user?.managedProjectIds || []).map(
+    (id) => new Types.ObjectId(String(id))
+  );
 
   // For PM/accountant, ALWAYS scope to their assigned projects.
   // Empty managedProjectIds means they see nothing (not everything).
@@ -110,7 +112,7 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   }
 
   if (role === "supervisor") {
-    let supervisor: { assignedProjects?: unknown[]; assignedProjectId?: unknown } | null = null;
+    let supervisor: { assignedProjects?: Types.ObjectId[]; assignedProjectId?: Types.ObjectId } | null = null;
     try {
       supervisor = await Supervisor.findOne({ userId })
         .select("assignedProjects assignedProjectId")
@@ -119,10 +121,10 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
     } catch (err) {
       console.warn("[rbac] Supervisor lookup timed out:", (err as Error).message);
     }
-    const supervisorProjectIds = (supervisor?.assignedProjects as unknown[])?.length
-      ? (supervisor!.assignedProjects as unknown[]).map((id) => new Types.ObjectId((id as { toString(): string }).toString()))
+    const supervisorProjectIds: Types.ObjectId[] = supervisor?.assignedProjects?.length
+      ? supervisor.assignedProjects.map((id) => new Types.ObjectId(id.toString()))
       : supervisor?.assignedProjectId
-        ? [new Types.ObjectId(supervisor.assignedProjectId as string)]
+        ? [new Types.ObjectId(supervisor.assignedProjectId.toString())]
         : [];
     const projectIds = [...supervisorProjectIds, ...managedProjectIds];
     const result = uniqueObjectIds(projectIds);
