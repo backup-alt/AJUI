@@ -1048,7 +1048,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         [class.selected]="addMaterialForm().siteId === site.id"
                         (click)="pickAddMaterialFromMenu('siteId', site.id)"
                       >{{ site.name }}</button>
-                      <div *ngIf="filteredAddMaterialSites().length === 0" class="inventory-init-menu-empty">No sites match.</div>
+                      <div *ngIf="addMaterialSiteOptions().length === 0" class="inventory-init-menu-empty inventory-init-menu-empty--friendly">No sites available. Please create a site first.</div>
+                      <div *ngIf="addMaterialSiteOptions().length > 0 && filteredAddMaterialSites().length === 0" class="inventory-init-menu-empty">No sites match.</div>
                     </div>
                   </div>
                   @if (addMaterialFieldErrors()['siteId']) {
@@ -1135,37 +1136,22 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   }
                 </div>
 
-                <div class="inventory-init-row-2">
-                  <div class="inventory-init-field" [class.has-error]="!!addMaterialFieldErrors()['quantity']">
-                    <label class="inventory-init-label">
-                      <span>Quantity / Current Stock <em class="required">*</em></span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        class="inventory-init-input"
-                        [value]="addMaterialForm().quantity"
-                        (input)="patchAddMaterialForm({ quantity: $any($event.target).value })"
-                        [class.input-error]="!!addMaterialFieldErrors()['quantity']"
-                      />
-                    </label>
-                    @if (addMaterialFieldErrors()['quantity']) {
-                      <small class="inventory-init-field-error">{{ addMaterialFieldErrors()['quantity'] }}</small>
-                    }
-                  </div>
-                  <div class="inventory-init-field">
-                    <label class="inventory-init-label">
-                      <span>Minimum Stock</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        class="inventory-init-input"
-                        [value]="addMaterialForm().minimumStock"
-                        (input)="patchAddMaterialForm({ minimumStock: $any($event.target).value })"
-                      />
-                    </label>
-                  </div>
+                <div class="inventory-init-field" [class.has-error]="!!addMaterialFieldErrors()['quantity']">
+                  <label class="inventory-init-label">
+                    <span>Quantity / Current Stock <em class="required">*</em></span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="inventory-init-input"
+                      [value]="addMaterialForm().quantity"
+                      (input)="patchAddMaterialForm({ quantity: $any($event.target).value })"
+                      [class.input-error]="!!addMaterialFieldErrors()['quantity']"
+                    />
+                  </label>
+                  @if (addMaterialFieldErrors()['quantity']) {
+                    <small class="inventory-init-field-error">{{ addMaterialFieldErrors()['quantity'] }}</small>
+                  }
                 </div>
 
                 <div class="inventory-init-field">
@@ -1480,27 +1466,36 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
     /* ============== Inventory Init Dialog ============== */
     .inventory-init-dialog {
-      max-width: 580px;
+      max-width: 520px;
       width: 96%;
       max-height: 90vh;
       display: flex;
       flex-direction: column;
     }
+    .inventory-init-dialog .dialog-head {
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid #e5eaf1;
+      background: #fbfcfe;
+    }
+    .inventory-init-dialog .dialog-head h2 {
+      margin: 4px 0 4px;
+      font-size: 19px;
+      color: #111827;
+    }
+    .inventory-init-dialog .dialog-head span {
+      font-size: 11px;
+    }
+    .inventory-init-dialog .dialog-head p {
+      max-width: 100%;
+      font-size: 13px;
+    }
     .inventory-init-body {
       display: flex;
       flex-direction: column;
-      gap: 18px;
-      padding: 4px 2px 8px;
+      gap: 16px;
+      padding: 20px 24px 12px;
       flex: 1 1 auto;
       min-height: 0;
-    }
-    .inventory-init-row-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-    }
-    @media (max-width: 640px) {
-      .inventory-init-row-2 { grid-template-columns: 1fr; }
     }
     .inventory-init-field {
       display: flex;
@@ -1523,11 +1518,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
       display: flex;
       flex-direction: column;
       gap: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
       text-transform: uppercase;
-      letter-spacing: 0.4px;
+      letter-spacing: 0.5px;
     }
     .inventory-init-label .required {
       color: #b3341c;
@@ -1541,7 +1536,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .inventory-init-input {
       width: 100%;
-      padding: 10px 12px;
+      min-height: 40px;
+      padding: 9px 12px;
       border: 1px solid #d6deeb;
       border-radius: 9px;
       font-size: 14px;
@@ -1567,6 +1563,33 @@ const siteMaterialDetailFields: FieldSchema[] = [
       font-family: inherit;
       line-height: 1.4;
     }
+    /* Unify trigger height with .inventory-init-input inside this dialog */
+    .inventory-init-dialog .erp-select-trigger {
+      min-height: 40px !important;
+      padding: 0 12px !important;
+      border-radius: 9px !important;
+      border: 1px solid #d6deeb !important;
+      background: #ffffff !important;
+      font-size: 14px !important;
+      font-weight: 400 !important;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+    .inventory-init-dialog .erp-select-menu.open .erp-select-trigger {
+      border-color: #8aa4d1 !important;
+      background: #ffffff !important;
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.1) !important;
+    }
+    .inventory-init-dialog .erp-select-trigger > span {
+      font-weight: 400;
+    }
+    .inventory-init-dialog .erp-select-menu {
+      position: relative;
+    }
+    .inventory-init-dialog .erp-select-panel {
+      width: 100%;
+      min-width: 100%;
+      top: calc(100% + 6px);
+    }
     .inventory-init-menu-search {
       width: 100%;
       padding: 8px 10px;
@@ -1589,6 +1612,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
       font-size: 12px;
       color: #94a3b8;
       text-align: center;
+    }
+    .inventory-init-menu-empty--friendly {
+      padding: 18px 14px;
+      color: #1a2540;
+      background: #f8fafc;
+      border-radius: 8px;
+      margin: 4px 0;
     }
     .inventory-init-menu-confirm {
       width: 100%;
@@ -1845,12 +1875,11 @@ export class UniversalDashboardPage implements OnInit {
   });
   readonly showInventoryBreakdown = signal(false);
   readonly showInventoryInitDialog = signal(false);
-  readonly addMaterialForm = signal<{ siteId: string; name: string; unit: string; quantity: number; minimumStock: number; remarks: string }>({
+  readonly addMaterialForm = signal<{ siteId: string; name: string; unit: string; quantity: number; remarks: string }>({
     siteId: "",
     name: "",
     unit: "",
     quantity: 0,
-    minimumStock: 0,
     remarks: "",
   });
   readonly addMaterialSaving = signal(false);
@@ -2006,9 +2035,9 @@ export class UniversalDashboardPage implements OnInit {
       name: "",
       unit: "",
       quantity: 0,
-      minimumStock: 0,
       remarks: "",
     });
+    this.refreshFromBackend();
     this.showInventoryInitDialog.set(true);
   }
 
@@ -2024,14 +2053,13 @@ export class UniversalDashboardPage implements OnInit {
       name: "",
       unit: "",
       quantity: 0,
-      minimumStock: 0,
       remarks: "",
     });
   }
 
-  patchAddMaterialForm(patch: Partial<{ siteId: string; name: string; unit: string; quantity: number; minimumStock: number; remarks: string }>) {
+  patchAddMaterialForm(patch: Partial<{ siteId: string; name: string; unit: string; quantity: number; remarks: string }>) {
     this.addMaterialForm.update((form) => ({ ...form, ...patch }));
-    if (patch.name !== undefined || patch.unit !== undefined || patch.quantity !== undefined || patch.minimumStock !== undefined || patch.siteId !== undefined) {
+    if (patch.name !== undefined || patch.unit !== undefined || patch.quantity !== undefined || patch.siteId !== undefined) {
       if (this.addMaterialError()) this.addMaterialError.set(null);
       if (Object.keys(this.addMaterialFieldErrors()).length) this.addMaterialFieldErrors.set({});
     }
@@ -2090,14 +2118,12 @@ export class UniversalDashboardPage implements OnInit {
       this.addMaterialError.set("Please fix the highlighted fields.");
       return;
     }
-    const minimumStock = Number(form.minimumStock) || 0;
     const remarks = form.remarks.trim() || undefined;
     const payload = {
       siteId: form.siteId,
       name,
       unit,
       quantity,
-      minimumStock,
       remarks,
     };
     this.addMaterialSaving.set(true);
