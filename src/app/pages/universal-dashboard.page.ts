@@ -2101,6 +2101,23 @@ export class UniversalDashboardPage implements OnInit {
     });
   }
 
+  private refreshMaterialsAfterSave() {
+    this.api.listMaterials({ limit: 100 }).subscribe({
+      next: (r: any) => {
+        try {
+          const items = ((r as any).items || []).map(mapMaterial);
+          localStorage.setItem("agb-erp:materials", JSON.stringify(items));
+          this.data.materials.set(items);
+        } catch (err) {
+          console.error("[addInventoryMaterial] Failed to refresh materials after save", err);
+        }
+      },
+      error: (err) => {
+        console.error("[addInventoryMaterial] /api/materials refresh failed", err);
+      },
+    });
+  }
+
   trackAddMaterialSiteById = (_: number, site: { id: string }) => site.id;
 
   closeInventoryInitDialog() {
@@ -2196,7 +2213,7 @@ export class UniversalDashboardPage implements OnInit {
         this.addMaterialSaving.set(false);
         const created = res?.created !== false;
         this.addMaterialToast.set(created ? "Material added." : "Existing material updated.");
-        this.refreshFromBackend();
+        this.refreshMaterialsAfterSave();
         setTimeout(() => {
           this.closeInventoryInitDialog();
         }, 1200);
