@@ -106,10 +106,10 @@ function numberToWords(num: number): string {
                           </td>
                           <td>
                             <button type="button" class="icon-action-btn edit" title="Edit" (click)="editInvoice(inv)">
-                              <ion-icon name="create-outline"></ion-icon>
+                              <ion-icon name="pencil-outline"></ion-icon>
                             </button>
                             <button type="button" class="icon-action-btn preview" title="Preview" (click)="previewInvoice(inv)">
-                              <ion-icon name="eye-outline"></ion-icon>
+                              <ion-icon name="document-text-outline"></ion-icon>
                             </button>
                             <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteInvoice(inv.id)">
                               <ion-icon name="trash-outline"></ion-icon>
