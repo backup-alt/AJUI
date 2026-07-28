@@ -1359,10 +1359,10 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     const projectIds = this.inviteProjectIds();
 
     this.inviteError.set(null);
-    if (role !== "Admin" && projectIds.length === 0) {
-      this.inviteError.set("Please select at least one project for this employee.");
-      return;
-    }
+    // projectIds is optional — admin can invite PM/accountant without
+    // selecting projects. They can assign projects later from the
+    // employee detail page. If no projects, the employee simply sees
+    // no projects in their scope until projects are assigned.
     this.inviteSending.set(true);
     this.api.createEmployeeInvite({
       name,
