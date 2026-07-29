@@ -138,18 +138,24 @@ export class WorkspaceHydrationService {
   }
 
   /**
-   * Warm up all 3 M0 collections with a trivial findOne query each.
-   * This primes the connection pool so cursor-paginated queries don't
-   * hang on the first page. Called once per hydration cycle.
+   * Warm up all 3 M0 collections sequentially — one at a time.
+   * Parallel warmup (Promise.all) would grab all 3 connection slots
+   * simultaneously and starve the pool for the subsequent cursor queries.
    */
   private async warmupAll(): Promise<void> {
     console.log("[warmupAll] priming M0 connections...");
     const t0 = Date.now();
-    await Promise.all([
-      firstValueFrom(this.api.warmupMaterials().pipe(timeout({ each: 15_000, meta: "warmup.materials" }))).catch(() => {}),
-      firstValueFrom(this.api.warmupInventory().pipe(timeout({ each: 15_000, meta: "warmup.inventory" }))).catch(() => {}),
-      firstValueFrom(this.api.warmupExpenses().pipe(timeout({ each: 15_000, meta: "warmup.expenses" }))).catch(() => {}),
-    ]);
+    for (const [label, warmupFn] of [
+      ["materials", () => this.api.warmupMaterials()],
+      ["inventory", () => this.api.warmupInventory()],
+      ["expenses", () => this.api.warmupExpenses()],
+    ] as Array<[string, () => import("rxjs").Observable<any>]>) {
+      try {
+        await firstValueFrom(warmupFn().pipe(timeout({ each: 15_000, meta: `warmup.${label}` })));
+      } catch {
+        // warmup is best-effort — still try the real query
+      }
+    }
     console.log(`[warmupAll] done in ${Date.now() - t0}ms`);
   }
 

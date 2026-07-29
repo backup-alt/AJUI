@@ -151,7 +151,7 @@ export async function listMaterials(filter: {
           .sort({ _id: -1 })
           .limit(effectiveLimit + 1)
           .lean()
-          .maxTimeMS(15000),
+          .maxTimeMS(10000),
         { label: "listMaterials.find" }
       )
     );
@@ -159,13 +159,18 @@ export async function listMaterials(filter: {
     // Only fetch countDocuments on the first page (no cursor) — counts on
     // paginated pages are expensive and usually unnecessary.
     if (!filter.cursor) {
-      const foundTotal = await dbMutex.run(() =>
-        withRetry(
-          () => Material.countDocuments(query).maxTimeMS(10000),
-          { label: "listMaterials.count" }
-        )
-      );
-      total = foundTotal;
+      try {
+        const foundTotal = await dbMutex.run(() =>
+          withRetry(
+            () => Material.countDocuments(query).maxTimeMS(8000),
+            { label: "listMaterials.count" }
+          )
+        );
+        total = foundTotal;
+      } catch (countErr) {
+        console.warn("[listMaterials] countDocuments failed (non-fatal):", (countErr as Error).message);
+        total = items.length; // fall back to items we already have
+      }
     } else {
       total = filter.page * effectiveLimit; // estimate
     }

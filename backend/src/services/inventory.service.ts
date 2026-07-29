@@ -135,18 +135,23 @@ export async function listInventory(filter: {
           .sort({ _id: -1 })
           .limit(effectiveLimit + 1)
           .lean()
-          .maxTimeMS(15000),
+          .maxTimeMS(10000),
         { label: "listInventory.find" }
       )
     );
     if (!filter.cursor) {
-      const foundTotal = await dbMutex.run(() =>
-        withRetry(
-          () => Inventory.countDocuments(query).maxTimeMS(10000),
-          { label: "listInventory.count" }
-        )
-      );
-      total = foundTotal;
+      try {
+        const foundTotal = await dbMutex.run(() =>
+          withRetry(
+            () => Inventory.countDocuments(query).maxTimeMS(8000),
+            { label: "listInventory.count" }
+          )
+        );
+        total = foundTotal;
+      } catch (countErr) {
+        console.warn("[listInventory] countDocuments failed (non-fatal):", (countErr as Error).message);
+        total = items.length;
+      }
     } else {
       total = filter.page * effectiveLimit;
     }

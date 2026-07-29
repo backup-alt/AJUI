@@ -198,18 +198,23 @@ export async function listExpenses(filter: {
           .sort({ _id: -1 })
           .limit(effectiveLimit + 1)
           .lean()
-          .maxTimeMS(15000),
+          .maxTimeMS(10000),
         { label: "listExpenses.find" }
       )
     );
     if (!filter.cursor) {
-      const foundTotal = await dbMutex.run(() =>
-        withRetry(
-          () => Expense.countDocuments(query).maxTimeMS(10000),
-          { label: "listExpenses.count" }
-        )
-      );
-      total = foundTotal;
+      try {
+        const foundTotal = await dbMutex.run(() =>
+          withRetry(
+            () => Expense.countDocuments(query).maxTimeMS(8000),
+            { label: "listExpenses.count" }
+          )
+        );
+        total = foundTotal;
+      } catch (countErr) {
+        console.warn("[listExpenses] countDocuments failed (non-fatal):", (countErr as Error).message);
+        total = items.length;
+      }
     } else {
       total = filter.page * effectiveLimit;
     }
