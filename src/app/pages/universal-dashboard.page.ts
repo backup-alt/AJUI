@@ -278,12 +278,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
       <agb-enterprise-sidebar active="dashboard"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        @if (false) {
+        @if (backendSyncMessage()) {
           <div class="backend-sync-banner" role="status">
             <span class="spinner" [class.spinning]="backendSyncing()"></span>
             <span>{{ backendSyncMessage() }}</span>
             @if (!backendSyncing()) {
               <button type="button" class="banner-btn" (click)="refreshFromBackend()">Refresh now</button>
+              <button type="button" class="banner-btn" (click)="clearLocalCacheAndReload()">Clear cache & reload</button>
             }
           </div>
         }
@@ -2027,19 +2028,36 @@ export class UniversalDashboardPage implements OnInit {
    * or the table silently empties out on every tab switch.
    */
   private refreshMaterialsForTable() {
+    const t0 = Date.now();
+    const existingCount = this.data.materials().length;
+    console.log(`[refreshMaterials] starting fetch — existing signal has ${existingCount} materials`);
     this.api.listMaterials({ limit: 100 }).subscribe({
       next: (r: any) => {
+        const dt = Date.now() - t0;
         try {
           const items = (r.items || []).map(mapMaterial);
+          console.log(
+            `[refreshMaterials] response in ${dt}ms — backend returned ${items.length} of ${r.total} total`
+          );
           if (items.length === 0) {
             console.warn("[refreshMaterials] backend returned 0 items — keeping existing signal/localStorage");
             return;
           }
+          if (items.length < existingCount) {
+            console.warn(
+              `[refreshMaterials] backend returned FEWER items (${items.length}) than existing signal (${existingCount}). This usually means the backend timed out and returned a partial set. Keeping existing data.`
+            );
+            return;
+          }
           localStorage.setItem("agb-erp:materials", JSON.stringify(items));
           this.data.materials.set(items);
-        } catch {}
+        } catch (err) {
+          console.error("[refreshMaterials] error processing response:", err);
+        }
       },
-      error: () => {},
+      error: (err) => {
+        console.error(`[refreshMaterials] fetch failed in ${Date.now() - t0}ms:`, err?.status, err?.message);
+      },
     });
   }
 
@@ -2806,6 +2824,30 @@ export class UniversalDashboardPage implements OnInit {
     });
 
     void this.data.loadCustomFieldsFromBackend();
+  }
+
+  /**
+   * Debug utility — clears ALL agb-erp:* localStorage keys and reloads the
+   * page. Use this when localStorage has stale data from a previous session
+   * that's masking fresh backend responses. The login flow already clears
+   * these keys but if a user is already authenticated (token in localStorage
+   * from a prior session), the skip-login path doesn't run that cleanup.
+   */
+  clearLocalCacheAndReload() {
+    const removed: string[] = [];
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("agb-erp:")) {
+          removed.push(key);
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (err) {
+      console.error("[clearLocalCache] error:", err);
+    }
+    console.log(`[clearLocalCache] removed ${removed.length} keys:`, removed);
+    window.location.reload();
   }
 
   @HostListener("document:pointerdown", ["$event"])

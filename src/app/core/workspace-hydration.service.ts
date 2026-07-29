@@ -52,11 +52,19 @@ export class WorkspaceHydrationService {
     // M0 free-tier MongoDB pool can only handle a few concurrent ops at a
     // time. Chaining these calls (instead of Promise.all of 8) keeps the
     // pool healthy and prevents every call from timing out simultaneously.
+    const t0 = Date.now();
+    const initialMaterials = this.erp.materials().length;
+    console.log(`[hydrateDeferred] starting — existing materials signal has ${initialMaterials} entries`);
+
     const sites = await this.safeList(() => this.api.listSites(), "sites");
     this.setSignalAndStorage("sites", (sites?.items || []).map(mapSite), this.erp.siteEntities);
 
     const materials = await this.safeList(() => this.api.listMaterials({ limit: 100 }), "materials");
-    this.setSignalAndStorage("materials", (materials?.items || []).map(mapMaterial), this.erp.materials);
+    const mappedMaterials = (materials?.items || []).map(mapMaterial);
+    console.log(
+      `[hydrateDeferred] materials: API returned ${materials?.items?.length ?? "null"} items, mapped ${mappedMaterials.length} (total reported: ${materials?.total ?? "n/a"})`
+    );
+    this.setSignalAndStorage("materials", mappedMaterials, this.erp.materials);
 
     const inventory = await this.safeList(() => this.api.listInventory({ limit: 100 }), "inventory");
     this.setSignalAndStorage("inventory", (inventory?.items || []).map(mapInventory), this.erp.inventory);
@@ -75,6 +83,9 @@ export class WorkspaceHydrationService {
 
     const invoices = await this.safeList(() => this.api.listInvoices({ limit: 100 }), "invoices");
     this.setSignalAndStorage("taxInvoices", (invoices?.items || []).map(mapInvoice), this.erp.taxInvoices);
+
+    const dt = Date.now() - t0;
+    console.log(`[hydrateDeferred] complete in ${dt}ms — materials signal now has ${this.erp.materials().length} entries`);
   }
 
   async hydrateFromBackend(): Promise<void> {
