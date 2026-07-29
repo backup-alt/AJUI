@@ -145,40 +145,30 @@ export async function listMaterials(filter: {
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    // Serialize through the in-process mutex so this query doesn't
-    // contend with other concurrent requests for the M0 cluster's
-    // shared resources. A single fast query returns faster than 5
-    // slow ones competing for the same CPU.
-    const foundItems = await dbMutex.run(() =>
-      withRetry(
-        () => Material.find(query)
-          .sort({ _id: -1 })
-          .limit(effectiveLimit + 1) // +1 so we know if there's another page
-          .lean()
-          .maxTimeMS(5000),
-        { label: "listMaterials.find" }
-      )
-    );
-    // Only fetch countDocuments on the first page (no cursor) — counts on
-    // paginated pages are expensive and usually unnecessary.
-    if (!filter.cursor) {
-      const foundTotal = await dbMutex.run(() =>
-        withRetry(
-          () => Material.countDocuments(query).maxTimeMS(5000),
-          { label: "listMaterials.count" }
-        )
-      );
-      total = foundTotal;
-    } else {
-      total = filter.page * effectiveLimit; // estimate
+    // === DIAGNOSTIC: minimal M0 round-trip test ===
+    // Replaces the real cursor-paginated find() with a trivial findOne()
+    // so we can see in Render logs whether M0 itself is responsive.
+    console.log("=== BEFORE findOne ===");
+    try {
+      const test = await Material.findOne().lean();
+      console.log("=== AFTER findOne ===", test?._id);
+    } catch (err) {
+      console.error("=== findOne FAILED ===", err);
     }
-    items = foundItems as unknown as MaterialLike[];
-    if (items.length > effectiveLimit) {
-      const nextItem = items.pop();
-      if (nextItem && (nextItem as any)._id) {
-        nextCursor = String((nextItem as any)._id);
-      }
-    }
+    console.log("=== CONTINUING ===");
+    // === END DIAGNOSTIC ===
+
+    // Short-circuit so we don't waste DB capacity on a query that might
+    // also fail. Return empty list — the diagnostic logs above are what
+    // we're testing.
+    return {
+      items: [],
+      total: 0,
+      page: filter.page,
+      limit: effectiveLimit,
+      pages: 0,
+      nextCursor: null,
+    };
   } catch (err) {
     console.error(
       "[listMaterials] query failed (projectId=%s siteId=%s status=%s search=%s scopeLen=%s):",
