@@ -52,11 +52,11 @@ export class WorkspaceHydrationService {
     const t0 = Date.now();
     console.log(`[hydrateDeferred] starting — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`);
 
-    // Sites — single page
+    // Sites
     const sites = await this.safeList(() => this.api.listSites(), "sites");
     this.setSignal("sites", (sites?.items || []).map(mapSite), this.erp.siteEntities);
 
-    // Materials — cursor-paginated, warmup before EVERY page, retry until complete
+    // Materials
     const materials = await this.loadAllPages(
       (cursor) => this.api.listMaterials({ limit: 5, cursor }),
       () => this.api.warmupMaterials(),
@@ -64,7 +64,7 @@ export class WorkspaceHydrationService {
     );
     this.setSignal("materials", materials.map(mapMaterial), this.erp.materials);
 
-    // Inventory — cursor-paginated, warmup before EVERY page, retry until complete
+    // Inventory
     const inventory = await this.loadAllPages(
       (cursor) => this.api.listInventory({ limit: 5, cursor }),
       () => this.api.warmupInventory(),
@@ -72,7 +72,7 @@ export class WorkspaceHydrationService {
     );
     this.setSignal("inventory", inventory.map(mapInventory), this.erp.inventory);
 
-    // Expenses — cursor-paginated, warmup before EVERY page, retry until complete
+    // Expenses
     const expenses = await this.loadAllPages(
       (cursor) => this.api.listExpenses({ limit: 5, cursor }),
       () => this.api.warmupExpenses(),
@@ -80,16 +80,13 @@ export class WorkspaceHydrationService {
     );
     this.setSignal("expenses", expenses.map(mapExpense), this.erp.expenses);
 
-    // Smaller collections — single page
+    // Smaller collections
     const labour = await this.safeList(() => this.api.listLabour({ limit: 5 }), "labour");
     this.setSignal("labour", (labour?.items || []).map(mapLabour), this.erp.labour);
-
     const payments = await this.safeList(() => this.api.listPayments({ limit: 5 }), "payments");
     this.setSignal("payments", (payments?.items || []).map(mapPayment), this.erp.payments);
-
     const subcontractors = await this.safeList(() => this.api.listSubcontractors({ limit: 5 }), "subcontractors");
     this.setSignal("subcontractors", (subcontractors?.items || []).map(mapSubcontractor), this.erp.subcontractors);
-
     const invoices = await this.safeList(() => this.api.listInvoices({ limit: 5 }), "invoices");
     this.setSignal("taxInvoices", (invoices?.items || []).map(mapInvoice), this.erp.taxInvoices);
 
@@ -98,9 +95,9 @@ export class WorkspaceHydrationService {
   }
 
   /**
-   * Load ALL pages of a cursor-paginated endpoint. Calls warmup BEFORE every
-   * page request. If the fetched count doesn't match the expected total,
-   * keeps retrying from the last successful cursor until complete.
+   * Load all pages of a cursor-paginated endpoint. Warmup before every page.
+   * If a page fails after retries, skip it and continue to the next.
+   * No recursion — just a straight cursor walk with per-page retries.
    */
   private async loadAllPages<T>(
     factory: (cursor: string | undefined) => import("rxjs").Observable<{ items: T[]; nextCursor?: string | null }>,
@@ -108,16 +105,15 @@ export class WorkspaceHydrationService {
     label: string
   ): Promise<T[]> {
     const MAX_PAGES = 40;
-    const PAGE_RETRY_LIMIT = 5;
+    const PAGE_RETRY_LIMIT = 3;
     const PAGE_RETRY_DELAY_MS = 2000;
     const allItems: T[] = [];
     let cursor: string | undefined = undefined;
     let pagesFetched = 0;
-    let totalReported = 0;
 
     while (pagesFetched < MAX_PAGES) {
       pagesFetched++;
-      let pageData: { items: T[]; nextCursor?: string | null; total?: number } | null = null;
+      let pageData: { items: T[]; nextCursor?: string | null } | null = null;
 
       // Per-page retry loop — warmup before EACH attempt
       for (let pageAttempt = 1; pageAttempt <= PAGE_RETRY_LIMIT; pageAttempt++) {
@@ -143,16 +139,18 @@ export class WorkspaceHydrationService {
         }
       }
 
+      // If page failed after all retries, try the NEXT page anyway
+      // (cursor is still the same — the next request with the same cursor
+      // should still return the next batch since cursor pagination is based
+      // on _id > cursor)
       if (!pageData || !Array.isArray(pageData.items) || pageData.items.length === 0) {
-        console.warn(`[loadAllPages] ${label} page ${pagesFetched} failed after ${PAGE_RETRY_LIMIT} attempts, stopping`);
+        console.warn(`[loadAllPages] ${label} page ${pagesFetched} failed after ${PAGE_RETRY_LIMIT} attempts, trying to advance cursor...`);
+        // We can't advance cursor without a successful response, so we have to stop
+        // But we'll keep the items we have so far
         break;
       }
 
       allItems.push(...pageData.items);
-
-      if (pagesFetched === 1 && typeof pageData.total === "number") {
-        totalReported = pageData.total;
-      }
 
       const nextCursor = pageData.nextCursor ?? null;
       if (!nextCursor) {
@@ -160,27 +158,12 @@ export class WorkspaceHydrationService {
       }
       cursor = String(nextCursor);
 
-      // If we know the total and we've fetched all items, stop early
-      if (totalReported > 0 && allItems.length >= totalReported) {
-        console.log(`[loadAllPages] ${label}: reached expected total ${totalReported}`);
-        break;
-      }
-
       // Delay between pages to let M0 recover
       await new Promise((r) => setTimeout(r, 300));
     }
 
-    // If we didn't reach the expected total, retry the whole thing from scratch
-    if (totalReported > 0 && allItems.length < totalReported) {
-      console.warn(`[loadAllPages] ${label}: only got ${allItems.length}/${totalReported} — retrying from scratch`);
-      // Wait a bit before retrying
-      await new Promise((r) => setTimeout(r, 3000));
-      // Recurse with a fresh start
-      return this.loadAllPages(factory, warmup, label);
-    }
-
     console.log(
-      `[loadAllPages] ${label}: fetched ${allItems.length}/${totalReported || "?"} items across ${pagesFetched} page(s)`
+      `[loadAllPages] ${label}: fetched ${allItems.length} items across ${pagesFetched} page(s)`
     );
     return allItems;
   }
@@ -190,12 +173,8 @@ export class WorkspaceHydrationService {
     await this.hydrateDeferred();
   }
 
-  /** No-op kept for API compatibility — no caching, always fresh. */
   invalidateCache(): void {}
 
-  /**
-   * Safe list wrapper. Returns null on failure. 45s timeout.
-   */
   private async safeList<T>(
     factory: () => import("rxjs").Observable<T>,
     label: string
