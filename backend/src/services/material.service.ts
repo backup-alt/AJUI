@@ -145,30 +145,45 @@ export async function listMaterials(filter: {
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    // === DIAGNOSTIC: minimal M0 round-trip test ===
-    // Replaces the real cursor-paginated find() with a trivial findOne()
-    // so we can see in Render logs whether M0 itself is responsive.
-    console.log("=== BEFORE findOne ===");
-    try {
-      const test = await Material.findOne().lean();
-      console.log("=== AFTER findOne ===", test?._id);
-    } catch (err) {
-      console.error("=== findOne FAILED ===", err);
-    }
-    console.log("=== CONTINUING ===");
+    // === DIAGNOSTIC: confirm M0 round-trip on the real query path ===
+    console.log("=== BEFORE listMaterials.find ===", { query, effectiveLimit });
+    const t0 = Date.now();
+    const foundItems = await dbMutex.run(() =>
+      withRetry(
+        () => Material.find(query)
+          .sort({ _id: -1 })
+          .limit(effectiveLimit + 1)
+          .lean()
+          .maxTimeMS(5000),
+        { label: "listMaterials.find" }
+      )
+    );
+    const dt = Date.now() - t0;
+    console.log(
+      `=== AFTER listMaterials.find === returned ${foundItems.length} items in ${dt}ms`
+    );
     // === END DIAGNOSTIC ===
 
-    // Short-circuit so we don't waste DB capacity on a query that might
-    // also fail. Return empty list — the diagnostic logs above are what
-    // we're testing.
-    return {
-      items: [],
-      total: 0,
-      page: filter.page,
-      limit: effectiveLimit,
-      pages: 0,
-      nextCursor: null,
-    };
+    // Only fetch countDocuments on the first page (no cursor) — counts on
+    // paginated pages are expensive and usually unnecessary.
+    if (!filter.cursor) {
+      const foundTotal = await dbMutex.run(() =>
+        withRetry(
+          () => Material.countDocuments(query).maxTimeMS(5000),
+          { label: "listMaterials.count" }
+        )
+      );
+      total = foundTotal;
+    } else {
+      total = filter.page * effectiveLimit; // estimate
+    }
+    items = foundItems as unknown as MaterialLike[];
+    if (items.length > effectiveLimit) {
+      const nextItem = items.pop();
+      if (nextItem && (nextItem as any)._id) {
+        nextCursor = String((nextItem as any)._id);
+      }
+    }
   } catch (err) {
     console.error(
       "[listMaterials] query failed (projectId=%s siteId=%s status=%s search=%s scopeLen=%s):",
