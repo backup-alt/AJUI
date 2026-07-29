@@ -117,8 +117,13 @@ export async function listMaterials(filter: {
 
   const skip = (filter.page - 1) * filter.limit;
   const [items, total] = await Promise.all([
-    Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Material.countDocuments(query),
+    Material.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(filter.limit)
+      .maxTimeMS(8000)
+      .lean(),
+    Material.countDocuments(query).maxTimeMS(8000),
   ]);
 
   // Resolve site names for items that have siteId but site field is ObjectId or missing

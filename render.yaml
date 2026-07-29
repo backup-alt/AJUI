@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: starter
     region: oregon
-    branch: main
+    branch: vendor-fix
     rootDir: backend
     buildCommand: npm ci && npm run build
     startCommand: npm start

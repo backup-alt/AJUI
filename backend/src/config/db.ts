@@ -6,10 +6,10 @@ export async function connectDatabase(): Promise<void> {
     mongoose.set("strictQuery", true);
 
     await mongoose.connect(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 15000,
       maxPoolSize: 20,
       minPoolSize: 2,
-      socketTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
       heartbeatFrequencyMS: 10000,
     });
 
