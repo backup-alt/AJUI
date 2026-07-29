@@ -19,6 +19,24 @@ declare global {
   }
 }
 
+// Process-level cache of non-admin users' managedProjectIds. Bypasses
+// the User.findById call for 60 seconds after the first lookup, which
+// eliminates the User collection query that was firing on every list
+// request and consuming M0 connection-pool slots.
+interface UserScopeEntry {
+  managedProjectIds: string[];
+  expiresAt: number;
+}
+const userScopeCache = new Map<string, UserScopeEntry>();
+
+// Periodically prune expired entries to keep the map small under load.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of userScopeCache) {
+    if (v.expiresAt <= now) userScopeCache.delete(k);
+  }
+}, 60_000).unref();
+
 export function requireRole(...allowedRoles: UserRole[]) {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -91,16 +109,30 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
     return null;
   }
 
-  // For non-admin, fetch the user's managedProjectIds. Wrap in a timeout so
-  // a slow MongoDB call doesn't block the request indefinitely on M0.
+  // Process-level cache for the user lookup. The User document rarely
+  // changes (managedProjectIds only update on role edits), so caching for
+  // 60s eliminates ~99% of the User.findById calls that were burning
+  // M0 connection pool slots on every listMaterials request.
+  const now = Date.now();
+  const cached = userScopeCache.get(req.user.sub);
   let user: { managedProjectIds?: Types.ObjectId[] } | null = null;
-  try {
-    user = await withRetry(
-      () => User.findById(userId).select("managedProjectIds").lean().maxTimeMS(3000),
-      { label: "rbac.userLookup" }
-    );
-  } catch (err) {
-    console.warn("[rbac] User lookup failed after retries:", (err as Error).message);
+  if (cached && cached.expiresAt > now) {
+    user = { managedProjectIds: cached.managedProjectIds.map((id) => new Types.ObjectId(id)) };
+  } else {
+    try {
+      user = await withRetry(
+        () => User.findById(userId).select("managedProjectIds").lean().maxTimeMS(2000),
+        { label: "rbac.userLookup", maxAttempts: 1 }
+      );
+      if (user) {
+        userScopeCache.set(req.user.sub, {
+          managedProjectIds: (user.managedProjectIds || []).map((id) => String(id)),
+          expiresAt: now + 60_000,
+        });
+      }
+    } catch (err) {
+      console.warn("[rbac] User lookup failed:", (err as Error).message);
+    }
   }
   const managedProjectIds: Types.ObjectId[] = (user?.managedProjectIds || []).map(
     (id) => new Types.ObjectId(String(id))

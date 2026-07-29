@@ -7,22 +7,36 @@ export async function connectDatabase(): Promise<void> {
 
     await mongoose.connect(env.MONGODB_URI, {
       serverSelectionTimeoutMS: 15000,
-      // Cap the pool aggressively for M0 free tier — too high and every
-      // concurrent request times out because M0 caps total connections
-      // (~100 cluster-wide). 5 + maxTimeMS(5s) on each query means each
-      // request takes 1 connection for at most ~5s before failing, freeing
-      // it for the next request.
-      maxPoolSize: 5,
-      minPoolSize: 1,
-      socketTimeoutMS: 20000,
+
+      // Atlas M0 free tier has aggressive idle-connection reaping — any
+      // socket that goes 60+ seconds without traffic gets killed by Atlas,
+      // and the driver doesn't know until it tries to use it. The fix is:
+      //
+      //   - keepAlive + keepAliveInitialDelay: ping the connection every
+      //     30s so Atlas never considers it idle
+      //   - maxIdleTimeMS: recycle sockets before Atlas kills them
+      //   - minPoolSize: 0: don't hold idle conns at all (we open on demand)
+      //   - maxPoolSize: 3: M0 cluster caps at ~100 conns shared across
+      //     every Render service. With many parallel hydration calls we
+      //     were exhausting the cluster budget. 3 keeps our footprint
+      //     small. The fix for "too many parallel calls" is sequential
+      //     awaits (already done in listMaterials/listInventory/listExpenses),
+      //     not bigger pools.
+      //   - waitQueueTimeoutMS: 3000 — fail fast instead of holding the
+      //     request open. Frontend retries the request.
+      maxPoolSize: 3,
+      minPoolSize: 0,
+      socketTimeoutMS: 15000,
       heartbeatFrequencyMS: 10000,
-      // Wait queue timeout of 12s — long enough to ride out transient pool
-      // contention, short enough that the client (15s timeout) sees the
-      // response before it cancels.
-      waitQueueTimeoutMS: 12000,
+      waitQueueTimeoutMS: 3000,
+      maxIdleTimeMS: 45000,
+      // Mongoose-specific option (not in raw mongodb types) — keep sockets
+      // alive so Atlas doesn't kill them during quiet periods.
+      keepAlive: true,
+      keepAliveInitialDelay: 30000,
       retryWrites: true,
       retryReads: true,
-    });
+    } as mongoose.ConnectOptions);
 
     console.log(`[DB] Connected to MongoDB (${isProduction ? "production" : "development"})`);
     console.log(`[DB] Database: ${mongoose.connection.db?.databaseName}`);
