@@ -2020,12 +2020,21 @@ export class UniversalDashboardPage implements OnInit {
    * materials signal + localStorage. Mirrors the pattern from commit
    * b754d2f where a dedicated sites refresh was added so the inventory
    * modal always had fresh data.
+   *
+   * IMPORTANT: when the M0 pool times out the backend falls back to
+   * returning { items: [] } instead of a 500. We MUST guard against
+   * overwriting the existing signal+localStorage with an empty array
+   * or the table silently empties out on every tab switch.
    */
   private refreshMaterialsForTable() {
     this.api.listMaterials({ limit: 100 }).subscribe({
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapMaterial);
+          if (items.length === 0) {
+            console.warn("[refreshMaterials] backend returned 0 items — keeping existing signal/localStorage");
+            return;
+          }
           localStorage.setItem("agb-erp:materials", JSON.stringify(items));
           this.data.materials.set(items);
         } catch {}
@@ -2037,13 +2046,18 @@ export class UniversalDashboardPage implements OnInit {
   /**
    * Dedicated Expense table refresh — bypasses refreshFromBackend's
    * debounce and unconditionally hits GET /expenses to update the
-   * expenses signal + localStorage.
+   * expenses signal + localStorage. Same empty-array guard as
+   * refreshMaterialsForTable — see comment there.
    */
   private refreshExpensesForTable() {
     this.api.listExpenses({ limit: 100 }).subscribe({
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapExpense);
+          if (items.length === 0) {
+            console.warn("[refreshExpenses] backend returned 0 items — keeping existing signal/localStorage");
+            return;
+          }
           localStorage.setItem("agb-erp:expenses", JSON.stringify(items));
           this.data.expenses.set(items);
         } catch {}
@@ -2058,13 +2072,17 @@ export class UniversalDashboardPage implements OnInit {
    * inventory signal + localStorage. The dashboard-wide refresh
    * reloads materials; this one populates the inventory signal so the
    * inventory table (separate from the aggregated inventory cards)
-   * also shows data.
+   * also shows data. Same empty-array guard as above.
    */
   private refreshInventoryForTable() {
     this.api.listInventory({ limit: 100 }).subscribe({
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapInventory);
+          if (items.length === 0) {
+            console.warn("[refreshInventory] backend returned 0 items — keeping existing signal/localStorage");
+            return;
+          }
           localStorage.setItem("agb-erp:inventory", JSON.stringify(items));
           this.data.inventory.set(items);
         } catch {}
@@ -2625,13 +2643,30 @@ export class UniversalDashboardPage implements OnInit {
       }
     };
 
+    /**
+     * Empty-array guard: the backend's listMaterials/listExpenses/
+     * listInventory controllers return { items: [] } on M0 timeout
+     * instead of a 500, and the frontend's safeList() returns null on
+     * HTTP errors so neither path overwrites existing localStorage
+     * with empty arrays. But these inline subscriptions here do NOT
+     * go through safeList — they write directly to localStorage on
+     * success. Without the guard, the dashboard silently empties out
+     * on every manual refresh if the DB pool is cold.
+     */
+    const writeIfNonEmpty = (key: string, items: any[], signal: { set: (v: any[]) => void }) => {
+      if (!Array.isArray(items) || items.length === 0) {
+        console.warn(`[refreshFromBackend] ${key} returned 0 items — keeping existing data`);
+        return;
+      }
+      localStorage.setItem(`agb-erp:${key}`, JSON.stringify(items));
+      signal.set(items);
+    };
+
     // Clients: pipe through mapper so row.id (=clientId) is set
     this.api.listClients({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapClient);
-          localStorage.setItem("agb-erp:clients", JSON.stringify(items));
-          this.data.clients.set(items);
+          writeIfNonEmpty("clients", (r.items || []).map(mapClient), this.data.clients);
         } catch {}
         finishOne();
       },
@@ -2641,9 +2676,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listProjects({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapProject);
-          localStorage.setItem("agb-erp:projects", JSON.stringify(items));
-          this.data.projects.set(items);
+          writeIfNonEmpty("projects", (r.items || []).map(mapProject), this.data.projects);
         } catch {}
         finishOne();
       },
@@ -2653,9 +2686,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listSites().subscribe({
       next: (r) => {
         try {
-          const items = (r.items || (r as any).sites || []).map(mapSite);
-          localStorage.setItem("agb-erp:sites", JSON.stringify(items));
-          this.data.siteEntities.set(items);
+          writeIfNonEmpty("sites", (r.items || (r as any).sites || []).map(mapSite), this.data.siteEntities);
         } catch {}
         finishOne();
       },
@@ -2665,9 +2696,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listMaterials({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapMaterial);
-          localStorage.setItem("agb-erp:materials", JSON.stringify(items));
-          this.data.materials.set(items);
+          writeIfNonEmpty("materials", (r.items || []).map(mapMaterial), this.data.materials);
         } catch {}
         finishOne();
       },
@@ -2677,9 +2706,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listLabour({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapLabour);
-          localStorage.setItem("agb-erp:labour", JSON.stringify(items));
-          this.data.labour.set(items);
+          writeIfNonEmpty("labour", (r.items || []).map(mapLabour), this.data.labour);
         } catch {}
         finishOne();
       },
@@ -2689,9 +2716,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listExpenses({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapExpense);
-          localStorage.setItem("agb-erp:expenses", JSON.stringify(items));
-          this.data.expenses.set(items);
+          writeIfNonEmpty("expenses", (r.items || []).map(mapExpense), this.data.expenses);
         } catch {}
         finishOne();
       },
@@ -2701,9 +2726,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listPayments({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapPayment);
-          localStorage.setItem("agb-erp:payments", JSON.stringify(items));
-          this.data.payments.set(items);
+          writeIfNonEmpty("payments", (r.items || []).map(mapPayment), this.data.payments);
         } catch {}
         finishOne();
       },
@@ -2713,9 +2736,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listVendors({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapVendor);
-          localStorage.setItem("agb-erp:vendors", JSON.stringify(items));
-          this.data.vendors.set(items);
+          writeIfNonEmpty("vendors", (r.items || []).map(mapVendor), this.data.vendors);
         } catch {}
         finishOne();
       },
@@ -2725,9 +2746,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listSubcontractors({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapSubcontractor);
-          localStorage.setItem("agb-erp:subcontractors", JSON.stringify(items));
-          this.data.subcontractors.set(items);
+          writeIfNonEmpty("subcontractors", (r.items || []).map(mapSubcontractor), this.data.subcontractors);
         } catch {}
         finishOne();
       },
@@ -2737,9 +2756,7 @@ export class UniversalDashboardPage implements OnInit {
     this.api.listInventory({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          const items = (r.items || []).map(mapInventory);
-          localStorage.setItem("agb-erp:inventory", JSON.stringify(items));
-          this.data.inventory.set(items);
+          writeIfNonEmpty("inventory", (r.items || []).map(mapInventory), this.data.inventory);
         } catch {}
         finishOne();
       },

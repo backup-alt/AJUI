@@ -19,6 +19,13 @@ export class MaterialsService {
     this.api.listMaterials({ ...params, limit: 100 }).subscribe({
       next: (r) => {
         const backendItems = (r.items || []).map(this.mapMaterial);
+        // Guard against empty backend response wiping existing data.
+        // The backend's listMaterials controller returns { items: [] }
+        // on M0 pool timeout, and we must not overwrite a previously
+        // loaded signal with an empty array or the table silently empties.
+        if (backendItems.length === 0) {
+          return;
+        }
         const localItems = this.materials();
         const backendIds = new Set(backendItems.map((i) => i.id));
         const merged = [...backendItems, ...localItems.filter((i) => !backendIds.has(i.id))];
@@ -27,7 +34,8 @@ export class MaterialsService {
         this.data.materials.set(merged);
       },
       error: () => {
-        this.materials.set(this.readState());
+        const cached = this.readState();
+        if (cached.length > 0) this.materials.set(cached);
       },
     });
     return this.materials();
@@ -38,6 +46,10 @@ export class MaterialsService {
       this.api.listMaterials({ limit: 100 }).subscribe({
         next: (r) => {
           const backendItems = (r.items || []).map(this.mapMaterial);
+          if (backendItems.length === 0) {
+            resolve(this.materials());
+            return;
+          }
           const localItems = this.materials();
           const backendIds = new Set(backendItems.map((i) => i.id));
           const merged = [...backendItems, ...localItems.filter((i) => !backendIds.has(i.id))];

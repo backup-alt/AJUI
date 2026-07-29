@@ -1145,6 +1145,13 @@ export class VendorDashboardPage {
             siteIds: v.siteIds || [],
           } as Vendor;
         });
+        // Empty-array guard — don't wipe existing vendor signal on M0 timeout
+        if (mapped.length === 0) {
+          console.warn("[loadVendors] backend returned 0 vendors — keeping existing data");
+          this.refreshing.set(false);
+          this.refreshMessage.set(null);
+          return;
+        }
         this.data.vendors.set(mapped);
         this.vendorsLoaded = true;
         this.initialLoadDone = true;

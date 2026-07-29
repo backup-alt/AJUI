@@ -162,21 +162,23 @@ export class ClientDashboardPage {
     this.api.listClients({ limit: 100 }).subscribe({
       next: (r) => {
         try {
-          localStorage.setItem(
-            "agb-erp:clients",
-            JSON.stringify(
-              (r.items || []).map((c: any) => ({
-                id: c.clientId,
-                initials: c.initials,
-                name: c.name,
-                mobile: c.mobile,
-                address: c.address,
-                status: c.status,
-                projectIds: c.projectIds || [],
-                supervisor: c.supervisor || "",
-              }))
-            )
-          );
+          const items = (r.items || []).map((c: any) => ({
+            id: c.clientId,
+            initials: c.initials,
+            name: c.name,
+            mobile: c.mobile,
+            address: c.address,
+            status: c.status,
+            projectIds: c.projectIds || [],
+            supervisor: c.supervisor || "",
+          }));
+          if (items.length === 0) {
+            console.warn("[client-dashboard refresh] backend returned 0 clients — keeping existing data");
+            this.refreshing.set(false);
+            this.refreshMessage.set(null);
+            return;
+          }
+          localStorage.setItem("agb-erp:clients", JSON.stringify(items));
         } catch {}
         this.refreshing.set(false);
         this.refreshMessage.set(`Synced ${r.total} clients`);
