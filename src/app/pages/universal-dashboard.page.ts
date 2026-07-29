@@ -1997,12 +1997,80 @@ export class UniversalDashboardPage implements OnInit {
     this.closeDropdowns();
     this.clearRowSelection();
 
-    // Inventory is derived from the materials collection. Refresh from the
-    // backend whenever the user opens the section so the cards are always
-    // current and no stale/empty data is shown.
-    if (module === "inventory") {
+    // Always hit the backend directly for the table the user is about to view.
+    // Bypasses the dashboard-wide debounce so the Material, Expense, and
+    // Inventory tabs always show fresh MongoDB data, not the localStorage
+    // fallback. Pattern mirrors the inventory-modal sites refresh from
+    // commit b754d2f.
+    if (module === "materials") {
+      this.refreshMaterialsForTable();
+    } else if (module === "expenses" || module === "generalExpenses") {
+      this.refreshExpensesForTable();
+    } else if (module === "inventory") {
+      this.refreshInventoryForTable();
+      this.refreshFromBackend();
+    } else {
       this.refreshFromBackend();
     }
+  }
+
+  /**
+   * Dedicated Material table refresh — bypasses refreshFromBackend's
+   * debounce and unconditionally hits GET /materials to update the
+   * materials signal + localStorage. Mirrors the pattern from commit
+   * b754d2f where a dedicated sites refresh was added so the inventory
+   * modal always had fresh data.
+   */
+  private refreshMaterialsForTable() {
+    this.api.listMaterials({ limit: 100 }).subscribe({
+      next: (r: any) => {
+        try {
+          const items = (r.items || []).map(mapMaterial);
+          localStorage.setItem("agb-erp:materials", JSON.stringify(items));
+          this.data.materials.set(items);
+        } catch {}
+      },
+      error: () => {},
+    });
+  }
+
+  /**
+   * Dedicated Expense table refresh — bypasses refreshFromBackend's
+   * debounce and unconditionally hits GET /expenses to update the
+   * expenses signal + localStorage.
+   */
+  private refreshExpensesForTable() {
+    this.api.listExpenses({ limit: 100 }).subscribe({
+      next: (r: any) => {
+        try {
+          const items = (r.items || []).map(mapExpense);
+          localStorage.setItem("agb-erp:expenses", JSON.stringify(items));
+          this.data.expenses.set(items);
+        } catch {}
+      },
+      error: () => {},
+    });
+  }
+
+  /**
+   * Dedicated Inventory table refresh — bypasses refreshFromBackend's
+   * debounce and unconditionally hits GET /inventory to update the
+   * inventory signal + localStorage. The dashboard-wide refresh
+   * reloads materials; this one populates the inventory signal so the
+   * inventory table (separate from the aggregated inventory cards)
+   * also shows data.
+   */
+  private refreshInventoryForTable() {
+    this.api.listInventory({ limit: 100 }).subscribe({
+      next: (r: any) => {
+        try {
+          const items = (r.items || []).map(mapInventory);
+          localStorage.setItem("agb-erp:inventory", JSON.stringify(items));
+          this.data.inventory.set(items);
+        } catch {}
+      },
+      error: () => {},
+    });
   }
 
   private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[], siteFilter?: string) {

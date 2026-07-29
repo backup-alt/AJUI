@@ -1109,6 +1109,72 @@ export class ProjectWorkspacePage {
     this.closeDropdowns();
     this.clearRowSelection();
     void this.router.navigate(["/clients", this.clientId(), "projects", this.projectId(), section]);
+
+    // Always hit the backend directly for the section the user is about to
+    // view. Bypasses refreshFromBackend's debounce so the Material, Site
+    // Expense, General Expense, and Inventory tables always show fresh
+    // MongoDB data. Pattern mirrors commit b754d2f.
+    this.refreshSectionFromBackend(section);
+  }
+
+  /**
+   * Dedicated per-section refresh — hits the matching backend endpoint
+   * and updates the data signal + localStorage. Runs in addition to the
+   * generic refreshFromBackend() so the active section is guaranteed
+   * to have current data without waiting for the next debounce window.
+   */
+  private refreshSectionFromBackend(section: ModuleKey) {
+    const apiMap: Record<string, () => any> = {
+      materials: () => this.api.listMaterials({ limit: 100 }),
+      labour: () => this.api.listLabour({ limit: 100 }),
+      expenses: () => this.api.listExpenses({ limit: 100 }),
+      payments: () => this.api.listPayments({ limit: 100 }),
+      vendors: () => this.api.listVendors({ limit: 100 }),
+      subcontractors: () => this.api.listSubcontractors({ limit: 100 }),
+      inventory: () => this.api.listInventory({ limit: 100 }),
+    };
+    const mapperMap: Record<string, (x: any) => any> = {
+      materials: mapMaterial,
+      labour: mapLabour,
+      expenses: mapExpense,
+      payments: mapPayment,
+      vendors: mapVendor,
+      subcontractors: mapSubcontractor,
+      inventory: mapInventory,
+    };
+    const storageMap: Record<string, string> = {
+      materials: "agb-erp:materials",
+      labour: "agb-erp:labour",
+      expenses: "agb-erp:expenses",
+      payments: "agb-erp:payments",
+      vendors: "agb-erp:vendors",
+      subcontractors: "agb-erp:subcontractors",
+      inventory: "agb-erp:inventory",
+    };
+    const dataMap: Record<string, any> = {
+      materials: this.data.materials,
+      labour: this.data.labour,
+      expenses: this.data.expenses,
+      payments: this.data.payments,
+      vendors: this.data.vendors,
+      subcontractors: this.data.subcontractors,
+      inventory: this.data.inventory,
+    };
+    const apiCall = apiMap[section];
+    const mapper = mapperMap[section];
+    const storageKey = storageMap[section];
+    const dataSignal = dataMap[section];
+    if (!apiCall || !mapper || !dataSignal) return;
+    apiCall().subscribe({
+      next: (r: any) => {
+        try {
+          const items = (r.items || []).map(mapper);
+          if (storageKey) localStorage.setItem(storageKey, JSON.stringify(items));
+          dataSignal.set(items);
+        } catch {}
+      },
+      error: () => {},
+    });
   }
 
   rowKey(row: TableRow): string {
