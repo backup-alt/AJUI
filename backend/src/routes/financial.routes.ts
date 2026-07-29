@@ -52,6 +52,7 @@ router.delete("/materials/:id", requireRole("admin", "project_manager"), ctrl.de
 
 // =================== INVENTORY ===================
 router.get("/inventory", validate(listInventorySchema, "query"), cache(20), ctrl.listInventory);
+router.get("/inventory/diagnostic-find-one", ctrl.diagnosticFindOneInventory);
 router.get(
   "/inventory/missing",
   validate(missingMaterialsForSiteSchema, "query"),
@@ -97,6 +98,7 @@ router.post(
   ctrl.createExpense
 );
 router.get("/expenses", validate(listExpensesSchema, "query"), cache(15), ctrl.listExpenses);
+router.get("/expenses/diagnostic-find-one", ctrl.diagnosticFindOneExpense);
 router.get("/expenses/pending", requireRole("admin", "accountant", "project_manager"), cache(10), ctrl.getPendingExpenses);
 router.get("/expenses/ledger/:projectId/:site", cache(30), ctrl.getExpenseLedger);
 router.get("/expenses/:id", cache(30), ctrl.getExpense);

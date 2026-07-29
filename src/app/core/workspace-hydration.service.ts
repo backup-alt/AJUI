@@ -49,14 +49,6 @@ export class WorkspaceHydrationService {
   }
 
   async hydrateDeferred(): Promise<void> {
-    // M0 free-tier MongoDB pool can only handle a few concurrent ops at a
-    // time. Chaining these calls (instead of Promise.all of 8) keeps the
-    // pool healthy and prevents every call from timing out simultaneously.
-    //
-    // Materials / Inventory / Expenses are loaded via cursor pagination —
-    // each batch is at most 25 rows so we don't hit the M0 timeout we saw
-    // on the user's deployment. The loop walks pages until nextCursor is
-    // null, then merges all rows into the signal.
     const t0 = Date.now();
     const initialMaterials = this.erp.materials().length;
     console.log(`[hydrateDeferred] starting — existing materials signal has ${initialMaterials} entries`);
@@ -64,26 +56,28 @@ export class WorkspaceHydrationService {
     const sites = await this.safeList(() => this.api.listSites(), "sites");
     this.setSignalAndStorage("sites", (sites?.items || []).map(mapSite), this.erp.siteEntities);
 
-    const materials = await this.fetchAllByCursor(
+    // Warm up M0 connections before each heavy cursor-paginated load,
+    // then aggressively fetch until we get data.
+    await this.warmupAndLoad(
+      () => this.api.warmupMaterials(),
       (cursor) => this.api.listMaterials({ limit: 5, cursor }),
       mapMaterial,
       "materials"
     );
-    this.setSignalAndStorage("materials", materials, this.erp.materials);
 
-    const inventory = await this.fetchAllByCursor(
+    await this.warmupAndLoad(
+      () => this.api.warmupInventory(),
       (cursor) => this.api.listInventory({ limit: 5, cursor }),
       mapInventory,
       "inventory"
     );
-    this.setSignalAndStorage("inventory", inventory, this.erp.inventory);
 
-    const expenses = await this.fetchAllByCursor(
+    await this.warmupAndLoad(
+      () => this.api.warmupExpenses(),
       (cursor) => this.api.listExpenses({ limit: 5, cursor }),
       mapExpense,
       "expenses"
     );
-    this.setSignalAndStorage("expenses", expenses, this.erp.expenses);
 
     const labour = await this.safeList(() => this.api.listLabour({ limit: 5 }), "labour");
     this.setSignalAndStorage("labour", (labour?.items || []).map(mapLabour), this.erp.labour);
@@ -102,9 +96,57 @@ export class WorkspaceHydrationService {
   }
 
   /**
+   * Warm up M0 by calling a diagnostic findOne endpoint, then aggressively
+   * fetch all pages. If the first page returns empty, retry up to 3 times
+   * with a delay between each attempt. This ensures M0 connections are
+   * primed before the heavier cursor-paginated query runs.
+   */
+  private async warmupAndLoad<T>(
+    warmup: () => import("rxjs").Observable<any>,
+    factory: (cursor: string | undefined) => import("rxjs").Observable<{ items: T[]; nextCursor?: string | null }>,
+    mapper: (row: any) => T,
+    label: string
+  ): Promise<void> {
+    const MAX_WARMUP_RETRIES = 3;
+    const WARMUP_DELAY_MS = 2000;
+
+    for (let attempt = 1; attempt <= MAX_WARMUP_RETRIES; attempt++) {
+      // Step 1: warm up the connection with a trivial findOne query
+      console.log(`[warmupAndLoad] ${label}: warmup attempt ${attempt}/${MAX_WARMUP_RETRIES}`);
+      try {
+        await firstValueFrom(warmup().pipe(timeout({ each: 15_000, meta: `warmup.${label}` })));
+      } catch {
+        // warmup failed — still try the real query
+      }
+
+      // Step 2: small delay to let the M0 connection settle
+      await new Promise((r) => setTimeout(r, WARMUP_DELAY_MS));
+
+      // Step 3: try fetching all pages
+      const items = await this.fetchAllByCursor(factory, mapper, label);
+      if (items.length > 0) {
+        this.setSignalAndStorage(label, items, this.getSignalTarget(label));
+        console.log(`[warmupAndLoad] ${label}: loaded ${items.length} items on attempt ${attempt}`);
+        return;
+      }
+      console.warn(`[warmupAndLoad] ${label}: attempt ${attempt} returned 0 items, retrying...`);
+    }
+
+    // All retries exhausted — keep existing data
+    console.warn(`[warmupAndLoad] ${label}: all ${MAX_WARMUP_RETRIES} attempts returned 0 items`);
+  }
+
+  private getSignalTarget(label: string): { set(value: any[]): void } {
+    switch (label) {
+      case "materials": return this.erp.materials;
+      case "inventory": return this.erp.inventory;
+      case "expenses": return this.erp.expenses;
+      default: throw new Error(`Unknown signal target: ${label}`);
+    }
+  }
+
+  /**
    * Walk all pages of a cursor-paginated endpoint and accumulate the rows.
-   * Each batch is at most 25 rows (the limit M0 can serve without timing
-   * out) so we never hold a connection long enough to starve the pool.
    * Returns [] if any page fails — the caller decides whether to preserve
    * the existing signal or overwrite with the empty result.
    */
@@ -113,7 +155,6 @@ export class WorkspaceHydrationService {
     mapper: (row: any) => T,
     label: string
   ): Promise<T[]> {
-    const PAGE_LIMIT = 25;
     const MAX_PAGES = 40; // safety cap — 40 * 5 = 200 rows max per resource
     const allItems: T[] = [];
     let cursor: string | undefined = undefined;
@@ -125,7 +166,7 @@ export class WorkspaceHydrationService {
       const page = await this.safeList(() => factory(cursor), `${label}/page${pagesFetched}`);
       if (!page || !Array.isArray(page.items)) {
         console.warn(
-          `[hydrateDeferred] ${label} page ${pagesFetched} failed; returning ${allItems.length} items fetched so far`
+          `[fetchAllByCursor] ${label} page ${pagesFetched} failed; returning ${allItems.length} items fetched so far`
         );
         break;
       }
@@ -142,7 +183,7 @@ export class WorkspaceHydrationService {
     }
 
     console.log(
-      `[hydrateDeferred] ${label}: fetched ${allItems.length} items across ${pagesFetched} page(s)${totalReported ? ` (backend reports ${totalReported} total)` : ""}`
+      `[fetchAllByCursor] ${label}: fetched ${allItems.length} items across ${pagesFetched} page(s)${totalReported ? ` (backend reports ${totalReported} total)` : ""}`
     );
     return allItems;
   }
@@ -153,25 +194,14 @@ export class WorkspaceHydrationService {
   }
 
   /**
-   * Safe list wrapper. Returns null on failure (instead of an empty array)
-   * so the caller can preserve existing localStorage data instead of
-   * overwriting it with empty arrays when the API is temporarily
-   * unreachable (e.g. 401 expired token, M0 slow query timeout).
-   *
-   * Wraps the observable in a 20s timeout. Without this, firstValueFrom()
-   * will wait forever on a hung HTTP request (Render cold start + M0
-   * pool can hang the underlying socket indefinitely), and the entire
-   * hydration chain freezes at the first await. The timeout converts
-   * "hung forever" into "fails fast" so the next collection in the
-   * sequential chain still gets a chance to hydrate.
+   * Safe list wrapper. Returns null on failure so the caller can preserve
+   * existing data. Wraps the observable in a 45s timeout.
    */
   private async safeList<T>(
     factory: () => import("rxjs").Observable<T>,
     label: string
   ): Promise<T | null> {
     try {
-      // 45s per-page timeout — enough for a healthy M0 query while still
-      // failing fast on cold connections.
       return await firstValueFrom(
         factory().pipe(timeout({ each: 45_000, meta: `hydration.${label}` }))
       );
@@ -180,7 +210,7 @@ export class WorkspaceHydrationService {
       const isTimeout = err?.name === "TimeoutError" || /timeout/i.test(err?.message || "");
       const message = err?.error?.error || err?.error?.message || err?.message || String(err);
       console.warn(
-        `[WorkspaceHydration] Skipping ${label} refresh — ${isTimeout ? "TIMEOUT after 20s" : `API failed (status=${status})`}: ${message}. Keeping existing cached data.`
+        `[WorkspaceHydration] Skipping ${label} — ${isTimeout ? "TIMEOUT" : `API failed (status=${status})`}: ${message}`
       );
       return null;
     }
@@ -191,14 +221,6 @@ export class WorkspaceHydrationService {
     value: T[],
     target: { set(value: T[]): void }
   ): void {
-    // Backend is the source of truth — always overwrite the signal, even
-    // when the value is an empty array. We no longer mirror to localStorage
-    // because the dashboard removed all agb-erp:* data-table caching; the
-    // backend is queried on every signal update and the response is the
-    // authoritative value.
-    //
-    // We still defend against undefined / non-array responses so a bug in
-    // the API response shape can't wipe the signal to an unrenderable value.
     if (!Array.isArray(value)) {
       return;
     }

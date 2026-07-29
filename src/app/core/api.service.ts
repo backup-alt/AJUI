@@ -52,6 +52,17 @@ export class ApiService {
   expiresAt = this.expiresAtSignal.asReadonly();
   isAuthenticated = computed(() => !!this.accessTokenSignal() && !!this.userSignal());
 
+  // =================== DIAGNOSTIC WARMUP ===================
+  warmupMaterials(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/materials/diagnostic-find-one`, { headers: this.authHeaders() });
+  }
+  warmupInventory(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/inventory/diagnostic-find-one`, { headers: this.authHeaders() });
+  }
+  warmupExpenses(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/expenses/diagnostic-find-one`, { headers: this.authHeaders() });
+  }
+
   // =================== AUTH ===================
   login(identifier: string, password: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login`, { identifier, password }).pipe(

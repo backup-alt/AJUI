@@ -81,6 +81,28 @@ export async function diagnosticFindOneMaterial(req: Request, res: Response, nex
   } catch (e) { next(e); }
 }
 
+export async function diagnosticFindOneInventory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const t0 = Date.now();
+    const { Inventory } = await import("../models/Inventory.js");
+    const test = await Inventory.findOne().lean();
+    const dt = Date.now() - t0;
+    console.log(`[diagnostic] Inventory.findOne().lean() returned in ${dt}ms — _id: ${test?._id}`);
+    res.json({ ok: true, durationMs: dt, id: test?._id ?? null });
+  } catch (e) { next(e); }
+}
+
+export async function diagnosticFindOneExpense(req: Request, res: Response, next: NextFunction) {
+  try {
+    const t0 = Date.now();
+    const { Expense } = await import("../models/Expense.js");
+    const test = await Expense.findOne().lean();
+    const dt = Date.now() - t0;
+    console.log(`[diagnostic] Expense.findOne().lean() returned in ${dt}ms — _id: ${test?._id}`);
+    res.json({ ok: true, durationMs: dt, id: test?._id ?? null });
+  } catch (e) { next(e); }
+}
+
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {
   try {
     const material = await materialService.getMaterialById(req.params.id);

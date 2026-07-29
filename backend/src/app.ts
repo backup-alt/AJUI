@@ -140,16 +140,22 @@ app.use((_req: express.Request, res: express.Response, next: express.NextFunctio
     res.redirect(302, env.FRONTEND_URL);
   });
 
-  // Lightweight keep-alive endpoint — pings M0 to keep the connection pool
-  // warm. Called periodically by the frontend to prevent Render free-tier
-  // spin-down and M0 connection expiry.
+  // Lightweight keep-alive endpoint — pings all 3 M0 collections to keep
+  // the connection pool warm. Called every 10 min by the frontend to
+  // prevent Render free-tier spin-down and M0 connection expiry.
   app.get("/keepalive", async (_req, res) => {
     try {
       const { Material } = await import("./models/Material.js");
-      await Material.findOne().lean().maxTimeMS(5000);
+      const { Inventory } = await import("./models/Inventory.js");
+      const { Expense } = await import("./models/Expense.js");
+      await Promise.all([
+        Material.findOne().lean().maxTimeMS(5000).catch(() => null),
+        Inventory.findOne().lean().maxTimeMS(5000).catch(() => null),
+        Expense.findOne().lean().maxTimeMS(5000).catch(() => null),
+      ]);
       res.json({ ok: true });
     } catch {
-      res.json({ ok: true }); // still return 200 so frontend keeps pinging
+      res.json({ ok: true });
     }
   });
 
