@@ -191,29 +191,74 @@ app.use((_req: express.Request, res: express.Response, next: express.NextFunctio
 }
 
 export async function bootstrap(): Promise<void> {
-  await connectDatabase();
-  initEmail();
-  await verifyEmailConnection();
-  initFirebase();
-  await ensureDefaultPermissions();
-  const { migrateMaterialStatus } = await import("./services/material.service.js");
-  await migrateMaterialStatus();
-  const { seedDefaultReports } = await import("./utils/seed-reports.js");
-  await seedDefaultReports();
-  const { seedDefaultAdmin } = await import("./utils/seed-admin.js");
-  await seedDefaultAdmin();
-  const { ensureWorkersCollection } = await import("./utils/ensure-collections.js");
-  await ensureWorkersCollection();
-  const { migrateCompanyName } = await import("./services/company-profile.service.js");
-  await migrateCompanyName();
+  // Each startup step is wrapped in its own try/catch so a single slow
+  // query on M0 can't take down the entire service. If a migration or
+  // seed fails, the app still comes up and serves requests; the failed
+  // step can be retried manually or on the next deploy.
+  try {
+    await connectDatabase();
+  } catch (err) {
+    console.error("[Bootstrap] DB connection failed:", (err as Error).message);
+    process.exit(1);
+  }
+  try {
+    initEmail();
+    await verifyEmailConnection();
+  } catch (err) {
+    console.warn("[Bootstrap] Email init failed (non-fatal):", (err as Error).message);
+  }
+  try {
+    initFirebase();
+  } catch (err) {
+    console.warn("[Bootstrap] Firebase init failed (non-fatal):", (err as Error).message);
+  }
+  try {
+    await ensureDefaultPermissions();
+  } catch (err) {
+    console.warn("[Bootstrap] ensureDefaultPermissions failed (non-fatal):", (err as Error).message);
+  }
+  try {
+    const { migrateMaterialStatus } = await import("./services/material.service.js");
+    await migrateMaterialStatus();
+  } catch (err) {
+    console.warn("[Bootstrap] migrateMaterialStatus failed (non-fatal):", (err as Error).message);
+  }
+  try {
+    const { seedDefaultReports } = await import("./utils/seed-reports.js");
+    await seedDefaultReports();
+  } catch (err) {
+    console.warn("[Bootstrap] seedDefaultReports failed (non-fatal):", (err as Error).message);
+  }
+  try {
+    const { seedDefaultAdmin } = await import("./utils/seed-admin.js");
+    await seedDefaultAdmin();
+  } catch (err) {
+    console.warn("[Bootstrap] seedDefaultAdmin failed (non-fatal):", (err as Error).message);
+  }
+  try {
+    const { ensureWorkersCollection } = await import("./utils/ensure-collections.js");
+    await ensureWorkersCollection();
+  } catch (err) {
+    console.warn("[Bootstrap] ensureWorkersCollection failed (non-fatal):", (err as Error).message);
+  }
+  try {
+    const { migrateCompanyName } = await import("./services/company-profile.service.js");
+    await migrateCompanyName();
+  } catch (err) {
+    console.warn("[Bootstrap] migrateCompanyName failed (non-fatal):", (err as Error).message);
+  }
 
-  const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
-  backfillMaterialSiteIds().catch((err: any) =>
-    console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
-  );
-  backfillApprovedMaterialsToInventory({}).catch((err: any) =>
-    console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
-  );
+  try {
+    const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
+    backfillMaterialSiteIds().catch((err: any) =>
+      console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
+    );
+    backfillApprovedMaterialsToInventory({}).catch((err: any) =>
+      console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
+    );
+  } catch (err) {
+    console.warn("[Bootstrap] backfill imports failed (non-fatal):", (err as Error).message);
+  }
 
   try {
     const { Material } = await import("./models/Material.js");
