@@ -116,7 +116,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Global HTTP request timeout — 30s is enough for a healthy M0 query.
-app.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   res.setTimeout(30_000, () => {
     if (!res.headersSent) {
       res.status(503).json({ error: "Request timeout, please try again" });
@@ -124,6 +124,14 @@ app.use((_req: express.Request, res: express.Response, next: express.NextFunctio
   });
   next();
 });
+
+// Hydration endpoints (/api/*/all) take longer because they fall back to
+// a cursor-paginated walk on M0 timeout — give them a higher ceiling so
+// they can return at least partial data instead of being killed by the
+// global 30s timeout. Frontend timeout is 60s anyway.
+app.use("/api/materials/all", (_req, res, next) => { res.setTimeout(90_000); next(); });
+app.use("/api/inventory/all", (_req, res, next) => { res.setTimeout(90_000); next(); });
+app.use("/api/expenses/all", (_req, res, next) => { res.setTimeout(90_000); next(); });
 
   app.get("/health", (_req: express.Request, res: express.Response) => {
     res.json({

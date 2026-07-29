@@ -126,13 +126,17 @@ export async function listAllMaterials(req: Request, res: Response, next: NextFu
     });
     const dt = Date.now() - t0;
     console.log(`[materials/all] returned ${items.length} items in ${dt}ms`);
+    // The service uses a single-shot query with cursor-walk fallback, so it
+    // ALWAYS returns data (or an empty array if every page failed). No more
+    // 503s — an empty array means "nothing visible to this user" rather
+    // than "DB is down", which is what the frontend wants for rendering.
     res.json({ items, total: items.length, count: items.length, durationMs: dt });
   } catch (err) {
     if (res.headersSent) {
       console.error("[materials/all] error after headers sent:", (err as Error).message);
       return;
     }
-    console.error("[materials/all] failed:", (err as Error).message);
+    console.error("[materials/all] unexpected failure:", (err as Error).message);
     res.status(503).json({
       error: "Database temporarily unavailable, please retry",
       items: [],
@@ -161,7 +165,7 @@ export async function listAllInventory(req: Request, res: Response, next: NextFu
       console.error("[inventory/all] error after headers sent:", (err as Error).message);
       return;
     }
-    console.error("[inventory/all] failed:", (err as Error).message);
+    console.error("[inventory/all] unexpected failure:", (err as Error).message);
     res.status(503).json({
       error: "Database temporarily unavailable, please retry",
       items: [],
@@ -194,7 +198,7 @@ export async function listAllExpenses(req: Request, res: Response, next: NextFun
       console.error("[expenses/all] error after headers sent:", (err as Error).message);
       return;
     }
-    console.error("[expenses/all] failed:", (err as Error).message);
+    console.error("[expenses/all] unexpected failure:", (err as Error).message);
     res.status(503).json({
       error: "Database temporarily unavailable, please retry",
       items: [],

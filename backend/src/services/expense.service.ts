@@ -7,6 +7,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { CreateExpenseInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { findAllOrFallback } from "../utils/find-all.js";
 import { withRetry } from "../utils/retry.js";
 import { dbMutex } from "../utils/db-mutex.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
@@ -147,10 +148,14 @@ export async function createExpense(input: CreateExpenseInput) {
 }
 
 /**
- * Single-shot "give me everything" endpoint. Same pattern as materials —
- * one query, no cursor pagination, hard cap. The general + site expense
- * tables share the same backend collection; the caller decides how to
- * bucket rows on the client side.
+ * Single-shot "give me everything" endpoint.
+ *
+ * Strategy: try one big query first. If M0 times out (which happens
+ * during cold-start or when the pool is exhausted), transparently fall
+ * back to a cursor-paginated walk that pages through 25 rows at a time
+ * and always returns data — never throws.
+ *
+ * Default cap is 500.
  */
 export async function listAllExpenses(filter: {
   type?: string;
@@ -162,7 +167,7 @@ export async function listAllExpenses(filter: {
   to?: string;
   scopeProjectIds?: ProjectScopeIds;
   max?: number;
-}) {
+}): Promise<any[]> {
   const query: Record<string, unknown> = {};
   if (filter.type) query.type = filter.type;
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
@@ -176,19 +181,7 @@ export async function listAllExpenses(filter: {
   }
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  const hardCap = Math.min(Math.max(filter.max ?? 500, 1), 2000);
-
-  return dbMutex.run(() =>
-    withRetry(
-      () =>
-        Expense.find(query)
-          .sort({ _id: -1 })
-          .limit(hardCap)
-          .lean()
-          .maxTimeMS(25000),
-      { label: "listAllExpenses" }
-    )
-  );
+  return findAllOrFallback(Expense, "expenses/all", query, filter.max ?? 500);
 }
 
 export async function listExpenses(filter: {

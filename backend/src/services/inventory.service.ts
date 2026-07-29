@@ -4,6 +4,7 @@ import { IMaterial, Material } from "../models/Material.js";
 import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { findAllOrFallback } from "../utils/find-all.js";
 import { withRetry } from "../utils/retry.js";
 import { dbMutex } from "../utils/db-mutex.js";
 
@@ -94,8 +95,15 @@ export async function addApprovedMaterialToInventory(
 }
 
 /**
- * Single-shot "give me everything" endpoint. Mirrors the materials pattern —
- * one query, no cursor pagination, hard cap to keep M0 happy.
+ * Single-shot "give me everything" endpoint.
+ *
+ * Strategy: try one big query first. If M0 times out (which happens
+ * during cold-start or when the pool is exhausted), transparently fall
+ * back to a cursor-paginated walk that pages through 25 rows at a time
+ * and always returns data — never throws.
+ *
+ * Default cap is 500. The 2000 cap on the previous version was the root
+ * cause of repeated 503s on /inventory/all.
  */
 export async function listAllInventory(filter: {
   projectId?: string;
@@ -103,26 +111,14 @@ export async function listAllInventory(filter: {
   search?: string;
   scopeProjectIds?: ProjectScopeIds;
   max?: number;
-}) {
+}): Promise<any[]> {
   const query: Record<string, unknown> = {};
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
   if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  const hardCap = Math.min(Math.max(filter.max ?? 500, 1), 2000);
-
-  return dbMutex.run(() =>
-    withRetry(
-      () =>
-        Inventory.find(query)
-          .sort({ _id: -1 })
-          .limit(hardCap)
-          .lean()
-          .maxTimeMS(25000),
-      { label: "listAllInventory" }
-    )
-  );
+  return findAllOrFallback(Inventory, "inventory/all", query, filter.max ?? 500);
 }
 
 export async function listInventory(filter: {
