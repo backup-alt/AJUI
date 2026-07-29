@@ -7,25 +7,6 @@ export async function connectDatabase(): Promise<void> {
 
     await mongoose.connect(env.MONGODB_URI, {
       serverSelectionTimeoutMS: 15000,
-
-      // Atlas M0 free tier is a shared cluster — every parallel query
-      // slows down the others. The listMaterials / listInventory /
-      // listExpenses services serialize their queries through
-      // dbMutex (utils/db-mutex.ts), so most of the time only 1 query
-      // is in flight at all. We keep a small pool as a buffer for
-      // RBAC user lookups and other short queries that don't go
-      // through the mutex.
-      //
-      // maxPoolSize: 5 — enough headroom for RBAC + a background
-      // task, but small enough that we never starve the M0 cluster.
-      // maxConnecting: 2 — back to the driver default. Connection
-      // storms are mitigated by dbMutex, so we don't need to
-      // allow many concurrent connection establishments.
-      // minPoolSize: 0 — no idle conns. Open on demand.
-      // waitQueueTimeoutMS: 8000 — give queued requests a fair
-      // chance to find a slot before failing.
-      // maxIdleTimeMS: 45000 — recycle sockets before Atlas's
-      // ~60s idle reaper kills them.
       maxPoolSize: 5,
       minPoolSize: 0,
       maxConnecting: 2,
@@ -37,8 +18,20 @@ export async function connectDatabase(): Promise<void> {
       retryReads: true,
     });
 
-    console.log(`[DB] Connected to MongoDB (${isProduction ? "production" : "development"})`);
+    console.log(
+      `[DB] Connected to MongoDB (${isProduction ? "production" : "development"})`
+    );
     console.log(`[DB] Database: ${mongoose.connection.db?.databaseName}`);
+
+    // Additional debugging information
+    console.log("[DB] Ready state:", mongoose.connection.readyState);
+    console.log("[DB] Host:", mongoose.connection.host);
+    console.log("[DB] Name:", mongoose.connection.name);
+    console.log("[DB] Connection ID:", mongoose.connection.id);
+
+    mongoose.connection.on("connected", () => {
+      console.log("[DB] Connected event fired");
+    });
 
     mongoose.connection.on("error", (err) => {
       console.error("[DB] Connection error:", err);
@@ -46,6 +39,14 @@ export async function connectDatabase(): Promise<void> {
 
     mongoose.connection.on("disconnected", () => {
       console.warn("[DB] Disconnected from MongoDB");
+    });
+
+    mongoose.connection.on("reconnected", () => {
+      console.log("[DB] Reconnected to MongoDB");
+    });
+
+    mongoose.connection.on("close", () => {
+      console.warn("[DB] Connection closed");
     });
   } catch (error) {
     console.error("[DB] Failed to connect:", error);
