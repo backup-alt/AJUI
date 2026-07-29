@@ -97,6 +97,51 @@ export async function createMaterial(input: CreateMaterialInput) {
   return material.toObject();
 }
 
+/**
+ * Single-shot "give me everything" endpoint. Uses an explicit .limit() cap
+ * (default 500, max 2000) — M0 can return a few hundred lean documents in a
+ * single round-trip without timing out, which is far faster than the cursor
+ * pagination walk that the previous per-page-warmup approach required.
+ *
+ * The caller can pass the same filter shape as listMaterials; project scope
+ * is applied automatically. The response is meant for hydration (one HTTP
+ * round-trip per collection) — anything that needs server-side pagination
+ * should still call listMaterials.
+ */
+export async function listAllMaterials(filter: {
+  projectId?: string;
+  siteId?: string;
+  site?: string;
+  vendorId?: string;
+  status?: string;
+  search?: string;
+  scopeProjectIds?: ProjectScopeIds;
+  max?: number;
+}) {
+  const query: Record<string, unknown> = {};
+  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
+  if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
+  if (filter.site) query.site = filter.site;
+  if (filter.vendorId) query.vendorId = new Types.ObjectId(filter.vendorId);
+  if (filter.status) query.status = filter.status;
+  if (filter.search) query.name = { $regex: filter.search, $options: "i" };
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
+
+  const hardCap = Math.min(Math.max(filter.max ?? 500, 1), 2000);
+
+  return dbMutex.run(() =>
+    withRetry(
+      () =>
+        Material.find(query)
+          .sort({ _id: -1 })
+          .limit(hardCap)
+          .lean()
+          .maxTimeMS(25000),
+      { label: "listAllMaterials" }
+    )
+  );
+}
+
 export async function listMaterials(filter: {
   projectId?: string;
   siteId?: string;

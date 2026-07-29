@@ -1,4 +1,4 @@
-import { Injectable, inject } from "@angular/core";
+import { Injectable, inject, signal } from "@angular/core";
 import { firstValueFrom, timeout } from "rxjs";
 import { ErpDataService } from "../data/erp-data.service";
 import {
@@ -17,12 +17,126 @@ import {
 } from "./mappers";
 import { ApiService } from "./api.service";
 
+interface PersistedSnapshot {
+  version: number;
+  savedAt: number;
+  data: {
+    materials: any[];
+    inventory: any[];
+    expenses: any[];
+    labour: any[];
+    payments: any[];
+    subcontractors: any[];
+    sites: any[];
+    vendors: any[];
+    supervisors: any[];
+    clients: any[];
+    projects: any[];
+    taxInvoices: any[];
+  };
+}
+
+const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_KEY = "agb-erp:hydrationSnapshotV1";
+/** Persist for 24h — long enough to survive a refresh, short enough that
+ *  the user doesn't see truly stale data after a multi-day gap. */
+const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 @Injectable({ providedIn: "root" })
 export class WorkspaceHydrationService {
   private readonly api = inject(ApiService);
   private readonly erp = inject(ErpDataService);
 
-  async hydrateCritical(): Promise<void> {
+  /**
+   * Set to true once hydrateFromBackend() completes successfully (or
+   * fails permanently). Dashboard pages can subscribe to this signal
+   * and show a spinner until hydration is done. This prevents the
+   * "data disappears on refresh" bug where tables render with empty
+   * data BEFORE hydration finishes.
+   */
+  readonly hydrationStatus = signal<"idle" | "loading" | "ready" | "error">("idle");
+  readonly hydrationError = signal<string | null>(null);
+
+  constructor() {
+    // On boot: immediately rehydrate signals from localStorage so the UI
+    // never shows an empty state on refresh. The user sees their last-known
+    // data within milliseconds while we kick off a fresh backend fetch in
+    // the background. When the backend fetch completes, we swap in the
+    // fresh data. This is what eliminates the "data disappears on refresh"
+    // bug — the data is never gone, it's just stale until refresh.
+    this.restoreFromSnapshot();
+  }
+
+  /**
+   * BLOCKING hydration — call from app.component's ngOnInit. Returns when
+   * all collections are loaded (or have failed permanently). UI can show a
+   * spinner during this time. Subsequent refreshes from the dashboard's
+   * "Refresh" button call refreshFromBackend() which is non-blocking.
+   */
+  async hydrateFromBackend(): Promise<void> {
+    if (this.hydrationStatus() === "loading") {
+      // Already in flight — wait for the existing one to settle
+      return this.waitUntilSettled();
+    }
+    this.hydrationStatus.set("loading");
+    this.hydrationError.set(null);
+
+    try {
+      await this.doHydrateAll();
+      this.hydrationStatus.set("ready");
+      this.persistSnapshot();
+      console.log(
+        `[hydrateFromBackend] OK — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
+      );
+    } catch (err: any) {
+      console.error("[hydrateFromBackend] failed:", err?.message ?? err);
+      this.hydrationStatus.set("error");
+      this.hydrationError.set(err?.message ?? String(err));
+    }
+  }
+
+  /**
+   * Refresh the snapshot in the background without blocking the UI. Used
+   * by the dashboard's "Refresh" button. Updates signals atomically when
+   * each collection finishes — never overwrites good data with empty
+   * data on a transient failure.
+   */
+  async refreshFromBackend(): Promise<void> {
+    try {
+      // Reuse the same code path as hydrateFromBackend but mark as a
+      // background refresh. We DON'T set hydrationStatus to loading
+      // here so the UI stays responsive.
+      await this.doHydrateAll();
+      this.persistSnapshot();
+    } catch (err: any) {
+      console.warn("[refreshFromBackend] failed (signals preserved):", err?.message ?? err);
+    }
+  }
+
+  invalidateCache(): void {
+    try {
+      localStorage.removeItem(SNAPSHOT_KEY);
+    } catch {}
+  }
+
+  // ---------- private helpers ----------
+
+  private async waitUntilSettled(): Promise<void> {
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+      const status = this.hydrationStatus();
+      if (status === "ready" || status === "error") return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
+  /** @internal — called from hydrateFromBackend AND refreshFromBackend. */
+  private async doHydrateAll(): Promise<void> {
+    await this.hydrateCritical();
+    await this.hydrateDeferred();
+  }
+
+  private async hydrateCritical(): Promise<void> {
     const [clients, projects, vendors, supervisors] = await Promise.all([
       this.safeList(() => this.api.listClients({ limit: 100 }), "clients"),
       this.safeList(() => this.api.listProjects({ limit: 100 }), "projects"),
@@ -30,150 +144,208 @@ export class WorkspaceHydrationService {
       this.safeList(() => this.api.listSupervisors(), "supervisors"),
     ]);
 
-    const mappedProjects = ((clients && projects) ? (projects.items || []) : []).map(mapProject);
-    const projectIds = new Set(mappedProjects.map((p: any) => String(p.id)));
-    const businessIdToProjectId = new Map(
-      mappedProjects.map((p: any) => [String(p.projectId || p.id), String(p.id)])
-    );
-    const mappedClients = ((clients && projects) ? (clients.items || []) : []).map(mapClient).map((client) => ({
-      ...client,
-      projectIds: (client.projectIds || [])
-        .map((pid) => businessIdToProjectId.get(String(pid)) || String(pid))
-        .filter((pid) => projectIds.has(pid)),
-    }));
+    if (projects) {
+      const mappedProjects = (projects.items || []).map(mapProject);
+      const projectIds = new Set(mappedProjects.map((p: any) => String(p.id)));
+      const businessIdToProjectId = new Map(
+        mappedProjects.map((p: any) => [String(p.projectId || p.id), String(p.id)])
+      );
+      this.replaceIfLarger(this.erp.projects, mappedProjects, "projects");
 
-    this.setSignal("projects", mappedProjects, this.erp.projects);
-    this.setSignal("clients", mappedClients, this.erp.clients);
-    this.setSignal("vendors", (vendors?.items || []).map(mapVendor), this.erp.vendors);
-    this.setSignal("supervisors", (supervisors?.items || []).map(mapSupervisor), this.erp.supervisors);
+      if (clients) {
+        const mappedClients = (clients.items || []).map(mapClient).map((client) => ({
+          ...client,
+          projectIds: (client.projectIds || [])
+            .map((pid) => businessIdToProjectId.get(String(pid)) || String(pid))
+            .filter((pid) => projectIds.has(pid)),
+        }));
+        this.replaceIfLarger(this.erp.clients, mappedClients, "clients");
+      }
+    }
+
+    if (vendors) {
+      this.replaceIfLarger(this.erp.vendors, (vendors.items || []).map(mapVendor), "vendors");
+    }
+    if (supervisors) {
+      this.replaceIfLarger(
+        this.erp.supervisors,
+        (supervisors.items || []).map(mapSupervisor),
+        "supervisors"
+      );
+    }
   }
 
-  async hydrateDeferred(): Promise<void> {
+  private async hydrateDeferred(): Promise<void> {
     const t0 = Date.now();
-    console.log(`[hydrateDeferred] starting — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`);
+    console.log(
+      `[hydrateDeferred] starting — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
+    );
 
-    // Sites
+    // Single-shot hydration calls — each endpoint returns ALL rows in one
+    // HTTP request instead of walking cursor pages. This is the fix for
+    // the "Materials shows only 10 / Inventory shows only 5 / Expenses
+    // shows 0" production bug.
+    const [materials, inventory, expenses] = await Promise.all([
+      this.safeList(() => this.api.listAllMaterials(2000), "materials/all"),
+      this.safeList(() => this.api.listAllInventory(2000), "inventory/all"),
+      this.safeList(() => this.api.listAllExpenses(2000), "expenses/all"),
+    ]);
+
+    // Only overwrite the signal if the new fetch returned more rows than
+    // we already had. This means a transient partial-fetch failure can
+    // NEVER wipe out good data the user is already looking at.
+    if (materials && Array.isArray((materials as any).items)) {
+      const mapped = (materials as any).items.map(mapMaterial);
+      this.replaceIfLarger(this.erp.materials, mapped, "materials");
+    }
+    if (inventory && Array.isArray((inventory as any).items)) {
+      const mapped = (inventory as any).items.map(mapInventory);
+      this.replaceIfLarger(this.erp.inventory, mapped, "inventory");
+    }
+    if (expenses && Array.isArray((expenses as any).items)) {
+      const mapped = (expenses as any).items.map(mapExpense);
+      this.replaceIfLarger(this.erp.expenses, mapped, "expenses");
+    }
+
+    // Sites (single page)
     const sites = await this.safeList(() => this.api.listSites(), "sites");
-    this.setSignal("sites", (sites?.items || []).map(mapSite), this.erp.siteEntities);
+    if (sites && Array.isArray(sites.items)) {
+      this.replaceIfLarger(
+        this.erp.siteEntities,
+        (sites.items || []).map(mapSite),
+        "sites"
+      );
+    }
 
-    // Materials
-    const materials = await this.loadAllPages(
-      (cursor) => this.api.listMaterials({ limit: 5, cursor }),
-      () => this.api.warmupMaterials(),
-      "materials"
+    // Smaller collections — still single page each
+    const labour = await this.safeList(() => this.api.listLabour({ limit: 100 }), "labour");
+    if (labour && Array.isArray(labour.items)) {
+      this.replaceIfLarger(this.erp.labour, (labour.items || []).map(mapLabour), "labour");
+    }
+    const payments = await this.safeList(() => this.api.listPayments({ limit: 100 }), "payments");
+    if (payments && Array.isArray(payments.items)) {
+      this.replaceIfLarger(this.erp.payments, (payments.items || []).map(mapPayment), "payments");
+    }
+    const subcontractors = await this.safeList(
+      () => this.api.listSubcontractors({ limit: 100 }),
+      "subcontractors"
     );
-    this.setSignal("materials", materials.map(mapMaterial), this.erp.materials);
-
-    // Inventory
-    const inventory = await this.loadAllPages(
-      (cursor) => this.api.listInventory({ limit: 5, cursor }),
-      () => this.api.warmupInventory(),
-      "inventory"
-    );
-    this.setSignal("inventory", inventory.map(mapInventory), this.erp.inventory);
-
-    // Expenses
-    const expenses = await this.loadAllPages(
-      (cursor) => this.api.listExpenses({ limit: 5, cursor }),
-      () => this.api.warmupExpenses(),
-      "expenses"
-    );
-    this.setSignal("expenses", expenses.map(mapExpense), this.erp.expenses);
-
-    // Smaller collections
-    const labour = await this.safeList(() => this.api.listLabour({ limit: 5 }), "labour");
-    this.setSignal("labour", (labour?.items || []).map(mapLabour), this.erp.labour);
-    const payments = await this.safeList(() => this.api.listPayments({ limit: 5 }), "payments");
-    this.setSignal("payments", (payments?.items || []).map(mapPayment), this.erp.payments);
-    const subcontractors = await this.safeList(() => this.api.listSubcontractors({ limit: 5 }), "subcontractors");
-    this.setSignal("subcontractors", (subcontractors?.items || []).map(mapSubcontractor), this.erp.subcontractors);
-    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 5 }), "invoices");
-    this.setSignal("taxInvoices", (invoices?.items || []).map(mapInvoice), this.erp.taxInvoices);
+    if (subcontractors && Array.isArray(subcontractors.items)) {
+      this.replaceIfLarger(
+        this.erp.subcontractors,
+        (subcontractors.items || []).map(mapSubcontractor),
+        "subcontractors"
+      );
+    }
+    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 100 }), "invoices");
+    if (invoices && Array.isArray(invoices.items)) {
+      this.replaceIfLarger(
+        this.erp.taxInvoices,
+        (invoices.items || []).map(mapInvoice),
+        "taxInvoices"
+      );
+    }
 
     const dt = Date.now() - t0;
-    console.log(`[hydrateDeferred] complete in ${dt}ms — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`);
+    console.log(
+      `[hydrateDeferred] complete in ${dt}ms — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
+    );
   }
 
   /**
-   * Load all pages of a cursor-paginated endpoint. Warmup before every page.
-   * If a page fails after retries, skip it and continue to the next.
-   * No recursion — just a straight cursor walk with per-page retries.
+   * Atomic update — only overwrites the signal if the new array has at
+   * least as many rows as the existing one. This is what prevents the
+   * "partial fetch wipes good data" bug: if M0 returns 10 rows when we
+   * already have 50, we keep the 50 and wait for the next attempt.
+   *
+   * The exception is the very first hydration where the signal is empty
+   * (length 0) — then we accept whatever the server returns so the UI
+   * shows something instead of staying blank.
    */
-  private async loadAllPages<T>(
-    factory: (cursor: string | undefined) => import("rxjs").Observable<{ items: T[]; nextCursor?: string | null }>,
-    warmup: () => import("rxjs").Observable<any>,
+  private replaceIfLarger<T>(
+    target: { set(value: T[]): void; (): T[] },
+    newRows: T[],
     label: string
-  ): Promise<T[]> {
-    const MAX_PAGES = 40;
-    const PAGE_RETRY_LIMIT = 3;
-    const PAGE_RETRY_DELAY_MS = 2000;
-    const allItems: T[] = [];
-    let cursor: string | undefined = undefined;
-    let pagesFetched = 0;
-
-    while (pagesFetched < MAX_PAGES) {
-      pagesFetched++;
-      let pageData: { items: T[]; nextCursor?: string | null } | null = null;
-
-      // Per-page retry loop — warmup before EACH attempt
-      for (let pageAttempt = 1; pageAttempt <= PAGE_RETRY_LIMIT; pageAttempt++) {
-        if (pageAttempt > 1) {
-          console.warn(`[loadAllPages] ${label} page ${pagesFetched} retry ${pageAttempt}/${PAGE_RETRY_LIMIT}`);
-          await new Promise((r) => setTimeout(r, PAGE_RETRY_DELAY_MS));
-        }
-
-        // Warm up M0 connection BEFORE every page query
-        try {
-          await firstValueFrom(warmup().pipe(timeout({ each: 10_000, meta: `warmup.${label}.page${pagesFetched}` })));
-        } catch {
-          // warmup failed — still try the data query
-        }
-
-        pageData = await this.safeList(
-          () => factory(cursor),
-          `${label}/page${pagesFetched}/attempt${pageAttempt}`
-        );
-
-        if (pageData && Array.isArray(pageData.items) && pageData.items.length > 0) {
-          break; // got data, stop retrying this page
-        }
-      }
-
-      // If page failed after all retries, try the NEXT page anyway
-      // (cursor is still the same — the next request with the same cursor
-      // should still return the next batch since cursor pagination is based
-      // on _id > cursor)
-      if (!pageData || !Array.isArray(pageData.items) || pageData.items.length === 0) {
-        console.warn(`[loadAllPages] ${label} page ${pagesFetched} failed after ${PAGE_RETRY_LIMIT} attempts, trying to advance cursor...`);
-        // We can't advance cursor without a successful response, so we have to stop
-        // But we'll keep the items we have so far
-        break;
-      }
-
-      allItems.push(...pageData.items);
-
-      const nextCursor = pageData.nextCursor ?? null;
-      if (!nextCursor) {
-        break;
-      }
-      cursor = String(nextCursor);
-
-      // Delay between pages to let M0 recover
-      await new Promise((r) => setTimeout(r, 300));
+  ): void {
+    if (!Array.isArray(newRows)) return;
+    const existing = target();
+    if (existing.length === 0 || newRows.length >= existing.length) {
+      target.set(newRows);
+    } else {
+      console.warn(
+        `[hydrate] ${label}: existing has ${existing.length} rows, new fetch returned only ${newRows.length} — keeping existing to avoid data loss`
+      );
     }
-
-    console.log(
-      `[loadAllPages] ${label}: fetched ${allItems.length} items across ${pagesFetched} page(s)`
-    );
-    return allItems;
   }
 
-  async hydrateFromBackend(): Promise<void> {
-    await this.hydrateCritical();
-    await this.hydrateDeferred();
+  /**
+   * Save the current ERP data to localStorage. Called after every
+   * successful hydration so that refresh / new tab open shows data
+   * immediately while a fresh fetch runs in the background.
+   */
+  private persistSnapshot(): void {
+    if (typeof localStorage === "undefined") return;
+    try {
+      const snapshot: PersistedSnapshot = {
+        version: SNAPSHOT_VERSION,
+        savedAt: Date.now(),
+        data: {
+          materials: this.erp.materials(),
+          inventory: this.erp.inventory(),
+          expenses: this.erp.expenses(),
+          labour: this.erp.labour(),
+          payments: this.erp.payments(),
+          subcontractors: this.erp.subcontractors(),
+          sites: this.erp.siteEntities(),
+          vendors: this.erp.vendors(),
+          supervisors: this.erp.supervisors(),
+          clients: this.erp.clients(),
+          projects: this.erp.projects(),
+          taxInvoices: this.erp.taxInvoices(),
+        },
+      };
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch (err) {
+      console.warn("[hydrate] persistSnapshot failed (non-fatal):", err);
+    }
   }
 
-  invalidateCache(): void {}
+  /**
+   * Read the snapshot back into the signals on boot. Runs synchronously
+   * in the constructor so the very first render of the dashboard shows
+   * real data instead of empty rows.
+   */
+  private restoreFromSnapshot(): void {
+    if (typeof localStorage === "undefined") return;
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      if (!raw) return;
+      const snap = JSON.parse(raw) as PersistedSnapshot;
+      if (snap.version !== SNAPSHOT_VERSION) return;
+      if (Date.now() - snap.savedAt > SNAPSHOT_MAX_AGE_MS) {
+        localStorage.removeItem(SNAPSHOT_KEY);
+        return;
+      }
+      const d = snap.data;
+      if (Array.isArray(d.materials) && d.materials.length) this.erp.materials.set(d.materials);
+      if (Array.isArray(d.inventory) && d.inventory.length) this.erp.inventory.set(d.inventory);
+      if (Array.isArray(d.expenses) && d.expenses.length) this.erp.expenses.set(d.expenses);
+      if (Array.isArray(d.labour) && d.labour.length) this.erp.labour.set(d.labour);
+      if (Array.isArray(d.payments) && d.payments.length) this.erp.payments.set(d.payments);
+      if (Array.isArray(d.subcontractors) && d.subcontractors.length) this.erp.subcontractors.set(d.subcontractors);
+      if (Array.isArray(d.sites) && d.sites.length) this.erp.siteEntities.set(d.sites);
+      if (Array.isArray(d.vendors) && d.vendors.length) this.erp.vendors.set(d.vendors);
+      if (Array.isArray(d.supervisors) && d.supervisors.length) this.erp.supervisors.set(d.supervisors);
+      if (Array.isArray(d.clients) && d.clients.length) this.erp.clients.set(d.clients);
+      if (Array.isArray(d.projects) && d.projects.length) this.erp.projects.set(d.projects);
+      if (Array.isArray(d.taxInvoices) && d.taxInvoices.length) this.erp.taxInvoices.set(d.taxInvoices);
+      console.log(
+        `[hydrate] restored snapshot from ${new Date(snap.savedAt).toISOString()} — materials=${d.materials.length}, inventory=${d.inventory.length}, expenses=${d.expenses.length}`
+      );
+    } catch (err) {
+      console.warn("[hydrate] restoreFromSnapshot failed (non-fatal):", err);
+    }
+  }
 
   private async safeList<T>(
     factory: () => import("rxjs").Observable<T>,
@@ -181,7 +353,7 @@ export class WorkspaceHydrationService {
   ): Promise<T | null> {
     try {
       return await firstValueFrom(
-        factory().pipe(timeout({ each: 45_000, meta: `hydration.${label}` }))
+        factory().pipe(timeout({ each: 60_000, meta: `hydration.${label}` }))
       );
     } catch (err: any) {
       const status = err?.status || err?.statusCode;
@@ -192,16 +364,5 @@ export class WorkspaceHydrationService {
       );
       return null;
     }
-  }
-
-  private setSignal<T>(
-    _key: string,
-    value: T[],
-    target: { set(value: T[]): void }
-  ): void {
-    if (!Array.isArray(value)) {
-      return;
-    }
-    target.set(value);
   }
 }

@@ -93,6 +93,38 @@ export async function addApprovedMaterialToInventory(
   return inventory;
 }
 
+/**
+ * Single-shot "give me everything" endpoint. Mirrors the materials pattern —
+ * one query, no cursor pagination, hard cap to keep M0 happy.
+ */
+export async function listAllInventory(filter: {
+  projectId?: string;
+  siteId?: string;
+  search?: string;
+  scopeProjectIds?: ProjectScopeIds;
+  max?: number;
+}) {
+  const query: Record<string, unknown> = {};
+  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
+  if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
+  if (filter.search) query.name = { $regex: filter.search, $options: "i" };
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
+
+  const hardCap = Math.min(Math.max(filter.max ?? 500, 1), 2000);
+
+  return dbMutex.run(() =>
+    withRetry(
+      () =>
+        Inventory.find(query)
+          .sort({ _id: -1 })
+          .limit(hardCap)
+          .lean()
+          .maxTimeMS(25000),
+      { label: "listAllInventory" }
+    )
+  );
+}
+
 export async function listInventory(filter: {
   projectId?: string;
   siteId?: string;

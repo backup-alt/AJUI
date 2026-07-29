@@ -66,10 +66,6 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
   }
 }
 
-// DIAGNOSTIC ENDPOINT — TEMPORARY.
-// Minimal test: Material.findOne().lean() with no filters, no sort, no limit.
-// Verifies whether M0 itself is responsive at all to a trivial query.
-// Safe to remove once we've confirmed the dashboard works.
 export async function diagnosticFindOneMaterial(req: Request, res: Response, next: NextFunction) {
   try {
     const t0 = Date.now();
@@ -101,6 +97,111 @@ export async function diagnosticFindOneExpense(req: Request, res: Response, next
     console.log(`[diagnostic] Expense.findOne().lean() returned in ${dt}ms — _id: ${test?._id}`);
     res.json({ ok: true, durationMs: dt, id: test?._id ?? null });
   } catch (e) { next(e); }
+}
+
+/**
+ * Production hydration endpoint: returns EVERY material visible to the
+ * caller in a single HTTP round-trip. The frontend hydration service calls
+ * this on every page boot (and on demand from the refresh button) instead
+ * of walking cursor pages. M0 can serve a few hundred lean documents in
+ * a single query without timing out, so the cursor pagination walk that
+ * the previous implementation required is no longer necessary.
+ *
+ * Cached server-side for 15s — concurrent dashboard loads from the same
+ * user share a single DB query.
+ */
+export async function listAllMaterials(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const t0 = Date.now();
+    const items = await materialService.listAllMaterials({
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      site: req.query.site as string | undefined,
+      vendorId: req.query.vendorId as string | undefined,
+      status: req.query.status as string | undefined,
+      search: req.query.search as string | undefined,
+      scopeProjectIds,
+      max: req.query.max ? Number(req.query.max) : undefined,
+    });
+    const dt = Date.now() - t0;
+    console.log(`[materials/all] returned ${items.length} items in ${dt}ms`);
+    res.json({ items, total: items.length, count: items.length, durationMs: dt });
+  } catch (err) {
+    if (res.headersSent) {
+      console.error("[materials/all] error after headers sent:", (err as Error).message);
+      return;
+    }
+    console.error("[materials/all] failed:", (err as Error).message);
+    res.status(503).json({
+      error: "Database temporarily unavailable, please retry",
+      items: [],
+      total: 0,
+      count: 0,
+    });
+  }
+}
+
+export async function listAllInventory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const t0 = Date.now();
+    const items = await inventoryService.listAllInventory({
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      search: req.query.search as string | undefined,
+      scopeProjectIds,
+      max: req.query.max ? Number(req.query.max) : undefined,
+    });
+    const dt = Date.now() - t0;
+    console.log(`[inventory/all] returned ${items.length} items in ${dt}ms`);
+    res.json({ items, total: items.length, count: items.length, durationMs: dt });
+  } catch (err) {
+    if (res.headersSent) {
+      console.error("[inventory/all] error after headers sent:", (err as Error).message);
+      return;
+    }
+    console.error("[inventory/all] failed:", (err as Error).message);
+    res.status(503).json({
+      error: "Database temporarily unavailable, please retry",
+      items: [],
+      total: 0,
+      count: 0,
+    });
+  }
+}
+
+export async function listAllExpenses(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const t0 = Date.now();
+    const items = await expenseService.listAllExpenses({
+      type: req.query.type as string | undefined,
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      site: req.query.site as string | undefined,
+      status: req.query.status as string | undefined,
+      from: req.query.from as string | undefined,
+      to: req.query.to as string | undefined,
+      scopeProjectIds,
+      max: req.query.max ? Number(req.query.max) : undefined,
+    });
+    const dt = Date.now() - t0;
+    console.log(`[expenses/all] returned ${items.length} items in ${dt}ms`);
+    res.json({ items, total: items.length, count: items.length, durationMs: dt });
+  } catch (err) {
+    if (res.headersSent) {
+      console.error("[expenses/all] error after headers sent:", (err as Error).message);
+      return;
+    }
+    console.error("[expenses/all] failed:", (err as Error).message);
+    res.status(503).json({
+      error: "Database temporarily unavailable, please retry",
+      items: [],
+      total: 0,
+      count: 0,
+    });
+  }
 }
 
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {

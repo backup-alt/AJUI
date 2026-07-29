@@ -146,6 +146,51 @@ export async function createExpense(input: CreateExpenseInput) {
   return expense.toObject();
 }
 
+/**
+ * Single-shot "give me everything" endpoint. Same pattern as materials —
+ * one query, no cursor pagination, hard cap. The general + site expense
+ * tables share the same backend collection; the caller decides how to
+ * bucket rows on the client side.
+ */
+export async function listAllExpenses(filter: {
+  type?: string;
+  projectId?: string;
+  siteId?: string;
+  site?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  scopeProjectIds?: ProjectScopeIds;
+  max?: number;
+}) {
+  const query: Record<string, unknown> = {};
+  if (filter.type) query.type = filter.type;
+  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
+  if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
+  if (filter.site) query.site = filter.site;
+  if (filter.status) query.status = filter.status;
+  if (filter.from || filter.to) {
+    query.date = {};
+    if (filter.from) (query.date as Record<string, string>).$gte = filter.from;
+    if (filter.to) (query.date as Record<string, string>).$lte = filter.to;
+  }
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
+
+  const hardCap = Math.min(Math.max(filter.max ?? 500, 1), 2000);
+
+  return dbMutex.run(() =>
+    withRetry(
+      () =>
+        Expense.find(query)
+          .sort({ _id: -1 })
+          .limit(hardCap)
+          .lean()
+          .maxTimeMS(25000),
+      { label: "listAllExpenses" }
+    )
+  );
+}
+
 export async function listExpenses(filter: {
   type?: string;
   projectId?: string;

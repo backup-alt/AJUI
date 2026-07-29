@@ -1082,7 +1082,7 @@ export class ProjectWorkspacePage {
 
   constructor() {
     void this.data.loadCustomFieldsFromBackend();
-    void this.hydration.hydrateDeferred();
+    void this.hydration.refreshFromBackend();
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.data.touchProject(projectId);

@@ -423,7 +423,7 @@ export class LoginPage {
         } catch {}
 
         try {
-          await this.hydration.hydrateCritical();
+          await this.hydration.hydrateFromBackend();
         } catch (e) {
           console.error("Failed to load workspace data from backend", e);
         }

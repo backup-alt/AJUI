@@ -1971,7 +1971,7 @@ export class UniversalDashboardPage implements OnInit {
   }));
 
   ngOnInit(): void {
-    void this.hydration.hydrateDeferred();
+    void this.hydration.refreshFromBackend();
     void this.data.loadCustomFieldsFromBackend();
   }
 
@@ -2033,26 +2033,25 @@ export class UniversalDashboardPage implements OnInit {
    * to overwrite. The only thing we skip on is empty.
    */
   private refreshMaterialsForTable() {
-    // Re-run the full hydration loop (cursor-paginated) to load all 59
-    // materials, not just the first page. The Materials table will show
-    // the updated set within ~1-2 seconds.
-    void this.hydration.hydrateDeferred();
+    // Single-shot refresh via the new /materials/all endpoint — returns
+    // every row in one HTTP call, no cursor pagination.
+    void this.hydration.refreshFromBackend();
   }
 
   /**
-   * Dedicated Expense table refresh — re-runs full hydration (cursor
-   * pagination handles all 49+7 rows in 25-row batches).
+   * Dedicated Expense table refresh — single-shot refresh via the new
+   * /expenses/all endpoint.
    */
   private refreshExpensesForTable() {
-    void this.hydration.hydrateDeferred();
+    void this.hydration.refreshFromBackend();
   }
 
   /**
-   * Dedicated Inventory table refresh — re-runs full hydration (cursor
-   * pagination handles all 35 rows in 25-row batches).
+   * Dedicated Inventory table refresh — single-shot refresh via the new
+   * /inventory/all endpoint.
    */
   private refreshInventoryForTable() {
-    void this.hydration.hydrateDeferred();
+    void this.hydration.refreshFromBackend();
   }
 
   private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[], siteFilter?: string) {
