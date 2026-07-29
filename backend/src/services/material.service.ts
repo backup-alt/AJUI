@@ -9,7 +9,7 @@ import { generateId } from "./id-generator.service.js";
 import { CreateMaterialInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { withRetry } from "../utils/retry.js";
-import { backfillApprovedMaterialsToInventory, inventoryKeyForMaterial, inventoryStockMapForMaterials } from "./inventory.service.js";
+import { inventoryKeyForMaterial, inventoryStockMapForMaterials } from "./inventory.service.js";
 
 async function populateRefs(input: CreateMaterialInput) {
   let project: any = null;
@@ -129,16 +129,17 @@ export async function listMaterials(filter: {
   let items: MaterialLike[] = [];
   let total = 0;
   try {
-    const [foundItems, foundTotal] = await Promise.all([
-      withRetry(
-        () => Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
-        { label: "listMaterials.find" }
-      ),
-      withRetry(
-        () => Material.countDocuments(query).maxTimeMS(8000),
-        { label: "listMaterials.count" }
-      ),
-    ]);
+    // Run find and countDocuments SEQUENTIALLY rather than Promise.all so a
+    // single listMaterials call only holds 1 M0 connection at a time. With
+    // maxPoolSize: 5, parallel calls were saturating the pool.
+    const foundItems = await withRetry(
+      () => Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(5000),
+      { label: "listMaterials.find" }
+    );
+    const foundTotal = await withRetry(
+      () => Material.countDocuments(query).maxTimeMS(5000),
+      { label: "listMaterials.count" }
+    );
     items = foundItems as unknown as MaterialLike[];
     total = foundTotal;
   } catch (err) {
@@ -173,18 +174,27 @@ export async function listMaterials(filter: {
   }
 
   const typedItems = items as unknown as IMaterial[];
-  try {
-    backfillApprovedMaterialsToInventory(query).catch((err: unknown) =>
-      console.warn("Background backfill failed:", err)
-    );
-    const stockMap = await inventoryStockMapForMaterials(items as unknown as Array<Pick<import("../models/Material.js").IMaterial, "projectId" | "siteId" | "site" | "name" | "unit">>);
+  // Inventory stock lookup is best-effort and asynchronous — never block
+  // the response on it. If M0 pool is saturated, the stock map will be
+  // empty and the UI will compute remainingStock from purchased − consumed.
+  //
+  // The fire-and-forget backfillApprovedMaterialsToInventory that previously
+  // ran here was REMOVED — it issued another Material.find + Inventory write
+  // for every single listMaterials request, and with 5+ parallel hydration
+  // calls the M0 connection pool saturated, causing every subsequent query
+  // to time out at 8s × 3 retries = 24s. Backfill is now a periodic
+  // startup task (see startupTasks()) instead of an inline per-request hook.
+  void Promise.race([
+    inventoryStockMapForMaterials(items as unknown as Array<Pick<import("../models/Material.js").IMaterial, "projectId" | "siteId" | "site" | "name" | "unit">>),
+    new Promise<Map<string, number>>((resolve) => setTimeout(() => resolve(new Map()), 1500)),
+  ]).then((stockMap) => {
     items.forEach((item) => {
       const sharedStock = stockMap.get(inventoryKeyForMaterial(item as unknown as Parameters<typeof inventoryKeyForMaterial>[0]));
       if (sharedStock !== undefined) item.remainingStock = sharedStock;
     });
-  } catch (err) {
+  }).catch((err: unknown) => {
     console.warn("[listMaterials] inventory stock lookup failed (returning items anyway):", (err as Error).message);
-  }
+  });
 
   return { items: typedItems, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }

@@ -2,6 +2,14 @@
  * Retry a MongoDB query with exponential backoff. Useful when M0 connection
  * pools get cleared because of a transient timeout — the retry hits a
  * re-established pool and usually succeeds.
+ *
+ * Defaults to 2 attempts (was 3) because:
+ *  - On M0, each timeout waits maxTimeMS (8s) before failing.
+ *  - With 3 attempts: 8s + 0.25s backoff + 8s + 0.5s backoff + 8s = ~25s.
+ *  - That exceeds the client timeout (25s) and trips the frontend retry loop,
+ *    which fires ANOTHER parallel request, which saturates the pool further.
+ *  - 2 attempts: 8s + 0.25s backoff + 8s = ~16.25s, fits under the client
+ *    timeout, gives the connection pool time to recover before the next request.
  */
 export async function withRetry<T>(
   factory: () => Promise<T>,
@@ -15,7 +23,7 @@ export async function withRetry<T>(
 ): Promise<T> {
   const {
     label,
-    maxAttempts = 3,
+    maxAttempts = 2,
     baseDelayMs = 250,
     maxDelayMs = 2000,
     shouldRetry = isTransientMongoError,

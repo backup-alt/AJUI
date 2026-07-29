@@ -111,16 +111,17 @@ export async function listInventory(filter: {
   let items: InventoryLike[] = [];
   let total = 0;
   try {
-    const [foundItems, foundTotal] = await Promise.all([
-      withRetry(
-        () => Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
-        { label: "listInventory.find" }
-      ),
-      withRetry(
-        () => Inventory.countDocuments(query).maxTimeMS(8000),
-        { label: "listInventory.count" }
-      ),
-    ]);
+    // Sequential find + countDocuments (was Promise.all) to avoid burning
+    // 2 M0 connections per request. With maxPoolSize: 5 + parallel calls
+    // the pool saturated and every list timed out.
+    const foundItems = await withRetry(
+      () => Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(5000),
+      { label: "listInventory.find" }
+    );
+    const foundTotal = await withRetry(
+      () => Inventory.countDocuments(query).maxTimeMS(5000),
+      { label: "listInventory.count" }
+    );
     items = foundItems as unknown as InventoryLike[];
     total = foundTotal;
   } catch (err) {

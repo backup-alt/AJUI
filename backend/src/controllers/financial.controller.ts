@@ -49,8 +49,13 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
     });
     res.json(result);
   } catch (e) {
-    console.error("[listMaterials] failed, returning empty result:", (e as Error).message);
-    res.status(200).json({
+    if (res.headersSent) {
+      console.error("[listMaterials] error after headers sent:", (e as Error).message);
+      return;
+    }
+    console.error("[listMaterials] failed:", (e as Error).message);
+    res.status(503).json({
+      error: "Database temporarily unavailable, please retry",
       items: [],
       total: 0,
       page: Number(req.query.page) || 1,
@@ -127,8 +132,13 @@ export async function listInventory(req: Request, res: Response, next: NextFunct
     });
     res.json(result);
   } catch (e) {
-    console.error("[listInventory] failed, returning empty result:", (e as Error).message);
-    res.status(200).json({
+    if (res.headersSent) {
+      console.error("[listInventory] error after headers sent:", (e as Error).message);
+      return;
+    }
+    console.error("[listInventory] failed:", (e as Error).message);
+    res.status(503).json({
+      error: "Database temporarily unavailable, please retry",
       items: [],
       total: 0,
       page: Number(req.query.page) || 1,
@@ -271,8 +281,16 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
     });
     res.json(result);
   } catch (e) {
-    console.error("[listExpenses] failed, returning empty result:", (e as Error).message);
-    res.status(200).json({
+    // Don't silently swallow DB timeouts — return 503 so the frontend
+    // knows this is a transient failure (not "0 expenses in DB") and
+    // can retry. Empty 200 fallbacks were hiding M0 pool exhaustion.
+    if (res.headersSent) {
+      console.error("[listExpenses] error after headers sent:", (e as Error).message);
+      return;
+    }
+    console.error("[listExpenses] failed:", (e as Error).message);
+    res.status(503).json({
+      error: "Database temporarily unavailable, please retry",
       items: [],
       total: 0,
       page: Number(req.query.page) || 1,

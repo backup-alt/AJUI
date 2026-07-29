@@ -175,16 +175,16 @@ export async function listExpenses(filter: {
   let items: ExpenseLike[] = [];
   let total = 0;
   try {
-    const [foundItems, foundTotal] = await Promise.all([
-      withRetry(
-        () => Expense.find(query).sort({ date: -1, createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(8000),
-        { label: "listExpenses.find" }
-      ),
-      withRetry(
-        () => Expense.countDocuments(query).maxTimeMS(8000),
-        { label: "listExpenses.count" }
-      ),
-    ]);
+    // Sequential find + countDocuments (was Promise.all) so a single request
+    // holds at most 1 M0 connection at a time.
+    const foundItems = await withRetry(
+      () => Expense.find(query).sort({ date: -1, createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(5000),
+      { label: "listExpenses.find" }
+    );
+    const foundTotal = await withRetry(
+      () => Expense.countDocuments(query).maxTimeMS(5000),
+      { label: "listExpenses.count" }
+    );
     items = foundItems as unknown as ExpenseLike[];
     total = foundTotal;
   } catch (err) {

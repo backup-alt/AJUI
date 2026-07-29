@@ -100,8 +100,18 @@ export function cache(ttlSeconds: number) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
+
+    // Track whether we've already sent a response so we don't double-send
+    // on error paths (which triggered ERR_HTTP_HEADERS_SENT in production).
+    // express.final is set internally and is the most reliable signal.
+    const alreadySent = () => (res as any).headersSent || res.writableEnded;
+
     const originalSend = res.send.bind(res);
     res.send = function (body?: unknown): Response {
+      if (alreadySent()) {
+        // Already responded — swallow this call to avoid ERR_HTTP_HEADERS_SENT
+        return res;
+      }
       const contentType = res.getHeader("Content-Type") || "application/json; charset=utf-8";
       const status = res.statusCode || 200;
       if (status >= 200 && status < 300 && body) {
