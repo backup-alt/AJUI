@@ -115,10 +115,12 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Global HTTP request timeout — fail fast on M0 Atlas hangs so the
-// browser doesn't sit on an open socket until socketTimeoutMS (45s) triggers
+// Global HTTP request timeout — Atlas M0 is currently under heavy
+// connection-pool pressure (TTFB ~30s on a single query). Temporary
+// ceiling bumped to 5 minutes so a slow M0 query can complete rather
+// than 503-ing at the 30s mark. Revert to 30000 once M0 is healthy.
 app.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
-  res.setTimeout(30000, () => {
+  res.setTimeout(300_000, () => {
     if (!res.headersSent) {
       res.status(503).json({ error: "Request timeout, please try again" });
     }
