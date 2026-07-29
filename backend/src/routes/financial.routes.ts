@@ -44,6 +44,7 @@ router.post(
 );
 router.get("/materials", validate(listMaterialsSchema, "query"), cache(15), ctrl.listMaterials);
 router.get("/materials/pending", requireRole("admin", "project_manager"), cache(10), ctrl.getPendingMaterials);
+router.get("/materials/diagnostic-find-one", ctrl.diagnosticFindOneMaterial);
 router.get("/materials/:id", cache(30), ctrl.getMaterial);
 router.patch("/materials/:id", validate(updateMaterialSchema), ctrl.updateMaterial);
 router.post("/materials/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadMaterialReceipt);

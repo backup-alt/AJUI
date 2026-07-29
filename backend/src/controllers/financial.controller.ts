@@ -66,6 +66,21 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
   }
 }
 
+// DIAGNOSTIC ENDPOINT — TEMPORARY.
+// Minimal test: Material.findOne().lean() with no filters, no sort, no limit.
+// Verifies whether M0 itself is responsive at all to a trivial query.
+// Safe to remove once we've confirmed the dashboard works.
+export async function diagnosticFindOneMaterial(req: Request, res: Response, next: NextFunction) {
+  try {
+    const t0 = Date.now();
+    const { Material } = await import("../models/Material.js");
+    const test = await Material.findOne().lean();
+    const dt = Date.now() - t0;
+    console.log(`[diagnostic] Material.findOne().lean() returned in ${dt}ms — _id: ${test?._id}`);
+    res.json({ ok: true, durationMs: dt, id: test?._id ?? null });
+  } catch (e) { next(e); }
+}
+
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {
   try {
     const material = await materialService.getMaterialById(req.params.id);
