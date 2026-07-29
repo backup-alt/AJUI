@@ -8,6 +8,7 @@ import { generateId } from "./id-generator.service.js";
 import { CreateExpenseInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { withRetry } from "../utils/retry.js";
+import { dbMutex } from "../utils/db-mutex.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
 import { uploadToPCloud } from "./pcloud.service.js";
 
@@ -188,20 +189,25 @@ export async function listExpenses(filter: {
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    // Sequential find + countDocuments (was Promise.all) so a single request
-    // holds at most 1 M0 connection at a time.
-    const foundItems = await withRetry(
-      () => Expense.find(query)
-        .sort({ _id: -1 })
-        .limit(effectiveLimit + 1)
-        .lean()
-        .maxTimeMS(5000),
-      { label: "listExpenses.find" }
+    // Serialize through the in-process mutex so this query doesn't
+    // contend with other concurrent requests for the M0 cluster's
+    // shared resources.
+    const foundItems = await dbMutex.run(() =>
+      withRetry(
+        () => Expense.find(query)
+          .sort({ _id: -1 })
+          .limit(effectiveLimit + 1)
+          .lean()
+          .maxTimeMS(5000),
+        { label: "listExpenses.find" }
+      )
     );
     if (!filter.cursor) {
-      const foundTotal = await withRetry(
-        () => Expense.countDocuments(query).maxTimeMS(5000),
-        { label: "listExpenses.count" }
+      const foundTotal = await dbMutex.run(() =>
+        withRetry(
+          () => Expense.countDocuments(query).maxTimeMS(5000),
+          { label: "listExpenses.count" }
+        )
       );
       total = foundTotal;
     } else {

@@ -8,31 +8,30 @@ export async function connectDatabase(): Promise<void> {
     await mongoose.connect(env.MONGODB_URI, {
       serverSelectionTimeoutMS: 15000,
 
-      // Atlas M0 free tier has aggressive idle-connection reaping — any
-      // socket that goes 60+ seconds without traffic gets killed by Atlas,
-      // and the driver doesn't know until it tries to use it. The driver
-      // keeps connections alive via heartbeatFrequencyMS (10s, well below
-      // Atlas's 60s reaper threshold), so we don't need TCP-level keepalive.
+      // Atlas M0 free tier is a shared cluster — every parallel query
+      // slows down the others. The listMaterials / listInventory /
+      // listExpenses services serialize their queries through
+      // dbMutex (utils/db-mutex.ts), so most of the time only 1 query
+      // is in flight at all. We keep a small pool as a buffer for
+      // RBAC user lookups and other short queries that don't go
+      // through the mutex.
       //
-      // maxConnecting: 5 — control how many new connections the driver
-      // tries to open concurrently when the pool is depleted. Default is
-      // 2 which causes connection storms under load.
-      //
-      // maxPoolSize: 3 — M0 cluster caps at ~100 conns shared across
-      // every Render service. 3 keeps our footprint small. The fix for
-      // "too many parallel calls" is sequential awaits (already done in
-      // listMaterials/listInventory/listExpenses), not bigger pools.
-      //
-      // minPoolSize: 0 — don't hold idle connections at all. Open on demand.
-      //
-      // waitQueueTimeoutMS: 3000 — fail fast instead of holding the
-      // request open. Frontend retries the request.
-      maxPoolSize: 3,
+      // maxPoolSize: 5 — enough headroom for RBAC + a background
+      // task, but small enough that we never starve the M0 cluster.
+      // maxConnecting: 2 — back to the driver default. Connection
+      // storms are mitigated by dbMutex, so we don't need to
+      // allow many concurrent connection establishments.
+      // minPoolSize: 0 — no idle conns. Open on demand.
+      // waitQueueTimeoutMS: 8000 — give queued requests a fair
+      // chance to find a slot before failing.
+      // maxIdleTimeMS: 45000 — recycle sockets before Atlas's
+      // ~60s idle reaper kills them.
+      maxPoolSize: 5,
       minPoolSize: 0,
-      maxConnecting: 5,
-      socketTimeoutMS: 15000,
+      maxConnecting: 2,
+      socketTimeoutMS: 20000,
       heartbeatFrequencyMS: 10000,
-      waitQueueTimeoutMS: 3000,
+      waitQueueTimeoutMS: 8000,
       maxIdleTimeMS: 45000,
       retryWrites: true,
       retryReads: true,

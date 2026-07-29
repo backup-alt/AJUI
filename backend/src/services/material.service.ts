@@ -9,6 +9,7 @@ import { generateId } from "./id-generator.service.js";
 import { CreateMaterialInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { withRetry } from "../utils/retry.js";
+import { dbMutex } from "../utils/db-mutex.js";
 import { inventoryKeyForMaterial, inventoryStockMapForMaterials } from "./inventory.service.js";
 
 async function populateRefs(input: CreateMaterialInput) {
@@ -144,23 +145,28 @@ export async function listMaterials(filter: {
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    // Sequential find + countDocuments (was Promise.all) to avoid burning
-    // 2 M0 connections per request. With maxPoolSize: 5, parallel calls
-    // were saturating the pool.
-    const foundItems = await withRetry(
-      () => Material.find(query)
-        .sort({ _id: -1 })
-        .limit(effectiveLimit + 1) // +1 so we know if there's another page
-        .lean()
-        .maxTimeMS(5000),
-      { label: "listMaterials.find" }
+    // Serialize through the in-process mutex so this query doesn't
+    // contend with other concurrent requests for the M0 cluster's
+    // shared resources. A single fast query returns faster than 5
+    // slow ones competing for the same CPU.
+    const foundItems = await dbMutex.run(() =>
+      withRetry(
+        () => Material.find(query)
+          .sort({ _id: -1 })
+          .limit(effectiveLimit + 1) // +1 so we know if there's another page
+          .lean()
+          .maxTimeMS(5000),
+        { label: "listMaterials.find" }
+      )
     );
     // Only fetch countDocuments on the first page (no cursor) — counts on
     // paginated pages are expensive and usually unnecessary.
     if (!filter.cursor) {
-      const foundTotal = await withRetry(
-        () => Material.countDocuments(query).maxTimeMS(5000),
-        { label: "listMaterials.count" }
+      const foundTotal = await dbMutex.run(() =>
+        withRetry(
+          () => Material.countDocuments(query).maxTimeMS(5000),
+          { label: "listMaterials.count" }
+        )
       );
       total = foundTotal;
     } else {

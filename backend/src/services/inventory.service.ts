@@ -5,6 +5,7 @@ import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { withRetry } from "../utils/retry.js";
+import { dbMutex } from "../utils/db-mutex.js";
 
 function normalized(value: unknown): string {
   return String(value || "").trim().toLowerCase();
@@ -125,21 +126,25 @@ export async function listInventory(filter: {
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    // Sequential find + countDocuments (was Promise.all) to avoid burning
-    // 2 M0 connections per request. With maxPoolSize: 5 + parallel calls
-    // the pool saturated and every list timed out.
-    const foundItems = await withRetry(
-      () => Inventory.find(query)
-        .sort({ _id: -1 })
-        .limit(effectiveLimit + 1)
-        .lean()
-        .maxTimeMS(5000),
-      { label: "listInventory.find" }
+    // Serialize through the in-process mutex so this query doesn't
+    // contend with other concurrent requests for the M0 cluster's
+    // shared resources.
+    const foundItems = await dbMutex.run(() =>
+      withRetry(
+        () => Inventory.find(query)
+          .sort({ _id: -1 })
+          .limit(effectiveLimit + 1)
+          .lean()
+          .maxTimeMS(5000),
+        { label: "listInventory.find" }
+      )
     );
     if (!filter.cursor) {
-      const foundTotal = await withRetry(
-        () => Inventory.countDocuments(query).maxTimeMS(5000),
-        { label: "listInventory.count" }
+      const foundTotal = await dbMutex.run(() =>
+        withRetry(
+          () => Inventory.countDocuments(query).maxTimeMS(5000),
+          { label: "listInventory.count" }
+        )
       );
       total = foundTotal;
     } else {

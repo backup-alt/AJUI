@@ -267,6 +267,31 @@ export async function bootstrap(): Promise<void> {
 
 async function seedDefaultReports(): Promise<void> {}
 
+// Process-level safety nets. Without these, an unhandled rejection from
+// a MongoDB timeout (e.g. WaitQueueTimeoutError) propagates out of the
+// async chain and crashes the Node process. Render then returns 502
+// Bad Gateway to every subsequent request until the service restarts.
+//
+// We log the error and KEEP THE PROCESS ALIVE. The failed request
+// already gets its 503 response from the controller's catch block;
+// the rejection bubbling out is just a symptom that the catch didn't
+// swallow.
+process.on("unhandledRejection", (reason: unknown) => {
+  console.error(
+    "[unhandledRejection]",
+    reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason)
+  );
+});
+
+process.on("uncaughtException", (err: Error) => {
+  console.error("[uncaughtException]", err.name, err.message);
+  // For truly fatal errors (e.g. out of memory), let Node exit. For
+  // anything else, log and continue.
+  if (err.name === "ERR_OUT_OF_MEMORY") {
+    process.exit(1);
+  }
+});
+
 if (require.main === module) {
   bootstrap().catch((err) => {
     console.error("[Fatal] Bootstrap failed:", err);
