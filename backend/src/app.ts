@@ -132,6 +132,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 app.use("/api/materials/all", (_req, res, next) => { res.setTimeout(90_000); next(); });
 app.use("/api/inventory/all", (_req, res, next) => { res.setTimeout(90_000); next(); });
 app.use("/api/expenses/all", (_req, res, next) => { res.setTimeout(90_000); next(); });
+app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(90_000); next(); });
 
   app.get("/health", (_req: express.Request, res: express.Response) => {
     res.json({

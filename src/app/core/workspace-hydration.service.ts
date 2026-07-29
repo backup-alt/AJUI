@@ -237,7 +237,7 @@ export class WorkspaceHydrationService {
         "subcontractors"
       );
     }
-    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 100 }), "invoices");
+    const invoices = await this.safeList(() => this.api.listAllInvoices(2000), "invoices/all");
     if (invoices && Array.isArray(invoices.items)) {
       this.replaceIfLarger(
         this.erp.taxInvoices,

@@ -388,6 +388,15 @@ export class ApiService {
     );
   }
 
+  /** Single-shot hydration endpoint for invoices. */
+  listAllInvoices(max?: number): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
+    const query = max ? `?max=${max}` : "";
+    return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
+      `${this.baseUrl}/invoices/all${query}`,
+      { headers: this.authHeaders() }
+    ).pipe(timeout(60_000), catchError(this.handleError));
+  }
+
   // =================== SUBCONTRACTORS ===================
   deleteSubcontractor(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/subcontractors/${id}`, { headers: this.authHeaders() }).pipe(

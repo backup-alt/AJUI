@@ -1,6 +1,7 @@
 import { Invoice, IInvoice } from "../models/Invoice.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
+import { findAllOrFallback } from "../utils/find-all.js";
 
 const MAX_CREATE_ATTEMPTS = 3;
 
@@ -71,4 +72,26 @@ export async function deleteInvoice(id: string) {
 
 export async function getNextInvoiceNumber(): Promise<string> {
   return generateId("INV", 4);
+}
+
+/**
+ * Single-shot "give me everything" endpoint — mirrors the materials/
+ * inventory/expenses pattern. Tries one query with 15s maxTimeMS, falls
+ * back to a cursor walk that always returns data (never throws).
+ */
+export async function listAllInvoices(filter: {
+  status?: string;
+  search?: string;
+  max?: number;
+}): Promise<any[]> {
+  const query: Record<string, unknown> = { archived: false };
+  if (filter.status) query.status = filter.status;
+  if (filter.search) {
+    query.$or = [
+      { invoiceNumber: { $regex: filter.search, $options: "i" } },
+      { clientName: { $regex: filter.search, $options: "i" } },
+      { companyName: { $regex: filter.search, $options: "i" } },
+    ];
+  }
+  return findAllOrFallback(Invoice, "invoices/all", query, filter.max ?? 500);
 }
