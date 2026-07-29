@@ -6,7 +6,7 @@ export async function connectDatabase(): Promise<void> {
     mongoose.set("strictQuery", true);
 
     await mongoose.connect(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 8000,
+      serverSelectionTimeoutMS: 15000,
       // Cap the pool aggressively for M0 free tier — too high and every
       // concurrent request times out because M0 caps total connections
       // (~100 cluster-wide). 5 + maxTimeMS(5s) on each query means each
@@ -16,10 +16,10 @@ export async function connectDatabase(): Promise<void> {
       minPoolSize: 1,
       socketTimeoutMS: 20000,
       heartbeatFrequencyMS: 10000,
-      // Shorter wait queue timeout — if all 5 connections are checked out,
-      // fail fast (8s) instead of holding the request open for 60s. The
-      // frontend already retries the request, so we'd rather cancel early.
-      waitQueueTimeoutMS: 8000,
+      // Wait queue timeout of 12s — long enough to ride out transient pool
+      // contention, short enough that the client (15s timeout) sees the
+      // response before it cancels.
+      waitQueueTimeoutMS: 12000,
       retryWrites: true,
       retryReads: true,
     });
