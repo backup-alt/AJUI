@@ -172,13 +172,9 @@ export class ClientDashboardPage {
             projectIds: c.projectIds || [],
             supervisor: c.supervisor || "",
           }));
-          if (items.length === 0) {
-            console.warn("[client-dashboard refresh] backend returned 0 clients — keeping existing data");
-            this.refreshing.set(false);
-            this.refreshMessage.set(null);
-            return;
-          }
+          // Backend is the source of truth — always overwrite, even with [].
           localStorage.setItem("agb-erp:clients", JSON.stringify(items));
+          this.data.clients.set(items as any);
         } catch {}
         this.refreshing.set(false);
         this.refreshMessage.set(`Synced ${r.total} clients`);

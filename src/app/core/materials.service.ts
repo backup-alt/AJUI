@@ -19,23 +19,18 @@ export class MaterialsService {
     this.api.listMaterials({ ...params, limit: 100 }).subscribe({
       next: (r) => {
         const backendItems = (r.items || []).map(this.mapMaterial);
-        // Guard against empty backend response wiping existing data.
-        // The backend's listMaterials controller returns { items: [] }
-        // on M0 pool timeout, and we must not overwrite a previously
-        // loaded signal with an empty array or the table silently empties.
-        if (backendItems.length === 0) {
-          return;
-        }
-        const localItems = this.materials();
-        const backendIds = new Set(backendItems.map((i) => i.id));
-        const merged = [...backendItems, ...localItems.filter((i) => !backendIds.has(i.id))];
-        this.materials.set(merged);
-        this.persist(merged);
-        this.data.materials.set(merged);
+        // Backend is the source of truth — always overwrite, even with [].
+        // Preserving stale local data would hide real rows that the
+        // backend added after the page was first loaded, and the empty
+        // guard previously caused the dashboard to keep the static
+        // placeholder rows visible after the backend returned 0 rows
+        // during an M0 timeout.
+        this.materials.set(backendItems);
+        this.persist(backendItems);
+        this.data.materials.set(backendItems);
       },
       error: () => {
-        const cached = this.readState();
-        if (cached.length > 0) this.materials.set(cached);
+        // Network error: keep whatever we last had (signal already has it).
       },
     });
     return this.materials();
@@ -46,17 +41,10 @@ export class MaterialsService {
       this.api.listMaterials({ limit: 100 }).subscribe({
         next: (r) => {
           const backendItems = (r.items || []).map(this.mapMaterial);
-          if (backendItems.length === 0) {
-            resolve(this.materials());
-            return;
-          }
-          const localItems = this.materials();
-          const backendIds = new Set(backendItems.map((i) => i.id));
-          const merged = [...backendItems, ...localItems.filter((i) => !backendIds.has(i.id))];
-          this.materials.set(merged);
-          this.persist(merged);
-          this.data.materials.set(merged);
-          resolve(merged);
+          this.materials.set(backendItems);
+          this.persist(backendItems);
+          this.data.materials.set(backendItems);
+          resolve(backendItems);
         },
         error: () => resolve(this.materials()),
       });

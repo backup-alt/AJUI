@@ -130,7 +130,17 @@ export class WorkspaceHydrationService {
     value: T[],
     target: { set(value: T[]): void }
   ): void {
-    if (!Array.isArray(value) || value.length === 0) {
+    // Backend is the source of truth — always overwrite, even when the
+    // value is an empty array. The previous empty-array guard kept stale
+    // placeholder data visible to the user whenever the backend returned
+    // [] (which happens on M0 pool timeout), but if the backend later
+    // recovers and returns the real 59 materials, the user would never
+    // see them because we kept the 13 placeholder rows. By unconditionally
+    // overwriting, the UI always reflects what the backend actually has.
+    //
+    // We still defend against undefined / non-array responses so a bug in
+    // the API response shape can't wipe the signal to an unrenderable value.
+    if (!Array.isArray(value)) {
       return;
     }
     target.set(value);

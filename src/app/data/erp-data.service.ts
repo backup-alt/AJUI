@@ -1,10 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from "@angular/core";
 import {
-  expenses,
-  labour,
-  materials,
-  payments,
-  projects,
   type ExpenseRow,
   type InventoryRow,
   type LabourRow,
@@ -148,7 +143,7 @@ export class ErpDataService {
 
   private readonly _syncMaterials = effect(() => {
     const rows = this.materialsService.materials();
-    if (rows && rows.length) {
+    if (rows !== undefined) {
       this.materials.set(rows);
     }
   });
@@ -218,11 +213,11 @@ export class ErpDataService {
     ]),
   );
 
-  readonly projects = signal<Project[]>(this.readState<Project[]>("projects", projects));
-  readonly materials = signal<MaterialRow[]>(this.readState<MaterialRow[]>("materials", materials));
-  readonly labour = signal<LabourRow[]>(this.readState<LabourRow[]>("labour", labour));
+  readonly projects = signal<Project[]>(this.readState<Project[]>("projects", []));
+  readonly materials = signal<MaterialRow[]>(this.readState<MaterialRow[]>("materials", []));
+  readonly labour = signal<LabourRow[]>(this.readState<LabourRow[]>("labour", []));
   readonly expenses = signal<ExpenseRow[]>(this.readState<ExpenseRow[]>("expenses", []));
-  readonly payments = signal<PaymentRow[]>(this.readState<PaymentRow[]>("payments", payments));
+  readonly payments = signal<PaymentRow[]>(this.readState<PaymentRow[]>("payments", []));
   readonly inventory = signal<InventoryRow[]>(this.readState<InventoryRow[]>("inventory", []));
   readonly vendors = signal<Vendor[]>(
     this.readState<Vendor[]>("vendors", [

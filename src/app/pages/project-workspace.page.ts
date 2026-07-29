@@ -1169,13 +1169,7 @@ export class ProjectWorkspacePage {
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapper);
-          // Guard against empty backend response overwriting a previously
-          // loaded signal with [] — see the same guard in
-          // universal-dashboard.page.ts refreshFromBackend().
-          if (items.length === 0) {
-            console.warn(`[refreshSection:${section}] backend returned 0 items — keeping existing data`);
-            return;
-          }
+          // Backend is the source of truth — always overwrite, even with [].
           if (storageKey) localStorage.setItem(storageKey, JSON.stringify(items));
           dataSignal.set(items);
         } catch {}
@@ -1430,11 +1424,7 @@ export class ProjectWorkspacePage {
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapper);
-          // Empty-array guard — see refreshSectionFromBackend above.
-          if (items.length === 0) {
-            console.warn(`[refreshFromBackend:${section}] backend returned 0 items — keeping existing data`);
-            return;
-          }
+          // Backend is the source of truth — always overwrite, even with [].
           if (storageKey) localStorage.setItem(storageKey, JSON.stringify(items));
           dataSignal.set(items);
         } catch {}
