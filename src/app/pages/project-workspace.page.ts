@@ -1369,6 +1369,7 @@ export class ProjectWorkspacePage {
   }
 
   refreshFromBackend() {
+    this.hydration.invalidateCache();
     const section = this.activeSection();
     const apiMap: Record<string, (opts: any) => any> = {
       materials: (opts: any) => this.api.listMaterials(opts),

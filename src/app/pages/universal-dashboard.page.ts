@@ -2588,6 +2588,7 @@ export class UniversalDashboardPage implements OnInit {
     if (this.backendSyncing()) return;
     this.backendSyncing.set(true);
     this.backendSyncMessage.set("Refreshing from backend…");
+    this.hydration.invalidateCache();
 
     let done = 0;
     const total = 11;
