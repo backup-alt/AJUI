@@ -198,14 +198,14 @@ export async function listExpenses(filter: {
           .sort({ _id: -1 })
           .limit(effectiveLimit + 1)
           .lean()
-          .maxTimeMS(5000),
+          .maxTimeMS(15000),
         { label: "listExpenses.find" }
       )
     );
     if (!filter.cursor) {
       const foundTotal = await dbMutex.run(() =>
         withRetry(
-          () => Expense.countDocuments(query).maxTimeMS(5000),
+          () => Expense.countDocuments(query).maxTimeMS(10000),
           { label: "listExpenses.count" }
         )
       );

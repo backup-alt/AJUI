@@ -163,6 +163,10 @@ export class WorkspaceHydrationService {
 
     while (pagesFetched < MAX_PAGES) {
       pagesFetched++;
+      // Small delay between pages to let M0 connection recover
+      if (pagesFetched > 1) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
       const page = await this.safeList(() => factory(cursor), `${label}/page${pagesFetched}`);
       if (!page || !Array.isArray(page.items)) {
         console.warn(

@@ -151,7 +151,7 @@ export async function listMaterials(filter: {
           .sort({ _id: -1 })
           .limit(effectiveLimit + 1)
           .lean()
-          .maxTimeMS(5000),
+          .maxTimeMS(15000),
         { label: "listMaterials.find" }
       )
     );
@@ -161,7 +161,7 @@ export async function listMaterials(filter: {
     if (!filter.cursor) {
       const foundTotal = await dbMutex.run(() =>
         withRetry(
-          () => Material.countDocuments(query).maxTimeMS(5000),
+          () => Material.countDocuments(query).maxTimeMS(10000),
           { label: "listMaterials.count" }
         )
       );
