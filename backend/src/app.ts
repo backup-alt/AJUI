@@ -248,17 +248,21 @@ export async function bootstrap(): Promise<void> {
     console.warn("[Bootstrap] migrateCompanyName failed (non-fatal):", (err as Error).message);
   }
 
-  try {
-    const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
-    backfillMaterialSiteIds().catch((err: any) =>
-      console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
-    );
-    backfillApprovedMaterialsToInventory({}).catch((err: any) =>
-      console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
-    );
-  } catch (err) {
-    console.warn("[Bootstrap] backfill imports failed (non-fatal):", (err as Error).message);
-  }
+  // TEMPORARILY DISABLED — both backfill tasks make 1+N DB queries each at
+  // startup, which on M0 free tier can starve the pool before the first
+  // user request gets through. Re-enable after confirming the dashboard
+  // works without them.
+  // try {
+  //   const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
+  //   backfillMaterialSiteIds().catch((err: any) =>
+  //     console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
+  //   );
+  //   backfillApprovedMaterialsToInventory({}).catch((err: any) =>
+  //     console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
+  //   );
+  // } catch (err) {
+  //   console.warn("[Bootstrap] backfill imports failed (non-fatal):", (err as Error).message);
+  // }
 
   try {
     const { Material } = await import("./models/Material.js");
