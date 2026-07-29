@@ -65,36 +65,36 @@ export class WorkspaceHydrationService {
     this.setSignalAndStorage("sites", (sites?.items || []).map(mapSite), this.erp.siteEntities);
 
     const materials = await this.fetchAllByCursor(
-      (cursor) => this.api.listMaterials({ limit: 25, cursor }),
+      (cursor) => this.api.listMaterials({ limit: 5, cursor }),
       mapMaterial,
       "materials"
     );
     this.setSignalAndStorage("materials", materials, this.erp.materials);
 
     const inventory = await this.fetchAllByCursor(
-      (cursor) => this.api.listInventory({ limit: 25, cursor }),
+      (cursor) => this.api.listInventory({ limit: 5, cursor }),
       mapInventory,
       "inventory"
     );
     this.setSignalAndStorage("inventory", inventory, this.erp.inventory);
 
     const expenses = await this.fetchAllByCursor(
-      (cursor) => this.api.listExpenses({ limit: 25, cursor }),
+      (cursor) => this.api.listExpenses({ limit: 5, cursor }),
       mapExpense,
       "expenses"
     );
     this.setSignalAndStorage("expenses", expenses, this.erp.expenses);
 
-    const labour = await this.safeList(() => this.api.listLabour({ limit: 25 }), "labour");
+    const labour = await this.safeList(() => this.api.listLabour({ limit: 5 }), "labour");
     this.setSignalAndStorage("labour", (labour?.items || []).map(mapLabour), this.erp.labour);
 
-    const payments = await this.safeList(() => this.api.listPayments({ limit: 25 }), "payments");
+    const payments = await this.safeList(() => this.api.listPayments({ limit: 5 }), "payments");
     this.setSignalAndStorage("payments", (payments?.items || []).map(mapPayment), this.erp.payments);
 
-    const subcontractors = await this.safeList(() => this.api.listSubcontractors({ limit: 25 }), "subcontractors");
+    const subcontractors = await this.safeList(() => this.api.listSubcontractors({ limit: 5 }), "subcontractors");
     this.setSignalAndStorage("subcontractors", (subcontractors?.items || []).map(mapSubcontractor), this.erp.subcontractors);
 
-    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 25 }), "invoices");
+    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 5 }), "invoices");
     this.setSignalAndStorage("taxInvoices", (invoices?.items || []).map(mapInvoice), this.erp.taxInvoices);
 
     const dt = Date.now() - t0;
@@ -114,7 +114,7 @@ export class WorkspaceHydrationService {
     label: string
   ): Promise<T[]> {
     const PAGE_LIMIT = 25;
-    const MAX_PAGES = 20; // safety cap — 20 * 25 = 500 rows max per resource
+    const MAX_PAGES = 40; // safety cap — 40 * 5 = 200 rows max per resource
     const allItems: T[] = [];
     let cursor: string | undefined = undefined;
     let pagesFetched = 0;
@@ -170,11 +170,10 @@ export class WorkspaceHydrationService {
     label: string
   ): Promise<T | null> {
     try {
-      // TEMPORARY: 110s per-page timeout while we test Atlas M0 with the
-      // 5-minute global backend ceiling. This lets a slow M0 page complete
-      // rather than cancelling at 45s. Revert to 45_000 once M0 is healthy.
+      // 45s per-page timeout — enough for a healthy M0 query while still
+      // failing fast on cold connections.
       return await firstValueFrom(
-        factory().pipe(timeout({ each: 110_000, meta: `hydration.${label}` }))
+        factory().pipe(timeout({ each: 45_000, meta: `hydration.${label}` }))
       );
     } catch (err: any) {
       const status = err?.status || err?.statusCode;

@@ -145,9 +145,6 @@ export async function listMaterials(filter: {
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    // === DIAGNOSTIC: confirm M0 round-trip on the real query path ===
-    console.log("=== BEFORE listMaterials.find ===", { query, effectiveLimit });
-    const t0 = Date.now();
     const foundItems = await dbMutex.run(() =>
       withRetry(
         () => Material.find(query)
@@ -158,11 +155,6 @@ export async function listMaterials(filter: {
         { label: "listMaterials.find" }
       )
     );
-    const dt = Date.now() - t0;
-    console.log(
-      `=== AFTER listMaterials.find === returned ${foundItems.length} items in ${dt}ms`
-    );
-    // === END DIAGNOSTIC ===
 
     // Only fetch countDocuments on the first page (no cursor) — counts on
     // paginated pages are expensive and usually unnecessary.
