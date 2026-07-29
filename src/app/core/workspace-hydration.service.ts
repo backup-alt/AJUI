@@ -181,14 +181,14 @@ export class WorkspaceHydrationService {
       `[hydrateDeferred] starting — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
     );
 
-    // Single-shot hydration calls — each endpoint returns ALL rows in one
-    // HTTP request instead of walking cursor pages. This is the fix for
-    // the "Materials shows only 10 / Inventory shows only 5 / Expenses
-    // shows 0" production bug.
+    // Materials, inventory, expenses — fetch via the paginated endpoint
+    // with limit=2000. M0 can serve a few hundred lean documents in a
+    // single skip+limit query without timing out. This was the pattern
+    // that worked before the /all endpoint regression.
     const [materials, inventory, expenses] = await Promise.all([
-      this.safeList(() => this.api.listAllMaterials(2000), "materials/all"),
-      this.safeList(() => this.api.listAllInventory(2000), "inventory/all"),
-      this.safeList(() => this.api.listAllExpenses(2000), "expenses/all"),
+      this.safeList(() => this.api.listMaterials({ limit: 2000 }), "materials"),
+      this.safeList(() => this.api.listInventory({ limit: 2000 }), "inventory"),
+      this.safeList(() => this.api.listExpenses({ limit: 2000 }), "expenses"),
     ]);
 
     // Only overwrite the signal if the new fetch returned more rows than
@@ -237,7 +237,7 @@ export class WorkspaceHydrationService {
         "subcontractors"
       );
     }
-    const invoices = await this.safeList(() => this.api.listAllInvoices(2000), "invoices/all");
+    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 2000 }), "invoices");
     if (invoices && Array.isArray(invoices.items)) {
       this.replaceIfLarger(
         this.erp.taxInvoices,

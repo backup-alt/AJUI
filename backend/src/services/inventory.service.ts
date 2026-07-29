@@ -147,8 +147,9 @@ export async function listInventory(filter: {
     }
   }
 
-  // Cap default at 25 — Atlas M0 times out on full-table scans above this.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 50);
+  // Cap default at 100 — matches the hydration request size, lets a single
+  // request pull everything visible without requiring cursor pagination.
+  const effectiveLimit = Math.min(Math.max(filter.limit || 100, 1), 2000);
   type InventoryLike = { [k: string]: unknown };
   let items: InventoryLike[] = [];
   let total = 0;

@@ -169,9 +169,9 @@ export async function listMaterials(filter: {
     }
   }
 
-  // Cap default at 25 — Atlas M0 times out on full-table scans above this.
-  // Use cursor to paginate beyond 25 if the caller asks for more.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 50);
+  // Cap default at 100 — matches the hydration request size, lets a single
+  // request pull everything visible without requiring cursor pagination.
+  const effectiveLimit = Math.min(Math.max(filter.limit || 100, 1), 2000);
   type MaterialLike = {
     projectId?: unknown;
     siteId?: unknown;

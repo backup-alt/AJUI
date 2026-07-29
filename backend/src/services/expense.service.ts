@@ -220,8 +220,9 @@ export async function listExpenses(filter: {
     }
   }
 
-  // Cap default at 25 — M0 times out above this.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 50);
+  // Cap default at 100 — matches the hydration request size, lets a single
+  // request pull everything visible without requiring cursor pagination.
+  const effectiveLimit = Math.min(Math.max(filter.limit || 100, 1), 2000);
   type ExpenseLike = { [k: string]: unknown };
   let items: ExpenseLike[] = [];
   let total = 0;
