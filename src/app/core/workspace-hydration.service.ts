@@ -182,13 +182,11 @@ export class WorkspaceHydrationService {
     );
 
     // Materials, inventory, expenses — fetch via the paginated endpoint
-    // with limit=2000. M0 can serve a few hundred lean documents in a
-    // single skip+limit query without timing out. This was the pattern
-    // that worked before the /all endpoint regression.
+    // with limit=100. Matches the labour/payments/subcontractors pattern.
     const [materials, inventory, expenses] = await Promise.all([
-      this.safeList(() => this.api.listMaterials({ limit: 2000 }), "materials"),
-      this.safeList(() => this.api.listInventory({ limit: 2000 }), "inventory"),
-      this.safeList(() => this.api.listExpenses({ limit: 2000 }), "expenses"),
+      this.safeList(() => this.api.listMaterials({ limit: 100 }), "materials"),
+      this.safeList(() => this.api.listInventory({ limit: 100 }), "inventory"),
+      this.safeList(() => this.api.listExpenses({ limit: 100 }), "expenses"),
     ]);
 
     // Only overwrite the signal if the new fetch returned more rows than
@@ -237,7 +235,7 @@ export class WorkspaceHydrationService {
         "subcontractors"
       );
     }
-    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 2000 }), "invoices");
+    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 100 }), "invoices");
     if (invoices && Array.isArray(invoices.items)) {
       this.replaceIfLarger(
         this.erp.taxInvoices,

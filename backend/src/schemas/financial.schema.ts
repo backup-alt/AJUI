@@ -40,7 +40,7 @@ export const listMaterialsSchema = z.object({
     status: z.enum(["Received", "Not Received"]).optional(),
     search: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(2000).default(100),
+    limit: z.coerce.number().int().min(1).max(100).default(100),
     cursor: z.string().optional(),
   }),
 });
@@ -164,7 +164,7 @@ export const listExpensesSchema = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(2000).default(100),
+    limit: z.coerce.number().int().min(1).max(100).default(100),
     cursor: z.string().optional(),
   }),
 });
@@ -303,7 +303,7 @@ export const listInventorySchema = z.object({
     siteId: objectIdSchema.optional(),
     search: z.string().trim().optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(2000).default(100),
+    limit: z.coerce.number().int().min(1).max(100).default(100),
     cursor: z.string().optional(),
   }),
 });

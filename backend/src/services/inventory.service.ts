@@ -152,9 +152,9 @@ export async function listInventory(filter: {
     `[listInventory.diag] query=${JSON.stringify(query)} limit=${filter.limit ?? "default"} scope=${filter.scopeProjectIds?.length ?? "null"}`
   );
 
-  // Cap default at 100 — matches the hydration request size, lets a single
-  // request pull everything visible without requiring cursor pagination.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 100, 1), 2000);
+  // Cap default at 100 — matches the hydration request size, matches
+  // labour/payments/subcontractors default.
+  const effectiveLimit = Math.min(Math.max(filter.limit || 100, 1), 100);
   type InventoryLike = { [k: string]: unknown };
   let items: InventoryLike[] = [];
   let total = 0;
