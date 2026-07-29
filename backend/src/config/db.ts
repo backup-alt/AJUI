@@ -32,8 +32,10 @@ export async function connectDatabase(): Promise<void> {
       maxIdleTimeMS: 45000,
       // Mongoose-specific option (not in raw mongodb types) — keep sockets
       // alive so Atlas doesn't kill them during quiet periods.
-      keepAlive: true,
-      keepAliveInitialDelay: 30000,
+      // Note: the option name is lowercase "keepalive" for the mongodb
+      // driver, not "keepAlive" as in Node's net module.
+      keepalive: true,
+      keepaliveInitialDelay: 30000,
       retryWrites: true,
       retryReads: true,
     } as mongoose.ConnectOptions);
