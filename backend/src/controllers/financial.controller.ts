@@ -165,6 +165,11 @@ export async function addInventoryMaterial(req: Request, res: Response, next: Ne
     const user = (req as any).user;
     const updatedBy = user?.username || user?.email || user?._id?.toString();
     const result = await inventoryService.addInventoryMaterial(req.body, updatedBy);
+
+    invalidateCachePrefix("/api/inventory");
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
+
     res.status(201).json(result);
   } catch (e) { next(e); }
 }
@@ -307,6 +312,9 @@ export async function uploadExpenseReceipt(req: Request, res: Response, next: Ne
 export async function markAsReceived(req: Request, res: Response, next: NextFunction) {
   try {
     const expense = await expenseService.markExpenseAsReceived(req.params.id);
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/supervisor/expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ expense });
   } catch (e) { next(e); }
 }

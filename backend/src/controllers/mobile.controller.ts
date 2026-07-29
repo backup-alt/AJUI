@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
 import { AppError } from "../middleware/errorHandler.js";
+import { invalidateCachePrefix } from "../middleware/cache.js";
 import * as mobileService from "../services/supervisor-mobile.service.js";
 import * as workerService from "../services/worker.service.js";
 import * as vendorService from "../services/vendor.service.js";
@@ -226,6 +227,14 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
       owner: userId,
     });
 
+    // Invalidate BOTH the supervisor and admin/materials caches. The web
+    // admin reads /api/materials, the supervisor app reads
+    // /api/supervisor/materials — invalidate both so any new material
+    // shows up immediately on either client.
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
+
     res.status(201).json({ material });
   } catch (e) { next(e); }
 }
@@ -239,6 +248,11 @@ export async function updateMaterialStock(req: Request, res: Response, next: Nex
       req.params.id,
       { purchasedQuantity, consumedQuantity }
     );
+
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
+
     res.json({ material });
   } catch (e) { next(e); }
 }
@@ -341,6 +355,10 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
       status: "Pending",
       owner: userId,
     });
+
+    invalidateCachePrefix("/api/labour");
+    invalidateCachePrefix("/api/supervisor/labour");
+    invalidateCachePrefix("/api/dashboard/batch");
 
     res.status(201).json({ labour });
   } catch (e) { next(e); }
@@ -450,6 +468,10 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
       });
     }
 
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/supervisor/expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
+
     res.status(201).json({ expense });
   } catch (e) { next(e); }
 }
@@ -551,6 +573,16 @@ export async function takeApprovalAction(req: Request, res: Response, next: Next
       action,
       comment,
     });
+
+    // Approving a material/expense/labour approval changes the
+    // underlying record's status — invalidate every relevant cache.
+    invalidateCachePrefix("/api/approvals");
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/labour");
+    invalidateCachePrefix("/api/supervisor");
+    invalidateCachePrefix("/api/dashboard/batch");
+
     res.json({ approval });
   } catch (e) { next(e); }
 }
