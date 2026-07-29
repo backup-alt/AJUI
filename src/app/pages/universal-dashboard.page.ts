@@ -2022,10 +2022,15 @@ export class UniversalDashboardPage implements OnInit {
    * b754d2f where a dedicated sites refresh was added so the inventory
    * modal always had fresh data.
    *
-   * IMPORTANT: when the M0 pool times out the backend falls back to
-   * returning { items: [] } instead of a 500. We MUST guard against
-   * overwriting the existing signal+localStorage with an empty array
-   * or the table silently empties out on every tab switch.
+   * Empty-array guard: the backend falls back to { items: [] } on M0
+   * timeout. We never overwrite the signal with an empty array or the
+   * table silently empties out on every tab switch.
+   *
+   * NOTE: we deliberately do NOT guard against "backend returned fewer
+   * items than existing signal" because that case is exactly the bug
+   * the user is hitting — localStorage has 4 stale entries and we want
+   * the fresh backend response (even if it equals 4, but usually 59)
+   * to overwrite. The only thing we skip on is empty.
    */
   private refreshMaterialsForTable() {
     const t0 = Date.now();
@@ -2043,14 +2048,11 @@ export class UniversalDashboardPage implements OnInit {
             console.warn("[refreshMaterials] backend returned 0 items — keeping existing signal/localStorage");
             return;
           }
-          if (items.length < existingCount) {
-            console.warn(
-              `[refreshMaterials] backend returned FEWER items (${items.length}) than existing signal (${existingCount}). This usually means the backend timed out and returned a partial set. Keeping existing data.`
-            );
-            return;
-          }
           localStorage.setItem("agb-erp:materials", JSON.stringify(items));
           this.data.materials.set(items);
+          console.log(
+            `[refreshMaterials] signal updated from ${existingCount} to ${items.length} materials`
+          );
         } catch (err) {
           console.error("[refreshMaterials] error processing response:", err);
         }

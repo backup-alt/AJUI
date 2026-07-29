@@ -1,5 +1,5 @@
 import { Injectable, inject } from "@angular/core";
-import { firstValueFrom } from "rxjs";
+import { firstValueFrom, timeout } from "rxjs";
 import { ErpDataService } from "../data/erp-data.service";
 import {
   mapClient,
@@ -98,18 +98,28 @@ export class WorkspaceHydrationService {
    * so the caller can preserve existing localStorage data instead of
    * overwriting it with empty arrays when the API is temporarily
    * unreachable (e.g. 401 expired token, M0 slow query timeout).
+   *
+   * Wraps the observable in a 20s timeout. Without this, firstValueFrom()
+   * will wait forever on a hung HTTP request (Render cold start + M0
+   * pool can hang the underlying socket indefinitely), and the entire
+   * hydration chain freezes at the first await. The timeout converts
+   * "hung forever" into "fails fast" so the next collection in the
+   * sequential chain still gets a chance to hydrate.
    */
   private async safeList<T>(
     factory: () => import("rxjs").Observable<T>,
     label: string
   ): Promise<T | null> {
     try {
-      return await firstValueFrom(factory());
+      return await firstValueFrom(
+        factory().pipe(timeout({ each: 20_000, meta: `hydration.${label}` }))
+      );
     } catch (err: any) {
       const status = err?.status || err?.statusCode;
+      const isTimeout = err?.name === "TimeoutError" || /timeout/i.test(err?.message || "");
       const message = err?.error?.error || err?.error?.message || err?.message || String(err);
       console.warn(
-        `[WorkspaceHydration] Skipping ${label} refresh — API failed (status=${status}): ${message}. Keeping existing cached data.`
+        `[WorkspaceHydration] Skipping ${label} refresh — ${isTimeout ? "TIMEOUT after 20s" : `API failed (status=${status})`}: ${message}. Keeping existing cached data.`
       );
       return null;
     }

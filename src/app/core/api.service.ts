@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, inject } from "@angular/core";
 import { HttpClient, HttpHeaders, HttpInterceptorFn, HttpHandlerFn, HttpRequest, HttpEvent, HttpErrorResponse } from "@angular/common/http";
-import { Observable, from, throwError, catchError, switchMap, tap, of } from "rxjs";
+import { Observable, from, throwError, catchError, switchMap, tap, of, timeout } from "rxjs";
 import { environment } from "../../environments/environment";
 
 export interface ApiUser {
@@ -548,6 +548,13 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/materials${query}`, { headers: this.authHeaders() }).pipe(
+      // 25s client-side timeout: Render free-tier cold starts can take
+      // 30-50s and M0 MongoDB pool can hang indefinitely. Without this,
+      // firstValueFrom() in the hydration service waits forever and the
+      // dashboard silently freezes at the first log line. 25s gives the
+      // request plenty of room on a warm path while still failing fast
+      // on a cold one.
+      timeout(25_000),
       catchError(this.handleError)
     );
   }
@@ -561,6 +568,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/inventory${query}`, { headers: this.authHeaders() }).pipe(
+      timeout(25_000),
       catchError(this.handleError)
     );
   }
@@ -637,6 +645,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/expenses${query}`, { headers: this.authHeaders() }).pipe(
+      timeout(25_000),
       catchError(this.handleError)
     );
   }
