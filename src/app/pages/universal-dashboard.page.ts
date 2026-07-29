@@ -2045,7 +2045,7 @@ export class UniversalDashboardPage implements OnInit {
             `[refreshMaterials] response in ${dt}ms — backend returned ${items.length} of ${r.total} total`
           );
           // Backend is the source of truth — always overwrite, even with [].
-          localStorage.setItem("agb-erp:materials", JSON.stringify(items));
+          // No localStorage write — the dashboard no longer caches data tables.
           this.data.materials.set(items);
           console.log(
             `[refreshMaterials] signal updated from ${existingCount} to ${items.length} materials`
@@ -2063,14 +2063,13 @@ export class UniversalDashboardPage implements OnInit {
   /**
    * Dedicated Expense table refresh — bypasses refreshFromBackend's
    * debounce and unconditionally hits GET /expenses to update the
-   * expenses signal + localStorage. Backend is the source of truth.
+   * expenses signal. Backend is the source of truth, no localStorage.
    */
   private refreshExpensesForTable() {
     this.api.listExpenses({ limit: 100 }).subscribe({
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapExpense);
-          localStorage.setItem("agb-erp:expenses", JSON.stringify(items));
           this.data.expenses.set(items);
         } catch {}
       },
@@ -2081,14 +2080,13 @@ export class UniversalDashboardPage implements OnInit {
   /**
    * Dedicated Inventory table refresh — bypasses refreshFromBackend's
    * debounce and unconditionally hits GET /inventory to update the
-   * inventory signal + localStorage. Backend is the source of truth.
+   * inventory signal. Backend is the source of truth, no localStorage.
    */
   private refreshInventoryForTable() {
     this.api.listInventory({ limit: 100 }).subscribe({
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapInventory);
-          localStorage.setItem("agb-erp:inventory", JSON.stringify(items));
           this.data.inventory.set(items);
         } catch {}
       },
@@ -2171,7 +2169,6 @@ export class UniversalDashboardPage implements OnInit {
       next: (r: any) => {
         try {
           const items = ((r as any).items || (r as any).sites || []).map(mapSite);
-          localStorage.setItem("agb-erp:sites", JSON.stringify(items));
           this.data.siteEntities.set(items);
           if (items.length === 0) {
             console.warn(
@@ -2197,7 +2194,6 @@ export class UniversalDashboardPage implements OnInit {
       next: (r: any) => {
         try {
           const items = ((r as any).items || []).map(mapMaterial);
-          localStorage.setItem("agb-erp:materials", JSON.stringify(items));
           this.data.materials.set(items);
         } catch (err) {
           console.error("[addInventoryMaterial] Failed to refresh materials after save", err);
@@ -2503,19 +2499,19 @@ export class UniversalDashboardPage implements OnInit {
       subcontractors: (id) => this.api.deleteSubcontractor(id),
     };
 
-    // Map of module → localStorage key
-    const localStorageKeys: Record<string, string> = {
-      clients: "agb-erp:clients",
-      materials: "agb-erp:materials",
-      labour: "agb-erp:labour",
-      expenses: "agb-erp:expenses",
-      generalExpenses: "agb-erp:expenses",
-      payments: "agb-erp:payments",
-      vendors: "agb-erp:vendors",
-      subcontractors: "agb-erp:subcontractors",
+    // Map of module → data signal (replaces localStorageKeys)
+    const dataSignals: Record<string, any> = {
+      clients: this.data.clients,
+      materials: this.data.materials,
+      labour: this.data.labour,
+      expenses: this.data.expenses,
+      generalExpenses: this.data.expenses,
+      payments: this.data.payments,
+      vendors: this.data.vendors,
+      subcontractors: this.data.subcontractors,
     };
 
-    // Map of module → ID field used as business key in localStorage / UI
+    // Map of module → ID field used as business key
     const idFields: Record<string, string> = {
       clients: "id",
       materials: "id",
@@ -2528,34 +2524,32 @@ export class UniversalDashboardPage implements OnInit {
     };
 
     const apiDelete = apiDeleters[module];
-    const storageKey = localStorageKeys[module];
+    const dataSignal = dataSignals[module];
     const idField = idFields[module];
     const failed: string[] = [];
     let deleted = 0;
 
-    // Fallback: build a bizId → _id lookup from the raw data source for this module
-    const rawKey = localStorageKeys[module];
+    // Build bizId → _id lookup from the live signal so we can resolve
+    // MongoDB _id when the row only carries the business ID.
     const bizIdToMongoId = new Map<string, string>();
-    try {
-      const raw = localStorage.getItem(rawKey);
-      if (raw) {
-        const arr = JSON.parse(raw);
-        for (const r of arr) {
+    if (dataSignal) {
+      try {
+        for (const r of dataSignal() as any[]) {
           const bid = String(r[idField] || r["materialId"] || r["labourId"] || r["vendorId"] || r["clientId"] || "").trim();
           const mid = String(r["_id"] || "").trim();
           if (bid && mid) bizIdToMongoId.set(bid, mid);
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     console.log(`[Delete] Starting delete of ${rows.length} ${module} rows`, rows.map((r) => ({ _id: r["_id"], id: r[idField], __rowId: r["__rowId"] })));
-    console.log(`[Delete] bizId→_id lookup has ${bizIdToMongoId.size} entries from localStorage`);
+    console.log(`[Delete] bizId→_id lookup has ${bizIdToMongoId.size} entries from data signal`);
 
     for (const row of rows) {
       let mongoId = String(row["_id"] || "").trim();
       const bizId = String(row[idField] || "").trim();
 
-      // If _id is missing on the row, look it up from the raw data
+      // If _id is missing on the row, look it up from the live signal
       if (!mongoId && bizId && bizIdToMongoId.has(bizId)) {
         mongoId = bizIdToMongoId.get(bizId)!;
         console.log(`[Delete] Resolved _id=${mongoId} for bizId=${bizId} via fallback lookup`);
@@ -2574,15 +2568,12 @@ export class UniversalDashboardPage implements OnInit {
         } else if (apiDelete && !mongoId) {
           console.warn(`[Delete] No _id for ${bizId} — skipping backend delete`);
         }
-        // Optimistic localStorage removal by business ID
-        try {
-          const raw = localStorage.getItem(storageKey);
-          if (raw) {
-            const arr = JSON.parse(raw);
-            const filtered = arr.filter((r: any) => String(r[idField] || "") !== bizId);
-            localStorage.setItem(storageKey, JSON.stringify(filtered));
-          }
-        } catch {}
+        // Optimistic signal removal by business ID (no localStorage)
+        if (dataSignal && bizId) {
+          try {
+            dataSignal.update((arr: any[]) => arr.filter((r: any) => String(r[idField] || "") !== bizId));
+          } catch {}
+        }
         deleted++;
       } catch (e: any) {
         console.error(`[Delete] FAILED for ${bizId} (_id=${mongoId}):`, e?.error?.message || e?.message || e);
@@ -2663,7 +2654,6 @@ export class UniversalDashboardPage implements OnInit {
         console.warn(`[refreshFromBackend] ${key} response was not an array — keeping existing data`);
         return;
       }
-      localStorage.setItem(`agb-erp:${key}`, JSON.stringify(items));
       signal.set(items);
     };
 
@@ -2800,7 +2790,6 @@ export class UniversalDashboardPage implements OnInit {
             const newRows = attendanceRows.filter((r) => !existingIds.has(r.id));
             if (newRows.length > 0) {
               const merged = [...newRows, ...existing];
-              localStorage.setItem("agb-erp:labour", JSON.stringify(merged));
               this.data.labour.set(merged);
             }
           }
@@ -3685,15 +3674,15 @@ visibleRows(): TableRow[] {
 
   /** Map a UI column key → backend field name + persist via PATCH. */
   private persistRowEditToBackend(module: string, row: TableRow, columnKey: string, value: string) {
-    // localStorage keys by module
-    const storageKey: Record<string, string> = {
-      materials: "agb-erp:materials",
-      labour: "agb-erp:labour",
-      expenses: "agb-erp:expenses",
-      generalExpenses: "agb-erp:expenses",
-      payments: "agb-erp:payments",
-      vendors: "agb-erp:vendors",
-      subcontractors: "agb-erp:subcontractors",
+    // Map of module → data signal (replaces localStorage key lookup)
+    const dataSignals: Record<string, any> = {
+      materials: this.data.materials,
+      labour: this.data.labour,
+      expenses: this.data.expenses,
+      generalExpenses: this.data.expenses,
+      payments: this.data.payments,
+      vendors: this.data.vendors,
+      subcontractors: this.data.subcontractors,
     };
 
     // Map of UI key → backend field per module. Most map 1:1 with columnKey.
@@ -3709,19 +3698,18 @@ visibleRows(): TableRow[] {
     const mongoId = String(row["_id"] || "").trim();
     const bizId = String(row["id"] || row["clientId"] || row["materialId"] || row["labourId"] || row["expenseId"] || row["paymentId"] || row["vendorId"] || row["subcontractId"] || "").trim();
     if (!bizId) return;
-    const storageKeyForModule = storageKey[module];
-    if (!storageKeyForModule) return;
+    const dataSignal = dataSignals[module];
+    if (!dataSignal) return;
 
-    // Optimistic localStorage update
+    // Optimistic signal update (no localStorage)
     try {
-      const raw = localStorage.getItem(storageKeyForModule);
-      if (raw) {
-        const arr = JSON.parse(raw);
-        const updated = arr.map((r: any) =>
-          String(r["id"] || "") === bizId ? { ...r, [columnKey]: value, ...(module === "labour" && columnKey === "labourTypes" ? { notes: value } : {}) } : r
-        );
-        localStorage.setItem(storageKeyForModule, JSON.stringify(updated));
-      }
+      dataSignal.update((arr: any[]) =>
+        arr.map((r: any) =>
+          String(r["id"] || "") === bizId
+            ? { ...r, [columnKey]: value, ...(module === "labour" && columnKey === "labourTypes" ? { notes: value } : {}) }
+            : r
+        )
+      );
     } catch {}
 
     // Background backend PATCH — must use MongoDB _id, not business id
@@ -3765,16 +3753,13 @@ visibleRows(): TableRow[] {
       ? { customFields: { [columnKey]: value } }
       : { [backendKey]: value };
 
-    // Persist locally
+    // Persist locally via the signal (no localStorage)
     try {
-      const raw = localStorage.getItem("agb-erp:clients");
-      if (raw) {
-        const arr = JSON.parse(raw);
-        const updated = arr.map((c: any) =>
+      this.data.clients.update((arr) =>
+        arr.map((c: any) =>
           String(c["id"] || c["clientId"] || "") === bizId ? { ...c, [columnKey]: value, [backendKey]: value } : c
-        );
-        localStorage.setItem("agb-erp:clients", JSON.stringify(updated));
-      }
+        )
+      );
     } catch {}
 
     // Backend PATCH — use MongoDB _id
@@ -3901,15 +3886,15 @@ visibleRows(): TableRow[] {
       vendors: (id) => this.api.deleteVendor(id),
       subcontractors: (id) => this.api.deleteSubcontractor(id),
     };
-    const localStorageKeys: Record<string, string> = {
-      clients: "agb-erp:clients",
-      materials: "agb-erp:materials",
-      labour: "agb-erp:labour",
-      expenses: "agb-erp:expenses",
-      generalExpenses: "agb-erp:expenses",
-      payments: "agb-erp:payments",
-      vendors: "agb-erp:vendors",
-      subcontractors: "agb-erp:subcontractors",
+    const dataSignals: Record<string, any> = {
+      clients: this.data.clients,
+      materials: this.data.materials,
+      labour: this.data.labour,
+      expenses: this.data.expenses,
+      generalExpenses: this.data.expenses,
+      payments: this.data.payments,
+      vendors: this.data.vendors,
+      subcontractors: this.data.subcontractors,
     };
     const idFields: Record<string, string> = {
       clients: "id", materials: "id", labour: "id", expenses: "id",
@@ -3917,31 +3902,23 @@ visibleRows(): TableRow[] {
     };
 
     const apiDelete = apiDeleters[module];
-    const storageKey = localStorageKeys[module];
+    const dataSignal = dataSignals[module];
     const idField = idFields[module];
     const bizId = String(row[idField] || "").trim();
     let mongoId = String(row["_id"] || "").trim();
 
-    if (!mongoId && bizId && storageKey) {
+    if (!mongoId && bizId && dataSignal) {
       try {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) {
-          const arr = JSON.parse(raw);
-          const match = arr.find((r: any) => String(r[idField] || "") === bizId);
-          if (match?._id) mongoId = String(match._id);
-        }
+        const match = dataSignal().find((r: any) => String(r[idField] || "") === bizId);
+        if (match?._id) mongoId = String(match._id);
       } catch {}
     }
 
     try {
       if (apiDelete && mongoId) await firstValueFrom(apiDelete(mongoId));
-      if (storageKey && bizId) {
+      if (dataSignal && bizId) {
         try {
-          const raw = localStorage.getItem(storageKey);
-          if (raw) {
-            const arr = JSON.parse(raw);
-            localStorage.setItem(storageKey, JSON.stringify(arr.filter((r: any) => String(r[idField] || "") !== bizId)));
-          }
+          dataSignal.update((arr: any[]) => arr.filter((r: any) => String(r[idField] || "") !== bizId));
         } catch {}
       }
       this.backendSyncMessage.set(`Deleted 1 ${module} row`);

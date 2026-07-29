@@ -130,13 +130,11 @@ export class WorkspaceHydrationService {
     value: T[],
     target: { set(value: T[]): void }
   ): void {
-    // Backend is the source of truth — always overwrite, even when the
-    // value is an empty array. The previous empty-array guard kept stale
-    // placeholder data visible to the user whenever the backend returned
-    // [] (which happens on M0 pool timeout), but if the backend later
-    // recovers and returns the real 59 materials, the user would never
-    // see them because we kept the 13 placeholder rows. By unconditionally
-    // overwriting, the UI always reflects what the backend actually has.
+    // Backend is the source of truth — always overwrite the signal, even
+    // when the value is an empty array. We no longer mirror to localStorage
+    // because the dashboard removed all agb-erp:* data-table caching; the
+    // backend is queried on every signal update and the response is the
+    // authoritative value.
     //
     // We still defend against undefined / non-array responses so a bug in
     // the API response shape can't wipe the signal to an unrenderable value.
@@ -144,16 +142,5 @@ export class WorkspaceHydrationService {
       return;
     }
     target.set(value);
-    this.writeState(key, value);
-  }
-
-  private writeState<T>(key: string, value: T): void {
-    try {
-      localStorage.setItem(this.storageKey(key), JSON.stringify(value));
-    } catch {}
-  }
-
-  private storageKey(key: string): string {
-    return `agb-erp:${key}`;
   }
 }

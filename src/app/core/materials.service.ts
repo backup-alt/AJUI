@@ -11,26 +11,24 @@ export class MaterialsService {
   private get data(): ErpDataService {
     return this.injector.get(ErpDataService);
   }
-  private readonly storageKey = "agb-erp:materials";
 
-  readonly materials = signal<MaterialRow[]>(this.readState());
+  // Backend is the single source of truth for materials — no localStorage
+  // read or write. Signal starts at [] and is populated by hydration
+  // and every API call. This eliminates the entire class of "stale
+  // localStorage showing placeholder data" bugs the dashboard has been
+  // hitting (e.g. AB-1024 / AB-1024 / AB-1024 / Area 1 / Area 2 / Area 3
+  // / First Floor static rows overriding the real backend data).
+  readonly materials = signal<MaterialRow[]>([]);
 
   getAll(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string }) {
     this.api.listMaterials({ ...params, limit: 100 }).subscribe({
       next: (r) => {
         const backendItems = (r.items || []).map(this.mapMaterial);
-        // Backend is the source of truth — always overwrite, even with [].
-        // Preserving stale local data would hide real rows that the
-        // backend added after the page was first loaded, and the empty
-        // guard previously caused the dashboard to keep the static
-        // placeholder rows visible after the backend returned 0 rows
-        // during an M0 timeout.
         this.materials.set(backendItems);
-        this.persist(backendItems);
         this.data.materials.set(backendItems);
       },
       error: () => {
-        // Network error: keep whatever we last had (signal already has it).
+        // Network error: keep whatever we last had.
       },
     });
     return this.materials();
@@ -42,7 +40,6 @@ export class MaterialsService {
         next: (r) => {
           const backendItems = (r.items || []).map(this.mapMaterial);
           this.materials.set(backendItems);
-          this.persist(backendItems);
           this.data.materials.set(backendItems);
           resolve(backendItems);
         },
@@ -93,7 +90,6 @@ export class MaterialsService {
             deliveredOn: input.deliveredOn,
           };
           this.materials.update((list) => [material, ...list]);
-          this.persist(this.materials());
           this.data.materials.update((list) => [material, ...list]);
           observer.next(material);
           observer.complete();
@@ -110,7 +106,6 @@ export class MaterialsService {
           this.materials.update((list) =>
             list.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m)),
           );
-          this.persist(this.materials());
           this.data.materials.update((list) =>
             list.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m)),
           );
@@ -127,7 +122,6 @@ export class MaterialsService {
       this.api.deleteMaterial(id).subscribe({
         next: () => {
           this.materials.update((list) => list.filter((m) => String(m.id) !== String(id)));
-          this.persist(this.materials());
           this.data.materials.update((list) => list.filter((m) => String(m.id) !== String(id)));
           observer.next();
           observer.complete();
@@ -161,21 +155,4 @@ export class MaterialsService {
     receiptImage: row.receiptImage,
     receiptImageMimeType: row.receiptImageMimeType,
   });
-
-  private readState(): MaterialRow[] {
-    if (typeof localStorage === "undefined") return [];
-    try {
-      const raw = localStorage.getItem(this.storageKey);
-      return raw ? (JSON.parse(raw) as MaterialRow[]) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private persist(rows: MaterialRow[]) {
-    if (typeof localStorage === "undefined") return;
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify(rows));
-    } catch {}
-  }
 }

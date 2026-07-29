@@ -173,7 +173,7 @@ export class ClientDashboardPage {
             supervisor: c.supervisor || "",
           }));
           // Backend is the source of truth — always overwrite, even with [].
-          localStorage.setItem("agb-erp:clients", JSON.stringify(items));
+          // No localStorage write — the dashboard no longer caches data tables.
           this.data.clients.set(items as any);
         } catch {}
         this.refreshing.set(false);

@@ -1170,7 +1170,7 @@ export class ProjectWorkspacePage {
         try {
           const items = (r.items || []).map(mapper);
           // Backend is the source of truth — always overwrite, even with [].
-          if (storageKey) localStorage.setItem(storageKey, JSON.stringify(items));
+          // No localStorage write — the dashboard no longer caches data tables.
           dataSignal.set(items);
         } catch {}
       },
@@ -1326,40 +1326,31 @@ export class ProjectWorkspacePage {
       vendors: (id) => this.api.deleteVendor(id),
       subcontractors: (id) => this.api.deleteSubcontractor(id),
     };
-    const localStorageKeys: Record<string, string> = {
-      materials: "agb-erp:materials",
-      labour: "agb-erp:labour",
-      expenses: "agb-erp:expenses",
-      payments: "agb-erp:payments",
-      vendors: "agb-erp:vendors",
-      subcontractors: "agb-erp:subcontractors",
+    const dataMap: Record<string, any> = {
+      materials: this.data.materials,
+      labour: this.data.labour,
+      expenses: this.data.expenses,
+      payments: this.data.payments,
+      vendors: this.data.vendors,
+      subcontractors: this.data.subcontractors,
     };
     const idField = "id";
     const apiDelete = apiDeleters[section];
-    const storageKey = localStorageKeys[section];
+    const dataSignal = dataMap[section];
 
     for (const row of rows) {
       let mongoId = String(row["_id"] || "").trim();
       const bizId = String(row[idField] || "").trim();
-      if (!mongoId && bizId && storageKey) {
+      if (!mongoId && bizId && dataSignal) {
         try {
-          const raw = localStorage.getItem(storageKey);
-          if (raw) {
-            const match = JSON.parse(raw).find((r: any) => String(r[idField] || "") === bizId);
-            if (match?._id) mongoId = String(match._id);
-          }
+          const match = dataSignal().find((r: any) => String(r[idField] || "") === bizId);
+          if (match?._id) mongoId = String(match._id);
         } catch {}
       }
       try {
         if (apiDelete && mongoId) await firstValueFrom(apiDelete(mongoId));
-        if (storageKey && bizId) {
-          try {
-            const raw = localStorage.getItem(storageKey);
-            if (raw) {
-              const arr = JSON.parse(raw);
-              localStorage.setItem(storageKey, JSON.stringify(arr.filter((r: any) => String(r[idField] || "") !== bizId)));
-            }
-          } catch {}
+        if (dataSignal && bizId) {
+          dataSignal.update((arr: any[]) => arr.filter((r: any) => String(r[idField] || "") !== bizId));
         }
       } catch {}
     }
@@ -1425,7 +1416,7 @@ export class ProjectWorkspacePage {
         try {
           const items = (r.items || []).map(mapper);
           // Backend is the source of truth — always overwrite, even with [].
-          if (storageKey) localStorage.setItem(storageKey, JSON.stringify(items));
+          // No localStorage write — the dashboard no longer caches data tables.
           dataSignal.set(items);
         } catch {}
       },
@@ -2202,40 +2193,31 @@ export class ProjectWorkspacePage {
       vendors: (id) => this.api.deleteVendor(id),
       subcontractors: (id) => this.api.deleteSubcontractor(id),
     };
-    const localStorageKeys: Record<string, string> = {
-      materials: "agb-erp:materials",
-      labour: "agb-erp:labour",
-      expenses: "agb-erp:expenses",
-      payments: "agb-erp:payments",
-      vendors: "agb-erp:vendors",
-      subcontractors: "agb-erp:subcontractors",
+    const dataMap: Record<string, any> = {
+      materials: this.data.materials,
+      labour: this.data.labour,
+      expenses: this.data.expenses,
+      payments: this.data.payments,
+      vendors: this.data.vendors,
+      subcontractors: this.data.subcontractors,
     };
     const idField = "id";
     const apiDelete = apiDeleters[section];
-    const storageKey = localStorageKeys[section];
+    const dataSignal = dataMap[section];
     const bizId = String(row[idField] || "").trim();
     let mongoId = String(row["_id"] || "").trim();
 
-    if (!mongoId && bizId && storageKey) {
+    if (!mongoId && bizId && dataSignal) {
       try {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) {
-          const match = JSON.parse(raw).find((r: any) => String(r[idField] || "") === bizId);
-          if (match?._id) mongoId = String(match._id);
-        }
+        const match = dataSignal().find((r: any) => String(r[idField] || "") === bizId);
+        if (match?._id) mongoId = String(match._id);
       } catch {}
     }
 
     try {
       if (apiDelete && mongoId) await firstValueFrom(apiDelete(mongoId));
-      if (storageKey && bizId) {
-        try {
-          const raw = localStorage.getItem(storageKey);
-          if (raw) {
-            const arr = JSON.parse(raw);
-            localStorage.setItem(storageKey, JSON.stringify(arr.filter((r: any) => String(r[idField] || "") !== bizId)));
-          }
-        } catch {}
+      if (dataSignal && bizId) {
+        dataSignal.update((arr: any[]) => arr.filter((r: any) => String(r[idField] || "") !== bizId));
       }
     } catch {}
 

@@ -141,6 +141,29 @@ export class ErpDataService {
   private readonly api = inject(ApiService);
   private readonly recoveredTablePresentationState = this.recoverTablePresentationState();
 
+  /**
+   * Wipe every stale agb-erp:* key on boot so leftover data from prior
+   * sessions can't pollute the freshly hydrated signals. Auth tokens
+   * (ajui_access_token, ajui_refresh_token) live under their own keys
+   * and are intentionally NOT cleared here so the user stays logged in.
+   */
+  private wipeStaleAgbErpKeys(): void {
+    if (typeof localStorage === "undefined") return;
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("agb-erp:")) keysToRemove.push(k);
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      if (keysToRemove.length > 0) {
+        console.info(`[ErpDataService] wiped ${keysToRemove.length} stale agb-erp:* localStorage keys on boot`);
+      }
+    } catch (err) {
+      console.warn("[ErpDataService] failed to wipe stale agb-erp keys:", err);
+    }
+  }
+
   private readonly _syncMaterials = effect(() => {
     const rows = this.materialsService.materials();
     if (rows !== undefined) {
@@ -148,216 +171,27 @@ export class ErpDataService {
     }
   });
 
-  readonly clients = signal<Client[]>(
-    this.readState<Client[]>("clients", [
-    {
-      id: "CL-1001",
-      initials: "MR",
-      name: "Meenakshi Raman",
-      mobile: "+91 98402 11880",
-      address: "Plot 42, Velachery Main Road, Chennai",
-      status: "Active",
-      projectIds: ["AB-1024", "AB-1031"],
-      supervisor: "R. Karthik",
-    },
-    {
-      id: "CL-1002",
-      initials: "DC",
-      name: "Dhanraj & Co",
-      mobile: "+91 97911 40590",
-      address: "Second Avenue, Anna Nagar, Chennai",
-      status: "Active",
-      projectIds: ["AB-1031"],
-      supervisor: "S. Prabhu",
-    },
-    {
-      id: "CL-1003",
-      initials: "AS",
-      name: "Arun Subramani",
-      mobile: "+91 98840 77012",
-      address: "Lakshmi Nagar, Porur, Chennai",
-      status: "On Hold",
-      projectIds: ["AB-1008"],
-      supervisor: "M. Saravanan",
-    },
-    {
-      id: "CL-1004",
-      initials: "VT",
-      name: "Vikram Traders",
-      mobile: "+91 76543 21098",
-      address: "Commercial Complex, Mount Road, Chennai",
-      status: "Completed",
-      projectIds: ["AB-1008"],
-      supervisor: "M. Saravanan",
-    },
-    {
-      id: "CL-1005",
-      initials: "SR",
-      name: "Sridhar Residency",
-      mobile: "+91 94444 70112",
-      address: "OMR Link Road, Sholinganallur, Chennai",
-      status: "Active",
-      projectIds: ["AB-1024"],
-      supervisor: "R. Karthik",
-    },
-    {
-      id: "CL-1006",
-      initials: "LN",
-      name: "Lakshmi Nagar Trust",
-      mobile: "+91 98840 55321",
-      address: "Community Hall Street, Porur, Chennai",
-      status: "Completed",
-      projectIds: ["AB-1008"],
-      supervisor: "M. Saravanan",
-    },
-    ]),
-  );
+  // Backend-driven signals (clients, projects, materials, labour, expenses,
+  // payments, inventory, vendors, supervisors, subcontractors, sites, users,
+  // quotations, taxInvoices) are NOT seeded from localStorage and do NOT
+  // write back to localStorage. The backend is the single source of truth;
+  // hydration fills these on app boot and every API call refreshes them.
+  // This eliminates the entire class of "stale localStorage showing
+  // placeholder data" bugs the dashboard has been hitting.
 
-  readonly projects = signal<Project[]>(this.readState<Project[]>("projects", []));
-  readonly materials = signal<MaterialRow[]>(this.readState<MaterialRow[]>("materials", []));
-  readonly labour = signal<LabourRow[]>(this.readState<LabourRow[]>("labour", []));
-  readonly expenses = signal<ExpenseRow[]>(this.readState<ExpenseRow[]>("expenses", []));
-  readonly payments = signal<PaymentRow[]>(this.readState<PaymentRow[]>("payments", []));
-  readonly inventory = signal<InventoryRow[]>(this.readState<InventoryRow[]>("inventory", []));
-  readonly vendors = signal<Vendor[]>(
-    this.readState<Vendor[]>("vendors", [
-    {
-      id: "VEN-101",
-      name: "Sri Devi Traders",
-      materialType: "Bricks",
-      phone: "+91 98410 22001",
-      address: "Velachery, Chennai",
-      gst: "33AABCS1402P1Z8",
-      status: "Active",
-    },
-    {
-      id: "VEN-102",
-      name: "KMS Agencies",
-      materialType: "Cement",
-      phone: "+91 98411 40222",
-      address: "Guindy, Chennai",
-      gst: "33AAKFK9902L1Z4",
-      status: "Active",
-    },
-    {
-      id: "VEN-103",
-      name: "Amman Steel",
-      materialType: "Steel",
-      phone: "+91 99620 88910",
-      address: "Ambattur, Chennai",
-      gst: "33AABFA8821M1Z2",
-      status: "Active",
-    },
-    {
-      id: "VEN-104",
-      name: "Thirumalai Blue Metals",
-      materialType: "M-Sand",
-      phone: "+91 94440 70115",
-      address: "Poonamallee, Chennai",
-      gst: "33AABFT4021K1Z9",
-      status: "Active",
-    },
-    {
-      id: "VEN-105",
-      name: "Ganesh Plumbing",
-      materialType: "Plumbing",
-      phone: "+91 98842 55120",
-      address: "Ambattur Industrial Estate, Chennai",
-      gst: "33AAJFG9120K1Z6",
-      status: "Active",
-    },
-    ]),
-  );
-  readonly supervisors = signal<Supervisor[]>(
-    this.readState<Supervisor[]>("supervisors", [
-    {
-      id: "SUP-101",
-      name: "R. Karthik",
-      phone: "+91 98400 11880",
-      role: "Senior Site Supervisor",
-      assignedProject: "Green Nest Villas",
-      assignedSite: "Area 1 / Area 2 / Area 3",
-      cashLimit: 50000,
-      activeAdvances: 25000,
-      approvalAuthority: "Material, Labour, Expense",
-      status: "Active",
-    },
-    {
-      id: "SUP-102",
-      name: "S. Prabhu",
-      phone: "+91 97911 40590",
-      role: "Site Supervisor",
-      assignedProject: "Kaveri Flats Renovation",
-      assignedSite: "Ground Floor / First Floor",
-      cashLimit: 35000,
-      activeAdvances: 10000,
-      approvalAuthority: "Labour, Expense",
-      status: "Active",
-    },
-    {
-      id: "SUP-103",
-      name: "M. Saravanan",
-      phone: "+91 98840 77012",
-      role: "Finishing Supervisor",
-      assignedProject: "Lakshmi Nagar Duplex",
-      assignedSite: "Block A / Block B",
-      cashLimit: 30000,
-      activeAdvances: 0,
-      approvalAuthority: "Attendance, Site Expense",
-      status: "Active",
-    },
-    ]),
-  );
-  readonly subcontractors = signal<Subcontractor[]>(
-    this.readState<Subcontractor[]>("subcontractors", [
-    {
-      id: "SUB-201",
-      projectId: "AB-1024",
-      site: "Area 1",
-      name: "Selvam Civil Works",
-      workPackage: "Block masonry and plastering",
-      contractValue: 780000,
-      advancePaid: 125000,
-      startDate: "2026-05-08",
-      dueDate: "2026-07-15",
-      supervisor: "R. Karthik",
-      approvalStatus: "Approved",
-      paymentStatus: "Part Paid",
-    },
-    {
-      id: "SUB-202",
-      projectId: "AB-1024",
-      site: "Area 2",
-      name: "Ganesh Plumbing",
-      workPackage: "Plumbing rough-in and testing",
-      contractValue: 340000,
-      advancePaid: 50000,
-      startDate: "2026-05-22",
-      dueDate: "2026-07-02",
-      supervisor: "R. Karthik",
-      approvalStatus: "Pending",
-      paymentStatus: "Part Paid",
-    },
-    {
-      id: "SUB-203",
-      projectId: "AB-1031",
-      site: "First Floor",
-      name: "Sri Balaji Electricals",
-      workPackage: "Electrical conduit and wiring",
-      contractValue: 465000,
-      advancePaid: 90000,
-      startDate: "2026-04-25",
-      dueDate: "2026-06-30",
-      supervisor: "S. Prabhu",
-      approvalStatus: "Approved",
-      paymentStatus: "Part Paid",
-    },
-    ]),
-  );
+  readonly clients = signal<Client[]>([]);
 
-  readonly siteEntities = signal<Site[]>(
-    this.readState<Site[]>("sites", []),
-  );
+  readonly projects = signal<Project[]>([]);
+  readonly materials = signal<MaterialRow[]>([]);
+  readonly labour = signal<LabourRow[]>([]);
+  readonly expenses = signal<ExpenseRow[]>([]);
+  readonly payments = signal<PaymentRow[]>([]);
+  readonly inventory = signal<InventoryRow[]>([]);
+  readonly vendors = signal<Vendor[]>([]);
+  readonly supervisors = signal<Supervisor[]>([]);
+  readonly subcontractors = signal<Subcontractor[]>([]);
+
+  readonly siteEntities = signal<Site[]>([]);
 
   readonly reports = signal([
     "Payment Collection Report",
@@ -374,7 +208,7 @@ export class ErpDataService {
     "Site Summary",
   ]);
 
-  readonly users = signal<AppUser[]>(this.readState<AppUser[]>("appUsers", []));
+  readonly users = signal<AppUser[]>([]);
 
   readonly activeClients = computed(() => this.clients().filter((client) => client.status === "Active").length);
   readonly customTableFields = signal<Record<SharedModuleKey, SharedTableField[]>>(
@@ -408,21 +242,17 @@ export class ErpDataService {
     }),
   );
 
-  readonly quotations = signal<Quotation[]>(this.readState<Quotation[]>("quotations", []));
-  readonly taxInvoices = signal<TaxInvoice[]>(this.readState<TaxInvoice[]>("taxInvoices", []));
+  readonly quotations = signal<Quotation[]>([]);
+  readonly taxInvoices = signal<TaxInvoice[]>([]);
 
   constructor() {
-    effect(() => this.writeState("clients", this.clients()));
-    effect(() => this.writeState("projects", this.projects()));
-    effect(() => this.writeState("materials", this.materials()));
-    effect(() => this.writeState("labour", this.labour()));
-    effect(() => this.writeState("expenses", this.expenses()));
-    effect(() => this.writeState("payments", this.payments()));
-    effect(() => this.writeState("inventory", this.inventory()));
-    effect(() => this.writeState("vendors", this.vendors()));
-    effect(() => this.writeState("supervisors", this.supervisors()));
-    effect(() => this.writeState("subcontractors", this.subcontractors()));
-    effect(() => this.writeState("sites", this.siteEntities()));
+    // Wipe any stale agb-erp:* data-table cache from prior sessions.
+    // UI prefs (customTableFields, settings, hiddenTableFields, etc.)
+    // are NOT under this prefix and stay untouched.
+    this.wipeStaleAgbErpKeys();
+
+    // Only UI/presentation signals keep their localStorage writeback.
+    // Backend-driven signals are sourced from the API and never persist.
     effect(() => this.writeState("customTableFields", this.customTableFields()));
     effect(() => this.writeState("customTableRows", this.customTableRows()));
     effect(() => this.writeState("tableCellEdits", this.tableCellEdits()));
@@ -432,10 +262,7 @@ export class ErpDataService {
     effect(() => this.writeState("siteKeys", this.siteKeys()));
     effect(() => this.writeState("projectActivity", this.projectActivity()));
     effect(() => this.writeState("settings", this.settings()));
-    effect(() => this.writeState("appUsers", this.users()));
     effect(() => this.writeState("companyProfile", this.companyProfile()));
-    effect(() => this.writeState("quotations", this.quotations()));
-    effect(() => this.writeState("taxInvoices", this.taxInvoices()));
     this.loadCompanyProfile();
     effect(() => {
       const rows = this.materials();
@@ -617,7 +444,6 @@ export class ErpDataService {
     };
 
     this.clients.update((clients) => [client, ...clients]);
-    this.writeState("clients", this.clients());
     return client;
   }
 
@@ -652,7 +478,6 @@ export class ErpDataService {
           : project,
       ),
     );
-    this.writeState("clients", this.clients());
   }
 
   deleteClient(clientId: string) {
@@ -666,8 +491,6 @@ export class ErpDataService {
     this.expenses.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
     this.payments.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
     this.subcontractors.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
-    this.writeState("clients", this.clients());
-    this.writeState("projects", this.projects());
   }
 
   addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus; siteIds?: string[]; id?: string; _id?: string }): Vendor {
@@ -696,7 +519,6 @@ export class ErpDataService {
       siteIds: input.siteIds || [],
     };
     this.vendors.update((vendors) => [vendor, ...vendors]);
-    this.writeState("vendors", this.vendors());
     return vendor;
   }
 
@@ -704,7 +526,6 @@ export class ErpDataService {
     this.vendors.update((vendors) =>
       vendors.map((v) => (v.id !== vendorId ? v : { ...v, ...patch })),
     );
-    this.writeState("vendors", this.vendors());
   }
 
   setVendorStatus(vendorId: string, status: VendorStatus) {
@@ -717,7 +538,6 @@ export class ErpDataService {
 
   deleteVendor(vendorId: string) {
     this.vendors.update((vendors) => vendors.filter((v) => v.id !== vendorId));
-    this.writeState("vendors", this.vendors());
   }
 
   addMaterial(input: Omit<MaterialRow, "id">): MaterialRow {
@@ -743,7 +563,6 @@ export class ErpDataService {
       deliveredOn: input.deliveredOn,
     };
     this.materials.update((materials) => [material, ...materials]);
-    this.writeState("materials", this.materials());
     return material;
   }
 
@@ -751,12 +570,10 @@ export class ErpDataService {
     this.materials.update((materials) =>
       materials.map((m) => (m.id !== materialId ? m : { ...m, ...patch })),
     );
-    this.writeState("materials", this.materials());
   }
 
   deleteMaterial(materialId: string) {
     this.materials.update((materials) => materials.filter((m) => m.id !== materialId));
-    this.writeState("materials", this.materials());
   }
 
   createDefaultProject(client: Client): Project {
@@ -897,7 +714,6 @@ export class ErpDataService {
 
   setExpenses(rows: ExpenseRow[]) {
     this.expenses.set(rows);
-    this.writeState("expenses", rows);
   }
 
   updateSettings(patch: Partial<ErpSettings>) {
