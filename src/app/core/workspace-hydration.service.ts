@@ -36,7 +36,7 @@ interface PersistedSnapshot {
   };
 }
 
-const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_VERSION = 2;
 const SNAPSHOT_KEY = "agb-erp:hydrationSnapshotV1";
 /** Persist for 24h — long enough to survive a refresh, short enough that
  *  the user doesn't see truly stale data after a multi-day gap. */

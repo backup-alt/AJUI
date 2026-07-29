@@ -35,6 +35,7 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
 
 export async function listMaterials(req: Request, res: Response, next: NextFunction) {
   try {
+    const t0 = Date.now();
     const scopeProjectIds = await getScopedProjectIds(req);
     const result = await materialService.listMaterials({
       projectId: req.query.projectId as string | undefined,
@@ -48,6 +49,10 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
+    const dt = Date.now() - t0;
+    console.log(
+      `[listMaterials] dt=${dt}ms limit=${req.query.limit ?? "default"} items=${result.items?.length ?? 0} total=${result.total} scope=${scopeProjectIds?.length ?? "null"}`
+    );
     res.json(result);
   } catch (e) {
     if (res.headersSent) {
@@ -264,6 +269,7 @@ export async function getPendingMaterials(req: Request, res: Response, next: Nex
 // =================== INVENTORY ===================
 export async function listInventory(req: Request, res: Response, next: NextFunction) {
   try {
+    const t0 = Date.now();
     const scopeProjectIds = await getScopedProjectIds(req);
     const result = await inventoryService.listInventory({
       projectId: req.query.projectId as string | undefined,
@@ -274,6 +280,10 @@ export async function listInventory(req: Request, res: Response, next: NextFunct
       cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
+    const dt = Date.now() - t0;
+    console.log(
+      `[listInventory] dt=${dt}ms limit=${req.query.limit ?? "default"} items=${result.items?.length ?? 0} total=${result.total} scope=${scopeProjectIds?.length ?? "null"}`
+    );
     res.json(result);
   } catch (e) {
     if (res.headersSent) {
@@ -410,6 +420,7 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
 
 export async function listExpenses(req: Request, res: Response, next: NextFunction) {
   try {
+    const t0 = Date.now();
     const scopeProjectIds = await getScopedProjectIds(req);
     const result = await expenseService.listExpenses({
       type: req.query.type as string | undefined,
@@ -424,6 +435,10 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
+    const dt = Date.now() - t0;
+    console.log(
+      `[listExpenses] dt=${dt}ms limit=${req.query.limit ?? "default"} items=${result.items?.length ?? 0} total=${result.total} scope=${scopeProjectIds?.length ?? "null"}`
+    );
     res.json(result);
   } catch (e) {
     // Don't silently swallow DB timeouts — return 503 so the frontend

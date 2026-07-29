@@ -114,7 +114,13 @@ export function cache(ttlSeconds: number) {
       }
       const contentType = res.getHeader("Content-Type") || "application/json; charset=utf-8";
       const status = res.statusCode || 200;
-      if (status >= 200 && status < 300 && body) {
+      // Don't cache empty-array responses — they can be transient
+      // (M0 timeout falling back to [] via the controller catch block)
+      // and would poison subsequent requests for the full TTL.
+      // Also don't cache non-2xx responses (errors should not be cached).
+      const isEmptyArrayBody =
+        typeof body === "string" && /"items":\s*\[\s*\]/.test(body);
+      if (status >= 200 && status < 300 && body && !isEmptyArrayBody) {
         const bodyStr = typeof body === "string" ? body : JSON.stringify(body);
         setCached(key, {
           body: bodyStr,

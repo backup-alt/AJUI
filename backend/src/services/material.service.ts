@@ -169,6 +169,11 @@ export async function listMaterials(filter: {
     }
   }
 
+  // DIAGNOSTIC: log the query that will be executed against M0
+  console.log(
+    `[listMaterials.diag] query=${JSON.stringify(query)} limit=${filter.limit ?? "default"} scope=${filter.scopeProjectIds?.length ?? "null"}`
+  );
+
   // Cap default at 100 — matches the hydration request size, lets a single
   // request pull everything visible without requiring cursor pagination.
   const effectiveLimit = Math.min(Math.max(filter.limit || 100, 1), 2000);
