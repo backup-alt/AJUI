@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { Material } from "../models/Material.js";
+import { IMaterial, Material } from "../models/Material.js";
 import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
 import { Vendor } from "../models/Vendor.js";
@@ -142,7 +142,17 @@ export async function listMaterials(filter: {
     items = foundItems as unknown as MaterialLike[];
     total = foundTotal;
   } catch (err) {
-    console.error("[listMaterials] main query failed, returning empty:", (err as Error).message);
+    console.error(
+      "[listMaterials] query failed (projectId=%s siteId=%s status=%s search=%s scopeLen=%s):",
+      String(filter.projectId || ""),
+      String(filter.siteId || ""),
+      String(filter.status || ""),
+      String(filter.search || ""),
+      String(filter.scopeProjectIds?.length ?? 0),
+      (err as Error)?.message || err
+    );
+    items = [];
+    total = 0;
   }
 
   // Aux queries are best-effort — if they time out on M0 we still want to
@@ -162,6 +172,7 @@ export async function listMaterials(filter: {
     console.warn("[listMaterials] site-name lookup failed (returning items anyway):", (err as Error).message);
   }
 
+  const typedItems = items as unknown as IMaterial[];
   try {
     backfillApprovedMaterialsToInventory(query).catch((err: unknown) =>
       console.warn("Background backfill failed:", err)
@@ -175,7 +186,7 @@ export async function listMaterials(filter: {
     console.warn("[listMaterials] inventory stock lookup failed (returning items anyway):", (err as Error).message);
   }
 
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  return { items: typedItems, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }
 
 export async function getMaterialById(id: string) {

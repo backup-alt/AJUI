@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { Inventory } from "../models/Inventory.js";
+import { IInventory, Inventory } from "../models/Inventory.js";
 import { IMaterial, Material } from "../models/Material.js";
 import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -124,16 +124,31 @@ export async function listInventory(filter: {
     items = foundItems as unknown as InventoryLike[];
     total = foundTotal;
   } catch (err) {
-    console.error("[listInventory] main query failed, returning empty:", (err as Error).message);
+    console.error(
+      "[listInventory] query failed (projectId=%s siteId=%s search=%s scopeLen=%s):",
+      String(filter.projectId || ""),
+      String(filter.siteId || ""),
+      String(filter.search || ""),
+      String(filter.scopeProjectIds?.length ?? 0),
+      (err as Error)?.message || err
+    );
+    items = [];
+    total = 0;
   }
 
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  return {
+    items: items as unknown as IInventory[],
+    total,
+    page: filter.page,
+    limit: filter.limit,
+    pages: Math.ceil(total / filter.limit),
+  };
 }
 
 export async function backfillApprovedMaterialsToInventory(materialQuery: Record<string, unknown>) {
   let materials;
   try {
-    materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed"] } }).lean();
+    materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed", "Not Received"] } }).lean();
   } catch {
     return;
   }
@@ -292,7 +307,7 @@ export async function getMissingMaterialsForSite(siteId: string) {
 
   const allMaterials = await Material.find({
     siteId: new Types.ObjectId(siteId),
-    status: { $in: ["Approved", "Received", "Completed"] },
+    status: { $in: ["Approved", "Received", "Completed", "Not Received"] },
   }).lean();
 
   if (allMaterials.length === 0) return { materials: [], site };

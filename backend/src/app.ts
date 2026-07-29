@@ -111,9 +111,20 @@ export function createApp(): express.Application {
   });
   app.use(globalLimiter);
 
-  app.use(express.json({ limit: "10mb" }));
-  app.use(express.urlencoded({ extended: true }));
-  app.use(cookieParser());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// Global HTTP request timeout — fail fast on M0 Atlas hangs so the
+// browser doesn't sit on an open socket until socketTimeoutMS (45s) triggers
+app.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
+  res.setTimeout(30000, () => {
+    if (!res.headersSent) {
+      res.status(503).json({ error: "Request timeout, please try again" });
+    }
+  });
+  next();
+});
 
   app.get("/health", (_req: express.Request, res: express.Response) => {
     res.json({
@@ -122,7 +133,7 @@ export function createApp(): express.Application {
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "fix-materials",
+      deploy: "fix-inventory-timeouts-vendor-fix",
     });
   });
 
