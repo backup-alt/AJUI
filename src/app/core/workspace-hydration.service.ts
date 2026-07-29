@@ -52,6 +52,11 @@ export class WorkspaceHydrationService {
     // M0 free-tier MongoDB pool can only handle a few concurrent ops at a
     // time. Chaining these calls (instead of Promise.all of 8) keeps the
     // pool healthy and prevents every call from timing out simultaneously.
+    //
+    // Materials / Inventory / Expenses are loaded via cursor pagination —
+    // each batch is at most 25 rows so we don't hit the M0 timeout we saw
+    // on the user's deployment. The loop walks pages until nextCursor is
+    // null, then merges all rows into the signal.
     const t0 = Date.now();
     const initialMaterials = this.erp.materials().length;
     console.log(`[hydrateDeferred] starting — existing materials signal has ${initialMaterials} entries`);
@@ -59,33 +64,87 @@ export class WorkspaceHydrationService {
     const sites = await this.safeList(() => this.api.listSites(), "sites");
     this.setSignalAndStorage("sites", (sites?.items || []).map(mapSite), this.erp.siteEntities);
 
-    const materials = await this.safeList(() => this.api.listMaterials({ limit: 100 }), "materials");
-    const mappedMaterials = (materials?.items || []).map(mapMaterial);
-    console.log(
-      `[hydrateDeferred] materials: API returned ${materials?.items?.length ?? "null"} items, mapped ${mappedMaterials.length} (total reported: ${materials?.total ?? "n/a"})`
+    const materials = await this.fetchAllByCursor(
+      (cursor) => this.api.listMaterials({ limit: 25, cursor }),
+      mapMaterial,
+      "materials"
     );
-    this.setSignalAndStorage("materials", mappedMaterials, this.erp.materials);
+    this.setSignalAndStorage("materials", materials, this.erp.materials);
 
-    const inventory = await this.safeList(() => this.api.listInventory({ limit: 100 }), "inventory");
-    this.setSignalAndStorage("inventory", (inventory?.items || []).map(mapInventory), this.erp.inventory);
+    const inventory = await this.fetchAllByCursor(
+      (cursor) => this.api.listInventory({ limit: 25, cursor }),
+      mapInventory,
+      "inventory"
+    );
+    this.setSignalAndStorage("inventory", inventory, this.erp.inventory);
 
-    const expenses = await this.safeList(() => this.api.listExpenses({ limit: 100 }), "expenses");
-    this.setSignalAndStorage("expenses", (expenses?.items || []).map(mapExpense), this.erp.expenses);
+    const expenses = await this.fetchAllByCursor(
+      (cursor) => this.api.listExpenses({ limit: 25, cursor }),
+      mapExpense,
+      "expenses"
+    );
+    this.setSignalAndStorage("expenses", expenses, this.erp.expenses);
 
-    const labour = await this.safeList(() => this.api.listLabour({ limit: 100 }), "labour");
+    const labour = await this.safeList(() => this.api.listLabour({ limit: 25 }), "labour");
     this.setSignalAndStorage("labour", (labour?.items || []).map(mapLabour), this.erp.labour);
 
-    const payments = await this.safeList(() => this.api.listPayments({ limit: 100 }), "payments");
+    const payments = await this.safeList(() => this.api.listPayments({ limit: 25 }), "payments");
     this.setSignalAndStorage("payments", (payments?.items || []).map(mapPayment), this.erp.payments);
 
-    const subcontractors = await this.safeList(() => this.api.listSubcontractors({ limit: 100 }), "subcontractors");
+    const subcontractors = await this.safeList(() => this.api.listSubcontractors({ limit: 25 }), "subcontractors");
     this.setSignalAndStorage("subcontractors", (subcontractors?.items || []).map(mapSubcontractor), this.erp.subcontractors);
 
-    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 100 }), "invoices");
+    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 25 }), "invoices");
     this.setSignalAndStorage("taxInvoices", (invoices?.items || []).map(mapInvoice), this.erp.taxInvoices);
 
     const dt = Date.now() - t0;
     console.log(`[hydrateDeferred] complete in ${dt}ms — materials signal now has ${this.erp.materials().length} entries`);
+  }
+
+  /**
+   * Walk all pages of a cursor-paginated endpoint and accumulate the rows.
+   * Each batch is at most 25 rows (the limit M0 can serve without timing
+   * out) so we never hold a connection long enough to starve the pool.
+   * Returns [] if any page fails — the caller decides whether to preserve
+   * the existing signal or overwrite with the empty result.
+   */
+  private async fetchAllByCursor<T>(
+    factory: (cursor: string | undefined) => import("rxjs").Observable<{ items: T[]; nextCursor?: string | null }>,
+    mapper: (row: any) => T,
+    label: string
+  ): Promise<T[]> {
+    const PAGE_LIMIT = 25;
+    const MAX_PAGES = 20; // safety cap — 20 * 25 = 500 rows max per resource
+    const allItems: T[] = [];
+    let cursor: string | undefined = undefined;
+    let pagesFetched = 0;
+    let totalReported = 0;
+
+    while (pagesFetched < MAX_PAGES) {
+      pagesFetched++;
+      const page = await this.safeList(() => factory(cursor), `${label}/page${pagesFetched}`);
+      if (!page || !Array.isArray(page.items)) {
+        console.warn(
+          `[hydrateDeferred] ${label} page ${pagesFetched} failed; returning ${allItems.length} items fetched so far`
+        );
+        break;
+      }
+      const mapped = page.items.map(mapper);
+      allItems.push(...mapped);
+      if (pagesFetched === 1 && typeof (page as any).total === "number") {
+        totalReported = (page as any).total;
+      }
+      const nextCursor = page.nextCursor ?? null;
+      if (!nextCursor || mapped.length === 0) {
+        break;
+      }
+      cursor = String(nextCursor);
+    }
+
+    console.log(
+      `[hydrateDeferred] ${label}: fetched ${allItems.length} items across ${pagesFetched} page(s)${totalReported ? ` (backend reports ${totalReported} total)` : ""}`
+    );
+    return allItems;
   }
 
   async hydrateFromBackend(): Promise<void> {

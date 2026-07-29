@@ -105,6 +105,7 @@ export async function listMaterials(filter: {
   search?: string;
   page: number;
   limit: number;
+  cursor?: string;
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
@@ -116,7 +117,20 @@ export async function listMaterials(filter: {
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  const skip = (filter.page - 1) * filter.limit;
+  // Cursor-based pagination via _id — uses the _id index for an O(log n)
+  // range query instead of the O(n) skip-then-limit pattern that timed
+  // out on M0 free tier.
+  if (filter.cursor) {
+    try {
+      query._id = { $gt: new Types.ObjectId(filter.cursor) };
+    } catch {
+      // Invalid cursor → fall through and start from the beginning
+    }
+  }
+
+  // Cap default at 25 — Atlas M0 times out on full-table scans above this.
+  // Use cursor to paginate beyond 25 if the caller asks for more.
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 50);
   type MaterialLike = {
     projectId?: unknown;
     siteId?: unknown;
@@ -128,20 +142,37 @@ export async function listMaterials(filter: {
   };
   let items: MaterialLike[] = [];
   let total = 0;
+  let nextCursor: string | null = null;
   try {
-    // Run find and countDocuments SEQUENTIALLY rather than Promise.all so a
-    // single listMaterials call only holds 1 M0 connection at a time. With
-    // maxPoolSize: 5, parallel calls were saturating the pool.
+    // Sequential find + countDocuments (was Promise.all) to avoid burning
+    // 2 M0 connections per request. With maxPoolSize: 5, parallel calls
+    // were saturating the pool.
     const foundItems = await withRetry(
-      () => Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(5000),
+      () => Material.find(query)
+        .sort({ _id: -1 })
+        .limit(effectiveLimit + 1) // +1 so we know if there's another page
+        .lean()
+        .maxTimeMS(5000),
       { label: "listMaterials.find" }
     );
-    const foundTotal = await withRetry(
-      () => Material.countDocuments(query).maxTimeMS(5000),
-      { label: "listMaterials.count" }
-    );
+    // Only fetch countDocuments on the first page (no cursor) — counts on
+    // paginated pages are expensive and usually unnecessary.
+    if (!filter.cursor) {
+      const foundTotal = await withRetry(
+        () => Material.countDocuments(query).maxTimeMS(5000),
+        { label: "listMaterials.count" }
+      );
+      total = foundTotal;
+    } else {
+      total = filter.page * effectiveLimit; // estimate
+    }
     items = foundItems as unknown as MaterialLike[];
-    total = foundTotal;
+    if (items.length > effectiveLimit) {
+      const nextItem = items.pop();
+      if (nextItem && (nextItem as any)._id) {
+        nextCursor = String((nextItem as any)._id);
+      }
+    }
   } catch (err) {
     console.error(
       "[listMaterials] query failed (projectId=%s siteId=%s status=%s search=%s scopeLen=%s):",
@@ -196,7 +227,14 @@ export async function listMaterials(filter: {
     console.warn("[listMaterials] inventory stock lookup failed (returning items anyway):", (err as Error).message);
   });
 
-  return { items: typedItems, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  return {
+    items: typedItems,
+    total,
+    page: filter.page,
+    limit: effectiveLimit,
+    pages: Math.ceil(total / effectiveLimit),
+    nextCursor,
+  };
 }
 
 export async function getMaterialById(id: string) {

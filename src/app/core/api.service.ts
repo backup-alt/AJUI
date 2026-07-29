@@ -26,6 +26,8 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   pages: number;
+  /** When set, pass this back as `cursor` to fetch the next page. */
+  nextCursor?: string | null;
 }
 
 const STORAGE_KEYS = {
@@ -540,7 +542,7 @@ export class ApiService {
   }
 
   // =================== MATERIALS ===================
-  listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -560,7 +562,7 @@ export class ApiService {
   }
 
   // =================== INVENTORY ===================
-  listInventory(params?: { projectId?: string; siteId?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listInventory(params?: { projectId?: string; siteId?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -637,7 +639,7 @@ export class ApiService {
   }
 
   // =================== EXPENSES ===================
-  listExpenses(params?: { type?: string; projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listExpenses(params?: { type?: string; projectId?: string; siteId?: string; status?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();

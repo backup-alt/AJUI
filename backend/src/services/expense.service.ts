@@ -155,6 +155,7 @@ export async function listExpenses(filter: {
   to?: string;
   page: number;
   limit: number;
+  cursor?: string;
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
@@ -170,27 +171,60 @@ export async function listExpenses(filter: {
   }
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  const skip = (filter.page - 1) * filter.limit;
+  // Cursor-based pagination via _id — O(log n) range query on the _id
+  // index, no skip-and-scan that M0 can't handle above ~25 rows.
+  if (filter.cursor) {
+    try {
+      query._id = { $gt: new Types.ObjectId(filter.cursor) };
+    } catch {
+      // Invalid cursor → start from beginning
+    }
+  }
+
+  // Cap default at 25 — M0 times out above this.
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 50);
   type ExpenseLike = { [k: string]: unknown };
   let items: ExpenseLike[] = [];
   let total = 0;
+  let nextCursor: string | null = null;
   try {
     // Sequential find + countDocuments (was Promise.all) so a single request
     // holds at most 1 M0 connection at a time.
     const foundItems = await withRetry(
-      () => Expense.find(query).sort({ date: -1, createdAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(5000),
+      () => Expense.find(query)
+        .sort({ _id: -1 })
+        .limit(effectiveLimit + 1)
+        .lean()
+        .maxTimeMS(5000),
       { label: "listExpenses.find" }
     );
-    const foundTotal = await withRetry(
-      () => Expense.countDocuments(query).maxTimeMS(5000),
-      { label: "listExpenses.count" }
-    );
+    if (!filter.cursor) {
+      const foundTotal = await withRetry(
+        () => Expense.countDocuments(query).maxTimeMS(5000),
+        { label: "listExpenses.count" }
+      );
+      total = foundTotal;
+    } else {
+      total = filter.page * effectiveLimit;
+    }
     items = foundItems as unknown as ExpenseLike[];
-    total = foundTotal;
+    if (items.length > effectiveLimit) {
+      const nextItem = items.pop();
+      if (nextItem && (nextItem as any)._id) {
+        nextCursor = String((nextItem as any)._id);
+      }
+    }
   } catch (err) {
     console.error("[listExpenses] main query failed, returning empty:", (err as Error).message);
   }
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  return {
+    items,
+    total,
+    page: filter.page,
+    limit: effectiveLimit,
+    pages: Math.ceil(total / effectiveLimit),
+    nextCursor,
+  };
 }
 
 export async function getExpenseById(id: string) {

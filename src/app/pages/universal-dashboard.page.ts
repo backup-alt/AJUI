@@ -2033,65 +2033,26 @@ export class UniversalDashboardPage implements OnInit {
    * to overwrite. The only thing we skip on is empty.
    */
   private refreshMaterialsForTable() {
-    const t0 = Date.now();
-    const existingCount = this.data.materials().length;
-    console.log(`[refreshMaterials] starting fetch — existing signal has ${existingCount} materials`);
-    this.api.listMaterials({ limit: 100 }).subscribe({
-      next: (r: any) => {
-        const dt = Date.now() - t0;
-        try {
-          const items = (r.items || []).map(mapMaterial);
-          console.log(
-            `[refreshMaterials] response in ${dt}ms — backend returned ${items.length} of ${r.total} total`
-          );
-          // Backend is the source of truth — always overwrite, even with [].
-          // No localStorage write — the dashboard no longer caches data tables.
-          this.data.materials.set(items);
-          console.log(
-            `[refreshMaterials] signal updated from ${existingCount} to ${items.length} materials`
-          );
-        } catch (err) {
-          console.error("[refreshMaterials] error processing response:", err);
-        }
-      },
-      error: (err) => {
-        console.error(`[refreshMaterials] fetch failed in ${Date.now() - t0}ms:`, err?.status, err?.message);
-      },
-    });
+    // Re-run the full hydration loop (cursor-paginated) to load all 59
+    // materials, not just the first page. The Materials table will show
+    // the updated set within ~1-2 seconds.
+    void this.hydration.hydrateDeferred();
   }
 
   /**
-   * Dedicated Expense table refresh — bypasses refreshFromBackend's
-   * debounce and unconditionally hits GET /expenses to update the
-   * expenses signal. Backend is the source of truth, no localStorage.
+   * Dedicated Expense table refresh — re-runs full hydration (cursor
+   * pagination handles all 49+7 rows in 25-row batches).
    */
   private refreshExpensesForTable() {
-    this.api.listExpenses({ limit: 100 }).subscribe({
-      next: (r: any) => {
-        try {
-          const items = (r.items || []).map(mapExpense);
-          this.data.expenses.set(items);
-        } catch {}
-      },
-      error: () => {},
-    });
+    void this.hydration.hydrateDeferred();
   }
 
   /**
-   * Dedicated Inventory table refresh — bypasses refreshFromBackend's
-   * debounce and unconditionally hits GET /inventory to update the
-   * inventory signal. Backend is the source of truth, no localStorage.
+   * Dedicated Inventory table refresh — re-runs full hydration (cursor
+   * pagination handles all 35 rows in 25-row batches).
    */
   private refreshInventoryForTable() {
-    this.api.listInventory({ limit: 100 }).subscribe({
-      next: (r: any) => {
-        try {
-          const items = (r.items || []).map(mapInventory);
-          this.data.inventory.set(items);
-        } catch {}
-      },
-      error: () => {},
-    });
+    void this.hydration.hydrateDeferred();
   }
 
   private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[], siteFilter?: string) {

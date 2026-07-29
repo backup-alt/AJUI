@@ -44,7 +44,8 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,
       page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 20,
+      limit: Number(req.query.limit) || 25,
+      cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
     res.json(result);
@@ -59,7 +60,7 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       items: [],
       total: 0,
       page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 20,
+      limit: Number(req.query.limit) || 25,
       pages: 0,
     });
   }
@@ -127,7 +128,8 @@ export async function listInventory(req: Request, res: Response, next: NextFunct
       siteId: req.query.siteId as string | undefined,
       search: req.query.search as string | undefined,
       page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 20,
+      limit: Number(req.query.limit) || 25,
+      cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
     res.json(result);
@@ -142,7 +144,7 @@ export async function listInventory(req: Request, res: Response, next: NextFunct
       items: [],
       total: 0,
       page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 20,
+      limit: Number(req.query.limit) || 25,
       pages: 0,
     });
   }
@@ -276,7 +278,8 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       from: req.query.from as string | undefined,
       to: req.query.to as string | undefined,
       page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 20,
+      limit: Number(req.query.limit) || 25,
+      cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
     res.json(result);
@@ -294,7 +297,7 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       items: [],
       total: 0,
       page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 20,
+      limit: Number(req.query.limit) || 25,
       pages: 0,
     });
   }

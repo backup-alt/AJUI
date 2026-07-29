@@ -98,6 +98,7 @@ export async function listInventory(filter: {
   search?: string;
   page: number;
   limit: number;
+  cursor?: string;
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
@@ -106,24 +107,51 @@ export async function listInventory(filter: {
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  const skip = (filter.page - 1) * filter.limit;
+  // Cursor-based pagination via _id — uses the _id index for an O(log n)
+  // range query instead of the O(n) skip-then-limit pattern that timed
+  // out on M0 free tier.
+  if (filter.cursor) {
+    try {
+      query._id = { $gt: new Types.ObjectId(filter.cursor) };
+    } catch {
+      // Invalid cursor → fall through and start from the beginning
+    }
+  }
+
+  // Cap default at 25 — Atlas M0 times out on full-table scans above this.
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 50);
   type InventoryLike = { [k: string]: unknown };
   let items: InventoryLike[] = [];
   let total = 0;
+  let nextCursor: string | null = null;
   try {
     // Sequential find + countDocuments (was Promise.all) to avoid burning
     // 2 M0 connections per request. With maxPoolSize: 5 + parallel calls
     // the pool saturated and every list timed out.
     const foundItems = await withRetry(
-      () => Inventory.find(query).sort({ updatedAt: -1 }).skip(skip).limit(filter.limit).lean().maxTimeMS(5000),
+      () => Inventory.find(query)
+        .sort({ _id: -1 })
+        .limit(effectiveLimit + 1)
+        .lean()
+        .maxTimeMS(5000),
       { label: "listInventory.find" }
     );
-    const foundTotal = await withRetry(
-      () => Inventory.countDocuments(query).maxTimeMS(5000),
-      { label: "listInventory.count" }
-    );
+    if (!filter.cursor) {
+      const foundTotal = await withRetry(
+        () => Inventory.countDocuments(query).maxTimeMS(5000),
+        { label: "listInventory.count" }
+      );
+      total = foundTotal;
+    } else {
+      total = filter.page * effectiveLimit;
+    }
     items = foundItems as unknown as InventoryLike[];
-    total = foundTotal;
+    if (items.length > effectiveLimit) {
+      const nextItem = items.pop();
+      if (nextItem && (nextItem as any)._id) {
+        nextCursor = String((nextItem as any)._id);
+      }
+    }
   } catch (err) {
     console.error(
       "[listInventory] query failed (projectId=%s siteId=%s search=%s scopeLen=%s):",
@@ -141,8 +169,9 @@ export async function listInventory(filter: {
     items: items as unknown as IInventory[],
     total,
     page: filter.page,
-    limit: filter.limit,
-    pages: Math.ceil(total / filter.limit),
+    limit: effectiveLimit,
+    pages: Math.ceil(total / effectiveLimit),
+    nextCursor,
   };
 }
 
