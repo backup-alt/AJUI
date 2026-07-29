@@ -5,19 +5,20 @@
  * - Atlas M0 free tier is a shared cluster. When several queries hit it
  *   simultaneously, every query slows down because they all share the
  *   same CPU/RAM/connection budget.
- * - With maxPoolSize: 3, the driver can only check out 3 connections at
- *   once. The 4th+ request waits waitQueueTimeoutMS (3s) then fails with
- *   WaitQueueTimeoutError.
- * - Sequentializing queries (1 at a time) makes each query faster on
- *   average because it doesn't compete for cluster resources.
+ * - With maxPoolSize: 5, the driver can only check out 5 connections at
+ *   once. The 6th+ request waits waitQueueTimeoutMS then fails.
+ * - Limiting concurrency to 3 lets cursor-paginated fetches across
+ *   materials/inventory/expenses run in parallel (one page each) without
+ *   saturating the cluster.
  *
  * Trade-off:
- * - Throughput drops (no parallel queries), but per-query latency stays
- *   predictable and bounded. For a dashboard that issues a handful of
- *   queries per page load, this is the right trade-off.
+ * - 3 concurrent DB ops is enough headroom for the hydration chain
+ *   (materials cursor walk, inventory cursor walk, expenses cursor walk
+ *   each running their pages concurrently). It keeps M0 happy while
+ *   not serializing the dashboard into oblivion.
  */
 class Semaphore {
-  private available = 1;
+  private available = 3;
   private waiting: Array<() => void> = [];
 
   async run<T>(fn: () => Promise<T>): Promise<T> {

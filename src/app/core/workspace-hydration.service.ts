@@ -170,8 +170,12 @@ export class WorkspaceHydrationService {
     label: string
   ): Promise<T | null> {
     try {
+      // 45s per-page timeout — Atlas M0 with serialized cursor pagination
+      // can take up to 30s for a slow query, especially on cold path.
+      // Without this, the 9-15s hydration budget gets eaten by a single
+      // slow page and the rest of the chain is cancelled.
       return await firstValueFrom(
-        factory().pipe(timeout({ each: 20_000, meta: `hydration.${label}` }))
+        factory().pipe(timeout({ each: 45_000, meta: `hydration.${label}` }))
       );
     } catch (err: any) {
       const status = err?.status || err?.statusCode;

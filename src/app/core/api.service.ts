@@ -556,7 +556,7 @@ export class ApiService {
       // dashboard silently freezes at the first log line. 25s gives the
       // request plenty of room on a warm path while still failing fast
       // on a cold one.
-      timeout(15_000),
+      timeout(30_000),
       catchError(this.handleError)
     );
   }
@@ -570,7 +570,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/inventory${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(15_000),
+      timeout(30_000),
       catchError(this.handleError)
     );
   }
@@ -647,7 +647,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/expenses${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(15_000),
+      timeout(30_000),
       catchError(this.handleError)
     );
   }
