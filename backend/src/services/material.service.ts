@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { Material } from "../models/Material.js";
+import { IMaterial, Material } from "../models/Material.js";
 import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
 import { Vendor } from "../models/Vendor.js";
@@ -116,22 +116,42 @@ export async function listMaterials(filter: {
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Material.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(filter.limit)
-      .maxTimeMS(8000)
-      .lean(),
-    Material.countDocuments(query).maxTimeMS(8000),
-  ]);
+  type MaterialLike = { [k: string]: unknown };
+  let items: MaterialLike[] = [];
+  let total = 0;
+  try {
+    const [foundItems, foundTotal] = await Promise.all([
+      Material.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(filter.limit)
+        .maxTimeMS(8000)
+        .lean(),
+      Material.countDocuments(query).maxTimeMS(8000),
+    ]);
+    items = foundItems as unknown as MaterialLike[];
+    total = foundTotal;
+  } catch (err) {
+    console.error(
+      "[listMaterials] query failed (projectId=%s siteId=%s status=%s search=%s scopeLen=%s):",
+      String(filter.projectId || ""),
+      String(filter.siteId || ""),
+      String(filter.status || ""),
+      String(filter.search || ""),
+      String(filter.scopeProjectIds?.length ?? 0),
+      (err as Error)?.message || err
+    );
+    items = [];
+    total = 0;
+  }
 
   // Resolve site names for items that have siteId but site field is ObjectId or missing
-  const siteIds = [...new Set(items.map(m => m.siteId?.toString()).filter(Boolean))];
+  const typedItems = items as unknown as IMaterial[];
+  const siteIds = [...new Set(typedItems.map(m => m.siteId?.toString()).filter(Boolean))];
   if (siteIds.length > 0) {
     const sites = await Site.find({ _id: { $in: siteIds.map(id => new Types.ObjectId(id)) } }).lean();
     const siteNameMap = new Map(sites.map(s => [s._id.toString(), s.name]));
-    items.forEach(item => {
+    typedItems.forEach(item => {
       if (item.siteId && (!item.site || typeof item.site === "object")) {
         item.site = siteNameMap.get(item.siteId.toString()) || item.site;
       }
@@ -141,13 +161,13 @@ export async function listMaterials(filter: {
   backfillApprovedMaterialsToInventory(query).catch((err: unknown) =>
     console.error("Background backfill failed:", err)
   );
-  const stockMap = await inventoryStockMapForMaterials(items);
-  items.forEach((item) => {
+  const stockMap = await inventoryStockMapForMaterials(typedItems);
+  typedItems.forEach((item) => {
     const sharedStock = stockMap.get(inventoryKeyForMaterial(item));
     if (sharedStock !== undefined) item.remainingStock = sharedStock;
   });
 
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  return { items: typedItems, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
 }
 
 export async function getMaterialById(id: string) {
