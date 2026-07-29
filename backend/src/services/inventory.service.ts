@@ -146,7 +146,7 @@ export async function listInventory(filter: {
 export async function backfillApprovedMaterialsToInventory(materialQuery: Record<string, unknown>) {
   let materials;
   try {
-    materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed"] } }).lean();
+    materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed", "Not Received"] } }).lean();
   } catch {
     return;
   }
@@ -305,7 +305,7 @@ export async function getMissingMaterialsForSite(siteId: string) {
 
   const allMaterials = await Material.find({
     siteId: new Types.ObjectId(siteId),
-    status: { $in: ["Approved", "Received", "Completed"] },
+    status: { $in: ["Approved", "Received", "Completed", "Not Received"] },
   }).lean();
 
   if (allMaterials.length === 0) return { materials: [], site };

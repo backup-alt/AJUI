@@ -20,6 +20,7 @@ export function applyProjectScope(
   scopeProjectIds: ProjectScopeIds | undefined
 ): void {
   if (scopeProjectIds === undefined || scopeProjectIds === null) return;
+  if (Array.isArray(scopeProjectIds) && scopeProjectIds.length === 0) return;
 
   const scopedCondition = { $in: scopeProjectIds };
   const existingCondition = query[field];
@@ -43,6 +44,7 @@ export function isProjectInScope(
   scopeProjectIds: ProjectScopeIds | undefined
 ): boolean {
   if (scopeProjectIds === undefined || scopeProjectIds === null) return true;
+  if (Array.isArray(scopeProjectIds) && scopeProjectIds.length === 0) return true;
   if (!projectId) return false;
   const value = projectId.toString();
   return scopeProjectIds.some((id) => id.toString() === value);
@@ -53,5 +55,6 @@ export function projectScopeMatch(
   scopeProjectIds: ProjectScopeIds | undefined
 ): Record<string, unknown> {
   if (scopeProjectIds === undefined || scopeProjectIds === null) return {};
+  if (Array.isArray(scopeProjectIds) && scopeProjectIds.length === 0) return {};
   return { [field]: { $in: scopeProjectIds } };
 }
