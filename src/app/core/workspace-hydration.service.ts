@@ -78,33 +78,33 @@ export class WorkspaceHydrationService {
       this.lastHydrated["sites"] = Date.now();
     }
 
-    // Warm up M0 connections once before the heavy cursor-paginated loads
-    await this.warmupAll();
-
-    // Materials — cursor-paginated with per-page retry
+    // Materials — cursor-paginated, warmup called before EVERY page
     if (!this.isFresh("materials")) {
       const materials = await this.loadAllPages(
         (cursor) => this.api.listMaterials({ limit: 5, cursor }),
+        () => this.api.warmupMaterials(),
         "materials"
       );
       this.setSignal("materials", materials.map(mapMaterial), this.erp.materials);
       this.lastHydrated["materials"] = Date.now();
     }
 
-    // Inventory — cursor-paginated with per-page retry
+    // Inventory — cursor-paginated, warmup called before EVERY page
     if (!this.isFresh("inventory")) {
       const inventory = await this.loadAllPages(
         (cursor) => this.api.listInventory({ limit: 5, cursor }),
+        () => this.api.warmupInventory(),
         "inventory"
       );
       this.setSignal("inventory", inventory.map(mapInventory), this.erp.inventory);
       this.lastHydrated["inventory"] = Date.now();
     }
 
-    // Expenses — cursor-paginated with per-page retry
+    // Expenses — cursor-paginated, warmup called before EVERY page
     if (!this.isFresh("expenses")) {
       const expenses = await this.loadAllPages(
         (cursor) => this.api.listExpenses({ limit: 5, cursor }),
+        () => this.api.warmupExpenses(),
         "expenses"
       );
       this.setSignal("expenses", expenses.map(mapExpense), this.erp.expenses);
@@ -138,34 +138,14 @@ export class WorkspaceHydrationService {
   }
 
   /**
-   * Warm up all 3 M0 collections sequentially — one at a time.
-   * Parallel warmup (Promise.all) would grab all 3 connection slots
-   * simultaneously and starve the pool for the subsequent cursor queries.
-   */
-  private async warmupAll(): Promise<void> {
-    console.log("[warmupAll] priming M0 connections...");
-    const t0 = Date.now();
-    for (const [label, warmupFn] of [
-      ["materials", () => this.api.warmupMaterials()],
-      ["inventory", () => this.api.warmupInventory()],
-      ["expenses", () => this.api.warmupExpenses()],
-    ] as Array<[string, () => import("rxjs").Observable<any>]>) {
-      try {
-        await firstValueFrom(warmupFn().pipe(timeout({ each: 15_000, meta: `warmup.${label}` })));
-      } catch {
-        // warmup is best-effort — still try the real query
-      }
-    }
-    console.log(`[warmupAll] done in ${Date.now() - t0}ms`);
-  }
-
-  /**
-   * Load all pages of a cursor-paginated endpoint with aggressive per-page
-   * retry. If a page fails or returns empty items, retry that specific page
-   * up to 3 times with a delay before moving on.
+   * Load all pages of a cursor-paginated endpoint. Calls the warmup endpoint
+   * BEFORE every page request to prime the M0 connection. This is what makes
+   * `?limit=5` work reliably — the diagnostic-find-one query forces a fresh
+   * connection, then the small data query can piggyback on it.
    */
   private async loadAllPages<T>(
     factory: (cursor: string | undefined) => import("rxjs").Observable<{ items: T[]; nextCursor?: string | null }>,
+    warmup: () => import("rxjs").Observable<any>,
     label: string
   ): Promise<T[]> {
     const MAX_PAGES = 40;
@@ -180,11 +160,18 @@ export class WorkspaceHydrationService {
       pagesFetched++;
       let pageData: { items: T[]; nextCursor?: string | null } | null = null;
 
-      // Per-page retry loop
+      // Per-page retry loop — warmup before EACH attempt
       for (let pageAttempt = 1; pageAttempt <= PAGE_RETRY_LIMIT; pageAttempt++) {
         if (pageAttempt > 1) {
           console.warn(`[loadAllPages] ${label} page ${pagesFetched} retry ${pageAttempt}/${PAGE_RETRY_LIMIT}`);
           await new Promise((r) => setTimeout(r, PAGE_RETRY_DELAY_MS));
+        }
+
+        // Warm up M0 connection BEFORE every page query
+        try {
+          await firstValueFrom(warmup().pipe(timeout({ each: 10_000, meta: `warmup.${label}.page${pagesFetched}` })));
+        } catch {
+          // warmup failed — still try the data query
         }
 
         pageData = await this.safeList(
@@ -194,17 +181,6 @@ export class WorkspaceHydrationService {
 
         if (pageData && Array.isArray(pageData.items) && pageData.items.length > 0) {
           break; // got data, stop retrying this page
-        }
-
-        // Empty or failed — if first page, do a fresh warmup before retrying
-        if (pagesFetched === 1 && pageAttempt === 1) {
-          console.warn(`[loadAllPages] ${label} first page empty, re-warming M0...`);
-          try {
-            await firstValueFrom(
-              this.getWarmupObservable(label).pipe(timeout({ each: 10_000, meta: `re-warmup.${label}` }))
-            );
-          } catch {}
-          await new Promise((r) => setTimeout(r, 1000));
         }
       }
 
@@ -233,15 +209,6 @@ export class WorkspaceHydrationService {
       `[loadAllPages] ${label}: fetched ${allItems.length}/${totalReported || "?"} items across ${pagesFetched} page(s)`
     );
     return allItems;
-  }
-
-  private getWarmupObservable(label: string): import("rxjs").Observable<any> {
-    switch (label) {
-      case "materials": return this.api.warmupMaterials();
-      case "inventory": return this.api.warmupInventory();
-      case "expenses": return this.api.warmupExpenses();
-      default: throw new Error(`No warmup for: ${label}`);
-    }
   }
 
   async hydrateFromBackend(): Promise<void> {
