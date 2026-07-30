@@ -751,11 +751,11 @@ export async function listMaterialsForSupervisor(
 
     const [items, total] = await Promise.all([
       withRetry(
-        () => Inventory.find(invQuery).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(8000),
+        () => Inventory.find(invQuery).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(30_000),
         { label: "mobile.listMaterials.inv.find" }
       ),
       withRetry(
-        () => Inventory.countDocuments(invQuery).maxTimeMS(8000),
+        () => Inventory.countDocuments(invQuery).maxTimeMS(30_000),
         { label: "mobile.listMaterials.inv.count" }
       ),
     ]).catch((err) => {
@@ -814,11 +814,11 @@ export async function listMaterialsForSupervisor(
 
   const [items, total] = await Promise.all([
     withRetry(
-      () => Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(8000),
+      () => Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(30_000),
       { label: "mobile.listMaterials.find" }
     ),
     withRetry(
-      () => Material.countDocuments(query).maxTimeMS(8000),
+      () => Material.countDocuments(query).maxTimeMS(30_000),
       { label: "mobile.listMaterials.count" }
     ),
   ]).catch((err) => {
@@ -908,11 +908,11 @@ export async function listExpensesForSupervisor(
 
   const [items, total] = await Promise.all([
     withRetry(
-      () => Expense.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(8000),
+      () => Expense.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(30_000),
       { label: "mobile.listExpenses.find" }
     ),
     withRetry(
-      () => Expense.countDocuments(query).maxTimeMS(8000),
+      () => Expense.countDocuments(query).maxTimeMS(30_000),
       { label: "mobile.listExpenses.count" }
     ),
   ]).catch((err) => {

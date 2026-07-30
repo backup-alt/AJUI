@@ -138,7 +138,7 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(300_000); nex
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "FINAL-senior-dev-fix-all-issues-2026-07-30",
+      deploy: "fix-mobile-maxTimeMS-30s-2026-07-30",
     });
   });
 
