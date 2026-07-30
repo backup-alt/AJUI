@@ -1125,15 +1125,13 @@ export class ProjectWorkspacePage {
    */
   private refreshSectionFromBackend(section: ModuleKey) {
     const apiMap: Record<string, () => any> = {
-      // limit must be <= 25 — schemas for materials/inventory/expenses
-      // cap at max(25). limit:100 silently returns 400.
-      materials: () => this.api.listMaterials({ limit: 25 }),
+      materials: () => this.api.listAllMaterials(),
       labour: () => this.api.listLabour({ limit: 100 }),
-      expenses: () => this.api.listExpenses({ limit: 25 }),
+      expenses: () => this.api.listAllExpenses(),
       payments: () => this.api.listPayments({ limit: 100 }),
       vendors: () => this.api.listVendors({ limit: 100 }),
       subcontractors: () => this.api.listSubcontractors({ limit: 100 }),
-      inventory: () => this.api.listInventory({ limit: 25 }),
+      inventory: () => this.api.listAllInventory(),
     };
     const mapperMap: Record<string, (x: any) => any> = {
       materials: mapMaterial,
@@ -1374,13 +1372,13 @@ export class ProjectWorkspacePage {
     this.hydration.invalidateCache();
     const section = this.activeSection();
     const apiMap: Record<string, (opts: any) => any> = {
-      materials: (opts: any) => this.api.listMaterials(opts),
+      materials: (_opts: any) => this.api.listAllMaterials(),
       labour: (opts: any) => this.api.listLabour(opts),
-      expenses: (opts: any) => this.api.listExpenses(opts),
+      expenses: (_opts: any) => this.api.listAllExpenses(),
       payments: (opts: any) => this.api.listPayments(opts),
       vendors: (opts: any) => this.api.listVendors(opts),
       subcontractors: (opts: any) => this.api.listSubcontractors(opts),
-      inventory: (opts: any) => this.api.listInventory(opts),
+      inventory: (_opts: any) => this.api.listAllInventory(),
     };
     const mapperMap: Record<string, (x: any) => any> = {
       materials: mapMaterial,
@@ -1414,8 +1412,7 @@ export class ProjectWorkspacePage {
     const storageKey = storageMap[section];
     const dataSignal = dataMap[section];
     if (!apiCall || !mapper || !dataSignal) return;
-    // Clamp limit to 25 for materials/inventory/expenses (schema max 25).
-    const limit = (section === "materials" || section === "inventory" || section === "expenses") ? 25 : 100;
+    const limit = 100;
     apiCall({ limit }).subscribe({
       next: (r: any) => {
         try {

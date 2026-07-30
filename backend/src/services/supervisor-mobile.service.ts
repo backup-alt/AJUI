@@ -221,6 +221,14 @@ async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
 async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) {
   if (!siteId) {
     if (access.siteIds.length === 0 && access.siteNames.length === 0) return undefined;
+    if (access.siteIds.length > 0 && access.siteNames.length > 0) {
+      return {
+        $or: [
+          { siteId: { $in: access.siteIds } },
+          { site: { $in: access.siteNames } },
+        ],
+      };
+    }
     if (access.siteIds.length > 0) return { siteId: { $in: access.siteIds } };
     return { site: { $in: access.siteNames } };
   }
@@ -244,7 +252,12 @@ async function getSiteScopeForFilter(access: SupervisorAccess, siteId?: string) 
     throw new AppError(403, "Not assigned to this site");
   }
 
-  return { siteId: requestedSiteId };
+  return {
+    $or: [
+      { siteId: requestedSiteId },
+      { site: site.name },
+    ],
+  };
 }
 
 async function buildScopedEntityQuery(

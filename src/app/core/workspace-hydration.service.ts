@@ -181,28 +181,21 @@ export class WorkspaceHydrationService {
       `[hydrateDeferred] starting — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
     );
 
-    // Materials, inventory, expenses — walk cursor pages with limit=25.
-    // The schema caps limit at max(25) so we MUST paginate to get all rows.
-    // Each collection is fetched sequentially (not in parallel) to avoid
-    // saturating the M0 connection pool with concurrent queries.
-    await this.loadAllByCursor(
-      "materials",
-      (cursor) => this.api.listMaterials({ limit: 25, cursor }),
-      mapMaterial,
-      this.erp.materials
-    );
-    await this.loadAllByCursor(
-      "inventory",
-      (cursor) => this.api.listInventory({ limit: 25, cursor }),
-      mapInventory,
-      this.erp.inventory
-    );
-    await this.loadAllByCursor(
-      "expenses",
-      (cursor) => this.api.listExpenses({ limit: 25, cursor }),
-      mapExpense,
-      this.erp.expenses
-    );
+    // Materials, inventory, expenses can exceed one 25-row page. Use the
+    // dedicated all-data endpoints so project/site views do not go blank
+    // when their rows are beyond the first page.
+    const materials = await this.safeList(() => this.api.listAllMaterials(), "materials/all");
+    if (materials && Array.isArray(materials.items)) {
+      this.replaceIfLarger(this.erp.materials, materials.items.map(mapMaterial), "materials");
+    }
+    const inventory = await this.safeList(() => this.api.listAllInventory(), "inventory/all");
+    if (inventory && Array.isArray(inventory.items)) {
+      this.replaceIfLarger(this.erp.inventory, inventory.items.map(mapInventory), "inventory");
+    }
+    const expenses = await this.safeList(() => this.api.listAllExpenses(), "expenses/all");
+    if (expenses && Array.isArray(expenses.items)) {
+      this.replaceIfLarger(this.erp.expenses, expenses.items.map(mapExpense), "expenses");
+    }
 
     // Sites (single page)
     const sites = await this.safeList(() => this.api.listSites(), "sites");

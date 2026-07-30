@@ -2650,8 +2650,7 @@ export class UniversalDashboardPage implements OnInit {
       error: finishOne,
     });
     // Materials: pipe through mapper (sets id from materialId).
-    // limit <= 25 — listMaterials schema caps at max(25).
-    this.api.listMaterials({ limit: 25 }).subscribe({
+    this.api.listAllMaterials().subscribe({
       next: (r) => {
         try {
           writeFromBackend("materials", (r.items || []).map(mapMaterial), this.data.materials);
@@ -2670,8 +2669,8 @@ export class UniversalDashboardPage implements OnInit {
       },
       error: finishOne,
     });
-    // Expenses: pipe through mapper. limit <= 25 (schema max).
-    this.api.listExpenses({ limit: 25 }).subscribe({
+    // Expenses: pipe through mapper.
+    this.api.listAllExpenses().subscribe({
       next: (r) => {
         try {
           writeFromBackend("expenses", (r.items || []).map(mapExpense), this.data.expenses);
@@ -2710,8 +2709,8 @@ export class UniversalDashboardPage implements OnInit {
       },
       error: finishOne,
     });
-    // Inventory: pipe through mapper. limit <= 25 (schema max).
-    this.api.listInventory({ limit: 25 }).subscribe({
+    // Inventory: pipe through mapper.
+    this.api.listAllInventory().subscribe({
       next: (r) => {
         try {
           writeFromBackend("inventory", (r.items || []).map(mapInventory), this.data.inventory);
