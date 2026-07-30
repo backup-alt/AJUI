@@ -237,15 +237,14 @@ export async function listExpenses(filter: {
     // contend with other concurrent requests for the M0 cluster's
     // shared resources.
     //
-    // Exclude receiptImage from list queries — it's a base64-encoded
-    // image that can be 100KB-2MB per record. When pCloud uploads fail,
-    // the receipt is stored as base64, causing list response payloads
-    // to balloon to multiple MB and triggering 503 timeouts. The
-    // single-record GET endpoint still returns the full document.
+    // Exclude receiptImage, billUrl, and customFields from list queries —
+    // receiptImage is base64 (100KB-2MB), billUrl can occasionally be
+    // large, and customFields is Mixed type that can store arbitrary
+    // data. The single-record GET endpoint still returns the full document.
     const foundItems = await dbMutex.run(() =>
       withRetry(
         () => Expense.find(query)
-          .select({ receiptImage: 0 })
+          .select({ receiptImage: 0, billUrl: 0, customFields: 0 })
           .sort({ _id: -1 })
           .limit(effectiveLimit + 1)
           .lean()
