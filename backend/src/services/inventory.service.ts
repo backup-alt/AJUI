@@ -226,62 +226,125 @@ export async function listInventory(filter: {
   };
 }
 
+/**
+ * Efficient bulk backfill: pulls all materials in one query, all existing
+ * inventory in one query, then bulk-inserts missing inventory records
+ * with `ordered: false` so a single failure doesn't abort the batch.
+ * Far faster than the previous N+1 loop (100s of queries → 2 queries + 1 bulk).
+ */
 export async function backfillApprovedMaterialsToInventory(materialQuery: Record<string, unknown>) {
-  let materials;
+  const t0 = Date.now();
+  let materials: any[];
   try {
-    materials = await Material.find({ ...materialQuery, status: { $in: ["Approved", "Received", "Completed", "Not Received"] } }).lean();
-  } catch {
+    materials = await Material.find({
+      ...materialQuery,
+      status: { $in: ["Approved", "Received", "Completed", "Not Received"] },
+    })
+      .select("_id projectId projectName clientId clientName siteId site name unit requestedQuantity approvedQuantity purchasedQuantity consumedQuantity vendor vendorId poNumber createdBy")
+      .lean()
+      .maxTimeMS(15000);
+  } catch (err) {
+    console.warn("[backfill] Material.find failed:", (err as Error).message);
     return;
   }
+  if (materials.length === 0) {
+    console.log("[backfill] no materials matched — nothing to backfill");
+    return;
+  }
+
+  // Bulk-fetch all existing inventory in one query
+  const matchClauses = materials.map(inventoryMatchForMaterial);
+  const existing: any[] = await Inventory.find({ $or: matchClauses })
+    .select("_id siteKey normalizedName normalizedUnit purchaseHistory materialId")
+    .lean()
+    .maxTimeMS(15000)
+    .catch((err) => {
+      console.warn("[backfill] Inventory.find failed (non-fatal):", (err as Error).message);
+      return [];
+    });
+
+  // Index existing inventory by composite key for O(1) lookup
+  const existingByKey = new Map<string, any>();
+  for (const inv of existing) {
+    const key = `${inv.projectId}__${inv.siteKey}__${inv.normalizedName}__${inv.normalizedUnit}`;
+    existingByKey.set(key, inv);
+  }
+
+  // Build bulk insert ops for missing inventory records
+  const ops: any[] = [];
   for (const material of materials) {
-    try {
-      const existing = await Inventory.findOne(inventoryMatchForMaterial(material)).lean();
-      if (existing) {
-        const qty = Math.max(0, Number(material.approvedQuantity) || 0);
-        if (qty <= 0) continue;
-        const alreadyRecorded = (existing.purchaseHistory || []).some(
-          (h) => h.materialId && h.materialId.toString() === material._id.toString()
-        );
-        if (alreadyRecorded) continue;
-        await addApprovedMaterialToInventory(material._id, qty, material.createdBy);
-        continue;
-      }
-      const quantity = Math.max(0, Number(material.approvedQuantity) || 0);
-      if (quantity <= 0) continue;
-      const inventory = new Inventory({
-        projectId: material.projectId,
-        projectName: material.projectName,
-        clientId: material.clientId,
-        clientName: material.clientName,
-        siteId: material.siteId,
-        site: material.site,
-        siteKey: siteKey(material.siteId, material.site),
-        name: material.name,
-        normalizedName: normalized(material.name),
-        unit: material.unit,
-        normalizedUnit: normalized(material.unit),
-        requestedQuantity: Number(material.requestedQuantity) || 0,
-        approvedQuantity: quantity,
-        purchasedQuantity: quantity,
-        consumedQuantity: Number(material.consumedQuantity) || 0,
-        vendor: material.vendor,
-        vendorId: material.vendorId,
-        poNumber: material.poNumber,
-        lastMaterialId: material._id,
-        purchaseHistory: [{
-          vendor: material.vendor || "",
-          vendorId: material.vendorId,
-          quantity: quantity,
-          date: new Date(),
-          poNumber: material.poNumber,
-          materialId: material._id,
-        }],
-      });
-      await inventory.save();
-    } catch {
+    const quantity = Math.max(0, Number(material.approvedQuantity) || 0);
+    if (quantity <= 0) continue;
+    const key = inventoryKeyForMaterial(material);
+    const inv = existingByKey.get(key);
+    if (inv) {
+      // Already exists — skip (no purchaseHistory update from backfill; that
+      // happens inline when new materials are approved via addApprovedMaterialToInventory)
       continue;
     }
+    ops.push({
+      insertOne: {
+        document: {
+          projectId: material.projectId,
+          projectName: material.projectName,
+          clientId: material.clientId,
+          clientName: material.clientName,
+          siteId: material.siteId,
+          site: material.site,
+          siteKey: siteKey(material.siteId, material.site),
+          name: material.name,
+          normalizedName: normalized(material.name),
+          unit: material.unit,
+          normalizedUnit: normalized(material.unit),
+          requestedQuantity: Number(material.requestedQuantity) || 0,
+          approvedQuantity: quantity,
+          purchasedQuantity: quantity,
+          consumedQuantity: Number(material.consumedQuantity) || 0,
+          vendor: material.vendor,
+          vendorId: material.vendorId,
+          poNumber: material.poNumber,
+          lastMaterialId: material._id,
+          purchaseHistory: [
+            {
+              vendor: material.vendor || "",
+              vendorId: material.vendorId,
+              quantity,
+              date: new Date(),
+              poNumber: material.poNumber,
+              materialId: material._id,
+            },
+          ],
+        },
+      },
+    });
   }
+
+  if (ops.length === 0) {
+    console.log(`[backfill] ${materials.length} materials, all already have inventory records — nothing to insert`);
+    return;
+  }
+
+  // Chunk to respect M0's 1000-op bulkWrite limit and add small pauses
+  const CHUNK_SIZE = 100;
+  let inserted = 0;
+  for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
+    const chunk = ops.slice(i, i + CHUNK_SIZE);
+    try {
+      const result = await Inventory.bulkWrite(chunk, { ordered: false });
+      inserted += result.insertedCount ?? 0;
+    } catch (err: any) {
+      // ordered: false means some inserts may succeed even if others fail
+      const written = err?.result?.result?.nInserted ?? err?.insertedCount ?? 0;
+      inserted += written;
+      console.warn(`[backfill] chunk ${i / CHUNK_SIZE + 1} partial: ${(err as Error).message}`);
+    }
+    if (i + CHUNK_SIZE < ops.length) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  console.log(
+    `[backfill] inserted ${inserted}/${ops.length} inventory records from ${materials.length} materials in ${Date.now() - t0}ms`
+  );
 }
 
 export async function adjustInventoryStock(

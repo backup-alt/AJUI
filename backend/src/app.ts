@@ -141,7 +141,7 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(90_000); next
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "fix-exclude-receiptImage-list",
+      deploy: "fix-inventory-bulk-backfill",
     });
   });
 
@@ -285,21 +285,24 @@ export async function bootstrap(): Promise<void> {
     console.warn("[Bootstrap] migrateCompanyName failed (non-fatal):", (err as Error).message);
   }
 
-  // TEMPORARILY DISABLED — both backfill tasks make 1+N DB queries each at
-  // startup, which on M0 free tier can starve the pool before the first
-  // user request gets through. Re-enable after confirming the dashboard
-  // works without them.
-  // try {
-  //   const { backfillApprovedMaterialsToInventory, backfillMaterialSiteIds } = await import("./services/inventory.service.js");
-  //   backfillMaterialSiteIds().catch((err: any) =>
-  //     console.error("[Startup] backfill material siteIds failed (non-fatal):", err?.message || err)
-  //   );
-  //   backfillApprovedMaterialsToInventory({}).catch((err: any) =>
-  //     console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
-  //   );
-  // } catch (err) {
-  //   console.warn("[Bootstrap] backfill imports failed (non-fatal):", (err as Error).message);
-  // }
+  // Backfill inventory records from materials — uses bulk operations now
+  // (was N+1 queries before). Runs in the background after server start
+  // so the first user request doesn't have to wait. Materials without
+  // inventory records will be auto-populated, so the Inventory tab
+  // shows all sites/projects visible to the user.
+  try {
+    const { backfillApprovedMaterialsToInventory } = await import("./services/inventory.service.js");
+    // Fire-and-forget — the bootstrap() resolves immediately, the backfill
+    // runs in the background. M0 may take 10-30s to process 50+ materials.
+    setImmediate(() => {
+      backfillApprovedMaterialsToInventory({}).catch((err: any) =>
+        console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
+      );
+    });
+    console.log("[Startup] inventory backfill scheduled (background)");
+  } catch (err) {
+    console.warn("[Bootstrap] backfill import failed (non-fatal):", (err as Error).message);
+  }
 
   try {
     const { Material } = await import("./models/Material.js");

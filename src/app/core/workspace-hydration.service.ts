@@ -277,9 +277,12 @@ export class WorkspaceHydrationService {
         `${label}/page${pagesFetched}`
       );
       const items = (response as any)?.items;
+      const nextCursor = (response as any)?.nextCursor;
+      console.log(
+        `[loadAllByCursor] ${label} page ${pagesFetched}: items=${Array.isArray(items) ? items.length : "?"} nextCursor=${nextCursor ? "yes" : "no"} raw=${JSON.stringify(response).substring(0, 200)}`
+      );
       if (!Array.isArray(items) || items.length === 0) break;
       allItems.push(...items);
-      const nextCursor = (response as any)?.nextCursor;
       if (!nextCursor) break;
       cursor = String(nextCursor);
       // Small delay between pages to let M0 recover
