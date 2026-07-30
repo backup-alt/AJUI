@@ -20,7 +20,7 @@ export async function walkAllByCursor<T>(
   pageFn: (q: Record<string, unknown>, limit: number) => Promise<T[]>
 ): Promise<T[]> {
   const PAGE_SIZE = 25;
-  const PAGE_DELAY_MS = 200;
+  const PAGE_DELAY_MS = 500;
   const MAX_PAGE_ATTEMPTS = 3;
   const out: T[] = [];
   let cursor: string | undefined = undefined;
@@ -83,13 +83,18 @@ export async function findAllOrFallback<T extends Record<string, unknown>>(
   label: string,
   query: Record<string, unknown>,
   hardCap = 500,
-  singleShotMs = 15_000
+  singleShotMs = 60_000
 ): Promise<T[]> {
   const cap = Math.min(Math.max(hardCap, 1), 500);
 
   try {
+    // Exclude receiptImage from the single-shot query — it's base64-encoded
+    // and can be 100KB-2MB per record, causing the query to balloon to
+    // multiple MB and timeout on M0. The cursor-walk fallback also excludes
+    // it for the same reason.
     const items = await model
       .find(query)
+      .select({ receiptImage: 0 })
       .sort({ _id: -1 })
       .limit(cap)
       .lean()
@@ -108,10 +113,11 @@ export async function findAllOrFallback<T extends Record<string, unknown>>(
     async (q, limit) => {
       const items = await model
         .find(q)
+        .select({ receiptImage: 0 })
         .sort({ _id: -1 })
         .limit(limit)
         .lean()
-        .maxTimeMS(8000);
+        .maxTimeMS(30_000);
       return items as unknown as T[];
     }
   );
