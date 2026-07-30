@@ -190,6 +190,10 @@ export type ExpenseRow = {
   reference: string;
   status: ApprovalStatus;
   billUrl?: string;
+  billImageName?: string;
+  receiptImage?: string;
+  receiptImageMimeType?: string;
+  receiptImageName?: string;
   poNumber?: string;
   transactionType?: "Purchase" | "Cash Added";
   isSiteMaterial?: boolean;

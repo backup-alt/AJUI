@@ -524,7 +524,8 @@ export class PendingApprovalsPage implements OnInit {
 
   private async refreshExpensesFromBackend(): Promise<void> {
     try {
-      const result = await firstValueFrom(this.api.listExpenses({ limit: 100 }));
+      // limit <= 25 — listExpenses schema caps at max(25).
+      const result = await firstValueFrom(this.api.listExpenses({ limit: 25 }));
       const mapped = (result.items || []).map(mapExpense);
       this.data.setExpenses(mapped);
     } catch (e) {

@@ -212,9 +212,12 @@ export async function listExpenses(filter: {
 
   // Cursor-based pagination via _id — O(log n) range query on the _id
   // index, no skip-and-scan that M0 can't handle above ~25 rows.
+  //
+  // Sort is {_id: -1} (descending), so the popped cursor is the SMALLEST
+  // _id in the page. Next page needs SMALLER _id values → $lt.
   if (filter.cursor) {
     try {
-      query._id = { $gt: new Types.ObjectId(filter.cursor) };
+      query._id = { $lt: new Types.ObjectId(filter.cursor) };
     } catch {
       // Invalid cursor → start from beginning
     }
@@ -237,14 +240,13 @@ export async function listExpenses(filter: {
     // contend with other concurrent requests for the M0 cluster's
     // shared resources.
     //
-    // Exclude receiptImage, billUrl, and customFields from list queries —
-    // receiptImage is base64 (100KB-2MB), billUrl can occasionally be
-    // large, and customFields is Mixed type that can store arbitrary
-    // data. The single-record GET endpoint still returns the full document.
+    // Exclude receiptImage and customFields from list queries — receiptImage
+    // is base64 (100KB-2MB), customFields is Mixed type that can store
+    // arbitrary data. Keep billUrl so View Bill works on list rows.
     const foundItems = await dbMutex.run(() =>
       withRetry(
         () => Expense.find(query)
-          .select({ receiptImage: 0, billUrl: 0, customFields: 0 })
+          .select({ receiptImage: 0, customFields: 0 })
           .sort({ _id: -1 })
           .limit(effectiveLimit + 1)
           .lean()

@@ -2150,7 +2150,8 @@ export class UniversalDashboardPage implements OnInit {
   }
 
   private refreshMaterialsAfterSave() {
-    this.api.listMaterials({ limit: 100 }).subscribe({
+    // limit <= 25 — listMaterials schema caps at max(25).
+    this.api.listMaterials({ limit: 25 }).subscribe({
       next: (r: any) => {
         try {
           const items = ((r as any).items || []).map(mapMaterial);
@@ -2648,8 +2649,9 @@ export class UniversalDashboardPage implements OnInit {
       },
       error: finishOne,
     });
-    // Materials: pipe through mapper (sets id from materialId)
-    this.api.listMaterials({ limit: 100 }).subscribe({
+    // Materials: pipe through mapper (sets id from materialId).
+    // limit <= 25 — listMaterials schema caps at max(25).
+    this.api.listMaterials({ limit: 25 }).subscribe({
       next: (r) => {
         try {
           writeFromBackend("materials", (r.items || []).map(mapMaterial), this.data.materials);
@@ -2668,8 +2670,8 @@ export class UniversalDashboardPage implements OnInit {
       },
       error: finishOne,
     });
-    // Expenses: pipe through mapper
-    this.api.listExpenses({ limit: 100 }).subscribe({
+    // Expenses: pipe through mapper. limit <= 25 (schema max).
+    this.api.listExpenses({ limit: 25 }).subscribe({
       next: (r) => {
         try {
           writeFromBackend("expenses", (r.items || []).map(mapExpense), this.data.expenses);
@@ -2708,8 +2710,8 @@ export class UniversalDashboardPage implements OnInit {
       },
       error: finishOne,
     });
-    // Inventory: pipe through mapper
-    this.api.listInventory({ limit: 100 }).subscribe({
+    // Inventory: pipe through mapper. limit <= 25 (schema max).
+    this.api.listInventory({ limit: 25 }).subscribe({
       next: (r) => {
         try {
           writeFromBackend("inventory", (r.items || []).map(mapInventory), this.data.inventory);
@@ -4036,7 +4038,7 @@ visibleRows(): TableRow[] {
       supervisor: row.supervisor,
       cashIssued: formatMoney(row.cashIssued || row.received || 0),
       reference: row.reference,
-      billUrl: row.billUrl,
+      billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       approvalStatus: row.status,
       ...(row.customFields || {}),
     }));
@@ -4053,7 +4055,7 @@ visibleRows(): TableRow[] {
       amount: formatMoney(row.spent),
       paidBy: row.supervisor,
       reference: row.reference,
-      billUrl: row.billUrl,
+      billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       approvalStatus: row.status,
       ...(row.customFields || {}),
     }));

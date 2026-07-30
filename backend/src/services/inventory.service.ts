@@ -139,9 +139,12 @@ export async function listInventory(filter: {
   // Cursor-based pagination via _id — uses the _id index for an O(log n)
   // range query instead of the O(n) skip-then-limit pattern that timed
   // out on M0 free tier.
+  //
+  // Sort is {_id: -1} (descending), so the popped cursor is the SMALLEST
+  // _id in the page. Next page needs SMALLER _id values → $lt.
   if (filter.cursor) {
     try {
-      query._id = { $gt: new Types.ObjectId(filter.cursor) };
+      query._id = { $lt: new Types.ObjectId(filter.cursor) };
     } catch {
       // Invalid cursor → fall through and start from the beginning
     }

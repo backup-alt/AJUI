@@ -1125,13 +1125,15 @@ export class ProjectWorkspacePage {
    */
   private refreshSectionFromBackend(section: ModuleKey) {
     const apiMap: Record<string, () => any> = {
-      materials: () => this.api.listMaterials({ limit: 100 }),
+      // limit must be <= 25 — schemas for materials/inventory/expenses
+      // cap at max(25). limit:100 silently returns 400.
+      materials: () => this.api.listMaterials({ limit: 25 }),
       labour: () => this.api.listLabour({ limit: 100 }),
-      expenses: () => this.api.listExpenses({ limit: 100 }),
+      expenses: () => this.api.listExpenses({ limit: 25 }),
       payments: () => this.api.listPayments({ limit: 100 }),
       vendors: () => this.api.listVendors({ limit: 100 }),
       subcontractors: () => this.api.listSubcontractors({ limit: 100 }),
-      inventory: () => this.api.listInventory({ limit: 100 }),
+      inventory: () => this.api.listInventory({ limit: 25 }),
     };
     const mapperMap: Record<string, (x: any) => any> = {
       materials: mapMaterial,
@@ -1412,7 +1414,9 @@ export class ProjectWorkspacePage {
     const storageKey = storageMap[section];
     const dataSignal = dataMap[section];
     if (!apiCall || !mapper || !dataSignal) return;
-    apiCall({ limit: 100 }).subscribe({
+    // Clamp limit to 25 for materials/inventory/expenses (schema max 25).
+    const limit = (section === "materials" || section === "inventory" || section === "expenses") ? 25 : 100;
+    apiCall({ limit }).subscribe({
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapper);
@@ -2640,7 +2644,7 @@ export class ProjectWorkspacePage {
         supervisor: row.supervisor,
         cashIssued: formatMoney(row.cashIssued || row.received || 0),
         reference: row.reference,
-        billUrl: row.billUrl,
+        billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
         approvalStatus: row.status,
       }));
 

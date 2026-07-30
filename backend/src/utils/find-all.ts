@@ -29,7 +29,9 @@ export async function walkAllByCursor<T>(
   while (out.length < hardCap) {
     if (cursor) {
       try {
-        query._id = { $gt: toObjectId(cursor) };
+        // Sort is {_id: -1} (descending), cursor is the SMALLEST _id
+        // in the page. Next page needs _id < cursor → $lt.
+        query._id = { $lt: toObjectId(cursor) };
       } catch {
         break;
       }
