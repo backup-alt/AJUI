@@ -179,7 +179,7 @@ export async function listInventory(filter: {
           .sort({ _id: -1 })
           .limit(effectiveLimit + 1)
           .lean()
-          .maxTimeMS(10000),
+          .maxTimeMS(60_000),
         { label: "listInventory.find" }
       )
     );
@@ -187,7 +187,7 @@ export async function listInventory(filter: {
       try {
         const foundTotal = await dbMutex.run(() =>
           withRetry(
-            () => Inventory.countDocuments(query).maxTimeMS(8000),
+            () => Inventory.countDocuments(query).maxTimeMS(30_000),
             { label: "listInventory.count" }
           )
         );
