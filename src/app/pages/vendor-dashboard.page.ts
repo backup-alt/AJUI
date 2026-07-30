@@ -28,15 +28,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       <agb-enterprise-sidebar active="vendors"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        @if (refreshMessage()) {
-          <div class="backend-sync-banner" role="status">
-            <span class="spinner" [class.spinning]="refreshing()"></span>
-            <span>{{ refreshMessage() }}</span>
-            @if (!refreshing()) {
-              <button type="button" class="banner-btn" (click)="refreshFromBackend()">Refresh from backend</button>
-            }
-          </div>
-        }
         <agb-enterprise-header
           title="Vendors"
           eyebrow="Vendor Registry · Material suppliers and contractors"
@@ -432,38 +423,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     </ion-split-pane>
   `,
   styles: [`
-    .backend-sync-banner {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 18px;
-      background: #1a2540;
-      color: #fff;
-      font-size: 13px;
-      border-bottom: 1px solid #2c3760;
-    }
-    .backend-sync-banner .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid #4a5780;
-      border-top-color: #6fffb0;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .backend-sync-banner .spinner.spinning {
-      animation: vd-spin 0.8s linear infinite;
-    }
-    @keyframes vd-spin { to { transform: rotate(360deg); } }
-    .backend-sync-banner .banner-btn {
-      margin-left: auto;
-      background: #2c5cff;
-      color: #fff;
-      border: none;
-      padding: 5px 12px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 12px;
-    }
     .vendor-card .card-head {
       padding-bottom: 12px;
       border-bottom: 1px solid #e5eaf1;
