@@ -278,16 +278,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
       <agb-enterprise-sidebar active="dashboard"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        @if (backendSyncMessage()) {
-          <div class="backend-sync-banner" role="status">
-            <span class="spinner" [class.spinning]="backendSyncing()"></span>
-            <span>{{ backendSyncMessage() }}</span>
-            @if (!backendSyncing()) {
-              <button type="button" class="banner-btn" (click)="refreshFromBackend()">Refresh now</button>
-              <button type="button" class="banner-btn" (click)="clearLocalCacheAndReload()">Clear cache & reload</button>
-            }
-          </div>
-        }
         <agb-enterprise-header
           title="Dashboard"
           eyebrow="Universal Records · Backend source of truth"
@@ -1194,38 +1184,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
     </ion-split-pane>
   `,
   styles: [`
-    .backend-sync-banner {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 18px;
-      background: #1a2540;
-      color: #fff;
-      font-size: 13px;
-      border-bottom: 1px solid #2c3760;
-    }
-    .backend-sync-banner .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid #4a5780;
-      border-top-color: #6fffb0;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .backend-sync-banner .spinner.spinning {
-      animation: banner-spin 0.8s linear infinite;
-    }
-    @keyframes banner-spin { to { transform: rotate(360deg); } }
-    .backend-sync-banner .banner-btn {
-      margin-left: auto;
-      background: #2c5cff;
-      color: #fff;
-      border: none;
-      padding: 5px 12px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 12px;
-    }
     .checkbox-label {
       display: flex;
       align-items: center;

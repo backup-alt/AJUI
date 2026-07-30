@@ -1029,9 +1029,9 @@ readonly savingPdf = signal(false);
   clientAddress = "";
   clientState = "Tamil Nadu";
   clientGstin = "";
-  cgstPercent = 9;
-  sgstPercent = 9;
-  roundOff = 0;
+  cgstPercent = signal(9);
+  sgstPercent = signal(9);
+  roundOff = signal(0);
 
   readonly currentQuoteNumber = computed(() => {
     if (this.editingQuoteId()) {
@@ -1055,11 +1055,11 @@ readonly savingPdf = signal(false);
     this.quotationRows().reduce((sum, row) => sum + (row.amount || 0), 0)
   );
 
-  readonly cgstAmount = computed(() => this.subtotal() * this.cgstPercent / 100);
-  readonly sgstAmount = computed(() => this.subtotal() * this.sgstPercent / 100);
+  readonly cgstAmount = computed(() => this.subtotal() * this.cgstPercent() / 100);
+  readonly sgstAmount = computed(() => this.subtotal() * this.sgstPercent() / 100);
 
   readonly totalAmount = computed(() =>
-    this.subtotal() + this.cgstAmount() + this.sgstAmount() + this.roundOff
+    this.subtotal() + this.cgstAmount() + this.sgstAmount() + this.roundOff()
   );
 
   readonly amountInWords = computed(() => numberToWords(Math.round(this.totalAmount())));
@@ -1082,11 +1082,11 @@ readonly savingPdf = signal(false);
       isCustom: row.isCustom ?? false,
     })),
     subtotal: this.subtotal(),
-    cgstPercent: this.cgstPercent,
-    sgstPercent: this.sgstPercent,
+    cgstPercent: this.cgstPercent(),
+    sgstPercent: this.sgstPercent(),
     cgstAmount: this.cgstAmount(),
     sgstAmount: this.sgstAmount(),
-    roundOff: this.roundOff,
+    roundOff: this.roundOff(),
     totalAmount: this.totalAmount(),
     amountInWords: this.amountInWords(),
   }));
@@ -1224,9 +1224,9 @@ readonly savingPdf = signal(false);
     this.clientGstin = "";
     this.clientSearchTerm.set("");
     this.selectedClientId.set(null);
-    this.cgstPercent = 9;
-    this.sgstPercent = 9;
-    this.roundOff = 0;
+    this.cgstPercent.set(9);
+    this.sgstPercent.set(9);
+    this.roundOff.set(0);
     this.editingQuotation.set(true);
   }
 
@@ -1240,9 +1240,9 @@ readonly savingPdf = signal(false);
     this.clientGstin = quote.clientGstin;
     this.clientSearchTerm.set(quote.clientName);
     this.selectedClientId.set(this.findClientIdByName(quote.clientName));
-    this.cgstPercent = quote.cgstPercent;
-    this.sgstPercent = quote.sgstPercent;
-    this.roundOff = quote.roundOff;
+    this.cgstPercent.set(quote.cgstPercent);
+    this.sgstPercent.set(quote.sgstPercent);
+    this.roundOff.set(quote.roundOff);
     this.editingQuotation.set(true);
   }
 
@@ -1338,11 +1338,11 @@ readonly savingPdf = signal(false);
       items: validItems,
       customColumns: this.customColumns(),
       subtotal: this.subtotal(),
-      cgstPercent: this.cgstPercent,
-      sgstPercent: this.sgstPercent,
+      cgstPercent: this.cgstPercent(),
+      sgstPercent: this.sgstPercent(),
       cgstAmount: this.cgstAmount(),
       sgstAmount: this.sgstAmount(),
-      roundOff: this.roundOff,
+      roundOff: this.roundOff(),
       totalAmount: this.totalAmount(),
       amountInWords: this.amountInWords(),
       status,
@@ -1447,9 +1447,9 @@ readonly savingPdf = signal(false);
       }),
       "",
       `Subtotal,,,,"${this.subtotal()}"`,
-      `CGST @${this.cgstPercent}%,,,,"${this.cgstAmount()}"`,
-      `SGST @${this.sgstPercent}%,,,,"${this.sgstAmount()}"`,
-      `Round Off,,,,,"${this.roundOff}"`,
+      `CGST @${this.cgstPercent()}%,,,,"${this.cgstAmount()}"`,
+      `SGST @${this.sgstPercent()}%,,,,"${this.sgstAmount()}"`,
+      `Round Off,,,,,"${this.roundOff()}"`,
       `Total,,,,,"${this.totalAmount()}"`,
       `Amount in Words: "${this.amountInWords()}"`,
     ];

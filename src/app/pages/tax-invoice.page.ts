@@ -513,9 +513,9 @@ export class TaxInvoicePage {
   clientAddress = "";
   clientState = "Tamil Nadu";
   clientGstin = "";
-  cgstPercent = 9;
-  sgstPercent = 9;
-  roundOff = 0;
+  cgstPercent = signal(9);
+  sgstPercent = signal(9);
+  roundOff = signal(0);
 
   readonly currentInvoiceNumber = computed(() => {
     if (this.editingInvoiceId()) {
@@ -543,9 +543,9 @@ export class TaxInvoicePage {
   });
 
   readonly subtotal = computed(() => this.invoiceRows().reduce((sum, r) => sum + (r.amount || 0), 0));
-  readonly cgstAmount = computed(() => Math.round(this.subtotal() * this.cgstPercent / 100));
-  readonly sgstAmount = computed(() => Math.round(this.subtotal() * this.sgstPercent / 100));
-  readonly totalAmount = computed(() => this.subtotal() + this.cgstAmount() + this.sgstAmount() + this.roundOff);
+  readonly cgstAmount = computed(() => Math.round(this.subtotal() * this.cgstPercent() / 100));
+  readonly sgstAmount = computed(() => Math.round(this.subtotal() * this.sgstPercent() / 100));
+  readonly totalAmount = computed(() => this.subtotal() + this.cgstAmount() + this.sgstAmount() + this.roundOff());
   readonly amountInWords = computed(() => numberToWords(Math.round(this.totalAmount())));
 
   readonly currentInvoiceForPreview = computed<TaxInvoice | null>(() => {
@@ -565,11 +565,11 @@ export class TaxInvoicePage {
       items: this.invoiceRows(),
       customColumns: this.customColumns(),
       subtotal: this.subtotal(),
-      cgstPercent: this.cgstPercent,
-      sgstPercent: this.sgstPercent,
+      cgstPercent: this.cgstPercent(),
+      sgstPercent: this.sgstPercent(),
       cgstAmount: this.cgstAmount(),
       sgstAmount: this.sgstAmount(),
-      roundOff: this.roundOff,
+      roundOff: this.roundOff(),
       totalAmount: this.totalAmount(),
       amountInWords: this.amountInWords(),
       supplyType: this.supplyType() as "Intrastate" | "Interstate",
@@ -719,9 +719,9 @@ export class TaxInvoicePage {
     this.clientGstin = "";
     this.clientSearchTerm.set("");
     this.selectedClientId.set(null);
-    this.cgstPercent = 9;
-    this.sgstPercent = 9;
-    this.roundOff = 0;
+    this.cgstPercent.set(9);
+    this.sgstPercent.set(9);
+    this.roundOff.set(0);
     this.editingInvoice.set(true);
   }
 
@@ -735,9 +735,9 @@ export class TaxInvoicePage {
     this.clientGstin = inv.clientGstin;
     this.clientSearchTerm.set(inv.clientName);
     this.selectedClientId.set(this.findClientIdByName(inv.clientName));
-    this.cgstPercent = inv.cgstPercent ?? 9;
-    this.sgstPercent = inv.sgstPercent ?? 9;
-    this.roundOff = inv.roundOff ?? 0;
+    this.cgstPercent.set(inv.cgstPercent ?? 9);
+    this.sgstPercent.set(inv.sgstPercent ?? 9);
+    this.roundOff.set(inv.roundOff ?? 0);
     this.editingInvoice.set(true);
   }
 
@@ -751,9 +751,9 @@ export class TaxInvoicePage {
     this.clientGstin = inv.clientGstin;
     this.clientSearchTerm.set(inv.clientName);
     this.selectedClientId.set(this.findClientIdByName(inv.clientName));
-    this.cgstPercent = inv.cgstPercent ?? 9;
-    this.sgstPercent = inv.sgstPercent ?? 9;
-    this.roundOff = inv.roundOff ?? 0;
+    this.cgstPercent.set(inv.cgstPercent ?? 9);
+    this.sgstPercent.set(inv.sgstPercent ?? 9);
+    this.roundOff.set(inv.roundOff ?? 0);
     this.editingInvoice.set(true);
     setTimeout(() => this.showInvoicePreview.set(true), 50);
   }
@@ -837,11 +837,11 @@ export class TaxInvoicePage {
       items: validItems,
       customColumns: this.customColumns(),
       subtotal: this.subtotal(),
-      cgstPercent: this.cgstPercent,
-      sgstPercent: this.sgstPercent,
+      cgstPercent: this.cgstPercent(),
+      sgstPercent: this.sgstPercent(),
       cgstAmount: this.cgstAmount(),
       sgstAmount: this.sgstAmount(),
-      roundOff: this.roundOff,
+      roundOff: this.roundOff(),
       totalAmount: this.totalAmount(),
       amountInWords: this.amountInWords(),
       supplyType: this.supplyType(),
