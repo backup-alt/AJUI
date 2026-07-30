@@ -174,9 +174,9 @@ export async function listMaterials(filter: {
     `[listMaterials.diag] query=${JSON.stringify(query)} limit=${filter.limit ?? "default"} scope=${filter.scopeProjectIds?.length ?? "null"}`
   );
 
-  // Cap default at 100 — matches the hydration request size, matches
-  // labour/payments/subcontractors default.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 100, 1), 100);
+  // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
+  // Use cursor to paginate beyond 25 if the caller asks for more.
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
   type MaterialLike = {
     projectId?: unknown;
     siteId?: unknown;

@@ -141,7 +141,7 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(90_000); next
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "fix-hydration-1f85a5e",
+      deploy: "fix-cursor-pagination-limit25",
     });
   });
 

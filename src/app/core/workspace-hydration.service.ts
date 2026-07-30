@@ -181,29 +181,28 @@ export class WorkspaceHydrationService {
       `[hydrateDeferred] starting — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
     );
 
-    // Materials, inventory, expenses — fetch via the paginated endpoint
-    // with limit=100. Matches the labour/payments/subcontractors pattern.
-    const [materials, inventory, expenses] = await Promise.all([
-      this.safeList(() => this.api.listMaterials({ limit: 100 }), "materials"),
-      this.safeList(() => this.api.listInventory({ limit: 100 }), "inventory"),
-      this.safeList(() => this.api.listExpenses({ limit: 100 }), "expenses"),
-    ]);
-
-    // Only overwrite the signal if the new fetch returned more rows than
-    // we already had. This means a transient partial-fetch failure can
-    // NEVER wipe out good data the user is already looking at.
-    if (materials && Array.isArray((materials as any).items)) {
-      const mapped = (materials as any).items.map(mapMaterial);
-      this.replaceIfLarger(this.erp.materials, mapped, "materials");
-    }
-    if (inventory && Array.isArray((inventory as any).items)) {
-      const mapped = (inventory as any).items.map(mapInventory);
-      this.replaceIfLarger(this.erp.inventory, mapped, "inventory");
-    }
-    if (expenses && Array.isArray((expenses as any).items)) {
-      const mapped = (expenses as any).items.map(mapExpense);
-      this.replaceIfLarger(this.erp.expenses, mapped, "expenses");
-    }
+    // Materials, inventory, expenses — walk cursor pages with limit=25.
+    // The schema caps limit at max(25) so we MUST paginate to get all rows.
+    // Each collection is fetched sequentially (not in parallel) to avoid
+    // saturating the M0 connection pool with concurrent queries.
+    await this.loadAllByCursor(
+      "materials",
+      (cursor) => this.api.listMaterials({ limit: 25, cursor }),
+      mapMaterial,
+      this.erp.materials
+    );
+    await this.loadAllByCursor(
+      "inventory",
+      (cursor) => this.api.listInventory({ limit: 25, cursor }),
+      mapInventory,
+      this.erp.inventory
+    );
+    await this.loadAllByCursor(
+      "expenses",
+      (cursor) => this.api.listExpenses({ limit: 25, cursor }),
+      mapExpense,
+      this.erp.expenses
+    );
 
     // Sites (single page)
     const sites = await this.safeList(() => this.api.listSites(), "sites");
@@ -215,17 +214,17 @@ export class WorkspaceHydrationService {
       );
     }
 
-    // Smaller collections — still single page each
-    const labour = await this.safeList(() => this.api.listLabour({ limit: 100 }), "labour");
+    // Smaller collections — single page each with limit=25 (max allowed)
+    const labour = await this.safeList(() => this.api.listLabour({ limit: 25 }), "labour");
     if (labour && Array.isArray(labour.items)) {
       this.replaceIfLarger(this.erp.labour, (labour.items || []).map(mapLabour), "labour");
     }
-    const payments = await this.safeList(() => this.api.listPayments({ limit: 100 }), "payments");
+    const payments = await this.safeList(() => this.api.listPayments({ limit: 25 }), "payments");
     if (payments && Array.isArray(payments.items)) {
       this.replaceIfLarger(this.erp.payments, (payments.items || []).map(mapPayment), "payments");
     }
     const subcontractors = await this.safeList(
-      () => this.api.listSubcontractors({ limit: 100 }),
+      () => this.api.listSubcontractors({ limit: 25 }),
       "subcontractors"
     );
     if (subcontractors && Array.isArray(subcontractors.items)) {
@@ -235,7 +234,7 @@ export class WorkspaceHydrationService {
         "subcontractors"
       );
     }
-    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 100 }), "invoices");
+    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 25 }), "invoices");
     if (invoices && Array.isArray(invoices.items)) {
       this.replaceIfLarger(
         this.erp.taxInvoices,
@@ -248,6 +247,50 @@ export class WorkspaceHydrationService {
     console.log(
       `[hydrateDeferred] complete in ${dt}ms — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
     );
+  }
+
+  /**
+   * Walk cursor pages to fetch ALL records from a paginated endpoint.
+   * Each page fetches up to 25 rows (the max allowed by the schema).
+   * Uses `nextCursor` from each response to advance. Stops when the
+   * response has no nextCursor or returns an empty items array.
+   *
+   * Updates the signal atomically with replaceIfLarger so partial
+   * failures never wipe out good data the user is already viewing.
+   */
+  private async loadAllByCursor<T>(
+    label: string,
+    factory: (cursor: string | undefined) => import("rxjs").Observable<{ items: any[]; nextCursor?: string | null }>,
+    mapper: (row: any) => T,
+    target: { set(value: T[]): void; (): T[] }
+  ): Promise<void> {
+    const MAX_PAGES = 40;
+    const PAGE_DELAY_MS = 300;
+    const allItems: any[] = [];
+    let cursor: string | undefined = undefined;
+    let pagesFetched = 0;
+
+    while (pagesFetched < MAX_PAGES) {
+      pagesFetched++;
+      const response = await this.safeList(
+        () => factory(cursor),
+        `${label}/page${pagesFetched}`
+      );
+      const items = (response as any)?.items;
+      if (!Array.isArray(items) || items.length === 0) break;
+      allItems.push(...items);
+      const nextCursor = (response as any)?.nextCursor;
+      if (!nextCursor) break;
+      cursor = String(nextCursor);
+      // Small delay between pages to let M0 recover
+      await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+    }
+
+    if (allItems.length > 0) {
+      const mapped = allItems.map(mapper);
+      this.replaceIfLarger(target, mapped, label);
+    }
+    console.log(`[loadAllByCursor] ${label}: ${allItems.length} items across ${pagesFetched} page(s)`);
   }
 
   /**
