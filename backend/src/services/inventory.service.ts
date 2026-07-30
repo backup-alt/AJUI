@@ -157,7 +157,7 @@ export async function listInventory(filter: {
 
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
   // Use cursor to paginate beyond 25 if the caller asks for more.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
   type InventoryLike = { [k: string]: unknown };
   let items: InventoryLike[] = [];
   let total = 0;
