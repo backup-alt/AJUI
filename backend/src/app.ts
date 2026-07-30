@@ -138,7 +138,7 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(300_000); nex
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "fix-find-all-receiptImage-exclude-singleShot-60s",
+      deploy: "FINAL-senior-dev-fix-all-issues-2026-07-30",
     });
   });
 
