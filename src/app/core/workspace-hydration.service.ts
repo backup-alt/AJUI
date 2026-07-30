@@ -265,7 +265,7 @@ export class WorkspaceHydrationService {
     target: { set(value: T[]): void; (): T[] }
   ): Promise<void> {
     const MAX_PAGES = 40;
-    const PAGE_DELAY_MS = 300;
+    const PAGE_DELAY_MS = 500;
     const allItems: any[] = [];
     let cursor: string | undefined = undefined;
     let pagesFetched = 0;

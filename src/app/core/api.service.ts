@@ -570,7 +570,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/materials${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(30_000),
+      timeout(60_000),
       catchError(this.handleError)
     );
   }
@@ -598,7 +598,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/inventory${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(30_000),
+      timeout(60_000),
       catchError(this.handleError)
     );
   }
@@ -684,7 +684,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/expenses${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(30_000),
+      timeout(60_000),
       catchError(this.handleError)
     );
   }
