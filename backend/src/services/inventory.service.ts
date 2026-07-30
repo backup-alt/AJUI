@@ -200,11 +200,16 @@ export async function listInventory(filter: {
       total = filter.page * effectiveLimit;
     }
     items = foundItems as unknown as InventoryLike[];
+    // CRITICAL: Use the last item that WILL be returned as the cursor
+    // (not the (limit+1)th item). With $lt cursor, the next page query
+    // is _id < cursor which EXCLUDES the cursor item itself. The
+    // standard "pop the extra" pattern loses the popped item forever.
     if (items.length > effectiveLimit) {
-      const nextItem = items.pop();
-      if (nextItem && (nextItem as any)._id) {
-        nextCursor = String((nextItem as any)._id);
+      const cursorItem = items[effectiveLimit - 1];
+      if (cursorItem && (cursorItem as any)._id) {
+        nextCursor = String((cursorItem as any)._id);
       }
+      items = items.slice(0, effectiveLimit);
     }
   } catch (err) {
     console.error(

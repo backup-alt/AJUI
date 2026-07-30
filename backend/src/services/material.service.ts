@@ -233,11 +233,24 @@ export async function listMaterials(filter: {
       total = filter.page * effectiveLimit; // estimate
     }
     items = foundItems as unknown as MaterialLike[];
+    // CRITICAL: Use the last item that WILL be returned as the cursor
+    // (not the (limit+1)th item). With sort {_id:-1} and $lt cursor,
+    // the next page query is _id < cursor, which EXCLUDES the cursor
+    // item itself. If we use the (limit+1)th item as cursor (the
+    // standard "fetch limit+1, pop extra" pattern), that item is
+    // NEVER returned to the client — it's skipped between pages.
+    //
+    // Example with 58 materials and limit=25:
+    //   WRONG (pop pattern): page1 returns 25, page2 returns 25, page3
+    //   returns 6 = 56 total (items #26 and #52 lost)
+    //   RIGHT (cursor = last returned): page1 returns 25, page2 returns
+    //   25, page3 returns 8 = 58 total (no items lost)
     if (items.length > effectiveLimit) {
-      const nextItem = items.pop();
-      if (nextItem && (nextItem as any)._id) {
-        nextCursor = String((nextItem as any)._id);
+      const cursorItem = items[effectiveLimit - 1];
+      if (cursorItem && (cursorItem as any)._id) {
+        nextCursor = String((cursorItem as any)._id);
       }
+      items = items.slice(0, effectiveLimit);
     }
   } catch (err) {
     console.error(
