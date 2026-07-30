@@ -269,6 +269,7 @@ export class WorkspaceHydrationService {
     const allItems: any[] = [];
     let cursor: string | undefined = undefined;
     let pagesFetched = 0;
+    let walkCompleted = false; // true if we got a null nextCursor on the last page
 
     while (pagesFetched < MAX_PAGES) {
       pagesFetched++;
@@ -276,6 +277,11 @@ export class WorkspaceHydrationService {
         () => factory(cursor),
         `${label}/page${pagesFetched}`
       );
+      // safeList returned null (timeout/error) — abort the walk
+      if (response === null || response === undefined) {
+        console.warn(`[loadAllByCursor] ${label} page ${pagesFetched} returned null — aborting walk`);
+        break;
+      }
       const items = (response as any)?.items;
       const nextCursor = (response as any)?.nextCursor;
       console.log(
@@ -283,7 +289,10 @@ export class WorkspaceHydrationService {
       );
       if (!Array.isArray(items) || items.length === 0) break;
       allItems.push(...items);
-      if (!nextCursor) break;
+      if (!nextCursor) {
+        walkCompleted = true;
+        break;
+      }
       cursor = String(nextCursor);
       // Small delay between pages to let M0 recover
       await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
@@ -291,9 +300,20 @@ export class WorkspaceHydrationService {
 
     if (allItems.length > 0) {
       const mapped = allItems.map(mapper);
-      this.replaceIfLarger(target, mapped, label);
+      // If the walk completed all pages (nextCursor was null), ALWAYS
+      // replace the signal — even if the new count is smaller than the
+      // existing signal. This ensures the final page is applied.
+      // If the walk was incomplete (timed out), only replace if we have
+      // MORE items than existing (replaceIfLarger guard).
+      if (walkCompleted) {
+        target.set(mapped);
+        console.log(`[loadAllByCursor] ${label}: walk COMPLETED — set ${mapped.length} items`);
+      } else {
+        this.replaceIfLarger(target, mapped, label);
+        console.log(`[loadAllByCursor] ${label}: walk INCOMPLETE — replaceIfLarger with ${mapped.length} items`);
+      }
     }
-    console.log(`[loadAllByCursor] ${label}: ${allItems.length} items across ${pagesFetched} page(s)`);
+    console.log(`[loadAllByCursor] ${label}: ${allItems.length} items across ${pagesFetched} page(s) (completed=${walkCompleted})`);
   }
 
   /**
