@@ -115,6 +115,33 @@ export const updateMaterialStockSchema = z.object({
   }),
 });
 
+/**
+ * Schema for "Add Existing Material" workflow (supervisor mobile app).
+ *
+ * Supervisors record materials that ALREADY exist at the site. No approval
+ * workflow is involved — the record is saved directly to the Inventory
+ * collection (or upserted if it already exists for that site/unit).
+ *
+ * If a record with the same (projectId, siteId, name, unit) exists, the
+ * quantities are ADDED to the existing record. Otherwise a new record
+ * is created.
+ */
+export const addExistingMaterialMobileSchema = z.object({
+  body: z.object({
+    projectId: objectIdSchema,
+    siteId: objectIdSchema.optional(),
+    site: z.string().trim().min(1).max(200),
+    name: z.string().trim().min(1).max(200),
+    unit: z.string().trim().min(1).max(50),
+    quantity: z.coerce.number().nonnegative().default(0),
+    vendor: z.string().trim().max(200).optional(),
+    vendorId: objectIdSchema.optional(),
+    poNumber: z.string().trim().max(100).optional(),
+    minimumQuantity: z.coerce.number().nonnegative().optional(),
+    notes: z.string().trim().max(2000).optional(),
+  }),
+});
+
 export const approvalActionSchema = z.object({
   body: z.object({
     action: z.enum(["approve", "reject"]),

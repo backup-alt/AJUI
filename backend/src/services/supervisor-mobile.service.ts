@@ -20,6 +20,7 @@ import { Supervisor } from "../models/Supervisor.js";
 import { Project } from "../models/Project.js";
 import { Site } from "../models/Site.js";
 import { Material } from "../models/Material.js";
+import { Inventory } from "../models/Inventory.js";
 import { Labour } from "../models/Labour.js";
 import { Worker } from "../models/Worker.js";
 import { Expense } from "../models/Expense.js";
@@ -27,7 +28,6 @@ import { Payment } from "../models/Payment.js";
 import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { Inventory } from "../models/Inventory.js";
 import { withRetry } from "../utils/retry.js";
 
 type SupervisorAccess = {
@@ -1120,6 +1120,135 @@ export async function listMaterialNames(userId: string, search?: string) {
   }
   const names = await Inventory.distinct("name", matchStage);
   return names.sort();
+}
+
+/**
+ * Add or update a material that already exists at the site.
+ *
+ * This is the "Add Existing Material" workflow — supervisors record
+ * materials that are already on-site (e.g., leftover stock from a previous
+ * project, materials transferred from another site, or stock found during
+ * a site survey). No approval workflow is involved; the record is saved
+ * directly to the Inventory collection.
+ *
+ * Behaviour:
+ * - If a record with the same (projectId, siteKey, normalizedName, normalizedUnit)
+ *   already exists, the supplied quantity is ADDED to purchasedQuantity and
+ *   approvedQuantity, and vendor/poNumber are updated if provided.
+ * - Otherwise, a new Inventory record is created with the supplied details.
+ *
+ * Authorization: supervisors only. Project assignment is verified — the
+ * supervisor must be assigned to the project.
+ */
+export async function addExistingMaterialForSupervisor(
+  userId: string,
+  input: {
+    projectId: string;
+    siteId?: string;
+    site: string;
+    name: string;
+    unit: string;
+    quantity?: number;
+    vendor?: string;
+    vendorId?: string;
+    poNumber?: string;
+    minimumQuantity?: number;
+    notes?: string;
+  }
+) {
+  const projectObjectId = toObjectId(input.projectId);
+  if (!projectObjectId) throw new AppError(400, "Invalid project id");
+
+  // Verify supervisor is assigned to this project (and site if provided)
+  const { access } = await buildScopedEntityQuery(userId, {
+    projectId: input.projectId,
+    siteId: input.siteId,
+  });
+  // buildScopedEntityQuery throws 403 if not assigned; if we reach here, OK.
+
+  const project = await Project.findById(projectObjectId).select("_id name clientId clientName").lean();
+  if (!project) throw new AppError(404, "Project not found");
+
+  const siteObjectId = input.siteId ? toObjectId(input.siteId) : undefined;
+  const normalizedName = String(input.name || "").trim().toLowerCase();
+  const normalizedUnit = String(input.unit || "").trim().toLowerCase();
+  const siteKey = siteObjectId ? siteObjectId.toString() : String(input.site || "").trim().toLowerCase();
+  const qty = Math.max(0, Number(input.quantity) || 0);
+
+  // Find existing inventory record using the unique compound key
+  const existing = await Inventory.findOne({
+    projectId: projectObjectId,
+    siteKey,
+    normalizedName,
+    normalizedUnit,
+  });
+
+  if (existing) {
+    // Add quantities to the existing record
+    existing.purchasedQuantity = (existing.purchasedQuantity || 0) + qty;
+    existing.approvedQuantity = Math.max(existing.approvedQuantity || 0, existing.purchasedQuantity);
+    existing.remainingStock = Math.max(0, existing.purchasedQuantity - (existing.consumedQuantity || 0));
+    if (input.vendor) existing.vendor = input.vendor;
+    if (input.vendorId) {
+      const vid = toObjectId(input.vendorId);
+      if (vid) existing.vendorId = vid;
+    }
+    if (input.poNumber) existing.poNumber = input.poNumber;
+    if (input.minimumQuantity !== undefined) existing.minimumQuantity = input.minimumQuantity;
+    existing.lastUpdatedBy = userId;
+    existing.purchaseHistory = existing.purchaseHistory || [];
+    existing.purchaseHistory.push({
+      vendor: input.vendor || existing.vendor || "",
+      vendorId: input.vendorId ? toObjectId(input.vendorId) || undefined : undefined,
+      quantity: qty,
+      date: new Date(),
+      poNumber: input.poNumber || existing.poNumber,
+    });
+    await existing.save();
+    return {
+      inventory: existing.toObject(),
+      created: false,
+      message: `Added ${qty} ${input.unit} to existing ${input.name}. Total: ${existing.purchasedQuantity} ${input.unit}.`,
+    };
+  }
+
+  // Create new inventory record
+  const inv = new Inventory({
+    projectId: projectObjectId,
+    projectName: project.name,
+    clientId: project.clientId,
+    siteId: siteObjectId,
+    site: input.site,
+    siteKey,
+    name: String(input.name).trim(),
+    normalizedName,
+    unit: String(input.unit).trim(),
+    normalizedUnit,
+    requestedQuantity: qty,
+    approvedQuantity: qty,
+    purchasedQuantity: qty,
+    consumedQuantity: 0,
+    remainingStock: qty,
+    minimumQuantity: input.minimumQuantity || 0,
+    vendor: input.vendor,
+    vendorId: input.vendorId ? toObjectId(input.vendorId) || undefined : undefined,
+    poNumber: input.poNumber,
+    lastUpdatedBy: userId,
+    received: true,
+    purchaseHistory: qty > 0 ? [{
+      vendor: input.vendor || "",
+      vendorId: input.vendorId ? toObjectId(input.vendorId) || undefined : undefined,
+      quantity: qty,
+      date: new Date(),
+      poNumber: input.poNumber,
+    }] : undefined,
+  });
+  await inv.save();
+  return {
+    inventory: inv.toObject(),
+    created: true,
+    message: `Recorded ${qty} ${input.unit} of ${input.name} at ${input.site}.`,
+  };
 }
 
 export async function getRecentNotificationsForSupervisor(userId: string, limit: number) {

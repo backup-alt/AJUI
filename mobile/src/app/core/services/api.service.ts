@@ -210,6 +210,31 @@ export class ApiService {
     }
   }
 
+  /**
+   * Add or update an existing material at a site.
+   * No approval workflow — saved directly to the Inventory collection.
+   * If a record with the same (projectId, site, name, unit) exists, the
+   * quantities are ADDED. Otherwise a new record is created.
+   */
+  async addExistingMaterial(payload: {
+    projectId: string;
+    siteId?: string;
+    site: string;
+    name: string;
+    unit: string;
+    quantity?: number;
+    vendor?: string;
+    vendorId?: string;
+    poNumber?: string;
+    minimumQuantity?: number;
+    notes?: string;
+  }): Promise<{ created: boolean; message: string; inventory?: any }> {
+    return this.fetchJson<{ created: boolean; message: string; inventory: any }>(
+      '/api/supervisor/inventory/add-existing',
+      { method: 'POST', body: JSON.stringify(payload) }
+    );
+  }
+
   async updateProfile(patch: { name?: string; phone?: string; email?: string }): Promise<boolean> {
     try {
       const data = await this.fetchJson<{ user: { id: string; name: string; email: string; phone: string; role: string; status: string } }>(

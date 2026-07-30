@@ -166,6 +166,23 @@ export async function getMaterial(req: Request, res: Response, next: NextFunctio
   } catch (e) { next(e); }
 }
 
+/**
+ * "Add Existing Material" endpoint — supervisors record materials that
+ * already exist at the site. No approval workflow; saves directly to
+ * the Inventory collection (upsert by projectId+site+name+unit).
+ */
+export async function addExistingMaterial(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const result = await mobileService.addExistingMaterialForSupervisor(userId, req.body);
+    // Invalidate relevant caches so the new data shows up immediately
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/supervisor/material-names");
+    invalidateCachePrefix("/api/inventory");
+    res.status(result.created ? 201 : 200).json(result);
+  } catch (e) { next(e); }
+}
+
 export async function createMaterial(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);

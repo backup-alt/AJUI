@@ -16,6 +16,7 @@ import {
   createWorkerSchema,
   markAttendanceSchema,
   updateAttendanceSchema,
+  addExistingMaterialMobileSchema,
 } from "../schemas/mobile.schema.js";
 
 const router = Router();
@@ -47,6 +48,7 @@ router.get("/supervisor/material-names", cache(60), ctrl.listMaterialNames);
 router.get("/supervisor/materials", cache(15), ctrl.listMaterials);
 router.get("/supervisor/materials/:id", cache(30), ctrl.getMaterial);
 router.post("/supervisor/materials", validate(createMaterialMobileSchema), ctrl.createMaterial);
+router.post("/supervisor/inventory/add-existing", validate(addExistingMaterialMobileSchema), ctrl.addExistingMaterial);
 router.patch("/supervisor/materials/:id/stock", validate(updateMaterialStockSchema), ctrl.updateMaterialStock);
 router.post("/supervisor/materials/:id/receipt", validate(uploadExpenseReceiptMobileSchema), ctrl.uploadMaterialReceipt);
 

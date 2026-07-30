@@ -1,31 +1,113 @@
 import { Component } from '@angular/core';
-import { PlaceholderPage } from '../../shared/placeholder-page.component';
+import { Router } from '@angular/router';
+import { IonButton, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { cubeOutline } from 'ionicons/icons';
+import { cubeOutline, addOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-materials',
   standalone: true,
-  imports: [PlaceholderPage],
+  imports: [IonButton, IonIcon],
   template: `
-    <app-placeholder-page
-      title="Material Requests"
-      subtitle="Log material requests for approval by admin / project manager."
-      iconName="cube-outline"
-      [phase]="3"
-      note="Phase 3 will add the full request form (project, site, item, quantity, vendor, expected delivery), the list with filters, and the detail view with status timeline."
-      [previewItems]="previewItems">
-    </app-placeholder-page>
+    <div class="materials-wrapper">
+      <div class="hero">
+        <ion-icon name="cube-outline" class="hero-icon"></ion-icon>
+        <h2>Material Requests</h2>
+        <p>Log material requests for approval by admin / project manager.</p>
+      </div>
+
+      <ion-button
+        expand="block"
+        class="add-existing-btn"
+        (click)="openAddExisting()">
+        <ion-icon name="add-outline" slot="start"></ion-icon>
+        Add Existing Material
+      </ion-button>
+
+      <p class="hint">
+        Use "Add Existing Material" to record materials that <strong>already exist</strong>
+        at the site. No approval is needed — saved directly to inventory.
+      </p>
+
+      <div class="placeholder-list">
+        <h3>Coming Soon</h3>
+        <ul>
+          <li>Full material request form</li>
+          <li>List with filters and status</li>
+          <li>Detail view with timeline</li>
+        </ul>
+      </div>
+    </div>
   `,
+  styles: [`
+    .materials-wrapper {
+      padding: 20px 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .hero {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .hero-icon {
+      font-size: 56px;
+      color: var(--agb-primary, #2563eb);
+      margin-bottom: 8px;
+    }
+    .hero h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 8px 0;
+    }
+    .hero p {
+      font-size: 14px;
+      color: #64748b;
+    }
+    .add-existing-btn {
+      --background: var(--agb-gradient-primary, linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%));
+      font-weight: 700;
+      height: 52px;
+      margin-bottom: 16px;
+    }
+    .hint {
+      font-size: 13px;
+      color: #475569;
+      text-align: center;
+      margin-bottom: 24px;
+      padding: 12px;
+      background: #f1f5f9;
+      border-radius: 8px;
+    }
+    .placeholder-list {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .placeholder-list h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .placeholder-list ul {
+      margin: 0;
+      padding-left: 20px;
+      color: #64748b;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+  `],
 })
 export class MaterialsPage {
-  previewItems = [
-    { title: 'Cement — 50 Bags', subtitle: 'AB-1024 · Site A', status: 'Pending', chipClass: 'agb-chip-warning' },
-    { title: 'TMT Steel — 800 kg', subtitle: 'AB-1024 · Site A', status: 'Approved', chipClass: 'agb-chip-success' },
-    { title: 'M-Sand — 4 units', subtitle: 'GH-220 · Site B', status: 'Pending', chipClass: 'agb-chip-warning' },
-    { title: 'Bricks — 2,000 nos', subtitle: 'GH-220 · Site B', status: 'Rejected', chipClass: 'agb-chip-danger' },
-  ];
-  constructor() {
-    addIcons({ 'cube-outline': cubeOutline });
+  constructor(private router: Router) {
+    addIcons({ 'cube-outline': cubeOutline, 'add-outline': addOutline });
+  }
+
+  openAddExisting() {
+    this.router.navigate(['/add-existing-material']);
   }
 }
