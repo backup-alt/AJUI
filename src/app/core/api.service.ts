@@ -394,7 +394,7 @@ export class ApiService {
     return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
       `${this.baseUrl}/invoices/all${query}`,
       { headers: this.authHeaders() }
-    ).pipe(timeout(60_000), catchError(this.handleError));
+    ).pipe(timeout(300_000), catchError(this.handleError));
   }
 
   // =================== SUBCONTRACTORS ===================
@@ -570,7 +570,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/materials${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(60_000),
+      timeout(300_000),
       catchError(this.handleError)
     );
   }
@@ -586,7 +586,7 @@ export class ApiService {
     return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
       `${this.baseUrl}/materials/all${query}`,
       { headers: this.authHeaders() }
-    ).pipe(timeout(60_000), catchError(this.handleError));
+    ).pipe(timeout(300_000), catchError(this.handleError));
   }
 
   // =================== INVENTORY ===================
@@ -598,7 +598,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/inventory${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(60_000),
+      timeout(300_000),
       catchError(this.handleError)
     );
   }
@@ -609,7 +609,7 @@ export class ApiService {
     return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
       `${this.baseUrl}/inventory/all${query}`,
       { headers: this.authHeaders() }
-    ).pipe(timeout(60_000), catchError(this.handleError));
+    ).pipe(timeout(300_000), catchError(this.handleError));
   }
 
   getMissingMaterials(siteId: string): Observable<{ site: any; materials: any[] }> {
@@ -684,7 +684,7 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/expenses${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(60_000),
+      timeout(300_000),
       catchError(this.handleError)
     );
   }
@@ -695,7 +695,7 @@ export class ApiService {
     return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
       `${this.baseUrl}/expenses/all${query}`,
       { headers: this.authHeaders() }
-    ).pipe(timeout(60_000), catchError(this.handleError));
+    ).pipe(timeout(300_000), catchError(this.handleError));
   }
 
   createExpense(payload: {
