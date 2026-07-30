@@ -138,7 +138,7 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(300_000); nex
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "fix-cursor-pop-loses-items-2026-07-30",
+      deploy: "FINAL-all-fixes-deployed-6277d4e",
     });
   });
 
