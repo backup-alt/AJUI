@@ -2030,7 +2030,7 @@ export class UniversalDashboardPage implements OnInit {
     this.scrollObserver.observe(this.scrollSentinel);
   }
 
-  loadMoreRows(): void {
+  async loadMoreRows(): Promise<void> {
     const module = this.activeModule();
     const localRows = this.visibleRows();
     if (localRows.length > this.displayLimit()) {
@@ -2038,7 +2038,8 @@ export class UniversalDashboardPage implements OnInit {
     } else if (this.isPageModule(module)) {
       const pageModule = module === "generalExpenses" ? "expenses" : module;
       if (this.hydration.hasMorePages(pageModule)) {
-        void this.hydration.loadNextPage(pageModule as PageModule);
+        await this.hydration.loadNextPage(pageModule as PageModule);
+        this.displayLimit.update((n) => n + this.PAGE_SIZE);
       }
     }
   }
