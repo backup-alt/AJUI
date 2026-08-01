@@ -313,14 +313,14 @@ export class WorkspaceHydrationService {
     module: PageModule,
     pageToken: string | undefined
   ): Promise<{ items: any[]; nextCursor: string | null; total: number } | null> {
-    const page = Math.max(Number(pageToken || 1) || 1, 1);
+    const request = this.parsePageToken(pageToken);
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const result = await this.fetchPageAttempt(module, page);
+      const result = await this.fetchPageAttempt(module, request);
       if (result) {
         const pages = Math.ceil(result.total / this.PAGE_SIZE);
-        const emptyExpectedPage = result.items.length === 0 && result.total > 0 && page <= pages;
+        const emptyExpectedPage = result.items.length === 0 && result.total > 0 && request.page <= pages;
         if (!emptyExpectedPage) return result;
-        console.warn(`[WorkspaceHydration] ${module} page ${page} returned empty while total=${result.total}; retry ${attempt}/3`);
+        console.warn(`[WorkspaceHydration] ${module} page ${request.page} returned empty while total=${result.total}; retry ${attempt}/3`);
       }
       if (attempt < 3) await this.delay(500 * attempt);
     }
@@ -329,10 +329,11 @@ export class WorkspaceHydrationService {
 
   private async fetchPageAttempt(
     module: PageModule,
-    page: number
+    request: { page: number; cursor?: string }
   ): Promise<{ items: any[]; nextCursor: string | null; total: number } | null> {
     const factory = this.apiFactoryForModule(module);
     if (!factory) return null;
+    const page = request.page;
 
     if (module === "expenses") {
       const [siteResponse, generalResponse] = await Promise.all([
@@ -364,7 +365,7 @@ export class WorkspaceHydrationService {
     }
 
     const response = await this.safeList(
-      () => factory({ limit: this.PAGE_SIZE, page }),
+      () => factory({ limit: this.PAGE_SIZE, page, ...(request.cursor ? { cursor: request.cursor } : {}) }),
       `${module}/page`
     );
     if (!response) return null;
@@ -372,9 +373,26 @@ export class WorkspaceHydrationService {
     const items = (response as any)?.items || [];
     const responsePage = (response as any)?.page ?? page;
     const pages = (response as any)?.pages ?? 0;
-    const nextCursor = responsePage < pages ? String(responsePage + 1) : null;
+    const backendCursor = (response as any)?.nextCursor;
+    const nextPage = Number(responsePage) + 1;
+    const nextCursor = backendCursor
+      ? this.encodePageToken(nextPage, String(backendCursor))
+      : responsePage < pages ? String(nextPage) : null;
     const total = (response as any)?.total ?? 0;
     return { items, nextCursor, total };
+  }
+
+  private parsePageToken(token: string | undefined): { page: number; cursor?: string } {
+    if (!token) return { page: 1 };
+    if (token.startsWith("cursor:")) {
+      const match = token.match(/^cursor:(.+):page:(\d+)$/);
+      if (match) return { cursor: match[1], page: Math.max(Number(match[2]) || 1, 1) };
+    }
+    return { page: Math.max(Number(token) || 1, 1) };
+  }
+
+  private encodePageToken(page: number, cursor: string): string {
+    return `cursor:${cursor}:page:${Math.max(page, 1)}`;
   }
 
   // =================== PRIVATE: HELPERS ===================

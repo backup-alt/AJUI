@@ -181,6 +181,11 @@ export async function listInventory(filter: {
         );
         items = repairedItems as unknown as InventoryLike[];
         total = repairedTotal;
+        if (items.length === 0 && total === 0) {
+          const materialBacked = await listMaterialBackedInventory(query, effectiveLimit, effectivePage, skip, Boolean(filter.cursor));
+          items = materialBacked.items;
+          total = materialBacked.total;
+        }
       }
       console.log(`[listInventory] dbMutex find+count dt=${Date.now() - tDb}ms items=${items.length} total=${total}`);
     } else {
@@ -197,6 +202,10 @@ export async function listInventory(filter: {
         )
       );
       items = foundItems as unknown as InventoryLike[];
+      if (items.length === 0) {
+        const materialBacked = await listMaterialBackedInventory(query, effectiveLimit, effectivePage, skip, Boolean(filter.cursor));
+        items = materialBacked.items;
+      }
       // Avoid a second filtered count on every page. The first page carries
       // the authoritative total; later pages only need continuation data.
       total = items.length < effectiveLimit
@@ -255,6 +264,63 @@ function inventoryQueryToMaterialQuery(query: Record<string, unknown>): Record<s
     materialQuery[key] = value;
   }
   return materialQuery;
+}
+
+async function listMaterialBackedInventory(
+  query: Record<string, unknown>,
+  effectiveLimit: number,
+  effectivePage: number,
+  skip: number,
+  hasCursor: boolean
+): Promise<{ items: any[]; total: number }> {
+  const materialQuery = inventoryQueryToMaterialQuery(query);
+  if (query._id) materialQuery._id = query._id;
+  const foundMaterials = await dbMutex.run(() =>
+    withRetry(
+      () => Material.find(materialQuery)
+        .select("_id projectId projectName clientId clientName siteId site name unit requestedQuantity approvedQuantity purchasedQuantity consumedQuantity remainingStock vendor vendorId poNumber createdAt updatedAt")
+        .sort({ _id: -1 })
+        .skip(hasCursor ? 0 : skip)
+        .limit(effectiveLimit)
+        .lean()
+        .maxTimeMS(60_000),
+      { label: "listInventory.materialFallback.find" }
+    )
+  );
+  const total = !hasCursor && effectivePage === 1
+    ? await Material.countDocuments(materialQuery).maxTimeMS(30_000)
+    : foundMaterials.length < effectiveLimit
+      ? (effectivePage - 1) * effectiveLimit + foundMaterials.length
+      : effectivePage * effectiveLimit + 1;
+  return {
+    items: foundMaterials.map((material: any) => ({
+      _id: material._id,
+      projectId: material.projectId,
+      projectName: material.projectName,
+      clientId: material.clientId,
+      clientName: material.clientName,
+      siteId: material.siteId,
+      site: material.site,
+      siteKey: siteKey(material.siteId, material.site),
+      name: material.name,
+      normalizedName: normalized(material.name),
+      unit: material.unit,
+      normalizedUnit: normalized(material.unit),
+      requestedQuantity: Number(material.requestedQuantity) || 0,
+      approvedQuantity: Number(material.approvedQuantity) || 0,
+      purchasedQuantity: Number(material.purchasedQuantity) || 0,
+      consumedQuantity: Number(material.consumedQuantity) || 0,
+      remainingStock: material.remainingStock ?? Math.max(0, (Number(material.purchasedQuantity) || 0) - (Number(material.consumedQuantity) || 0)),
+      minimumQuantity: 0,
+      vendor: material.vendor,
+      vendorId: material.vendorId,
+      poNumber: material.poNumber,
+      lastMaterialId: material._id,
+      createdAt: material.createdAt,
+      updatedAt: material.updatedAt,
+    })),
+    total,
+  };
 }
 
 /**
