@@ -422,11 +422,10 @@ export class LoginPage {
           this.sessionRole.set(this.formatRole(role));
         } catch {}
 
-        try {
-          await this.hydration.hydrateFromBackend();
-        } catch (e) {
-          console.error("Failed to load workspace data from backend", e);
-        }
+        // Hydrate critical data (clients, projects, vendors, supervisors)
+        // in the background — do NOT block navigation. The dashboard
+        // shows a loading skeleton until hydration completes.
+        this.hydration.hydrateFromBackend().catch(() => {});
         await this.router.navigateByUrl(this.safeReturnUrl());
       },
       error: (err) => {

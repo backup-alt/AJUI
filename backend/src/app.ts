@@ -49,11 +49,6 @@ export function createApp(): express.Application {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          // 'unsafe-inline' is required because reset-password.html and signup.html
-          // use inline <script> tags and onclick= handlers (served as raw HTML
-          // strings from this backend). These auth pages are served from the same
-          // origin so there's no cross-origin XSS risk from these specific inline
-          // scripts/handlers.
           scriptSrc: ["'self'", "'unsafe-inline'"],
           scriptSrcAttr: ["'unsafe-inline'"],
           styleSrc: ["'self'", "'unsafe-inline'"],

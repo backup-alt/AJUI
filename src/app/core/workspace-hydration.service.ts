@@ -57,6 +57,12 @@ export class WorkspaceHydrationService {
   readonly hydrationStatus = signal<"idle" | "loading" | "ready" | "error">("idle");
   readonly hydrationError = signal<string | null>(null);
 
+  /**
+   * Track which module datasets have been loaded. Pages check this
+   * to decide whether to fetch or use cached data.
+   */
+  readonly loadedModules = signal<Set<string>>(new Set());
+
   constructor() {
     // On boot: immediately rehydrate signals from localStorage so the UI
     // never shows an empty state on refresh. The user sees their last-known
@@ -82,17 +88,118 @@ export class WorkspaceHydrationService {
     this.hydrationError.set(null);
 
     try {
-      await this.doHydrateAll();
+      // Step 1: Load critical data first (clients, projects, vendors,
+      // supervisors) — this is fast (4 parallel requests) and needed
+      // for navigation dropdowns, project selectors, and sidebar.
+      await this.hydrateCritical();
+
+      // Step 2: Mark critical as loaded, set ready — the dashboard can
+      // now render with critical data while module data loads lazily.
       this.hydrationStatus.set("ready");
+      this.loadedModules.update(s => { s.add("critical"); return s; });
       this.persistSnapshot();
       console.log(
-        `[hydrateFromBackend] OK — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
+        `[hydrateFromBackend] critical OK — clients=${this.erp.clients().length}, projects=${this.erp.projects().length}, vendors=${this.erp.vendors().length}`
       );
+
+      // Step 3: Load module data in background (non-blocking).
+      // Each module is loaded independently — failure in one doesn't
+      // block others. Pages that need specific module data call
+      // loadModule() themselves.
+      this.hydrateModulesBackground();
     } catch (err: any) {
       console.error("[hydrateFromBackend] failed:", err?.message ?? err);
       this.hydrationStatus.set("error");
       this.hydrationError.set(err?.message ?? String(err));
     }
+  }
+
+  /**
+   * Load a specific module's data on demand. Called by pages when they
+   * need data that hasn't been loaded yet. Uses the same cursor-walk
+   * logic but only for the requested module.
+   *
+   * Returns immediately if the module is already loaded or in-flight.
+   */
+  async loadModule(module: "materials" | "inventory" | "expenses" | "labour" | "payments" | "subcontractors" | "sites" | "invoices"): Promise<void> {
+    if (this.loadedModules().has(module)) return;
+    // Mark as in-flight immediately to prevent duplicate calls
+    this.loadedModules.update(s => { s.add(module); return s; });
+
+    try {
+      switch (module) {
+        case "materials":
+          await this.loadAllByCursor(
+            "materials",
+            (cursor) => this.api.listMaterials({ limit: 25, cursor }),
+            mapMaterial,
+            this.erp.materials
+          );
+          break;
+        case "inventory":
+          await this.loadAllByCursor(
+            "inventory",
+            (cursor) => this.api.listInventory({ limit: 25, cursor }),
+            mapInventory,
+            this.erp.inventory
+          );
+          break;
+        case "expenses":
+          await this.loadAllByCursor(
+            "expenses",
+            (cursor) => this.api.listExpenses({ limit: 25, cursor }),
+            mapExpense,
+            this.erp.expenses
+          );
+          break;
+        case "labour": {
+          const labour = await this.safeList(() => this.api.listLabour({ limit: 25 }), "labour");
+          if (labour && Array.isArray(labour.items)) {
+            this.replaceIfLarger(this.erp.labour, (labour.items || []).map(mapLabour), "labour");
+          }
+          break;
+        }
+        case "payments": {
+          const payments = await this.safeList(() => this.api.listPayments({ limit: 25 }), "payments");
+          if (payments && Array.isArray(payments.items)) {
+            this.replaceIfLarger(this.erp.payments, (payments.items || []).map(mapPayment), "payments");
+          }
+          break;
+        }
+        case "subcontractors": {
+          const subs = await this.safeList(() => this.api.listSubcontractors({ limit: 25 }), "subcontractors");
+          if (subs && Array.isArray(subs.items)) {
+            this.replaceIfLarger(this.erp.subcontractors, (subs.items || []).map(mapSubcontractor), "subcontractors");
+          }
+          break;
+        }
+        case "sites": {
+          const sites = await this.safeList(() => this.api.listSites(), "sites");
+          if (sites && Array.isArray(sites.items)) {
+            this.replaceIfLarger(this.erp.siteEntities, (sites.items || []).map(mapSite), "sites");
+          }
+          break;
+        }
+        case "invoices": {
+          const invoices = await this.safeList(() => this.api.listInvoices({ limit: 25 }), "invoices");
+          if (invoices && Array.isArray(invoices.items)) {
+            this.replaceIfLarger(this.erp.taxInvoices, (invoices.items || []).map(mapInvoice), "invoices");
+          }
+          break;
+        }
+      }
+      this.persistSnapshot();
+      console.log(`[loadModule] ${module} loaded`);
+    } catch (err: any) {
+      console.warn(`[loadModule] ${module} failed:`, err?.message ?? err);
+    }
+  }
+
+  /**
+   * Check if a module's data has been loaded and is available.
+   */
+  isModuleLoaded(module: string): boolean {
+    return this.loadedModules().has(module);
   }
 
   /**
@@ -106,7 +213,8 @@ export class WorkspaceHydrationService {
       // Reuse the same code path as hydrateFromBackend but mark as a
       // background refresh. We DON'T set hydrationStatus to loading
       // here so the UI stays responsive.
-      await this.doHydrateAll();
+      await this.hydrateCritical();
+      await this.hydrateModulesBackground();
       this.persistSnapshot();
     } catch (err: any) {
       console.warn("[refreshFromBackend] failed (signals preserved):", err?.message ?? err);
@@ -116,6 +224,7 @@ export class WorkspaceHydrationService {
   invalidateCache(): void {
     try {
       localStorage.removeItem(SNAPSHOT_KEY);
+      this.loadedModules.set(new Set());
     } catch {}
   }
 
@@ -130,10 +239,23 @@ export class WorkspaceHydrationService {
     }
   }
 
-  /** @internal — called from hydrateFromBackend AND refreshFromBackend. */
-  private async doHydrateAll(): Promise<void> {
-    await this.hydrateCritical();
-    await this.hydrateDeferred();
+  /**
+   * Background module hydration — fires after critical data is loaded.
+   * Each module loads independently. Pages that need specific data
+   * can also call loadModule() directly.
+   */
+  private async hydrateModulesBackground(): Promise<void> {
+    const modules: Array<"sites" | "labour" | "payments" | "subcontractors" | "invoices"> = [
+      "sites", "labour", "payments", "subcontractors", "invoices",
+    ];
+    for (const mod of modules) {
+      if (!this.loadedModules().has(mod)) {
+        await this.loadModule(mod);
+      }
+    }
+    // Materials, inventory, expenses are NOT pre-loaded — they're
+    // loaded on demand when the user opens those pages. This reduces
+    // login time and avoids saturating the M0 connection pool.
   }
 
   private async hydrateCritical(): Promise<void> {
@@ -173,80 +295,6 @@ export class WorkspaceHydrationService {
         "supervisors"
       );
     }
-  }
-
-  private async hydrateDeferred(): Promise<void> {
-    const t0 = Date.now();
-    console.log(
-      `[hydrateDeferred] starting — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
-    );
-
-    // Materials, inventory, expenses — walk cursor pages with limit=25.
-    // The schema caps limit at max(25) so we MUST paginate to get all rows.
-    // Each collection is fetched sequentially (not in parallel) to avoid
-    // saturating the M0 connection pool with concurrent queries.
-    await this.loadAllByCursor(
-      "materials",
-      (cursor) => this.api.listMaterials({ limit: 25, cursor }),
-      mapMaterial,
-      this.erp.materials
-    );
-    await this.loadAllByCursor(
-      "inventory",
-      (cursor) => this.api.listInventory({ limit: 25, cursor }),
-      mapInventory,
-      this.erp.inventory
-    );
-    await this.loadAllByCursor(
-      "expenses",
-      (cursor) => this.api.listExpenses({ limit: 25, cursor }),
-      mapExpense,
-      this.erp.expenses
-    );
-
-    // Sites (single page)
-    const sites = await this.safeList(() => this.api.listSites(), "sites");
-    if (sites && Array.isArray(sites.items)) {
-      this.replaceIfLarger(
-        this.erp.siteEntities,
-        (sites.items || []).map(mapSite),
-        "sites"
-      );
-    }
-
-    // Smaller collections — single page each with limit=25 (max allowed)
-    const labour = await this.safeList(() => this.api.listLabour({ limit: 25 }), "labour");
-    if (labour && Array.isArray(labour.items)) {
-      this.replaceIfLarger(this.erp.labour, (labour.items || []).map(mapLabour), "labour");
-    }
-    const payments = await this.safeList(() => this.api.listPayments({ limit: 25 }), "payments");
-    if (payments && Array.isArray(payments.items)) {
-      this.replaceIfLarger(this.erp.payments, (payments.items || []).map(mapPayment), "payments");
-    }
-    const subcontractors = await this.safeList(
-      () => this.api.listSubcontractors({ limit: 25 }),
-      "subcontractors"
-    );
-    if (subcontractors && Array.isArray(subcontractors.items)) {
-      this.replaceIfLarger(
-        this.erp.subcontractors,
-        (subcontractors.items || []).map(mapSubcontractor),
-        "subcontractors"
-      );
-    }
-    const invoices = await this.safeList(() => this.api.listInvoices({ limit: 25 }), "invoices");
-    if (invoices && Array.isArray(invoices.items)) {
-      this.replaceIfLarger(
-        this.erp.taxInvoices,
-        (invoices.items || []).map(mapInvoice),
-        "taxInvoices"
-      );
-    }
-
-    const dt = Date.now() - t0;
-    console.log(
-      `[hydrateDeferred] complete in ${dt}ms — materials=${this.erp.materials().length}, inventory=${this.erp.inventory().length}, expenses=${this.erp.expenses().length}`
-    );
   }
 
   /**
@@ -295,7 +343,7 @@ export class WorkspaceHydrationService {
       const items = (response as any)?.items;
       const nextCursor = (response as any)?.nextCursor;
       console.log(
-        `[loadAllByCursor] ${label} page ${pagesFetched}: items=${Array.isArray(items) ? items.length : "?"} nextCursor=${nextCursor ? "yes" : "no"} raw=${JSON.stringify(response).substring(0, 200)}`
+        `[loadAllByCursor] ${label} page ${pagesFetched}: items=${Array.isArray(items) ? items.length : "?"} nextCursor=${nextCursor ? "yes" : "no"}`
       );
       if (!Array.isArray(items) || items.length === 0) break;
       allItems.push(...items);
@@ -413,6 +461,12 @@ export class WorkspaceHydrationService {
       if (Array.isArray(d.clients) && d.clients.length) this.erp.clients.set(d.clients);
       if (Array.isArray(d.projects) && d.projects.length) this.erp.projects.set(d.projects);
       if (Array.isArray(d.taxInvoices) && d.taxInvoices.length) this.erp.taxInvoices.set(d.taxInvoices);
+      // Mark all restored modules as loaded so pages don't re-fetch
+      const restored = new Set<string>(["critical", "sites", "labour", "payments", "subcontractors", "invoices"]);
+      if (d.materials.length) restored.add("materials");
+      if (d.inventory.length) restored.add("inventory");
+      if (d.expenses.length) restored.add("expenses");
+      this.loadedModules.set(restored);
       console.log(
         `[hydrate] restored snapshot from ${new Date(snap.savedAt).toISOString()} — materials=${d.materials.length}, inventory=${d.inventory.length}, expenses=${d.expenses.length}`
       );

@@ -1,7 +1,45 @@
 import { Injectable, signal, computed, inject } from "@angular/core";
 import { HttpClient, HttpHeaders, HttpInterceptorFn, HttpHandlerFn, HttpRequest, HttpEvent, HttpErrorResponse } from "@angular/common/http";
-import { Observable, from, throwError, catchError, switchMap, tap, of, timeout } from "rxjs";
+import { Observable, from, throwError, catchError, switchMap, tap, of, timeout, shareReplay } from "rxjs";
 import { environment } from "../../environments/environment";
+
+/**
+ * Simple in-memory GET response cache. Prevents duplicate requests when
+ * multiple components request the same data simultaneously (e.g. during
+ * hydration). TTL-based — stale entries are evicted on access.
+ */
+class ResponseCache {
+  private store = new Map<string, { data: any; expiresAt: number }>();
+
+  get<T>(key: string): T | null {
+    const entry = this.store.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      return null;
+    }
+    return entry.data as T;
+  }
+
+  set<T>(key: string, data: T, ttlMs: number): void {
+    this.store.set(key, { data, expiresAt: Date.now() + ttlMs });
+    // Prevent unbounded growth
+    if (this.store.size > 200) {
+      const firstKey = this.store.keys().next().value;
+      if (firstKey !== undefined) this.store.delete(firstKey);
+    }
+  }
+
+  invalidate(pattern: string): void {
+    for (const key of this.store.keys()) {
+      if (key.includes(pattern)) this.store.delete(key);
+    }
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
+}
 
 export interface ApiUser {
   id: string;
@@ -41,6 +79,10 @@ const STORAGE_KEYS = {
 export class ApiService {
   private http = inject(HttpClient);
   private baseUrl = environment.apiUrl;
+  private cache = new ResponseCache();
+
+  /** Default TTL for list endpoints: 30 seconds. */
+  private LIST_TTL = 30_000;
 
   // Reactive state
   private accessTokenSignal = signal<string | null>(this.getStored(STORAGE_KEYS.ACCESS_TOKEN));
@@ -125,19 +167,19 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/clients${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/clients${query}`);
   }
 
   deleteClient(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/clients/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/clients")),
       catchError(this.handleError)
     );
   }
 
   createClient(payload: any): Observable<any> {
     return this.http.post(`${this.baseUrl}/clients`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/clients")),
       catchError(this.handleError)
     );
   }
@@ -222,16 +264,19 @@ export class ApiService {
   // =================== MATERIALS ===================
   deleteMaterial(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/materials/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/materials")),
       catchError(this.handleError)
     );
   }
   patchMaterial(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/materials/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/materials")),
       catchError(this.handleError)
     );
   }
   createMaterial(payload: any): Observable<any> {
     return this.http.post(`${this.baseUrl}/materials`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/materials")),
       catchError(this.handleError)
     );
   }
@@ -239,11 +284,13 @@ export class ApiService {
   // =================== LABOUR ===================
   deleteLabour(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/labour/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/labour")),
       catchError(this.handleError)
     );
   }
   patchLabour(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/labour/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/labour")),
       catchError(this.handleError)
     );
   }
@@ -251,11 +298,13 @@ export class ApiService {
   // =================== EXPENSES ===================
   deleteExpense(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/expenses/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/expenses")),
       catchError(this.handleError)
     );
   }
   patchExpense(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/expenses/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/expenses")),
       catchError(this.handleError)
     );
   }
@@ -263,11 +312,13 @@ export class ApiService {
   // =================== PAYMENTS ===================
   deletePayment(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/payments/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/payments")),
       catchError(this.handleError)
     );
   }
   patchPayment(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/payments/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/payments")),
       catchError(this.handleError)
     );
   }
@@ -275,16 +326,19 @@ export class ApiService {
   // =================== VENDORS ===================
   deleteVendor(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/vendors/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/vendors")),
       catchError(this.handleError)
     );
   }
   patchVendor(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/vendors/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/vendors")),
       catchError(this.handleError)
     );
   }
   createVendor(payload: any): Observable<any> {
     return this.http.post(`${this.baseUrl}/vendors`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/vendors")),
       catchError(this.handleError)
     );
   }
@@ -400,11 +454,13 @@ export class ApiService {
   // =================== SUBCONTRACTORS ===================
   deleteSubcontractor(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/subcontractors/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/subcontractors")),
       catchError(this.handleError)
     );
   }
   patchSubcontractor(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/subcontractors/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/subcontractors")),
       catchError(this.handleError)
     );
   }
@@ -437,9 +493,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/projects${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/projects${query}`);
   }
 
   getProject(id: string): Observable<{ project: any }> {
@@ -500,9 +554,7 @@ export class ApiService {
 
   // =================== SITES ===================
   listSites(): Observable<PaginatedResponse<any>> {
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/sites?limit=100`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/sites?limit=100`);
   }
 
   createSite(payload: { name: string; projectIds?: string[]; openingBalance?: number; status?: string }): Observable<{ site: any }> {
@@ -531,9 +583,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/vendors${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/vendors${query}`);
   }
 
   // =================== SUPERVISORS ===================
@@ -544,9 +594,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/supervisors${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/supervisors${query}`);
   }
 
   getSupervisor(id: string): Observable<{ supervisor: any }> {
@@ -562,17 +610,14 @@ export class ApiService {
   }
 
   // =================== MATERIALS ===================
-  listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
+  listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/materials${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(300_000),
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/materials${query}`);
   }
 
   /**
@@ -597,10 +642,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/inventory${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(300_000),
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/inventory${query}`);
   }
 
   /** Single-shot hydration endpoint for inventory. */
@@ -645,9 +687,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/labour${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/labour${query}`);
   }
 
   // =================== ATTENDANCE (New Model) ===================
@@ -683,10 +723,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/expenses${query}`, { headers: this.authHeaders() }).pipe(
-      timeout(300_000),
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/expenses${query}`);
   }
 
   /** Single-shot hydration endpoint for expenses (site + general). */
@@ -726,9 +763,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/payments${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/payments${query}`);
   }
 
   createPayment(payload: {
@@ -755,9 +790,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/subcontractors${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/subcontractors${query}`);
   }
 
   // =================== ACCOUNT ===================
@@ -1164,6 +1197,32 @@ export class ApiService {
   }
 
   // =================== HELPERS ===================
+
+  /**
+   * GET with in-memory caching. Prevents duplicate requests when multiple
+   * components request the same data simultaneously. Returns a shared
+   * observable so concurrent subscribers share one HTTP call.
+   */
+  private cachedGet<T>(url: string, ttlMs: number = this.LIST_TTL): Observable<T> {
+    const cacheKey = `GET:${url}`;
+    const cached = this.cache.get<T>(cacheKey);
+    if (cached) return of(cached);
+
+    return this.http.get<T>(url, { headers: this.authHeaders() }).pipe(
+      tap((data) => this.cache.set(cacheKey, data, ttlMs)),
+      shareReplay(1),
+      catchError(this.handleError)
+    );
+  }
+
+  /**
+   * Invalidate cached responses matching a URL pattern. Call after
+   * POST/PATCH/DELETE to ensure subsequent GETs fetch fresh data.
+   */
+  invalidateCache(pattern: string): void {
+    this.cache.invalidate(pattern);
+  }
+
   private authHeaders(): HttpHeaders {
     const token = this.accessTokenSignal();
     return new HttpHeaders({
