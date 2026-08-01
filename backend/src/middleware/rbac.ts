@@ -142,9 +142,7 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   // Empty managedProjectIds means they see nothing (not everything).
   if (role === "project_manager" || role === "accountant") {
     const result = uniqueObjectIds(managedProjectIds);
-    // Empty resolved scope must mean "no filter" (admin-style), never
-    // "{ $in: [] }" which silently hides every record from the user.
-    req._cachedScopedProjectIds = result.length > 0 ? result : null;
+    req._cachedScopedProjectIds = result;
     return req._cachedScopedProjectIds;
   }
 
@@ -169,7 +167,7 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
         : [];
     const projectIds = [...supervisorProjectIds, ...managedProjectIds];
     const result = uniqueObjectIds(projectIds);
-    req._cachedScopedProjectIds = result.length > 0 ? result : null;
+    req._cachedScopedProjectIds = result;
     return req._cachedScopedProjectIds;
   }
 
