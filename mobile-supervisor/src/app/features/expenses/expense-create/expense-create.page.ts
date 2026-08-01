@@ -467,7 +467,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   }
 
   async loadVendors() {
-    this.supervisor.getVendors({ limit: 100 }).subscribe({
+    this.supervisor.getVendors({ limit: 25 }).subscribe({
       next: (res) => this.vendors.set(res.items || []),
       error: () => this.vendors.set([]),
     });
@@ -560,7 +560,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
         projectId: projectId ?? undefined,
         type: 'site',
         status: 'Approved',
-        limit: 100,
+          limit: 25,
       })
       .subscribe({
         next: (res) => {

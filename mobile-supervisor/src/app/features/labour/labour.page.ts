@@ -573,6 +573,7 @@ export class LabourPage implements OnInit, OnDestroy {
       layersOutline, carOutline, sparklesOutline, briefcaseOutline,
       calendarOutline, ellipsisHorizontalOutline, searchOutline,
     });
+    await this.supervisor.init().catch(() => {});
     await this.loadData();
 
     this.supervisor.siteChanged$
@@ -601,7 +602,7 @@ export class LabourPage implements OnInit, OnDestroy {
       const projectId = this.supervisor.selectedProjectId();
 
       const [workersRes, attendanceRes] = await Promise.all([
-        this.supervisor.getWorkers({ siteId: siteId || undefined, limit: 200 }).toPromise(),
+        this.supervisor.getWorkers({ siteId: siteId || undefined, limit: 25 }).toPromise(),
         this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).toPromise(),
       ]);
 

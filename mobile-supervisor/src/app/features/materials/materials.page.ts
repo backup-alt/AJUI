@@ -13,6 +13,8 @@ import {
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -68,6 +70,8 @@ interface ConsolidatedMaterial {
     IonSkeletonText,
     IonRefresher,
     IonRefresherContent,
+    IonInfiniteScroll,
+    IonInfiniteScrollContent,
     DatePipe,
     PageHeaderComponent,
     EmptyStateComponent,
@@ -221,6 +225,14 @@ interface ConsolidatedMaterial {
           <ion-icon name="add-outline"></ion-icon>
         </ion-fab-button>
       </ion-fab>
+
+      <ion-infinite-scroll
+        threshold="160px"
+        [disabled]="!nextCursor() || isLoading() || isLoadingMore()"
+        (ionInfinite)="loadMoreMaterials($event)"
+      >
+        <ion-infinite-scroll-content loadingSpinner="dots"></ion-infinite-scroll-content>
+      </ion-infinite-scroll>
     </ion-content>
   `,
   styles: [`
@@ -397,8 +409,10 @@ export class MaterialsPage implements OnInit {
   materials = signal<Material[]>([]);
   consolidatedMaterials = signal<ConsolidatedMaterial[]>([]);
   isLoading = signal(true);
+  isLoadingMore = signal(false);
   errorMessage = signal<string>('');
   expandedKey = signal<string>('');
+  nextCursor = signal<string | null>(null);
   searchQuery = '';
   statusFilter: MaterialStatus | '' = '';
   private loadGeneration = 0;
@@ -409,7 +423,7 @@ export class MaterialsPage implements OnInit {
       closeCircleOutline, chevronForwardOutline, chevronDownOutline, businessOutline,
       cloudOfflineOutline, refreshOutline,
     });
-    this.supervisor.init().catch(() => {});
+    await this.supervisor.init().catch(() => {});
     await this.loadMaterials();
 
     this.supervisor.siteChanged$
@@ -428,11 +442,12 @@ export class MaterialsPage implements OnInit {
         this.supervisor.getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
-          limit: 20,
+          limit: 25,
         })
       );
       if (gen !== this.loadGeneration) return;
       this.materials.set(response?.materials || []);
+      this.nextCursor.set(response?.pagination?.nextCursor ?? null);
       this.filterMaterials();
       this.isLoading.set(false);
     } catch (error) {
@@ -441,6 +456,37 @@ export class MaterialsPage implements OnInit {
       this.errorMessage.set((error as Error)?.message || 'Failed to load materials');
       this.filterMaterials();
       this.isLoading.set(false);
+    }
+  }
+
+  async loadMoreMaterials(event: CustomEvent): Promise<void> {
+    const cursor = this.nextCursor();
+    if (!cursor || this.isLoadingMore()) {
+      (event.target as HTMLIonInfiniteScrollElement).complete();
+      return;
+    }
+
+    this.isLoadingMore.set(true);
+    try {
+      const response = await firstValueFrom(
+        this.supervisor.getMaterials({
+          siteId: this.supervisor.selectedSiteId() || undefined,
+          projectId: this.supervisor.selectedProjectId() || undefined,
+          limit: 25,
+          cursor,
+        })
+      );
+      const existing = this.materials();
+      const existingIds = new Set(existing.map((material) => material._id));
+      const appended = (response?.materials || []).filter((material) => !existingIds.has(material._id));
+      this.materials.set([...existing, ...appended]);
+      this.nextCursor.set(response?.pagination?.nextCursor ?? null);
+      this.filterMaterials();
+    } catch (error) {
+      console.error('[Materials] failed to load next page', error);
+    } finally {
+      this.isLoadingMore.set(false);
+      (event.target as HTMLIonInfiniteScrollElement).complete();
     }
   }
 

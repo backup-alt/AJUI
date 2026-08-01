@@ -66,6 +66,7 @@ export interface ExpenseListResponse {
     limit: number;
     total: number;
     pages: number;
+    nextCursor?: string | null;
   };
   total?: number;
   page?: number;
@@ -81,6 +82,7 @@ export interface ExpenseFilters {
   dateTo?: string;
   page?: number;
   limit?: number;
+  cursor?: string;
 }
 
 export interface UploadReceiptResponse {

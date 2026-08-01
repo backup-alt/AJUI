@@ -7,6 +7,14 @@ import * as workerService from "../services/worker.service.js";
 import * as vendorService from "../services/vendor.service.js";
 import * as deviceService from "../services/device-token.service.js";
 
+const MOBILE_PAGE_SIZE = 25;
+
+function mobilePageLimit(value: unknown): number {
+  const requested = Number(value);
+  if (!Number.isFinite(requested)) return MOBILE_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(requested), 1), MOBILE_PAGE_SIZE);
+}
+
 function requireSupervisor(req: Request): string {
   if (!req.user?.sub) throw new AppError(401, "Not authenticated");
   if (req.user.role !== "supervisor") {
@@ -142,7 +150,7 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
-      limit: req.query.limit ? Number(req.query.limit) : 20,
+      limit: mobilePageLimit(req.query.limit),
       cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
@@ -151,7 +159,7 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
     res.status(200).json({
       materials: [],
       total: 0,
-      limit: 20,
+      limit: MOBILE_PAGE_SIZE,
       pages: 0,
       nextCursor: null,
     });
@@ -282,7 +290,7 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
-      limit: req.query.limit ? Number(req.query.limit) : 20,
+      limit: mobilePageLimit(req.query.limit),
       cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
@@ -291,7 +299,7 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
     res.status(200).json({
       labour: [],
       total: 0,
-      limit: 20,
+      limit: MOBILE_PAGE_SIZE,
       pages: 0,
       nextCursor: null,
     });
@@ -390,7 +398,7 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       type: req.query.type as string | undefined,
-      limit: req.query.limit ? Number(req.query.limit) : 20,
+      limit: mobilePageLimit(req.query.limit),
       cursor: req.query.cursor as string | undefined,
     };
     const result = await mobileService.listExpensesForSupervisor(userId, filters);
@@ -400,7 +408,7 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
     res.status(200).json({
       expenses: [],
       total: 0,
-      limit: 20,
+      limit: MOBILE_PAGE_SIZE,
       pages: 0,
       nextCursor: null,
     });
@@ -564,7 +572,7 @@ export async function listVendorsForSupervisor(req: Request, res: Response, next
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,
       page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 50,
+      limit: mobilePageLimit(req.query.limit),
       cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
@@ -630,7 +638,7 @@ export async function listWorkers(req: Request, res: Response, next: NextFunctio
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       labourType: req.query.labourType as string | undefined,
-      limit: req.query.limit ? Number(req.query.limit) : 50,
+      limit: mobilePageLimit(req.query.limit),
       cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
@@ -682,7 +690,7 @@ export async function listAttendanceForWorker(req: Request, res: Response, next:
     const result = await workerService.listAttendanceForWorker(
       req.params.workerId,
       req.query.page ? Number(req.query.page) : 1,
-      req.query.limit ? Number(req.query.limit) : 50
+      mobilePageLimit(req.query.limit)
     );
     res.json(result);
   } catch (e) { next(e); }
@@ -732,7 +740,7 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
 export async function getRecentNotifications(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    const limit = Math.min(Number(req.query.limit) || 30, 50);
+    const limit = mobilePageLimit(req.query.limit);
     const notifications = await mobileService.getRecentNotificationsForSupervisor(userId, limit);
     res.json({ notifications });
   } catch (e) { next(e); }

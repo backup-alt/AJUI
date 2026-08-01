@@ -522,7 +522,7 @@ export async function getActionableApprovals(
     approvalScopeQuery(access, status === "all" ? undefined : status)
   )
     .sort({ submittedAt: -1 })
-    .limit(status === "all" ? 100 : 50)
+    .limit(25)
     .lean();
 
   return approvals.map((a) => ({
@@ -743,7 +743,7 @@ export async function listMaterialsForSupervisor(
   });
   if (filters.status) query.status = filters.status;
 
-  const limit = filters.limit ?? 20;
+  const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
 
   if (filters.status === "Approved") {
     const invQuery = { ...query };
@@ -752,13 +752,15 @@ export async function listMaterialsForSupervisor(
 
     const [items, total] = await dbMutex.run(() => Promise.all([
       withRetry(
-        () => Inventory.find(invQuery).sort({ updatedAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
+        () => Inventory.find(invQuery).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(30_000),
         { label: "mobile.listMaterials.inv.find" }
       ),
-      withRetry(
-        () => Inventory.countDocuments(invQuery).maxTimeMS(30_000),
-        { label: "mobile.listMaterials.inv.count" }
-      ),
+      filters.cursor
+        ? Promise.resolve(0)
+        : withRetry(
+            () => Inventory.countDocuments(invQuery).maxTimeMS(30_000),
+            { label: "mobile.listMaterials.inv.count" }
+          ),
     ])).catch((err) => {
       console.error("[mobile.listMaterials] inventory query failed:", (err as Error).message);
       return [[], 0] as [unknown[], number];
@@ -821,13 +823,15 @@ export async function listMaterialsForSupervisor(
   applyCursor(query, filters.cursor);
   const [items, total] = await dbMutex.run(() => Promise.all([
     withRetry(
-      () => Material.find(query).sort({ createdAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
+      () => Material.find(query).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(30_000),
       { label: "mobile.listMaterials.find" }
     ),
-    withRetry(
-      () => Material.countDocuments(query).maxTimeMS(30_000),
-      { label: "mobile.listMaterials.count" }
-    ),
+      filters.cursor
+        ? Promise.resolve(0)
+        : withRetry(
+            () => Material.countDocuments(query).maxTimeMS(30_000),
+            { label: "mobile.listMaterials.count" }
+          ),
   ])).catch((err) => {
     console.error("[mobile.listMaterials] main query failed:", (err as Error).message);
     return [[], 0] as [unknown[], number];
@@ -876,12 +880,12 @@ export async function listLabourForSupervisor(
 ) {
   const { query } = await buildScopedEntityQuery(userId, filters);
 
-  const limit = filters.limit ?? 20;
+  const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
   applyCursor(query, filters.cursor);
 
   const [items, total] = await dbMutex.run(() => Promise.all([
-    Labour.find(query).sort({ createdAt: -1 }).limit(limit).lean(),
-    Labour.countDocuments(query),
+    Labour.find(query).sort({ _id: -1 }).limit(limit).lean(),
+    filters.cursor ? Promise.resolve(0) : Labour.countDocuments(query),
   ]));
 
   return {
@@ -918,18 +922,20 @@ export async function listExpensesForSupervisor(
 ) {
   const { query } = await buildScopedEntityQuery(userId, filters);
 
-  const limit = filters.limit ?? 20;
+  const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
   applyCursor(query, filters.cursor);
 
   const [items, total] = await dbMutex.run(() => Promise.all([
     withRetry(
-      () => Expense.find(query).sort({ createdAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
+      () => Expense.find(query).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(30_000),
       { label: "mobile.listExpenses.find" }
     ),
-    withRetry(
-      () => Expense.countDocuments(query).maxTimeMS(30_000),
-      { label: "mobile.listExpenses.count" }
-    ),
+      filters.cursor
+        ? Promise.resolve(0)
+        : withRetry(
+            () => Expense.countDocuments(query).maxTimeMS(30_000),
+            { label: "mobile.listExpenses.count" }
+          ),
   ])).catch((err) => {
     console.error("[mobile.listExpenses] main query failed:", (err as Error).message);
     return [[], 0] as [unknown[], number];

@@ -4,6 +4,7 @@ import {
   IonContent, IonSearchbar,
   IonSegment, IonSegmentButton, IonLabel, IonFab, IonFabButton,
   IonIcon, IonSkeletonText, IonRefresher, IonRefresherContent,
+  IonInfiniteScroll, IonInfiniteScrollContent,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -29,6 +30,7 @@ import {
     IonContent, IonSearchbar,
     IonSegment, IonSegmentButton, IonLabel, IonFab, IonFabButton,
     IonIcon, IonSkeletonText, IonRefresher, IonRefresherContent,
+    IonInfiniteScroll, IonInfiniteScrollContent,
     FormsModule, DatePipe, CurrencyPipe,
     PageHeaderComponent, EmptyStateComponent, StatusPillComponent,
   ],
@@ -161,6 +163,14 @@ import {
           <ion-icon name="add-outline"></ion-icon>
         </ion-fab-button>
       </ion-fab>
+
+      <ion-infinite-scroll
+        threshold="160px"
+        [disabled]="!nextCursor() || isLoading() || isLoadingMore()"
+        (ionInfinite)="loadMoreExpenses($event)"
+      >
+        <ion-infinite-scroll-content loadingSpinner="dots"></ion-infinite-scroll-content>
+      </ion-infinite-scroll>
 
       @if (viewerUrl()) {
         <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
@@ -328,6 +338,8 @@ export class ExpensesPage implements OnInit {
   expenses = signal<Expense[]>([]);
   filteredExpenses = signal<Expense[]>([]);
   isLoading = signal(true);
+  isLoadingMore = signal(false);
+  nextCursor = signal<string | null>(null);
   searchQuery = '';
   statusFilter: ExpenseStatus | '' = '';
   selectedSiteName = signal<string | null>(null);
@@ -391,13 +403,14 @@ export class ExpensesPage implements OnInit {
           siteId: siteId || undefined,
           projectId: projectId || undefined,
           type: 'site',
-          limit: 100,
+          limit: 25,
         })
         .toPromise();
       this.expenses.set((r?.expenses || []).map((expense) => ({
         ...expense,
         amount: Number(expense.amount) || 0,
       })));
+      this.nextCursor.set(r?.pagination?.nextCursor ?? null);
       this.filterExpenses();
       this.isLoading.set(false);
     } catch (e) {
@@ -410,6 +423,38 @@ export class ExpensesPage implements OnInit {
   async refreshExpenses(event: CustomEvent): Promise<void> {
     await this.loadExpenses();
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
+  }
+
+  async loadMoreExpenses(event: CustomEvent): Promise<void> {
+    const cursor = this.nextCursor();
+    if (!cursor || this.isLoadingMore()) {
+      (event.target as HTMLIonInfiniteScrollElement).complete();
+      return;
+    }
+
+    this.isLoadingMore.set(true);
+    try {
+      const response = await this.supervisor.getExpenses({
+        siteId: this.supervisor.selectedSiteId() || undefined,
+        projectId: this.supervisor.selectedProjectId() || undefined,
+        type: 'site',
+        limit: 25,
+        cursor,
+      }).toPromise();
+      const existing = this.expenses();
+      const existingIds = new Set(existing.map((expense) => expense._id));
+      const appended = (response?.expenses || [])
+        .filter((expense) => !existingIds.has(expense._id))
+        .map((expense) => ({ ...expense, amount: Number(expense.amount) || 0 }));
+      this.expenses.set([...existing, ...appended]);
+      this.nextCursor.set(response?.pagination?.nextCursor ?? null);
+      this.filterExpenses();
+    } catch (error) {
+      console.error('[Expenses] failed to load next page', error);
+    } finally {
+      this.isLoadingMore.set(false);
+      (event.target as HTMLIonInfiniteScrollElement).complete();
+    }
   }
 
   filterExpenses(): void {

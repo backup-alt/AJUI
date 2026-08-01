@@ -371,7 +371,7 @@ export class MaterialCreatePage implements OnInit {
 
   async loadVendors(): Promise<void> {
     try {
-      const res = await firstValueFrom(this.supervisor.getVendors({ limit: 200 }));
+      const res = await firstValueFrom(this.supervisor.getVendors({ limit: 25 }));
       this.vendors.set(res.items || []);
     } catch (err) {
       console.warn('[MaterialCreate] failed to load vendors', err);

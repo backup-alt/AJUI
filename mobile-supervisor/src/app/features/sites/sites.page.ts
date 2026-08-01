@@ -564,7 +564,7 @@ export class SitesPage implements OnInit {
   private async loadDrawerMaterials(site: Site): Promise<void> {
     this.drawerLoading.set(true);
     this.supervisor
-      .getMaterials({ siteId: site.id, limit: 100 })
+        .getMaterials({ siteId: site.id, limit: 25 })
       .subscribe({
         next: (res) => {
           this.drawerMaterials.set(res.materials || []);

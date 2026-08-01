@@ -559,7 +559,7 @@ export class LabourWorkersPage implements OnInit {
             siteId: siteId || undefined,
             projectId: projectId || undefined,
             labourType: this.labourType(),
-            limit: 200,
+          limit: 25,
           }).subscribe({
             next: (r) => resolve(r as { items?: Worker[] }),
             error: () => resolve({ items: [] }),

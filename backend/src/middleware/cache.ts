@@ -114,10 +114,12 @@ export function cache(ttlSeconds: number) {
           res.setHeader("X-Cache-TTL", String(Math.round((entry.expiresAt - Date.now()) / 1000)));
           res.status(entry.status).type(entry.contentType).send(entry.body);
         } else if (!res.writableEnded) {
-          res.status(200).json({ items: [] });
+          res.status(503).json({ error: "Data is temporarily unavailable. Please retry." });
         }
       }).catch(() => {
-        if (!res.writableEnded) res.status(200).json({ items: [] });
+        if (!res.writableEnded) {
+          res.status(503).json({ error: "Data is temporarily unavailable. Please retry." });
+        }
       });
       return;
     }

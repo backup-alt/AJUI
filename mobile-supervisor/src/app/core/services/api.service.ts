@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Preferences } from '@capacitor/preferences';
-import { Observable, throwError, timeout } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Observable, of, throwError, timeout, finalize, shareReplay } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
 /**
@@ -16,11 +16,19 @@ const DEFAULT_TIMEOUT_MS = 25000;
  * Timeout for the auth refresh call — should be fast or fail fast.
  */
 const REFRESH_TIMEOUT_MS = 10000;
+const GET_CACHE_TTL_MS = 5 * 60_000;
+
+interface CachedGet {
+  data: unknown;
+  expiresAt: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
   readonly baseUrl = environment.apiUrl;
+  private readonly getCache = new Map<string, CachedGet>();
+  private readonly inFlightGets = new Map<string, Observable<unknown>>();
 
   get<T>(path: string, params?: Record<string, string | number | boolean>, timeoutMs: number = DEFAULT_TIMEOUT_MS): Observable<T> {
     let httpParams = new HttpParams();
@@ -31,12 +39,27 @@ export class ApiService {
         }
       }
     }
-    return this.http
-      .get<T>(`${this.baseUrl}${path}`, { params: httpParams })
+    const url = `${this.baseUrl}${path}`;
+    const query = httpParams.toString();
+    const cacheKey = query ? `${url}?${query}` : url;
+    const cached = this.getCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return of(cached.data as T);
+    if (cached) this.getCache.delete(cacheKey);
+
+    const inFlight = this.inFlightGets.get(cacheKey);
+    if (inFlight) return inFlight as Observable<T>;
+
+    const request = this.http
+      .get<T>(url, { params: httpParams })
       .pipe(
         timeout(timeoutMs),
-        catchError((err) => throwError(() => this.toAppError(err)))
+        tap((data) => this.cacheGet(cacheKey, data)),
+        catchError((err) => throwError(() => this.toAppError(err))),
+        finalize(() => this.inFlightGets.delete(cacheKey)),
+        shareReplay({ bufferSize: 1, refCount: false })
       );
+    this.inFlightGets.set(cacheKey, request as Observable<unknown>);
+    return request;
   }
 
   post<T>(path: string, body: unknown, timeoutMs: number = DEFAULT_TIMEOUT_MS): Observable<T> {
@@ -44,6 +67,7 @@ export class ApiService {
       .post<T>(`${this.baseUrl}${path}`, body)
       .pipe(
         timeout(timeoutMs),
+        tap(() => this.clearGetCache()),
         catchError((err) => throwError(() => this.toAppError(err)))
       );
   }
@@ -53,6 +77,7 @@ export class ApiService {
       .patch<T>(`${this.baseUrl}${path}`, body)
       .pipe(
         timeout(timeoutMs),
+        tap(() => this.clearGetCache()),
         catchError((err) => throwError(() => this.toAppError(err)))
       );
   }
@@ -62,6 +87,7 @@ export class ApiService {
       .put<T>(`${this.baseUrl}${path}`, body)
       .pipe(
         timeout(timeoutMs),
+        tap(() => this.clearGetCache()),
         catchError((err) => throwError(() => this.toAppError(err)))
       );
   }
@@ -71,8 +97,21 @@ export class ApiService {
       .delete<T>(`${this.baseUrl}${path}`)
       .pipe(
         timeout(timeoutMs),
+        tap(() => this.clearGetCache()),
         catchError((err) => throwError(() => this.toAppError(err)))
       );
+  }
+
+  private cacheGet(key: string, data: unknown): void {
+    this.getCache.set(key, { data, expiresAt: Date.now() + GET_CACHE_TTL_MS });
+    if (this.getCache.size > 200) {
+      const oldestKey = this.getCache.keys().next().value;
+      if (oldestKey) this.getCache.delete(oldestKey);
+    }
+  }
+
+  private clearGetCache(): void {
+    this.getCache.clear();
   }
 
   /** Canonical HTTP error → AppError converter. */
@@ -153,10 +192,12 @@ export class ApiService {
   }
 
   async setAccessToken(token: string): Promise<void> {
+    this.clearGetCache();
     await Preferences.set({ key: 'accessToken', value: token });
   }
 
   async clearTokens(): Promise<void> {
+    this.clearGetCache();
     await Preferences.remove({ key: 'accessToken' });
     await Preferences.remove({ key: 'refreshToken' });
   }

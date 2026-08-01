@@ -621,7 +621,7 @@ export class RequestsPage implements OnInit {
       imageOutline, cashOutline, chevronForwardOutline,
       cloudOfflineOutline, refreshOutline,
     });
-    this.supervisor.init().catch(() => {});
+    await this.supervisor.init().catch(() => {});
     await this.loadAllRequests();
     this.supervisor.siteChanged$
       .pipe(takeUntilDestroyed())
@@ -648,7 +648,7 @@ export class RequestsPage implements OnInit {
     try {
       // Load APPROVED materials from Inventory (fast on M0 — avoids Material.find() timeout)
       try {
-        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 200 }));
+        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 25 }));
         for (const m of approvedMatRes?.materials || []) {
           const hasNoBill = !(m as any).billUrl;
           items.push({
@@ -672,7 +672,7 @@ export class RequestsPage implements OnInit {
 
           // Load PENDING/DECLINED materials from Material collection (may timeout on M0 — non-critical)
       try {
-        const otherMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, limit: 200 }));
+        const otherMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, limit: 25 }));
         const approvedIds = new Set(items.filter(i => i.type === 'material').map(i => i._id));
         for (const m of otherMatRes?.materials || []) {
           if (approvedIds.has(m._id)) continue;
@@ -698,7 +698,7 @@ export class RequestsPage implements OnInit {
 
       // Load expenses — include ALL transaction types (Purchase + Add Cash)
       try {
-        const expRes = await firstValueFrom(this.supervisor.getExpenses({ ...siteFilter, type: 'site', limit: 200 }));
+        const expRes = await firstValueFrom(this.supervisor.getExpenses({ ...siteFilter, type: 'site', limit: 25 }));
         for (const e of expRes?.expenses || []) {
           const txLabel =
             e.transactionType === 'Cash Added' ? 'Add Cash' :

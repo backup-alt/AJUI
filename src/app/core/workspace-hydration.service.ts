@@ -271,11 +271,14 @@ export class WorkspaceHydrationService {
    */
   private async hydrateModulesFirstPage(): Promise<void> {
     const modules: PageModule[] = [
-      "sites", "labour", "payments", "subcontractors", "invoices",
-      "materials", "expenses", "inventory",
+      "inventory", "materials", "expenses", "labour", "payments",
+      "subcontractors", "sites", "invoices",
     ];
-    for (const mod of modules) {
-      await this.loadModule(mod);
+    const concurrentRequests = 2;
+    for (let start = 0; start < modules.length; start += concurrentRequests) {
+      await Promise.all(
+        modules.slice(start, start + concurrentRequests).map((module) => this.loadModule(module))
+      );
     }
   }
 

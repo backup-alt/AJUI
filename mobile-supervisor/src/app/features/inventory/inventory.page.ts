@@ -8,6 +8,8 @@ import {
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonFab,
   IonFabButton,
   ModalController,
@@ -82,6 +84,8 @@ type SortDir = 'asc' | 'desc';
     IonSkeletonText,
     IonRefresher,
     IonRefresherContent,
+    IonInfiniteScroll,
+    IonInfiniteScrollContent,
     DatePipe,
     CurrencyPipe,
     PageHeaderComponent,
@@ -237,6 +241,14 @@ type SortDir = 'asc' | 'desc';
           <ion-icon name="add-outline"></ion-icon>
         </ion-fab-button>
       </ion-fab>
+
+      <ion-infinite-scroll
+        threshold="160px"
+        [disabled]="!nextCursor() || isLoading() || isLoadingMore()"
+        (ionInfinite)="loadMoreInventory($event)"
+      >
+        <ion-infinite-scroll-content loadingSpinner="dots"></ion-infinite-scroll-content>
+      </ion-infinite-scroll>
 
       @if (viewerUrl()) {
         <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
@@ -626,7 +638,9 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   items = signal<InventoryItem[]>([]);
   isLoading = signal(true);
+  isLoadingMore = signal(false);
   errorMessage = signal<string>('');
+  nextCursor = signal<string | null>(null);
   searchQuery = signal('');
   sortField = signal<SortField>('name');
   sortDir = signal<SortDir>('asc');
@@ -689,7 +703,7 @@ export class InventoryPage implements OnInit, OnDestroy {
       checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline, close,
       swapVerticalOutline, cloudOfflineOutline, refreshOutline,
     });
-    this.supervisor.init().catch(() => {});
+    await this.supervisor.init().catch(() => {});
     await this.loadInventory();
 
     this.supervisor.siteChanged$
@@ -724,30 +738,13 @@ export class InventoryPage implements OnInit, OnDestroy {
           siteId: siteId || undefined,
           projectId: projectId || undefined,
           status: 'Approved',
-          limit: 200,
+          limit: 25,
         })
       );
       if (gen !== this.loadGeneration) return;
-      const materials: InventoryItem[] = (res?.materials || []).map((m) => ({
-        _id: m._id,
-        materialId: m.materialId,
-        name: m.name,
-        category: (m as any).category || 'General',
-        unit: m.unit,
-        currentQuantity: m.remainingStock ?? m.approvedQuantity ?? 0,
-        minimumQuantity: (m as any).minimumQuantity || 0,
-        lastUpdated: m.updatedAt || m.requestDate,
-        vendor: m.vendor || '',
-        poNumber: m.poNumber || '',
-        status: m.status,
-        projectId: m.projectId,
-        projectName: m.projectName,
-        siteId: m.siteId || '',
-        site: m.site,
-        billUrl: (m as any).billUrl || '',
-        purchaseHistory: m.purchaseHistory || [],
-      }));
+      const materials = (res?.materials || []).map((material) => this.toInventoryItem(material));
       this.items.set(materials);
+      this.nextCursor.set(res?.pagination?.nextCursor ?? null);
       this.isLoading.set(false);
     } catch (err) {
       if (gen !== this.loadGeneration) return;
@@ -760,6 +757,61 @@ export class InventoryPage implements OnInit, OnDestroy {
   async refreshInventory(event: CustomEvent): Promise<void> {
     await this.loadInventory();
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
+  }
+
+  async loadMoreInventory(event: CustomEvent): Promise<void> {
+    const cursor = this.nextCursor();
+    if (!cursor || this.isLoadingMore()) {
+      (event.target as HTMLIonInfiniteScrollElement).complete();
+      return;
+    }
+
+    this.isLoadingMore.set(true);
+    try {
+      const response = await firstValueFrom(
+        this.supervisor.getMaterials({
+          siteId: this.supervisor.selectedSiteId() || undefined,
+          projectId: this.supervisor.selectedProjectId() || undefined,
+          status: 'Approved',
+          limit: 25,
+          cursor,
+        })
+      );
+      const existing = this.items();
+      const existingIds = new Set(existing.map((item) => item._id));
+      const appended = (response?.materials || [])
+        .map((material) => this.toInventoryItem(material))
+        .filter((item) => !existingIds.has(item._id));
+      this.items.set([...existing, ...appended]);
+      this.nextCursor.set(response?.pagination?.nextCursor ?? null);
+    } catch (error) {
+      console.error('[Inventory] failed to load next page', error);
+    } finally {
+      this.isLoadingMore.set(false);
+      (event.target as HTMLIonInfiniteScrollElement).complete();
+    }
+  }
+
+  private toInventoryItem(material: Material): InventoryItem {
+    return {
+      _id: material._id,
+      materialId: material.materialId,
+      name: material.name,
+      category: (material as any).category || 'General',
+      unit: material.unit,
+      currentQuantity: material.remainingStock ?? material.approvedQuantity ?? 0,
+      minimumQuantity: (material as any).minimumQuantity || 0,
+      lastUpdated: material.updatedAt || material.requestDate,
+      vendor: material.vendor || '',
+      poNumber: material.poNumber || '',
+      status: material.status,
+      projectId: material.projectId,
+      projectName: material.projectName,
+      siteId: material.siteId || '',
+      site: material.site,
+      billUrl: (material as any).billUrl || '',
+      purchaseHistory: material.purchaseHistory || [],
+    };
   }
 
   applyFilters(): void {

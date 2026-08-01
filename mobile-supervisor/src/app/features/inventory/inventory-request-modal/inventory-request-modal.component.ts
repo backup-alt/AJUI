@@ -379,7 +379,7 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   }
 
   loadVendors(): void {
-    this.supervisor.getVendors({ limit: 100 }).subscribe({
+    this.supervisor.getVendors({ limit: 25 }).subscribe({
       next: (res) => this.vendors.set(res.items || []),
       error: () => this.vendors.set([]),
     });

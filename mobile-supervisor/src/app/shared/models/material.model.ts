@@ -74,6 +74,7 @@ export interface MaterialsListResponse {
     limit: number;
     total: number;
     pages: number;
+    nextCursor?: string | null;
   };
   total?: number;
   page?: number;
@@ -87,4 +88,5 @@ export interface MaterialFilters {
   search?: string;
   page?: number;
   limit?: number;
+  cursor?: string;
 }

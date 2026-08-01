@@ -96,6 +96,7 @@ export class SupervisorService {
     status?: string;
     page?: number;
     limit?: number;
+    cursor?: string;
   }) {
     return this.api.get<MaterialsListResponse>('/supervisor/materials', filters);
   }
@@ -141,6 +142,7 @@ export class SupervisorService {
     dateTo?: string;
     page?: number;
     limit?: number;
+    cursor?: string;
   }) {
     return this.api.get<LabourListResponse>('/supervisor/labour', filters);
   }
@@ -231,6 +233,7 @@ export class SupervisorService {
     dateTo?: string;
     page?: number;
     limit?: number;
+    cursor?: string;
   }) {
     return this.api.get<ExpenseListResponse>('/supervisor/expenses', filters);
   }
