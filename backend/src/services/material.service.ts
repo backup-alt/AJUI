@@ -11,6 +11,51 @@ import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { withRetry } from "../utils/retry.js";
 import { dbMutex } from "../utils/db-mutex.js";
 
+type MaterialPageCursorState = {
+  cursors: Map<number, string>;
+  total?: number;
+  expiresAt: number;
+};
+
+const materialPageCursorCache = new Map<string, MaterialPageCursorState>();
+const MATERIAL_PAGE_CURSOR_TTL_MS = 5 * 60_000;
+
+function materialPageKey(filter: {
+  projectId?: string;
+  siteId?: string;
+  site?: string;
+  vendorId?: string;
+  status?: string;
+  search?: string;
+  scopeProjectIds?: ProjectScopeIds;
+}): string {
+  return JSON.stringify({
+    projectId: filter.projectId || "",
+    siteId: filter.siteId || "",
+    site: filter.site || "",
+    vendorId: filter.vendorId || "",
+    status: filter.status || "",
+    search: filter.search || "",
+    scopeProjectIds: (filter.scopeProjectIds || []).map((id) => String(id)).sort(),
+  });
+}
+
+function getMaterialCursorState(key: string): MaterialPageCursorState {
+  const existing = materialPageCursorCache.get(key);
+  if (existing && existing.expiresAt > Date.now()) return existing;
+
+  const fresh: MaterialPageCursorState = {
+    cursors: new Map<number, string>(),
+    expiresAt: Date.now() + MATERIAL_PAGE_CURSOR_TTL_MS,
+  };
+  materialPageCursorCache.set(key, fresh);
+  if (materialPageCursorCache.size > 200) {
+    const oldest = materialPageCursorCache.keys().next().value;
+    if (oldest) materialPageCursorCache.delete(oldest);
+  }
+  return fresh;
+}
+
 async function populateRefs(input: CreateMaterialInput) {
   let project: any = null;
   let client: any = null;
@@ -138,24 +183,27 @@ export async function listMaterials(filter: {
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
+  const effectivePage = Math.max(filter.page || 1, 1);
+  const pageState = getMaterialCursorState(materialPageKey(filter));
+  const internalCursor = filter.cursor || pageState.cursors.get(effectivePage);
+
   // Cursor-based pagination via _id — uses the _id index for an O(log n)
   // range query instead of the O(n) skip-then-limit pattern that timed
   // out on M0 free tier.
   //
   // Sort is {_id: -1} (descending), so the popped cursor is the SMALLEST
   // _id in the page. Next page needs SMALLER _id values → $lt.
-  if (filter.cursor) {
+  if (internalCursor) {
     try {
-      query._id = { $lt: new Types.ObjectId(filter.cursor) };
+      query._id = { $lt: new Types.ObjectId(internalCursor) };
     } catch {
       // Invalid cursor → fall through and start from the beginning
     }
   }
 
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
-  const effectivePage = Math.max(filter.page || 1, 1);
-  const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
+  const skip = internalCursor ? 0 : (effectivePage - 1) * effectiveLimit;
   type MaterialLike = {
     projectId?: unknown;
     siteId?: unknown;
@@ -171,7 +219,7 @@ export async function listMaterials(filter: {
   let queryFailed = false;
   try {
     const tDb = Date.now();
-    if (!filter.cursor && effectivePage === 1) {
+    if (!internalCursor && effectivePage === 1) {
       // First page: run find + count in a SINGLE dbMutex acquisition to
       // avoid two round-trips through the semaphore queue. On M0 free tier
       // this halves the wall-clock time for page 1 (each acquisition can
@@ -191,6 +239,7 @@ export async function listMaterials(filter: {
       );
       items = foundItems as unknown as MaterialLike[];
       total = foundTotal;
+      pageState.total = foundTotal;
       console.log(`[listMaterials] dbMutex find+count dt=${Date.now() - tDb}ms items=${items.length} total=${total}`);
     } else {
       // Cursor pages: just the find query — skip count entirely.
@@ -210,9 +259,11 @@ export async function listMaterials(filter: {
       // Numbered pages after page 1 intentionally avoid countDocuments().
       // Page 1 already supplied the authoritative total; here we only need
       // an honest continuation signal for the next 25-row request.
-      total = items.length < effectiveLimit
-        ? skip + items.length
-        : skip + effectiveLimit + 1;
+      total = pageState.total ?? (
+        items.length < effectiveLimit
+          ? skip + items.length
+          : skip + effectiveLimit + 1
+      );
       console.log(`[listMaterials] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
     }
     // Cursor-based pagination by _id, descending. Sort is {_id: -1} so
@@ -234,6 +285,8 @@ export async function listMaterials(filter: {
       const lastItem = items[items.length - 1];
       if (lastItem && (lastItem as any)._id) {
         nextCursor = String((lastItem as any)._id);
+        pageState.cursors.set(effectivePage + 1, nextCursor);
+        pageState.expiresAt = Date.now() + MATERIAL_PAGE_CURSOR_TTL_MS;
       }
     }
   } catch (err) {
