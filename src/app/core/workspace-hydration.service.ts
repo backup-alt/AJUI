@@ -273,13 +273,23 @@ export class WorkspaceHydrationService {
 
     while (pagesFetched < MAX_PAGES) {
       pagesFetched++;
-      const response = await this.safeList(
+      let response = await this.safeList(
         () => factory(cursor),
         `${label}/page${pagesFetched}`
       );
+      // Retry once on failure — M0 cold starts and connection pool
+      // exhaustion cause transient failures on the second page.
+      if (response === null || response === undefined) {
+        console.warn(`[loadAllByCursor] ${label} page ${pagesFetched} failed — retrying in 2s`);
+        await new Promise((r) => setTimeout(r, 2000));
+        response = await this.safeList(
+          () => factory(cursor),
+          `${label}/page${pagesFetched}/retry`
+        );
+      }
       // safeList returned null (timeout/error) — abort the walk
       if (response === null || response === undefined) {
-        console.warn(`[loadAllByCursor] ${label} page ${pagesFetched} returned null — aborting walk`);
+        console.warn(`[loadAllByCursor] ${label} page ${pagesFetched} returned null after retry — aborting walk`);
         break;
       }
       const items = (response as any)?.items;

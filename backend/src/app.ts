@@ -9,7 +9,6 @@ import { connectDatabase } from "./config/db.js";
 import { initEmail, verifyEmailConnection } from "./config/email.js";
 import { initFirebase } from "./config/firebase.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
-import { throttle } from "./middleware/throttle.js";
 import { setupSwagger } from "./config/swagger.js";
 import authRoutes from "./routes/auth.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
@@ -185,10 +184,6 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(300_000); nex
   }
 
   setupSwagger(app);
-
-  // Global HTTP request throttle — limits concurrent request handlers to
-  // prevent M0 connection pool exhaustion from 11+ simultaneous endpoints.
-  app.use(throttle);
 
   app.use("/api/auth", authRoutes);
   app.use("/api/admin", adminRoutes);
