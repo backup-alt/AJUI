@@ -2038,8 +2038,8 @@ export class UniversalDashboardPage implements OnInit {
     } else if (this.isPageModule(module)) {
       const pageModule = module === "generalExpenses" ? "expenses" : module;
       if (this.hydration.hasMorePages(pageModule)) {
-        await this.hydration.loadNextPage(pageModule as PageModule);
-        this.displayLimit.update((n) => n + this.PAGE_SIZE);
+        const loaded = await this.hydration.loadNextPage(pageModule as PageModule);
+        if (loaded) this.displayLimit.update((n) => n + this.PAGE_SIZE);
       }
     }
   }

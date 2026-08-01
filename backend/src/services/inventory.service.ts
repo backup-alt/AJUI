@@ -148,7 +148,7 @@ export async function listInventory(filter: {
   let queryFailed = false;
   try {
     const tDb = Date.now();
-    if (!filter.cursor) {
+    if (!filter.cursor && effectivePage === 1) {
       // First page: find + count in a SINGLE dbMutex acquisition.
       const [foundItems, foundTotal] = await dbMutex.run(() =>
         withRetry(async () => {
@@ -179,7 +179,11 @@ export async function listInventory(filter: {
         )
       );
       items = foundItems as unknown as InventoryLike[];
-      total = filter.page * effectiveLimit;
+      // Avoid a second filtered count on every page. The first page carries
+      // the authoritative total; later pages only need continuation data.
+      total = items.length < effectiveLimit
+        ? (effectivePage - 1) * effectiveLimit + items.length
+        : effectivePage * effectiveLimit + 1;
       console.log(`[listInventory] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
     }
     // Cursor-based pagination by _id, descending. Sort is {_id: -1} so

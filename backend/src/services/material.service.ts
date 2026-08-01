@@ -171,7 +171,7 @@ export async function listMaterials(filter: {
   let queryFailed = false;
   try {
     const tDb = Date.now();
-    if (!filter.cursor) {
+    if (!filter.cursor && effectivePage === 1) {
       // First page: run find + count in a SINGLE dbMutex acquisition to
       // avoid two round-trips through the semaphore queue. On M0 free tier
       // this halves the wall-clock time for page 1 (each acquisition can
@@ -206,7 +206,12 @@ export async function listMaterials(filter: {
         )
       );
       items = foundItems as unknown as MaterialLike[];
-      total = filter.page * effectiveLimit;
+      // Numbered pages after page 1 intentionally avoid countDocuments().
+      // Page 1 already supplied the authoritative total; here we only need
+      // an honest continuation signal for the next 25-row request.
+      total = items.length < effectiveLimit
+        ? (effectivePage - 1) * effectiveLimit + items.length
+        : effectivePage * effectiveLimit + 1;
       console.log(`[listMaterials] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
     }
     // Cursor-based pagination by _id, descending. Sort is {_id: -1} so

@@ -137,18 +137,18 @@ export class WorkspaceHydrationService {
    * existing signal. Called by infinite scroll when the user reaches
    * the bottom of the table.
    */
-  async loadNextPage(module: PageModule): Promise<void> {
+  async loadNextPage(module: PageModule): Promise<boolean> {
     const cursors = this.pageCursors();
     const nextCursor = cursors[module];
     // Already at the end — no more pages
-    if (nextCursor === null || nextCursor === undefined) return;
+    if (nextCursor === null || nextCursor === undefined) return false;
     // Already loading — don't fire a duplicate
-    if (this.loadingNextPage()[module]) return;
+    if (this.loadingNextPage()[module]) return false;
 
     this.loadingNextPage.update(s => ({ ...s, [module]: true }));
     try {
       const result = await this.fetchPage(module, nextCursor);
-      if (!result) return;
+      if (!result) return false;
 
       const mapped = result.items.map(this.mapperForModule(module));
       // Append to existing data
@@ -157,13 +157,15 @@ export class WorkspaceHydrationService {
 
       // Update cursor and total
       this.pageCursors.update(s => ({ ...s, [module]: result.nextCursor ?? null }));
-      this.pageTotals.update(s => ({ ...s, [module]: result.total }));
+      this.pageTotals.update(s => ({ ...s, [module]: Math.max(s[module] ?? 0, result.total) }));
 
       console.log(
         `[loadNextPage] ${module}: appended ${mapped.length} items, nextPage=${result.nextCursor ?? "end"}, total=${result.total}`
       );
+      return true;
     } catch (err: any) {
       console.warn(`[loadNextPage] ${module} failed:`, err?.message ?? err);
+      return false;
     } finally {
       this.loadingNextPage.update(s => ({ ...s, [module]: false }));
     }
@@ -295,7 +297,7 @@ export class WorkspaceHydrationService {
     this.replaceIfLarger(signal, mapped, module);
 
     this.pageCursors.update(s => ({ ...s, [module]: result.nextCursor ?? null }));
-    this.pageTotals.update(s => ({ ...s, [module]: result.total }));
+    this.pageTotals.update(s => ({ ...s, [module]: Math.max(s[module] ?? 0, result.total) }));
 
     console.log(
       `[loadFirstPage] ${module}: ${mapped.length} items, total=${result.total}, nextPage=${result.nextCursor ?? "end"}`
@@ -311,9 +313,26 @@ export class WorkspaceHydrationService {
     module: PageModule,
     pageToken: string | undefined
   ): Promise<{ items: any[]; nextCursor: string | null; total: number } | null> {
+    const page = Math.max(Number(pageToken || 1) || 1, 1);
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const result = await this.fetchPageAttempt(module, page);
+      if (result) {
+        const pages = Math.ceil(result.total / this.PAGE_SIZE);
+        const emptyExpectedPage = result.items.length === 0 && result.total > 0 && page <= pages;
+        if (!emptyExpectedPage) return result;
+        console.warn(`[WorkspaceHydration] ${module} page ${page} returned empty while total=${result.total}; retry ${attempt}/3`);
+      }
+      if (attempt < 3) await this.delay(500 * attempt);
+    }
+    return null;
+  }
+
+  private async fetchPageAttempt(
+    module: PageModule,
+    page: number
+  ): Promise<{ items: any[]; nextCursor: string | null; total: number } | null> {
     const factory = this.apiFactoryForModule(module);
     if (!factory) return null;
-    const page = Math.max(Number(pageToken || 1) || 1, 1);
 
     if (module === "expenses") {
       const [siteResponse, generalResponse] = await Promise.all([
@@ -326,7 +345,9 @@ export class WorkspaceHydrationService {
           "expenses/general/page"
         ),
       ]);
-      if (!siteResponse && !generalResponse) return null;
+      // Both partitions are part of one logical page. Never advance the
+      // shared cursor when either request failed.
+      if (!siteResponse || !generalResponse) return null;
 
       const siteItems = ((siteResponse as any)?.items || []);
       const generalItems = ((generalResponse as any)?.items || []);
@@ -524,18 +545,27 @@ export class WorkspaceHydrationService {
     factory: () => import("rxjs").Observable<T>,
     label: string
   ): Promise<T | null> {
-    try {
-      return await firstValueFrom(
-        factory().pipe(timeout({ each: 60_000, meta: `hydration.${label}` }))
-      );
-    } catch (err: any) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await firstValueFrom(
+          factory().pipe(timeout({ each: 60_000, meta: `hydration.${label}` }))
+        );
+      } catch (err: any) {
       const status = err?.status || err?.statusCode;
       const isTimeout = err?.name === "TimeoutError" || /timeout/i.test(err?.message || "");
       const message = err?.error?.error || err?.error?.message || err?.message || String(err);
       console.warn(
-        `[WorkspaceHydration] ${label} failed — ${isTimeout ? "TIMEOUT" : `status=${status}`}: ${message}`
+        `[WorkspaceHydration] ${label} failed (attempt ${attempt}/3) — ${isTimeout ? "TIMEOUT" : `status=${status}`}: ${message}`
       );
-      return null;
+      const retryable = isTimeout || status === 408 || status === 429 || status >= 500 || status == null;
+      if (!retryable || attempt === 3) return null;
+      await this.delay(500 * attempt);
+      }
     }
+    return null;
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
