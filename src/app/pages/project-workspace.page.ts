@@ -1081,8 +1081,11 @@ export class ProjectWorkspacePage {
   readonly activeConfig = computed(() => sectionConfigs.find((section) => section.key === this.activeSection()) ?? sectionConfigs[0]);
 
   constructor() {
+    // Custom fields have a loaded guard — won't re-fetch if already loaded.
     void this.data.loadCustomFieldsFromBackend();
-    void this.hydration.refreshFromBackend();
+    // Don't refreshFromBackend here — data is already loaded by the
+    // hydration service on boot. This was causing duplicate API calls
+    // on every project workspace navigation.
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.data.touchProject(projectId);

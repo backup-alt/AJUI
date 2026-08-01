@@ -384,16 +384,19 @@ export class ApiService {
   // =================== QUOTATIONS ===================
   deleteQuotation(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/quotations/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
       catchError(this.handleError)
     );
   }
   patchQuotation(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/quotations/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
       catchError(this.handleError)
     );
   }
   createQuotation(payload: any): Observable<any> {
     return this.http.post(`${this.baseUrl}/quotations`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
       catchError(this.handleError)
     );
   }
@@ -404,24 +407,25 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/quotations${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/quotations${query}`);
   }
 
   // =================== INVOICES ===================
   deleteInvoice(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/invoices/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
       catchError(this.handleError)
     );
   }
   patchInvoice(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/invoices/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
       catchError(this.handleError)
     );
   }
   createInvoice(payload: any): Observable<any> {
     return this.http.post(`${this.baseUrl}/invoices`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
       catchError(this.handleError)
     );
   }
@@ -437,9 +441,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/invoices${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/invoices${query}`);
   }
 
   /** Single-shot hydration endpoint for invoices. */
@@ -559,14 +561,13 @@ export class ApiService {
 
   createSite(payload: { name: string; projectIds?: string[]; openingBalance?: number; status?: string }): Observable<{ site: any }> {
     return this.http.post<{ site: any }>(`${this.baseUrl}/sites`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
       catchError(this.handleError)
     );
   }
 
   listSitesAdmin(): Observable<{ sites: any[] }> {
-    return this.http.get<{ sites: any[] }>(`${this.baseUrl}/admin/sites`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<{ sites: any[] }>(`${this.baseUrl}/admin/sites`);
   }
 
   getSiteMaterials(siteId: string): Observable<{ materials: any[] }> {
@@ -576,7 +577,7 @@ export class ApiService {
   }
 
   // =================== VENDORS ===================
-  listVendors(params?: { materialType?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listVendors(params?: { materialType?: string; status?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -680,7 +681,7 @@ export class ApiService {
   }
 
   // =================== LABOUR ===================
-  listLabour(params?: { projectId?: string; siteId?: string; category?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listLabour(params?: { projectId?: string; siteId?: string; category?: string; status?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -698,9 +699,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<{ items: any[]; total: number }>(`${this.baseUrl}/attendance/grouped${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<{ items: any[]; total: number }>(`${this.baseUrl}/attendance/grouped${query}`);
   }
 
   getLabourReport(params?: { projectId?: string; from?: string; to?: string }): Observable<{ items: any[]; weeklySummaries: any[]; grandTotal: any }> {
@@ -716,7 +715,7 @@ export class ApiService {
   }
 
   // =================== EXPENSES ===================
-  listExpenses(params?: { type?: string; projectId?: string; siteId?: string; status?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
+  listExpenses(params?: { type?: string; projectId?: string; siteId?: string; status?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -756,7 +755,7 @@ export class ApiService {
   }
 
   // =================== PAYMENTS ===================
-  listPayments(params?: { projectId?: string; clientId?: string; status?: string; mode?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listPayments(params?: { projectId?: string; clientId?: string; status?: string; mode?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -783,7 +782,7 @@ export class ApiService {
   }
 
   // =================== SUBCONTRACTORS ===================
-  listSubcontractors(params?: { projectId?: string; approvalStatus?: string; paymentStatus?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listSubcontractors(params?: { projectId?: string; approvalStatus?: string; paymentStatus?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -879,9 +878,7 @@ export class ApiService {
       Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
       query = `?${q.toString()}`;
     }
-    return this.http.get<PaginatedResponse<any>>(`${this.baseUrl}/admin/users${query}`, { headers: this.authHeaders() }).pipe(
-      catchError(this.handleError)
-    );
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/admin/users${query}`);
   }
 
   getEmployee(id: string): Observable<{ employee: any }> {
@@ -892,6 +889,7 @@ export class ApiService {
 
   patchEmployee(id: string, payload: any): Observable<{ employee: any }> {
     return this.http.patch<{ employee: any }>(`${this.baseUrl}/admin/users/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
       catchError(this.handleError)
     );
   }
@@ -1219,8 +1217,12 @@ export class ApiService {
    * Invalidate cached responses matching a URL pattern. Call after
    * POST/PATCH/DELETE to ensure subsequent GETs fetch fresh data.
    */
-  invalidateCache(pattern: string): void {
-    this.cache.invalidate(pattern);
+  invalidateCache(pattern?: string): void {
+    if (pattern) {
+      this.cache.invalidate(pattern);
+    } else {
+      this.cache.clear();
+    }
   }
 
   private authHeaders(): HttpHeaders {

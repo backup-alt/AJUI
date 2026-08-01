@@ -966,10 +966,35 @@ export class ErpDataService {
     return match?._id ?? null;
   }
 
+  private customFieldsLoaded = false;
+  private customFieldsInFlight: Promise<void> | null = null;
+
+  resetCustomFieldsLoaded(): void {
+    this.customFieldsLoaded = false;
+  }
+
   async loadCustomFieldsFromBackend(): Promise<void> {
+    // Already loaded — skip entirely. This prevents the N×7 API call
+    // storm that fires on every route navigation to dashboard and
+    // project workspace.
+    if (this.customFieldsLoaded) return;
+    // If a load is already in flight, wait for it instead of starting
+    // a duplicate.
+    if (this.customFieldsInFlight) return this.customFieldsInFlight;
+
     const siteEntities = this.siteEntities();
     if (!siteEntities.length) return;
 
+    this.customFieldsInFlight = this.doLoadCustomFields(siteEntities);
+    try {
+      await this.customFieldsInFlight;
+      this.customFieldsLoaded = true;
+    } finally {
+      this.customFieldsInFlight = null;
+    }
+  }
+
+  private async doLoadCustomFields(siteEntities: Site[]): Promise<void> {
     const modules: SharedModuleKey[] = [
       "clients", "materials", "labour", "expenses",
       "payments", "vendors", "subcontractors",

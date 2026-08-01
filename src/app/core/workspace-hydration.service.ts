@@ -208,23 +208,34 @@ export class WorkspaceHydrationService {
    * each collection finishes — never overwrites good data with empty
    * data on a transient failure.
    */
+  private refreshingInFlight: Promise<void> | null = null;
+
   async refreshFromBackend(): Promise<void> {
-    try {
-      // Reuse the same code path as hydrateFromBackend but mark as a
-      // background refresh. We DON'T set hydrationStatus to loading
-      // here so the UI stays responsive.
-      await this.hydrateCritical();
-      await this.hydrateModulesBackground();
-      this.persistSnapshot();
-    } catch (err: any) {
-      console.warn("[refreshFromBackend] failed (signals preserved):", err?.message ?? err);
-    }
+    // If a refresh is already in flight, wait for it instead of starting
+    // a duplicate. This prevents the 11+ parallel hydration requests
+    // that were causing 429 errors.
+    if (this.refreshingInFlight) return this.refreshingInFlight;
+
+    this.refreshingInFlight = (async () => {
+      try {
+        await this.hydrateCritical();
+        await this.hydrateModulesBackground();
+        this.persistSnapshot();
+      } catch (err: any) {
+        console.warn("[refreshFromBackend] failed (signals preserved):", err?.message ?? err);
+      } finally {
+        this.refreshingInFlight = null;
+      }
+    })();
+
+    return this.refreshingInFlight;
   }
 
   invalidateCache(): void {
     try {
       localStorage.removeItem(SNAPSHOT_KEY);
       this.loadedModules.set(new Set());
+      this.erp.resetCustomFieldsLoaded();
     } catch {}
   }
 

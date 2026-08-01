@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, computed, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
@@ -340,7 +340,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div class="table-actions">
                   <label class="table-search" *ngIf="!tableViewExpanded()">
                     <ion-icon name="search-outline"></ion-icon>
-                    <input [value]="searchText()" (input)="searchText.set($any($event.target).value)" placeholder="Search rows" />
+                    <input [value]="searchText()" (input)="onSearchTextChange($any($event.target).value)" placeholder="Search rows" />
                   </label>
                   <button
                     type="button"
@@ -519,7 +519,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
               <ng-container *ngIf="activeModule() !== 'inventory'">
                 <ng-container *ngIf="tableState() as tableState">
                 <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
-                <span>{{ tableState.rows.length }} rows</span>
+                <span>{{ totalVisibleCount() }} rows</span>
                 <span>{{ tableState.columns.length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
                 <span *ngIf="activeModule() === 'clients'">Customer records synced</span>
@@ -697,6 +697,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </span>
                           </ng-template>
                         </ng-template>
+                      </td>
+                    </tr>
+                    <tr #scrollSentinel *ngIf="hasMoreRows()">
+                      <td [attr.colspan]="tableState.columns.length + (hasSelectedRows() ? 1 : 0)" class="load-more-row">
+                        <button type="button" class="load-more-btn" (click)="loadMoreRows()">
+                          Show more ({{ totalVisibleCount() - displayLimit() }} remaining)
+                        </button>
                       </td>
                     </tr>
                     <tr *ngIf="tableState.rows.length === 0">
@@ -1808,6 +1815,25 @@ const siteMaterialDetailFields: FieldSchema[] = [
       cursor: not-allowed;
       opacity: 0.6;
     }
+    .load-more-row {
+      text-align: center;
+      padding: 16px;
+    }
+    .load-more-btn {
+      background: #f3f6ff;
+      border: 1px solid #d6deeb;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #2c5cff;
+      cursor: pointer;
+      transition: all 160ms ease;
+    }
+    .load-more-btn:hover {
+      background: #e4ecff;
+      border-color: #2c5cff;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -1840,6 +1866,17 @@ export class UniversalDashboardPage implements OnInit {
   readonly backendSyncing = signal(false);
   readonly backendSyncMessage = signal<string | null>(null);
   readonly backendSource = signal<string | null>(null);
+
+  // Infinite scroll: show 50 rows initially, load 50 more when sentinel is visible
+  readonly displayLimit = signal(50);
+  private scrollObserver: IntersectionObserver | null = null;
+  private scrollSentinel: HTMLElement | null = null;
+  @ViewChild("scrollSentinel") set scrollSentinelRef(el: ElementRef<HTMLElement> | undefined) {
+    if (el) {
+      this.scrollSentinel = el.nativeElement;
+      this.setupScrollObserver();
+    }
+  }
 
   readonly calendarWeekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   readonly tableViewExpanded = signal(false);
@@ -1924,14 +1961,98 @@ export class UniversalDashboardPage implements OnInit {
   readonly activeConfig = computed(() => dashboardModules.find((module) => module.key === this.activeModule()) ?? dashboardModules[0]);
   readonly dashboardRows = computed(() => this.buildRows());
   readonly tableState = computed(() => ({
-    rows: this.visibleRows(),
+    rows: this.displayedRows(),
     columns: this.columnsForActive(),
   }));
+  readonly displayedRows = computed(() => {
+    const all = this.visibleRows();
+    const limit = this.displayLimit();
+    return all.length > limit ? all.slice(0, limit) : all;
+  });
+  readonly hasMoreRows = computed(() => this.visibleRows().length > this.displayLimit());
+  readonly totalVisibleCount = computed(() => this.visibleRows().length);
 
   ngOnInit(): void {
-    void this.hydration.refreshFromBackend();
     void this.data.loadCustomFieldsFromBackend();
   }
+
+  ngOnDestroy(): void {
+    this.scrollObserver?.disconnect();
+    this.scrollObserver = null;
+  }
+
+  private setupScrollObserver(): void {
+    if (this.scrollObserver) this.scrollObserver.disconnect();
+    if (!this.scrollSentinel) return;
+    this.scrollObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) this.loadMoreRows();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    this.scrollObserver.observe(this.scrollSentinel);
+  }
+
+  loadMoreRows(): void {
+    if (!this.hasMoreRows()) return;
+    this.displayLimit.update((n) => n + 50);
+  }
+
+  // Server-side search: debounce timer and in-flight guard
+  private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private serverSearchInFlight = false;
+
+  onSearchTextChange(value: string): void {
+    this.searchText.set(value);
+    this.displayLimit.set(50);
+    if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
+    if (!value.trim()) {
+      this.serverSearchResults.set(null);
+      return;
+    }
+    this.searchDebounceTimer = setTimeout(() => this.executeServerSearch(value.trim()), 350);
+  }
+
+  private async executeServerSearch(query: string): Promise<void> {
+    if (this.serverSearchInFlight) return;
+    this.serverSearchInFlight = true;
+    const module = this.activeModule();
+    try {
+      const apiMap: Record<string, (opts: any) => any> = {
+        materials: (opts: any) => firstValueFrom(this.api.listMaterials(opts)),
+        labour: (opts: any) => firstValueFrom(this.api.listLabour(opts)),
+        expenses: (opts: any) => firstValueFrom(this.api.listExpenses(opts)),
+        payments: (opts: any) => firstValueFrom(this.api.listPayments(opts)),
+        vendors: (opts: any) => firstValueFrom(this.api.listVendors(opts)),
+        subcontractors: (opts: any) => firstValueFrom(this.api.listSubcontractors(opts)),
+        inventory: (opts: any) => firstValueFrom(this.api.listInventory(opts)),
+      };
+      const mapperMap: Record<string, (x: any) => any> = {
+        materials: mapMaterial,
+        labour: mapLabour,
+        expenses: mapExpense,
+        payments: mapPayment,
+        vendors: mapVendor,
+        subcontractors: mapSubcontractor,
+        inventory: mapInventory,
+      };
+      const apiCall = apiMap[module];
+      const mapper = mapperMap[module];
+      if (!apiCall || !mapper) return;
+      const limit = (module === "materials" || module === "inventory" || module === "expenses") ? 25 : 100;
+      const result = await apiCall({ limit, search: query });
+      const items = (result?.items || []).map(mapper);
+      this.serverSearchResults.set({ module, items });
+    } catch (err) {
+      console.warn("[serverSearch] failed:", err);
+    } finally {
+      this.serverSearchInFlight = false;
+    }
+  }
+
+  readonly serverSearchResults = signal<{ module: string; items: TableRow[] } | null>(null);
 
   activeProjectsCount() {
     return this.data.projects().filter((project) => project.status === "Active").length;
@@ -1952,64 +2073,27 @@ export class UniversalDashboardPage implements OnInit {
   switchModule(module: DashboardModule) {
     this.activeModule.set(module);
     this.searchText.set("");
+    this.displayLimit.set(50);
+    this.serverSearchResults.set(null);
     this.resetFilterState();
     this.closeDropdowns();
     this.clearRowSelection();
 
-    // Always hit the backend directly for the table the user is about to view.
-    // Bypasses the dashboard-wide debounce so the Material, Expense, and
-    // Inventory tabs always show fresh MongoDB data, not the localStorage
-    // fallback. Pattern mirrors the inventory-modal sites refresh from
-    // commit b754d2f.
+    // Load only the specific module's data if not already loaded.
+    // Don't refresh everything — that was causing 429 errors.
     if (module === "materials") {
-      this.refreshMaterialsForTable();
+      void this.hydration.loadModule("materials");
     } else if (module === "expenses" || module === "generalExpenses") {
-      this.refreshExpensesForTable();
+      void this.hydration.loadModule("expenses");
     } else if (module === "inventory") {
-      this.refreshInventoryForTable();
-      this.refreshFromBackend();
-    } else {
-      this.refreshFromBackend();
+      void this.hydration.loadModule("inventory");
+    } else if (module === "labour") {
+      void this.hydration.loadModule("labour");
+    } else if (module === "payments") {
+      void this.hydration.loadModule("payments");
+    } else if (module === "subcontractors") {
+      void this.hydration.loadModule("subcontractors");
     }
-  }
-
-  /**
-   * Dedicated Material table refresh — bypasses refreshFromBackend's
-   * debounce and unconditionally hits GET /materials to update the
-   * materials signal + localStorage. Mirrors the pattern from commit
-   * b754d2f where a dedicated sites refresh was added so the inventory
-   * modal always had fresh data.
-   *
-   * Empty-array guard: the backend falls back to { items: [] } on M0
-   * timeout. We never overwrite the signal with an empty array or the
-   * table silently empties out on every tab switch.
-   *
-   * NOTE: we deliberately do NOT guard against "backend returned fewer
-   * items than existing signal" because that case is exactly the bug
-   * the user is hitting — localStorage has 4 stale entries and we want
-   * the fresh backend response (even if it equals 4, but usually 59)
-   * to overwrite. The only thing we skip on is empty.
-   */
-  private refreshMaterialsForTable() {
-    // Single-shot refresh via the new /materials/all endpoint — returns
-    // every row in one HTTP call, no cursor pagination.
-    void this.hydration.refreshFromBackend();
-  }
-
-  /**
-   * Dedicated Expense table refresh — single-shot refresh via the new
-   * /expenses/all endpoint.
-   */
-  private refreshExpensesForTable() {
-    void this.hydration.refreshFromBackend();
-  }
-
-  /**
-   * Dedicated Inventory table refresh — single-shot refresh via the new
-   * /inventory/all endpoint.
-   */
-  private refreshInventoryForTable() {
-    void this.hydration.refreshFromBackend();
   }
 
   private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[], siteFilter?: string) {
@@ -3978,6 +4062,8 @@ const inventory = this.data.inventory().map((row) => ({
         lastUpdated: card.lastUpdated,
       })) as TableRow[];
     }
+    const srs = this.serverSearchResults();
+    if (srs && srs.module === module) return srs.items;
     return this.data.tableRowsFor(module, this.dashboardRows()[module]);
   }
 
