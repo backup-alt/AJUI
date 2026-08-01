@@ -9,7 +9,7 @@ import { ApiService } from "../core/api.service";
 import { mapClient, mapProject, mapSite, mapVendor, mapSupervisor, mapMaterial, mapLabour, mapExpense, mapPayment, mapSubcontractor, mapInventory } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
+import { WorkspaceHydrationService, type PageModule } from "../core/workspace-hydration.service";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 
@@ -519,7 +519,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
               <ng-container *ngIf="activeModule() !== 'inventory'">
                 <ng-container *ngIf="tableState() as tableState">
                 <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
-                <span>{{ totalVisibleCount() }} rows</span>
+                <span *ngIf="totalCount()">{{ totalCount() }} total</span>
+                <span>{{ displayedRows().length }} showing</span>
                 <span>{{ tableState.columns.length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
                 <span *ngIf="activeModule() === 'clients'">Customer records synced</span>
@@ -701,9 +702,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     </tr>
                     <tr #scrollSentinel *ngIf="hasMoreRows()">
                       <td [attr.colspan]="tableState.columns.length + (hasSelectedRows() ? 1 : 0)" class="load-more-row">
-                        <button type="button" class="load-more-btn" (click)="loadMoreRows()">
-                          Show more ({{ totalVisibleCount() - displayLimit() }} remaining)
+                        <button *ngIf="!isLoadingNextPage()" type="button" class="load-more-btn" (click)="loadMoreRows()">
+                          Show more
                         </button>
+                        <span *ngIf="isLoadingNextPage()" class="load-more-loading">Loading…</span>
                       </td>
                     </tr>
                     <tr *ngIf="tableState.rows.length === 0">
@@ -1834,6 +1836,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
       background: #e4ecff;
       border-color: #2c5cff;
     }
+    .load-more-loading {
+      display: inline-block;
+      padding: 10px 24px;
+      font-size: 13px;
+      color: #64748b;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -1969,8 +1977,16 @@ export class UniversalDashboardPage implements OnInit {
     const limit = this.displayLimit();
     return all.length > limit ? all.slice(0, limit) : all;
   });
-  readonly hasMoreRows = computed(() => this.visibleRows().length > this.displayLimit());
-  readonly totalVisibleCount = computed(() => this.visibleRows().length);
+  /** True if there are more rows to show — either locally or on the server. */
+  readonly hasMoreRows = computed(() => {
+    const localMore = this.visibleRows().length > this.displayLimit();
+    const serverMore = this.hydration.hasMorePages(this.activeModule());
+    return localMore || serverMore;
+  });
+  /** Total records from MongoDB (not loaded array length). */
+  readonly totalCount = computed(() => this.hydration.getTotalCount(this.activeModule()));
+  /** True while fetching the next page from server. */
+  readonly isLoadingNextPage = computed(() => this.hydration.loadingNextPage()[this.activeModule()] ?? false);
 
   ngOnInit(): void {
     void this.data.loadCustomFieldsFromBackend();
@@ -1996,8 +2012,17 @@ export class UniversalDashboardPage implements OnInit {
   }
 
   loadMoreRows(): void {
-    if (!this.hasMoreRows()) return;
-    this.displayLimit.update((n) => n + 50);
+    const module = this.activeModule();
+    const localRows = this.visibleRows();
+    if (localRows.length > this.displayLimit()) {
+      this.displayLimit.update((n) => n + 50);
+    } else if (this.isPageModule(module) && this.hydration.hasMorePages(module)) {
+      void this.hydration.loadNextPage(module as PageModule);
+    }
+  }
+
+  private isPageModule(module: string): boolean {
+    return ["materials", "inventory", "expenses", "labour", "payments", "subcontractors", "invoices"].includes(module);
   }
 
   // Server-side search: debounce timer and in-flight guard
