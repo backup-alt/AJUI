@@ -67,6 +67,7 @@ export async function listLabour(filter: {
   to?: string;
   page: number;
   limit: number;
+  cursor?: string;
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
@@ -82,12 +83,63 @@ export async function listLabour(filter: {
   }
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Labour.find(query).sort({ attendanceDate: -1, createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Labour.countDocuments(query),
-  ]);
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  // Cursor-based pagination by _id. The previous implementation used
+  // skip+limit which is O(skip) on MongoDB and times out on M0 once the
+  // collection grows past a few hundred rows. Cursor pagination uses an
+  // indexed _id range query that's O(log n).
+  if (filter.cursor) {
+    try {
+      query._id = { $lt: new Types.ObjectId(filter.cursor) };
+    } catch {
+      // Invalid cursor → start from beginning
+    }
+  }
+
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
+  type LabourLike = { [k: string]: unknown };
+  let items: LabourLike[] = [];
+  let total = 0;
+  let nextCursor: string | null = null;
+  try {
+    const foundItems = await Labour.find(query)
+      .sort({ _id: -1 })
+      .limit(effectiveLimit)
+      .lean()
+      .maxTimeMS(60_000);
+
+    if (!filter.cursor) {
+      try {
+        const foundTotal = await Labour.countDocuments(query).maxTimeMS(30_000);
+        total = foundTotal;
+      } catch (countErr) {
+        console.warn("[listLabour] countDocuments failed (non-fatal):", (countErr as Error).message);
+        total = items.length;
+      }
+    } else {
+      total = filter.page * effectiveLimit;
+    }
+    items = foundItems as unknown as LabourLike[];
+    // Emit nextCursor only when the page is full — a short page means
+    // we've reached the end of the collection.
+    if (items.length === effectiveLimit) {
+      const lastItem = items[items.length - 1];
+      if (lastItem && (lastItem as any)._id) {
+        nextCursor = String((lastItem as any)._id);
+      }
+    }
+  } catch (err) {
+    console.error("[listLabour] query failed:", (err as Error).message);
+    items = [];
+    total = 0;
+  }
+  return {
+    items,
+    total,
+    page: filter.page,
+    limit: effectiveLimit,
+    pages: Math.ceil(total / effectiveLimit),
+    nextCursor,
+  };
 }
 
 export async function getLabourById(id: string) {

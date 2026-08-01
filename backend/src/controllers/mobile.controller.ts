@@ -142,8 +142,8 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
-      page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
+      cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
   } catch (e) {
@@ -151,9 +151,9 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
     res.status(200).json({
       materials: [],
       total: 0,
-      page: 1,
       limit: 20,
       pages: 0,
+      nextCursor: null,
     });
   }
 }
@@ -282,8 +282,8 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
-      page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
+      cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
   } catch (e) {
@@ -291,9 +291,9 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
     res.status(200).json({
       labour: [],
       total: 0,
-      page: 1,
       limit: 20,
       pages: 0,
+      nextCursor: null,
     });
   }
 }
@@ -390,8 +390,8 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       siteId: req.query.siteId as string | undefined,
       status: req.query.status as string | undefined,
       type: req.query.type as string | undefined,
-      page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 20,
+      cursor: req.query.cursor as string | undefined,
     };
     const result = await mobileService.listExpensesForSupervisor(userId, filters);
     res.json(result);
@@ -400,9 +400,9 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
     res.status(200).json({
       expenses: [],
       total: 0,
-      page: 1,
       limit: 20,
       pages: 0,
+      nextCursor: null,
     });
   }
 }
@@ -565,6 +565,7 @@ export async function listVendorsForSupervisor(req: Request, res: Response, next
       search: req.query.search as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 50,
+      cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -629,8 +630,8 @@ export async function listWorkers(req: Request, res: Response, next: NextFunctio
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       labourType: req.query.labourType as string | undefined,
-      page: req.query.page ? Number(req.query.page) : 1,
       limit: req.query.limit ? Number(req.query.limit) : 50,
+      cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
   } catch (e) { next(e); }

@@ -22,6 +22,7 @@ export async function listClients(req: Request, res: Response, next: NextFunctio
       status: req.query.status as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      cursor: req.query.cursor as string | undefined,
       scopeQuery,
     });
     res.json(result);
@@ -78,6 +79,7 @@ export async function listSites(req: Request, res: Response, next: NextFunction)
       scopeProjectIds,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 100,
+      cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -126,6 +128,7 @@ export async function listProjects(req: Request, res: Response, next: NextFuncti
       supervisorId: req.query.supervisorId as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      cursor: req.query.cursor as string | undefined,
       scopeQuery,
     });
     res.json(result);
@@ -189,6 +192,7 @@ export async function listSupervisors(req: Request, res: Response, next: NextFun
       scopeProjectIds,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 100,
+      cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
   } catch (e) { next(e); }

@@ -207,7 +207,7 @@ export async function listMaterials(filter: {
         () => Material.find(query)
           .select({ receiptImage: 0 })
           .sort({ _id: -1 })
-          .limit(effectiveLimit + 1)
+          .limit(effectiveLimit)
           .lean()
           .maxTimeMS(60_000),
         { label: "listMaterials.find" }
@@ -233,24 +233,26 @@ export async function listMaterials(filter: {
       total = filter.page * effectiveLimit; // estimate
     }
     items = foundItems as unknown as MaterialLike[];
-    // CRITICAL: Use the last item that WILL be returned as the cursor
-    // (not the (limit+1)th item). With sort {_id:-1} and $lt cursor,
-    // the next page query is _id < cursor, which EXCLUDES the cursor
-    // item itself. If we use the (limit+1)th item as cursor (the
-    // standard "fetch limit+1, pop extra" pattern), that item is
-    // NEVER returned to the client — it's skipped between pages.
+    // Cursor-based pagination by _id, descending. Sort is {_id: -1} so
+    // the last item in the page has the SMALLEST _id in the page.
+    // Next page uses `_id < cursor` (already applied above when the
+    // caller passed `filter.cursor`). The cursor IS the last item's _id,
+    // and because the next query is strictly less-than, the cursor item
+    // is not re-included — it's already been returned in this page.
+    //
+    // We only emit a nextCursor when the page is full. A short page
+    // (< effectiveLimit) means we've reached the end of the collection.
     //
     // Example with 58 materials and limit=25:
-    //   WRONG (pop pattern): page1 returns 25, page2 returns 25, page3
-    //   returns 6 = 56 total (items #26 and #52 lost)
-    //   RIGHT (cursor = last returned): page1 returns 25, page2 returns
-    //   25, page3 returns 8 = 58 total (no items lost)
-    if (items.length > effectiveLimit) {
-      const cursorItem = items[effectiveLimit - 1];
-      if (cursorItem && (cursorItem as any)._id) {
-        nextCursor = String((cursorItem as any)._id);
+    //   page 1: items 0..24 (25 rows, full) → cursor = items[24]._id
+    //   page 2: items 25..49 (25 rows, full) → cursor = items[49]._id
+    //   page 3: items 50..57 (8 rows, short) → nextCursor = null, walk ends
+    //   total returned: 58
+    if (items.length === effectiveLimit) {
+      const lastItem = items[items.length - 1];
+      if (lastItem && (lastItem as any)._id) {
+        nextCursor = String((lastItem as any)._id);
       }
-      items = items.slice(0, effectiveLimit);
     }
   } catch (err) {
     console.error(

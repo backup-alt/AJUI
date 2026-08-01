@@ -6,6 +6,7 @@ import { generateId } from "./id-generator.service.js";
 import { CreateClientInput, UpdateClientInput } from "../schemas/entities.schema.js";
 import { recomputeClientTotals } from "./financial.service.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 export async function createClient(input: CreateClientInput) {
   const clientId = await generateId("CLI");
@@ -18,6 +19,7 @@ export async function listClients(filter: {
   status?: string;
   page: number;
   limit: number;
+  cursor?: string;
   scopeQuery?: Record<string, unknown>;
 }) {
   const query: Record<string, unknown> = {};
@@ -34,19 +36,11 @@ export async function listClients(filter: {
     Object.assign(query, filter.scopeQuery);
   }
 
-  const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Client.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Client.countDocuments(query),
-  ]);
-
-  return {
-    items,
-    total,
+  return paginateByCursor(Client, query, {
     page: filter.page,
     limit: filter.limit,
-    pages: Math.ceil(total / filter.limit),
-  };
+    cursor: filter.cursor,
+  });
 }
 
 export async function getClientById(id: string, scopeQuery?: Record<string, unknown>) {

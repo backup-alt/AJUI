@@ -13,6 +13,7 @@ import { Site } from "../models/Site.js";
 import { Project } from "../models/Project.js";
 import { Material } from "../models/Material.js";
 import { Worker } from "../models/Worker.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 const deactivateSchema = z.object({
   body: z.object({
@@ -219,26 +220,19 @@ export async function deleteAccessTemplate(req: Request, res: Response, next: Ne
 
 export async function listAllUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 50;
-    const skip = (page - 1) * limit;
-
-    const [users, total] = await Promise.all([
-      User.find()
-        .select("_id name email phone role status managedProjectIds createdAt lastLoginAt")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      User.countDocuments(),
-    ]);
+    const result = await paginateByCursor(
+      User,
+      {},
+      { page: Number(req.query.page) || 1, limit: Number(req.query.limit) || 50, cursor: req.query.cursor as string | undefined },
+      { _id: 1, name: 1, email: 1, phone: 1, role: 1, status: 1, managedProjectIds: 1, createdAt: 1, lastLoginAt: 1 },
+    );
 
     res.json({
-      items: users,
-      total,
-      page,
-      limit,
-      pages: Math.ceil(total / limit),
+      items: result.items,
+      total: result.total,
+      limit: result.limit,
+      pages: result.pages,
+      nextCursor: result.nextCursor,
     });
   } catch (err) {
     next(err);

@@ -5,6 +5,7 @@ import { Material } from "../models/Material.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { CreateVendorInput } from "../schemas/financial.schema.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 export async function createVendor(input: CreateVendorInput & { siteIds?: string[] }) {
   const vendorId = await generateId("VEN");
@@ -22,6 +23,7 @@ export async function listVendors(filter: {
   search?: string;
   page: number;
   limit: number;
+  cursor?: string;
 }) {
   const query: Record<string, unknown> = {};
   if (filter.materialType) query.materialType = filter.materialType;
@@ -34,12 +36,11 @@ export async function listVendors(filter: {
     ];
   }
 
-  const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Vendor.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Vendor.countDocuments(query),
-  ]);
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  return paginateByCursor(Vendor, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  });
 }
 
 export async function getVendorById(id: string) {

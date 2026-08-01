@@ -361,6 +361,7 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
       to: req.query.to as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
     res.json(result);
@@ -544,6 +545,7 @@ export async function listPayments(req: Request, res: Response, next: NextFuncti
       to: req.query.to as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
     res.json(result);
@@ -614,6 +616,7 @@ export async function listVendors(req: Request, res: Response, next: NextFunctio
       search: req.query.search as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -672,6 +675,7 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
       paymentStatus: req.query.paymentStatus as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
     res.json(result);
@@ -721,6 +725,7 @@ export async function listApprovals(req: Request, res: Response, next: NextFunct
       status: req.query.status as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
       userRole: req.user?.role,
       userId: req.user?.sub,

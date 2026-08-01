@@ -12,6 +12,7 @@ import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
 import { recomputeSiteLedger } from "./expense.service.js";
 import { addApprovedMaterialToInventory } from "./inventory.service.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 export interface CreateApprovalParams {
   type: ApprovalType;
@@ -366,6 +367,7 @@ export async function listApprovals(filter: {
   status?: string;
   page: number;
   limit: number;
+  cursor?: string;
   scopeProjectIds?: ProjectScopeIds;
   userRole?: string;
   userId?: string;
@@ -379,14 +381,14 @@ export async function listApprovals(filter: {
   if (filter.type) query.type = filter.type;
   if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
 
-  const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Approval.find(query).sort({ submittedAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Approval.countDocuments(query),
-  ]);
+  const result = await paginateByCursor(Approval, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  }, null, 30_000);
 
-  const enriched = await Promise.all(items.map((item) => enrichApprovalWithSource(item)));
-  return { items: enriched, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  const enriched = await Promise.all(result.items.map((item) => enrichApprovalWithSource(item as unknown as Record<string, unknown>)));
+  return { items: enriched, total: result.total, page: result.page, limit: result.limit, pages: result.pages, nextCursor: result.nextCursor };
 }
 
 async function enrichApprovalWithSource(approval: Record<string, unknown>): Promise<Record<string, unknown>> {

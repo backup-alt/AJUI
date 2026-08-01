@@ -1,6 +1,7 @@
 import { Quotation, IQuotation } from "../models/Quotation.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 const MAX_CREATE_ATTEMPTS = 3;
 
@@ -24,7 +25,7 @@ export async function createQuotation(input: Partial<IQuotation> & { quotationNu
   throw lastError;
 }
 
-export async function listQuotations(filter: { search?: string; status?: string; page?: number; limit?: number; includeArchived?: boolean } = {}) {
+export async function listQuotations(filter: { search?: string; status?: string; page?: number; limit?: number; cursor?: string; includeArchived?: boolean } = {}) {
   const query: Record<string, unknown> = {};
   if (!filter.includeArchived) query.archived = false;
   if (filter.status) query.status = filter.status;
@@ -36,16 +37,12 @@ export async function listQuotations(filter: { search?: string; status?: string;
     ];
   }
 
-  const page = filter.page ?? 1;
-  const limit = filter.limit ?? 20;
-  const skip = (page - 1) * limit;
-
-  const [items, total] = await Promise.all([
-    Quotation.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Quotation.countDocuments(query),
-  ]);
-
-  return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  const result = await paginateByCursor(Quotation, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  });
+  return { items: result.items, total: result.total, page: result.page, limit: result.limit, totalPages: result.pages, nextCursor: result.nextCursor };
 }
 
 export async function getQuotationById(id: string) {

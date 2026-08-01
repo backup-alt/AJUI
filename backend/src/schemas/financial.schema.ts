@@ -92,6 +92,7 @@ export const listLabourSchema = z.object({
     to: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().optional(),
   }),
 });
 
@@ -200,6 +201,7 @@ export const listPaymentsSchema = z.object({
     to: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().optional(),
   }),
 });
 
@@ -233,6 +235,7 @@ export const listVendorsSchema = z.object({
     search: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().optional(),
   }),
 });
 
@@ -270,6 +273,7 @@ export const listSubcontractorsSchema = z.object({
     paymentStatus: z.enum(["Not Started", "Part Paid", "Paid"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().optional(),
   }),
 });
 
@@ -294,6 +298,7 @@ export const listApprovalsSchema = z.object({
     status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().optional(),
   }),
 });
 

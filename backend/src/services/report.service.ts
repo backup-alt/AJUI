@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Report, IReport, ReportCategory, ReportScope } from "../models/Report.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 export interface CreateReportInput {
   category: ReportCategory;
@@ -28,16 +29,15 @@ export async function createReport(input: CreateReportInput): Promise<IReport> {
   return report.toObject();
 }
 
-export async function listReports(filter: { category?: ReportCategory; page: number; limit: number }) {
+export async function listReports(filter: { category?: ReportCategory; page: number; limit: number; cursor?: string }) {
   const query: Record<string, unknown> = {};
   if (filter.category) query.category = filter.category;
 
-  const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Report.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Report.countDocuments(query),
-  ]);
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  return paginateByCursor(Report, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  });
 }
 
 export async function getReportById(id: string): Promise<IReport> {

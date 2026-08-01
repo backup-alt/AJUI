@@ -36,6 +36,7 @@ export const listClientsSchema = z.object({
     status: z.enum(["Active", "On Hold", "Completed"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().optional(),
   }),
 });
 
@@ -102,6 +103,7 @@ export const listProjectsSchema = z.object({
     supervisorId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().optional(),
   }),
 });
 

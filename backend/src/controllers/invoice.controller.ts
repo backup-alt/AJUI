@@ -15,6 +15,7 @@ export async function listInvoices(req: Request, res: Response, next: NextFuncti
       status: req.query.status as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
+      cursor: req.query.cursor as string | undefined,
     });
     res.json(result);
   } catch (e) { next(e); }

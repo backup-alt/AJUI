@@ -29,6 +29,7 @@ import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { withRetry } from "../utils/retry.js";
+import { applyCursor } from "../utils/cursor-pagination.js";
 
 type SupervisorAccess = {
   user: Awaited<ReturnType<typeof User.findById>>;
@@ -733,7 +734,7 @@ async function getProjectIdStrings(userId: string): Promise<string[]> {
 
 export async function listMaterialsForSupervisor(
   userId: string,
-  filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
+  filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number; cursor?: string }
 ) {
   const { query } = await buildScopedEntityQuery(userId, {
     projectId: filters.projectId,
@@ -741,17 +742,16 @@ export async function listMaterialsForSupervisor(
   });
   if (filters.status) query.status = filters.status;
 
-  const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
-  const skip = (page - 1) * limit;
 
   if (filters.status === "Approved") {
     const invQuery = { ...query };
     delete invQuery.status;
+    applyCursor(invQuery, filters.cursor);
 
     const [items, total] = await Promise.all([
       withRetry(
-        () => Inventory.find(invQuery).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(30_000),
+        () => Inventory.find(invQuery).sort({ updatedAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
         { label: "mobile.listMaterials.inv.find" }
       ),
       withRetry(
@@ -808,13 +808,19 @@ export async function listMaterialsForSupervisor(
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
       })),
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      pagination: {
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
+      },
     };
   }
 
+  applyCursor(query, filters.cursor);
   const [items, total] = await Promise.all([
     withRetry(
-      () => Material.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(30_000),
+      () => Material.find(query).sort({ createdAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
       { label: "mobile.listMaterials.find" }
     ),
     withRetry(
@@ -854,22 +860,26 @@ export async function listMaterialsForSupervisor(
       createdAt: m.createdAt,
       updatedAt: m.updatedAt,
     })),
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    pagination: {
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+      nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
+    },
   };
 }
 
 export async function listLabourForSupervisor(
   userId: string,
-  filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number }
+  filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number; cursor?: string }
 ) {
   const { query } = await buildScopedEntityQuery(userId, filters);
 
-  const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
-  const skip = (page - 1) * limit;
+  applyCursor(query, filters.cursor);
 
   const [items, total] = await Promise.all([
-    Labour.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Labour.find(query).sort({ createdAt: -1 }).limit(limit).lean(),
     Labour.countDocuments(query),
   ]);
 
@@ -892,23 +902,27 @@ export async function listLabourForSupervisor(
       createdAt: l.createdAt,
       updatedAt: l.updatedAt,
     })),
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    pagination: {
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+      nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
+    },
   };
 }
 
 export async function listExpensesForSupervisor(
   userId: string,
-  filters: { projectId?: string; siteId?: string; status?: string; type?: string; page?: number; limit?: number }
+  filters: { projectId?: string; siteId?: string; status?: string; type?: string; page?: number; limit?: number; cursor?: string }
 ) {
   const { query } = await buildScopedEntityQuery(userId, filters);
 
-  const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
-  const skip = (page - 1) * limit;
+  applyCursor(query, filters.cursor);
 
   const [items, total] = await Promise.all([
     withRetry(
-      () => Expense.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(30_000),
+      () => Expense.find(query).sort({ createdAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
       { label: "mobile.listExpenses.find" }
     ),
     withRetry(
@@ -951,7 +965,12 @@ export async function listExpensesForSupervisor(
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     })),
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    pagination: {
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+      nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
+    },
   };
 }
 

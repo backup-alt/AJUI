@@ -7,6 +7,7 @@ import { generateId } from "./id-generator.service.js";
 import { createApproval } from "./approval.service.js";
 import { CreateSubcontractorInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 export async function createSubcontractor(input: CreateSubcontractorInput) {
   const project = await Project.findById(input.projectId);
@@ -58,6 +59,7 @@ export async function listSubcontractors(filter: {
   paymentStatus?: string;
   page: number;
   limit: number;
+  cursor?: string;
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
@@ -68,12 +70,11 @@ export async function listSubcontractors(filter: {
   if (filter.paymentStatus) query.paymentStatus = filter.paymentStatus;
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Subcontractor.find(query).sort({ createdAt: -1 }).skip(skip).limit(filter.limit).lean(),
-    Subcontractor.countDocuments(query),
-  ]);
-  return { items, total, page: filter.page, limit: filter.limit, pages: Math.ceil(total / filter.limit) };
+  return paginateByCursor(Subcontractor, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  });
 }
 
 export async function getSubcontractorById(id: string) {

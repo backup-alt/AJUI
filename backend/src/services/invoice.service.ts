@@ -2,6 +2,7 @@ import { Invoice, IInvoice } from "../models/Invoice.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { findAllOrFallback } from "../utils/find-all.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 const MAX_CREATE_ATTEMPTS = 3;
 
@@ -30,6 +31,7 @@ export async function listInvoices(filter: {
   status?: string;
   page?: number;
   limit?: number;
+  cursor?: string;
 } = {}) {
   const query: Record<string, unknown> = { archived: false };
   if (filter.status) query.status = filter.status;
@@ -41,16 +43,12 @@ export async function listInvoices(filter: {
     ];
   }
 
-  const page = filter.page ?? 1;
-  const limit = filter.limit ?? 20;
-  const skip = (page - 1) * limit;
-
-  const [items, total] = await Promise.all([
-    Invoice.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Invoice.countDocuments(query),
-  ]);
-
-  return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  const result = await paginateByCursor(Invoice, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  });
+  return { items: result.items, total: result.total, page: result.page, limit: result.limit, totalPages: result.pages, nextCursor: result.nextCursor };
 }
 
 export async function getInvoiceById(id: string) {

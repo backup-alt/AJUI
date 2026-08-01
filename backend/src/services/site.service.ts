@@ -5,6 +5,7 @@ import { generateId } from "./id-generator.service.js";
 import { CreateSiteInput, UpdateSiteInput } from "../schemas/entities.schema.js";
 import { Types } from "mongoose";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 export async function createSite(input: CreateSiteInput) {
   const siteId = await generateId("SITE");
@@ -22,19 +23,16 @@ export async function createSite(input: CreateSiteInput) {
   return site.toObject();
 }
 
-export async function listSites(filter: { status?: string; search?: string; scopeProjectIds?: ProjectScopeIds; page?: number; limit?: number } = {}) {
+export async function listSites(filter: { status?: string; search?: string; scopeProjectIds?: ProjectScopeIds; page?: number; limit?: number; cursor?: string } = {}) {
   const query: Record<string, unknown> = {};
   if (filter.status) query.status = filter.status;
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectIds", filter.scopeProjectIds);
-  const page = Math.max(1, filter.page || 1);
-  const limit = Math.min(200, Math.max(1, filter.limit || 100));
-  const skip = (page - 1) * limit;
-  const [items, total] = await Promise.all([
-    Site.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Site.countDocuments(query),
-  ]);
-  return { items, total, page, limit, pages: Math.ceil(total / limit) };
+  return paginateByCursor(Site, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  });
 }
 
 export async function getSiteById(id: string, scopeProjectIds?: ProjectScopeIds) {

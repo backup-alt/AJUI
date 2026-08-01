@@ -8,6 +8,7 @@ import {
   UpdateSupervisorInput,
 } from "../schemas/entities.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 type SiteAssignmentInput = {
   assignedSite?: string;
@@ -126,7 +127,7 @@ export async function createSupervisor(input: CreateSupervisorInput) {
   return supervisor.toObject();
 }
 
-export async function listSupervisors(filter: { status?: string; search?: string; scopeProjectIds?: ProjectScopeIds; page?: number; limit?: number } = {}) {
+export async function listSupervisors(filter: { status?: string; search?: string; scopeProjectIds?: ProjectScopeIds; page?: number; limit?: number; cursor?: string } = {}) {
   const query: Record<string, unknown> = {};
   if (filter.status) query.status = filter.status;
   if (filter.search) {
@@ -137,14 +138,11 @@ export async function listSupervisors(filter: { status?: string; search?: string
     ];
   }
   applyProjectScope(query, "assignedProjects", filter.scopeProjectIds);
-  const page = Math.max(1, filter.page || 1);
-  const limit = Math.min(200, Math.max(1, filter.limit || 100));
-  const skip = (page - 1) * limit;
-  const [items, total] = await Promise.all([
-    Supervisor.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Supervisor.countDocuments(query),
-  ]);
-  return { items, total, page, limit, pages: Math.ceil(total / limit) };
+  return paginateByCursor(Supervisor, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  });
 }
 
 export async function getSupervisorById(id: string, scopeProjectIds?: ProjectScopeIds) {

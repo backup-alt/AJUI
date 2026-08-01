@@ -5,6 +5,7 @@ import { Subcontractor } from "../models/Subcontractor.js";
 import { User } from "../models/User.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 async function resolveSupervisorName(userId: string): Promise<string> {
   if (!userId || !Types.ObjectId.isValid(userId)) return "";
@@ -69,6 +70,7 @@ export async function listWorkers(filter: {
   createdBy?: string;
   page?: number;
   limit?: number;
+  cursor?: string;
 }) {
   const query: Record<string, unknown> = {};
   if (filter.projectId && Types.ObjectId.isValid(filter.projectId)) {
@@ -80,16 +82,11 @@ export async function listWorkers(filter: {
   if (filter.labourType) query.labourType = filter.labourType;
   if (filter.createdBy) query.createdBy = filter.createdBy;
 
-  const page = filter.page || 1;
-  const limit = filter.limit || 50;
-  const skip = (page - 1) * limit;
-
-  const [items, total] = await Promise.all([
-    Worker.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Worker.countDocuments(query),
-  ]);
-
-  return { items, total, page, limit, pages: Math.ceil(total / limit) };
+  return paginateByCursor(Worker, query, {
+    page: filter.page,
+    limit: filter.limit,
+    cursor: filter.cursor,
+  });
 }
 
 /**
@@ -103,6 +100,7 @@ export async function listWorkersForSupervisor(filter: {
   labourType?: string;
   page?: number;
   limit?: number;
+  cursor?: string;
 }) {
   return listWorkers({
     siteId: filter.siteId,
@@ -110,6 +108,7 @@ export async function listWorkersForSupervisor(filter: {
     labourType: filter.labourType,
     page: filter.page,
     limit: filter.limit,
+    cursor: filter.cursor,
   });
 }
 
@@ -219,20 +218,12 @@ export async function listAttendanceForDate(siteId: string | undefined, date: st
   return Attendance.find(query).sort({ workerName: 1 }).lean();
 }
 
-export async function listAttendanceForWorker(workerId: string, page = 1, limit = 50) {
+export async function listAttendanceForWorker(workerId: string, page = 1, limit = 50, cursor?: string) {
   if (!Types.ObjectId.isValid(workerId)) {
     throw new AppError(400, "Invalid worker id");
   }
-  const skip = (page - 1) * limit;
-  const [items, total] = await Promise.all([
-    Attendance.find({ workerId: new Types.ObjectId(workerId) })
-      .sort({ attendanceDate: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-    Attendance.countDocuments({ workerId: new Types.ObjectId(workerId) }),
-  ]);
-  return { items, total, page, limit, pages: Math.ceil(total / limit) };
+  const query: Record<string, unknown> = { workerId: new Types.ObjectId(workerId) };
+  return paginateByCursor(Attendance, query, { page, limit, cursor });
 }
 
 export async function getAttendanceById(id: string) {

@@ -248,7 +248,7 @@ export async function listExpenses(filter: {
         () => Expense.find(query)
           .select({ receiptImage: 0, customFields: 0 })
           .sort({ _id: -1 })
-          .limit(effectiveLimit + 1)
+          .limit(effectiveLimit)
           .lean()
           .maxTimeMS(60_000),
         { label: "listExpenses.find" }
@@ -271,16 +271,24 @@ export async function listExpenses(filter: {
       total = filter.page * effectiveLimit;
     }
     items = foundItems as unknown as ExpenseLike[];
-    // CRITICAL: Use the last item that WILL be returned as the cursor
-    // (not the (limit+1)th item). With $lt cursor, the next page query
-    // is _id < cursor which EXCLUDES the cursor item itself. The
-    // standard "pop the extra" pattern loses the popped item forever.
-    if (items.length > effectiveLimit) {
-      const cursorItem = items[effectiveLimit - 1];
-      if (cursorItem && (cursorItem as any)._id) {
-        nextCursor = String((cursorItem as any)._id);
+    // Cursor-based pagination by _id, descending. Sort is {_id: -1} so
+    // the last item in the page has the SMALLEST _id in the page. The
+    // next page query is `_id < cursor` (already applied above when
+    // filter.cursor is set) — the cursor item is NOT re-included.
+    //
+    // We only emit a nextCursor when the page is full. A short page
+    // (< effectiveLimit) means we've reached the end of the collection.
+    //
+    // Example with 58 items and limit=25:
+    //   page 1: items 0..24 (25, full) → cursor = items[24]._id
+    //   page 2: items 25..49 (25, full) → cursor = items[49]._id
+    //   page 3: items 50..57 (8, short) → nextCursor = null, walk ends
+    //   total returned: 58
+    if (items.length === effectiveLimit) {
+      const lastItem = items[items.length - 1];
+      if (lastItem && (lastItem as any)._id) {
+        nextCursor = String((lastItem as any)._id);
       }
-      items = items.slice(0, effectiveLimit);
     }
   } catch (err) {
     console.error("[listExpenses] main query failed, returning empty:", (err as Error).message);

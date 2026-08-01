@@ -10,6 +10,7 @@ import {
 } from "../schemas/entities.schema.js";
 import { recomputeClientTotals, computeProjectLedger } from "./financial.service.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 export async function createProject(input: CreateProjectInput) {
   const client = await Client.findById(input.clientId);
@@ -63,6 +64,7 @@ export async function listProjects(filter: {
   supervisorId?: string;
   page: number;
   limit: number;
+  cursor?: string;
   scopeQuery?: Record<string, unknown>;
 }) {
   const query: Record<string, unknown> = {};
@@ -83,23 +85,11 @@ export async function listProjects(filter: {
     Object.assign(query, filter.scopeQuery);
   }
 
-  const skip = (filter.page - 1) * filter.limit;
-  const [items, total] = await Promise.all([
-    Project.find(query)
-      .sort({ lastActivityAt: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(filter.limit)
-      .lean(),
-    Project.countDocuments(query),
-  ]);
-
-  return {
-    items,
-    total,
+  return paginateByCursor(Project, query, {
     page: filter.page,
     limit: filter.limit,
-    pages: Math.ceil(total / filter.limit),
-  };
+    cursor: filter.cursor,
+  });
 }
 
 export async function getProjectById(id: string, scopeProjectIds?: ProjectScopeIds) {
