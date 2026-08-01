@@ -10,7 +10,6 @@ import { CreateMaterialInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { withRetry } from "../utils/retry.js";
 import { dbMutex } from "../utils/db-mutex.js";
-import { inventoryKeyForMaterial, inventoryStockMapForMaterials } from "./inventory.service.js";
 
 async function populateRefs(input: CreateMaterialInput) {
   let project: any = null;
@@ -246,17 +245,21 @@ export async function listMaterials(filter: {
     queryFailed = true;
   }
 
-  // Site-name lookup is best-effort and outside dbMutex — if it times out
-  // we still return the main results. This query does NOT go through dbMutex
-  // to avoid adding another queue wait.
+  // Material records normally store the site name. Only query Sites for
+  // legacy rows where that denormalized value is missing; doing it for every
+  // page added a second database round-trip that expense pagination does not
+  // need.
   try {
-    const siteIds = [...new Set(items.map((m) => m.siteId?.toString()).filter(Boolean))];
+    const rowsMissingSiteName = items.filter(
+      (item) => item.siteId && (!item.site || typeof item.site === "object")
+    );
+    const siteIds = [...new Set(rowsMissingSiteName.map((m) => m.siteId?.toString()).filter(Boolean))];
     if (siteIds.length > 0) {
       const tSite = Date.now();
       const sites = await Site.find({ _id: { $in: siteIds.map((id) => new Types.ObjectId(id)) } }).lean().maxTimeMS(10_000);
       console.log(`[listMaterials] site lookup dt=${Date.now() - tSite}ms sites=${sites.length}`);
       const siteNameMap = new Map(sites.map((s) => [s._id.toString(), s.name]));
-      items.forEach((item) => {
+      rowsMissingSiteName.forEach((item) => {
         if (item.siteId && (!item.site || typeof item.site === "object")) {
           item.site = siteNameMap.get(item.siteId.toString()) || item.site;
         }
@@ -267,27 +270,6 @@ export async function listMaterials(filter: {
   }
 
   const typedItems = items as unknown as IMaterial[];
-  // Inventory stock lookup is best-effort and asynchronous — never block
-  // the response on it. If M0 pool is saturated, the stock map will be
-  // empty and the UI will compute remainingStock from purchased − consumed.
-  //
-  // The fire-and-forget backfillApprovedMaterialsToInventory that previously
-  // ran here was REMOVED — it issued another Material.find + Inventory write
-  // for every single listMaterials request, and with 5+ parallel hydration
-  // calls the M0 connection pool saturated, causing every subsequent query
-  // to time out at 8s × 3 retries = 24s. Backfill is now a periodic
-  // startup task (see startupTasks()) instead of an inline per-request hook.
-  void Promise.race([
-    inventoryStockMapForMaterials(items as unknown as Array<Pick<import("../models/Material.js").IMaterial, "projectId" | "siteId" | "site" | "name" | "unit">>),
-    new Promise<Map<string, number>>((resolve) => setTimeout(() => resolve(new Map()), 1500)),
-  ]).then((stockMap) => {
-    items.forEach((item) => {
-      const sharedStock = stockMap.get(inventoryKeyForMaterial(item as unknown as Parameters<typeof inventoryKeyForMaterial>[0]));
-      if (sharedStock !== undefined) item.remainingStock = sharedStock;
-    });
-  }).catch((err: unknown) => {
-    console.warn("[listMaterials] inventory stock lookup failed (returning items anyway):", (err as Error).message);
-  });
 
   return {
     items: typedItems,
