@@ -42,6 +42,7 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       siteId: req.query.siteId as string | undefined,
       site: req.query.site as string | undefined,
       vendorId: req.query.vendorId as string | undefined,
+      type: req.query.type as string | undefined,
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,
       page: Number(req.query.page) || 1,

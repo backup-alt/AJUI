@@ -364,6 +364,27 @@ export class WorkspaceHydrationService {
     const factory = this.apiFactoryForModule(module);
     if (!factory) return null;
 
+    if (module === "materials") {
+      const materialTypes = ["pending", "approved", "received", "notReceived"];
+      const responses = await Promise.all(
+        materialTypes.map((type) =>
+          this.safeList(
+            () => this.api.listMaterials({ limit: this.PAGE_SIZE, page, type }),
+            `materials/${type}/page`
+          )
+        )
+      );
+      if (responses.some((response) => !response)) return null;
+
+      const items = responses
+        .flatMap((response: any) => response?.items || [])
+        .sort((a: any, b: any) => this.rowSortTime(b) - this.rowSortTime(a));
+      const total = responses.reduce((sum, response: any) => sum + (response?.total ?? 0), 0);
+      const pages = Math.max(...responses.map((response: any) => response?.pages ?? 0), 0);
+      const nextCursor = page < pages ? String(page + 1) : null;
+      return { items, nextCursor, total };
+    }
+
     if (module === "expenses") {
       const [siteResponse, generalResponse] = await Promise.all([
         this.safeList(
@@ -406,6 +427,12 @@ export class WorkspaceHydrationService {
     const nextCursor = responsePage < pages ? String(nextPage) : null;
     const total = (response as any)?.total ?? 0;
     return { items, nextCursor, total };
+  }
+
+  private rowSortTime(row: any): number {
+    const value = row?.createdAt || row?.updatedAt || row?.requestDate || row?._id || "";
+    const parsed = Date.parse(String(value));
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   // =================== PRIVATE: HELPERS ===================

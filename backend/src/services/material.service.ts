@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { IMaterial, Material } from "../models/Material.js";
+import { IMaterial, Material, MaterialStatus } from "../models/Material.js";
 import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
 import { Vendor } from "../models/Vendor.js";
@@ -25,6 +25,7 @@ function materialPageKey(filter: {
   siteId?: string;
   site?: string;
   vendorId?: string;
+  type?: string;
   status?: string;
   search?: string;
   scopeProjectIds?: ProjectScopeIds;
@@ -34,6 +35,7 @@ function materialPageKey(filter: {
     siteId: filter.siteId || "",
     site: filter.site || "",
     vendorId: filter.vendorId || "",
+    type: filter.type || "",
     status: filter.status || "",
     search: filter.search || "",
     scopeProjectIds: (filter.scopeProjectIds || []).map((id) => String(id)).sort(),
@@ -54,6 +56,16 @@ function getMaterialCursorState(key: string): MaterialPageCursorState {
     if (oldest) materialPageCursorCache.delete(oldest);
   }
   return fresh;
+}
+
+function materialTypeToStatus(type?: string): MaterialStatus | undefined {
+  const map: Record<string, MaterialStatus> = {
+    pending: "Pending",
+    approved: "Approved",
+    received: "Received",
+    notReceived: "Not Received",
+  };
+  return type ? map[type] : undefined;
 }
 
 async function populateRefs(input: CreateMaterialInput) {
@@ -167,6 +179,7 @@ export async function listMaterials(filter: {
   siteId?: string;
   site?: string;
   vendorId?: string;
+  type?: string;
   status?: string;
   search?: string;
   page: number;
@@ -179,7 +192,8 @@ export async function listMaterials(filter: {
   if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
   if (filter.site) query.site = filter.site;
   if (filter.vendorId) query.vendorId = new Types.ObjectId(filter.vendorId);
-  if (filter.status) query.status = filter.status;
+  const status = filter.status || materialTypeToStatus(filter.type);
+  if (status) query.status = status;
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 

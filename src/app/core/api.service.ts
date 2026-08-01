@@ -602,7 +602,7 @@ export class ApiService {
   }
 
   // =================== MATERIALS ===================
-  listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
+  listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; type?: string; status?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
