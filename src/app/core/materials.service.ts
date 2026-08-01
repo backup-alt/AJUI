@@ -24,8 +24,11 @@ export class MaterialsService {
     this.api.listMaterials({ ...params, limit: 25, page: 1 }).subscribe({
       next: (r) => {
         const backendItems = (r.items || []).map(this.mapMaterial);
-        this.materials.set(backendItems);
-        this.data.materials.set(backendItems);
+        const items = params
+          ? backendItems
+          : this.mergeRowsByStableId(this.materials(), backendItems);
+        this.materials.set(items);
+        this.data.materials.set(items);
       },
       error: () => {
         // Network error: keep whatever we last had.
@@ -39,9 +42,10 @@ export class MaterialsService {
       this.api.listMaterials({ limit: 25, page: 1 }).subscribe({
         next: (r) => {
           const backendItems = (r.items || []).map(this.mapMaterial);
-          this.materials.set(backendItems);
-          this.data.materials.set(backendItems);
-          resolve(backendItems);
+          const items = this.mergeRowsByStableId(this.materials(), backendItems);
+          this.materials.set(items);
+          this.data.materials.set(items);
+          resolve(items);
         },
         error: () => resolve(this.materials()),
       });
@@ -155,4 +159,29 @@ export class MaterialsService {
     receiptImage: row.receiptImage,
     receiptImageMimeType: row.receiptImageMimeType,
   });
+
+  private mergeRowsByStableId(existing: MaterialRow[], incoming: MaterialRow[]): MaterialRow[] {
+    const keyFor = (row: MaterialRow) => String((row as any).id || (row as any)._id || "").trim();
+    const existingByKey = new Map(existing.map((row) => [keyFor(row), row]));
+    const output: MaterialRow[] = [];
+    const seen = new Set<string>();
+
+    for (const row of incoming) {
+      const key = keyFor(row);
+      if (!key) {
+        output.push(row);
+        continue;
+      }
+      output.push({ ...(existingByKey.get(key) || {}), ...row });
+      seen.add(key);
+    }
+
+    for (const row of existing) {
+      const key = keyFor(row);
+      if (key && seen.has(key)) continue;
+      output.push(row);
+    }
+
+    return output;
+  }
 }

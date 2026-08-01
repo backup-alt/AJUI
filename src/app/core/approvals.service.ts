@@ -194,7 +194,7 @@ export class ApprovalsService {
     limit?: number;
   }): Promise<AnyApprovalRow[]> {
     const result = await firstValueFrom(
-      this.api.listApprovals({ status: params.status ?? "Pending", limit: 100, ...params })
+      this.api.listApprovals({ status: params.status ?? "Pending", limit: 25, ...params })
     );
     return (result.items || []).map((item: RawApprovalItem) =>
       this.mapToRow(item)

@@ -1128,14 +1128,12 @@ export class ProjectWorkspacePage {
    */
   private refreshSectionFromBackend(section: ModuleKey) {
     const apiMap: Record<string, () => any> = {
-      // limit must be <= 25 — schemas for materials/inventory/expenses
-      // cap at max(25). limit:100 silently returns 400.
       materials: () => this.api.listMaterials({ limit: 25 }),
-      labour: () => this.api.listLabour({ limit: 100 }),
+      labour: () => this.api.listLabour({ limit: 25 }),
       expenses: () => this.api.listExpenses({ limit: 25 }),
-      payments: () => this.api.listPayments({ limit: 100 }),
-      vendors: () => this.api.listVendors({ limit: 100 }),
-      subcontractors: () => this.api.listSubcontractors({ limit: 100 }),
+      payments: () => this.api.listPayments({ limit: 25 }),
+      vendors: () => this.api.listVendors({ limit: 25 }),
+      subcontractors: () => this.api.listSubcontractors({ limit: 25 }),
       inventory: () => this.api.listInventory({ limit: 25 }),
     };
     const mapperMap: Record<string, (x: any) => any> = {
@@ -1417,9 +1415,7 @@ export class ProjectWorkspacePage {
     const storageKey = storageMap[section];
     const dataSignal = dataMap[section];
     if (!apiCall || !mapper || !dataSignal) return;
-    // Clamp limit to 25 for materials/inventory/expenses (schema max 25).
-    const limit = (section === "materials" || section === "inventory" || section === "expenses") ? 25 : 100;
-    apiCall({ limit }).subscribe({
+    apiCall({ limit: 25, page: 1 }).subscribe({
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapper);
@@ -2555,7 +2551,7 @@ export class ProjectWorkspacePage {
         projectId,
         from: fromDate,
         to: toDate,
-        limit: 500,
+        limit: 25,
       }));
 
       const rows: TableRow[] = (result.items || []).flatMap((group: any) =>

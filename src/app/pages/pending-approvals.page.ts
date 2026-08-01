@@ -405,7 +405,7 @@ export class PendingApprovalsPage implements OnInit {
     this.isLoading.set(true);
     this.loadError.set(false);
     try {
-      const all = await this.approvalsService.fetchApprovals({ status: "Pending", limit: 100 });
+      const all = await this.approvalsService.fetchApprovals({ status: "Pending", limit: 25 });
       this._materialRows.set(all.filter((r) => r.module === "materials") as MaterialApprovalRow[]);
       this._labourRows.set(all.filter((r) => r.module === "labour") as LabourApprovalRow[]);
       this._siteExpenseRows.set(all.filter((r) => r.module === "expenses") as ExpenseApprovalRow[]);

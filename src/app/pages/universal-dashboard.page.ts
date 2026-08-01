@@ -1884,8 +1884,10 @@ export class UniversalDashboardPage implements OnInit {
   readonly backendSyncMessage = signal<string | null>(null);
   readonly backendSource = signal<string | null>(null);
 
-  // Infinite scroll: show 50 rows initially, load 50 more when sentinel is visible
-  readonly displayLimit = signal(50);
+  private readonly PAGE_SIZE = 25;
+
+  // Infinite scroll: show 25 rows initially, then reveal/fetch 25 more at a time.
+  readonly displayLimit = signal(this.PAGE_SIZE);
   private scrollObserver: IntersectionObserver | null = null;
   private scrollSentinel: HTMLElement | null = null;
   @ViewChild("scrollSentinel") set scrollSentinelRef(el: ElementRef<HTMLElement> | undefined) {
@@ -2032,7 +2034,7 @@ export class UniversalDashboardPage implements OnInit {
     const module = this.activeModule();
     const localRows = this.visibleRows();
     if (localRows.length > this.displayLimit()) {
-      this.displayLimit.update((n) => n + 50);
+      this.displayLimit.update((n) => n + this.PAGE_SIZE);
     } else if (this.isPageModule(module)) {
       const pageModule = module === "generalExpenses" ? "expenses" : module;
       if (this.hydration.hasMorePages(pageModule)) {
@@ -2051,7 +2053,7 @@ export class UniversalDashboardPage implements OnInit {
 
   onSearchTextChange(value: string): void {
     this.searchText.set(value);
-    this.displayLimit.set(50);
+    this.displayLimit.set(this.PAGE_SIZE);
     if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
     if (!value.trim()) {
       this.serverSearchResults.set(null);
@@ -2088,8 +2090,7 @@ export class UniversalDashboardPage implements OnInit {
       const apiCall = apiMap[module];
       const mapper = mapperMap[module];
       if (!apiCall || !mapper) return;
-      const limit = (module === "materials" || module === "inventory" || module === "expenses") ? 25 : 100;
-      const result = await apiCall({ limit, search: query });
+      const result = await apiCall({ limit: this.PAGE_SIZE, page: 1, search: query });
       const items = (result?.items || []).map(mapper);
       this.serverSearchResults.set({ module, items });
     } catch (err) {
@@ -2120,7 +2121,7 @@ export class UniversalDashboardPage implements OnInit {
   switchModule(module: DashboardModule) {
     this.activeModule.set(module);
     this.searchText.set("");
-    this.displayLimit.set(50);
+    this.displayLimit.set(this.PAGE_SIZE);
     this.serverSearchResults.set(null);
     this.resetFilterState();
     this.closeDropdowns();
@@ -2240,12 +2241,11 @@ export class UniversalDashboardPage implements OnInit {
   }
 
   private refreshMaterialsAfterSave() {
-    // limit <= 25 — listMaterials schema caps at max(25).
-    this.api.listMaterials({ limit: 25 }).subscribe({
+    this.api.listMaterials({ limit: this.PAGE_SIZE, page: 1 }).subscribe({
       next: (r: any) => {
         try {
           const items = ((r as any).items || []).map(mapMaterial);
-          this.data.materials.set(items);
+          this.data.materials.set(this.mergeRowsByStableId(this.data.materials(), items));
         } catch (err) {
           console.error("[addInventoryMaterial] Failed to refresh materials after save", err);
         }
@@ -4113,6 +4113,31 @@ const inventory = this.data.inventory().map((row) => ({
     const srs = this.serverSearchResults();
     if (srs && srs.module === module) return srs.items;
     return this.data.tableRowsFor(module, this.dashboardRows()[module]);
+  }
+
+  private mergeRowsByStableId<T extends Record<string, any>>(existing: T[], incoming: T[]): T[] {
+    const keyFor = (row: T) => String(row["id"] || row["_id"] || row["__rowId"] || "").trim();
+    const existingByKey = new Map(existing.map((row) => [keyFor(row), row]));
+    const output: T[] = [];
+    const seen = new Set<string>();
+
+    for (const row of incoming) {
+      const key = keyFor(row);
+      if (!key) {
+        output.push(row);
+        continue;
+      }
+      output.push({ ...(existingByKey.get(key) || {}), ...row });
+      seen.add(key);
+    }
+
+    for (const row of existing) {
+      const key = keyFor(row);
+      if (key && seen.has(key)) continue;
+      output.push(row);
+    }
+
+    return output;
   }
 
   selectOptions(module: DashboardModule, key: string): string[] {

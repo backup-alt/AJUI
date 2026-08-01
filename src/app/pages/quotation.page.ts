@@ -1185,7 +1185,7 @@ readonly savingPdf = signal(false);
   }
 
   private loadQuotationsFromBackend() {
-    this.api.listQuotations({ limit: 100 }).subscribe({
+    this.api.listQuotations({ limit: 25, page: 1 }).subscribe({
       next: (res) => {
         const items = (res.items || []).map((q: any) => ({
           id: q._id,

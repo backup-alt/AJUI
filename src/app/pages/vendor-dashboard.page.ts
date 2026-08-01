@@ -1088,7 +1088,7 @@ export class VendorDashboardPage {
     if (this.initialLoadDone) {
       this.refreshMessage.set("Loading vendors from backend…");
     }
-    this.api.listVendors({ limit: 100 }).subscribe({
+    this.api.listVendors({ limit: 25, page: 1 }).subscribe({
       next: (r) => {
         const mapped = (r.items || []).map((v: any) => {
           const status: VendorStatus = v.status === "Not Active" ? "Not Active" : "Active";

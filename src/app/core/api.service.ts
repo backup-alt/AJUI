@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, inject } from "@angular/core";
 import { HttpClient, HttpHeaders, HttpInterceptorFn, HttpHandlerFn, HttpRequest, HttpEvent, HttpErrorResponse } from "@angular/common/http";
-import { Observable, from, throwError, catchError, switchMap, tap, of, timeout, shareReplay } from "rxjs";
+import { Observable, from, throwError, catchError, switchMap, tap, of, shareReplay } from "rxjs";
 import { environment } from "../../environments/environment";
 
 /**
@@ -444,15 +444,6 @@ export class ApiService {
     return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/invoices${query}`);
   }
 
-  /** Single-shot hydration endpoint for invoices. */
-  listAllInvoices(max?: number): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
-    const query = max ? `?max=${max}` : "";
-    return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
-      `${this.baseUrl}/invoices/all${query}`,
-      { headers: this.authHeaders() }
-    ).pipe(timeout(300_000), catchError(this.handleError));
-  }
-
   // =================== SUBCONTRACTORS ===================
   deleteSubcontractor(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/subcontractors/${id}`, { headers: this.authHeaders() }).pipe(
@@ -556,7 +547,7 @@ export class ApiService {
 
   // =================== SITES ===================
   listSites(): Observable<PaginatedResponse<any>> {
-    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/sites?limit=100`);
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/sites?limit=25&page=1`);
   }
 
   createSite(payload: { name: string; projectIds?: string[]; openingBalance?: number; status?: string }): Observable<{ site: any }> {
@@ -621,20 +612,6 @@ export class ApiService {
     return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/materials${query}`);
   }
 
-  /**
-   * Single-shot hydration endpoint — returns every material visible to
-   * the caller in one HTTP round-trip. Replaces the cursor pagination
-   * walk that the previous hydration service used (which was slow and
-   * unreliable on M0 free tier).
-   */
-  listAllMaterials(max?: number): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
-    const query = max ? `?max=${max}` : "";
-    return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
-      `${this.baseUrl}/materials/all${query}`,
-      { headers: this.authHeaders() }
-    ).pipe(timeout(300_000), catchError(this.handleError));
-  }
-
   // =================== INVENTORY ===================
   listInventory(params?: { projectId?: string; siteId?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
@@ -644,15 +621,6 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/inventory${query}`);
-  }
-
-  /** Single-shot hydration endpoint for inventory. */
-  listAllInventory(max?: number): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
-    const query = max ? `?max=${max}` : "";
-    return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
-      `${this.baseUrl}/inventory/all${query}`,
-      { headers: this.authHeaders() }
-    ).pipe(timeout(300_000), catchError(this.handleError));
   }
 
   getMissingMaterials(siteId: string): Observable<{ site: any; materials: any[] }> {
@@ -723,15 +691,6 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/expenses${query}`);
-  }
-
-  /** Single-shot hydration endpoint for expenses (site + general). */
-  listAllExpenses(max?: number): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
-    const query = max ? `?max=${max}` : "";
-    return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
-      `${this.baseUrl}/expenses/all${query}`,
-      { headers: this.authHeaders() }
-    ).pipe(timeout(300_000), catchError(this.handleError));
   }
 
   createExpense(payload: {

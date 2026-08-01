@@ -72,7 +72,7 @@ export class WorkspaceHydrationService {
   private readonly PAGE_SIZE = 25;
 
   constructor() {
-    this.restoreFromSnapshot();
+    this.clearPersistedSnapshot();
   }
 
   // =================== PUBLIC API ===================
@@ -425,6 +425,9 @@ export class WorkspaceHydrationService {
   }
 
   private persistSnapshot(): void {
+    // Cache lives in Angular signals and ApiService's in-memory response cache.
+    // A browser refresh should call the backend again and rebuild page 1.
+    return;
     if (typeof localStorage === "undefined") return;
     try {
       const snapshot: PersistedSnapshot = {
@@ -451,6 +454,13 @@ export class WorkspaceHydrationService {
     } catch (err) {
       console.warn("[hydrate] persistSnapshot failed (non-fatal):", err);
     }
+  }
+
+  private clearPersistedSnapshot(): void {
+    if (typeof localStorage === "undefined") return;
+    try {
+      localStorage.removeItem(SNAPSHOT_KEY);
+    } catch {}
   }
 
   private restoreFromSnapshot(): void {

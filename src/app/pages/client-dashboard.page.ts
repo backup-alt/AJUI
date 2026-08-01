@@ -117,7 +117,7 @@ export class ClientDashboardPage {
     if (this.refreshing()) return;
     this.refreshing.set(true);
     this.refreshMessage.set("Refreshing clients from backend…");
-    this.api.listClients({ limit: 100 }).subscribe({
+    this.api.listClients({ limit: 25, page: 1 }).subscribe({
       next: (r) => {
         try {
           const items = (r.items || []).map((c: any) => ({

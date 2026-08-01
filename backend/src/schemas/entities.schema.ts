@@ -35,7 +35,7 @@ export const listClientsSchema = z.object({
     search: z.string().optional(),
     status: z.enum(["Active", "On Hold", "Completed"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(100).default(20),
+    limit: z.coerce.number().int().min(1).max(25).default(25),
     cursor: z.string().optional(),
   }),
 });
@@ -102,7 +102,7 @@ export const listProjectsSchema = z.object({
     siteId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
     supervisorId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(100).default(20),
+    limit: z.coerce.number().int().min(1).max(25).default(25),
     cursor: z.string().optional(),
   }),
 });

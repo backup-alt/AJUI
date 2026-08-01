@@ -96,7 +96,7 @@ export async function listLabour(filter: {
     }
   }
 
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
   type LabourLike = { [k: string]: unknown };
   let items: LabourLike[] = [];
   let total = 0;

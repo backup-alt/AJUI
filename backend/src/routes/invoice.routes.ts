@@ -8,7 +8,6 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/", validate(listInvoicesSchema, "query"), ctrl.listInvoices);
-router.get("/all", ctrl.listAllInvoices);
 router.get("/:id", ctrl.getInvoice);
 router.post("/", validate(createInvoiceSchema), ctrl.createInvoice);
 router.patch("/:id", validate(updateInvoiceSchema), ctrl.updateInvoice);

@@ -130,7 +130,7 @@ export class ProjectsDirectoryPage implements OnInit {
 
   private loadProjects() {
     this.loading.set(true);
-    this.api.listProjects({ limit: 100 }).subscribe({
+    this.api.listProjects({ limit: 25, page: 1 }).subscribe({
       next: (res) => {
         this.projects.set(res.items);
         this.loading.set(false);

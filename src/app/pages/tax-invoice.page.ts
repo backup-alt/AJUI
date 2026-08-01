@@ -667,7 +667,7 @@ export class TaxInvoicePage {
   }
 
   private loadInvoicesFromBackend() {
-    this.api.listInvoices({ limit: 100 }).subscribe({
+    this.api.listInvoices({ limit: 25, page: 1 }).subscribe({
       next: (res) => {
         const items = (res.items || []).map((i: any) => ({
           id: i._id,

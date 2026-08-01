@@ -4,7 +4,6 @@ import { IMaterial, Material } from "../models/Material.js";
 import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
-import { findAllOrFallback } from "../utils/find-all.js";
 import { withRetry } from "../utils/retry.js";
 import { dbMutex } from "../utils/db-mutex.js";
 
@@ -105,20 +104,8 @@ export async function addApprovedMaterialToInventory(
  * Default cap is 500. The 2000 cap on the previous version was the root
  * cause of repeated 503s on /inventory/all.
  */
-export async function listAllInventory(filter: {
-  projectId?: string;
-  siteId?: string;
-  search?: string;
-  scopeProjectIds?: ProjectScopeIds;
-  max?: number;
-}): Promise<any[]> {
-  const query: Record<string, unknown> = {};
-  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
-  if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
-  if (filter.search) query.name = { $regex: filter.search, $options: "i" };
-  applyProjectScope(query, "projectId", filter.scopeProjectIds);
-
-  return findAllOrFallback(Inventory, "inventory/all", query, filter.max ?? 500);
+export async function listAllInventory(_filter?: unknown): Promise<any[]> {
+  throw new AppError(410, "Use paginated /inventory?limit=25&page=1");
 }
 
 export async function listInventory(filter: {
@@ -151,7 +138,7 @@ export async function listInventory(filter: {
   }
 
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
+  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
   const effectivePage = Math.max(filter.page || 1, 1);
   const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
   type InventoryLike = { [k: string]: unknown };
