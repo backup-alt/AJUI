@@ -7,12 +7,12 @@ export async function connectDatabase(): Promise<void> {
 
     await mongoose.connect(env.MONGODB_URI, {
       serverSelectionTimeoutMS: 15000,
-      maxPoolSize: 5,
-      minPoolSize: 0,
-      maxConnecting: 2,
-      socketTimeoutMS: 20000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      maxConnecting: 3,
+      socketTimeoutMS: 45000,
       heartbeatFrequencyMS: 10000,
-      waitQueueTimeoutMS: 8000,
+      waitQueueTimeoutMS: 30000,
       maxIdleTimeMS: 45000,
       retryWrites: true,
       retryReads: true,

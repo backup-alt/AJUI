@@ -7,6 +7,7 @@ import { generateId } from "./id-generator.service.js";
 import { createApproval } from "./approval.service.js";
 import { CreateLabourInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { dbMutex } from "../utils/db-mutex.js";
 
 export async function createLabour(input: CreateLabourInput) {
   const project = await Project.findById(input.projectId);
@@ -101,15 +102,19 @@ export async function listLabour(filter: {
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    const foundItems = await Labour.find(query)
-      .sort({ _id: -1 })
-      .limit(effectiveLimit)
-      .lean()
-      .maxTimeMS(60_000);
+    const foundItems = await dbMutex.run(async () => {
+      return await Labour.find(query)
+        .sort({ _id: -1 })
+        .limit(effectiveLimit)
+        .lean()
+        .maxTimeMS(60_000);
+    });
 
     if (!filter.cursor) {
       try {
-        const foundTotal = await Labour.countDocuments(query).maxTimeMS(30_000);
+        const foundTotal = await dbMutex.run(async () => {
+          return await Labour.countDocuments(query).maxTimeMS(30_000);
+        });
         total = foundTotal;
       } catch (countErr) {
         console.warn("[listLabour] countDocuments failed (non-fatal):", (countErr as Error).message);

@@ -1,10 +1,14 @@
 import { Types, type Model, type FilterQuery } from "mongoose";
+import { dbMutex } from "./db-mutex.js";
 
 /**
  * Cursor-based pagination helper for Mongoose queries.
  *
  * Replaces the slow O(skip) `skip().limit()` pattern that times out on
  * Atlas M0 free tier once a collection grows past a few hundred rows.
+ *
+ * All queries are serialized through dbMutex (max 3 concurrent DB ops)
+ * to prevent connection pool exhaustion on M0.
  *
  * Contract:
  * - Sort is fixed to `{ _id: -1 }` (descending) — newest first.
@@ -60,6 +64,9 @@ export function applyCursor(
  * Run a single cursor-paginated query against a Mongoose model. Returns
  * the page of documents plus the next cursor.
  *
+ * All queries go through dbMutex to prevent M0 connection pool exhaustion
+ * when the dashboard fires 11+ endpoints simultaneously.
+ *
  * @param model      Mongoose model to query
  * @param query      Base MongoDB filter (will be mutated with the _id
  *                   cursor clause if `opts.cursor` is provided)
@@ -79,14 +86,18 @@ export async function paginateByCursor<T>(
 
   applyCursor(query, opts.cursor);
 
-  const findQuery = model.find(query as FilterQuery<any>).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(maxTimeMS);
-  const findExec = select ? findQuery.select(select) : findQuery;
-  const items = (await findExec) as unknown as T[];
+  const items = await dbMutex.run(async () => {
+    const findQuery = model.find(query as FilterQuery<any>).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(maxTimeMS);
+    const findExec = select ? findQuery.select(select) : findQuery;
+    return (await findExec) as unknown as T[];
+  });
 
   let total = 0;
   if (!opts.cursor) {
     try {
-      total = await model.countDocuments(query as FilterQuery<any>).maxTimeMS(30_000);
+      total = await dbMutex.run(async () => {
+        return await model.countDocuments(query as FilterQuery<any>).maxTimeMS(30_000);
+      });
     } catch {
       total = items.length;
     }

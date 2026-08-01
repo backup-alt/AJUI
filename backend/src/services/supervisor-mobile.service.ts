@@ -30,6 +30,7 @@ import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { withRetry } from "../utils/retry.js";
 import { applyCursor } from "../utils/cursor-pagination.js";
+import { dbMutex } from "../utils/db-mutex.js";
 
 type SupervisorAccess = {
   user: Awaited<ReturnType<typeof User.findById>>;
@@ -749,7 +750,7 @@ export async function listMaterialsForSupervisor(
     delete invQuery.status;
     applyCursor(invQuery, filters.cursor);
 
-    const [items, total] = await Promise.all([
+    const [items, total] = await dbMutex.run(() => Promise.all([
       withRetry(
         () => Inventory.find(invQuery).sort({ updatedAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
         { label: "mobile.listMaterials.inv.find" }
@@ -758,7 +759,7 @@ export async function listMaterialsForSupervisor(
         () => Inventory.countDocuments(invQuery).maxTimeMS(30_000),
         { label: "mobile.listMaterials.inv.count" }
       ),
-    ]).catch((err) => {
+    ])).catch((err) => {
       console.error("[mobile.listMaterials] inventory query failed:", (err as Error).message);
       return [[], 0] as [unknown[], number];
     });
@@ -818,7 +819,7 @@ export async function listMaterialsForSupervisor(
   }
 
   applyCursor(query, filters.cursor);
-  const [items, total] = await Promise.all([
+  const [items, total] = await dbMutex.run(() => Promise.all([
     withRetry(
       () => Material.find(query).sort({ createdAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
       { label: "mobile.listMaterials.find" }
@@ -827,7 +828,7 @@ export async function listMaterialsForSupervisor(
       () => Material.countDocuments(query).maxTimeMS(30_000),
       { label: "mobile.listMaterials.count" }
     ),
-  ]).catch((err) => {
+  ])).catch((err) => {
     console.error("[mobile.listMaterials] main query failed:", (err as Error).message);
     return [[], 0] as [unknown[], number];
   });
@@ -878,10 +879,10 @@ export async function listLabourForSupervisor(
   const limit = filters.limit ?? 20;
   applyCursor(query, filters.cursor);
 
-  const [items, total] = await Promise.all([
+  const [items, total] = await dbMutex.run(() => Promise.all([
     Labour.find(query).sort({ createdAt: -1 }).limit(limit).lean(),
     Labour.countDocuments(query),
-  ]);
+  ]));
 
   return {
     labour: items.map((l) => ({
@@ -920,7 +921,7 @@ export async function listExpensesForSupervisor(
   const limit = filters.limit ?? 20;
   applyCursor(query, filters.cursor);
 
-  const [items, total] = await Promise.all([
+  const [items, total] = await dbMutex.run(() => Promise.all([
     withRetry(
       () => Expense.find(query).sort({ createdAt: -1 }).limit(limit).lean().maxTimeMS(30_000),
       { label: "mobile.listExpenses.find" }
@@ -929,7 +930,7 @@ export async function listExpensesForSupervisor(
       () => Expense.countDocuments(query).maxTimeMS(30_000),
       { label: "mobile.listExpenses.count" }
     ),
-  ]).catch((err) => {
+  ])).catch((err) => {
     console.error("[mobile.listExpenses] main query failed:", (err as Error).message);
     return [[], 0] as [unknown[], number];
   });

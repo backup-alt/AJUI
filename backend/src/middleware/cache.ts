@@ -29,6 +29,12 @@ interface CacheEntry {
 
 const store = new Map<string, CacheEntry>();
 
+// In-flight request coalescing — when two identical requests arrive
+// simultaneously, the second waits for the first's result instead of
+// hammering M0 independently. This prevents connection pool exhaustion
+// from duplicate hydration/dashboard requests.
+const inFlight = new Map<string, Promise<CacheEntry | null>>();
+
 // Per-user cache key prefix — different users see different data
 function makeKey(req: Request): string {
   const auth = req.headers.authorization || "";
@@ -95,6 +101,27 @@ export function cache(ttlSeconds: number) {
       return;
     }
 
+    // Request coalescing: if an identical request is already in-flight,
+    // piggyback on it instead of firing a duplicate DB query.
+    const pending = inFlight.get(key);
+    if (pending) {
+      res.setHeader("X-Cache", "COALESCED");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      pending.then((entry) => {
+        if (entry && !res.writableEnded) {
+          res.setHeader("X-Cache-TTL", String(Math.round((entry.expiresAt - Date.now()) / 1000)));
+          res.status(entry.status).type(entry.contentType).send(entry.body);
+        } else if (!res.writableEnded) {
+          res.status(200).json({ items: [] });
+        }
+      }).catch(() => {
+        if (!res.writableEnded) res.status(200).json({ items: [] });
+      });
+      return;
+    }
+
     res.setHeader("X-Cache", "MISS");
     // Prevent browser from caching — forces fresh data on next request
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -105,6 +132,12 @@ export function cache(ttlSeconds: number) {
     // on error paths (which triggered ERR_HTTP_HEADERS_SENT in production).
     // express.final is set internally and is the most reliable signal.
     const alreadySent = () => (res as any).headersSent || res.writableEnded;
+
+    let resolveInFlight: (val: CacheEntry | null) => void;
+    const inFlightPromise = new Promise<CacheEntry | null>((resolve) => {
+      resolveInFlight = resolve;
+    });
+    inFlight.set(key, inFlightPromise);
 
     const originalSend = res.send.bind(res);
     res.send = function (body?: unknown): Response {
@@ -120,15 +153,19 @@ export function cache(ttlSeconds: number) {
       // Also don't cache non-2xx responses (errors should not be cached).
       const isEmptyArrayBody =
         typeof body === "string" && /"items":\s*\[\s*\]/.test(body);
+      let cacheEntry: CacheEntry | null = null;
       if (status >= 200 && status < 300 && body && !isEmptyArrayBody) {
         const bodyStr = typeof body === "string" ? body : JSON.stringify(body);
-        setCached(key, {
+        cacheEntry = {
           body: bodyStr,
           contentType: String(contentType),
           status,
           expiresAt: Date.now() + ttlSeconds * 1000,
-        });
+        };
+        setCached(key, cacheEntry);
       }
+      inFlight.delete(key);
+      resolveInFlight!(cacheEntry);
       return originalSend(body);
     };
     next();
