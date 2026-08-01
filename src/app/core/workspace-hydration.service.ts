@@ -38,7 +38,7 @@ interface PersistedSnapshot {
   totals: Record<string, number>;
 }
 
-const SNAPSHOT_VERSION = 3;
+const SNAPSHOT_VERSION = 4;
 const SNAPSHOT_KEY = "agb-erp:hydrationSnapshotV1";
 const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -61,7 +61,7 @@ export class WorkspaceHydrationService {
   readonly hydrationError = signal<string | null>(null);
   readonly loadedModules = signal<Set<string>>(new Set());
 
-  /** Cursor for next page per module. null = no more pages. */
+  /** Next page number per module, stored as a string for snapshot compatibility. null = no more pages. */
   readonly pageCursors = signal<Record<string, string | null>>({});
   /** Total document count from MongoDB per module. */
   readonly pageTotals = signal<Record<string, number>>({});
@@ -123,7 +123,7 @@ export class WorkspaceHydrationService {
   }
 
   /**
-   * Load the NEXT cursor page for a module. Appends items to the
+   * Load the NEXT page for a module. Appends items to the
    * existing signal. Called by infinite scroll when the user reaches
    * the bottom of the table.
    */
@@ -150,7 +150,7 @@ export class WorkspaceHydrationService {
       this.pageTotals.update(s => ({ ...s, [module]: result.total }));
 
       console.log(
-        `[loadNextPage] ${module}: appended ${mapped.length} items, nextCursor=${result.nextCursor ? "yes" : "no"}, total=${result.total}`
+        `[loadNextPage] ${module}: appended ${mapped.length} items, nextPage=${result.nextCursor ?? "end"}, total=${result.total}`
       );
     } catch (err: any) {
       console.warn(`[loadNextPage] ${module} failed:`, err?.message ?? err);
@@ -271,7 +271,7 @@ export class WorkspaceHydrationService {
 
   /**
    * Fetch and set the first page (limit=25) for a module. Stores the
-   * nextCursor and total count for infinite scroll.
+   * next page and total count for infinite scroll.
    */
   private async loadFirstPageByModule(module: PageModule): Promise<void> {
     const result = await this.fetchPage(module, undefined);
@@ -285,7 +285,7 @@ export class WorkspaceHydrationService {
     this.pageTotals.update(s => ({ ...s, [module]: result.total }));
 
     console.log(
-      `[loadFirstPage] ${module}: ${mapped.length} items, total=${result.total}, nextCursor=${result.nextCursor ? "yes" : "no"}`
+      `[loadFirstPage] ${module}: ${mapped.length} items, total=${result.total}, nextPage=${result.nextCursor ?? "end"}`
     );
   }
 
@@ -295,19 +295,49 @@ export class WorkspaceHydrationService {
    */
   private async fetchPage(
     module: PageModule,
-    cursor: string | undefined
+    pageToken: string | undefined
   ): Promise<{ items: any[]; nextCursor: string | null; total: number } | null> {
     const factory = this.apiFactoryForModule(module);
     if (!factory) return null;
+    const page = Math.max(Number(pageToken || 1) || 1, 1);
+
+    if (module === "expenses") {
+      const [siteResponse, generalResponse] = await Promise.all([
+        this.safeList(
+          () => this.api.listExpenses({ limit: this.PAGE_SIZE, page, type: "site" }),
+          "expenses/site/page"
+        ),
+        this.safeList(
+          () => this.api.listExpenses({ limit: this.PAGE_SIZE, page, type: "general" }),
+          "expenses/general/page"
+        ),
+      ]);
+      if (!siteResponse && !generalResponse) return null;
+
+      const siteItems = ((siteResponse as any)?.items || []);
+      const generalItems = ((generalResponse as any)?.items || []);
+      const siteTotal = (siteResponse as any)?.total ?? 0;
+      const generalTotal = (generalResponse as any)?.total ?? 0;
+      const sitePages = (siteResponse as any)?.pages ?? 0;
+      const generalPages = (generalResponse as any)?.pages ?? 0;
+      const nextPage = page < Math.max(sitePages, generalPages) ? String(page + 1) : null;
+      return {
+        items: [...siteItems, ...generalItems],
+        nextCursor: nextPage,
+        total: siteTotal + generalTotal,
+      };
+    }
 
     const response = await this.safeList(
-      () => factory({ limit: this.PAGE_SIZE, cursor }),
+      () => factory({ limit: this.PAGE_SIZE, page }),
       `${module}/page`
     );
     if (!response) return null;
 
     const items = (response as any)?.items || [];
-    const nextCursor = (response as any)?.nextCursor ?? null;
+    const responsePage = (response as any)?.page ?? page;
+    const pages = (response as any)?.pages ?? 0;
+    const nextCursor = responsePage < pages ? String(responsePage + 1) : null;
     const total = (response as any)?.total ?? 0;
     return { items, nextCursor, total };
   }

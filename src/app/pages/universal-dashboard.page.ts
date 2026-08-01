@@ -2016,13 +2016,16 @@ export class UniversalDashboardPage implements OnInit {
     const localRows = this.visibleRows();
     if (localRows.length > this.displayLimit()) {
       this.displayLimit.update((n) => n + 50);
-    } else if (this.isPageModule(module) && this.hydration.hasMorePages(module)) {
-      void this.hydration.loadNextPage(module as PageModule);
+    } else if (this.isPageModule(module)) {
+      const pageModule = module === "generalExpenses" ? "expenses" : module;
+      if (this.hydration.hasMorePages(pageModule)) {
+        void this.hydration.loadNextPage(pageModule as PageModule);
+      }
     }
   }
 
   private isPageModule(module: string): boolean {
-    return ["materials", "inventory", "expenses", "labour", "payments", "subcontractors", "invoices"].includes(module);
+    return ["materials", "inventory", "expenses", "generalExpenses", "labour", "payments", "subcontractors", "invoices"].includes(module);
   }
 
   // Server-side search: debounce timer and in-flight guard
@@ -2049,6 +2052,7 @@ export class UniversalDashboardPage implements OnInit {
         materials: (opts: any) => firstValueFrom(this.api.listMaterials(opts)),
         labour: (opts: any) => firstValueFrom(this.api.listLabour(opts)),
         expenses: (opts: any) => firstValueFrom(this.api.listExpenses(opts)),
+        generalExpenses: (opts: any) => firstValueFrom(this.api.listExpenses({ ...opts, type: "general" })),
         payments: (opts: any) => firstValueFrom(this.api.listPayments(opts)),
         vendors: (opts: any) => firstValueFrom(this.api.listVendors(opts)),
         subcontractors: (opts: any) => firstValueFrom(this.api.listSubcontractors(opts)),
@@ -2058,6 +2062,7 @@ export class UniversalDashboardPage implements OnInit {
         materials: mapMaterial,
         labour: mapLabour,
         expenses: mapExpense,
+        generalExpenses: mapExpense,
         payments: mapPayment,
         vendors: mapVendor,
         subcontractors: mapSubcontractor,

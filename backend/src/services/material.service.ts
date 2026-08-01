@@ -174,6 +174,8 @@ export async function listMaterials(filter: {
 
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
   const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
+  const effectivePage = Math.max(filter.page || 1, 1);
+  const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
   type MaterialLike = {
     projectId?: unknown;
     siteId?: unknown;
@@ -198,10 +200,11 @@ export async function listMaterials(filter: {
           const findPromise = Material.find(query)
             .select({ receiptImage: 0 })
             .sort({ _id: -1 })
+            .skip(skip)
             .limit(effectiveLimit)
             .lean()
             .maxTimeMS(60_000);
-          const countPromise = Material.estimatedDocumentCount(query).maxTimeMS(30_000);
+          const countPromise = Material.countDocuments(query).maxTimeMS(30_000);
           return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
         }, { label: "listMaterials.find+count" })
       );
@@ -306,7 +309,7 @@ export async function listMaterials(filter: {
   return {
     items: typedItems,
     total,
-    page: filter.page,
+    page: effectivePage,
     limit: effectiveLimit,
     pages: Math.ceil(total / effectiveLimit),
     nextCursor,

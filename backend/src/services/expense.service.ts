@@ -13,6 +13,30 @@ import { dbMutex } from "../utils/db-mutex.js";
 import { generatePoNumberForSite } from "./po-number.service.js";
 import { uploadToPCloud } from "./pcloud.service.js";
 
+function applyExpenseProjectScope(
+  query: Record<string, unknown>,
+  filter: { type?: string; projectId?: string; scopeProjectIds?: ProjectScopeIds }
+): void {
+  if (filter.scopeProjectIds === undefined || filter.scopeProjectIds === null) return;
+  if (filter.type === "general") return;
+
+  if (filter.projectId || filter.type === "site") {
+    applyProjectScope(query, "projectId", filter.scopeProjectIds);
+    return;
+  }
+
+  const existingAnd = Array.isArray(query.$and) ? query.$and : [];
+  query.$and = [
+    ...existingAnd,
+    {
+      $or: [
+        { projectId: { $in: filter.scopeProjectIds } },
+        { type: "general" },
+      ],
+    },
+  ];
+}
+
 /**
  * Recompute the running balance for every approved site expense of a single
  * (projectId, site) pair in chronological order. The opening balance is the
@@ -179,7 +203,7 @@ export async function listAllExpenses(filter: {
     if (filter.from) (query.date as Record<string, string>).$gte = filter.from;
     if (filter.to) (query.date as Record<string, string>).$lte = filter.to;
   }
-  applyProjectScope(query, "projectId", filter.scopeProjectIds);
+  applyExpenseProjectScope(query, filter);
 
   return findAllOrFallback(Expense, "expenses/all", query, filter.max ?? 500);
 }
@@ -208,7 +232,7 @@ export async function listExpenses(filter: {
     if (filter.from) (query.date as Record<string, string>).$gte = filter.from;
     if (filter.to) (query.date as Record<string, string>).$lte = filter.to;
   }
-  applyProjectScope(query, "projectId", filter.scopeProjectIds);
+  applyExpenseProjectScope(query, filter);
 
   // Cursor-based pagination via _id — O(log n) range query on the _id
   // index, no skip-and-scan that M0 can't handle above ~25 rows.
@@ -225,6 +249,8 @@ export async function listExpenses(filter: {
 
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
   const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
+  const effectivePage = Math.max(filter.page || 1, 1);
+  const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
   type ExpenseLike = { [k: string]: unknown };
   let items: ExpenseLike[] = [];
   let total = 0;
@@ -238,10 +264,11 @@ export async function listExpenses(filter: {
           const findPromise = Expense.find(query)
             .select({ receiptImage: 0, customFields: 0 })
             .sort({ _id: -1 })
+            .skip(skip)
             .limit(effectiveLimit)
             .lean()
             .maxTimeMS(60_000);
-          const countPromise = Expense.estimatedDocumentCount(query).maxTimeMS(30_000);
+          const countPromise = Expense.countDocuments(query).maxTimeMS(30_000);
           return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
         }, { label: "listExpenses.find+count" })
       );
@@ -289,7 +316,7 @@ export async function listExpenses(filter: {
   return {
     items,
     total,
-    page: filter.page,
+    page: effectivePage,
     limit: effectiveLimit,
     pages: Math.ceil(total / effectiveLimit),
     nextCursor,
