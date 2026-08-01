@@ -1901,12 +1901,12 @@ export class UniversalDashboardPage implements OnInit {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
-  readonly inventoryCards = computed(() => this.aggregateInventory(this.data.materials(), this.activeSiteFilter()));
+  readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inventory(), this.activeSiteFilter()));
   readonly selectedInventoryCard = signal<{ siteKey: string; siteName: string; materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
   readonly inventoryBreakdownRows = computed(() => {
     const card = this.selectedInventoryCard();
-    if (!card) return [] as import("../../data/dashboardData").MaterialRow[];
-    return this.data.materials().filter((m) =>
+    if (!card) return [] as any[];
+    return this.data.inventory().filter((m: any) =>
       m.name === card.materialName &&
       (m.site || "").toLowerCase() === (card.siteKey || "").toLowerCase()
     );
@@ -1980,13 +1980,21 @@ export class UniversalDashboardPage implements OnInit {
   /** True if there are more rows to show — either locally or on the server. */
   readonly hasMoreRows = computed(() => {
     const localMore = this.visibleRows().length > this.displayLimit();
-    const serverMore = this.hydration.hasMorePages(this.activeModule());
+    const module = this.activeModule();
+    const pageModule = module === "generalExpenses" ? "expenses" : module;
+    const serverMore = this.hydration.hasMorePages(pageModule);
     return localMore || serverMore;
   });
   /** Total records from MongoDB (not loaded array length). */
-  readonly totalCount = computed(() => this.hydration.getTotalCount(this.activeModule()));
+  readonly totalCount = computed(() => {
+    const module = this.activeModule();
+    return this.hydration.getTotalCount(module === "generalExpenses" ? "expenses" : module);
+  });
   /** True while fetching the next page from server. */
-  readonly isLoadingNextPage = computed(() => this.hydration.loadingNextPage()[this.activeModule()] ?? false);
+  readonly isLoadingNextPage = computed(() => {
+    const module = this.activeModule();
+    return this.hydration.loadingNextPage()[module === "generalExpenses" ? "expenses" : module] ?? false;
+  });
 
   ngOnInit(): void {
     void this.data.loadCustomFieldsFromBackend();
@@ -2126,7 +2134,7 @@ export class UniversalDashboardPage implements OnInit {
     }
   }
 
-  private aggregateInventory(materials: import("../../data/dashboardData").MaterialRow[], siteFilter?: string) {
+  private aggregateInventory(materials: any[], siteFilter?: string) {
     const filtered = (siteFilter && siteFilter !== "All")
       ? materials.filter((m) => m.site && m.site.toLowerCase() === siteFilter.toLowerCase())
       : materials;
@@ -2142,10 +2150,11 @@ export class UniversalDashboardPage implements OnInit {
         lastUpdated: "",
         siteCount: 1,
       };
-      const incomingQty = Math.max(0, Number(m.quantity) || 0);
+      const incomingQty = Math.max(0, Number(m.remainingStock ?? m.quantity ?? m.purchasedQuantity) || 0);
       existing.qty = Math.max(existing.qty, incomingQty);
       existing.unit = m.unit || existing.unit;
-      if (m.requestDate && m.requestDate > existing.lastUpdated) existing.lastUpdated = m.requestDate;
+      const updatedAt = m.updatedAt || m.requestDate || m.createdAt || "";
+      if (updatedAt && updatedAt > existing.lastUpdated) existing.lastUpdated = updatedAt;
       map.set(key, existing);
     }
     return [...map.entries()].map(([key, v]) => {

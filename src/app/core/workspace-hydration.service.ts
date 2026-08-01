@@ -38,9 +38,10 @@ interface PersistedSnapshot {
   totals: Record<string, number>;
 }
 
-const SNAPSHOT_VERSION = 4;
+const SNAPSHOT_VERSION = 5;
 const SNAPSHOT_KEY = "agb-erp:hydrationSnapshotV1";
 const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const FULL_HYDRATION_LIMIT = 1000;
 
 export type PageModule =
   | "materials"
@@ -300,6 +301,28 @@ export class WorkspaceHydrationService {
     const factory = this.apiFactoryForModule(module);
     if (!factory) return null;
     const page = Math.max(Number(pageToken || 1) || 1, 1);
+
+    if (!pageToken && module === "materials") {
+      const response = await this.safeList(
+        () => this.api.listAllMaterials(FULL_HYDRATION_LIMIT),
+        "materials/all"
+      );
+      if (!response) return null;
+      const items = (response as any)?.items || [];
+      const total = (response as any)?.total ?? items.length;
+      return { items, nextCursor: null, total };
+    }
+
+    if (!pageToken && module === "inventory") {
+      const response = await this.safeList(
+        () => this.api.listAllInventory(FULL_HYDRATION_LIMIT),
+        "inventory/all"
+      );
+      if (!response) return null;
+      const items = (response as any)?.items || [];
+      const total = (response as any)?.total ?? items.length;
+      return { items, nextCursor: null, total };
+    }
 
     if (module === "expenses") {
       const [siteResponse, generalResponse] = await Promise.all([

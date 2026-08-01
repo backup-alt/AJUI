@@ -325,9 +325,13 @@ export function mapInventory(i: any): any {
     purchasedQuantity: i.purchasedQuantity ?? 0,
     consumedQuantity: i.consumedQuantity ?? 0,
     remainingStock: i.remainingStock ?? 0,
+    quantity: i.remainingStock ?? i.purchasedQuantity ?? 0,
     minimumQuantity: i.minimumQuantity ?? 0,
     vendor: i.vendor,
     poNumber: i.poNumber,
+    requestDate: i.updatedAt || i.createdAt || "",
+    createdAt: i.createdAt,
+    updatedAt: i.updatedAt,
     customFields: i.customFields || {},
   };
 }

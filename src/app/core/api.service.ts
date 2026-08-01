@@ -627,8 +627,15 @@ export class ApiService {
    * walk that the previous hydration service used (which was slow and
    * unreliable on M0 free tier).
    */
-  listAllMaterials(max?: number): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
-    const query = max ? `?max=${max}` : "";
+  listAllMaterials(
+    max?: number,
+    params?: { projectId?: string; siteId?: string; site?: string; vendorId?: string; status?: string; search?: string }
+  ): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
+    const q = new URLSearchParams();
+    if (max) q.set("max", String(max));
+    Object.entries(params || {}).forEach(([key, value]) => value !== undefined && q.set(key, String(value)));
+    const queryString = q.toString();
+    const query = queryString ? `?${queryString}` : "";
     return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
       `${this.baseUrl}/materials/all${query}`,
       { headers: this.authHeaders() }
@@ -647,8 +654,15 @@ export class ApiService {
   }
 
   /** Single-shot hydration endpoint for inventory. */
-  listAllInventory(max?: number): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
-    const query = max ? `?max=${max}` : "";
+  listAllInventory(
+    max?: number,
+    params?: { projectId?: string; siteId?: string; search?: string }
+  ): Observable<{ items: any[]; total: number; count: number; durationMs: number }> {
+    const q = new URLSearchParams();
+    if (max) q.set("max", String(max));
+    Object.entries(params || {}).forEach(([key, value]) => value !== undefined && q.set(key, String(value)));
+    const queryString = q.toString();
+    const query = queryString ? `?${queryString}` : "";
     return this.http.get<{ items: any[]; total: number; count: number; durationMs: number }>(
       `${this.baseUrl}/inventory/all${query}`,
       { headers: this.authHeaders() }

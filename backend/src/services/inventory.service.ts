@@ -152,6 +152,8 @@ export async function listInventory(filter: {
 
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
   const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
+  const effectivePage = Math.max(filter.page || 1, 1);
+  const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
   type InventoryLike = { [k: string]: unknown };
   let items: InventoryLike[] = [];
   let total = 0;
@@ -165,10 +167,11 @@ export async function listInventory(filter: {
           const findPromise = Inventory.find(query)
             .select({ receiptImage: 0 })
             .sort({ _id: -1 })
+            .skip(skip)
             .limit(effectiveLimit)
             .lean()
             .maxTimeMS(60_000);
-          const countPromise = Inventory.estimatedDocumentCount(query).maxTimeMS(30_000);
+          const countPromise = Inventory.countDocuments(query).maxTimeMS(30_000);
           return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
         }, { label: "listInventory.find+count" })
       );
@@ -226,7 +229,7 @@ export async function listInventory(filter: {
   return {
     items: items as unknown as IInventory[],
     total,
-    page: filter.page,
+    page: effectivePage,
     limit: effectiveLimit,
     pages: Math.ceil(total / effectiveLimit),
     nextCursor,

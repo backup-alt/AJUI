@@ -85,7 +85,7 @@ export async function findAllOrFallback<T extends Record<string, unknown>>(
   hardCap = 500,
   singleShotMs = 60_000
 ): Promise<T[]> {
-  const cap = Math.min(Math.max(hardCap, 1), 500);
+  const cap = Math.min(Math.max(hardCap, 1), 1000);
 
   try {
     // Exclude receiptImage from the single-shot query — it's base64-encoded
