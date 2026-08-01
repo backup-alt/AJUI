@@ -199,6 +199,7 @@ export async function listMaterials(filter: {
           () => Material.find(query)
             .select({ receiptImage: 0 })
             .sort({ _id: -1 })
+            .skip(skip)
             .limit(effectiveLimit)
             .lean()
             .maxTimeMS(60_000),
@@ -210,8 +211,8 @@ export async function listMaterials(filter: {
       // Page 1 already supplied the authoritative total; here we only need
       // an honest continuation signal for the next 25-row request.
       total = items.length < effectiveLimit
-        ? (effectivePage - 1) * effectiveLimit + items.length
-        : effectivePage * effectiveLimit + 1;
+        ? skip + items.length
+        : skip + effectiveLimit + 1;
       console.log(`[listMaterials] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
     }
     // Cursor-based pagination by _id, descending. Sort is {_id: -1} so

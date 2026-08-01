@@ -165,6 +165,23 @@ export async function listInventory(filter: {
       );
       items = foundItems as unknown as InventoryLike[];
       total = foundTotal;
+      if (items.length === 0 && total === 0) {
+        await backfillApprovedMaterialsToInventory(inventoryQueryToMaterialQuery(query));
+        const [repairedItems, repairedTotal] = await dbMutex.run(() =>
+          withRetry(async () => {
+            const findPromise = Inventory.find(query)
+              .select({ receiptImage: 0 })
+              .sort({ _id: -1 })
+              .limit(effectiveLimit)
+              .lean()
+              .maxTimeMS(60_000);
+            const countPromise = Inventory.countDocuments(query).maxTimeMS(30_000);
+            return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
+          }, { label: "listInventory.repaired.find+count" })
+        );
+        items = repairedItems as unknown as InventoryLike[];
+        total = repairedTotal;
+      }
       console.log(`[listInventory] dbMutex find+count dt=${Date.now() - tDb}ms items=${items.length} total=${total}`);
     } else {
       const foundItems = await dbMutex.run(() =>
@@ -172,6 +189,7 @@ export async function listInventory(filter: {
           () => Inventory.find(query)
             .select({ receiptImage: 0 })
             .sort({ _id: -1 })
+            .skip(skip)
             .limit(effectiveLimit)
             .lean()
             .maxTimeMS(60_000),
@@ -182,8 +200,8 @@ export async function listInventory(filter: {
       // Avoid a second filtered count on every page. The first page carries
       // the authoritative total; later pages only need continuation data.
       total = items.length < effectiveLimit
-        ? (effectivePage - 1) * effectiveLimit + items.length
-        : effectivePage * effectiveLimit + 1;
+        ? skip + items.length
+        : skip + effectiveLimit + 1;
       console.log(`[listInventory] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
     }
     // Cursor-based pagination by _id, descending. Sort is {_id: -1} so
@@ -230,6 +248,15 @@ export async function listInventory(filter: {
   };
 }
 
+function inventoryQueryToMaterialQuery(query: Record<string, unknown>): Record<string, unknown> {
+  const materialQuery: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (key === "_id") continue;
+    materialQuery[key] = value;
+  }
+  return materialQuery;
+}
+
 /**
  * Efficient bulk backfill: pulls all materials in one query, all existing
  * inventory in one query, then bulk-inserts missing inventory records
@@ -259,7 +286,7 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
   // Bulk-fetch all existing inventory in one query
   const matchClauses = materials.map(inventoryMatchForMaterial);
   const existing: any[] = await Inventory.find({ $or: matchClauses })
-    .select("_id siteKey normalizedName normalizedUnit purchaseHistory materialId")
+    .select("_id projectId siteKey normalizedName normalizedUnit purchaseHistory materialId")
     .lean()
     .maxTimeMS(15000)
     .catch((err) => {

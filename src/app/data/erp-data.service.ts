@@ -166,8 +166,11 @@ export class ErpDataService {
 
   private readonly _syncMaterials = effect(() => {
     const rows = this.materialsService.materials();
-    if (rows !== undefined) {
-      this.materials.set(rows);
+    if (!rows?.length) return;
+    const existing = this.materials();
+    const merged = this.mergeMaterialRows(existing, rows);
+    if (merged.length !== existing.length || merged.some((row, index) => row !== existing[index])) {
+      this.materials.set(merged);
     }
   });
 
@@ -270,6 +273,23 @@ export class ErpDataService {
         this.materialsService.materials.set(rows);
       }
     });
+  }
+
+  private mergeMaterialRows(existing: MaterialRow[], incoming: MaterialRow[]): MaterialRow[] {
+    const keyFor = (row: MaterialRow) => String((row as any)._id || row.id || "").trim();
+    const existingByKey = new Map(existing.map((row) => [keyFor(row), row]));
+    const incomingKeys = new Set<string>();
+    const merged = incoming.map((row) => {
+      const key = keyFor(row);
+      if (key) incomingKeys.add(key);
+      return key && existingByKey.has(key) ? { ...existingByKey.get(key), ...row } as MaterialRow : row;
+    });
+    for (const row of existing) {
+      const key = keyFor(row);
+      if (key && incomingKeys.has(key)) continue;
+      merged.push(row);
+    }
+    return merged;
   }
 
   addUser(user: Omit<AppUser, "id" | "createdAt"> & { id?: string; createdAt?: string }): AppUser {
