@@ -514,6 +514,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     </div>
                   }
                 </div>
+                <div #scrollSentinel class="inventory-load-more" *ngIf="hasMoreRows()">
+                  <button *ngIf="!isLoadingNextPage()" type="button" class="load-more-btn" (click)="loadMoreRows()">Show more</button>
+                  <span *ngIf="isLoadingNextPage()" class="load-more-loading">Loading...</span>
+                </div>
               </section>
 
               <ng-container *ngIf="activeModule() !== 'inventory'">
@@ -1841,6 +1845,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
       padding: 10px 24px;
       font-size: 13px;
       color: #64748b;
+    }
+    .inventory-load-more {
+      display: flex;
+      justify-content: center;
+      padding: 16px 0 4px;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
