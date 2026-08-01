@@ -81,8 +81,8 @@ export class ApiService {
   private baseUrl = environment.apiUrl;
   private cache = new ResponseCache();
 
-  /** Default TTL for list endpoints: 30 seconds. */
-  private LIST_TTL = 30_000;
+  /** Keep pages already visited during this app session for five minutes. */
+  private LIST_TTL = 5 * 60_000;
 
   // Reactive state
   private accessTokenSignal = signal<string | null>(this.getStored(STORAGE_KEYS.ACCESS_TOKEN));

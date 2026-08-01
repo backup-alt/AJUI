@@ -188,6 +188,7 @@ export async function listMaterials(filter: {
   let items: MaterialLike[] = [];
   let total = 0;
   let nextCursor: string | null = null;
+  let queryFailed = false;
   try {
     const tDb = Date.now();
     if (!filter.cursor) {
@@ -261,6 +262,7 @@ export async function listMaterials(filter: {
     );
     items = [];
     total = 0;
+    queryFailed = true;
   }
 
   // Site-name lookup is best-effort and outside dbMutex — if it times out
@@ -313,6 +315,7 @@ export async function listMaterials(filter: {
     limit: effectiveLimit,
     pages: Math.ceil(total / effectiveLimit),
     nextCursor,
+    queryFailed,
   };
 }
 

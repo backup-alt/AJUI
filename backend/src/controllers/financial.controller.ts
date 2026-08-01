@@ -49,6 +49,10 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
+    if (result.queryFailed) {
+      res.status(503).json({ error: "Materials are temporarily unavailable. Please retry.", ...result });
+      return;
+    }
     const dt = Date.now() - t0;
     console.log(
       `[listMaterials] dt=${dt}ms limit=${req.query.limit ?? "default"} items=${result.items?.length ?? 0} total=${result.total} scope=${scopeProjectIds?.length ?? "null"}`
@@ -280,6 +284,10 @@ export async function listInventory(req: Request, res: Response, next: NextFunct
       cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
+    if (result.queryFailed) {
+      res.status(503).json({ error: "Inventory is temporarily unavailable. Please retry.", ...result });
+      return;
+    }
     const dt = Date.now() - t0;
     console.log(
       `[listInventory] dt=${dt}ms limit=${req.query.limit ?? "default"} items=${result.items?.length ?? 0} total=${result.total} scope=${scopeProjectIds?.length ?? "null"}`

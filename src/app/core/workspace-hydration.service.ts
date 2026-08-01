@@ -38,7 +38,7 @@ interface PersistedSnapshot {
   totals: Record<string, number>;
 }
 
-const SNAPSHOT_VERSION = 6;
+const SNAPSHOT_VERSION = 7;
 const SNAPSHOT_KEY = "agb-erp:hydrationSnapshotV1";
 const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -67,6 +67,7 @@ export class WorkspaceHydrationService {
   readonly pageTotals = signal<Record<string, number>>({});
   /** True while fetching the next page for a module. */
   readonly loadingNextPage = signal<Record<string, boolean>>({});
+  private readonly moduleLoads = new Map<PageModule, Promise<boolean>>();
 
   private readonly PAGE_SIZE = 25;
 
@@ -111,14 +112,23 @@ export class WorkspaceHydrationService {
    */
   async loadModule(module: PageModule): Promise<void> {
     if (this.loadedModules().has(module)) return;
-    this.loadedModules.update(s => { s.add(module); return s; });
+
+    let load = this.moduleLoads.get(module);
+    if (!load) {
+      load = this.loadFirstPageByModule(module);
+      this.moduleLoads.set(module, load);
+    }
 
     try {
-      await this.loadFirstPageByModule(module);
+      const loaded = await load;
+      if (!loaded) return;
+      this.loadedModules.update((modules) => new Set([...modules, module]));
       this.persistSnapshot();
       console.log(`[loadModule] ${module} loaded`);
     } catch (err: any) {
       console.warn(`[loadModule] ${module} failed:`, err?.message ?? err);
+    } finally {
+      if (this.moduleLoads.get(module) === load) this.moduleLoads.delete(module);
     }
   }
 
@@ -197,8 +207,10 @@ export class WorkspaceHydrationService {
 
   invalidateCache(): void {
     try {
+      this.api.invalidateCache();
       localStorage.removeItem(SNAPSHOT_KEY);
       this.loadedModules.set(new Set());
+      this.moduleLoads.clear();
       this.pageCursors.set({});
       this.pageTotals.set({});
       this.erp.resetCustomFieldsLoaded();
@@ -271,9 +283,9 @@ export class WorkspaceHydrationService {
    * Fetch and set the first page (limit=25) for a module. Stores the
    * next page and total count for infinite scroll.
    */
-  private async loadFirstPageByModule(module: PageModule): Promise<void> {
+  private async loadFirstPageByModule(module: PageModule): Promise<boolean> {
     const result = await this.fetchPage(module, undefined);
-    if (!result) return;
+    if (!result) return false;
 
     const mapped = result.items.map(this.mapperForModule(module));
     const signal = this.signalForModule(module);
@@ -285,6 +297,7 @@ export class WorkspaceHydrationService {
     console.log(
       `[loadFirstPage] ${module}: ${mapped.length} items, total=${result.total}, nextPage=${result.nextCursor ?? "end"}`
     );
+    return true;
   }
 
   /**

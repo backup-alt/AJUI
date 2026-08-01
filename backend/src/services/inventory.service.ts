@@ -158,6 +158,7 @@ export async function listInventory(filter: {
   let items: InventoryLike[] = [];
   let total = 0;
   let nextCursor: string | null = null;
+  let queryFailed = false;
   try {
     const tDb = Date.now();
     if (!filter.cursor) {
@@ -224,6 +225,7 @@ export async function listInventory(filter: {
     );
     items = [];
     total = 0;
+    queryFailed = true;
   }
 
   return {
@@ -233,6 +235,7 @@ export async function listInventory(filter: {
     limit: effectiveLimit,
     pages: Math.ceil(total / effectiveLimit),
     nextCursor,
+    queryFailed,
   };
 }
 
