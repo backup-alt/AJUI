@@ -223,54 +223,47 @@ export async function listExpenses(filter: {
     }
   }
 
-  // DIAGNOSTIC: log the query that will be executed against M0
-  console.log(
-    `[listExpenses.diag] query=${JSON.stringify(query)} limit=${filter.limit ?? "default"} scope=${filter.scopeProjectIds?.length ?? "null"}`
-  );
-
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
-  // Use cursor to paginate beyond 25 if the caller asks for more.
   const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
   type ExpenseLike = { [k: string]: unknown };
   let items: ExpenseLike[] = [];
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    // Serialize through the in-process mutex so this query doesn't
-    // contend with other concurrent requests for the M0 cluster's
-    // shared resources.
-    //
-    // Exclude receiptImage and customFields from list queries — receiptImage
-    // is base64 (100KB-2MB), customFields is Mixed type that can store
-    // arbitrary data. Keep billUrl so View Bill works on list rows.
-    const foundItems = await dbMutex.run(() =>
-      withRetry(
-        () => Expense.find(query)
-          .select({ receiptImage: 0, customFields: 0 })
-          .sort({ _id: -1 })
-          .limit(effectiveLimit)
-          .lean()
-          .maxTimeMS(60_000),
-        { label: "listExpenses.find" }
-      )
-    );
+    const tDb = Date.now();
     if (!filter.cursor) {
-      try {
-        const foundTotal = await dbMutex.run(() =>
-          withRetry(
-            () => Expense.countDocuments(query).maxTimeMS(30_000),
-            { label: "listExpenses.count" }
-          )
-        );
-        total = foundTotal;
-      } catch (countErr) {
-        console.warn("[listExpenses] countDocuments failed (non-fatal):", (countErr as Error).message);
-        total = items.length;
-      }
+      // First page: find + count in a SINGLE dbMutex acquisition.
+      const [foundItems, foundTotal] = await dbMutex.run(() =>
+        withRetry(async () => {
+          const findPromise = Expense.find(query)
+            .select({ receiptImage: 0, customFields: 0 })
+            .sort({ _id: -1 })
+            .limit(effectiveLimit)
+            .lean()
+            .maxTimeMS(60_000);
+          const countPromise = Expense.estimatedDocumentCount(query).maxTimeMS(30_000);
+          return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
+        }, { label: "listExpenses.find+count" })
+      );
+      items = foundItems as unknown as ExpenseLike[];
+      total = foundTotal;
+      console.log(`[listExpenses] dbMutex find+count dt=${Date.now() - tDb}ms items=${items.length} total=${total}`);
     } else {
+      const foundItems = await dbMutex.run(() =>
+        withRetry(
+          () => Expense.find(query)
+            .select({ receiptImage: 0, customFields: 0 })
+            .sort({ _id: -1 })
+            .limit(effectiveLimit)
+            .lean()
+            .maxTimeMS(60_000),
+          { label: "listExpenses.find" }
+        )
+      );
+      items = foundItems as unknown as ExpenseLike[];
       total = filter.page * effectiveLimit;
+      console.log(`[listExpenses] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
     }
-    items = foundItems as unknown as ExpenseLike[];
     // Cursor-based pagination by _id, descending. Sort is {_id: -1} so
     // the last item in the page has the SMALLEST _id in the page. The
     // next page query is `_id < cursor` (already applied above when

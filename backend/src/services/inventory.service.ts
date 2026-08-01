@@ -150,56 +150,47 @@ export async function listInventory(filter: {
     }
   }
 
-  // DIAGNOSTIC: log the query that will be executed against M0
-  console.log(
-    `[listInventory.diag] query=${JSON.stringify(query)} limit=${filter.limit ?? "default"} scope=${filter.scopeProjectIds?.length ?? "null"}`
-  );
-
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
-  // Use cursor to paginate beyond 25 if the caller asks for more.
   const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 100);
   type InventoryLike = { [k: string]: unknown };
   let items: InventoryLike[] = [];
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    // Serialize through the in-process mutex so this query doesn't
-    // contend with other concurrent requests for the M0 cluster's
-    // shared resources.
-    //
-    // Exclude receiptImage from list queries — it's a base64-encoded
-    // image that can be 100KB-2MB per record. When pCloud uploads fail,
-    // the receipt is stored as base64, causing list response payloads
-    // to balloon to multiple MB and triggering 503 timeouts. The
-    // single-record GET endpoint still returns the full document.
-    const foundItems = await dbMutex.run(() =>
-      withRetry(
-        () => Inventory.find(query)
-          .select({ receiptImage: 0 })
-          .sort({ _id: -1 })
-          .limit(effectiveLimit)
-          .lean()
-          .maxTimeMS(60_000),
-        { label: "listInventory.find" }
-      )
-    );
+    const tDb = Date.now();
     if (!filter.cursor) {
-      try {
-        const foundTotal = await dbMutex.run(() =>
-          withRetry(
-            () => Inventory.countDocuments(query).maxTimeMS(30_000),
-            { label: "listInventory.count" }
-          )
-        );
-        total = foundTotal;
-      } catch (countErr) {
-        console.warn("[listInventory] countDocuments failed (non-fatal):", (countErr as Error).message);
-        total = items.length;
-      }
+      // First page: find + count in a SINGLE dbMutex acquisition.
+      const [foundItems, foundTotal] = await dbMutex.run(() =>
+        withRetry(async () => {
+          const findPromise = Inventory.find(query)
+            .select({ receiptImage: 0 })
+            .sort({ _id: -1 })
+            .limit(effectiveLimit)
+            .lean()
+            .maxTimeMS(60_000);
+          const countPromise = Inventory.estimatedDocumentCount(query).maxTimeMS(30_000);
+          return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
+        }, { label: "listInventory.find+count" })
+      );
+      items = foundItems as unknown as InventoryLike[];
+      total = foundTotal;
+      console.log(`[listInventory] dbMutex find+count dt=${Date.now() - tDb}ms items=${items.length} total=${total}`);
     } else {
+      const foundItems = await dbMutex.run(() =>
+        withRetry(
+          () => Inventory.find(query)
+            .select({ receiptImage: 0 })
+            .sort({ _id: -1 })
+            .limit(effectiveLimit)
+            .lean()
+            .maxTimeMS(60_000),
+          { label: "listInventory.find" }
+        )
+      );
+      items = foundItems as unknown as InventoryLike[];
       total = filter.page * effectiveLimit;
+      console.log(`[listInventory] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
     }
-    items = foundItems as unknown as InventoryLike[];
     // Cursor-based pagination by _id, descending. Sort is {_id: -1} so
     // the last item in the page has the SMALLEST _id in the page. The
     // next page query is `_id < cursor` (already applied above when

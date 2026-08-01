@@ -13,10 +13,11 @@
  * that abort the cursor walk.
  */
 class Semaphore {
-  private available = 3;
+  private available = 5;
   private waiting: Array<() => void> = [];
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
+    const tWait = Date.now();
     if (this.available > 0) {
       this.available--;
       try {
@@ -25,8 +26,13 @@ class Semaphore {
         this.release();
       }
     }
+    const queueDepth = this.waiting.length + 1;
     return new Promise<T>((resolve, reject) => {
       this.waiting.push(() => {
+        const waited = Date.now() - tWait;
+        if (waited > 500) {
+          console.log(`[dbMutex] queued ${waited}ms depth=${queueDepth}`);
+        }
         this.available--;
         fn()
           .then(resolve)

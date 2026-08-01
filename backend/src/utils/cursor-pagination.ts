@@ -86,24 +86,52 @@ export async function paginateByCursor<T>(
 
   applyCursor(query, opts.cursor);
 
+  const tDb = Date.now();
+
+  if (!opts.cursor) {
+    // First page: run find + count in a SINGLE dbMutex acquisition.
+    // The old two-acquisition pattern (find releases mutex → count
+    // re-acquires it) meant first pages waited for two queue turns.
+    // On M0 free tier with 11+ concurrent hydration requests, this
+    // doubled the wall-clock time and frequently exceeded the 60s
+    // frontend timeout.
+    const [items, total] = await dbMutex.run(async () => {
+      const findQuery = model.find(query as FilterQuery<any>).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(maxTimeMS);
+      const findExec = select ? findQuery.select(select) : findQuery;
+      const countPromise = model.estimatedDocumentCount(query as FilterQuery<any>).maxTimeMS(30_000);
+      const [foundItems, foundTotal] = await Promise.all([
+        findExec as unknown as Promise<T[]>,
+        countPromise,
+      ]);
+      return [foundItems, foundTotal] as const;
+    });
+    console.log(`[paginateByCursor] dbMutex find+count dt=${Date.now() - tDb}ms items=${(items as T[]).length} total=${total}`);
+
+    let nextCursor: string | null = null;
+    if ((items as T[]).length === limit) {
+      const lastItem = (items as T[])[(items as T[]).length - 1] as unknown as { _id?: unknown };
+      if (lastItem && lastItem._id) {
+        nextCursor = String(lastItem._id);
+      }
+    }
+
+    return {
+      items: items as T[],
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+      nextCursor,
+    };
+  }
+
+  // Cursor pages: just the find query — skip count entirely.
   const items = await dbMutex.run(async () => {
     const findQuery = model.find(query as FilterQuery<any>).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(maxTimeMS);
     const findExec = select ? findQuery.select(select) : findQuery;
     return (await findExec) as unknown as T[];
   });
-
-  let total = 0;
-  if (!opts.cursor) {
-    try {
-      total = await dbMutex.run(async () => {
-        return await model.countDocuments(query as FilterQuery<any>).maxTimeMS(30_000);
-      });
-    } catch {
-      total = items.length;
-    }
-  } else {
-    total = page * limit; // estimate for cursor pages
-  }
+  console.log(`[paginateByCursor] dbMutex find dt=${Date.now() - tDb}ms items=${(items as T[]).length}`);
 
   let nextCursor: string | null = null;
   if (items.length === limit) {
@@ -115,10 +143,10 @@ export async function paginateByCursor<T>(
 
   return {
     items,
-    total,
+    total: page * limit,
     page,
     limit,
-    pages: Math.ceil(total / limit),
+    pages: Math.ceil((page * limit) / limit),
     nextCursor,
   };
 }

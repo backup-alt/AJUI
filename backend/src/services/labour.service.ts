@@ -102,28 +102,32 @@ export async function listLabour(filter: {
   let total = 0;
   let nextCursor: string | null = null;
   try {
-    const foundItems = await dbMutex.run(async () => {
-      return await Labour.find(query)
-        .sort({ _id: -1 })
-        .limit(effectiveLimit)
-        .lean()
-        .maxTimeMS(60_000);
-    });
-
+    const tDb = Date.now();
     if (!filter.cursor) {
-      try {
-        const foundTotal = await dbMutex.run(async () => {
-          return await Labour.countDocuments(query).maxTimeMS(30_000);
-        });
-        total = foundTotal;
-      } catch (countErr) {
-        console.warn("[listLabour] countDocuments failed (non-fatal):", (countErr as Error).message);
-        total = items.length;
-      }
+      const [foundItems, foundTotal] = await dbMutex.run(async () => {
+        const findPromise = Labour.find(query)
+          .sort({ _id: -1 })
+          .limit(effectiveLimit)
+          .lean()
+          .maxTimeMS(60_000);
+        const countPromise = Labour.estimatedDocumentCount(query).maxTimeMS(30_000);
+        return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
+      });
+      items = foundItems as unknown as LabourLike[];
+      total = foundTotal;
+      console.log(`[listLabour] dbMutex find+count dt=${Date.now() - tDb}ms items=${items.length} total=${total}`);
     } else {
+      const foundItems = await dbMutex.run(async () => {
+        return await Labour.find(query)
+          .sort({ _id: -1 })
+          .limit(effectiveLimit)
+          .lean()
+          .maxTimeMS(60_000);
+      });
+      items = foundItems as unknown as LabourLike[];
       total = filter.page * effectiveLimit;
+      console.log(`[listLabour] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
     }
-    items = foundItems as unknown as LabourLike[];
     // Emit nextCursor only when the page is full — a short page means
     // we've reached the end of the collection.
     if (items.length === effectiveLimit) {
