@@ -138,6 +138,15 @@ export class WorkspaceHydrationService {
    * the bottom of the table.
    */
   async loadNextPage(module: PageModule): Promise<boolean> {
+    if (module === "inventory") {
+      if (!this.loadedModules().has("materials")) await this.loadModule("materials");
+      const loaded = await this.loadNextPage("materials");
+      this.syncInventoryFromMaterials();
+      this.pageCursors.update(s => ({ ...s, inventory: s.materials ?? null }));
+      this.pageTotals.update(s => ({ ...s, inventory: s.materials ?? this.erp.materials().length }));
+      return loaded;
+    }
+
     const cursors = this.pageCursors();
     const nextCursor = cursors[module];
     // Already at the end — no more pages
@@ -289,6 +298,17 @@ export class WorkspaceHydrationService {
    * next page and total count for infinite scroll.
    */
   private async loadFirstPageByModule(module: PageModule): Promise<boolean> {
+    if (module === "inventory") {
+      if (!this.loadedModules().has("materials")) await this.loadModule("materials");
+      this.syncInventoryFromMaterials();
+      this.pageCursors.update(s => ({ ...s, inventory: s.materials ?? null }));
+      this.pageTotals.update(s => ({ ...s, inventory: s.materials ?? this.erp.materials().length }));
+      console.log(
+        `[loadFirstPage] inventory: ${this.erp.inventory().length} material-backed items, total=${this.pageTotals().inventory ?? 0}, nextPage=${this.pageCursors().inventory ?? "end"}`
+      );
+      return true;
+    }
+
     const result = await this.fetchPage(module, undefined);
     if (!result) return false;
 
@@ -464,6 +484,37 @@ export class WorkspaceHydrationService {
       return true;
     });
     return [...existing, ...uniqueNext];
+  }
+
+  private syncInventoryFromMaterials(): void {
+    const rows = this.erp.materials().map((m: any) => ({
+      _id: m._id,
+      id: m._id || m.id,
+      projectId: m.projectId,
+      projectName: m.projectName,
+      clientId: m.clientId,
+      siteId: m.siteId,
+      site: m.site,
+      siteKey: m.siteKey || m.siteId || m.site,
+      name: m.name,
+      normalizedName: m.normalizedName || String(m.name || "").trim().toLowerCase(),
+      unit: m.unit,
+      normalizedUnit: m.normalizedUnit || String(m.unit || "").trim().toLowerCase(),
+      requestedQuantity: m.requestedQuantity ?? m.requested ?? 0,
+      approvedQuantity: m.approvedQuantity ?? m.approved ?? 0,
+      purchasedQuantity: m.purchasedQuantity ?? m.purchased ?? 0,
+      consumedQuantity: m.consumedQuantity ?? m.consumed ?? 0,
+      remainingStock: m.remainingStock ?? Math.max(0, (m.purchasedQuantity ?? m.purchased ?? 0) - (m.consumedQuantity ?? m.consumed ?? 0)),
+      quantity: m.remainingStock ?? m.quantity ?? 0,
+      minimumQuantity: m.minimumQuantity ?? 0,
+      vendor: m.vendor,
+      poNumber: m.poNumber,
+      requestDate: m.updatedAt || m.requestDate || m.createdAt || "",
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+      customFields: m.customFields || {},
+    }));
+    this.erp.inventory.set(rows);
   }
 
   private persistSnapshot(): void {

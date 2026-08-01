@@ -33,7 +33,6 @@ class Semaphore {
         if (waited > 500) {
           console.log(`[dbMutex] queued ${waited}ms depth=${queueDepth}`);
         }
-        this.available--;
         fn()
           .then(resolve)
           .catch(reject)
