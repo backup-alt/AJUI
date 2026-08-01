@@ -641,6 +641,7 @@ export class RequestsPage implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set('');
     const items: RequestItem[] = [];
+    let failedRequests = 0;
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
     const siteFilter = { siteId: siteId || undefined, projectId: projectId || undefined };
@@ -667,6 +668,7 @@ export class RequestsPage implements OnInit {
           });
         }
       } catch (err) {
+        failedRequests++;
         console.error('[Requests] approved materials load failed', err);
       }
 
@@ -693,6 +695,7 @@ export class RequestsPage implements OnInit {
           });
         }
       } catch (err) {
+        failedRequests++;
         console.error('[Requests] other materials load failed (non-critical)', err);
       }
 
@@ -728,6 +731,7 @@ export class RequestsPage implements OnInit {
           });
         }
       } catch (err) {
+        failedRequests++;
         console.error('[Requests] expenses load failed', err);
       }
     } catch (err) {
@@ -735,6 +739,9 @@ export class RequestsPage implements OnInit {
       this.errorMessage.set((err as Error)?.message || 'Failed to load requests');
     }
 
+    if (failedRequests === 3) {
+      this.errorMessage.set('Unable to load requests. Please retry.');
+    }
     this.allItems.set(items);
     this.isLoading.set(false);
   }

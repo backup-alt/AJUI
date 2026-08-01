@@ -1166,7 +1166,9 @@ export class ApiService {
     if (cached) return of(cached);
 
     return this.http.get<T>(url, { headers: this.authHeaders() }).pipe(
-      tap((data) => this.cache.set(cacheKey, data, ttlMs)),
+      tap((data) => {
+        if (!this.isEmptyListResponse(data)) this.cache.set(cacheKey, data, ttlMs);
+      }),
       shareReplay(1),
       catchError(this.handleError)
     );
@@ -1182,6 +1184,14 @@ export class ApiService {
     } else {
       this.cache.clear();
     }
+  }
+
+  private isEmptyListResponse(data: unknown): boolean {
+    if (!data || typeof data !== "object") return false;
+    const response = data as Record<string, unknown>;
+    return ["items", "materials", "expenses", "labour"].some(
+      (key) => Array.isArray(response[key]) && response[key].length === 0
+    );
   }
 
   private authHeaders(): HttpHeaders {

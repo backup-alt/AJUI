@@ -4117,7 +4117,7 @@ const inventory = this.data.inventory().map((row) => ({
   }
 
   private mergeRowsByStableId<T extends Record<string, any>>(existing: T[], incoming: T[]): T[] {
-    const keyFor = (row: T) => String(row["id"] || row["_id"] || row["__rowId"] || "").trim();
+    const keyFor = (row: T) => String(row["_id"] || row["id"] || row["__rowId"] || "").trim();
     const existingByKey = new Map(existing.map((row) => [keyFor(row), row]));
     const output: T[] = [];
     const seen = new Set<string>();

@@ -417,9 +417,9 @@ export class WorkspaceHydrationService {
   }
 
   private appendUniqueRows<T extends Record<string, any>>(existing: T[], next: T[]): T[] {
-    const seen = new Set(existing.map((row) => String(row.id || row._id || "")));
+    const seen = new Set(existing.map((row) => String(row._id || row.id || "")));
     const uniqueNext = next.filter((row) => {
-      const key = String(row.id || row._id || "");
+      const key = String(row._id || row.id || "");
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;

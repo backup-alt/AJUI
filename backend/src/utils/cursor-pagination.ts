@@ -12,7 +12,7 @@ import { dbMutex } from "./db-mutex.js";
  *
  * Contract:
  * - Sort is fixed to `{ _id: -1 }` (descending) — newest first.
- * - Page size is `limit` (no lookahead, no +1, no slicing).
+ * - Page size is capped at 25 (no lookahead, no +1, no slicing).
  * - When the page is full (items.length === limit), a `nextCursor` is
  *   emitted containing the LAST item's _id. The next page must pass
  *   this back as the `cursor` parameter.
@@ -82,7 +82,8 @@ export async function paginateByCursor<T>(
   maxTimeMS = 60_000
 ): Promise<CursorPaginationResult<T>> {
   const page = Math.max(Number(opts.page) || 1, 1);
-  const limit = Math.min(Math.max(Number(opts.limit) || 25, 1), 100);
+  const limit = Math.min(Math.max(Number(opts.limit) || 25, 1), 25);
+  const skip = opts.cursor ? 0 : (page - 1) * limit;
 
   applyCursor(query, opts.cursor);
 
@@ -96,9 +97,9 @@ export async function paginateByCursor<T>(
     // doubled the wall-clock time and frequently exceeded the 60s
     // frontend timeout.
     const [items, total] = await dbMutex.run(async () => {
-      const findQuery = model.find(query as FilterQuery<any>).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(maxTimeMS);
+      const findQuery = model.find(query as FilterQuery<any>).sort({ _id: -1 }).skip(skip).limit(limit).lean().maxTimeMS(maxTimeMS);
       const findExec = select ? findQuery.select(select) : findQuery;
-      const countPromise = model.estimatedDocumentCount(query as FilterQuery<any>).maxTimeMS(30_000);
+      const countPromise = model.countDocuments(query as FilterQuery<any>).maxTimeMS(30_000);
       const [foundItems, foundTotal] = await Promise.all([
         findExec as unknown as Promise<T[]>,
         countPromise,

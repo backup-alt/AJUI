@@ -8,6 +8,7 @@ import { createApproval } from "./approval.service.js";
 import { CreateLabourInput } from "../schemas/financial.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { dbMutex } from "../utils/db-mutex.js";
+import { withRetry } from "../utils/retry.js";
 
 export async function createLabour(input: CreateLabourInput) {
   const project = await Project.findById(input.projectId);
@@ -97,33 +98,42 @@ export async function listLabour(filter: {
   }
 
   const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
+  const effectivePage = Math.max(filter.page || 1, 1);
+  const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
   type LabourLike = { [k: string]: unknown };
   let items: LabourLike[] = [];
   let total = 0;
   let nextCursor: string | null = null;
+  let queryFailed = false;
   try {
     const tDb = Date.now();
     if (!filter.cursor) {
-      const [foundItems, foundTotal] = await dbMutex.run(async () => {
-        const findPromise = Labour.find(query)
-          .sort({ _id: -1 })
-          .limit(effectiveLimit)
-          .lean()
-          .maxTimeMS(60_000);
-        const countPromise = Labour.estimatedDocumentCount(query).maxTimeMS(30_000);
-        return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
-      });
+      const [foundItems, foundTotal] = await dbMutex.run(() =>
+        withRetry(async () => {
+          const findPromise = Labour.find(query)
+            .sort({ _id: -1 })
+            .skip(skip)
+            .limit(effectiveLimit)
+            .lean()
+            .maxTimeMS(60_000);
+          const countPromise = Labour.countDocuments(query).maxTimeMS(30_000);
+          return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
+        }, { label: "listLabour.find+count" })
+      );
       items = foundItems as unknown as LabourLike[];
       total = foundTotal;
       console.log(`[listLabour] dbMutex find+count dt=${Date.now() - tDb}ms items=${items.length} total=${total}`);
     } else {
-      const foundItems = await dbMutex.run(async () => {
-        return await Labour.find(query)
-          .sort({ _id: -1 })
-          .limit(effectiveLimit)
-          .lean()
-          .maxTimeMS(60_000);
-      });
+      const foundItems = await dbMutex.run(() =>
+        withRetry(
+          () => Labour.find(query)
+            .sort({ _id: -1 })
+            .limit(effectiveLimit)
+            .lean()
+            .maxTimeMS(60_000),
+          { label: "listLabour.find" }
+        )
+      );
       items = foundItems as unknown as LabourLike[];
       total = filter.page * effectiveLimit;
       console.log(`[listLabour] dbMutex find dt=${Date.now() - tDb}ms items=${items.length}`);
@@ -140,14 +150,16 @@ export async function listLabour(filter: {
     console.error("[listLabour] query failed:", (err as Error).message);
     items = [];
     total = 0;
+    queryFailed = true;
   }
   return {
     items,
     total,
-    page: filter.page,
+    page: effectivePage,
     limit: effectiveLimit,
     pages: Math.ceil(total / effectiveLimit),
     nextCursor,
+    queryFailed,
   };
 }
 

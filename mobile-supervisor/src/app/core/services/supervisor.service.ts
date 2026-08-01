@@ -166,6 +166,7 @@ export class SupervisorService {
     labourType?: string;
     page?: number;
     limit?: number;
+    cursor?: string;
   }) {
     return this.api.get<WorkerListResponse>('/supervisor/workers', filters);
   }

@@ -171,6 +171,7 @@ export interface WorkerListResponse {
   page: number;
   limit: number;
   pages: number;
+  nextCursor: string | null;
 }
 
 export interface LabourTypeCount {

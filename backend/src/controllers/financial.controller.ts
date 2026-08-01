@@ -368,10 +368,14 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
       from: req.query.from as string | undefined,
       to: req.query.to as string | undefined,
       page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 20,
+      limit: Number(req.query.limit) || 25,
       cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
+    if (result.queryFailed) {
+      res.status(503).json({ error: "Labour is temporarily unavailable. Please retry.", ...result });
+      return;
+    }
     res.json(result);
   } catch (e) { next(e); }
 }
@@ -444,6 +448,10 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
       cursor: req.query.cursor as string | undefined,
       scopeProjectIds,
     });
+    if (result.queryFailed) {
+      res.status(503).json({ error: "Expenses are temporarily unavailable. Please retry.", ...result });
+      return;
+    }
     const dt = Date.now() - t0;
     console.log(
       `[listExpenses] dt=${dt}ms limit=${req.query.limit ?? "default"} items=${result.items?.length ?? 0} total=${result.total} scope=${scopeProjectIds?.length ?? "null"}`

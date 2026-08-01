@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent, IonSegment, IonSegmentButton, IonLabel,
-  IonFab, IonFabButton, IonIcon, IonSkeletonText,
+  IonFab, IonFabButton, IonIcon, IonSkeletonText, IonInfiniteScroll, IonInfiniteScrollContent,
   IonRefresher, IonRefresherContent, IonSearchbar,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
@@ -56,7 +56,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
   standalone: true,
   imports: [
     IonContent, IonSegment, IonSegmentButton, IonLabel,
-    IonFab, IonFabButton, IonIcon, IonSkeletonText,
+    IonFab, IonFabButton, IonIcon, IonSkeletonText, IonInfiniteScroll, IonInfiniteScrollContent,
     IonRefresher, IonRefresherContent, IonSearchbar,
     FormsModule, DatePipe, CurrencyPipe,
     EmptyStateComponent,
@@ -248,6 +248,16 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
             </ion-fab-button>
           </ion-fab>
         }
+      }
+
+      @if (activeTab === 'workers') {
+        <ion-infinite-scroll
+          threshold="200px"
+          [disabled]="!nextWorkerCursor() || isLoading() || isLoadingMore()"
+          (ionInfinite)="loadMoreWorkers($event)"
+        >
+          <ion-infinite-scroll-content loadingSpinner="dots"></ion-infinite-scroll-content>
+        </ion-infinite-scroll>
       }
     </ion-content>
   `,
@@ -532,6 +542,8 @@ export class LabourPage implements OnInit, OnDestroy {
   labourTypeCounts = signal<LabourTypeCount[]>([]);
   showWorkerSheet = signal(false);
   isLoading = signal(true);
+  isLoadingMore = signal(false);
+  nextWorkerCursor = signal<string | null>(null);
   searchQuery = signal('');
 
   filteredWorkers = computed<Worker[]>(() => {
@@ -602,16 +614,50 @@ export class LabourPage implements OnInit, OnDestroy {
       const projectId = this.supervisor.selectedProjectId();
 
       const [workersRes, attendanceRes] = await Promise.all([
-        this.supervisor.getWorkers({ siteId: siteId || undefined, limit: 25 }).toPromise(),
+        this.supervisor.getWorkers({
+          siteId: siteId || undefined,
+          projectId: projectId || undefined,
+          limit: 25,
+        }).toPromise(),
         this.supervisor.getAttendanceForDate(this.todayDate, siteId || undefined, projectId || undefined).toPromise(),
       ]);
 
       this.workers.set(workersRes?.items || []);
+      this.nextWorkerCursor.set(workersRes?.nextCursor ?? null);
       this.todayAttendance.set(attendanceRes?.attendances || []);
       this.isLoading.set(false);
     } catch (e) {
       console.error('[Labour] failed to load', e);
+      this.nextWorkerCursor.set(null);
       this.isLoading.set(false);
+    }
+  }
+
+  async loadMoreWorkers(event: CustomEvent): Promise<void> {
+    const cursor = this.nextWorkerCursor();
+    if (!cursor || this.isLoadingMore()) {
+      (event.target as HTMLIonInfiniteScrollElement).complete();
+      return;
+    }
+
+    this.isLoadingMore.set(true);
+    try {
+      const response = await this.supervisor.getWorkers({
+        siteId: this.supervisor.selectedSiteId() || undefined,
+        projectId: this.supervisor.selectedProjectId() || undefined,
+        limit: 25,
+        cursor,
+      }).toPromise();
+      const existing = this.workers();
+      const existingIds = new Set(existing.map((worker) => worker._id));
+      const appended = (response?.items || []).filter((worker) => !existingIds.has(worker._id));
+      this.workers.set([...existing, ...appended]);
+      this.nextWorkerCursor.set(response?.nextCursor ?? null);
+    } catch (error) {
+      console.error('[Labour] failed to load next workers page', error);
+    } finally {
+      this.isLoadingMore.set(false);
+      (event.target as HTMLIonInfiniteScrollElement).complete();
     }
   }
 

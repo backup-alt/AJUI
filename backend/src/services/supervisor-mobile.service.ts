@@ -556,15 +556,10 @@ export async function getSupervisorDashboard(
   const siteExpenseScope = { ...entityScope, type: "site" };
   const today = new Date().toISOString().slice(0, 10);
 
-  // Use indexed fields directly for counts when siteId is provided —
-  // avoids the slow entityScope spread on M0. When siteId is NOT provided,
-  // fall back to the scoped query (user-assigned sites).
-  const inventoryQuery = filters.siteId
-    ? { siteId: filters.siteId }
-    : { projectId: { $in: scopedAccess.access.projectIds }, siteId: { $in: scopedAccess.access.siteIds } };
-  const labourQuery = filters.siteId
-    ? { siteId: filters.siteId }
-    : { projectId: { $in: scopedAccess.access.projectIds } };
+  // Use the same resolved access scope as the list endpoints. Legacy
+  // supervisor assignments may be represented by names rather than site IDs.
+  const inventoryQuery = { ...entityScope };
+  const labourQuery = { ...entityScope };
   const pendingMaterialsQuery = filters.siteId
     ? { siteId: filters.siteId, status: "Pending" }
     : { ...entityScope, status: "Pending" };
@@ -763,7 +758,7 @@ export async function listMaterialsForSupervisor(
           ),
     ])).catch((err) => {
       console.error("[mobile.listMaterials] inventory query failed:", (err as Error).message);
-      return [[], 0] as [unknown[], number];
+      throw new AppError(503, "Inventory is temporarily unavailable. Please retry.");
     });
 
     // Batch-fetch billUrl for purchaseHistory entries across all items
@@ -834,7 +829,7 @@ export async function listMaterialsForSupervisor(
           ),
   ])).catch((err) => {
     console.error("[mobile.listMaterials] main query failed:", (err as Error).message);
-    return [[], 0] as [unknown[], number];
+    throw new AppError(503, "Materials are temporarily unavailable. Please retry.");
   });
 
   return {
@@ -938,7 +933,7 @@ export async function listExpensesForSupervisor(
           ),
   ])).catch((err) => {
     console.error("[mobile.listExpenses] main query failed:", (err as Error).message);
-    return [[], 0] as [unknown[], number];
+    throw new AppError(503, "Expenses are temporarily unavailable. Please retry.");
   });
 
   return {

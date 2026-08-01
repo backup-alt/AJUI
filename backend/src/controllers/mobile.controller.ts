@@ -155,13 +155,11 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
     });
     res.json(result);
   } catch (e) {
-    console.error("[mobile.listMaterials] failed, returning empty:", (e as Error).message);
-    res.status(200).json({
+    console.error("[mobile.listMaterials] failed:", (e as Error).message);
+    res.status(503).json({
+      error: "Materials are temporarily unavailable. Please retry.",
       materials: [],
-      total: 0,
-      limit: MOBILE_PAGE_SIZE,
-      pages: 0,
-      nextCursor: null,
+      pagination: { total: 0, limit: MOBILE_PAGE_SIZE, pages: 0, nextCursor: null },
     });
   }
 }
@@ -295,13 +293,11 @@ export async function listLabour(req: Request, res: Response, next: NextFunction
     });
     res.json(result);
   } catch (e) {
-    console.error("[mobile.listLabour] failed, returning empty:", (e as Error).message);
-    res.status(200).json({
+    console.error("[mobile.listLabour] failed:", (e as Error).message);
+    res.status(503).json({
+      error: "Labour is temporarily unavailable. Please retry.",
       labour: [],
-      total: 0,
-      limit: MOBILE_PAGE_SIZE,
-      pages: 0,
-      nextCursor: null,
+      pagination: { total: 0, limit: MOBILE_PAGE_SIZE, pages: 0, nextCursor: null },
     });
   }
 }
@@ -404,13 +400,11 @@ export async function listExpenses(req: Request, res: Response, next: NextFuncti
     const result = await mobileService.listExpensesForSupervisor(userId, filters);
     res.json(result);
   } catch (e) {
-    console.error("[mobile.listExpenses] failed, returning empty:", (e as Error).message);
-    res.status(200).json({
+    console.error("[mobile.listExpenses] failed:", (e as Error).message);
+    res.status(503).json({
+      error: "Expenses are temporarily unavailable. Please retry.",
       expenses: [],
-      total: 0,
-      limit: MOBILE_PAGE_SIZE,
-      pages: 0,
-      nextCursor: null,
+      pagination: { total: 0, limit: MOBILE_PAGE_SIZE, pages: 0, nextCursor: null },
     });
   }
 }
@@ -638,6 +632,7 @@ export async function listWorkers(req: Request, res: Response, next: NextFunctio
       projectId: req.query.projectId as string | undefined,
       siteId: req.query.siteId as string | undefined,
       labourType: req.query.labourType as string | undefined,
+      page: Number(req.query.page) || 1,
       limit: mobilePageLimit(req.query.limit),
       cursor: req.query.cursor as string | undefined,
     });

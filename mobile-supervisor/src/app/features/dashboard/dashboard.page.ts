@@ -772,6 +772,8 @@ export class DashboardPage implements OnInit, OnDestroy {
         .subscribe(() => void this.loadDashboard());
     }
 
+    await this.supervisor.init().catch(() => {});
+
     // Load all data; signal appReady when done
     const success = await this.loadDashboard();
     this.appReady.resolve(success);

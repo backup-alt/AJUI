@@ -12,6 +12,8 @@ import {
   IonSpinner,
   IonRefresher,
   IonRefresherContent,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -85,6 +87,8 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
     IonIcon,
     IonRefresher,
     IonRefresherContent,
+    IonInfiniteScroll,
+    IonInfiniteScrollContent,
     CurrencyPipe,
     EmptyStateComponent,
   ],
@@ -200,6 +204,14 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
           </button>
         }
       </div>
+
+      <ion-infinite-scroll
+        threshold="200px"
+        [disabled]="!nextCursor() || isLoading() || isLoadingMore()"
+        (ionInfinite)="loadMoreWorkers($event)"
+      >
+        <ion-infinite-scroll-content loadingSpinner="dots"></ion-infinite-scroll-content>
+      </ion-infinite-scroll>
     </ion-content>
   `,
   styles: [`
@@ -504,12 +516,14 @@ export class LabourWorkersPage implements OnInit {
   todayAttendance = signal<any[]>([]);
   todayDate = new Date().toISOString().slice(0, 10);
   isLoading = signal(true);
+  isLoadingMore = signal(false);
+  nextCursor = signal<string | null>(null);
   selectedSiteName = signal<string>('');
 
   markedWorkerIds = computed(() => new Set(this.todayAttendance().map(a => a.workerId)));
   hasWorkers = computed(() => this.workers().length > 0);
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     addIcons({
       chevronForwardOutline,
       personOutline,
@@ -533,6 +547,7 @@ export class LabourWorkersPage implements OnInit {
       checkmarkCircleOutline,
     });
 
+    await this.supervisor.init().catch(() => {});
     this.labourType.set(decodeURIComponent(this.route.snapshot.paramMap.get('type') || ''));
     this.selectedSiteName.set(this.supervisor.selectedSiteName() || '');
 
@@ -544,7 +559,7 @@ export class LabourWorkersPage implements OnInit {
       });
 
     if (this.labourType()) {
-      void this.loadWorkers();
+      await this.loadWorkers();
     }
   }
 
@@ -554,14 +569,14 @@ export class LabourWorkersPage implements OnInit {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
       const [workersRes, attendanceRes] = await Promise.all([
-        new Promise<{ items?: Worker[] }>((resolve) => {
+        new Promise<{ items?: Worker[]; nextCursor?: string | null }>((resolve) => {
           this.supervisor.getWorkers({
             siteId: siteId || undefined,
             projectId: projectId || undefined,
             labourType: this.labourType(),
           limit: 25,
           }).subscribe({
-            next: (r) => resolve(r as { items?: Worker[] }),
+            next: (r) => resolve(r as { items?: Worker[]; nextCursor?: string | null }),
             error: () => resolve({ items: [] }),
           });
         }),
@@ -573,13 +588,44 @@ export class LabourWorkersPage implements OnInit {
         }),
       ]);
       this.workers.set(workersRes.items || []);
+      this.nextCursor.set(workersRes.nextCursor ?? null);
       this.todayAttendance.set(attendanceRes.attendances || []);
     } catch (e) {
       console.error('[LabourWorkers] failed to load', e);
       this.workers.set([]);
+      this.nextCursor.set(null);
       this.todayAttendance.set([]);
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  async loadMoreWorkers(event: CustomEvent): Promise<void> {
+    const cursor = this.nextCursor();
+    if (!cursor || this.isLoadingMore()) {
+      (event.target as HTMLIonInfiniteScrollElement).complete();
+      return;
+    }
+
+    this.isLoadingMore.set(true);
+    try {
+      const response = await this.supervisor.getWorkers({
+        siteId: this.supervisor.selectedSiteId() || undefined,
+        projectId: this.supervisor.selectedProjectId() || undefined,
+        labourType: this.labourType(),
+        limit: 25,
+        cursor,
+      }).toPromise();
+      const existing = this.workers();
+      const existingIds = new Set(existing.map((worker) => worker._id));
+      const appended = (response?.items || []).filter((worker) => !existingIds.has(worker._id));
+      this.workers.set([...existing, ...appended]);
+      this.nextCursor.set(response?.nextCursor ?? null);
+    } catch (error) {
+      console.error('[LabourWorkers] failed to load next workers page', error);
+    } finally {
+      this.isLoadingMore.set(false);
+      (event.target as HTMLIonInfiniteScrollElement).complete();
     }
   }
 

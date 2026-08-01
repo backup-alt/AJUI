@@ -231,6 +231,7 @@ export async function listExpenses(filter: {
   let items: ExpenseLike[] = [];
   let total = 0;
   let nextCursor: string | null = null;
+  let queryFailed = false;
   try {
     const tDb = Date.now();
     if (!filter.cursor) {
@@ -288,6 +289,7 @@ export async function listExpenses(filter: {
     }
   } catch (err) {
     console.error("[listExpenses] main query failed, returning empty:", (err as Error).message);
+    queryFailed = true;
   }
   return {
     items,
@@ -296,6 +298,7 @@ export async function listExpenses(filter: {
     limit: effectiveLimit,
     pages: Math.ceil(total / effectiveLimit),
     nextCursor,
+    queryFailed,
   };
 }
 

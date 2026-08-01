@@ -103,6 +103,7 @@ export class ApiService {
   }
 
   private cacheGet(key: string, data: unknown): void {
+    if (this.isEmptyListResponse(data)) return;
     this.getCache.set(key, { data, expiresAt: Date.now() + GET_CACHE_TTL_MS });
     if (this.getCache.size > 200) {
       const oldestKey = this.getCache.keys().next().value;
@@ -112,6 +113,14 @@ export class ApiService {
 
   private clearGetCache(): void {
     this.getCache.clear();
+  }
+
+  private isEmptyListResponse(data: unknown): boolean {
+    if (!data || typeof data !== 'object') return false;
+    const response = data as Record<string, unknown>;
+    return ['items', 'materials', 'expenses', 'labour'].some(
+      (key) => Array.isArray(response[key]) && response[key].length === 0
+    );
   }
 
   /** Canonical HTTP error → AppError converter. */
