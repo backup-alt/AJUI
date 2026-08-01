@@ -139,12 +139,23 @@ export class WorkspaceHydrationService {
    */
   async loadNextPage(module: PageModule): Promise<boolean> {
     if (module === "inventory") {
-      if (!this.loadedModules().has("materials")) await this.loadModule("materials");
-      const loaded = await this.loadNextPage("materials");
-      this.syncInventoryFromMaterials();
-      this.pageCursors.update(s => ({ ...s, inventory: s.materials ?? null }));
-      this.pageTotals.update(s => ({ ...s, inventory: s.materials ?? this.erp.materials().length }));
-      return loaded;
+      if (this.loadingNextPage().inventory || this.loadingNextPage().materials) return false;
+
+      this.loadingNextPage.update(s => ({ ...s, inventory: true }));
+      try {
+        if (!this.loadedModules().has("materials")) await this.loadModule("materials");
+        if (!this.hasMorePages("materials")) {
+          this.syncInventoryFromMaterials();
+          this.syncInventoryPageState();
+          return false;
+        }
+        const loaded = await this.loadNextPage("materials");
+        this.syncInventoryFromMaterials();
+        this.syncInventoryPageState();
+        return loaded;
+      } finally {
+        this.loadingNextPage.update(s => ({ ...s, inventory: false }));
+      }
     }
 
     const cursors = this.pageCursors();
@@ -301,8 +312,7 @@ export class WorkspaceHydrationService {
     if (module === "inventory") {
       if (!this.loadedModules().has("materials")) await this.loadModule("materials");
       this.syncInventoryFromMaterials();
-      this.pageCursors.update(s => ({ ...s, inventory: s.materials ?? null }));
-      this.pageTotals.update(s => ({ ...s, inventory: s.materials ?? this.erp.materials().length }));
+      this.syncInventoryPageState();
       console.log(
         `[loadFirstPage] inventory: ${this.erp.inventory().length} material-backed items, total=${this.pageTotals().inventory ?? 0}, nextPage=${this.pageCursors().inventory ?? "end"}`
       );
@@ -333,14 +343,14 @@ export class WorkspaceHydrationService {
     module: PageModule,
     pageToken: string | undefined
   ): Promise<{ items: any[]; nextCursor: string | null; total: number } | null> {
-    const request = this.parsePageToken(pageToken);
+    const page = Math.max(Number(pageToken || 1) || 1, 1);
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const result = await this.fetchPageAttempt(module, request);
+      const result = await this.fetchPageAttempt(module, page);
       if (result) {
         const pages = Math.ceil(result.total / this.PAGE_SIZE);
-        const emptyExpectedPage = result.items.length === 0 && result.total > 0 && request.page <= pages;
+        const emptyExpectedPage = result.items.length === 0 && result.total > 0 && page <= pages;
         if (!emptyExpectedPage) return result;
-        console.warn(`[WorkspaceHydration] ${module} page ${request.page} returned empty while total=${result.total}; retry ${attempt}/3`);
+        console.warn(`[WorkspaceHydration] ${module} page ${page} returned empty while total=${result.total}; retry ${attempt}/3`);
       }
       if (attempt < 3) await this.delay(500 * attempt);
     }
@@ -349,11 +359,10 @@ export class WorkspaceHydrationService {
 
   private async fetchPageAttempt(
     module: PageModule,
-    request: { page: number; cursor?: string }
+    page: number
   ): Promise<{ items: any[]; nextCursor: string | null; total: number } | null> {
     const factory = this.apiFactoryForModule(module);
     if (!factory) return null;
-    const page = request.page;
 
     if (module === "expenses") {
       const [siteResponse, generalResponse] = await Promise.all([
@@ -385,7 +394,7 @@ export class WorkspaceHydrationService {
     }
 
     const response = await this.safeList(
-      () => factory({ limit: this.PAGE_SIZE, page, ...(request.cursor ? { cursor: request.cursor } : {}) }),
+      () => factory({ limit: this.PAGE_SIZE, page }),
       `${module}/page`
     );
     if (!response) return null;
@@ -393,26 +402,10 @@ export class WorkspaceHydrationService {
     const items = (response as any)?.items || [];
     const responsePage = (response as any)?.page ?? page;
     const pages = (response as any)?.pages ?? 0;
-    const backendCursor = (response as any)?.nextCursor;
     const nextPage = Number(responsePage) + 1;
-    const nextCursor = backendCursor
-      ? this.encodePageToken(nextPage, String(backendCursor))
-      : responsePage < pages ? String(nextPage) : null;
+    const nextCursor = responsePage < pages ? String(nextPage) : null;
     const total = (response as any)?.total ?? 0;
     return { items, nextCursor, total };
-  }
-
-  private parsePageToken(token: string | undefined): { page: number; cursor?: string } {
-    if (!token) return { page: 1 };
-    if (token.startsWith("cursor:")) {
-      const match = token.match(/^cursor:(.+):page:(\d+)$/);
-      if (match) return { cursor: match[1], page: Math.max(Number(match[2]) || 1, 1) };
-    }
-    return { page: Math.max(Number(token) || 1, 1) };
-  }
-
-  private encodePageToken(page: number, cursor: string): string {
-    return `cursor:${cursor}:page:${Math.max(page, 1)}`;
   }
 
   // =================== PRIVATE: HELPERS ===================
@@ -515,6 +508,13 @@ export class WorkspaceHydrationService {
       customFields: m.customFields || {},
     }));
     this.erp.inventory.set(rows);
+  }
+
+  private syncInventoryPageState(): void {
+    const materialCursor = this.pageCursors().materials ?? null;
+    const materialTotal = this.pageTotals().materials ?? this.erp.materials().length;
+    this.pageCursors.update(s => ({ ...s, inventory: materialCursor }));
+    this.pageTotals.update(s => ({ ...s, inventory: materialTotal }));
   }
 
   private persistSnapshot(): void {
