@@ -5,7 +5,7 @@
  * - Atlas M0 free tier is a shared cluster. When several queries hit it
  *   simultaneously, every query slows down because they all share the
  *   same CPU/RAM/connection budget.
- * - Limiting concurrency to 3 lets materials, inventory, and expenses
+ * - Limiting concurrency to 2 lets materials, inventory, and expenses
  *   each run one page at a time without saturating the cluster.
  *
  * No queue timeout — the frontend already has its own 60s RxJS timeout
@@ -13,7 +13,7 @@
  * that abort the cursor walk.
  */
 class Semaphore {
-  private available = 5;
+  private available = 2;
   private waiting: Array<() => void> = [];
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
