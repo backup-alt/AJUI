@@ -231,6 +231,7 @@ const dashboardModules: ModuleConfig[] = [
     title: "Inventory Summary",
     description: "Aggregated material stock by type across all sites with site-wise breakdown.",
     columns: [
+      { key: "site", label: "Site" },
       { key: "materialName", label: "Material" },
       { key: "totalQty", label: "Total Qty", type: "number" },
       { key: "unit", label: "Unit" },
@@ -345,35 +346,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded() && activeModule() !== 'vendors' && (selectedRowCount() > 0 || !isNoCreateModule())"
-                    [title]="selectedRowCount()
-                       ? 'Edit ' + selectedRowCount() + ' selected row(s)'
-                       : (activeModule() === 'inventory' ? 'Add materials' : 'Add row')"
-                    [attr.aria-label]="selectedRowCount()
-                       ? 'Edit ' + selectedRowCount() + ' selected row(s)'
-                       : (activeModule() === 'inventory' ? 'Add materials' : 'Add row')"
-                    (click)="selectedRowCount() ? editSelectedRows() : openRecordDialog()"
+                    *ngIf="!tableViewExpanded() && activeModule() !== 'vendors' && !isNoCreateModule()"
+                    [title]="activeModule() === 'inventory' ? 'Add materials' : 'Add row'"
+                    [attr.aria-label]="activeModule() === 'inventory' ? 'Add materials' : 'Add row'"
+                    (click)="openRecordDialog()"
                   >
-                    <ion-icon [name]="selectedRowCount() ? 'create-outline' : 'add-outline'"></ion-icon>
-                    {{ selectedRowCount()
-                       ? 'Edit ' + selectedRowCount() + ' Row(s)'
-                       : (activeModule() === 'inventory' ? 'Add Materials' : 'Add Row') }}
-                  </button>
-                  <button
-                    *ngIf="!tableViewExpanded() && selectedRowCount()"
-                    type="button"
-                    class="danger-table-action"
-                    [attr.aria-label]="'Delete ' + selectedRowCount() + ' selected row(s)'"
-                    (click)="deleteSelectedRows()"
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M4 7h14" />
-                      <path d="M10 11v6" />
-                      <path d="M14 11v6" />
-                      <path d="M6 7l1 14h10l1-14" />
-                      <path d="M9 7V4h6v3" />
-                    </svg>
-                    Delete {{ selectedRowCount() }} Row(s)
+                    <ion-icon name="add-outline"></ion-icon>
+                    {{ activeModule() === 'inventory' ? 'Add Materials' : 'Add Row' }}
                   </button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
@@ -538,14 +517,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <table>
                   <thead>
                     <tr>
-                      <th *ngIf="hasSelectedRows()" class="row-check-column">
-                        <input
-                          type="checkbox"
-                          [checked]="allVisibleRowsSelected()"
-                          aria-label="Select all visible rows"
-                          (click)="toggleVisibleRowsSelection($event)"
-                        />
-                      </th>
                       <th *ngFor="let column of tableState.columns; trackBy: trackColumn">
                         <span class="column-head-inner">
                           <span>{{ column.label }}</span>
@@ -562,70 +533,20 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <tbody>
                     <tr
                       *ngFor="let row of tableState.rows; trackBy: trackRow"
-                      class="selectable-data-row"
-                      [class.row-selected]="isRowSelected(row)"
-                      [class.row-editing]="isRowEditing(row)"
-                      (click)="selectRow(row, $event)"
                     >
-                      <td *ngIf="hasSelectedRows()" class="row-check-column">
-                        <input
-                          type="checkbox"
-                          [checked]="isRowChecked(row)"
-                          aria-label="Select row"
-                          (click)="toggleRowSelection(row, $event)"
-                        />
-                      </td>
                       <td
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
-                        [class.select-cell]="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeModule(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeModule() === 'labour' && column.key === 'labourTypes'"
                         spellcheck="false"
                       >
-                        <div
-                          *ngIf="first && selectedRowKey() === rowKey(row)"
-                          class="row-hover-toolbar"
-                          [style.left.px]="rowToolbarPosition().x"
-                          [style.top.px]="rowToolbarPosition().y"
-                          (click)="$event.stopPropagation()"
-                        >
-                          <button type="button" class="icon-row-action" aria-label="Edit row" title="Edit row" (click)="startRowEdit(row, $event)">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20Z" />
-                              <path d="m13.5 6 4.5 4.5" />
-                            </svg>
-                          </button>
-                          <button
-                            *ngIf="activeModule() === 'reports'"
-                            type="button"
-                            class="icon-row-action"
-                            aria-label="Download report"
-                            title="Download report"
-                            (click)="downloadReportRow(row)"
-                          >
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M12 4v10" />
-                              <path d="m8 10 4 4 4-4" />
-                              <path d="M5 20h14" />
-                            </svg>
-                          </button>
-                          <button type="button" class="icon-row-action danger" aria-label="Delete row" title="Delete row" (click)="deleteRow(row)">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M4 7h16" />
-                              <path d="M10 11v6" />
-                              <path d="M14 11v6" />
-                              <path d="M6 7l1 14h10l1-14" />
-                              <path d="M9 7V4h6v3" />
-                            </svg>
-                          </button>
-                        </div>
                         <ng-container *ngIf="activeModule() === 'labour' && column.key === 'labourTypes'; else standardDashboardCell">
                           <div class="labour-types-cell">
                             <div class="labour-type-chip-row" *ngIf="labourTypeCards(row).length; else emptyUniversalLabourTypes">
                               <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row)">
                                 <span>{{ type.type }}</span>
                                 <strong>{{ type.count }}</strong>
-                                <button *ngIf="isRowEditing(row)" type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type, $event)">
+                                <button type="button" aria-label="Remove labor type" title="Remove labor type" (click)="removeLabourType(row, type.type, $event)">
                                   <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                     <path d="m5.5 5.5 9 9" />
                                     <path d="m14.5 5.5-9 9" />
@@ -636,7 +557,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             <ng-template #emptyUniversalLabourTypes>
                               <span class="labour-type-empty">No labor types</span>
                             </ng-template>
-                            <button *ngIf="isRowEditing(row)" type="button" class="labour-type-add" (click)="openLabourTypeDialog(row)">
+                            <button type="button" class="labour-type-add" (click)="openLabourTypeDialog(row)">
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
                                 <path d="M10 4v12" />
                                 <path d="M4 10h12" />
@@ -646,66 +567,17 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           </div>
                         </ng-container>
                         <ng-template #standardDashboardCell>
-                          <div
-                            *ngIf="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeModule(), column.key).length > 0; else editableDashboardCell"
-                            class="erp-select-menu"
-                            [class.open]="isSelectMenuOpen(row, column.key)"
+                          <span
+                            class="editable-cell cell-readonly"
+                            spellcheck="false"
                           >
-                            <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
-                              <span>{{ displayCell(row, column.key) || 'Select' }}</span>
-                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                <path d="M5.5 7.5 10 12l4.5-4.5" />
-                              </svg>
-                            </button>
-                            <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
-                              <button
-                                *ngFor="let option of selectOptions(activeModule(), column.key)"
-                                type="button"
-                                [class.selected]="option === row[column.key]"
-                                (click)="selectCellOptionForRow(row, column.key, option)"
-                              >
-                                <span
-                                  class="select-option-icon"
-                                  *ngIf="selectOptionIcon(option) as icon"
-                                  [class.approve]="icon === 'approve'"
-                                  [class.decline]="icon === 'decline'"
-                                >
-                                  <svg *ngIf="icon === 'approve'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                    <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-                                  </svg>
-                                  <svg *ngIf="icon === 'decline'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                    <path d="m5.5 5.5 9 9" />
-                                    <path d="m14.5 5.5-9 9" />
-                                  </svg>
-                                </span>
-                                {{ option }}
-                              </button>
-                              <label class="custom-select-entry" *ngIf="allowsCustomOption(activeModule(), column.key)">
-                                <span>Custom</span>
-                                <input
-                                  #dashboardCustomValue
-                                  (keydown.enter)="saveCustomSelectOptionForRow(row, column.key, dashboardCustomValue.value, $event)"
-                                  placeholder="Type value and press Enter"
-                                />
-                              </label>
-                            </div>
-                          </div>
-                          <ng-template #editableDashboardCell>
-                            <span
-                              class="editable-cell"
-                              [class.cell-readonly]="!isRowEditing(row) || isReadonlyColumn(column.key)"
-                              [attr.contenteditable]="isRowEditing(row) && !isReadonlyColumn(column.key) ? 'true' : null"
-                              spellcheck="false"
-                              (blur)="isRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
-                            >
-                              {{ displayCell(row, column.key) }}
-                            </span>
-                          </ng-template>
+                            {{ displayCell(row, column.key) }}
+                          </span>
                         </ng-template>
                       </td>
                     </tr>
                     <tr #scrollSentinel *ngIf="hasMoreRows()">
-                      <td [attr.colspan]="tableState.columns.length + (hasSelectedRows() ? 1 : 0)" class="load-more-row">
+                      <td [attr.colspan]="tableState.columns.length" class="load-more-row">
                         <button *ngIf="!isLoadingNextPage()" type="button" class="load-more-btn" (click)="loadMoreRows()">
                           Show more
                         </button>
@@ -713,7 +585,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       </td>
                     </tr>
                     <tr *ngIf="tableState.rows.length === 0">
-                      <td class="empty-row" [attr.colspan]="tableState.columns.length + (hasSelectedRows() ? 1 : 0)">
+                      <td class="empty-row" [attr.colspan]="tableState.columns.length">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -1864,11 +1736,6 @@ export class UniversalDashboardPage implements OnInit {
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
   readonly activeModule = signal<DashboardModule>("clients");
-  readonly selectedRowKey = signal("");
-  readonly selectedRowKeys = signal<string[]>([]);
-  readonly editingRowKey = signal("");
-  readonly editingRowKeys = signal<string[]>([]);
-  readonly rowToolbarPosition = signal({ x: 160, y: 120 });
   readonly searchText = signal("");
   readonly activeSite = signal("All");
   readonly selectedFilters = signal<Record<string, string>>({});
@@ -1912,7 +1779,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
-  readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inventory(), this.activeSiteFilter()));
+readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inventory(), this.activeSiteFilter(), this.selectedFilters(), this.searchText()));
   readonly selectedInventoryCard = signal<{ siteKey: string; siteName: string; materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
   readonly inventoryBreakdownRows = computed(() => {
     const card = this.selectedInventoryCard();
@@ -2126,7 +1993,6 @@ export class UniversalDashboardPage implements OnInit {
     this.serverSearchResults.set(null);
     this.resetFilterState();
     this.closeDropdowns();
-    this.clearRowSelection();
 
     // Load only the specific module's data if not already loaded.
     // Don't refresh everything — that was causing 429 errors.
@@ -2145,7 +2011,51 @@ export class UniversalDashboardPage implements OnInit {
     }
   }
 
-  private aggregateInventory(materials: any[], siteFilter?: string) {
+/**
+   * Dedicated Material table refresh — bypasses refreshFromBackend's
+   * debounce and unconditionally hits GET /materials to update the
+   * materials signal + localStorage. Mirrors the pattern from commit
+   * b754d2f where a dedicated sites refresh was added so the inventory
+   * modal always had fresh data.
+   *
+   * Empty-array guard: the backend falls back to { items: [] } on M0
+   * timeout. We never overwrite the signal with an empty array or the
+   * table silently empties out on every tab switch.
+   *
+   * NOTE: we deliberately do NOT guard against "backend returned fewer
+   * items than existing signal" because that case is exactly the bug
+   * the user is hitting — localStorage has 4 stale entries and we want
+   * the fresh backend response (even if it equals 4, but usually 59)
+   * to overwrite. The only thing we skip on is empty.
+   */
+  private refreshMaterialsForTable() {
+    // Single-shot refresh via the new /materials/all endpoint — returns
+    // every row in one HTTP call, no cursor pagination.
+    void this.hydration.refreshFromBackend();
+  }
+
+  /**
+   * Dedicated Expense table refresh — single-shot refresh via the new
+   * /expenses/all endpoint.
+   */
+  private refreshExpensesForTable() {
+    void this.hydration.refreshFromBackend();
+  }
+
+  /**
+   * Dedicated Inventory table refresh — single-shot refresh via the new
+   * /inventory/all endpoint.
+   */
+  private refreshInventoryForTable() {
+    void this.hydration.refreshFromBackend();
+  }
+
+  private aggregateInventory(
+    materials: any[],
+    siteFilter?: string,
+    filters?: Record<string, string>,
+    searchText?: string,
+  ) {
     const filtered = (siteFilter && siteFilter !== "All")
       ? materials.filter((m) => m.site && m.site.toLowerCase() === siteFilter.toLowerCase())
       : materials;
@@ -2169,7 +2079,7 @@ export class UniversalDashboardPage implements OnInit {
       if (updatedAt && updatedAt > existing.lastUpdated) existing.lastUpdated = updatedAt;
       map.set(key, existing);
     }
-    return [...map.values()].map((v) => {
+let cards = [...map.values()].map((v) => {
       return {
         siteKey: v.siteName.toLowerCase(),
         siteName: v.siteName,
@@ -2179,7 +2089,19 @@ export class UniversalDashboardPage implements OnInit {
         siteCount: v.siteCount,
         lastUpdated: v.lastUpdated,
       };
-    }).sort((a, b) => {
+    });
+    const query = (searchText || "").trim().toLowerCase();
+    if (query) {
+      cards = cards.filter((c) => Object.values(c).some((v) => String(v).toLowerCase().includes(query)));
+    }
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) {
+        if (!value) continue;
+        const needle = value.trim().toLowerCase();
+        cards = cards.filter((c) => String((c as any)[key] ?? "").toLowerCase().includes(needle));
+      }
+    }
+    return cards.sort((a, b) => {
       const siteCmp = (a.siteName || "").localeCompare(b.siteName || "");
       if (siteCmp !== 0) return siteCmp;
       return a.materialName.localeCompare(b.materialName);
@@ -2471,259 +2393,6 @@ export class UniversalDashboardPage implements OnInit {
 
   trackColumn = (_index: number, column: FieldSchema): string => column.key;
 
-  selectRow(row: TableRow, event?: MouseEvent) {
-    this.positionRowToolbar(event);
-    const key = this.rowKey(row);
-    const wasSelected = this.selectedRowKeys().includes(key);
-    if (wasSelected && this.selectedRowKey() === key) {
-      this.clearRowSelection();
-      return;
-    }
-    this.selectedRowKeys.set([key]);
-    this.selectedRowKey.set(key);
-    if (this.selectedRowKey() !== key || !wasSelected) {
-      this.editingRowKey.set("");
-      this.editingRowKeys.set([]);
-      this.openSelectKey.set("");
-    }
-  }
-
-  private positionRowToolbar(event?: MouseEvent) {
-    const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
-    const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
-    const toolbarWidth = 126;
-    const toolbarHeight = 44;
-    const margin = 12;
-    const rawX = event ? event.clientX + 12 : viewportWidth - toolbarWidth - 32;
-    const rawY = event ? event.clientY - toolbarHeight - 10 : 132;
-    this.rowToolbarPosition.set({
-      x: Math.min(Math.max(rawX, margin), viewportWidth - toolbarWidth - margin),
-      y: Math.min(Math.max(rawY, margin), viewportHeight - toolbarHeight - margin),
-    });
-  }
-
-  isRowSelected(row: TableRow): boolean {
-    const key = this.rowKey(row);
-    return this.selectedRowKey() === key || this.selectedRowKeys().includes(key);
-  }
-
-  isRowEditing(row: TableRow): boolean {
-    const key = this.rowKey(row);
-    return this.editingRowKey() === key || this.editingRowKeys().includes(key);
-  }
-
-  selectedRowCount(): number {
-    return this.selectedRowKeys().length;
-  }
-
-  hasSelectedRows(): boolean {
-    return this.selectedRowCount() > 0;
-  }
-
-  isRowChecked(row: TableRow): boolean {
-    return this.selectedRowKeys().includes(this.rowKey(row));
-  }
-
-  toggleRowSelection(row: TableRow, event?: Event) {
-    event?.stopPropagation();
-    const key = this.rowKey(row);
-    if (this.selectedRowKeys().includes(key)) {
-      this.clearRowSelection();
-    } else {
-      this.selectedRowKeys.set([key]);
-      this.selectedRowKey.set(key);
-    }
-    this.editingRowKey.set("");
-    this.editingRowKeys.set([]);
-    this.openSelectKey.set("");
-  }
-
-  allVisibleRowsSelected(): boolean {
-    const rows = this.visibleRows();
-    if (!rows.length) return false;
-    const selected = new Set(this.selectedRowKeys());
-    return rows.every((row) => selected.has(this.rowKey(row)));
-  }
-
-  toggleVisibleRowsSelection(event?: Event) {
-    event?.stopPropagation();
-    if (this.hasSelectedRows()) {
-      this.clearRowSelection();
-    }
-  }
-
-  private selectedRows(): TableRow[] {
-    const selected = new Set(this.selectedRowKeys());
-    const module = this.activeModule();
-    const allRows = this.withComputedRows(module, this.rowsFor(module));
-    return allRows.filter((row) => selected.has(this.rowKey(row)));
-  }
-
-  editSelectedRows() {
-    const rows = this.selectedRows();
-    if (!rows.length) {
-      this.openRecordDialog();
-      return;
-    }
-    const keys = rows.map((row) => this.rowKey(row));
-    // Sync single-key state with multi-key
-    this.selectedRowKeys.set(keys);
-    this.selectedRowKey.set(keys[0] ?? "");
-    // Enable inline editing on ALL selected rows simultaneously.
-    // The template uses [attr.contenteditable] bound to isRowEditing(row),
-    // which checks editingRowKeys.includes(key). Setting it here makes every
-    // selected cell editable in-place.
-    this.editingRowKey.set(keys[0] ?? "");
-    this.editingRowKeys.set(keys);
-    // When exactly one row is selected we still open the standard dialog
-    // (single-row create/edit flow). For 2+ rows we rely on inline editing.
-    if (rows.length === 1) {
-      this.openRecordEditDialog(keys[0]);
-    }
-    // For bulk: nothing else to open — the inline editors are now active.
-  }
-
-  async deleteSelectedRows() {
-    const rows = this.selectedRows();
-    if (!rows.length) return;
-    const label = rows.length === 1 ? "this row" : `${rows.length} rows`;
-    if (!window.confirm(`Delete ${label}? This will permanently delete them from the backend.`)) return;
-    const module = this.activeModule();
-
-    // Map of module → API delete function
-    const apiDeleters: Record<string, ((id: string) => any) | null> = {
-      clients: (id) => this.api.deleteClient(id),
-      materials: (id) => this.api.deleteMaterial(id),
-      labour: (id) => this.api.deleteLabour(id),
-      expenses: (id) => this.api.deleteExpense(id),
-      payments: (id) => this.api.deletePayment(id),
-      vendors: (id) => this.api.deleteVendor(id),
-      subcontractors: (id) => this.api.deleteSubcontractor(id),
-    };
-
-    // Map of module → data signal (replaces localStorageKeys)
-    const dataSignals: Record<string, any> = {
-      clients: this.data.clients,
-      materials: this.data.materials,
-      labour: this.data.labour,
-      expenses: this.data.expenses,
-      generalExpenses: this.data.expenses,
-      payments: this.data.payments,
-      vendors: this.data.vendors,
-      subcontractors: this.data.subcontractors,
-    };
-
-    // Map of module → ID field used as business key
-    const idFields: Record<string, string> = {
-      clients: "id",
-      materials: "id",
-      labour: "id",
-      expenses: "id",
-      generalExpenses: "id",
-      payments: "id",
-      vendors: "id",
-      subcontractors: "id",
-    };
-
-    const apiDelete = apiDeleters[module];
-    const dataSignal = dataSignals[module];
-    const idField = idFields[module];
-    const failed: string[] = [];
-    let deleted = 0;
-
-    // Build bizId → _id lookup from the live signal so we can resolve
-    // MongoDB _id when the row only carries the business ID.
-    const bizIdToMongoId = new Map<string, string>();
-    if (dataSignal) {
-      try {
-        for (const r of dataSignal() as any[]) {
-          const bid = String(r[idField] || r["materialId"] || r["labourId"] || r["vendorId"] || r["clientId"] || "").trim();
-          const mid = String(r["_id"] || "").trim();
-          if (bid && mid) bizIdToMongoId.set(bid, mid);
-        }
-      } catch {}
-    }
-
-    console.log(`[Delete] Starting delete of ${rows.length} ${module} rows`, rows.map((r) => ({ _id: r["_id"], id: r[idField], __rowId: r["__rowId"] })));
-    console.log(`[Delete] bizId→_id lookup has ${bizIdToMongoId.size} entries from data signal`);
-
-    for (const row of rows) {
-      let mongoId = String(row["_id"] || "").trim();
-      const bizId = String(row[idField] || "").trim();
-
-      // If _id is missing on the row, look it up from the live signal
-      if (!mongoId && bizId && bizIdToMongoId.has(bizId)) {
-        mongoId = bizIdToMongoId.get(bizId)!;
-        console.log(`[Delete] Resolved _id=${mongoId} for bizId=${bizId} via fallback lookup`);
-      }
-
-      if (!mongoId && !bizId) {
-        console.warn(`[Delete] Skipping row — no _id or ${idField}`, row);
-        failed.push(bizId || "(no id)");
-        continue;
-      }
-      try {
-        if (apiDelete && mongoId) {
-          console.log(`[Delete] Calling DELETE ${module}/${mongoId} for bizId=${bizId}`);
-          await firstValueFrom(apiDelete(mongoId));
-          console.log(`[Delete] SUCCESS for ${bizId} (_id=${mongoId})`);
-        } else if (apiDelete && !mongoId) {
-          console.warn(`[Delete] No _id for ${bizId} — skipping backend delete`);
-        }
-        // Optimistic signal removal by business ID (no localStorage)
-        if (dataSignal && bizId) {
-          try {
-            dataSignal.update((arr: any[]) => arr.filter((r: any) => String(r[idField] || "") !== bizId));
-          } catch {}
-        }
-        deleted++;
-      } catch (e: any) {
-        console.error(`[Delete] FAILED for ${bizId} (_id=${mongoId}):`, e?.error?.message || e?.message || e);
-        failed.push(bizId);
-      }
-    }
-
-    console.log(`[Delete] Result: ${deleted}/${rows.length} deleted from ${module}`, failed.length ? `(failed: ${failed.join(", ")})` : "(all succeeded)");
-
-    if (failed.length) {
-      this.backendSyncMessage.set(`Deleted ${deleted}, failed ${failed.length}: ${failed[0]}${failed.length > 1 ? "…" : ""}`);
-      setTimeout(() => this.backendSyncMessage.set(null), 5000);
-    } else {
-      this.backendSyncMessage.set(`Deleted ${deleted} ${module} row(s)`);
-      setTimeout(() => this.backendSyncMessage.set(null), 3000);
-    }
-
-    this.clearRowSelection();
-
-    // Refresh from backend so the table re-renders without the deleted rows
-    if (deleted > 0) {
-      try { this.refreshFromBackend(); } catch {}
-    }
-  }
-
-  /** Open edit dialog for a single row (used by editSelectedRows) */
-  openRecordEditDialog(_key: string) {
-    // For a single-row edit, open the standard record dialog.
-    // The dialog is wired up to update the row on save.
-    this.openRecordDialog();
-  }
-
-  /** Open bulk-edit dialog for multiple selected rows */
-  openBulkEditDialog() {
-    // Bulk editing is handled inline via contenteditable cells.
-    // This method exists for future expansion (e.g., a modal for batch field updates).
-    // Currently a no-op so callers don't break.
-  }
-
-  startRowEdit(row: TableRow, event?: Event) {
-    event?.stopPropagation();
-    const key = this.rowKey(row);
-    this.selectedRowKey.set(key);
-    this.selectedRowKeys.set([key]);
-    this.editingRowKey.set(key);
-    this.editingRowKeys.set([key]);
-  }
-
   // ============ Backend sync (data source of truth) ============
   refreshFromBackend() {
     if (this.backendSyncing()) return;
@@ -2776,20 +2445,13 @@ export class UniversalDashboardPage implements OnInit {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions, .universal-filter-bar, .filter-dialog, .date-filter-panel, .site-workbench")) {
-      this.clearRowSelection();
+    if (!target.closest(".table-actions, .universal-filter-bar, .filter-dialog, .date-filter-panel, .site-workbench")) {
+      // Row selection has been removed — no state to clear here.
     }
 
     if (!target.closest(".erp-select-menu, .filter-select-shell, .custom-select-entry, .filter-combo-field, .date-filter-panel")) {
       this.closeDropdowns();
     }
-  }
-
-  private clearRowSelection() {
-    this.selectedRowKey.set("");
-    this.selectedRowKeys.set([]);
-    this.editingRowKey.set("");
-    this.editingRowKeys.set([]);
   }
 
   private closeDropdowns() {
@@ -2921,7 +2583,6 @@ visibleRows(): TableRow[] {
   selectUniversalSite(siteId: string) {
     this.activeSite.set(siteId);
     this.closeDropdowns();
-    this.clearRowSelection();
   }
 
   isFilterMenuOpen(key: string): boolean {
@@ -3024,7 +2685,6 @@ visibleRows(): TableRow[] {
     this.resetFilterState();
     this.searchText.set("");
     this.closeDropdowns();
-    this.clearRowSelection();
   }
 
   private resetFilterState() {
@@ -3231,7 +2891,6 @@ visibleRows(): TableRow[] {
     this.filterBuilderOpen.set(false);
     this.dateFilterOpen.set(false);
     this.activeFilterValueKey.set("");
-    this.clearRowSelection();
   }
 
   closeTableView() {
@@ -3406,15 +3065,9 @@ visibleRows(): TableRow[] {
   }
 
   addInlineRow(event?: MouseEvent) {
-    this.positionRowToolbar(event);
     const module = this.activeModule();
     if (module === "clients") {
-      const client = this.data.addClient({ name: "New Client", mobile: "", address: "", supervisor: "Unassigned" });
-      const key = `${module}:client:${client.id}`;
-      this.selectedRowKey.set(key);
-      this.selectedRowKeys.set([key]);
-      this.editingRowKey.set(key);
-      this.editingRowKeys.set([key]);
+      this.data.addClient({ name: "New Client", mobile: "", address: "", supervisor: "Unassigned" });
       return;
     }
     if (module === "vendors") {
@@ -3422,12 +3075,7 @@ visibleRows(): TableRow[] {
       this.showVendorDialog.set(true);
       return;
     }
-    const row = this.data.addCustomRow(module, this.defaultRowFor(module));
-    const key = `${module}:${row["__rowId"]}`;
-    this.selectedRowKey.set(key);
-    this.selectedRowKeys.set([key]);
-    this.editingRowKey.set(key);
-    this.editingRowKeys.set([key]);
+    this.data.addCustomRow(module, this.defaultRowFor(module));
   }
 
   updateDraftField(key: string, value: string) {
@@ -3817,70 +3465,6 @@ visibleRows(): TableRow[] {
     if (wageField) this.data.updateSharedRowCell(rowId, wageField.key, "");
   }
 
-  async deleteRow(row: TableRow) {
-    const key = this.rowKey(row);
-    const module = this.activeModule();
-    if (!window.confirm("Delete this row? This will permanently delete it from the backend.")) return;
-
-    const apiDeleters: Record<string, ((id: string) => any) | null> = {
-      clients: (id) => this.api.deleteClient(id),
-      materials: (id) => this.api.deleteMaterial(id),
-      labour: (id) => this.api.deleteLabour(id),
-      expenses: (id) => this.api.deleteExpense(id),
-      payments: (id) => this.api.deletePayment(id),
-      vendors: (id) => this.api.deleteVendor(id),
-      subcontractors: (id) => this.api.deleteSubcontractor(id),
-    };
-    const dataSignals: Record<string, any> = {
-      clients: this.data.clients,
-      materials: this.data.materials,
-      labour: this.data.labour,
-      expenses: this.data.expenses,
-      generalExpenses: this.data.expenses,
-      payments: this.data.payments,
-      vendors: this.data.vendors,
-      subcontractors: this.data.subcontractors,
-    };
-    const idFields: Record<string, string> = {
-      clients: "id", materials: "id", labour: "id", expenses: "id",
-      generalExpenses: "id", payments: "id", vendors: "id", subcontractors: "id",
-    };
-
-    const apiDelete = apiDeleters[module];
-    const dataSignal = dataSignals[module];
-    const idField = idFields[module];
-    const bizId = String(row[idField] || "").trim();
-    let mongoId = String(row["_id"] || "").trim();
-
-    if (!mongoId && bizId && dataSignal) {
-      try {
-        const match = dataSignal().find((r: any) => String(r[idField] || "") === bizId);
-        if (match?._id) mongoId = String(match._id);
-      } catch {}
-    }
-
-    try {
-      if (apiDelete && mongoId) await firstValueFrom(apiDelete(mongoId));
-      if (dataSignal && bizId) {
-        try {
-          dataSignal.update((arr: any[]) => arr.filter((r: any) => String(r[idField] || "") !== bizId));
-        } catch {}
-      }
-      this.backendSyncMessage.set(`Deleted 1 ${module} row`);
-      setTimeout(() => this.backendSyncMessage.set(null), 3000);
-    } catch (e: any) {
-      this.backendSyncMessage.set(`Delete failed: ${e?.error?.message || e?.message || "unknown error"}`);
-      setTimeout(() => this.backendSyncMessage.set(null), 5000);
-    }
-
-    this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
-    if (this.selectedRowKey() === key) this.selectedRowKey.set("");
-    if (this.editingRowKey() === key) this.editingRowKey.set("");
-    this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
-
-    try { this.refreshFromBackend(); } catch {}
-  }
-
   exportExcel() {
     const columns = this.columnsForActive();
     const rows = this.visibleRows();
@@ -4154,6 +3738,7 @@ const inventory = this.data.inventory().map((row) => ({
   private rowsFor(module: DashboardModule): TableRow[] {
     if (module === "inventory") {
       return this.inventoryCards().map((card) => ({
+        site: card.siteName,
         materialName: card.materialName,
         totalQty: card.totalQty,
         unit: card.unit,
