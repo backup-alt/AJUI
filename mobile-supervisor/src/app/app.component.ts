@@ -34,12 +34,10 @@ export class AppComponent implements OnInit {
     await this.auth.init();
 
     if (this.auth.isAuthenticated()) {
-      try {
-        // 2. Fetch supervisor sites, auto-select first site
-        await this.auth.initAfterLogin();
-      } catch {
-        // network may be down; continue — dashboard will show error state
-      }
+      // 2. Fetch supervisor sites, auto-select first site
+      // Fire-and-forget: don't block the splash screen on network calls.
+      // If the backend is sleeping (Render.com), this could take 30+ seconds.
+      void this.auth.initAfterLogin();
     }
 
     // 3. Hydrate selected site from Preferences
@@ -52,7 +50,12 @@ export class AppComponent implements OnInit {
 
     if (this.notifications.pushEnabled()) {
       try {
-        await this.notifications.requestPermission();
+        // PushNotifications.requestPermissions() can hang on some devices.
+        // Race it against a short timeout so the splash always hides.
+        await Promise.race([
+          this.notifications.requestPermission(),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
+        ]);
       } catch {
         // ignore
       }

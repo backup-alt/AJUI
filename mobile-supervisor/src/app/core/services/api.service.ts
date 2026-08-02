@@ -56,7 +56,7 @@ export class ApiService {
         tap((data) => this.cacheGet(cacheKey, data)),
         catchError((err) => throwError(() => this.toAppError(err))),
         finalize(() => this.inFlightGets.delete(cacheKey)),
-        shareReplay({ bufferSize: 1, refCount: false })
+        shareReplay({ bufferSize: 1, refCount: true })
       );
     this.inFlightGets.set(cacheKey, request as Observable<unknown>);
     return request;

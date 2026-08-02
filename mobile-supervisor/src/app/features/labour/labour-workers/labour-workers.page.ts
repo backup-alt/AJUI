@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent,
@@ -506,6 +506,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
   `],
 })
 export class LabourWorkersPage implements OnInit {
+  private destroyRef = inject(DestroyRef);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private supervisor = inject(SupervisorService);
@@ -552,7 +553,7 @@ export class LabourWorkersPage implements OnInit {
     this.selectedSiteName.set(this.supervisor.selectedSiteName() || '');
 
     this.supervisor.siteChanged$
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         this.selectedSiteName.set(this.supervisor.selectedSiteName() || '');
         void this.loadWorkers();

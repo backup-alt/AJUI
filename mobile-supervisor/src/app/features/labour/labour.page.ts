@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent, IonSegment, IonSegmentButton, IonLabel,
@@ -531,6 +531,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
   `],
 })
 export class LabourPage implements OnInit, OnDestroy {
+  private destroyRef = inject(DestroyRef);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -589,7 +590,7 @@ export class LabourPage implements OnInit, OnDestroy {
     await this.loadData();
 
     this.supervisor.siteChanged$
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => void this.loadData());
 
     if (typeof window !== 'undefined') {

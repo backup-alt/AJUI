@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent, IonSearchbar,
@@ -332,6 +332,7 @@ import {
   `],
 })
 export class ExpensesPage implements OnInit {
+  private destroyRef = inject(DestroyRef);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -386,7 +387,7 @@ export class ExpensesPage implements OnInit {
     await this.loadExpenses();
 
     this.supervisor.siteChanged$
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         this.selectedSiteName.set(this.supervisor.selectedSiteName());
         void this.loadExpenses();

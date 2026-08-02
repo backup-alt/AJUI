@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -623,7 +623,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
 
     :host ::ng-deep .action-sheet-modal {
-      --backdrop-opacity: 0.4;
+      --backdrop-opacity: 0;
       --width: 100%;
       --max-width: 480px;
       --height: auto;
@@ -669,6 +669,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
   `],
 })
 export class InventoryPage implements OnInit, OnDestroy {
+  private destroyRef = inject(DestroyRef);
   private supervisor = inject(SupervisorService);
   private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
@@ -755,7 +756,7 @@ export class InventoryPage implements OnInit, OnDestroy {
     await this.loadInventory();
 
     this.supervisor.siteChanged$
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => void this.loadInventory());
 
     if (typeof window !== 'undefined') {
@@ -937,6 +938,7 @@ export class InventoryPage implements OnInit, OnDestroy {
       breakpoints: [0, 0.5, 0.7],
       initialBreakpoint: 0.5,
       handle: false,
+      showBackdrop: false,
     });
     await modal.present();
     const { data } = await modal.onDidDismiss();

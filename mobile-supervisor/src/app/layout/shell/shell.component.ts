@@ -118,6 +118,10 @@ import { Site } from '../../shared/models';
             <ion-icon name="grid-outline" slot="start"></ion-icon>
             <ion-label>Inventory</ion-label>
           </ion-item>
+          <ion-item routerLink="/tabs/materials" routerLinkActive="selected" button detail="false">
+            <ion-icon name="cube-outline" slot="start"></ion-icon>
+            <ion-label>Materials</ion-label>
+          </ion-item>
           <ion-item routerLink="/tabs/labour" routerLinkActive="selected" button detail="false">
             <ion-icon name="people-outline" slot="start"></ion-icon>
             <ion-label>Labour</ion-label>

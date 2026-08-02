@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent,
@@ -714,6 +714,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private router = inject(Router);
   private appReady = inject(AppReadyService);
+  private destroyRef = inject(DestroyRef);
 
   dashboard = signal<DashboardData | null>(null);
   sites = signal<Site[]>([]);
@@ -769,7 +770,7 @@ export class DashboardPage implements OnInit, OnDestroy {
 
     if (typeof window !== 'undefined') {
       this.supervisor.siteChanged$
-        .pipe(takeUntilDestroyed())
+        .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(() => void this.loadDashboard(true, true));
     }
 

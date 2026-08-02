@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -15,6 +15,8 @@ import {
   IonRefresherContent,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
+  IonSelect,
+  IonSelectOption,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -54,6 +56,8 @@ interface ConsolidatedMaterial {
   lowStock: boolean;
 }
 
+type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
+
 @Component({
   selector: 'app-materials',
   standalone: true,
@@ -72,6 +76,8 @@ interface ConsolidatedMaterial {
     IonRefresherContent,
     IonInfiniteScroll,
     IonInfiniteScrollContent,
+    IonSelect,
+    IonSelectOption,
     DatePipe,
     PageHeaderComponent,
     EmptyStateComponent,
@@ -93,12 +99,12 @@ interface ConsolidatedMaterial {
       <div class="filter-stack">
         <ion-searchbar
           placeholder="Search by material, site, vendor"
-          [(ngModel)]="searchQuery"
-          (ionInput)="filterMaterials()"
+          [ngModel]="searchQuery"
+          (ngModelChange)="onSearchChange($event)"
           class="search"
         ></ion-searchbar>
         <div class="seg-wrap">
-          <ion-segment [(ngModel)]="statusFilter" (ionChange)="filterMaterials()" [value]="''">
+          <ion-segment [(ngModel)]="statusFilter" (ionChange)="onStatusChange($event.detail.value)" [value]="'Approved'">
             <ion-segment-button [value]="''">
               <ion-label>All</ion-label>
             </ion-segment-button>
@@ -109,6 +115,20 @@ interface ConsolidatedMaterial {
               <ion-label>Approved</ion-label>
             </ion-segment-button>
           </ion-segment>
+        </div>
+        <div class="filter-row">
+          <ion-select
+            class="stock-filter"
+            aria-label="Stock filter"
+            interface="popover"
+            [ngModel]="stockFilter"
+            (ionChange)="onStockFilterChange($event.detail.value)"
+          >
+            <ion-select-option value="all">All stock</ion-select-option>
+            <ion-select-option value="available">Available</ion-select-option>
+            <ion-select-option value="low">Low stock</ion-select-option>
+            <ion-select-option value="out">Out of stock</ion-select-option>
+          </ion-select>
         </div>
       </div>
 
@@ -134,8 +154,8 @@ interface ConsolidatedMaterial {
         } @else if (consolidatedMaterials().length === 0) {
           <app-empty-state
             icon="cube-outline"
-            [title]="searchQuery || statusFilter ? 'No matches' : 'No materials yet'"
-            [message]="searchQuery || statusFilter
+            [title]="searchQuery || stockFilter !== 'all' ? 'No matches' : 'No materials yet'"
+            [message]="searchQuery || stockFilter !== 'all'
               ? 'No materials match your filters. Try clearing them.'
               : 'Create a material request to get started.'"
           ></app-empty-state>
@@ -249,6 +269,19 @@ interface ConsolidatedMaterial {
     .filter-stack { padding: 0 var(--md-space-4) var(--md-space-2); }
     .search { --background: var(--m3-surface-bright); padding: 0; }
     .seg-wrap { padding: 4px 4px 6px; }
+    .filter-row { display: flex; align-items: center; gap: var(--md-space-3); }
+    .stock-filter {
+      flex: 1;
+      min-width: 0;
+      min-height: 38px;
+      --background: var(--m3-surface-bright);
+      --padding-start: var(--md-space-3);
+      --padding-end: var(--md-space-3);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-lg);
+      font-size: 12px;
+      color: var(--m3-on-surface-variant);
+    }
 
     .cards { padding: var(--md-space-3) var(--md-space-4) 96px; }
     .material-group { margin-bottom: var(--md-space-3); }
@@ -403,6 +436,7 @@ interface ConsolidatedMaterial {
   `],
 })
 export class MaterialsPage implements OnInit {
+  private destroyRef = inject(DestroyRef);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
 
@@ -414,8 +448,10 @@ export class MaterialsPage implements OnInit {
   expandedKey = signal<string>('');
   nextCursor = signal<string | null>(null);
   searchQuery = '';
-  statusFilter: MaterialStatus | '' = '';
+  statusFilter: MaterialStatus | '' = 'Approved';
+  stockFilter: MaterialsStockFilter = 'all';
   private loadGeneration = 0;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   async ngOnInit(): Promise<void> {
     addIcons({
@@ -427,11 +463,15 @@ export class MaterialsPage implements OnInit {
     await this.loadMaterials();
 
     this.supervisor.siteChanged$
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => void this.loadMaterials());
+
+    this.destroyRef.onDestroy(() => {
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+    });
   }
 
-  async loadMaterials(): Promise<void> {
+  async loadMaterials(force = false): Promise<void> {
     this.isLoading.set(true);
     this.errorMessage.set('');
     const gen = ++this.loadGeneration;
@@ -442,8 +482,11 @@ export class MaterialsPage implements OnInit {
         this.supervisor.getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
+          status: this.statusFilter || undefined,
           limit: 25,
-        })
+          search: this.searchQuery.trim() || undefined,
+          stockStatus: this.stockFilter,
+        }, force)
       );
       if (gen !== this.loadGeneration) return;
       this.materials.set(response?.materials || []);
@@ -472,8 +515,11 @@ export class MaterialsPage implements OnInit {
         this.supervisor.getMaterials({
           siteId: this.supervisor.selectedSiteId() || undefined,
           projectId: this.supervisor.selectedProjectId() || undefined,
+          status: this.statusFilter || undefined,
           limit: 25,
           cursor,
+          search: this.searchQuery.trim() || undefined,
+          stockStatus: this.stockFilter,
         })
       );
       const existing = this.materials();
@@ -491,27 +537,28 @@ export class MaterialsPage implements OnInit {
   }
 
   async refreshMaterials(event: CustomEvent): Promise<void> {
-    await this.loadMaterials();
+    await this.loadMaterials(true);
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
+  onSearchChange(value: string): void {
+    this.searchQuery = value || '';
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.loadMaterials(true), 350);
+  }
+
+  onStatusChange(value: string | number | undefined): void {
+    this.statusFilter = (String(value ?? '') as MaterialStatus | '');
+    void this.loadMaterials(true);
+  }
+
+  onStockFilterChange(value: MaterialsStockFilter): void {
+    this.stockFilter = value || 'all';
+    void this.loadMaterials(true);
+  }
+
   filterMaterials(): void {
-    let filtered = this.materials();
-    if (this.searchQuery) {
-      const query = this.searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (m) =>
-          m.name.toLowerCase().includes(query) ||
-          m.site.toLowerCase().includes(query) ||
-          m.projectName.toLowerCase().includes(query) ||
-          m.vendor?.toLowerCase().includes(query)
-      );
-    }
-    if (this.statusFilter) {
-      filtered = filtered.filter((m) => m.status === this.statusFilter);
-    }
-    const groups = this.consolidateByName(filtered);
-    this.consolidatedMaterials.set(groups);
+    this.consolidatedMaterials.set(this.consolidateByName(this.materials()));
   }
 
   private consolidateByName(materials: Material[]): ConsolidatedMaterial[] {

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, AfterViewInit, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -557,6 +557,7 @@ interface RequestItem {
   `],
 })
 export class RequestsPage implements OnInit {
+  private destroyRef = inject(DestroyRef);
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
   private notifications = inject(NotificationService);
@@ -636,7 +637,7 @@ export class RequestsPage implements OnInit {
     await this.supervisor.init().catch(() => {});
     await this.loadAllRequests();
     this.supervisor.siteChanged$
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => void this.loadAllRequests());
   }
 

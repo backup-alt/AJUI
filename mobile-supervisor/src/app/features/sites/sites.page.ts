@@ -172,14 +172,14 @@ import {
                   <ion-skeleton-text animated style="width: 80%; height: 14px; margin-top: 6px;"></ion-skeleton-text>
                 </div>
               }
-            } @else if (filteredDrawerMaterials().length === 0) {
+            } @else if (drawerMaterials().length === 0) {
               <app-empty-state
                 icon="cube-outline"
                 [title]="drawerSearch() ? 'No matches' : 'No materials yet'"
-                [message]="drawerSearch() ? 'Try a different search term.' : 'This site has no materials recorded.'"
+                [message]="drawerSearch() ? 'Try a different search term.' : 'This site has no approved materials recorded.'"
               ></app-empty-state>
             } @else {
-              @for (m of filteredDrawerMaterials(); track m._id) {
+              @for (m of drawerMaterials(); track m._id) {
                 <article class="material-card">
                   <header class="m-head">
                     <span class="m-icon"><ion-icon name="cube-outline"></ion-icon></span>
@@ -207,6 +207,13 @@ import {
                   </div>
                   <p class="m-date">Requested {{ m.requestDate | date: 'MMM d, y' }}</p>
                 </article>
+              }
+              @if (drawerNextCursor()) {
+                <div class="drawer-load-more">
+                  <button class="load-more-btn" (click)="loadMoreDrawerMaterials()" [disabled]="drawerLoadingMore()">
+                    {{ drawerLoadingMore() ? 'Loading more...' : 'Load more materials' }}
+                  </button>
+                </div>
               }
             }
           </div>
@@ -457,6 +464,28 @@ import {
     .m-value { font-size: 14px; font-weight: 700; color: var(--m3-on-surface); margin-top: 2px; }
     .m-value.highlight { color: var(--m3-secondary); }
     .m-date { font-size: 11px; color: var(--m3-on-surface-muted); margin: 4px 0 0; }
+    .drawer-load-more {
+      padding: var(--md-space-3) var(--md-space-4) var(--md-space-2);
+      display: flex;
+      justify-content: center;
+    }
+    .load-more-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: var(--md-radius-pill);
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity var(--md-motion-duration-short1);
+    }
+    .load-more-btn:disabled { opacity: 0.6; }
   `],
 })
 export class SitesPage implements OnInit {
@@ -474,18 +503,10 @@ export class SitesPage implements OnInit {
   drawerSite = signal<Site | null>(null);
   drawerMaterials = signal<Material[]>([]);
   drawerLoading = signal(false);
+  drawerLoadingMore = signal(false);
+  drawerNextCursor = signal<string | null>(null);
   drawerSearch = signal('');
-
-  filteredDrawerMaterials = computed(() => {
-    const q = this.drawerSearch().toLowerCase().trim();
-    if (!q) return this.drawerMaterials();
-    return this.drawerMaterials().filter((m) => {
-      const name = (m.name || '').toLowerCase();
-      const vendor = (m.vendor || '').toLowerCase();
-      const status = (m.status || '').toLowerCase();
-      return name.includes(q) || vendor.includes(q) || status.includes(q);
-    });
-  });
+  private drawerSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
   pendingApprovals = signal<any[]>([]);
 
@@ -546,34 +567,69 @@ export class SitesPage implements OnInit {
   }
 
   closeDrawer(): void {
+    if (this.drawerSearchTimer) clearTimeout(this.drawerSearchTimer);
     this.drawerOpen.set(false);
     this.drawerSite.set(null);
     this.drawerMaterials.set([]);
+    this.drawerNextCursor.set(null);
     this.drawerSearch.set('');
   }
 
   onDrawerSearch(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.drawerSearch.set(value);
+    if (this.drawerSearchTimer) clearTimeout(this.drawerSearchTimer);
+    this.drawerSearchTimer = setTimeout(() => {
+      const site = this.drawerSite();
+      if (site) void this.loadDrawerMaterials(site, true);
+    }, 350);
   }
 
   clearDrawerSearch(): void {
     this.drawerSearch.set('');
+    const site = this.drawerSite();
+    if (site) void this.loadDrawerMaterials(site, true);
   }
 
-  private async loadDrawerMaterials(site: Site): Promise<void> {
-    this.drawerLoading.set(true);
+  loadMoreDrawerMaterials(): void {
+    const site = this.drawerSite();
+    if (!site || this.drawerLoadingMore() || !this.drawerNextCursor()) return;
+    this.drawerLoadingMore.set(true);
+    void this.loadDrawerMaterials(site, false);
+  }
+
+  private async loadDrawerMaterials(site: Site, reset = true): Promise<void> {
+    if (reset) this.drawerLoading.set(true);
+    const cursor = reset ? undefined : (this.drawerNextCursor() || undefined);
     this.supervisor
-        .getMaterials({ siteId: site.id, limit: 25 })
+        .getMaterials({
+          siteId: site.id,
+          projectId: site.projectId || undefined,
+          status: 'Approved',
+          limit: 25,
+          search: this.drawerSearch().trim() || undefined,
+          cursor,
+        })
       .subscribe({
         next: (res) => {
-          this.drawerMaterials.set(res.materials || []);
+          const mats = res.materials || [];
+          if (reset) {
+            this.drawerMaterials.set(mats);
+          } else {
+            const existing = this.drawerMaterials();
+            const ids = new Set(existing.map((m) => m._id));
+            this.drawerMaterials.set([...existing, ...mats.filter((m) => !ids.has(m._id))]);
+          }
+          this.drawerNextCursor.set(res.pagination?.nextCursor ?? null);
           this.drawerLoading.set(false);
+          this.drawerLoadingMore.set(false);
         },
         error: (err) => {
           console.error('[Sites] failed to load materials', err);
           this.drawerMaterials.set([]);
+          this.drawerNextCursor.set(null);
           this.drawerLoading.set(false);
+          this.drawerLoadingMore.set(false);
         },
       });
   }
