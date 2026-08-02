@@ -45,10 +45,10 @@ export class AppComponent implements OnInit {
     // 3. Hydrate selected site from Preferences
     await this.supervisor.init();
 
-    // 4. Load cached notifications from Preferences
+    // 4. Load cached notifications from Preferences (no API call)
     await this.notifications.initFromStorage();
-    // 4b. Fetch approval/decline notifications from backend
-    this.notifications.fetchFromBackend();
+    // 4b. Defer backend notification fetch — not needed for dashboard display
+    setTimeout(() => this.notifications.fetchFromBackend(), 3000);
 
     if (this.notifications.pushEnabled()) {
       try {
@@ -63,7 +63,7 @@ export class AppComponent implements OnInit {
     this.watchSessionExpiry();
 
     // 5. Wait for the first page (Dashboard) to finish loading all data.
-    const DASHBOARD_TIMEOUT_MS = 12_000;
+    const DASHBOARD_TIMEOUT_MS = 8_000;
     const timeoutPromise = new Promise<boolean>((resolve) =>
       setTimeout(() => resolve(false), DASHBOARD_TIMEOUT_MS)
     );

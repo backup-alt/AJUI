@@ -632,11 +632,21 @@ export class ShellComponent implements OnInit {
 
     this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
-    await this.loadSites();
-    this.loadBadgeCounts();
+
+    // Sites are loaded from the dashboard response — no separate API call needed.
+    // The site selector popover will fetch sites lazily when opened.
+    const sel = this.supervisor.selection();
+    if (sel) {
+      this.selectedSiteId.set(sel.siteId);
+      this.selectedSiteName.set(sel.siteName || null);
+    }
+
+    // Badge counts: derive from dashboard data if available, otherwise defer
+    this.loadBadgeCountsDeferred();
   }
 
   async loadSites(): Promise<void> {
+    if (this.isLoadingSites() || this.sites().length > 0) return;
     this.isLoadingSites.set(true);
     try {
       const response = await new Promise<{ sites: Site[] }>((resolve) => {
@@ -674,15 +684,19 @@ export class ShellComponent implements OnInit {
     }
   }
 
-  private loadBadgeCounts(): void {
-    this.supervisor.getApprovals().subscribe({
-      next: (res) => {
-        const pending = (res.approvals || []).filter((approval) => approval.status === 'Pending');
-        this.pendingApprovals.set(pending.length);
-        this.pendingExpenses.set(pending.filter((approval) => approval.type === 'expense').length);
-      },
-      error: () => undefined,
-    });
+  private loadBadgeCountsDeferred(): void {
+    // Defer badge count loading — don't block dashboard display.
+    // Load after a short delay so the dashboard can render first.
+    setTimeout(() => {
+      this.supervisor.getApprovals().subscribe({
+        next: (res) => {
+          const pending = (res.approvals || []).filter((approval) => approval.status === 'Pending');
+          this.pendingApprovals.set(pending.length);
+          this.pendingExpenses.set(pending.filter((approval) => approval.type === 'expense').length);
+        },
+        error: () => undefined,
+      });
+    }, 2000);
   }
 
   toggleSitePopover(event: Event): void {

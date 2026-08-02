@@ -779,7 +779,9 @@ export class DashboardPage implements OnInit, OnDestroy {
     if (cached) {
       this.applyDashboard(cached);
       this.loading.set(false);
+      // Resolve immediately — user sees cached data instantly
       this.appReady.resolve(true);
+      // Refresh in background without blocking
       void this.loadDashboard(true, true);
       return;
     }

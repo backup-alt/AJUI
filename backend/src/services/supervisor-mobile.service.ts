@@ -602,7 +602,7 @@ export async function getSupervisorDashboard(
     }
   };
 
-  const [projects, sites, approvals, todayExpenseRows, inventoryPreview, workerStats] = await Promise.all([
+  const [projects, sites, pendingApprovalCount, todayExpenseRows, inventoryCount, workerStats] = await Promise.all([
     safeDashboardList("projects", Project.find(projectQuery)
       .select("_id projectId name client clientId status startDate totalValue receivedAmount pendingBalance materialSpend labourPayable completion siteNames lastActivityAt")
       .sort({ lastActivityAt: -1, _id: -1 })
@@ -615,24 +615,30 @@ export async function getSupervisorDashboard(
       .limit(25)
       .lean()
       .maxTimeMS(8_000)),
-    safeDashboardList("approvals", Approval.find(approvalQuery)
-      .select("_id approvalId type title projectId projectName site amount submittedAt status sourceCollection sourceId")
-      .sort({ submittedAt: -1, _id: -1 })
-      .limit(25)
-      .lean()
-      .maxTimeMS(8_000)),
+    // Use count instead of fetching full approval documents
+    (async () => {
+      try {
+        return await Approval.countDocuments(approvalQuery).maxTimeMS(8_000);
+      } catch (err) {
+        console.warn('[mobile.dashboard] approvals count failed:', (err as Error).message);
+        return 0;
+      }
+    })(),
     safeDashboardList("todayExpenses", Expense.find(todayExpensesQuery)
       .select("_id expenseId type projectId projectName siteId site transactionType amount date description status materialVendor createdAt")
       .sort({ _id: -1 })
       .limit(5)
       .lean()
       .maxTimeMS(8_000)),
-    safeDashboardList("inventoryPreview", Inventory.find(entityScope)
-      .select("_id")
-      .sort({ _id: -1 })
-      .limit(25)
-      .lean()
-      .maxTimeMS(8_000)),
+    // Use count instead of fetching full inventory documents
+    (async () => {
+      try {
+        return await Inventory.countDocuments(entityScope).maxTimeMS(8_000);
+      } catch (err) {
+        console.warn('[mobile.dashboard] inventory count failed:', (err as Error).message);
+        return 0;
+      }
+    })(),
     safeDashboardList("workerStats", Worker.aggregate([
       { $match: entityScope },
       {
@@ -693,33 +699,17 @@ export async function getSupervisorDashboard(
     };
   });
 
-  const mappedApprovals = approvals.map((a) => ({
-    _id: a._id.toString(),
-    approvalId: a.approvalId,
-    type: a.type,
-    title: a.title,
-    projectId: a.projectId,
-    projectName: a.projectName,
-    site: a.site,
-    amount: a.amount,
-    submittedAt: a.submittedAt,
-    status: a.status,
-    sourceCollection: a.sourceCollection,
-    sourceId: a.sourceId,
-  }));
-
-  const pendingApprovals = mappedApprovals.filter((a) => a.status === "Pending");
   const todayTotal = todayExpenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
 
   return {
     counts: {
       projects: mappedProjects.length,
       sites: mappedSites.length,
-      pendingApprovals: pendingApprovals.length,
-      pendingMaterials: pendingApprovals.filter((a) => a.type === "material").length,
-      pendingLabour: pendingApprovals.filter((a) => a.type === "labour").length,
-      pendingExpenses: pendingApprovals.filter((a) => a.type === "expense").length,
-      inventory: inventoryPreview.length,
+      pendingApprovals: pendingApprovalCount,
+      pendingMaterials: 0,
+      pendingLabour: 0,
+      pendingExpenses: 0,
+      inventory: inventoryCount,
       labour: workerStats.reduce((total, stat) => total + (Number(stat.workerCount) || 0), 0),
     },
     todayExpense: {
@@ -729,7 +719,7 @@ export async function getSupervisorDashboard(
     projects: mappedProjects,
     sites: mappedSites,
     todayExpenses: todayExpenseRows,
-    pendingApprovals: mappedApprovals.slice(0, 20),
+    pendingApprovals: [],
   };
 }
 
