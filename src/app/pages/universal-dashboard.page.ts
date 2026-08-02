@@ -2251,7 +2251,7 @@ export class UniversalDashboardPage implements OnInit {
   }
 
   private refreshMaterialsAfterSave() {
-    this.api.listMaterials({ limit: this.PAGE_SIZE, page: 1 }).subscribe({
+    this.api.listMaterials({ limit: 200, page: 1 }).subscribe({
       next: (r: any) => {
         try {
           const items = ((r as any).items || []).map(mapMaterial);
@@ -2262,6 +2262,19 @@ export class UniversalDashboardPage implements OnInit {
       },
       error: (err) => {
         console.error("[addInventoryMaterial] /api/materials refresh failed", err);
+      },
+    });
+    this.api.listInventory({ limit: 200, page: 1 }).subscribe({
+      next: (r: any) => {
+        try {
+          const items = ((r as any).items || []).map(mapInventory);
+          this.data.inventory.set(this.mergeRowsByStableId(this.data.inventory(), items));
+        } catch (err) {
+          console.error("[addInventoryMaterial] Failed to refresh inventory after save", err);
+        }
+      },
+      error: (err) => {
+        console.error("[addInventoryMaterial] /api/inventory refresh failed", err);
       },
     });
   }

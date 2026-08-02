@@ -138,7 +138,7 @@ export async function listInventory(filter: {
   }
 
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
+  const effectiveLimit = Math.min(Math.max(filter.limit || 200, 1), 200);
   const effectivePage = Math.max(filter.page || 1, 1);
   const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
   type InventoryLike = { [k: string]: unknown };
@@ -790,6 +790,58 @@ export async function addInventoryMaterial(
     notes: remarks,
     createdBy: updatedBy,
   });
+
+  // Also create an Inventory record so the item appears immediately
+  const invMatch = {
+    projectId: projectId || undefined,
+    siteKey: siteKeyValue,
+    normalizedName,
+    normalizedUnit,
+  };
+  const existingInv = await Inventory.findOne(invMatch);
+  if (existingInv) {
+    existingInv.approvedQuantity = Math.max(0, Number(existingInv.approvedQuantity) || 0) + quantity;
+    existingInv.purchasedQuantity = Math.max(0, Number(existingInv.purchasedQuantity) || 0) + quantity;
+    existingInv.remainingStock = Math.max(0, existingInv.purchasedQuantity - (Number(existingInv.consumedQuantity) || 0));
+    existingInv.lastMaterialId = created._id;
+    existingInv.lastUpdatedBy = updatedBy;
+    existingInv.purchaseHistory = existingInv.purchaseHistory || [];
+    existingInv.purchaseHistory.push({
+      vendor: "",
+      quantity,
+      date: new Date(),
+      materialId: created._id,
+    });
+    await existingInv.save();
+  } else {
+    const inv = new Inventory({
+      projectId,
+      projectName,
+      clientId,
+      clientName,
+      siteId: siteObjectId,
+      site: site.name,
+      siteKey: siteKeyValue,
+      name: trimmedName,
+      normalizedName,
+      unit: trimmedUnit,
+      normalizedUnit,
+      requestedQuantity: quantity,
+      approvedQuantity: quantity,
+      purchasedQuantity: quantity,
+      consumedQuantity: 0,
+      remainingStock: quantity,
+      minimumQuantity: minimumStock ?? 0,
+      lastMaterialId: created._id,
+      lastUpdatedBy: updatedBy,
+      purchaseHistory: [{
+        quantity,
+        date: new Date(),
+        materialId: created._id,
+      }],
+    });
+    await inv.save();
+  }
 
   return { material: created.toObject(), created: true };
 }

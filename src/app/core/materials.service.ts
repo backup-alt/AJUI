@@ -21,7 +21,7 @@ export class MaterialsService {
   readonly materials = signal<MaterialRow[]>([]);
 
   getAll(params?: { projectId?: string; siteId?: string; vendorId?: string; status?: string }) {
-    this.api.listMaterials({ ...params, limit: 25, page: 1 }).subscribe({
+    this.api.listMaterials({ ...params, limit: 200, page: 1 }).subscribe({
       next: (r) => {
         const backendItems = (r.items || []).map(this.mapMaterial);
         const items = params
@@ -39,7 +39,7 @@ export class MaterialsService {
 
   async refresh() {
     return new Promise<MaterialRow[]>((resolve) => {
-      this.api.listMaterials({ limit: 25, page: 1 }).subscribe({
+      this.api.listMaterials({ limit: 200, page: 1 }).subscribe({
         next: (r) => {
           const backendItems = (r.items || []).map(this.mapMaterial);
           const items = this.mergeRowsByStableId(this.materials(), backendItems);

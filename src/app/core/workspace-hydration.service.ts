@@ -69,7 +69,7 @@ export class WorkspaceHydrationService {
   readonly loadingNextPage = signal<Record<string, boolean>>({});
   private readonly moduleLoads = new Map<PageModule, Promise<boolean>>();
 
-  private readonly PAGE_SIZE = 25;
+  private readonly PAGE_SIZE = 200;
 
   constructor() {
     this.clearPersistedSnapshot();

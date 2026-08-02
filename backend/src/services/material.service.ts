@@ -200,7 +200,7 @@ export async function listMaterials(filter: {
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
+  const effectiveLimit = Math.min(Math.max(filter.limit || 200, 1), 200);
   const effectivePage = Math.max(filter.page || 1, 1);
   const pageState = getMaterialCursorState(materialPageKey(filter));
   const internalCursor = filter.cursor || pageState.cursors.get(effectivePage);

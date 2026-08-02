@@ -1128,13 +1128,13 @@ export class ProjectWorkspacePage {
    */
   private refreshSectionFromBackend(section: ModuleKey) {
     const apiMap: Record<string, () => any> = {
-      materials: () => this.api.listMaterials({ limit: 25 }),
-      labour: () => this.api.listLabour({ limit: 25 }),
-      expenses: () => this.api.listExpenses({ limit: 25 }),
-      payments: () => this.api.listPayments({ limit: 25 }),
-      vendors: () => this.api.listVendors({ limit: 25 }),
-      subcontractors: () => this.api.listSubcontractors({ limit: 25 }),
-      inventory: () => this.api.listInventory({ limit: 25 }),
+      materials: () => this.api.listMaterials({ limit: 200, projectId: this.projectId() }),
+      labour: () => this.api.listLabour({ limit: 200, projectId: this.projectId() }),
+      expenses: () => this.api.listExpenses({ limit: 200, projectId: this.projectId() }),
+      payments: () => this.api.listPayments({ limit: 200, projectId: this.projectId() }),
+      vendors: () => this.api.listVendors({ limit: 200 }),
+      subcontractors: () => this.api.listSubcontractors({ limit: 200, projectId: this.projectId() }),
+      inventory: () => this.api.listInventory({ limit: 200, projectId: this.projectId() }),
     };
     const mapperMap: Record<string, (x: any) => any> = {
       materials: mapMaterial,
@@ -1415,7 +1415,7 @@ export class ProjectWorkspacePage {
     const storageKey = storageMap[section];
     const dataSignal = dataMap[section];
     if (!apiCall || !mapper || !dataSignal) return;
-    apiCall({ limit: 25, page: 1 }).subscribe({
+    apiCall({ limit: 200, page: 1, projectId: this.projectId() }).subscribe({
       next: (r: any) => {
         try {
           const items = (r.items || []).map(mapper);
