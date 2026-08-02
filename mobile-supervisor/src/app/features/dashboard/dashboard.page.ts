@@ -189,7 +189,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
               <button class="sites-empty-cta" (click)="navigateTo('/tabs/sites')">Add a site</button>
             </div>
           } @else {
-            @for (site of sites().slice(0, 5); track site.id) {
+            @for (site of sites(); track site.id) {
               <button class="site-row" (click)="navigateToSite(site)">
                 <div class="site-info">
                   <span class="site-name">{{ site.name }}</span>
@@ -803,10 +803,7 @@ export class DashboardPage implements OnInit, OnDestroy {
 
     try {
       let dashData: DashboardData | null = null;
-      const dashResult = await this.supervisor.getDashboard({
-        siteId: this.supervisor.selectedSiteId() || undefined,
-        projectId: this.supervisor.selectedProjectId() || undefined,
-      }).toPromise().then(
+      const dashResult = await this.supervisor.getDashboard().toPromise().then(
         (r) => { if (r) dashData = r.dashboard; return !!r; },
         () => false
       );

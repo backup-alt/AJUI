@@ -600,7 +600,7 @@ export async function getSupervisorDashboard(
     }
   };
 
-  const [projects, sites, approvals, todayExpenseRows, inventoryPreview, labourPreview] = await Promise.all([
+  const [projects, sites, approvals, todayExpenseRows, inventoryPreview, workerStats] = await Promise.all([
     safeDashboardList("projects", Project.find(projectQuery)
       .select("_id projectId name client clientId status startDate totalValue receivedAmount pendingBalance materialSpend labourPayable completion siteNames lastActivityAt")
       .sort({ lastActivityAt: -1, _id: -1 })
@@ -631,12 +631,15 @@ export async function getSupervisorDashboard(
       .limit(25)
       .lean()
       .maxTimeMS(8_000)),
-    safeDashboardList("labourPreview", Labour.find(entityScope)
-      .select("_id")
-      .sort({ _id: -1 })
-      .limit(25)
-      .lean()
-      .maxTimeMS(8_000)),
+    safeDashboardList("workerStats", Worker.aggregate([
+      { $match: entityScope },
+      {
+        $group: {
+          _id: { siteId: "$siteId", site: "$site" },
+          workerCount: { $sum: 1 },
+        },
+      },
+    ]).option({ maxTimeMS: 8_000 }).exec()),
   ]);
 
   const mappedProjects = projects.map((p) => ({
@@ -658,8 +661,20 @@ export async function getSupervisorDashboard(
   }));
 
   const projectIdToName = new Map(mappedProjects.map((p) => [String(p.id), p.name]));
+  const workersBySiteId = new Map<string, number>();
+  const workersBySiteName = new Map<string, number>();
+  for (const stat of workerStats) {
+    const count = Number(stat.workerCount) || 0;
+    const siteId = stat._id?.siteId?.toString();
+    const siteName = String(stat._id?.site || "").trim().toLowerCase();
+    if (siteId) workersBySiteId.set(siteId, (workersBySiteId.get(siteId) || 0) + count);
+    if (siteName) workersBySiteName.set(siteName, (workersBySiteName.get(siteName) || 0) + count);
+  }
   const mappedSites = sites.map((s) => {
     const firstProjectId = s.projectIds?.[0]?.toString();
+    const employeeCount = workersBySiteId.get(s._id.toString())
+      ?? workersBySiteName.get(s.name.trim().toLowerCase())
+      ?? 0;
     return {
       id: s._id.toString(),
       siteId: s.siteId,
@@ -670,7 +685,7 @@ export async function getSupervisorDashboard(
       targetEndDate: s.targetEndDate,
       projectId: firstProjectId,
       projectName: firstProjectId ? projectIdToName.get(firstProjectId) : undefined,
-      employeeCount: 0,
+      employeeCount,
       daysActive: 0,
       updatedAt: (s as any).updatedAt?.toISOString?.() || s.createdAt?.toISOString?.(),
     };
@@ -703,7 +718,7 @@ export async function getSupervisorDashboard(
       pendingLabour: pendingApprovals.filter((a) => a.type === "labour").length,
       pendingExpenses: pendingApprovals.filter((a) => a.type === "expense").length,
       inventory: inventoryPreview.length,
-      labour: labourPreview.length,
+      labour: workerStats.reduce((total, stat) => total + (Number(stat.workerCount) || 0), 0),
     },
     todayExpense: {
       total: todayTotal,

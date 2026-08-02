@@ -502,7 +502,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         </div>
                         <div class="inventory-meta">
                           <span class="meta-label">Last Updated</span>
-                          <span class="meta-value">{{ card.lastUpdated || 'N/A' }}</span>
+                          <span class="meta-value">{{ formatInventoryTimestamp(card.lastUpdated) }}</span>
                         </div>
                       </div>
                     </article>
@@ -977,7 +977,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
                 <div class="breakdown-stat">
                   <span class="stat-label">Last Updated</span>
-                  <strong class="stat-value">{{ selectedInventoryCard()!.lastUpdated || 'N/A' }}</strong>
+                  <strong class="stat-value">{{ formatInventoryTimestamp(selectedInventoryCard()!.lastUpdated) }}</strong>
                 </div>
               </div>
               <div class="inventory-breakdown-table">
@@ -992,7 +992,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     <span>{{ row.site || 'Unknown Site' }}</span>
                     <strong>{{ row.quantity ?? 0 }}</strong>
                     <span>{{ row.unit }}</span>
-                    <span>{{ row.requestDate || 'N/A' }}</span>
+                    <span>{{ formatInventoryTimestamp(row.updatedAt || row.requestDate || row.createdAt) }}</span>
                   </div>
                 }
               </div>
@@ -1918,8 +1918,8 @@ export class UniversalDashboardPage implements OnInit {
     const card = this.selectedInventoryCard();
     if (!card) return [] as any[];
     return this.data.inventory().filter((m: any) =>
-      m.name === card.materialName &&
-      (m.site || "").toLowerCase() === (card.siteKey || "").toLowerCase()
+      String(m.name || "").trim().toLowerCase() === card.materialName.trim().toLowerCase() &&
+      String(m.site || "").trim().toLowerCase() === card.siteKey.trim().toLowerCase()
     );
   });
   readonly showInventoryBreakdown = signal(false);
@@ -2149,7 +2149,7 @@ export class UniversalDashboardPage implements OnInit {
     const filtered = (siteFilter && siteFilter !== "All")
       ? materials.filter((m) => m.site && m.site.toLowerCase() === siteFilter.toLowerCase())
       : materials;
-    const map = new Map<string, { qty: number; unit: string; siteName: string; lastUpdated: string; siteCount: number }>();
+    const map = new Map<string, { qty: number; unit: string; siteName: string; materialName: string; lastUpdated: string; siteCount: number }>();
     for (const m of filtered) {
       if (!m.name) continue;
       const siteName = (m.site || "").trim() || "Unassigned";
@@ -2158,6 +2158,7 @@ export class UniversalDashboardPage implements OnInit {
         qty: 0,
         unit: m.unit || "",
         siteName,
+        materialName: String(m.name).trim(),
         lastUpdated: "",
         siteCount: 1,
       };
@@ -2168,14 +2169,11 @@ export class UniversalDashboardPage implements OnInit {
       if (updatedAt && updatedAt > existing.lastUpdated) existing.lastUpdated = updatedAt;
       map.set(key, existing);
     }
-    return [...map.entries()].map(([key, v]) => {
-      const sepIndex = key.indexOf("::");
-      const siteName = sepIndex >= 0 ? key.slice(0, sepIndex) : v.siteName;
-      const materialName = sepIndex >= 0 ? key.slice(sepIndex + 2) : "";
+    return [...map.values()].map((v) => {
       return {
-        siteKey: siteName,
+        siteKey: v.siteName.toLowerCase(),
         siteName: v.siteName,
-        materialName,
+        materialName: v.materialName,
         totalQty: v.qty,
         unit: v.unit,
         siteCount: v.siteCount,
@@ -2186,6 +2184,17 @@ export class UniversalDashboardPage implements OnInit {
       if (siteCmp !== 0) return siteCmp;
       return a.materialName.localeCompare(b.materialName);
     });
+  }
+
+  formatInventoryTimestamp(value: unknown): string {
+    if (!value) return "N/A";
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return "N/A";
+    const hours = date.getHours();
+    const displayHours = hours % 12 || 12;
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const meridiem = hours < 12 ? "a.m." : "p.m.";
+    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()} ${displayHours}:${minutes} ${meridiem}`;
   }
 
   openInventoryBreakdown(card: { siteKey: string; siteName: string; materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string }) {
