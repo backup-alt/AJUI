@@ -242,6 +242,17 @@ export async function bootstrap(): Promise<void> {
     console.warn("[Bootstrap] Firebase init failed (non-fatal):", (err as Error).message);
   }
   try {
+    const { verifyPCloudConnection } = await import("./services/pcloud.service.js");
+    const status = await verifyPCloudConnection();
+    if (status.ok) {
+      console.log(`[pCloud] Connected: ${status.message} (folder=${status.folderId}, ${status.ms}ms)`);
+    } else {
+      console.warn(`[pCloud] Connection check failed: ${status.message} (folder=${status.folderId || "not configured"}, ${status.ms}ms)`);
+    }
+  } catch (err) {
+    console.warn("[pCloud] Not configured or unavailable (non-fatal):", (err as Error).message);
+  }
+  try {
     await ensureDefaultPermissions();
   } catch (err) {
     console.warn("[Bootstrap] ensureDefaultPermissions failed (non-fatal):", (err as Error).message);

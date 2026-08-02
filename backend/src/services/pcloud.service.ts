@@ -19,11 +19,53 @@ interface PCloudResponse {
   publink?: string;
 }
 
+export interface PCloudConnectionStatus {
+  ok: boolean;
+  folderId?: string;
+  ms: number;
+  message: string;
+}
+
 function pcloudConfig(): { folderId: string; token: string } {
   if (!env.PCLOUD_FOLDER_ID || !env.PCLOUD_BEARER_TOKEN) {
     throw new Error("pCloud is not configured. Set PCLOUD_BEARER_TOKEN and PCLOUD_FOLDER_ID.");
   }
   return { folderId: env.PCLOUD_FOLDER_ID, token: env.PCLOUD_BEARER_TOKEN };
+}
+
+export async function verifyPCloudConnection(timeoutMs = 8000): Promise<PCloudConnectionStatus> {
+  const { folderId, token } = pcloudConfig();
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${PCLOUD_API}/listfolder`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ access_token: token, folderid: folderId, recursive: "0" }).toString(),
+      signal: controller.signal,
+    });
+
+    const ms = Date.now() - startedAt;
+    if (!response.ok) {
+      return { ok: false, folderId, ms, message: `HTTP ${response.status}` };
+    }
+
+    const result = await response.json() as PCloudResponse;
+    if (result.result !== 0) {
+      return { ok: false, folderId, ms, message: `${result.result} - ${result.error || "Unknown error"}` };
+    }
+
+    return { ok: true, folderId, ms, message: "folder verified" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, folderId, ms: Date.now() - startedAt, message };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function uploadToPCloud(
