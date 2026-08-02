@@ -92,7 +92,7 @@ export const listLabourSchema = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(25).default(25),
+    limit: z.coerce.number().int().min(1).max(200).default(200),
     cursor: z.string().optional(),
   }),
 });
@@ -163,7 +163,7 @@ export const listExpensesSchema = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(25).default(25),
+    limit: z.coerce.number().int().min(1).max(200).default(200),
     cursor: z.string().optional(),
   }),
 });
@@ -198,7 +198,7 @@ export const listPaymentsSchema = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(25).default(25),
+    limit: z.coerce.number().int().min(1).max(200).default(200),
     cursor: z.string().optional(),
   }),
 });
@@ -232,7 +232,7 @@ export const listVendorsSchema = z.object({
     status: z.enum(["Active", "Inactive", "Not Active"]).optional(),
     search: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(25).default(25),
+    limit: z.coerce.number().int().min(1).max(200).default(200),
     cursor: z.string().optional(),
   }),
 });
@@ -270,7 +270,7 @@ export const listSubcontractorsSchema = z.object({
     approvalStatus: z.enum(["Pending", "Approved", "Rejected"]).optional(),
     paymentStatus: z.enum(["Not Started", "Part Paid", "Paid"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(25).default(25),
+    limit: z.coerce.number().int().min(1).max(200).default(200),
     cursor: z.string().optional(),
   }),
 });
@@ -295,7 +295,7 @@ export const listApprovalsSchema = z.object({
     projectId: objectIdSchema.optional(),
     status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(25).default(25),
+    limit: z.coerce.number().int().min(1).max(200).default(200),
     cursor: z.string().optional(),
   }),
 });

@@ -16,7 +16,6 @@ import {
   IonSelectOption,
   ModalController,
   ToastController,
-  ActionSheetController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
@@ -44,6 +43,7 @@ import { Router } from '@angular/router';
 import { PageHeaderComponent, EmptyStateComponent } from '../../shared/components';
 import { InventoryEditModalComponent } from './inventory-edit-modal/inventory-edit-modal.component';
 import { InventoryRequestModalComponent } from './inventory-request-modal/inventory-request-modal.component';
+import { InventoryActionSheetComponent } from './inventory-action-sheet/inventory-action-sheet.component';
 
 export interface InventoryItem {
   _id: string;
@@ -622,6 +622,26 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
 
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
 
+    :host ::ng-deep .action-sheet-modal {
+      --backdrop-opacity: 0.5;
+      --box-shadow: none;
+      --width: 100%;
+      --max-width: 480px;
+      --height: auto;
+      --border-radius: var(--md-radius-2xl) var(--md-radius-2xl) 0 0;
+      bottom: 0;
+      top: auto;
+      align-self: center;
+    }
+
+    :host ::ng-deep .action-sheet-modal ion-content {
+      --background: transparent;
+    }
+
+    :host ::ng-deep .action-sheet-modal ion-backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
     .bill-viewer-overlay {
       position: fixed; inset: 0; z-index: 9999;
       background: rgba(0,0,0,0.92);
@@ -657,7 +677,6 @@ export class InventoryPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
-  private actionSheetCtrl = inject(ActionSheetController);
   private router = inject(Router);
 
   items = signal<InventoryItem[]>([]);
@@ -917,23 +936,20 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   async showInventoryActions(): Promise<void> {
-    const actionSheet = await this.actionSheetCtrl.create({
-      header: 'Add inventory',
-      buttons: [
-        {
-          text: 'Add Existing Material',
-          icon: 'cube-outline',
-          handler: () => { void this.openAddExisting(); },
-        },
-        {
-          text: 'Raise Material Request',
-          icon: 'add-outline',
-          handler: () => { void this.raiseRequest(null); },
-        },
-        { text: 'Cancel', role: 'cancel', icon: 'close-outline' },
-      ],
+    const modal = await this.modalCtrl.create({
+      component: InventoryActionSheetComponent,
+      cssClass: 'action-sheet-modal',
+      breakpoints: [0, 0.5, 0.7],
+      initialBreakpoint: 0.5,
+      handle: false,
     });
-    await actionSheet.present();
+    await modal.present();
+    const { data } = await modal.onDidDismiss();
+    if (data?.action === 'existing') {
+      void this.openAddExisting();
+    } else if (data?.action === 'request') {
+      void this.raiseRequest(null);
+    }
   }
 
   private async openAddExisting(): Promise<void> {

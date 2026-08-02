@@ -43,10 +43,10 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
     FormsModule,
   ],
   template: `
-    <ion-header>
+    <ion-header class="modal-header">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button (click)="dismiss()">
+          <ion-button (click)="dismiss()" class="close-button">
             <ion-icon name="close-outline"></ion-icon>
           </ion-button>
         </ion-buttons>
@@ -58,6 +58,9 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
       <div class="modal-body">
         @if (preSelected) {
           <div class="item-banner">
+            <div class="banner-icon">
+              <ion-icon name="cube-outline"></ion-icon>
+            </div>
             <div class="banner-info">
               <h2>{{ preSelected.name }}</h2>
               <p>Current stock: {{ preSelected.currentQuantity }} {{ preSelected.unit }}</p>
@@ -65,122 +68,125 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
           </div>
         }
 
-        <div class="form-group">
-          <label class="form-label">Material Name *</label>
-          <div class="search-wrap" (pointerdown)="onSearchWrapClick($event)">
-            <ion-input
-              class="form-input"
-              [(ngModel)]="name"
-              [clearInput]="true"
-              placeholder="Search or enter material name"
-              (ionInput)="onNameInput($event)"
-            ></ion-input>
-            @if (filteredNames().length > 0 && showSuggestions()) {
-              <div class="suggestions-list">
-                @for (n of filteredNames(); track n) {
-                  <div class="suggestion-item" (pointerdown)="onSelectSuggestion($event, n)">
-                    <ion-icon name="search-outline"></ion-icon>
-                    {{ n }}
-                  </div>
-                }
-              </div>
-            }
-          </div>
-        </div>
-
-        <div class="form-row">
+        <div class="form-section">
           <div class="form-group">
-            <label class="form-label">Quantity *</label>
-            <ion-input
-              class="form-input"
-              type="number"
-              [(ngModel)]="quantity"
-              [clearInput]="true"
-              placeholder="0"
-            ></ion-input>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Unit *</label>
-            <ion-select
-              class="form-input"
-              [(ngModel)]="unit"
-              interface="popover"
-              placeholder="Select unit"
-            >
-              @for (option of unitOptions; track option) {
-                <ion-select-option [value]="option">{{ option }}</ion-select-option>
+            <label class="form-label">Material Name *</label>
+            <div class="search-wrap" (pointerdown)="onSearchWrapClick($event)">
+              <ion-input
+                class="form-input"
+                [(ngModel)]="name"
+                [clearInput]="true"
+                placeholder="Search or enter material name"
+                (ionInput)="onNameInput($event)"
+              ></ion-input>
+              @if (filteredNames().length > 0 && showSuggestions()) {
+                <div class="suggestions-list">
+                  @for (n of filteredNames(); track n) {
+                    <div class="suggestion-item" (pointerdown)="onSelectSuggestion($event, n)">
+                      <ion-icon name="search-outline"></ion-icon>
+                      {{ n }}
+                    </div>
+                  }
+                </div>
               }
-            </ion-select>
+            </div>
           </div>
-        </div>
 
-        @if (mode === 'request') {
-          <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Issued Amount *</label>
-            <ion-input
-              class="form-input"
-              type="number"
-              [(ngModel)]="issuedAmount"
-              [clearInput]="true"
-              placeholder="0"
-            ></ion-input>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Vendor *</label>
-            <ion-select
-              class="form-input"
-              [(ngModel)]="vendorId"
-              interface="popover"
-              placeholder="Select vendor"
-              (ionChange)="onVendorChange()"
-            >
-              @for (vendor of vendors(); track vendor._id) {
-                <ion-select-option [value]="vendor._id">{{ vendor.name }}</ion-select-option>
-              }
-            </ion-select>
-          </div>
-          </div>
-        } @else {
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Vendor (optional)</label>
-              <ion-select class="form-input" [(ngModel)]="vendorId" interface="popover" placeholder="Select vendor" (ionChange)="onVendorChange()">
+              <label class="form-label">Quantity *</label>
+              <ion-input
+                class="form-input"
+                type="number"
+                [(ngModel)]="quantity"
+                [clearInput]="true"
+                placeholder="0"
+              ></ion-input>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Unit *</label>
+              <ion-select
+                class="form-input"
+                [(ngModel)]="unit"
+                interface="popover"
+                placeholder="Select unit"
+              >
+                @for (option of unitOptions; track option) {
+                  <ion-select-option [value]="option">{{ option }}</ion-select-option>
+                }
+              </ion-select>
+            </div>
+          </div>
+
+          @if (mode === 'request') {
+            <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Issued Amount *</label>
+              <ion-input
+                class="form-input"
+                type="number"
+                [(ngModel)]="issuedAmount"
+                [clearInput]="true"
+                placeholder="0"
+              ></ion-input>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Vendor *</label>
+              <ion-select
+                class="form-input"
+                [(ngModel)]="vendorId"
+                interface="popover"
+                placeholder="Select vendor"
+                (ionChange)="onVendorChange()"
+              >
                 @for (vendor of vendors(); track vendor._id) {
                   <ion-select-option [value]="vendor._id">{{ vendor.name }}</ion-select-option>
                 }
               </ion-select>
             </div>
-            <div class="form-group">
-              <label class="form-label">PO Number (optional)</label>
-              <ion-input class="form-input" [(ngModel)]="poNumber" placeholder="PO number"></ion-input>
             </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Minimum Stock (optional)</label>
-            <ion-input class="form-input" type="number" [(ngModel)]="minimumQuantity" placeholder="0"></ion-input>
-          </div>
-        }
+          } @else {
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Vendor (optional)</label>
+                <ion-select class="form-input" [(ngModel)]="vendorId" interface="popover" placeholder="Select vendor" (ionChange)="onVendorChange()">
+                  @for (vendor of vendors(); track vendor._id) {
+                    <ion-select-option [value]="vendor._id">{{ vendor.name }}</ion-select-option>
+                  }
+                </ion-select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">PO Number (optional)</label>
+                <ion-input class="form-input" [(ngModel)]="poNumber" placeholder="PO number"></ion-input>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Minimum Stock (optional)</label>
+              <ion-input class="form-input" type="number" [(ngModel)]="minimumQuantity" placeholder="0"></ion-input>
+            </div>
+          }
 
-        <div class="form-group">
-          <label class="form-label">Notes (optional)</label>
-          <ion-textarea
-            class="form-textarea"
-            [(ngModel)]="notes"
-            placeholder="Any additional notes..."
-            [rows]="3"
-            [autoGrow]="true"
-          ></ion-textarea>
+          <div class="form-group">
+            <label class="form-label">Notes (optional)</label>
+            <ion-textarea
+              class="form-textarea"
+              [(ngModel)]="notes"
+              placeholder="Any additional notes..."
+              [rows]="3"
+              [autoGrow]="true"
+            ></ion-textarea>
+          </div>
         </div>
 
         <div class="modal-actions">
-          <ion-button expand="block" fill="outline" (click)="dismiss()">
+          <ion-button expand="block" fill="outline" (click)="dismiss()" class="cancel-btn">
             Cancel
           </ion-button>
           <ion-button
             expand="block"
             [disabled]="!isValid() || isSubmitting()"
             (click)="submit()"
+            class="submit-btn"
           >
             @if (isSubmitting()) {
               <ion-spinner name="crescent" slot="start"></ion-spinner>
@@ -195,29 +201,93 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
     </ion-content>
   `,
   styles: [`
-    .modal-content { --background: var(--m3-surface); }
-    .modal-body { padding: var(--md-space-4); }
+    .modal-header ion-toolbar {
+      --background: var(--m3-surface-bright);
+      --border-width: 0;
+    }
+
+    .modal-header ion-title {
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--m3-on-surface);
+    }
+
+    .close-button {
+      --color: var(--m3-on-surface-variant);
+    }
+
+    .modal-content {
+      --background: var(--m3-surface);
+    }
+
+    .modal-body {
+      padding: var(--md-space-4);
+      animation: fadeInUp 0.25s ease;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
 
     .item-banner {
-      background: var(--m3-primary-container);
-      border-radius: var(--md-radius-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-3);
+      background: linear-gradient(135deg, rgba(0, 34, 99, 0.06) 0%, rgba(0, 34, 99, 0.03) 100%);
+      border: 1px solid rgba(0, 34, 99, 0.12);
+      border-radius: var(--md-radius-xl);
       padding: var(--md-space-4);
-      margin-bottom: var(--md-space-4);
+      margin-bottom: var(--md-space-5);
     }
+
+    .banner-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--md-radius-lg);
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .banner-icon ion-icon {
+      font-size: 22px;
+    }
+
     .banner-info h2 {
       font-size: 15px;
       font-weight: 700;
-      color: var(--m3-on-primary-container);
-      margin: 0 0 4px;
+      color: var(--m3-on-surface);
+      margin: 0 0 3px;
     }
+
     .banner-info p {
       font-size: 12px;
-      color: var(--m3-on-primary-container);
-      opacity: 0.75;
+      color: var(--m3-on-surface-muted);
       margin: 0;
     }
 
-    .form-group { margin-bottom: var(--md-space-4); }
+    .form-section {
+      margin-bottom: var(--md-space-4);
+    }
+
+    .form-group {
+      margin-bottom: var(--md-space-4);
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
     .form-label {
       display: block;
       font-size: 12px;
@@ -227,16 +297,25 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
       letter-spacing: 0.5px;
       margin-bottom: var(--md-space-2);
     }
+
     .form-input {
       --background: var(--m3-surface-bright);
       --border-radius: var(--md-radius-lg);
       --padding-start: var(--md-space-4);
       --padding-end: var(--md-space-4);
+      --min-height: 48px;
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-lg);
       font-size: 15px;
       color: var(--m3-on-surface);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
+
+    .form-input:focus-within {
+      border-color: var(--m3-primary);
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.08);
+    }
+
     .form-textarea {
       --background: var(--m3-surface-bright);
       --padding-start: var(--md-space-4);
@@ -247,6 +326,12 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
       border-radius: var(--md-radius-lg);
       font-size: 15px;
       color: var(--m3-on-surface);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .form-textarea:focus-within {
+      border-color: var(--m3-primary);
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.08);
     }
 
     .form-row {
@@ -259,10 +344,38 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: var(--md-space-3);
-      margin-top: var(--md-space-2);
+      margin-top: var(--md-space-5);
+      padding-top: var(--md-space-4);
+      border-top: 1px solid var(--m3-outline-variant);
     }
 
-    .search-wrap { position: relative; }
+    .cancel-btn {
+      --border-radius: var(--md-radius-lg);
+      --border-color: var(--m3-outline-variant);
+      --color: var(--m3-on-surface-variant);
+      font-weight: 600;
+      font-size: 15px;
+      --min-height: 48px;
+    }
+
+    .submit-btn {
+      --border-radius: var(--md-radius-lg);
+      --background: var(--m3-primary);
+      --color: var(--m3-on-primary);
+      font-weight: 700;
+      font-size: 15px;
+      --min-height: 48px;
+      --box-shadow: 0 2px 8px rgba(0, 34, 99, 0.25);
+    }
+
+    .submit-btn:active {
+      transform: scale(0.98);
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
     .suggestions-list {
       position: absolute;
       top: 100%;
@@ -275,21 +388,42 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
       border-radius: 0 0 var(--md-radius-lg) var(--md-radius-lg);
       max-height: 180px;
       overflow-y: auto;
-      box-shadow: var(--md-elevation-2);
+      box-shadow: var(--md-elevation-3);
+      animation: slideDown 0.15s ease;
     }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     .suggestion-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 10px var(--md-space-4);
+      padding: 12px var(--md-space-4);
       font-size: 14px;
       color: var(--m3-on-surface);
       cursor: pointer;
+      transition: background 0.1s ease;
     }
-    .suggestion-item:hover, .suggestion-item:active {
+
+    .suggestion-item:hover,
+    .suggestion-item:active {
       background: var(--m3-primary-container);
     }
-    .suggestion-item ion-icon { font-size: 14px; color: var(--m3-on-surface-muted); flex-shrink: 0; }
+
+    .suggestion-item ion-icon {
+      font-size: 14px;
+      color: var(--m3-on-surface-muted);
+      flex-shrink: 0;
+    }
   `],
 })
 export class InventoryRequestModalComponent implements OnInit, OnDestroy {

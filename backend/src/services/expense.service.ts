@@ -224,7 +224,7 @@ export async function listExpenses(filter: {
   }
 
   // Cap default at 25 — Atlas M0 free tier rate-limit/rejection threshold.
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
+  const effectiveLimit = Math.min(Math.max(filter.limit || 200, 1), 200);
   const effectivePage = Math.max(filter.page || 1, 1);
   const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
   type ExpenseLike = { [k: string]: unknown };

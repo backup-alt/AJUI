@@ -136,7 +136,7 @@ export async function listLabour(filter: {
   // skip+limit which is O(skip) on MongoDB and times out on M0 once the
   // collection grows past a few hundred rows. Cursor pagination uses an
   // indexed _id range query that's O(log n).
-  const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
+  const effectiveLimit = Math.min(Math.max(filter.limit || 200, 1), 200);
   const effectivePage = Math.max(filter.page || 1, 1);
   const pageState = getLabourCursorState(labourPageKey(filter));
   const internalCursor = filter.cursor || pageState.cursors.get(effectivePage);

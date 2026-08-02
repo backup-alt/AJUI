@@ -48,7 +48,7 @@ export const listQuotationsSchema = z.object({
     search: z.string().optional(),
     status: z.enum(["Draft", "Sent", "Accepted", "Rejected"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(25).default(25),
+    limit: z.coerce.number().int().min(1).max(200).default(200),
   }),
 });
 
