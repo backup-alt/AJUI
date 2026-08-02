@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { IMaterial, Material, MaterialStatus } from "../models/Material.js";
+import { IMaterial, Material } from "../models/Material.js";
 import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
 import { Vendor } from "../models/Vendor.js";
@@ -58,12 +58,18 @@ function getMaterialCursorState(key: string): MaterialPageCursorState {
   return fresh;
 }
 
-function materialTypeToStatus(type?: string): MaterialStatus | undefined {
-  const map: Record<string, MaterialStatus> = {
-    received: "Received",
-    notReceived: "Not Received",
-  };
-  return type ? map[type] : undefined;
+function applyMaterialTypeFilter(query: Record<string, unknown>, type?: string, status?: string): void {
+  if (status) {
+    query.status = status;
+    return;
+  }
+  if (type === "received") {
+    query.status = "Received";
+    return;
+  }
+  if (type === "notReceived") {
+    query.status = { $ne: "Received" };
+  }
 }
 
 async function populateRefs(input: CreateMaterialInput) {
@@ -143,7 +149,7 @@ export async function createMaterial(input: CreateMaterialInput) {
     poNumber: input.poNumber,
     requestDate: input.requestDate,
     approvalDate: input.approvedQuantity ? new Date().toISOString().slice(0, 10) : undefined,
-    status: "Pending",
+    status: "Not Received",
     createdBy: input.createdBy,
     notes: input.notes,
   });
@@ -190,8 +196,7 @@ export async function listMaterials(filter: {
   if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
   if (filter.site) query.site = filter.site;
   if (filter.vendorId) query.vendorId = new Types.ObjectId(filter.vendorId);
-  const status = filter.status || materialTypeToStatus(filter.type);
-  if (status) query.status = status;
+  applyMaterialTypeFilter(query, filter.type, filter.status);
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
