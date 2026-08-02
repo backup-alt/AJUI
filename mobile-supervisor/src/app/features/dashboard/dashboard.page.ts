@@ -802,11 +802,17 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.error.set(false);
 
     try {
-      const startup = await this.supervisor.preloadStartupData(force);
-      const dashData = startup.dashboard;
+      let dashData: DashboardData | null = null;
+      const dashResult = await this.supervisor.getDashboard({
+        siteId: this.supervisor.selectedSiteId() || undefined,
+        projectId: this.supervisor.selectedProjectId() || undefined,
+      }).toPromise().then(
+        (r) => { if (r) dashData = r.dashboard; return !!r; },
+        () => false
+      );
 
       // Dashboard is critical — if it failed, show error state
-      if (!dashData) {
+      if (!dashResult || !dashData) {
         console.error('[Dashboard] failed to load');
         this.loading.set(false);
         this.error.set(true);

@@ -13,7 +13,8 @@ export const authGuard: CanActivateFn = async () => {
     return router.createUrlTree(['/auth/login']);
   }
 
-  await supervisor.preloadStartupData();
+  // Ensure supervisor site selection is hydrated before any tab page runs.
+  await supervisor.init();
   return true;
 };
 

@@ -824,7 +824,7 @@ export async function listMaterialsForSupervisor(
   userId: string,
   filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number; cursor?: string }
 ) {
-  const { query } = await buildScopedEntityQuery(userId, {
+  const { access, query } = await buildScopedEntityQuery(userId, {
     projectId: filters.projectId,
     siteId: filters.siteId,
   });
@@ -837,7 +837,7 @@ export async function listMaterialsForSupervisor(
     delete invQuery.status;
     applyCursor(invQuery, filters.cursor);
 
-    const items = await dbMutex.run(() =>
+    let items = await dbMutex.run(() =>
       withRetry(
         () => Inventory.find(invQuery)
           .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
@@ -851,6 +851,35 @@ export async function listMaterialsForSupervisor(
       console.error("[mobile.listMaterials] inventory query failed:", (err as Error).message);
       throw new AppError(503, "Inventory is temporarily unavailable. Please retry.");
     });
+
+    if (items.length === 0 && (invQuery as any).siteId) {
+      const fallbackQuery: Record<string, unknown> = { ...invQuery };
+      const siteIdCondition = (fallbackQuery as any).siteId;
+      delete (fallbackQuery as any).siteId;
+      const names = filters.siteId
+        ? uniqueStrings([access.siteIdToName.get(filters.siteId)])
+        : access.siteNames;
+      const siteKeys = names.map((name) => name.trim().toLowerCase()).filter(Boolean);
+      const siteOr: Record<string, unknown>[] = [{ siteId: siteIdCondition }];
+      if (names.length > 0) siteOr.push({ site: { $in: names } });
+      if (siteKeys.length > 0) siteOr.push({ siteKey: { $in: siteKeys } });
+      fallbackQuery.$or = siteOr;
+
+      items = await dbMutex.run(() =>
+        withRetry(
+          () => Inventory.find(fallbackQuery)
+            .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
+            .sort({ _id: -1 })
+            .limit(limit)
+            .lean()
+            .maxTimeMS(20_000),
+          { label: "mobile.listMaterials.inv.fallbackFind" }
+        )
+      ).catch((err) => {
+        console.error("[mobile.listMaterials] inventory fallback query failed:", (err as Error).message);
+        throw new AppError(503, "Inventory is temporarily unavailable. Please retry.");
+      });
+    }
 
     // Batch-fetch billUrl for purchaseHistory entries across all items
     const allMatIds = items.flatMap((m) =>
