@@ -611,6 +611,7 @@ export async function takeApprovalAction(req: Request, res: Response, next: Next
     // underlying record's status — invalidate every relevant cache.
     invalidateCachePrefix("/api/approvals");
     invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/inventory");
     invalidateCachePrefix("/api/expenses");
     invalidateCachePrefix("/api/labour");
     invalidateCachePrefix("/api/supervisor");

@@ -31,6 +31,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { withRetry } from "../utils/retry.js";
 import { applyCursor } from "../utils/cursor-pagination.js";
 import { dbMutex } from "../utils/db-mutex.js";
+import { approveRequest, rejectRequest } from "./approval.service.js";
 
 type SupervisorAccess = {
   user: Awaited<ReturnType<typeof User.findById>>;
@@ -1227,41 +1228,20 @@ export async function takeApprovalActionForSupervisor(
   if (!approval) throw new AppError(404, "Approval not found or not accessible");
   if (approval.status !== "Pending") throw new AppError(400, "Approval is not pending");
 
-  approval.status = action.action === "approve" ? "Approved" : "Rejected";
-  approval.reviewedAt = new Date();
-  approval.reviewedBy = userId;
-  if (action.comment) approval.detail = action.comment;
-  await approval.save();
-
-  // Update the linked source document
-  if (approval.sourceCollection && approval.sourceId) {
-    const Model =
-      approval.sourceCollection === "Material"
-        ? Material
-        : approval.sourceCollection === "Labour"
-        ? Labour
-        : approval.sourceCollection === "Expense"
-        ? Expense
-        : null;
-
-    if (Model) {
-      const doc: any = await (Model as any).findById(approval.sourceId);
-      if (doc) {
-        if (approval.sourceCollection === "Material") {
-          doc.status = "Not Received";
-        } else {
-          doc.status = approval.status;
-        }
-        if (action.action === "approve") {
-          doc.approvedBy = userId;
-          doc.approvedAt = new Date();
-        }
-        await doc.save();
-      }
-    }
+  if (!approval.approvalId) {
+    throw new AppError(500, "Approval is missing its business identifier");
   }
 
-  return approval;
+  if (action.comment) {
+    approval.detail = action.comment;
+    await approval.save();
+  }
+
+  // Keep mobile and web approvals on one canonical path. This also creates
+  // or updates Inventory whenever a material request is approved.
+  return action.action === "approve"
+    ? approveRequest(approval.approvalId, userId)
+    : rejectRequest(approval.approvalId, userId);
 }
 
 export async function getApprovalDetailForSupervisor(userId: string, approvalId: string) {
