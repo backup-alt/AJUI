@@ -658,10 +658,8 @@ export class RequestsPage implements OnInit {
         items.push(item);
       };
 
-      const cachedStartup = force ? null : this.supervisor.getStartupData();
-
       try {
-        const approvalsRes = cachedStartup?.approvals || await firstValueFrom(this.supervisor.getApprovals());
+        const approvalsRes = await firstValueFrom(this.supervisor.getApprovals());
         for (const approval of approvalsRes?.approvals || []) {
           const rawType = String((approval as any).type || (approval as any).sourceCollection || '').toLowerCase();
           const requestType: RequestItem['type'] =
@@ -688,7 +686,7 @@ export class RequestsPage implements OnInit {
 
       // Load APPROVED materials from Inventory (fast on M0 — avoids Material.find() timeout)
       try {
-        const approvedMatRes = cachedStartup?.inventory || await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 25 }));
+        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 25 }));
         for (const m of approvedMatRes?.materials || []) {
           const hasNoBill = !(m as any).billUrl;
           addItem({
@@ -740,7 +738,7 @@ export class RequestsPage implements OnInit {
 
       // Load expenses — include ALL transaction types (Purchase + Add Cash)
       try {
-        const expRes = cachedStartup?.expenses || await firstValueFrom(this.supervisor.getExpenses({ ...siteFilter, type: 'site', limit: 25 }));
+        const expRes = await firstValueFrom(this.supervisor.getExpenses({ ...siteFilter, type: 'site', limit: 25 }));
         for (const e of expRes?.expenses || []) {
           const txLabel =
             e.transactionType === 'Cash Added' ? 'Add Cash' :

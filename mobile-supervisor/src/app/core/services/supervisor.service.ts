@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { firstValueFrom, Subject } from 'rxjs';
+import { Subject } from 'rxjs';
 import { ApiService } from './api.service';
 import {
   DashboardData,
@@ -35,15 +35,6 @@ export interface SiteSelection {
   siteName: string;
 }
 
-export interface SupervisorStartupData {
-  dashboard: DashboardData;
-  inventory: MaterialsListResponse;
-  expenses: ExpenseListResponse;
-  approvals: ApprovalsListResponse;
-  selectionKey: string;
-  loadedAt: number;
-}
-
 @Injectable({ providedIn: 'root' })
 export class SupervisorService {
   private api = inject(ApiService);
@@ -51,8 +42,6 @@ export class SupervisorService {
   readonly selection = this._selection.asReadonly();
   private _siteChanged$ = new Subject<SiteSelection>();
   readonly siteChanged$ = this._siteChanged$.asObservable();
-  private startupData: SupervisorStartupData | null = null;
-  private startupPromise: Promise<SupervisorStartupData> | null = null;
 
   async init(): Promise<void> {
     const [siteId, projectId, projectName, siteName] = await Promise.all([
@@ -64,71 +53,6 @@ export class SupervisorService {
     if (siteId && projectId) {
       this._selection.set({ siteId, projectId, projectName: projectName || '', siteName: siteName || '' });
     }
-  }
-
-  async preloadStartupData(force = false): Promise<SupervisorStartupData> {
-    await this.init();
-    const selectionKey = this.currentSelectionKey();
-    if (!force && this.startupData?.selectionKey === selectionKey) return this.startupData;
-    if (!force && this.startupPromise) return this.startupPromise;
-
-    this.startupPromise = this.loadStartupData(selectionKey)
-      .then((data) => {
-        this.startupData = data;
-        return data;
-      })
-      .finally(() => {
-        this.startupPromise = null;
-      });
-    return this.startupPromise;
-  }
-
-  getStartupData(): SupervisorStartupData | null {
-    return this.startupData?.selectionKey === this.currentSelectionKey() ? this.startupData : null;
-  }
-
-  private async loadStartupData(selectionKey: string): Promise<SupervisorStartupData> {
-    const started = Date.now();
-    const siteId = this.selectedSiteId() || undefined;
-    const projectId = this.selectedProjectId() || undefined;
-    const scopedFilters = { siteId, projectId };
-    const [dashboardRes, inventory, expenses, approvals] = await this.withStartupRetry(() => Promise.all([
-      firstValueFrom(this.getDashboard(scopedFilters)),
-      firstValueFrom(this.getMaterials({ ...scopedFilters, status: 'Approved', limit: 25 })),
-      firstValueFrom(this.getExpenses({ ...scopedFilters, type: 'site', limit: 25 })),
-      firstValueFrom(this.getApprovals()),
-    ]));
-
-    const data: SupervisorStartupData = {
-      dashboard: dashboardRes.dashboard,
-      inventory,
-      expenses,
-      approvals,
-      selectionKey,
-      loadedAt: Date.now(),
-    };
-    console.info(`[SupervisorStartup] loaded in ${Date.now() - started}ms`);
-    return data;
-  }
-
-  private async withStartupRetry<T>(factory: () => Promise<T>, attempts = 2): Promise<T> {
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        return await factory();
-      } catch (error) {
-        lastError = error;
-        console.warn(`[SupervisorStartup] attempt ${attempt} failed`, error);
-        if (attempt < attempts) {
-          await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
-        }
-      }
-    }
-    throw lastError;
-  }
-
-  private currentSelectionKey(): string {
-    return `${this.selectedProjectId() || 'all'}:${this.selectedSiteId() || 'all'}`;
   }
 
   // ---------------- Profile ----------------
@@ -351,7 +275,6 @@ export class SupervisorService {
     await this.api.setSelectedProjectId(projectId);
     await this.api.setSelectedProjectName(projectName);
     if (siteName) await this.api.setSelectedSiteName(siteName);
-    this.startupData = null;
   }
 
   selectedSiteId(): string | null {
@@ -373,7 +296,6 @@ export class SupervisorService {
   async clearSiteSelection(): Promise<void> {
     this._selection.set(null);
     await this.api.clearSiteSelection();
-    this.startupData = null;
   }
 
   // ---------------- Vendors ----------------

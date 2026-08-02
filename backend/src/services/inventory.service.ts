@@ -491,7 +491,12 @@ export async function uploadInventoryReceipt(
       payload.fileName || `receipt_inv_${inventory.name.replace(/\s+/g, "_")}.${payload.mimeType.split("/")[1] || "jpg"}`,
       payload.mimeType
     );
-    inventory.billUrl = pcloudResult.fileUrl;
+    inventory.billUrl = pcloudResult.mediaUrl;
+    inventory.pcloudFileId = pcloudResult.fileId;
+    inventory.pcloudPublicCode = pcloudResult.publicCode;
+    inventory.receiptImageName = pcloudResult.fileName;
+    inventory.receiptImage = undefined;
+    inventory.receiptImageMimeType = undefined;
   } catch (err) {
     console.error("[pCloud] Upload failed for inventory item:", err);
     throw new AppError(503, "Bill upload failed. Please retry after pCloud is available.");
@@ -508,12 +513,20 @@ export async function uploadInventoryReceipt(
   if (inventory.billUrl) {
     try {
       const { Material } = await import("../models/Material.js");
+      const pcloudUpdate = {
+        $set: {
+          billUrl: inventory.billUrl,
+          pcloudFileId: inventory.pcloudFileId,
+          pcloudPublicCode: inventory.pcloudPublicCode,
+        },
+        $unset: { receiptImage: "", receiptImageMimeType: "" },
+      };
       if (inventory.lastMaterialId) {
-        await Material.updateOne({ _id: inventory.lastMaterialId }, { $set: { billUrl: inventory.billUrl } });
+        await Material.updateOne({ _id: inventory.lastMaterialId }, pcloudUpdate);
       } else {
         await Material.updateOne(
           { projectId: inventory.projectId, name: inventory.name, unit: inventory.unit },
-          { $set: { billUrl: inventory.billUrl } }
+          pcloudUpdate
         );
       }
     } catch (err) {

@@ -366,6 +366,9 @@ export async function getMaterialById(id: string) {
 
 export async function updateMaterial(id: string, patch: Partial<CreateMaterialInput>) {
   const update: Record<string, unknown> = { ...patch };
+  for (const key of ["receiptImage", "receiptImageMimeType", "billUrl", "pcloudFileId", "pcloudPublicCode", "pcloudContentHash"]) {
+    delete update[key];
+  }
   if (patch.siteId) {
     update.siteId = new Types.ObjectId(patch.siteId);
     const site = await Site.findById(patch.siteId).lean();
@@ -414,7 +417,12 @@ export async function uploadMaterialReceipt(
       payload.fileName || `receipt_mat_${material.materialId}.${payload.mimeType.split("/")[1] || "jpg"}`,
       payload.mimeType
     );
-    material.billUrl = pcloudResult.fileUrl;
+    material.billUrl = pcloudResult.mediaUrl;
+    material.pcloudFileId = pcloudResult.fileId;
+    material.pcloudPublicCode = pcloudResult.publicCode;
+    material.receiptImageName = pcloudResult.fileName;
+    material.receiptImage = undefined;
+    material.receiptImageMimeType = undefined;
   } catch (err) {
     console.error("[pCloud] Upload failed for material:", err);
     throw new AppError(503, "Bill upload failed. Please retry after pCloud is available.");

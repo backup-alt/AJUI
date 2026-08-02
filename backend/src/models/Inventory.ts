@@ -25,6 +25,9 @@ export interface IInventory extends Document {
   lastMaterialId?: Types.ObjectId;
   lastUpdatedBy?: string;
   billUrl?: string;
+  pcloudFileId?: string;
+  pcloudPublicCode?: string;
+  pcloudContentHash?: string;
   receiptImage?: string;
   receiptImageMimeType?: string;
   receiptImageName?: string;
@@ -72,8 +75,11 @@ const inventorySchema = new Schema<IInventory>(
     lastMaterialId: { type: Schema.Types.ObjectId, ref: "Material" },
     lastUpdatedBy: { type: String },
     billUrl: { type: String },
-    receiptImage: { type: String },
-    receiptImageMimeType: { type: String },
+    pcloudFileId: { type: String, trim: true, index: true },
+    pcloudPublicCode: { type: String, trim: true },
+    pcloudContentHash: { type: String, trim: true },
+    receiptImage: { type: String, select: false },
+    receiptImageMimeType: { type: String, select: false },
     receiptImageName: { type: String },
     received: { type: Boolean, default: false },
     purchaseHistory: {

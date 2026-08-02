@@ -639,15 +639,12 @@ export class ShellComponent implements OnInit {
   async loadSites(): Promise<void> {
     this.isLoadingSites.set(true);
     try {
-      const startupSites = this.supervisor.getStartupData()?.dashboard.sites as Site[] | undefined;
-      const response = startupSites
-        ? { sites: startupSites }
-        : await new Promise<{ sites: Site[] }>((resolve) => {
-            this.supervisor.getSites().subscribe({
-              next: (data) => resolve(data as { sites: Site[] }),
-              error: () => resolve({ sites: [] }),
-            });
-          });
+      const response = await new Promise<{ sites: Site[] }>((resolve) => {
+        this.supervisor.getSites().subscribe({
+          next: (data) => resolve(data as { sites: Site[] }),
+          error: () => resolve({ sites: [] }),
+        });
+      });
 
       this.sites.set(response.sites);
 
@@ -678,18 +675,11 @@ export class ShellComponent implements OnInit {
   }
 
   private loadBadgeCounts(): void {
-    const startupDashboard = this.supervisor.getStartupData()?.dashboard;
-    if (startupDashboard?.counts) {
-      this.pendingApprovals.set(startupDashboard.counts.pendingApprovals || 0);
-      this.pendingExpenses.set(startupDashboard.counts.pendingExpenses || 0);
-      return;
-    }
-
-    this.supervisor.getDashboard().subscribe({
+    this.supervisor.getApprovals().subscribe({
       next: (res) => {
-        const d = (res as { dashboard?: { counts?: { pendingApprovals?: number; pendingExpenses?: number } } }).dashboard;
-        this.pendingApprovals.set(d?.counts?.pendingApprovals || 0);
-        this.pendingExpenses.set(d?.counts?.pendingExpenses || 0);
+        const pending = (res.approvals || []).filter((approval) => approval.status === 'Pending');
+        this.pendingApprovals.set(pending.length);
+        this.pendingExpenses.set(pending.filter((approval) => approval.type === 'expense').length);
       },
       error: () => undefined,
     });

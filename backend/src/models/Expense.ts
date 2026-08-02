@@ -43,6 +43,9 @@ export interface IExpense extends Document {
   givenAmount?: number;
   received?: boolean;
   billUrl?: string;
+  pcloudFileId?: string;
+  pcloudPublicCode?: string;
+  pcloudContentHash?: string;
   customFields?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -63,8 +66,8 @@ const expenseSchema = new Schema<IExpense>(
     transactionType: { type: String, enum: ["Purchase", "Cash Added"], index: true },
     amount: { type: Number, required: true },
     siteMaterialBalance: { type: Number },
-    receiptImage: { type: String },
-    receiptImageMimeType: { type: String },
+    receiptImage: { type: String, select: false },
+    receiptImageMimeType: { type: String, select: false },
     receiptImageName: { type: String },
     runningBalance: { type: Number, default: 0 },
     date: { type: String, required: true, index: true },
@@ -92,6 +95,9 @@ const expenseSchema = new Schema<IExpense>(
     givenAmount: { type: Number },
     received: { type: Boolean, default: false },
     billUrl: { type: String },
+    pcloudFileId: { type: String, trim: true, index: true },
+    pcloudPublicCode: { type: String, trim: true },
+    pcloudContentHash: { type: String, trim: true },
     customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }

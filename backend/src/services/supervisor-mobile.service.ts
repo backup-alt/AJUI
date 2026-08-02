@@ -1110,13 +1110,13 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
 
   const linkedId = (material as any).lastMaterialId;
   if (linkedId) {
-    try {
-      const linked = await Material.findById(linkedId).select("billUrl receiptImage receiptImageMimeType poNumber vendor").lean();
-      if (linked) {
-        result.billUrl = linked.billUrl || result.billUrl;
-        result.receiptImage = linked.receiptImage || result.receiptImage;
-        result.receiptImageMimeType = linked.receiptImageMimeType || result.receiptImageMimeType;
-      }
+      try {
+        const linked = await Material.findById(linkedId).select("billUrl pcloudFileId pcloudPublicCode poNumber vendor").lean();
+        if (linked) {
+          result.billUrl = linked.billUrl || result.billUrl;
+          result.pcloudFileId = linked.pcloudFileId || result.pcloudFileId;
+          result.pcloudPublicCode = linked.pcloudPublicCode || result.pcloudPublicCode;
+        }
     } catch {}
   }
 

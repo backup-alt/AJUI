@@ -21,6 +21,7 @@ import vendorExtraRoutes from "./routes/vendor-extra.routes.js";
 import quotationRoutes from "./routes/quotation.routes.js";
 import invoiceRoutes from "./routes/invoice.routes.js";
 import companyProfileRoutes from "./routes/company-profile.routes.js";
+import mediaRoutes from "./routes/media.routes.js";
 import { ensureDefaultPermissions } from "./models/RolePermission.js";
 import { RESET_PASSWORD_HTML, SIGNUP_HTML } from "./config/pages.js";
 
@@ -150,9 +151,9 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(300_000); nex
       const { Inventory } = await import("./models/Inventory.js");
       const { Expense } = await import("./models/Expense.js");
       await Promise.all([
-        Material.findOne().lean().maxTimeMS(5000).catch(() => null),
-        Inventory.findOne().lean().maxTimeMS(5000).catch(() => null),
-        Expense.findOne().lean().maxTimeMS(5000).catch(() => null),
+        Material.findOne().select("_id").lean().maxTimeMS(5000).catch(() => null),
+        Inventory.findOne().select("_id").lean().maxTimeMS(5000).catch(() => null),
+        Expense.findOne().select("_id").lean().maxTimeMS(5000).catch(() => null),
       ]);
       res.json({ ok: true });
     } catch {
@@ -180,6 +181,7 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(300_000); nex
 
   setupSwagger(app);
 
+  app.use("/api", mediaRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api", entitiesRoutes);

@@ -106,8 +106,6 @@ export const expenseBaseSchema = z.object({
   supervisorId: objectIdSchema.optional(),
   transactionType: z.enum(["Purchase", "Cash Added"]).optional(),
   siteMaterialBalance: z.coerce.number().optional(),
-  receiptImage: z.string().optional(),
-  receiptImageMimeType: z.string().optional(),
   receiptImageName: z.string().optional(),
   amount: z.coerce.number().nonnegative(),
   date: z.string().min(1),
@@ -124,7 +122,6 @@ export const expenseBaseSchema = z.object({
   issuedAmount: z.coerce.number().nonnegative().optional(),
   givenAmount: z.coerce.number().nonnegative().optional(),
   received: z.boolean().optional(),
-  billUrl: z.string().trim().optional(),
   customFields: z.record(z.unknown()).optional(),
 });
 

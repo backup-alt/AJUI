@@ -733,8 +733,7 @@ export class InventoryPage implements OnInit, OnDestroy {
     const projectId = this.supervisor.selectedProjectId();
 
     try {
-      const cachedStartup = force ? null : this.supervisor.getStartupData();
-      const res = cachedStartup?.inventory || await firstValueFrom(
+      const res = await firstValueFrom(
         this.supervisor.getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,

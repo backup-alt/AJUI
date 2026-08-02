@@ -28,6 +28,9 @@ export interface IMaterial extends Document {
   status: MaterialStatus;
   notes?: string;
   billUrl?: string;
+  pcloudFileId?: string;
+  pcloudPublicCode?: string;
+  pcloudContentHash?: string;
   receiptImage?: string;
   receiptImageMimeType?: string;
   receiptImageName?: string;
@@ -75,8 +78,11 @@ const materialSchema = new Schema<IMaterial>(
     approvedAt: { type: Date },
     notes: { type: String, trim: true, maxlength: 2000 },
     billUrl: { type: String, trim: true },
-    receiptImage: { type: String },
-    receiptImageMimeType: { type: String },
+    pcloudFileId: { type: String, trim: true, index: true },
+    pcloudPublicCode: { type: String, trim: true },
+    pcloudContentHash: { type: String, trim: true },
+    receiptImage: { type: String, select: false },
+    receiptImageMimeType: { type: String, select: false },
     receiptImageName: { type: String },
     customFields: { type: Schema.Types.Mixed, default: {} },
   },

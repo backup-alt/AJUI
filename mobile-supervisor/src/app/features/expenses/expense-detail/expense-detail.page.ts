@@ -155,7 +155,7 @@ import { Expense } from '../../../shared/models';
                     <h3>{{ expense()!.date | date: 'EEE, MMM d, y' }}</h3>
                   </ion-label>
                 </ion-item>
-                @if (expense()!.receiptImage) {
+                @if (expense()!.billUrl || expense()!.receiptImage) {
                   <ion-item>
                     <ion-icon name="document-text-outline" slot="start" color="primary"></ion-icon>
                     <ion-label>
@@ -352,12 +352,14 @@ export class ExpenseDetailPage implements OnInit {
     return (
       exp.transactionType !== 'Cash Added' &&
       !!exp.poNumber &&
+      !exp.billUrl &&
       !exp.receiptImage
     );
   });
 
   receiptDataUrl = computed(() => {
     const exp = this.expense();
+    if (exp?.billUrl) return exp.billUrl;
     if (!exp?.receiptImage) return '#';
     const mimeType = exp.receiptImageMimeType || 'image/jpeg';
     return `data:${mimeType};base64,${exp.receiptImage}`;

@@ -9,7 +9,9 @@
     "start": "tsx src/app.ts",
     "lint": "tsc --noEmit",
     "test": "jest --passWithNoTests",
-    "test:coverage": "jest --coverage --passWithNoTests"
+    "test:coverage": "jest --coverage --passWithNoTests",
+    "migrate:images:dry-run": "tsx scripts/migrate-images-to-pcloud.ts",
+    "migrate:images": "tsx scripts/migrate-images-to-pcloud.ts --execute"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.3",

@@ -398,8 +398,7 @@ export class ExpensesPage implements OnInit {
     try {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
-      const cachedStartup = force ? null : this.supervisor.getStartupData();
-      const r = cachedStartup?.expenses || await this.supervisor
+      const r = await this.supervisor
         .getExpenses({
           siteId: siteId || undefined,
           projectId: projectId || undefined,

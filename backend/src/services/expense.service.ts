@@ -310,6 +310,9 @@ export async function getExpenseById(id: string) {
 
 export async function updateExpense(id: string, patch: Partial<CreateExpenseInput>) {
   const update: Record<string, unknown> = { ...patch };
+  for (const key of ["receiptImage", "receiptImageMimeType", "billUrl", "pcloudFileId", "pcloudPublicCode", "pcloudContentHash"]) {
+    delete update[key];
+  }
   if (patch.siteId) update.siteId = new Types.ObjectId(patch.siteId);
   if (patch.supervisorId) update.supervisorId = new Types.ObjectId(patch.supervisorId);
   if (patch.projectId) update.projectId = new Types.ObjectId(patch.projectId);
@@ -345,9 +348,13 @@ export async function uploadExpenseReceipt(
       payload.fileName || `receipt_${expense.expenseId}.${payload.mimeType.split("/")[1] || "jpg"}`,
       payload.mimeType
     );
-    expense.billUrl = pcloudResult.fileUrl;
+    expense.billUrl = pcloudResult.mediaUrl;
+    expense.pcloudFileId = pcloudResult.fileId;
+    expense.pcloudPublicCode = pcloudResult.publicCode;
     expense.receiptImageName = pcloudResult.fileName;
-    console.log(`[uploadExpenseReceipt svc] pCloud OK: ${pcloudResult.fileUrl?.substring(0, 60)}`);
+    expense.receiptImage = undefined;
+    expense.receiptImageMimeType = undefined;
+    console.log(`[uploadExpenseReceipt svc] pCloud OK: fileId=${pcloudResult.fileId}`);
   } catch (err) {
     console.error("[uploadExpenseReceipt svc] pCloud failed:", err);
     throw new AppError(503, "Bill upload failed. Please retry after pCloud is available.");
@@ -371,7 +378,17 @@ export async function uploadExpenseReceipt(
 
   if (expense.poNumber && expense.billUrl) {
     const { Material } = await import("../models/Material.js");
-    await Material.updateOne({ poNumber: expense.poNumber }, { billUrl: expense.billUrl });
+    await Material.updateOne(
+      { poNumber: expense.poNumber },
+      {
+        $set: {
+          billUrl: expense.billUrl,
+          pcloudFileId: expense.pcloudFileId,
+          pcloudPublicCode: expense.pcloudPublicCode,
+        },
+        $unset: { receiptImage: "", receiptImageMimeType: "" },
+      }
+    );
   }
 
   return expense.toObject();
@@ -383,7 +400,7 @@ export async function markExpenseAsReceived(id: string) {
   if (expense.status !== "Approved") {
     throw new AppError(400, "Only approved expenses can be marked as received");
   }
-  if (!expense.billUrl && !expense.receiptImage) {
+  if (!expense.billUrl && !expense.pcloudFileId) {
     throw new AppError(400, "Bill must be uploaded before marking as received");
   }
 
