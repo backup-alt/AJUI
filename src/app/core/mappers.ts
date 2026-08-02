@@ -6,6 +6,16 @@ import type {
   ClientStatus,
 } from "../data/erp-data.service";
 import type { TaxInvoice, TaxInvoiceRow } from "../../data/dashboardData";
+import { environment } from "../../environments/environment";
+
+function billUrlFor(row: any): string | undefined {
+  if (row?.pcloudFileId) {
+    return `${environment.apiUrl}/media/pcloud/${encodeURIComponent(String(row.pcloudFileId))}`;
+  }
+  return row?.billUrl || (row?.receiptImage
+    ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}`
+    : undefined);
+}
 
 /**
  * Mappers from backend API response shapes (Mongoose documents) to
@@ -129,7 +139,7 @@ export function mapMaterial(m: any): any {
     vendor: m.vendor,
     vendorId: m.vendorId,
     poNumber: m.poNumber,
-    billUrl: m.billUrl || (m.receiptImage ? `data:${m.receiptImageMimeType || 'image/jpeg'};base64,${m.receiptImage}` : undefined),
+    billUrl: billUrlFor(m),
     issuedAmount: m.issuedAmount,
     givenAmount: m.givenAmount,
     requestDate: m.requestDate,
@@ -195,7 +205,7 @@ export function mapExpense(e: any): any {
     openingBalance: isCashAdded ? (Number(e.runningBalance) || amount) : 0,
     siteMaterialBalance: e.siteMaterialBalance,
     poNumber: e.poNumber,
-    billUrl: e.billUrl || (e.receiptImage ? `data:${e.receiptImageMimeType || 'image/jpeg'};base64,${e.receiptImage}` : undefined),
+    billUrl: billUrlFor(e),
     receiptImage: e.receiptImage,
     receiptImageMimeType: e.receiptImageMimeType,
     receiptImageName: e.receiptImageName,
@@ -329,6 +339,8 @@ export function mapInventory(i: any): any {
     minimumQuantity: i.minimumQuantity ?? 0,
     vendor: i.vendor,
     poNumber: i.poNumber,
+    billUrl: billUrlFor(i),
+    purchaseHistory: i.purchaseHistory || [],
     requestDate: i.updatedAt || i.createdAt || "",
     createdAt: i.createdAt,
     updatedAt: i.updatedAt,

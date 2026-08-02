@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Subject } from 'rxjs';
+import { Preferences } from '@capacitor/preferences';
 import { ApiService } from './api.service';
 import {
   DashboardData,
@@ -61,11 +62,38 @@ export class SupervisorService {
   }
 
   // ---------------- Dashboard ----------------
-  getDashboard(filters?: { siteId?: string; projectId?: string }) {
+  getDashboard(filters?: { siteId?: string; projectId?: string }, force = false) {
+    if (force) this.api.invalidateGetCache('/supervisor/dashboard');
     const params: Record<string, string> = {};
     if (filters?.siteId) params['siteId'] = filters.siteId;
     if (filters?.projectId) params['projectId'] = filters.projectId;
     return this.api.get<{ dashboard: DashboardData }>('/supervisor/dashboard', params);
+  }
+
+  async getCachedDashboard(): Promise<DashboardData | null> {
+    try {
+      const userId = await this.api.getUserId();
+      if (!userId) return null;
+      const { value } = await Preferences.get({ key: `dashboardCache:${userId}` });
+      if (!value) return null;
+      const cached = JSON.parse(value) as { data?: DashboardData };
+      return cached.data || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async cacheDashboard(data: DashboardData): Promise<void> {
+    try {
+      const userId = await this.api.getUserId();
+      if (!userId) return;
+      await Preferences.set({
+        key: `dashboardCache:${userId}`,
+        value: JSON.stringify({ savedAt: Date.now(), data }),
+      });
+    } catch {
+      // Persistent cache is an optimization; live dashboard data still works without it.
+    }
   }
 
   // ---------------- Sites ----------------
@@ -97,8 +125,30 @@ export class SupervisorService {
     page?: number;
     limit?: number;
     cursor?: string;
-  }) {
+    search?: string;
+    stockStatus?: 'all' | 'available' | 'low' | 'out';
+  }, force = false) {
+    if (force) this.api.invalidateGetCache('/supervisor/materials');
     return this.api.get<MaterialsListResponse>('/supervisor/materials', filters);
+  }
+
+  addExistingMaterial(payload: {
+    projectId: string;
+    siteId?: string;
+    site: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    vendor?: string;
+    vendorId?: string;
+    poNumber?: string;
+    minimumQuantity?: number;
+    notes?: string;
+  }) {
+    return this.api.post<{ inventory: unknown; created: boolean; message: string }>(
+      '/supervisor/inventory/add-existing',
+      payload
+    );
   }
 
   getMaterialBillRequests(filters?: {

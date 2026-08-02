@@ -4,12 +4,9 @@ import {
   IonHeader,
   IonToolbar,
   IonTitle,
-  IonBackButton,
   IonButtons,
   IonButton,
   IonInput,
-  IonItem,
-  IonLabel,
   IonTextarea,
   IonSelect,
   IonSelectOption,
@@ -35,12 +32,9 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
     IonHeader,
     IonToolbar,
     IonTitle,
-    IonBackButton,
     IonButtons,
     IonButton,
     IonInput,
-    IonItem,
-    IonLabel,
     IonTextarea,
     IonSelect,
     IonSelectOption,
@@ -56,7 +50,7 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
             <ion-icon name="close-outline"></ion-icon>
           </ion-button>
         </ion-buttons>
-        <ion-title>{{ preSelected ? 'Request More' : 'New Material Request' }}</ion-title>
+        <ion-title>{{ mode === 'existing' ? 'Add Existing Material' : (preSelected ? 'Request More' : 'New Material Request') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -120,7 +114,8 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
           </div>
         </div>
 
-        <div class="form-row">
+        @if (mode === 'request') {
+          <div class="form-row">
           <div class="form-group">
             <label class="form-label">Issued Amount *</label>
             <ion-input
@@ -145,7 +140,27 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
               }
             </ion-select>
           </div>
-        </div>
+          </div>
+        } @else {
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Vendor (optional)</label>
+              <ion-select class="form-input" [(ngModel)]="vendorId" interface="popover" placeholder="Select vendor" (ionChange)="onVendorChange()">
+                @for (vendor of vendors(); track vendor._id) {
+                  <ion-select-option [value]="vendor._id">{{ vendor.name }}</ion-select-option>
+                }
+              </ion-select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">PO Number (optional)</label>
+              <ion-input class="form-input" [(ngModel)]="poNumber" placeholder="PO number"></ion-input>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Minimum Stock (optional)</label>
+            <ion-input class="form-input" type="number" [(ngModel)]="minimumQuantity" placeholder="0"></ion-input>
+          </div>
+        }
 
         <div class="form-group">
           <label class="form-label">Notes (optional)</label>
@@ -172,7 +187,7 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
               Submitting...
             } @else {
               <ion-icon name="checkmark-outline" slot="start"></ion-icon>
-              Submit Request
+              {{ mode === 'existing' ? 'Add to Inventory' : 'Submit Request' }}
             }
           </ion-button>
         </div>
@@ -283,12 +298,16 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   private toastCtrl = inject(ToastController);
 
   @Input() preSelected: InventoryItem | null = null;
+  @Input() mode: 'request' | 'existing' = 'request';
+  @Input() materialCatalog: Array<{ name: string; unit: string }> = [];
   name = '';
   quantity: number | null = null;
   unit = '';
   issuedAmount: number | null = null;
   vendorId = '';
   vendorName = '';
+  poNumber = '';
+  minimumQuantity: number | null = null;
   notes = '';
   unitOptions = MATERIAL_UNITS;
   vendors = signal<Vendor[]>([]);
@@ -354,6 +373,8 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   selectName(n: string): void {
     this.selectingName = true;
     this.name = n;
+    const known = this.materialCatalog.find((item) => item.name.trim().toLowerCase() === n.trim().toLowerCase());
+    if (known?.unit) this.unit = known.unit;
     this.showSuggestions.set(false);
     this.filteredNames.set([]);
     setTimeout(() => { this.selectingName = false; }, 100);
@@ -369,11 +390,12 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   }
 
   isValid(): boolean {
-    return !!this.name.trim()
+    const baseValid = !!this.name.trim()
       && this.quantity !== null
       && this.quantity > 0
-      && !!this.unit.trim()
-      && this.issuedAmount !== null
+      && !!this.unit.trim();
+    if (this.mode === 'existing') return baseValid;
+    return baseValid && this.issuedAmount !== null
       && this.issuedAmount >= 0
       && !!this.vendorName.trim();
   }
@@ -413,6 +435,38 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
     }
 
     this.isSubmitting.set(true);
+
+    if (this.mode === 'existing') {
+      this.supervisor.addExistingMaterial({
+        projectId,
+        siteId,
+        site: siteName,
+        name: this.name.trim(),
+        unit: this.unit.trim(),
+        quantity: this.quantity!,
+        vendor: this.vendorName.trim() || undefined,
+        vendorId: this.vendorId || undefined,
+        poNumber: this.poNumber.trim() || undefined,
+        minimumQuantity: this.minimumQuantity === null ? undefined : Math.max(0, Number(this.minimumQuantity) || 0),
+        notes: this.notes.trim() || undefined,
+      }).subscribe({
+        next: async (result) => {
+          this.isSubmitting.set(false);
+          await this.modalCtrl.dismiss({ added: true, message: result.message });
+        },
+        error: async (err) => {
+          this.isSubmitting.set(false);
+          const toast = await this.toastCtrl.create({
+            message: err?.message || 'Failed to update inventory',
+            duration: 3000,
+            color: 'danger',
+            position: 'top',
+          });
+          await toast.present();
+        },
+      });
+      return;
+    }
 
     this.supervisor.createMaterial({
       projectId,

@@ -28,6 +28,7 @@ import { Payment } from "../models/Payment.js";
 import { Approval } from "../models/Approval.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { buildPCloudMediaUrl } from "./pcloud.service.js";
 import { withRetry } from "../utils/retry.js";
 import { applyCursor } from "../utils/cursor-pagination.js";
 import { dbMutex } from "../utils/db-mutex.js";
@@ -589,7 +590,7 @@ export async function getSupervisorDashboard(
     siteQuery = { _id: { $exists: false } };
   }
 
-  const approvalQuery = approvalScopeQuery(access);
+  const approvalQuery = approvalScopeQuery(access, "Pending");
   if (filters.projectId) approvalQuery.projectId = toObjectId(filters.projectId) || approvalQuery.projectId;
   const todayExpensesQuery = { ...entityScope, type: "site", date: today, transactionType: { $ne: "Cash Added" } };
   const safeDashboardList = async <T>(label: string, promise: Promise<T[]>): Promise<T[]> => {
@@ -838,7 +839,16 @@ async function getProjectIdStrings(userId: string): Promise<string[]> {
 
 export async function listMaterialsForSupervisor(
   userId: string,
-  filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number; cursor?: string }
+  filters: {
+    projectId?: string;
+    siteId?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+    cursor?: string;
+    search?: string;
+    stockStatus?: "all" | "available" | "low" | "out";
+  }
 ) {
   const { access, query } = await buildScopedEntityQuery(userId, {
     projectId: filters.projectId,
@@ -849,8 +859,32 @@ export async function listMaterialsForSupervisor(
   const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
 
   if (filters.status === "Approved") {
-    const invQuery = { ...query };
+    const invQuery: Record<string, any> = { ...query };
     delete invQuery.status;
+    const andConditions: Record<string, unknown>[] = [];
+    const search = String(filters.search || "").trim();
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = { $regex: escaped, $options: "i" };
+      andConditions.push({ $or: [{ name: regex }, { vendor: regex }, { poNumber: regex }, { site: regex }] });
+    }
+    if (filters.stockStatus === "available") {
+      andConditions.push({ remainingStock: { $gt: 0 } });
+    } else if (filters.stockStatus === "out") {
+      andConditions.push({ remainingStock: { $lte: 0 } });
+    } else if (filters.stockStatus === "low") {
+      andConditions.push({
+        $expr: {
+          $and: [
+            { $gt: ["$remainingStock", 0] },
+            { $lte: ["$remainingStock", { $ifNull: ["$minimumQuantity", 0] }] },
+          ],
+        },
+      });
+    }
+    if (andConditions.length > 0) {
+      invQuery.$and = [...(Array.isArray(invQuery.$and) ? invQuery.$and : []), ...andConditions];
+    }
     applyCursor(invQuery, filters.cursor);
 
     let items = await dbMutex.run(() =>
@@ -879,7 +913,10 @@ export async function listMaterialsForSupervisor(
       const siteOr: Record<string, unknown>[] = [{ siteId: siteIdCondition }];
       if (names.length > 0) siteOr.push({ site: { $in: names } });
       if (siteKeys.length > 0) siteOr.push({ siteKey: { $in: siteKeys } });
-      fallbackQuery.$or = siteOr;
+      fallbackQuery.$and = [
+        ...(Array.isArray(fallbackQuery.$and) ? fallbackQuery.$and as Record<string, unknown>[] : []),
+        { $or: siteOr },
+      ];
 
       items = await dbMutex.run(() =>
         withRetry(
@@ -904,8 +941,11 @@ export async function listMaterialsForSupervisor(
     let billMap = new Map<string, string>();
     if (allMatIds.length > 0) {
       try {
-        const linkedMats = await Material.find({ _id: { $in: allMatIds } }).select("_id billUrl").lean();
-        billMap = new Map(linkedMats.map((m: any) => [m._id.toString(), m.billUrl || '']));
+        const linkedMats = await Material.find({ _id: { $in: allMatIds } }).select("_id billUrl pcloudFileId").lean();
+        billMap = new Map(linkedMats.map((m: any) => [
+          m._id.toString(),
+          m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : (m.billUrl || ''),
+        ]));
       } catch {}
     }
 
@@ -924,9 +964,10 @@ export async function listMaterialsForSupervisor(
         purchasedQuantity: m.purchasedQuantity,
         consumedQuantity: m.consumedQuantity,
         remainingStock: m.remainingStock,
+        minimumQuantity: m.minimumQuantity,
         vendor: m.vendor,
         poNumber: m.poNumber,
-        billUrl: m.billUrl,
+        billUrl: m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl,
         received: m.received,
         purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
           vendor: h.vendor,
@@ -985,7 +1026,9 @@ export async function listMaterialsForSupervisor(
       poNumber: m.poNumber,
       issuedAmount: m.issuedAmount,
       givenAmount: (m as any).givenAmount,
-      billUrl: (m as any).billUrl,
+      billUrl: (m as any).pcloudFileId
+        ? buildPCloudMediaUrl(String((m as any).pcloudFileId))
+        : (m as any).billUrl,
       received: (m as any).status === "Received",
       requestDate: m.requestDate,
       status: m.status,
@@ -1045,7 +1088,9 @@ export async function listMaterialBillRequestsForSupervisor(
       approvedQuantity: m.approvedQuantity,
       issuedAmount: m.issuedAmount,
       givenAmount: m.givenAmount,
-      billUrl: m.billUrl,
+      billUrl: (m as any).pcloudFileId
+        ? buildPCloudMediaUrl(String((m as any).pcloudFileId))
+        : m.billUrl,
       receiptImageName: m.receiptImageName,
       requestDate: m.requestDate,
       status: m.status,
@@ -1148,7 +1193,9 @@ export async function listExpensesForSupervisor(
       site: e.site,
       transactionType: e.transactionType,
       poNumber: e.poNumber,
-      billUrl: (e as any).billUrl,
+      billUrl: (e as any).pcloudFileId
+        ? buildPCloudMediaUrl(String((e as any).pcloudFileId))
+        : (e as any).billUrl,
       received: (e as any).received,
       isSiteMaterial: (e as any).isSiteMaterial,
       materialName: (e as any).materialName,
@@ -1182,13 +1229,18 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
   if (!material) throw new AppError(404, "Material not found or not accessible");
 
   const result: any = material;
+  if (result.pcloudFileId) {
+    result.billUrl = buildPCloudMediaUrl(String(result.pcloudFileId));
+  }
 
   const linkedId = (material as any).lastMaterialId;
   if (linkedId) {
       try {
         const linked = await Material.findById(linkedId).select("billUrl pcloudFileId pcloudPublicCode poNumber vendor").lean();
         if (linked) {
-          result.billUrl = linked.billUrl || result.billUrl;
+          result.billUrl = linked.pcloudFileId
+            ? buildPCloudMediaUrl(String(linked.pcloudFileId))
+            : (linked.billUrl || result.billUrl);
           result.pcloudFileId = linked.pcloudFileId || result.pcloudFileId;
           result.pcloudPublicCode = linked.pcloudPublicCode || result.pcloudPublicCode;
         }
@@ -1204,9 +1256,12 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
     if (matIds.length > 0) {
       try {
         const linkedMats = await Material.find({ _id: { $in: matIds } })
-          .select("_id billUrl")
+          .select("_id billUrl pcloudFileId")
           .lean();
-        const billMap = new Map(linkedMats.map((m: any) => [m._id.toString(), m.billUrl]));
+        const billMap = new Map(linkedMats.map((m: any) => [
+          m._id.toString(),
+          m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl,
+        ]));
         for (const entry of history) {
           if (entry.materialId) {
             entry.billUrl = billMap.get(entry.materialId.toString()) || '';

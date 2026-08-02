@@ -32,6 +32,7 @@ import { AppReadyService } from '../../core/services/app-ready.service';
 import { DashboardData, Site } from '../../shared/models';
 import { Expense } from '../../shared/models/expense.model';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
@@ -769,12 +770,20 @@ export class DashboardPage implements OnInit, OnDestroy {
     if (typeof window !== 'undefined') {
       this.supervisor.siteChanged$
         .pipe(takeUntilDestroyed())
-        .subscribe(() => void this.loadDashboard());
+        .subscribe(() => void this.loadDashboard(true, true));
     }
 
     await this.supervisor.init().catch(() => {});
 
-    // Load all data; signal appReady when done
+    const cached = await this.supervisor.getCachedDashboard();
+    if (cached) {
+      this.applyDashboard(cached);
+      this.loading.set(false);
+      this.appReady.resolve(true);
+      void this.loadDashboard(true, true);
+      return;
+    }
+
     const success = await this.loadDashboard();
     this.appReady.resolve(success);
   }
@@ -797,38 +806,43 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.appReady.resolve(success);
   }
 
-  async loadDashboard(force = false): Promise<boolean> {
-    this.loading.set(true);
+  async loadDashboard(force = false, background = false): Promise<boolean> {
+    if (!background) this.loading.set(true);
     this.error.set(false);
 
     try {
-      let dashData: DashboardData | null = null;
-      const dashResult = await this.supervisor.getDashboard().toPromise().then(
-        (r) => { if (r) dashData = r.dashboard; return !!r; },
-        () => false
-      );
+      const response = await firstValueFrom(this.supervisor.getDashboard(undefined, force));
+      const dashData = response?.dashboard || null;
 
       // Dashboard is critical — if it failed, show error state
-      if (!dashResult || !dashData) {
+      if (!dashData) {
         console.error('[Dashboard] failed to load');
-        this.loading.set(false);
-        this.error.set(true);
+        if (!background || !this.dashboard()) {
+          this.loading.set(false);
+          this.error.set(true);
+        }
         return false;
       }
 
-      const loadedDashboard = dashData as DashboardData;
-      this.dashboard.set(loadedDashboard);
-      this.sites.set((loadedDashboard.sites || []) as Site[]);
-      this.todayExpenses.set((loadedDashboard.todayExpenses || []) as Expense[]);
+      this.applyDashboard(dashData);
+      void this.supervisor.cacheDashboard(dashData);
 
       this.loading.set(false);
       return true;
     } catch (error) {
       console.error('Failed to load dashboard:', error);
-      this.loading.set(false);
-      this.error.set(true);
+      if (!background || !this.dashboard()) {
+        this.loading.set(false);
+        this.error.set(true);
+      }
       return false;
     }
+  }
+
+  private applyDashboard(data: DashboardData): void {
+    this.dashboard.set(data);
+    this.sites.set((data.sites || []) as Site[]);
+    this.todayExpenses.set((data.todayExpenses || []) as Expense[]);
   }
 
   navigateTo(path: string): void {

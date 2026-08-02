@@ -25,6 +25,7 @@ const envSchema = z.object({
   MOBILE_APP_URL: z.string().default("*"),
   QR_BASE_URL: z.string().default("agb-supervisor://invite"),
   BACKEND_PUBLIC_URL: z.string().url().optional(),
+  RENDER_EXTERNAL_URL: z.string().url().optional(),
 
   PCLOUD_BEARER_TOKEN: z.string().optional(),
   PCLOUD_FOLDER_ID: z.string().optional(),

@@ -1952,7 +1952,7 @@ export class UniversalDashboardPage implements OnInit {
   });
   readonly materialNameSuggestions = computed((): string[] => {
     const set = new Set<string>();
-    for (const m of this.data.materials()) {
+    for (const m of [...this.data.materials(), ...this.data.inventory()]) {
       const n = (m as any).name;
       if (n) set.add(n.trim());
     }
@@ -2303,7 +2303,17 @@ export class UniversalDashboardPage implements OnInit {
   }
 
   pickAddMaterialFromMenu(field: "siteId" | "name" | "unit", value: string) {
-    this.patchAddMaterialForm({ [field]: value } as any);
+    if (field === "name") {
+      this.patchAddMaterialForm({ name: value, unit: this.preferredUnitForMaterial(value) });
+    } else if (field === "siteId") {
+      const current = this.addMaterialForm();
+      this.patchAddMaterialForm({
+        siteId: value,
+        unit: current.name ? this.preferredUnitForMaterial(current.name, value) || current.unit : current.unit,
+      });
+    } else {
+      this.patchAddMaterialForm({ unit: value });
+    }
     this.addMaterialOpenMenu.set("");
     this.addMaterialMenuSearch.set("");
   }
@@ -2311,9 +2321,27 @@ export class UniversalDashboardPage implements OnInit {
   commitAddMaterialFreeText(field: "name" | "unit") {
     const value = this.addMaterialMenuSearch().trim();
     if (!value) return;
-    this.patchAddMaterialForm({ [field]: value } as any);
+    if (field === "name") {
+      this.patchAddMaterialForm({ name: value, unit: this.preferredUnitForMaterial(value) });
+    } else {
+      this.patchAddMaterialForm({ unit: value });
+    }
     this.addMaterialOpenMenu.set("");
     this.addMaterialMenuSearch.set("");
+  }
+
+  private preferredUnitForMaterial(name: string, siteId = this.addMaterialForm().siteId): string {
+    const normalizedName = name.trim().toLowerCase();
+    if (!normalizedName) return "";
+    const siteName = this.addMaterialSiteOptions().find((site) => site.id === siteId)?.name.trim().toLowerCase();
+    const candidates = [...this.data.inventory(), ...this.data.materials()].filter(
+      (row: any) => String(row?.name || "").trim().toLowerCase() === normalizedName && String(row?.unit || "").trim()
+    );
+    const siteMatch = candidates.find((row: any) =>
+      String(row?.siteId || "") === siteId ||
+      (siteName && String(row?.site || "").trim().toLowerCase() === siteName)
+    );
+    return String((siteMatch || candidates[0])?.unit || "").trim();
   }
 
   closeAddMaterialMenusOnInsideClick(event: Event) {

@@ -29,6 +29,9 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
     const material = await materialService.createMaterial(body);
     invalidateCachePrefix("/api/materials");
     invalidateCachePrefix("/api/dashboard/batch");
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/supervisor/material-names");
+    invalidateCachePrefix("/api/supervisor/dashboard");
     res.status(201).json({ material });
   } catch (e) { next(e); }
 }
@@ -342,6 +345,9 @@ export async function addInventoryMaterial(req: Request, res: Response, next: Ne
     invalidateCachePrefix("/api/inventory");
     invalidateCachePrefix("/api/materials");
     invalidateCachePrefix("/api/dashboard/batch");
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/supervisor/material-names");
+    invalidateCachePrefix("/api/supervisor/dashboard");
 
     res.status(201).json(result);
   } catch (e) { next(e); }

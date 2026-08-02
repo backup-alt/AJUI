@@ -12,8 +12,11 @@ import {
   IonInfiniteScrollContent,
   IonFab,
   IonFabButton,
+  IonSelect,
+  IonSelectOption,
   ModalController,
   ToastController,
+  ActionSheetController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
@@ -36,7 +39,7 @@ import {
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { Material, MaterialStatus } from '../../shared/models';
-import { DatePipe, CurrencyPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { PageHeaderComponent, EmptyStateComponent } from '../../shared/components';
 import { InventoryEditModalComponent } from './inventory-edit-modal/inventory-edit-modal.component';
@@ -70,6 +73,7 @@ export interface InventoryItem {
 
 type SortField = 'name' | 'currentQuantity' | 'lastUpdated' | 'vendor';
 type SortDir = 'asc' | 'desc';
+type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
 
 @Component({
   selector: 'app-inventory',
@@ -80,6 +84,8 @@ type SortDir = 'asc' | 'desc';
     IonSearchbar,
     IonFab,
     IonFabButton,
+    IonSelect,
+    IonSelectOption,
     IonIcon,
     IonSkeletonText,
     IonRefresher,
@@ -87,7 +93,6 @@ type SortDir = 'asc' | 'desc';
     IonInfiniteScroll,
     IonInfiniteScrollContent,
     DatePipe,
-    CurrencyPipe,
     PageHeaderComponent,
     EmptyStateComponent,
   ],
@@ -108,12 +113,23 @@ type SortDir = 'asc' | 'desc';
         <ion-searchbar
           placeholder="Search materials..."
           [ngModel]="searchQuery()"
-          (ngModelChange)="searchQuery.set($event)"
-          (ionInput)="applyFilters()"
+          (ngModelChange)="onSearchChange($event)"
           class="search-bar"
        />
 
         <div class="filter-row">
+          <ion-select
+            class="stock-filter"
+            aria-label="Stock filter"
+            interface="popover"
+            [ngModel]="stockFilter()"
+            (ionChange)="onStockFilterChange($event.detail.value)"
+          >
+            <ion-select-option value="all">All stock</ion-select-option>
+            <ion-select-option value="available">Available</ion-select-option>
+            <ion-select-option value="low">Low stock</ion-select-option>
+            <ion-select-option value="out">Out of stock</ion-select-option>
+          </ion-select>
           <button class="sort-btn" (click)="cycleSort()">
             <ion-icon name="swap-vertical-outline"></ion-icon>
             <span>{{ sortLabel() }}</span>
@@ -237,7 +253,7 @@ type SortDir = 'asc' | 'desc';
       </div>
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button (click)="raiseRequest(null)">
+        <ion-fab-button (click)="showInventoryActions()">
           <ion-icon name="add-outline"></ion-icon>
         </ion-fab-button>
       </ion-fab>
@@ -305,10 +321,17 @@ type SortDir = 'asc' | 'desc';
       gap: var(--md-space-3);
     }
 
-    .seg-wrap {
+    .stock-filter {
       flex: 1;
       min-width: 0;
-      padding: 0;
+      min-height: 38px;
+      --background: var(--m3-surface-bright);
+      --padding-start: var(--md-space-3);
+      --padding-end: var(--md-space-3);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--md-radius-lg);
+      font-size: 12px;
+      color: var(--m3-on-surface-variant);
     }
 
     .sort-btn {
@@ -634,6 +657,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   private supervisor = inject(SupervisorService);
   private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
+  private actionSheetCtrl = inject(ActionSheetController);
   private router = inject(Router);
 
   items = signal<InventoryItem[]>([]);
@@ -642,9 +666,11 @@ export class InventoryPage implements OnInit, OnDestroy {
   errorMessage = signal<string>('');
   nextCursor = signal<string | null>(null);
   searchQuery = signal('');
+  stockFilter = signal<InventoryStockFilter>('all');
   sortField = signal<SortField>('name');
   sortDir = signal<SortDir>('asc');
   private loadGeneration = 0;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   viewerUrl = signal<string | null>(null);
   zoomScale = 1;
@@ -669,6 +695,14 @@ export class InventoryPage implements OnInit, OnDestroy {
           (i.site || '').toLowerCase().includes(q) ||
           (i.category || '').toLowerCase().includes(q)
       );
+    }
+
+    if (this.stockFilter() === 'available') {
+      result = result.filter((item) => item.currentQuantity > 0);
+    } else if (this.stockFilter() === 'low') {
+      result = result.filter((item) => item.currentQuantity > 0 && item.currentQuantity <= item.minimumQuantity);
+    } else if (this.stockFilter() === 'out') {
+      result = result.filter((item) => item.currentQuantity <= 0);
     }
 
     const field = this.sortField();
@@ -716,6 +750,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
     if (typeof window !== 'undefined') {
       window.removeEventListener('agb:inventory-changed', this.handleInventoryChange);
     }
@@ -739,7 +774,9 @@ export class InventoryPage implements OnInit, OnDestroy {
           projectId: projectId || undefined,
           status: 'Approved',
           limit: 25,
-        })
+          search: this.searchQuery().trim() || undefined,
+          stockStatus: this.stockFilter(),
+        }, force)
       );
       if (gen !== this.loadGeneration) return;
       const materials = (res?.materials || []).map((material) => this.toInventoryItem(material));
@@ -775,6 +812,8 @@ export class InventoryPage implements OnInit, OnDestroy {
           status: 'Approved',
           limit: 25,
           cursor,
+          search: this.searchQuery().trim() || undefined,
+          stockStatus: this.stockFilter(),
         })
       );
       const existing = this.items();
@@ -800,7 +839,7 @@ export class InventoryPage implements OnInit, OnDestroy {
       category: (material as any).category || 'General',
       unit: material.unit,
       currentQuantity: material.remainingStock ?? material.approvedQuantity ?? 0,
-      minimumQuantity: (material as any).minimumQuantity || 0,
+      minimumQuantity: material.minimumQuantity || 0,
       lastUpdated: material.updatedAt || material.requestDate,
       vendor: material.vendor || '',
       poNumber: material.poNumber || '',
@@ -815,19 +854,31 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
-    // No-op: search is bound to a signal, computed re-evaluates automatically.
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.loadInventory(true), 350);
+  }
+
+  onSearchChange(value: string): void {
+    this.searchQuery.set(value || '');
+    this.applyFilters();
+  }
+
+  onStockFilterChange(value: InventoryStockFilter): void {
+    this.stockFilter.set(value || 'all');
+    void this.loadInventory(true);
   }
 
   cycleSort(): void {
-    const fields: SortField[] = ['name', 'currentQuantity', 'lastUpdated', 'vendor'];
-    const idx = fields.indexOf(this.sortField());
-    const next = fields[(idx + 1) % fields.length];
-    if (next === this.sortField()) {
-      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
-    } else {
-      this.sortField.set(next);
-      this.sortDir.set('asc');
-    }
+    const states: Array<[SortField, SortDir]> = [
+      ['name', 'asc'], ['name', 'desc'],
+      ['currentQuantity', 'asc'], ['currentQuantity', 'desc'],
+      ['lastUpdated', 'desc'], ['lastUpdated', 'asc'],
+      ['vendor', 'asc'], ['vendor', 'desc'],
+    ];
+    const index = states.findIndex(([field, direction]) => field === this.sortField() && direction === this.sortDir());
+    const [field, direction] = states[(index + 1) % states.length];
+    this.sortField.set(field);
+    this.sortDir.set(direction);
   }
 
   async openEditQuantity(item: InventoryItem): Promise<void> {
@@ -863,6 +914,47 @@ export class InventoryPage implements OnInit, OnDestroy {
       });
       await toast.present();
     }
+  }
+
+  async showInventoryActions(): Promise<void> {
+    const actionSheet = await this.actionSheetCtrl.create({
+      header: 'Add inventory',
+      buttons: [
+        {
+          text: 'Add Existing Material',
+          icon: 'cube-outline',
+          handler: () => { void this.openAddExisting(); },
+        },
+        {
+          text: 'Raise Material Request',
+          icon: 'add-outline',
+          handler: () => { void this.raiseRequest(null); },
+        },
+        { text: 'Cancel', role: 'cancel', icon: 'close-outline' },
+      ],
+    });
+    await actionSheet.present();
+  }
+
+  private async openAddExisting(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: InventoryRequestModalComponent,
+      componentProps: {
+        mode: 'existing',
+        materialCatalog: this.items().map((item) => ({ name: item.name, unit: item.unit })),
+      },
+    });
+    await modal.present();
+    const { data } = await modal.onDidDismiss();
+    if (!data?.added) return;
+    await this.loadInventory(true);
+    const toast = await this.toastCtrl.create({
+      message: data.message || 'Inventory updated successfully',
+      duration: 2500,
+      color: 'success',
+      position: 'top',
+    });
+    await toast.present();
   }
 
   openBillViewer(url: string): void {

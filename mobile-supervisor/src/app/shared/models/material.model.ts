@@ -15,6 +15,7 @@ export interface Material {
   purchasedQuantity: number;
   consumedQuantity: number;
   remainingStock: number;
+  minimumQuantity?: number;
   vendor?: string;
   vendorId?: string;
   poNumber?: string;

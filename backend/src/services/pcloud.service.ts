@@ -71,7 +71,7 @@ async function pcloudFormRequest(
 }
 
 export function buildPCloudMediaUrl(fileId: string): string {
-  const baseUrl = (env.BACKEND_PUBLIC_URL || `http://localhost:${env.PORT}`).replace(/\/+$/, "");
+  const baseUrl = (env.BACKEND_PUBLIC_URL || env.RENDER_EXTERNAL_URL || `http://localhost:${env.PORT}`).replace(/\/+$/, "");
   return `${baseUrl}/api/media/pcloud/${encodeURIComponent(fileId)}`;
 }
 

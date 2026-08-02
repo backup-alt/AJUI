@@ -111,6 +111,18 @@ export class ApiService {
     }
   }
 
+  /** Remove cached GET responses for one API path (or every GET when omitted). */
+  invalidateGetCache(pathPrefix?: string): void {
+    if (!pathPrefix) {
+      this.clearGetCache();
+      return;
+    }
+    const absolutePrefix = `${this.baseUrl}${pathPrefix}`;
+    for (const key of this.getCache.keys()) {
+      if (key.startsWith(absolutePrefix)) this.getCache.delete(key);
+    }
+  }
+
   private clearGetCache(): void {
     this.getCache.clear();
   }
