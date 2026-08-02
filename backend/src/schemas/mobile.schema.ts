@@ -103,7 +103,6 @@ export const uploadExpenseReceiptMobileSchema = z.object({
     data: z.string().min(20),
     mimeType: z.string().min(1).max(120),
     fileName: z.string().max(200).optional(),
-    givenAmount: z.coerce.number().nonnegative().optional(),
     received: z.boolean().optional(),
   }),
 });

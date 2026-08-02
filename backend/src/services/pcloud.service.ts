@@ -150,9 +150,9 @@ export async function getPCloudPublicLink(fileId: string): Promise<{ url: string
   return { url: result.link, code: result.code };
 }
 
-export async function getPCloudDownloadUrl(fileId: string): Promise<string> {
+export async function getPCloudDownloadUrl(fileId: string, forceRefresh = false): Promise<string> {
   const cached = downloadUrlCache.get(fileId);
-  if (cached && cached.expiresAt > Date.now()) return cached.url;
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached.url;
 
   const result = await pcloudFormRequest("getfilelink", { fileid: fileId });
   const host = result.hosts?.[0];

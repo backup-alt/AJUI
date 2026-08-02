@@ -10,12 +10,12 @@ import {
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonSpinner,
-  IonInput,
   IonButton,
   IonCheckbox,
   ToastController,
-  AlertController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
@@ -55,8 +55,10 @@ interface RequestItem {
   issuedAmount?: number;
   givenAmount?: number;
   billUrl?: string;
+  billFileName?: string;
   received?: boolean;
   transactionType?: string;
+  billEligible: boolean;
   needsUpload: boolean;
 }
 
@@ -72,8 +74,9 @@ interface RequestItem {
     IonSkeletonText,
     IonRefresher,
     IonRefresherContent,
+    IonInfiniteScroll,
+    IonInfiniteScrollContent,
     IonSpinner,
-    IonInput,
     IonButton,
     IonCheckbox,
     FormsModule,
@@ -186,27 +189,17 @@ interface RequestItem {
                       </div>
                     }
 
-                    @if (item.type === 'expense') {
-                      <div class="upload-field">
-                        <ion-label class="upload-field-label">Given Amount (INR) *</ion-label>
-                        <ion-input
-                          type="number"
-                          placeholder="Enter given amount"
-                          [(ngModel)]="givenAmountInput"
-                          class="upload-input"
-                        ></ion-input>
+                    @if (item.type === 'material') {
+                      <div class="upload-field checkbox-field">
+                        <ion-checkbox
+                          [(ngModel)]="isReceivedInput"
+                          [disabled]="isUploading()"
+                          class="received-checkbox"
+                          aria-label="Received materials reached the site"
+                        ></ion-checkbox>
+                        <span class="received-label">Received (materials reached the site)</span>
                       </div>
                     }
-                    
-                    <div class="upload-field checkbox-field">
-                      <ion-checkbox
-                        [(ngModel)]="isReceivedInput"
-                        [disabled]="isUploading()"
-                        class="received-checkbox"
-                        aria-label="Received materials reached the site"
-                      ></ion-checkbox>
-                      <span class="received-label">Received (materials reached the site)</span>
-                    </div>
 
                     <div class="upload-actions">
                       <ion-button
@@ -241,7 +234,7 @@ interface RequestItem {
                       (click)="startUpload(item)"
                     >
                       <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
-                      {{ item.type === 'expense' ? 'Upload Bill & Enter Given Amount' : 'Upload Bill' }}
+                      Upload Bill
                     </ion-button>
                   </div>
                 }
@@ -250,13 +243,17 @@ interface RequestItem {
               @if (activeTab === 'upload' && !item.needsUpload) {
                 <div class="completed-notice">
                   <ion-icon name="checkmark-circle-outline"></ion-icon>
-                  {{ item.type === 'expense' ? 'Bill uploaded & Given amount recorded' : 'Bill uploaded' }}
+                  Bill uploaded
                 </div>
               }
 
               @if (item.billUrl) {
-                <div class="bill-thumb-wrap" (click)="openBillImage(item.billUrl!)">
-                  <img [src]="item.billUrl" alt="Bill" class="bill-thumb" />
+                <div class="bill-thumb-wrap" (click)="openBill(item)">
+                  @if (isPdfBill(item)) {
+                    <ion-icon name="document-outline" class="bill-document-icon"></ion-icon>
+                  } @else {
+                    <img [src]="item.billUrl" alt="Bill" class="bill-thumb" />
+                  }
                   <span class="bill-thumb-label">View Bill</span>
                 </div>
               }
@@ -264,6 +261,12 @@ interface RequestItem {
           }
         }
       </div>
+
+      @if (activeTab === 'upload' && materialBillNextCursor()) {
+        <ion-infinite-scroll threshold="120px" (ionInfinite)="loadMoreMaterialBills($event)">
+          <ion-infinite-scroll-content loadingSpinner="crescent"></ion-infinite-scroll-content>
+        </ion-infinite-scroll>
+      }
 
       @if (viewImageUrl()) {
         <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
@@ -484,6 +487,14 @@ interface RequestItem {
       width: 48px; height: 48px; border-radius: var(--md-radius-md);
       object-fit: cover; flex-shrink: 0;
     }
+    .bill-document-icon {
+      width: 48px;
+      height: 48px;
+      padding: 8px;
+      color: var(--m3-primary);
+      background: var(--m3-primary-container);
+      border-radius: 6px;
+    }
     .bill-thumb-label {
       font-size: 12px; font-weight: 600; color: var(--m3-primary);
     }
@@ -548,7 +559,6 @@ interface RequestItem {
 export class RequestsPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
-  private alertCtrl = inject(AlertController);
   private notifications = inject(NotificationService);
 
   activeTab: 'pending' | 'approved' | 'declined' | 'upload' = 'pending';
@@ -556,6 +566,7 @@ export class RequestsPage implements OnInit {
   errorMessage = signal<string>('');
 
   allItems = signal<RequestItem[]>([]);
+  materialBillNextCursor = signal<string | null>(null);
   get filteredItems() {
     const items = [...this.allItems()].sort((a, b) => {
       const aTime = a.date ? new Date(a.date).getTime() : 0;
@@ -571,15 +582,14 @@ export class RequestsPage implements OnInit {
     if (this.activeTab === 'declined') {
       return items.filter(i => i.status === 'Rejected' || i.status === 'Declined');
     }
-    // Upload tab: show items that still need a bill uploaded
-    return items.filter(i => i.needsUpload);
+    // Keep completed uploads visible so the bill can be opened again.
+    return items.filter(i => i.billEligible);
   }
 
   uploadingItemId = signal<string | null>(null);
   selectedFileData = signal<string | null>(null);
   selectedFileName = signal<string | null>(null);
   selectedFileMimeType = signal<string | null>(null);
-  givenAmountInput: number | null = null;
   isReceivedInput: boolean = false;
   isUploading = signal(false);
 
@@ -606,14 +616,14 @@ export class RequestsPage implements OnInit {
     if (this.activeTab === 'pending') return 'No pending requests';
     if (this.activeTab === 'approved') return 'No approved requests';
     if (this.activeTab === 'declined') return 'No declined requests';
-    return 'Nothing to upload';
+    return 'No bill requests';
   }
 
   get emptyMessage() {
     if (this.activeTab === 'pending') return 'Pending material and expense requests will appear here.';
     if (this.activeTab === 'approved') return 'Approved material and purchase requests will appear here.';
     if (this.activeTab === 'declined') return 'Declined requests will appear here.';
-    return 'All bills have been uploaded. Great job!';
+    return 'Approved material and purchase bills will appear here.';
   }
 
   async ngOnInit(): Promise<void> {
@@ -647,6 +657,7 @@ export class RequestsPage implements OnInit {
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
     const siteFilter = { siteId: siteId || undefined, projectId: projectId || undefined };
+    this.materialBillNextCursor.set(null);
 
     try {
       const addItem = (item: RequestItem) => {
@@ -676,6 +687,7 @@ export class RequestsPage implements OnInit {
             status: approval.status || 'Pending',
             amount: approval.amount,
             issuedAmount: approval.amount,
+            billEligible: false,
             needsUpload: false,
           });
         }
@@ -684,26 +696,13 @@ export class RequestsPage implements OnInit {
         console.error('[Requests] approvals load failed', err);
       }
 
-      // Load APPROVED materials from Inventory (fast on M0 — avoids Material.find() timeout)
+      // Load the individual approved Material records, not aggregated Inventory cards.
       try {
-        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 25 }));
+        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterialBillRequests({ ...siteFilter, limit: 25 }));
         for (const m of approvedMatRes?.materials || []) {
-          const hasNoBill = !(m as any).billUrl;
-          addItem({
-            _id: m._id,
-            type: 'material',
-            title: m.name,
-            subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
-            site: m.site,
-            date: m.requestDate,
-            status: m.status,
-            issuedAmount: m.issuedAmount,
-            givenAmount: (m as any).givenAmount,
-            billUrl: (m as any).billUrl,
-            received: m.status === 'Received',
-            needsUpload: hasNoBill,
-          });
+          addItem(this.toMaterialBillItem(m));
         }
+        this.materialBillNextCursor.set(approvedMatRes?.pagination?.nextCursor || null);
       } catch (err) {
         failedRequests++;
         console.error('[Requests] approved materials load failed', err);
@@ -727,7 +726,9 @@ export class RequestsPage implements OnInit {
             issuedAmount: m.issuedAmount,
             givenAmount: (m as any).givenAmount,
             billUrl: (m as any).billUrl,
+            billFileName: m.receiptImageName,
             received: m.status === 'Received',
+            billEligible: false,
             needsUpload: isApproved && !(m as any).billUrl,
           });
         }
@@ -762,6 +763,10 @@ export class RequestsPage implements OnInit {
             billUrl: (e as any).billUrl,
             received: (e as any).received,
             transactionType: e.transactionType,
+            billFileName: e.receiptImageName,
+            billEligible:
+              e.transactionType === 'Purchase' &&
+              (e.status === 'Approved' || e.status === 'Completed'),
             needsUpload:
               (e.status === 'Approved') &&
               !(e as any).billUrl,
@@ -783,6 +788,63 @@ export class RequestsPage implements OnInit {
     this.isLoading.set(false);
   }
 
+  async loadMoreMaterialBills(event: CustomEvent): Promise<void> {
+    const cursor = this.materialBillNextCursor();
+    if (!cursor) {
+      await (event.target as HTMLIonInfiniteScrollElement).complete();
+      return;
+    }
+
+    try {
+      const response = await firstValueFrom(this.supervisor.getMaterialBillRequests({
+        siteId: this.supervisor.selectedSiteId() || undefined,
+        projectId: this.supervisor.selectedProjectId() || undefined,
+        limit: 25,
+        cursor,
+      }));
+      const merged = [...this.allItems()];
+      for (const material of response?.materials || []) {
+        const item = this.toMaterialBillItem(material);
+        const index = merged.findIndex((current) => current._id === item._id);
+        if (index >= 0) merged[index] = { ...merged[index], ...item };
+        else merged.push(item);
+      }
+      this.allItems.set(merged);
+      this.materialBillNextCursor.set(response?.pagination?.nextCursor || null);
+    } catch (err) {
+      const toast = await this.toastCtrl.create({
+        message: (err as Error)?.message || 'Failed to load more bill requests',
+        duration: 2500,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+    } finally {
+      await (event.target as HTMLIonInfiniteScrollElement).complete();
+    }
+  }
+
+  private toMaterialBillItem(material: any): RequestItem {
+    return {
+      _id: material._id,
+      type: 'material',
+      title: material.name,
+      subtitle: material.approvedQuantity
+        ? `${material.approvedQuantity} ${material.unit} approved`
+        : `${material.requestedQuantity} ${material.unit} requested`,
+      site: material.site,
+      date: material.requestDate,
+      status: material.status,
+      issuedAmount: material.issuedAmount,
+      givenAmount: material.givenAmount,
+      billUrl: material.billUrl,
+      billFileName: material.receiptImageName,
+      received: material.status === 'Received',
+      billEligible: true,
+      needsUpload: !material.billUrl,
+    };
+  }
+
   getStatusTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
     if (status === 'Approved' || status === 'Completed' || status === 'Received') return 'success';
     if (status === 'Pending') return 'warning';
@@ -793,6 +855,19 @@ export class RequestsPage implements OnInit {
   openBillImage(url: string): void {
     this.viewImageUrl.set(url);
     this.resetZoom();
+  }
+
+  openBill(item: RequestItem): void {
+    if (!item.billUrl) return;
+    if (this.isPdfBill(item)) {
+      window.open(item.billUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    this.openBillImage(item.billUrl);
+  }
+
+  isPdfBill(item: RequestItem): boolean {
+    return String(item.billFileName || '').toLowerCase().endsWith('.pdf');
   }
 
   closeBillViewer(event: Event): void {
@@ -872,7 +947,6 @@ export class RequestsPage implements OnInit {
 
   startUpload(item: RequestItem): void {
     this.uploadingItemId.set(item._id);
-    this.givenAmountInput = null;
     this.selectedFileData.set(null);
     this.selectedFileName.set(null);
     this.selectedFileMimeType.set(null);
@@ -882,7 +956,6 @@ export class RequestsPage implements OnInit {
 
   cancelUpload(): void {
     this.uploadingItemId.set(null);
-    this.givenAmountInput = null;
     this.isReceivedInput = false;
     this.selectedFileData.set(null);
     this.selectedFileName.set(null);
@@ -915,9 +988,6 @@ export class RequestsPage implements OnInit {
     if (item.type === 'material') {
       return !!this.isReceivedInput;
     }
-    if (item.type === 'expense') {
-      return this.givenAmountInput !== null && this.givenAmountInput > 0;
-    }
     return true;
   }
 
@@ -930,9 +1000,6 @@ export class RequestsPage implements OnInit {
       mimeType: this.selectedFileMimeType() || 'image/jpeg',
       fileName: this.selectedFileName() || 'bill.jpg',
     };
-    if (item.type === 'expense') {
-      payload.givenAmount = this.givenAmountInput!;
-    }
     if (item.type === 'material') {
       payload.received = this.isReceivedInput;
     }
@@ -955,7 +1022,7 @@ export class RequestsPage implements OnInit {
       }
 
       const toast = await this.toastCtrl.create({
-        message: item.type === 'expense' ? 'Bill uploaded & Given Amount recorded successfully' : 'Bill uploaded successfully',
+        message: 'Bill uploaded successfully',
         duration: 2500,
         color: 'success',
         position: 'top',

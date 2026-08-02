@@ -46,6 +46,7 @@ router.patch("/supervisor/approvals/:id", validate(approvalActionSchema), ctrl.t
 // Materials
 router.get("/supervisor/material-names", cache(60), ctrl.listMaterialNames);
 router.get("/supervisor/materials", cache(15), ctrl.listMaterials);
+router.get("/supervisor/material-bill-requests", cache(10), ctrl.listMaterialBillRequests);
 router.get("/supervisor/materials/:id", cache(30), ctrl.getMaterial);
 router.post("/supervisor/materials", validate(createMaterialMobileSchema), ctrl.createMaterial);
 router.post("/supervisor/inventory/add-existing", validate(addExistingMaterialMobileSchema), ctrl.addExistingMaterial);

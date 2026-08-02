@@ -362,9 +362,12 @@ export async function uploadExpenseReceipt(
 
   if (payload.givenAmount !== undefined) {
     expense.givenAmount = payload.givenAmount;
-    expense.received = true;
-    expense.status = "Completed";
   }
+
+  // Uploading the approved purchase bill completes the supervisor's part.
+  // The amount remains the value entered by the admin during approval.
+  expense.received = true;
+  expense.status = "Completed";
 
   expense.receiptUploadedAt = new Date();
   await expense.save();

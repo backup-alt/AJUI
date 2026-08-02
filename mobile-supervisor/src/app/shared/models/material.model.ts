@@ -19,6 +19,7 @@ export interface Material {
   vendorId?: string;
   poNumber?: string;
   billUrl?: string;
+  receiptImageName?: string;
   requestDate: string;
   approvalDate?: string;
   status: MaterialStatus;

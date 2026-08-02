@@ -1003,6 +1003,65 @@ export async function listMaterialsForSupervisor(
   };
 }
 
+export async function listMaterialBillRequestsForSupervisor(
+  userId: string,
+  filters: { projectId?: string; siteId?: string; limit?: number; cursor?: string }
+) {
+  const { query } = await buildScopedEntityQuery(userId, {
+    projectId: filters.projectId,
+    siteId: filters.siteId,
+  });
+  query.approvedAt = { $exists: true };
+  query.status = { $in: ["Approved", "Not Received", "Received"] };
+  applyCursor(query, filters.cursor);
+
+  const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
+  const items = await dbMutex.run(() =>
+    withRetry(
+      () => Material.find(query)
+        .select({ receiptImage: 0, receiptImageMimeType: 0 })
+        .sort({ _id: -1 })
+        .limit(limit)
+        .lean()
+        .maxTimeMS(20_000),
+      { label: "mobile.listMaterialBillRequests.find" }
+    )
+  ).catch((err) => {
+    console.error("[mobile.listMaterialBillRequests] query failed:", (err as Error).message);
+    throw new AppError(503, "Material bill requests are temporarily unavailable. Please retry.");
+  });
+
+  return {
+    materials: items.map((m) => ({
+      _id: m._id.toString(),
+      materialId: m.materialId,
+      projectId: m.projectId,
+      projectName: m.projectName,
+      siteId: m.siteId,
+      site: m.site,
+      name: m.name,
+      unit: m.unit,
+      requestedQuantity: m.requestedQuantity,
+      approvedQuantity: m.approvedQuantity,
+      issuedAmount: m.issuedAmount,
+      givenAmount: m.givenAmount,
+      billUrl: m.billUrl,
+      receiptImageName: m.receiptImageName,
+      requestDate: m.requestDate,
+      status: m.status,
+      approvedAt: m.approvedAt,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+    })),
+    pagination: {
+      limit,
+      total: estimatedMobileTotal(items.length, limit, !!filters.cursor),
+      pages: items.length === limit ? 2 : 1,
+      nextCursor: items.length === limit ? String(items[items.length - 1]?._id ?? "") : null,
+    },
+  };
+}
+
 export async function listLabourForSupervisor(
   userId: string,
   filters: { projectId?: string; siteId?: string; status?: string; page?: number; limit?: number; cursor?: string }

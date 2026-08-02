@@ -11,8 +11,11 @@ router.get("/media/pcloud/:fileId", async (req, res) => {
   }
 
   try {
-    const downloadUrl = await getPCloudDownloadUrl(fileId);
-    res.setHeader("Cache-Control", "public, max-age=240");
+    // pCloud download URLs are temporary. Never let a browser/CDN cache the
+    // redirect, or it will keep serving an expired URL after pCloud rotates it.
+    const downloadUrl = await getPCloudDownloadUrl(fileId, true);
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.setHeader("Pragma", "no-cache");
     res.redirect(302, downloadUrl);
   } catch (error) {
     console.error(`[pCloud] Failed to resolve media ${fileId}:`, (error as Error).message);

@@ -404,7 +404,7 @@ export async function getPendingMaterials(scopeProjectIds?: ProjectScopeIds) {
 
 export async function uploadMaterialReceipt(
   id: string,
-  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
+  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number; received?: boolean }
 ) {
   const material = await Material.findById(id);
   if (!material) throw new AppError(404, "Material not found");
@@ -430,8 +430,8 @@ export async function uploadMaterialReceipt(
 
   if (payload.givenAmount !== undefined) {
     material.givenAmount = payload.givenAmount;
-    material.status = "Received";
   }
+  if (payload.received) material.status = "Received";
 
   await material.save();
   return material.toObject();

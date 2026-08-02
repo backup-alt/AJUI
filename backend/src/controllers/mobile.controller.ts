@@ -164,6 +164,19 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
   }
 }
 
+export async function listMaterialBillRequests(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const result = await mobileService.listMaterialBillRequestsForSupervisor(userId, {
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      limit: mobilePageLimit(req.query.limit),
+      cursor: req.query.cursor as string | undefined,
+    });
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
 export async function getMaterial(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
@@ -511,7 +524,7 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
 export async function uploadExpenseReceipt(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = requireSupervisor(req);
-    console.log(`[uploadExpenseReceipt] id=${req.params.id} user=${userId} hasData=${!!req.body.data} mimeType=${req.body.mimeType} givenAmount=${req.body.givenAmount}`);
+    console.log(`[uploadExpenseReceipt] id=${req.params.id} user=${userId} hasData=${!!req.body.data} mimeType=${req.body.mimeType}`);
     const { Expense } = await import("../models/Expense.js");
     const expense = await Expense.findById(req.params.id).lean();
     if (!expense) throw new AppError(404, "Expense not found");
@@ -523,9 +536,12 @@ export async function uploadExpenseReceipt(req: Request, res: Response, next: Ne
       data: req.body.data,
       mimeType: req.body.mimeType,
       fileName: req.body.fileName,
-      givenAmount: req.body.givenAmount,
     });
     console.log(`[uploadExpenseReceipt] success: billUrl=${updated.billUrl?.substring(0, 60)}`);
+    invalidateCachePrefix("/api/supervisor/expenses");
+    invalidateCachePrefix("/api/supervisor/material-bill-requests");
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/materials");
     res.json({ expense: updated });
   } catch (e) { console.error(`[uploadExpenseReceipt] FAILED:`, e); next(e); }
 }
@@ -543,8 +559,12 @@ export async function uploadMaterialReceipt(req: Request, res: Response, next: N
         data: req.body.data,
         mimeType: req.body.mimeType,
         fileName: req.body.fileName,
-        givenAmount: req.body.givenAmount,
+        received: req.body.received,
       });
+      invalidateCachePrefix("/api/supervisor/materials");
+      invalidateCachePrefix("/api/supervisor/material-bill-requests");
+      invalidateCachePrefix("/api/materials");
+      invalidateCachePrefix("/api/inventory");
       res.json({ material: updated });
       return;
     }
@@ -558,9 +578,12 @@ export async function uploadMaterialReceipt(req: Request, res: Response, next: N
         data: req.body.data,
         mimeType: req.body.mimeType,
         fileName: req.body.fileName,
-        givenAmount: req.body.givenAmount,
         received: req.body.received,
       });
+      invalidateCachePrefix("/api/supervisor/materials");
+      invalidateCachePrefix("/api/supervisor/material-bill-requests");
+      invalidateCachePrefix("/api/materials");
+      invalidateCachePrefix("/api/inventory");
       res.json({ material: updated });
       return;
     }

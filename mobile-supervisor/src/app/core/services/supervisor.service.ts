@@ -101,6 +101,15 @@ export class SupervisorService {
     return this.api.get<MaterialsListResponse>('/supervisor/materials', filters);
   }
 
+  getMaterialBillRequests(filters?: {
+    projectId?: string;
+    siteId?: string;
+    limit?: number;
+    cursor?: string;
+  }) {
+    return this.api.get<MaterialsListResponse>('/supervisor/material-bill-requests', filters);
+  }
+
   getMaterialNames(search?: string) {
     return this.api.get<{ names: string[] }>('/supervisor/material-names', search ? { search } : undefined);
   }
@@ -125,7 +134,7 @@ export class SupervisorService {
 
   uploadMaterialReceipt(
     materialId: string,
-    payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
+    payload: { data: string; mimeType: string; fileName?: string; received?: boolean }
   ) {
     return this.api.post<{ material: Material }>(
       `/supervisor/materials/${materialId}/receipt`,
@@ -249,7 +258,7 @@ export class SupervisorService {
 
   uploadReceipt(
     expenseId: string,
-    payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
+    payload: { data: string; mimeType: string; fileName?: string }
   ) {
     return this.api.post<{ expense: Expense }>(
       `/supervisor/expenses/${expenseId}/receipt`,
