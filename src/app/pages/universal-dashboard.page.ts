@@ -4238,7 +4238,7 @@ const inventory = this.data.inventory().map((row) => ({
 
   isNoCreateModule(): boolean {
     const m = this.activeModule();
-    return m === "expenses" || m === "materials" || m === "generalExpenses" || m === "clients";
+    return m === "expenses" || m === "materials" || m === "clients";
   }
 
   private ensureExpenseOpeningForInput(row: TableRow) {

@@ -398,7 +398,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded()"
+                    *ngIf="!tableViewExpanded() && !isNoCreateTab()"
                     title="Add row"
                     aria-label="Add row"
                     (click)="openRecordDialog()"
@@ -2114,6 +2114,11 @@ export class ProjectWorkspacePage {
 
   isSiteAware(section: ModuleKey): boolean {
     return section === "materials" || section === "labour" || section === "expenses" || section === "subcontractors";
+  }
+
+  isNoCreateTab(): boolean {
+    const s = this.activeSection();
+    return s === "materials" || s === "labour" || s === "expenses" || s === "vendors";
   }
 
   selectSite(site: string) {
