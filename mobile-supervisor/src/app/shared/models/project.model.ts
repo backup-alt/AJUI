@@ -70,6 +70,8 @@ export interface DashboardData {
   };
   todayExpense: { total: number; count: number };
   projects: Project[];
+  sites?: Site[];
+  todayExpenses?: unknown[];
   pendingApprovals: ApprovalSummary[];
 }
 

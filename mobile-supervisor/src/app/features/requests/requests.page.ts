@@ -45,7 +45,7 @@ import {
 
 interface RequestItem {
   _id: string;
-  type: 'material' | 'expense';
+  type: 'material' | 'expense' | 'labour';
   title: string;
   subtitle: string;
   site: string;
@@ -142,10 +142,12 @@ interface RequestItem {
           @for (item of filteredItems; track item._id) {
             <div class="request-card" [class.upload-mode]="activeTab === 'upload'">
               <header class="request-head">
-                <div class="type-pill" [class.material]="item.type === 'material'" [class.expense]="item.type === 'expense'">
-                  <ion-icon [name]="item.type === 'material' ? 'cube-outline' : 'cart-outline'"></ion-icon>
+                <div class="type-pill" [class.material]="item.type === 'material'" [class.expense]="item.type === 'expense' || item.type === 'labour'">
+                  <ion-icon [name]="item.type === 'material' ? 'cube-outline' : (item.type === 'labour' ? 'cash-outline' : 'cart-outline')"></ion-icon>
                   {{ item.type === 'material'
                       ? 'Material'
+                      : item.type === 'labour'
+                      ? 'Labour'
                       : (item.transactionType === 'Cash Added' ? 'Add Cash' : 'Purchase') }}
              </div>
                 <app-status-pill [tone]="getStatusTone(item.status)">{{ item.status }}</app-status-pill>
@@ -647,12 +649,47 @@ export class RequestsPage implements OnInit {
     const siteFilter = { siteId: siteId || undefined, projectId: projectId || undefined };
 
     try {
+      const addItem = (item: RequestItem) => {
+        const existingIndex = items.findIndex((existing) => existing._id === item._id);
+        if (existingIndex >= 0) {
+          items[existingIndex] = { ...items[existingIndex], ...item };
+          return;
+        }
+        items.push(item);
+      };
+
+      try {
+        const approvalsRes = await firstValueFrom(this.supervisor.getApprovals());
+        for (const approval of approvalsRes?.approvals || []) {
+          const rawType = String((approval as any).type || (approval as any).sourceCollection || '').toLowerCase();
+          const requestType: RequestItem['type'] =
+            rawType.includes('expense') ? 'expense' :
+            rawType.includes('labour') ? 'labour' :
+            'material';
+          addItem({
+            _id: String((approval as any).sourceId || approval._id || approval.approvalId),
+            type: requestType,
+            title: approval.title || (requestType === 'labour' ? 'Labour request' : `${requestType} request`),
+            subtitle: approval.projectName || approval.sourceCollection || '',
+            site: approval.site || 'General',
+            date: approval.submittedAt,
+            status: approval.status || 'Pending',
+            amount: approval.amount,
+            issuedAmount: approval.amount,
+            needsUpload: false,
+          });
+        }
+      } catch (err) {
+        failedRequests++;
+        console.error('[Requests] approvals load failed', err);
+      }
+
       // Load APPROVED materials from Inventory (fast on M0 — avoids Material.find() timeout)
       try {
         const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 25 }));
         for (const m of approvedMatRes?.materials || []) {
           const hasNoBill = !(m as any).billUrl;
-          items.push({
+          addItem({
             _id: m._id,
             type: 'material',
             title: m.name,
@@ -679,7 +716,7 @@ export class RequestsPage implements OnInit {
         for (const m of otherMatRes?.materials || []) {
           if (approvedIds.has(m._id)) continue;
           const isApproved = m.status === 'Approved' || m.status === 'Completed' || m.status === 'Received';
-          items.push({
+          addItem({
             _id: m._id,
             type: 'material',
             title: m.name,
@@ -707,7 +744,7 @@ export class RequestsPage implements OnInit {
             e.transactionType === 'Cash Added' ? 'Add Cash' :
             (e.transactionType || 'Purchase');
 
-          items.push({
+          addItem({
             _id: e._id,
             type: 'expense',
             title: (e as any).isSiteMaterial
@@ -739,7 +776,7 @@ export class RequestsPage implements OnInit {
       this.errorMessage.set((err as Error)?.message || 'Failed to load requests');
     }
 
-    if (failedRequests === 3) {
+    if (failedRequests >= 4 && items.length === 0) {
       this.errorMessage.set('Unable to load requests. Please retry.');
     }
     this.allItems.set(items);

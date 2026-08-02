@@ -313,6 +313,11 @@ function runMobileDb<T>(label: string, factory: () => Promise<T>): Promise<T> {
   return dbMutex.run(() => withRetry(factory, { label }));
 }
 
+function estimatedMobileTotal(itemsLength: number, limit: number, hasCursor?: boolean): number {
+  if (hasCursor) return itemsLength;
+  return itemsLength === limit ? limit + 1 : itemsLength;
+}
+
 export async function ensureSupervisorSiteAccess(
   userId: string,
   projectId?: string,
@@ -555,94 +560,159 @@ export async function getSupervisorDashboard(
   userId: string,
   filters: { siteId?: string; projectId?: string } = {}
 ) {
-  const [projects, sites, approvals, scopedAccess] = await Promise.all([
-    getAssignedProjects(userId),
-    getAssignedSites(userId),
-    getActionableApprovals(userId),
-    buildScopedEntityQuery(userId, filters),
-  ]);
-
-  const entityScope = scopedAccess.query;
-  const siteExpenseScope = { ...entityScope, type: "site" };
+  const access = await getSupervisorAccess(userId);
+  const { query: entityScope } = await buildScopedEntityQuery(userId, filters);
   const today = new Date().toISOString().slice(0, 10);
 
-  // Use the same resolved access scope as the list endpoints. Legacy
-  // supervisor assignments may be represented by names rather than site IDs.
-  const inventoryQuery = { ...entityScope };
-  const labourQuery = { ...entityScope };
-  const pendingMaterialsQuery = filters.siteId
-    ? { siteId: filters.siteId, status: "Pending" }
-    : { ...entityScope, status: "Pending" };
-  const pendingLabourQuery = filters.siteId
-    ? { siteId: filters.siteId, status: "Pending" }
-    : { ...entityScope, status: "Pending" };
-  const pendingExpensesQuery = filters.siteId
-    ? { siteId: filters.siteId, type: "site", status: "Pending" }
-    : { ...siteExpenseScope, status: "Pending" };
-  const todayExpensesQuery = filters.siteId
-    ? { siteId: filters.siteId, type: "site", date: today, transactionType: { $ne: "Cash Added" } }
-    : { ...siteExpenseScope, date: today, transactionType: { $ne: "Cash Added" } };
+  const projectQuery: Record<string, unknown> = { status: { $ne: "Completed" } };
+  if (filters.projectId) {
+    const requestedProjectId = toObjectId(filters.projectId);
+    if (requestedProjectId) projectQuery._id = requestedProjectId;
+  } else if (access.projectIds.length > 0) {
+    projectQuery._id = { $in: access.projectIds };
+  } else {
+    projectQuery._id = { $exists: false };
+  }
 
-  const [inventoryCount, labourCount, pendingMaterials, pendingLabour, pendingExpenses, todayExpenses] = await Promise.all([
-    runMobileDb("mobile.dashboard.inventoryCount", () =>
-      Inventory.countDocuments(inventoryQuery).maxTimeMS(20_000)
-    ),
-    runMobileDb("mobile.dashboard.labourCount", () =>
-      Labour.countDocuments(labourQuery).maxTimeMS(20_000)
-    ),
-    runMobileDb("mobile.dashboard.pendingMaterials", () =>
-      Material.countDocuments(pendingMaterialsQuery).maxTimeMS(20_000)
-    ),
-    runMobileDb("mobile.dashboard.pendingLabour", () =>
-      Labour.countDocuments(pendingLabourQuery).maxTimeMS(20_000)
-    ),
-    runMobileDb("mobile.dashboard.pendingExpenses", () =>
-      Expense.countDocuments(pendingExpensesQuery).maxTimeMS(20_000)
-    ),
-    runMobileDb("mobile.dashboard.todayExpenses", () =>
-      Expense.aggregate([
-        { $match: todayExpensesQuery },
-        { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
-      ]).option({ maxTimeMS: 20_000 })
-    ),
+  let siteQuery: Record<string, unknown> = {};
+  if (filters.siteId) {
+    const requestedSiteId = toObjectId(filters.siteId);
+    siteQuery = requestedSiteId ? { _id: requestedSiteId } : { _id: { $exists: false } };
+  } else if (access.siteIds.length > 0) {
+    siteQuery = { _id: { $in: access.siteIds } };
+  } else if (access.siteNames.length > 0) {
+    siteQuery = { name: { $in: access.siteNames } };
+  } else if (access.projectIds.length > 0) {
+    siteQuery = { projectIds: { $in: access.projectIds } };
+  } else {
+    siteQuery = { _id: { $exists: false } };
+  }
+
+  const approvalQuery = approvalScopeQuery(access);
+  if (filters.projectId) approvalQuery.projectId = toObjectId(filters.projectId) || approvalQuery.projectId;
+  const todayExpensesQuery = { ...entityScope, type: "site", date: today, transactionType: { $ne: "Cash Added" } };
+  const safeDashboardList = async <T>(label: string, promise: Promise<T[]>): Promise<T[]> => {
+    try {
+      return await promise;
+    } catch (err) {
+      console.warn(`[mobile.dashboard] ${label} failed:`, (err as Error).message);
+      return [];
+    }
+  };
+
+  const [projects, sites, approvals, todayExpenseRows, inventoryPreview, labourPreview] = await Promise.all([
+    safeDashboardList("projects", Project.find(projectQuery)
+      .select("_id projectId name client clientId status startDate totalValue receivedAmount pendingBalance materialSpend labourPayable completion siteNames lastActivityAt")
+      .sort({ lastActivityAt: -1, _id: -1 })
+      .limit(10)
+      .lean()
+      .maxTimeMS(8_000)),
+    safeDashboardList("sites", Site.find(siteQuery)
+      .select("_id siteId name status supervisor startDate targetEndDate projectIds updatedAt createdAt")
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(25)
+      .lean()
+      .maxTimeMS(8_000)),
+    safeDashboardList("approvals", Approval.find(approvalQuery)
+      .select("_id approvalId type title projectId projectName site amount submittedAt status sourceCollection sourceId")
+      .sort({ submittedAt: -1, _id: -1 })
+      .limit(25)
+      .lean()
+      .maxTimeMS(8_000)),
+    safeDashboardList("todayExpenses", Expense.find(todayExpensesQuery)
+      .select("_id expenseId type projectId projectName siteId site transactionType amount date description status materialVendor createdAt")
+      .sort({ _id: -1 })
+      .limit(5)
+      .lean()
+      .maxTimeMS(8_000)),
+    safeDashboardList("inventoryPreview", Inventory.find(entityScope)
+      .select("_id")
+      .sort({ _id: -1 })
+      .limit(25)
+      .lean()
+      .maxTimeMS(8_000)),
+    safeDashboardList("labourPreview", Labour.find(entityScope)
+      .select("_id")
+      .sort({ _id: -1 })
+      .limit(25)
+      .lean()
+      .maxTimeMS(8_000)),
   ]);
 
-  // Filter projects and approvals by the selected site if provided
-  let filteredProjects = projects;
-  let filteredApprovals = approvals;
-  if (filters.siteId) {
-    filteredProjects = projects.filter((p: any) =>
-      !filters.projectId || p.id?.toString() === filters.projectId || p._id?.toString() === filters.projectId
-    );
-    filteredApprovals = approvals.filter((a: any) =>
-      a.siteId === filters.siteId || a.projectId?.toString() === filters.projectId
-    );
-  } else if (filters.projectId) {
-    filteredProjects = projects.filter((p: any) =>
-      p.id?.toString() === filters.projectId || p._id?.toString() === filters.projectId
-    );
-    filteredApprovals = approvals.filter((a: any) =>
-      a.projectId?.toString() === filters.projectId
-    );
-  }
+  const mappedProjects = projects.map((p) => ({
+    id: p._id.toString(),
+    projectId: p.projectId,
+    name: p.name,
+    client: p.client,
+    clientId: p.clientId,
+    status: p.status,
+    startDate: p.startDate,
+    totalValue: p.totalValue,
+    receivedAmount: p.receivedAmount,
+    pendingBalance: p.pendingBalance,
+    materialSpend: p.materialSpend,
+    labourPayable: p.labourPayable,
+    completion: p.completion,
+    siteNames: p.siteNames,
+    lastActivityAt: p.lastActivityAt,
+  }));
+
+  const projectIdToName = new Map(mappedProjects.map((p) => [String(p.id), p.name]));
+  const mappedSites = sites.map((s) => {
+    const firstProjectId = s.projectIds?.[0]?.toString();
+    return {
+      id: s._id.toString(),
+      siteId: s.siteId,
+      name: s.name,
+      status: s.status,
+      supervisor: s.supervisor,
+      startDate: s.startDate,
+      targetEndDate: s.targetEndDate,
+      projectId: firstProjectId,
+      projectName: firstProjectId ? projectIdToName.get(firstProjectId) : undefined,
+      employeeCount: 0,
+      daysActive: 0,
+      updatedAt: (s as any).updatedAt?.toISOString?.() || s.createdAt?.toISOString?.(),
+    };
+  });
+
+  const mappedApprovals = approvals.map((a) => ({
+    _id: a._id.toString(),
+    approvalId: a.approvalId,
+    type: a.type,
+    title: a.title,
+    projectId: a.projectId,
+    projectName: a.projectName,
+    site: a.site,
+    amount: a.amount,
+    submittedAt: a.submittedAt,
+    status: a.status,
+    sourceCollection: a.sourceCollection,
+    sourceId: a.sourceId,
+  }));
+
+  const pendingApprovals = mappedApprovals.filter((a) => a.status === "Pending");
+  const todayTotal = todayExpenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
 
   return {
     counts: {
-      projects: filteredProjects.length,
-      sites: sites.length,
-      pendingApprovals: filteredApprovals.length,
-      pendingMaterials,
-      pendingLabour,
-      pendingExpenses,
-      inventory: inventoryCount,
-      labour: labourCount,
+      projects: mappedProjects.length,
+      sites: mappedSites.length,
+      pendingApprovals: pendingApprovals.length,
+      pendingMaterials: pendingApprovals.filter((a) => a.type === "material").length,
+      pendingLabour: pendingApprovals.filter((a) => a.type === "labour").length,
+      pendingExpenses: pendingApprovals.filter((a) => a.type === "expense").length,
+      inventory: inventoryPreview.length,
+      labour: labourPreview.length,
     },
     todayExpense: {
-      total: todayExpenses[0]?.total ?? 0,
-      count: todayExpenses[0]?.count ?? 0,
+      total: todayTotal,
+      count: todayExpenseRows.length,
     },
-    projects: filteredProjects.slice(0, 10),
-    pendingApprovals: filteredApprovals.slice(0, 20),
+    projects: mappedProjects,
+    sites: mappedSites,
+    todayExpenses: todayExpenseRows,
+    pendingApprovals: mappedApprovals.slice(0, 20),
   };
 }
 
@@ -767,23 +837,17 @@ export async function listMaterialsForSupervisor(
     delete invQuery.status;
     applyCursor(invQuery, filters.cursor);
 
-    const [items, total] = await dbMutex.run(() => Promise.all([
+    const items = await dbMutex.run(() =>
       withRetry(
         () => Inventory.find(invQuery)
           .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
           .sort({ _id: -1 })
           .limit(limit)
           .lean()
-          .maxTimeMS(30_000),
+          .maxTimeMS(20_000),
         { label: "mobile.listMaterials.inv.find" }
-      ),
-      filters.cursor
-        ? Promise.resolve(0)
-        : withRetry(
-            () => Inventory.countDocuments(invQuery).maxTimeMS(30_000),
-            { label: "mobile.listMaterials.inv.count" }
-          ),
-    ])).catch((err) => {
+      )
+    ).catch((err) => {
       console.error("[mobile.listMaterials] inventory query failed:", (err as Error).message);
       throw new AppError(503, "Inventory is temporarily unavailable. Please retry.");
     });
@@ -834,31 +898,25 @@ export async function listMaterialsForSupervisor(
       })),
       pagination: {
         limit,
-        total,
-        pages: Math.ceil(total / limit),
+        total: estimatedMobileTotal(items.length, limit, !!filters.cursor),
+        pages: items.length === limit ? 2 : 1,
         nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
       },
     };
   }
 
   applyCursor(query, filters.cursor);
-  const [items, total] = await dbMutex.run(() => Promise.all([
+  const items = await dbMutex.run(() =>
     withRetry(
       () => Material.find(query)
         .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
         .sort({ _id: -1 })
         .limit(limit)
         .lean()
-        .maxTimeMS(30_000),
+        .maxTimeMS(20_000),
       { label: "mobile.listMaterials.find" }
-    ),
-      filters.cursor
-        ? Promise.resolve(0)
-        : withRetry(
-            () => Material.countDocuments(query).maxTimeMS(30_000),
-            { label: "mobile.listMaterials.count" }
-          ),
-  ])).catch((err) => {
+    )
+  ).catch((err) => {
     console.error("[mobile.listMaterials] main query failed:", (err as Error).message);
     throw new AppError(503, "Materials are temporarily unavailable. Please retry.");
   });
@@ -893,8 +951,8 @@ export async function listMaterialsForSupervisor(
     })),
     pagination: {
       limit,
-      total,
-      pages: Math.ceil(total / limit),
+      total: estimatedMobileTotal(items.length, limit, !!filters.cursor),
+      pages: items.length === limit ? 2 : 1,
       nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
     },
   };
@@ -909,22 +967,16 @@ export async function listLabourForSupervisor(
   const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
   applyCursor(query, filters.cursor);
 
-  const [items, total] = await dbMutex.run(() => Promise.all([
+  const items = await dbMutex.run(() =>
     withRetry(
       () => Labour.find(query)
         .sort({ _id: -1 })
         .limit(limit)
         .lean()
-        .maxTimeMS(30_000),
+        .maxTimeMS(20_000),
       { label: "mobile.listLabour.find" }
-    ),
-    filters.cursor
-      ? Promise.resolve(0)
-      : withRetry(
-          () => Labour.countDocuments(query).maxTimeMS(30_000),
-          { label: "mobile.listLabour.count" }
-        ),
-  ])).catch((err) => {
+    )
+  ).catch((err) => {
     console.error("[mobile.listLabour] main query failed:", (err as Error).message);
     throw new AppError(503, "Labour is temporarily unavailable. Please retry.");
   });
@@ -950,8 +1002,8 @@ export async function listLabourForSupervisor(
     })),
     pagination: {
       limit,
-      total,
-      pages: Math.ceil(total / limit),
+      total: estimatedMobileTotal(items.length, limit, !!filters.cursor),
+      pages: items.length === limit ? 2 : 1,
       nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
     },
   };
@@ -966,23 +1018,17 @@ export async function listExpensesForSupervisor(
   const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
   applyCursor(query, filters.cursor);
 
-  const [items, total] = await dbMutex.run(() => Promise.all([
+  const items = await dbMutex.run(() =>
     withRetry(
       () => Expense.find(query)
         .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
         .sort({ _id: -1 })
         .limit(limit)
         .lean()
-        .maxTimeMS(30_000),
+        .maxTimeMS(20_000),
       { label: "mobile.listExpenses.find" }
-    ),
-      filters.cursor
-        ? Promise.resolve(0)
-        : withRetry(
-            () => Expense.countDocuments(query).maxTimeMS(30_000),
-            { label: "mobile.listExpenses.count" }
-          ),
-  ])).catch((err) => {
+    )
+  ).catch((err) => {
     console.error("[mobile.listExpenses] main query failed:", (err as Error).message);
     throw new AppError(503, "Expenses are temporarily unavailable. Please retry.");
   });
@@ -1017,8 +1063,8 @@ export async function listExpensesForSupervisor(
     })),
     pagination: {
       limit,
-      total,
-      pages: Math.ceil(total / limit),
+      total: estimatedMobileTotal(items.length, limit, !!filters.cursor),
+      pages: items.length === limit ? 2 : 1,
       nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
     },
   };

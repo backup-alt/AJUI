@@ -802,39 +802,14 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.error.set(false);
 
     try {
-      // Fire all requests in parallel, catch each individually
       let dashData: DashboardData | null = null;
-      let sitesData: Site[] = [];
-      let profileName: string | null = null;
-      let expensesData: Expense[] = [];
-
-      const [dashResult, sitesResult, profileResult, expensesResult] = await Promise.all([
-        this.supervisor.getDashboard({
-          siteId: this.supervisor.selectedSiteId() || undefined,
-          projectId: this.supervisor.selectedProjectId() || undefined,
-        }).toPromise().then(
-          (r) => { if (r) dashData = r.dashboard; return !!r; },
-          () => false
-        ),
-        this.supervisor.getSites().toPromise().then(
-          (r) => { if (r) sitesData = r.sites || []; return !!r; },
-          () => false
-        ),
-        this.supervisor.getProfile().toPromise().then(
-          (r) => { if (r) profileName = (r as { user?: { name?: string } }).user?.name || null; return !!r; },
-          () => false
-        ),
-        this.supervisor.getExpenses({
-          siteId: this.supervisor.selectedSiteId() || undefined,
-          projectId: this.supervisor.selectedProjectId() || undefined,
-          dateFrom: this.todayStr(),
-          dateTo: this.todayStr(),
-          limit: 5,
-        }).toPromise().then(
-          (r) => { if (r) expensesData = r.expenses || []; return !!r; },
-          () => false
-        ),
-      ]);
+      const dashResult = await this.supervisor.getDashboard({
+        siteId: this.supervisor.selectedSiteId() || undefined,
+        projectId: this.supervisor.selectedProjectId() || undefined,
+      }).toPromise().then(
+        (r) => { if (r) dashData = r.dashboard; return !!r; },
+        () => false
+      );
 
       // Dashboard is critical — if it failed, show error state
       if (!dashResult || !dashData) {
@@ -844,10 +819,10 @@ export class DashboardPage implements OnInit, OnDestroy {
         return false;
       }
 
-      this.dashboard.set(dashData);
-      if (sitesResult) this.sites.set(sitesData);
-      if (profileResult && profileName) this.userName.set(profileName);
-      if (expensesResult) this.todayExpenses.set(expensesData);
+      const loadedDashboard = dashData as DashboardData;
+      this.dashboard.set(loadedDashboard);
+      this.sites.set((loadedDashboard.sites || []) as Site[]);
+      this.todayExpenses.set((loadedDashboard.todayExpenses || []) as Expense[]);
 
       this.loading.set(false);
       return true;
@@ -857,14 +832,6 @@ export class DashboardPage implements OnInit, OnDestroy {
       this.error.set(true);
       return false;
     }
-  }
-
-  private todayStr(): string {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
   }
 
   navigateTo(path: string): void {
