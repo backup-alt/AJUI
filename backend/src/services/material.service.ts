@@ -60,8 +60,6 @@ function getMaterialCursorState(key: string): MaterialPageCursorState {
 
 function materialTypeToStatus(type?: string): MaterialStatus | undefined {
   const map: Record<string, MaterialStatus> = {
-    pending: "Pending",
-    approved: "Approved",
     received: "Received",
     notReceived: "Not Received",
   };

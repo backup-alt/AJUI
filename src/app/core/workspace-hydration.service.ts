@@ -365,7 +365,7 @@ export class WorkspaceHydrationService {
     if (!factory) return null;
 
     if (module === "materials") {
-      const materialTypes = ["pending", "approved", "received", "notReceived"];
+      const materialTypes = ["received", "notReceived"];
       const responses = await Promise.all(
         materialTypes.map((type) =>
           this.safeList(
