@@ -138,26 +138,6 @@ export class WorkspaceHydrationService {
    * the bottom of the table.
    */
   async loadNextPage(module: PageModule): Promise<boolean> {
-    if (module === "inventory") {
-      if (this.loadingNextPage().inventory || this.loadingNextPage().materials) return false;
-
-      this.loadingNextPage.update(s => ({ ...s, inventory: true }));
-      try {
-        if (!this.loadedModules().has("materials")) await this.loadModule("materials");
-        if (!this.hasMorePages("materials")) {
-          this.syncInventoryFromMaterials();
-          this.syncInventoryPageState();
-          return false;
-        }
-        const loaded = await this.loadNextPage("materials");
-        this.syncInventoryFromMaterials();
-        this.syncInventoryPageState();
-        return loaded;
-      } finally {
-        this.loadingNextPage.update(s => ({ ...s, inventory: false }));
-      }
-    }
-
     const cursors = this.pageCursors();
     const nextCursor = cursors[module];
     // Already at the end — no more pages
@@ -309,16 +289,6 @@ export class WorkspaceHydrationService {
    * next page and total count for infinite scroll.
    */
   private async loadFirstPageByModule(module: PageModule): Promise<boolean> {
-    if (module === "inventory") {
-      if (!this.loadedModules().has("materials")) await this.loadModule("materials");
-      this.syncInventoryFromMaterials();
-      this.syncInventoryPageState();
-      console.log(
-        `[loadFirstPage] inventory: ${this.erp.inventory().length} material-backed items, total=${this.pageTotals().inventory ?? 0}, nextPage=${this.pageCursors().inventory ?? "end"}`
-      );
-      return true;
-    }
-
     const result = await this.fetchPage(module, undefined);
     if (!result) return false;
 

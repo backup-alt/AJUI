@@ -141,42 +141,6 @@ export async function listInventory(filter: {
   const effectiveLimit = Math.min(Math.max(filter.limit || 25, 1), 25);
   const effectivePage = Math.max(filter.page || 1, 1);
   const skip = filter.cursor ? 0 : (effectivePage - 1) * effectiveLimit;
-  try {
-    const tDb = Date.now();
-    const materialBacked = await listMaterialBackedInventory(query, effectiveLimit, effectivePage, skip, Boolean(filter.cursor));
-    const items = materialBacked.items;
-    const lastItem = items.length === effectiveLimit ? items[items.length - 1] : null;
-    const nextCursor = lastItem?._id ? String(lastItem._id) : null;
-    console.log(`[listInventory] material-backed dt=${Date.now() - tDb}ms items=${items.length} total=${materialBacked.total}`);
-    return {
-      items: items as unknown as IInventory[],
-      total: materialBacked.total,
-      page: effectivePage,
-      limit: effectiveLimit,
-      pages: Math.ceil(materialBacked.total / effectiveLimit),
-      nextCursor,
-      queryFailed: false,
-    };
-  } catch (err) {
-    console.error(
-      "[listInventory] material-backed query failed (projectId=%s siteId=%s search=%s scopeLen=%s):",
-      String(filter.projectId || ""),
-      String(filter.siteId || ""),
-      String(filter.search || ""),
-      String(filter.scopeProjectIds?.length ?? 0),
-      (err as Error)?.message || err
-    );
-    return {
-      items: [],
-      total: 0,
-      page: effectivePage,
-      limit: effectiveLimit,
-      pages: 0,
-      nextCursor: null,
-      queryFailed: true,
-    };
-  }
-
   type InventoryLike = { [k: string]: unknown };
   let items: InventoryLike[] = [];
   let total = 0;

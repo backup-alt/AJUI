@@ -185,7 +185,9 @@ export async function addExistingMaterial(req: Request, res: Response, next: Nex
     invalidateCachePrefix("/api/supervisor/materials");
     invalidateCachePrefix("/api/supervisor/material-names");
     invalidateCachePrefix("/api/supervisor/dashboard");
+    invalidateCachePrefix("/api/materials");
     invalidateCachePrefix("/api/inventory");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.status(result.created ? 201 : 200).json(result);
   } catch (e) { next(e); }
 }
