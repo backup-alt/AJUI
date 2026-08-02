@@ -9,76 +9,60 @@ import { cubeOutline, documentTextOutline, closeOutline } from 'ionicons/icons';
   standalone: true,
   imports: [IonIcon],
   template: `
-    <div class="action-sheet-backdrop" (click)="dismiss()">
-      <div class="action-sheet-container" (click)="$event.stopPropagation()">
-        <div class="action-sheet-header">
-          <h2>Add to Inventory</h2>
-          <p>Choose how you'd like to add materials</p>
-          <button class="close-btn" (click)="dismiss()" aria-label="Close">
-            <ion-icon name="close-outline"></ion-icon>
-          </button>
-        </div>
+    <div class="action-sheet-container">
+      <div class="action-sheet-header">
+        <h2>Add to Inventory</h2>
+        <p>Choose how you'd like to add materials</p>
+        <button class="close-btn" (click)="dismiss()" aria-label="Close">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
 
-        <div class="action-cards">
-          <button class="action-card" (click)="selectAction('existing')">
-            <div class="action-icon existing-icon">
-              <ion-icon name="cube-outline"></ion-icon>
-            </div>
-            <div class="action-content">
-              <h3>Add Existing Material</h3>
-              <p>Record materials already present at the site</p>
-            </div>
-            <div class="action-arrow">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
-            </div>
-          </button>
+      <div class="action-cards">
+        <button class="action-card" (click)="selectAction('existing')">
+          <div class="action-icon existing-icon">
+            <ion-icon name="cube-outline"></ion-icon>
+          </div>
+          <div class="action-content">
+            <h3>Add Existing Material</h3>
+            <p>Record materials already present at the site</p>
+          </div>
+          <div class="action-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </div>
+        </button>
 
-          <button class="action-card" (click)="selectAction('request')">
-            <div class="action-icon request-icon">
-              <ion-icon name="document-text-outline"></ion-icon>
-            </div>
-            <div class="action-content">
-              <h3>Raise Material Request</h3>
-              <p>Submit a new material request for approval</p>
-            </div>
-            <div class="action-arrow">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
-            </div>
-          </button>
-        </div>
+        <button class="action-card" (click)="selectAction('request')">
+          <div class="action-icon request-icon">
+            <ion-icon name="document-text-outline"></ion-icon>
+          </div>
+          <div class="action-content">
+            <h3>Raise Material Request</h3>
+            <p>Submit a new material request for approval</p>
+          </div>
+          <div class="action-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </div>
+        </button>
       </div>
     </div>
   `,
   styles: [`
-    .action-sheet-backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      animation: fadeIn 0.2s ease;
-      padding: 0;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+    :host {
+      display: block;
+      width: 100%;
     }
 
     .action-sheet-container {
       width: 100%;
-      max-width: 480px;
       background: var(--m3-surface-bright);
       border-radius: var(--md-radius-2xl) var(--md-radius-2xl) 0 0;
       padding: var(--md-space-6) var(--md-space-4) var(--md-space-8);
       animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
     }
 
     @keyframes slideUp {

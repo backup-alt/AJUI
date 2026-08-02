@@ -623,23 +623,18 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
     ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
 
     :host ::ng-deep .action-sheet-modal {
-      --backdrop-opacity: 0.5;
-      --box-shadow: none;
+      --backdrop-opacity: 0.4;
       --width: 100%;
       --max-width: 480px;
       --height: auto;
       --border-radius: var(--md-radius-2xl) var(--md-radius-2xl) 0 0;
-      bottom: 0;
-      top: auto;
+      --box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
       align-self: center;
     }
 
     :host ::ng-deep .action-sheet-modal ion-content {
       --background: transparent;
-    }
-
-    :host ::ng-deep .action-sheet-modal ion-backdrop {
-      background: rgba(0, 0, 0, 0.5);
+      --overflow: hidden;
     }
 
     .bill-viewer-overlay {
