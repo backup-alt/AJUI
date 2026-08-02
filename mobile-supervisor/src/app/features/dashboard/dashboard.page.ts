@@ -786,33 +786,27 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   async refreshDashboard(event: CustomEvent): Promise<void> {
     this.error.set(false);
-    await this.loadDashboard();
+    await this.loadDashboard(true);
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   async retryLoad(): Promise<void> {
     this.error.set(false);
     this.loading.set(true);
-    const success = await this.loadDashboard();
+    const success = await this.loadDashboard(true);
     this.appReady.resolve(success);
   }
 
-  async loadDashboard(): Promise<boolean> {
+  async loadDashboard(force = false): Promise<boolean> {
     this.loading.set(true);
     this.error.set(false);
 
     try {
-      let dashData: DashboardData | null = null;
-      const dashResult = await this.supervisor.getDashboard({
-        siteId: this.supervisor.selectedSiteId() || undefined,
-        projectId: this.supervisor.selectedProjectId() || undefined,
-      }).toPromise().then(
-        (r) => { if (r) dashData = r.dashboard; return !!r; },
-        () => false
-      );
+      const startup = await this.supervisor.preloadStartupData(force);
+      const dashData = startup.dashboard;
 
       // Dashboard is critical — if it failed, show error state
-      if (!dashResult || !dashData) {
+      if (!dashData) {
         console.error('[Dashboard] failed to load');
         this.loading.set(false);
         this.error.set(true);

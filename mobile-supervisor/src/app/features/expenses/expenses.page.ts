@@ -393,12 +393,13 @@ export class ExpensesPage implements OnInit {
       });
   }
 
-  async loadExpenses(): Promise<void> {
+  async loadExpenses(force = false): Promise<void> {
     this.isLoading.set(true);
     try {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
-      const r = await this.supervisor
+      const cachedStartup = force ? null : this.supervisor.getStartupData();
+      const r = cachedStartup?.expenses || await this.supervisor
         .getExpenses({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
@@ -421,7 +422,7 @@ export class ExpensesPage implements OnInit {
   }
 
   async refreshExpenses(event: CustomEvent): Promise<void> {
-    await this.loadExpenses();
+    await this.loadExpenses(true);
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 

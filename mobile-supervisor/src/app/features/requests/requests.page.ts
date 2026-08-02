@@ -635,11 +635,11 @@ export class RequestsPage implements OnInit {
   }
 
   async handleRefresh(event: CustomEvent): Promise<void> {
-    await this.loadAllRequests();
+    await this.loadAllRequests(true);
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
-  async loadAllRequests(): Promise<void> {
+  async loadAllRequests(force = false): Promise<void> {
     this.isLoading.set(true);
     this.errorMessage.set('');
     const items: RequestItem[] = [];
@@ -658,8 +658,10 @@ export class RequestsPage implements OnInit {
         items.push(item);
       };
 
+      const cachedStartup = force ? null : this.supervisor.getStartupData();
+
       try {
-        const approvalsRes = await firstValueFrom(this.supervisor.getApprovals());
+        const approvalsRes = cachedStartup?.approvals || await firstValueFrom(this.supervisor.getApprovals());
         for (const approval of approvalsRes?.approvals || []) {
           const rawType = String((approval as any).type || (approval as any).sourceCollection || '').toLowerCase();
           const requestType: RequestItem['type'] =
@@ -686,7 +688,7 @@ export class RequestsPage implements OnInit {
 
       // Load APPROVED materials from Inventory (fast on M0 — avoids Material.find() timeout)
       try {
-        const approvedMatRes = await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 25 }));
+        const approvedMatRes = cachedStartup?.inventory || await firstValueFrom(this.supervisor.getMaterials({ ...siteFilter, status: 'Approved', limit: 25 }));
         for (const m of approvedMatRes?.materials || []) {
           const hasNoBill = !(m as any).billUrl;
           addItem({
@@ -738,7 +740,7 @@ export class RequestsPage implements OnInit {
 
       // Load expenses — include ALL transaction types (Purchase + Add Cash)
       try {
-        const expRes = await firstValueFrom(this.supervisor.getExpenses({ ...siteFilter, type: 'site', limit: 25 }));
+        const expRes = cachedStartup?.expenses || await firstValueFrom(this.supervisor.getExpenses({ ...siteFilter, type: 'site', limit: 25 }));
         for (const e of expRes?.expenses || []) {
           const txLabel =
             e.transactionType === 'Cash Added' ? 'Add Cash' :
@@ -969,7 +971,7 @@ export class RequestsPage implements OnInit {
         'Material Submitted',
         `Receipt for ${item.title || 'material'} has been uploaded successfully.`
       );
-      await this.loadAllRequests();
+      await this.loadAllRequests(true);
     } catch (err: any) {
       const toast = await this.toastCtrl.create({
         message: err?.message || 'Failed to upload bill',

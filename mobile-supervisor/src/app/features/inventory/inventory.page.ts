@@ -722,10 +722,10 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   private handleInventoryChange = (): void => {
-    void this.loadInventory();
+    void this.loadInventory(true);
   };
 
-  async loadInventory(): Promise<void> {
+  async loadInventory(force = false): Promise<void> {
     this.isLoading.set(true);
     this.errorMessage.set('');
     const gen = ++this.loadGeneration;
@@ -733,7 +733,8 @@ export class InventoryPage implements OnInit, OnDestroy {
     const projectId = this.supervisor.selectedProjectId();
 
     try {
-      const res = await firstValueFrom(
+      const cachedStartup = force ? null : this.supervisor.getStartupData();
+      const res = cachedStartup?.inventory || await firstValueFrom(
         this.supervisor.getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
@@ -755,7 +756,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   async refreshInventory(event: CustomEvent): Promise<void> {
-    await this.loadInventory();
+    await this.loadInventory(true);
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
@@ -838,7 +839,7 @@ export class InventoryPage implements OnInit, OnDestroy {
     await modal.present();
     const { data } = await modal.onDidDismiss();
     if (data?.updated) {
-      await this.loadInventory();
+      await this.loadInventory(true);
     }
   }
 
@@ -854,7 +855,7 @@ export class InventoryPage implements OnInit, OnDestroy {
     await modal.present();
     const { data } = await modal.onDidDismiss();
     if (data?.requested) {
-      await this.loadInventory();
+      await this.loadInventory(true);
       const toast = await this.toastCtrl.create({
         message: 'Material request submitted successfully',
         duration: 2500,

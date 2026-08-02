@@ -44,6 +44,10 @@ export class AppComponent implements OnInit {
 
     // 3. Hydrate selected site from Preferences
     await this.supervisor.init();
+    if (this.auth.isAuthenticated()) {
+      await this.waitForStartupData();
+    }
+
     // 4. Load cached notifications from Preferences
     await this.notifications.initFromStorage();
     // 4b. Fetch approval/decline notifications from backend
@@ -62,7 +66,7 @@ export class AppComponent implements OnInit {
     this.watchSessionExpiry();
 
     // 5. Wait for the first page (Dashboard) to finish loading all data.
-    const DASHBOARD_TIMEOUT_MS = 12_000;
+    const DASHBOARD_TIMEOUT_MS = 86_400_000;
     const timeoutPromise = new Promise<boolean>((resolve) =>
       setTimeout(() => resolve(false), DASHBOARD_TIMEOUT_MS)
     );
@@ -73,6 +77,19 @@ export class AppComponent implements OnInit {
     }
 
     this.hideSplashScreen();
+  }
+
+  private async waitForStartupData(): Promise<void> {
+    while (true) {
+      try {
+        await this.supervisor.preloadStartupData();
+        this.appReady.resolve(true);
+        return;
+      } catch (error) {
+        console.error('[App] Startup data load failed; retrying before entering app', error);
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+      }
+    }
   }
 
   private hideSplashScreen(): void {
