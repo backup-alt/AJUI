@@ -1,9 +1,11 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import {
   IonContent,
   IonIcon,
   IonRefresher,
   IonRefresherContent,
+  AlertController,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
@@ -42,7 +44,7 @@ import { DatePipe } from '@angular/common';
         <div class="notif-header">
           <h1 class="notif-title">Notifications</h1>
           @if (notifications().length > 0) {
-            <button class="clear-btn" (click)="clearAll()">
+            <button class="clear-btn" (click)="confirmClearAll()">
               <ion-icon name="trash-outline"></ion-icon>
               Clear All
             </button>
@@ -59,7 +61,7 @@ import { DatePipe } from '@angular/common';
           </div>
         } @else {
           @for (notif of notifications(); track notif.id) {
-            <div class="notif-card" [class.unread]="!notif.read" (click)="markRead(notif)">
+            <div class="notif-card" [class.unread]="!notif.read" (click)="handleNotifClick(notif)">
               <div class="notif-icon" [class]="getIconClass(notif)">
                 <ion-icon [name]="getIcon(notif)"></ion-icon>
               </div>
@@ -223,6 +225,8 @@ import { DatePipe } from '@angular/common';
 })
 export class NotificationsPage implements OnInit {
   private notifService = inject(NotificationService);
+  private alertCtrl = inject(AlertController);
+  private toastCtrl = inject(ToastController);
 
   notifications = signal<InAppNotification[]>([]);
 
@@ -232,6 +236,9 @@ export class NotificationsPage implements OnInit {
       timeOutline, cubeOutline, walletOutline, peopleOutline,
       alertCircleOutline, trashOutline, cardOutline, cashOutline,
     });
+    // Load from local storage first (instant), then fetch from backend
+    await this.notifService.loadFromStorage();
+    this.notifications.set(this.notifService.notifications());
     await this.notifService.fetchFromBackend();
     this.notifications.set(this.notifService.notifications());
     this.notifService.markAllRead();
@@ -244,14 +251,47 @@ export class NotificationsPage implements OnInit {
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
-  markRead(notif: InAppNotification): void {
-    notif.read = true;
-    this.notifService.markAllRead();
+  handleNotifClick(notif: InAppNotification): void {
+    this.notifService.markRead(notif.id);
+    this.notifications.set(this.notifService.notifications());
   }
 
-  clearAll(): void {
-    this.notifService.clear();
-    this.notifications.set([]);
+  async confirmClearAll(): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Clear All Notifications',
+      message: 'This will permanently remove all notifications from this screen. Are you sure?',
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Clear All',
+          role: 'destructive',
+          handler: () => void this.clearAll(),
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  async clearAll(): Promise<void> {
+    try {
+      await this.notifService.clear();
+      this.notifications.set([]);
+      const toast = await this.toastCtrl.create({
+        message: 'All notifications cleared',
+        duration: 2000,
+        color: 'success',
+        position: 'bottom',
+      });
+      await toast.present();
+    } catch {
+      const toast = await this.toastCtrl.create({
+        message: 'Failed to clear notifications',
+        duration: 3000,
+        color: 'danger',
+        position: 'bottom',
+      });
+      await toast.present();
+    }
   }
 
   getIcon(notif: InAppNotification): string {

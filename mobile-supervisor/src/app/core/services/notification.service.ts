@@ -24,6 +24,9 @@ export class NotificationService {
   readonly notifications = signal<InAppNotification[]>([]);
   readonly unreadCount = signal<number>(0);
 
+  /** Timestamp (ms) when the user last cleared all notifications. */
+  private clearedAt = 0;
+
   async requestPermission(): Promise<boolean> {
     try {
       const result = await PushNotifications.requestPermissions();
@@ -60,6 +63,7 @@ export class NotificationService {
   async initFromStorage(): Promise<void> {
     const { value } = await Preferences.get({ key: 'pushEnabled' });
     this.pushEnabled.set(value === 'true');
+    await this.loadClearedAt();
     await this.loadFromStorage();
   }
 
@@ -104,7 +108,6 @@ export class NotificationService {
       (action) => {
         const data = action.notification?.data;
         if (data?.['route']) {
-          // Navigation is the caller's responsibility. We expose the route via the data.
           window.dispatchEvent(
             new CustomEvent('agb:push-navigate', { detail: data['route'] })
           );
@@ -126,8 +129,15 @@ export class NotificationService {
   }
 
   private addInApp(n: InAppNotification): void {
+    // Skip if this notification was received before the user cleared all
+    if (this.clearedAt > 0 && n.receivedAt <= this.clearedAt) return;
+
+    const existing = this.notifications();
+    // Deduplicate by ID
+    if (existing.some((e) => e.id === n.id)) return;
+
     this.notifications.update((list) => [n, ...list].slice(0, 50));
-    this.unreadCount.update((c) => c + 1);
+    this.unreadCount.update((c) => c + (n.read ? 0 : 1));
     this.persistNotifications();
   }
 
@@ -142,16 +152,44 @@ export class NotificationService {
     });
   }
 
+  /** Mark a single notification as read. */
+  markRead(notifId: string): void {
+    let changed = false;
+    this.notifications.update((list) =>
+      list.map((n) => {
+        if (n.id === notifId && !n.read) {
+          changed = true;
+          return { ...n, read: true };
+        }
+        return n;
+      })
+    );
+    if (changed) {
+      this.recalcUnread();
+      this.persistNotifications();
+    }
+  }
+
   markAllRead(): void {
     this.notifications.update((list) => list.map((n) => ({ ...n, read: true })));
     this.unreadCount.set(0);
     this.persistNotifications();
   }
 
-  clear(): void {
+  /** Clear all notifications and persist the clearedAt timestamp. */
+  async clear(): Promise<void> {
+    this.clearedAt = Date.now();
     this.notifications.set([]);
     this.unreadCount.set(0);
-    this.persistNotifications();
+    await this.persistClearedAt();
+    await this.persistNotifications();
+  }
+
+  /** Clear a single notification. */
+  async clearSingle(notifId: string): Promise<void> {
+    this.notifications.update((list) => list.filter((n) => n.id !== notifId));
+    this.recalcUnread();
+    await this.persistNotifications();
   }
 
   async loadFromStorage(): Promise<void> {
@@ -159,8 +197,12 @@ export class NotificationService {
     if (value) {
       try {
         const list = JSON.parse(value) as InAppNotification[];
-        this.notifications.set(list);
-        this.unreadCount.set(list.filter((n) => !n.read).length);
+        // Filter out notifications that were received before the last clear
+        const filtered = this.clearedAt > 0
+          ? list.filter((n) => n.receivedAt > this.clearedAt)
+          : list;
+        this.notifications.set(filtered);
+        this.unreadCount.set(filtered.filter((n) => !n.read).length);
       } catch { /* ignore */ }
     }
   }
@@ -180,16 +222,33 @@ export class NotificationService {
 
       const existing = this.notifications();
       const existingIds = new Set(existing.map((n) => n.id));
-      const newNotifs = backendNotifs.filter((n) => !existingIds.has(n.id));
+
+      // Filter: skip notifications received before the last clear, and skip duplicates
+      const newNotifs = backendNotifs.filter((n) => {
+        if (existingIds.has(n.id)) return false;
+        if (this.clearedAt > 0 && n.receivedAt <= this.clearedAt) return false;
+        return true;
+      });
 
       if (newNotifs.length > 0) {
-        this.notifications.update((list) => [...newNotifs, ...list].slice(0, 50));
-        this.unreadCount.update((c) => c + newNotifs.length);
+        // Preserve read state from existing notifications
+        const readMap = new Map(existing.map((n) => [n.id, n.read]));
+        const withReadState = newNotifs.map((n) => ({
+          ...n,
+          read: readMap.get(n.id) ?? false,
+        }));
+
+        this.notifications.update((list) => [...withReadState, ...list].slice(0, 50));
+        this.recalcUnread();
         this.persistNotifications();
       }
     } catch (err) {
       console.error('[Notification] failed to fetch from backend', err);
     }
+  }
+
+  private recalcUnread(): void {
+    this.unreadCount.set(this.notifications().filter((n) => !n.read).length);
   }
 
   private async persistNotifications(): Promise<void> {
@@ -201,6 +260,18 @@ export class NotificationService {
 
   private async persistPreference(enabled: boolean): Promise<void> {
     await Preferences.set({ key: 'pushEnabled', value: enabled ? 'true' : 'false' });
+  }
+
+  private async loadClearedAt(): Promise<void> {
+    const { value } = await Preferences.get({ key: 'notificationsClearedAt' });
+    this.clearedAt = value ? Number(value) || 0 : 0;
+  }
+
+  private async persistClearedAt(): Promise<void> {
+    await Preferences.set({
+      key: 'notificationsClearedAt',
+      value: String(this.clearedAt),
+    });
   }
 
   private getPlatform(): 'ios' | 'android' {
