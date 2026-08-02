@@ -1,6 +1,6 @@
+import { env } from "../config/env.js";
+
 const PCLOUD_API = "https://api.pcloud.com";
-const FOLDER_ID = process.env.PCLOUD_FOLDER_ID || "32411322506";
-const BEARER_TOKEN = process.env.PCLOUD_BEARER_TOKEN || "hwwEZC70fbQB8DbpZMhWTO7Zeswo5En32opA21MAJKr2RFadrYBX";
 
 export interface PCloudUploadResult {
   fileId: string;
@@ -16,6 +16,14 @@ interface PCloudResponse {
     name: string;
     size: number;
   }>;
+  publink?: string;
+}
+
+function pcloudConfig(): { folderId: string; token: string } {
+  if (!env.PCLOUD_FOLDER_ID || !env.PCLOUD_BEARER_TOKEN) {
+    throw new Error("pCloud is not configured. Set PCLOUD_BEARER_TOKEN and PCLOUD_FOLDER_ID.");
+  }
+  return { folderId: env.PCLOUD_FOLDER_ID, token: env.PCLOUD_BEARER_TOKEN };
 }
 
 export async function uploadToPCloud(
@@ -23,26 +31,20 @@ export async function uploadToPCloud(
   fileName: string,
   mimeType: string
 ): Promise<PCloudUploadResult> {
-  const url = `${PCLOUD_API}/uploadfile?access_token=${BEARER_TOKEN}`;
-
-  // fileData is a base64-encoded string — decode it to a binary buffer
+  const { folderId, token } = pcloudConfig();
   const binaryData = Buffer.from(fileData, "base64");
-
-  // Build multipart/form-data manually
   const boundary = `----PCloudBoundary${Date.now()}`;
   const parts: Buffer[] = [];
 
-  // folderid field
   parts.push(Buffer.from(
-    `--${boundary}\r\nContent-Disposition: form-data; name="folderid"\r\n\r\n${FOLDER_ID}\r\n`
+    `--${boundary}\r\nContent-Disposition: form-data; name="access_token"\r\n\r\n${token}\r\n`
   ));
-
-  // filename field
+  parts.push(Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="folderid"\r\n\r\n${folderId}\r\n`
+  ));
   parts.push(Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="filename"\r\n\r\n${fileName}\r\n`
   ));
-
-  // file field (the actual binary content)
   parts.push(Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`
   ));
@@ -50,8 +52,7 @@ export async function uploadToPCloud(
   parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
 
   const body = Buffer.concat(parts);
-
-  const response = await fetch(url, {
+  const response = await fetch(`${PCLOUD_API}/uploadfile`, {
     method: "POST",
     headers: {
       "Content-Type": `multipart/form-data; boundary=${boundary}`,
@@ -66,64 +67,49 @@ export async function uploadToPCloud(
   }
 
   const result = await response.json() as PCloudResponse;
-
   if (result.result !== 0) {
     throw new Error(`pCloud API error: ${result.result} - ${result.error || "Unknown error"}`);
   }
 
   const fileInfo = result.files?.[0];
-  if (!fileInfo) {
-    throw new Error("No file info returned from pCloud");
-  }
-
-  let fileUrl = `https://my.pcloud.com/publink/show/${fileInfo.fileid}`;
-  try {
-    const publinkResponse = await fetch(`${PCLOUD_API}/getfilepublink?fileid=${fileInfo.fileid}&access_token=${BEARER_TOKEN}`);
-    if (publinkResponse.ok) {
-      const publinkResult = await publinkResponse.json() as any;
-      if (publinkResult.result === 0) {
-        fileUrl = publinkResult.publink;
-      }
-    }
-  } catch (err) {
-    console.warn("[pCloud] Failed to generate public link, using fallback:", err);
-  }
+  if (!fileInfo) throw new Error("No file info returned from pCloud");
 
   return {
     fileId: String(fileInfo.fileid),
-    fileUrl,
+    fileUrl: await getPCloudFileUrl(String(fileInfo.fileid)),
     fileName: fileInfo.name,
   };
 }
 
 export async function getPCloudFileUrl(fileId: string): Promise<string> {
-  try {
-    const publinkResponse = await fetch(`${PCLOUD_API}/getfilepublink?fileid=${fileId}&access_token=${BEARER_TOKEN}`);
-    if (publinkResponse.ok) {
-      const publinkResult = await publinkResponse.json() as any;
-      if (publinkResult.result === 0) {
-        return publinkResult.publink;
-      }
-    }
-  } catch {}
-  return `https://my.pcloud.com/publink/show/${fileId}`;
-}
-
-export async function deleteFromPCloud(fileId: string): Promise<boolean> {
-  const url = `${PCLOUD_API}/deletefile?access_token=${BEARER_TOKEN}`;
-
-  const response = await fetch(url, {
+  const { token } = pcloudConfig();
+  const response = await fetch(`${PCLOUD_API}/getfilepublink`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ fileid: fileId }).toString(),
+    body: new URLSearchParams({ access_token: token, fileid: fileId }).toString(),
   });
 
-  if (!response.ok) {
-    return false;
+  if (response.ok) {
+    const result = await response.json() as PCloudResponse;
+    if (result.result === 0 && result.publink) return result.publink;
   }
 
+  return `https://my.pcloud.com/publink/show/${fileId}`;
+}
+
+export async function deleteFromPCloud(fileId: string): Promise<boolean> {
+  const { token } = pcloudConfig();
+  const response = await fetch(`${PCLOUD_API}/deletefile`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ access_token: token, fileid: fileId }).toString(),
+  });
+
+  if (!response.ok) return false;
   const result = await response.json() as PCloudResponse;
   return result.result === 0;
 }

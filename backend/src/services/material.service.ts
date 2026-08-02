@@ -416,11 +416,8 @@ export async function uploadMaterialReceipt(
     );
     material.billUrl = pcloudResult.fileUrl;
   } catch (err) {
-    console.warn("[pCloud] Upload failed for material, falling back to base64 storage:", err);
-    material.receiptImage = payload.data;
-    material.receiptImageMimeType = payload.mimeType;
-    material.receiptImageName = payload.fileName;
-    material.billUrl = `data:${payload.mimeType};base64,${payload.data}`;
+    console.error("[pCloud] Upload failed for material:", err);
+    throw new AppError(503, "Bill upload failed. Please retry after pCloud is available.");
   }
 
   if (payload.givenAmount !== undefined) {

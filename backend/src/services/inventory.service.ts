@@ -529,11 +529,8 @@ export async function uploadInventoryReceipt(
     );
     inventory.billUrl = pcloudResult.fileUrl;
   } catch (err) {
-    console.warn("[pCloud] Upload failed for inventory item, falling back to base64 storage:", err);
-    inventory.receiptImage = payload.data;
-    inventory.receiptImageMimeType = payload.mimeType;
-    inventory.receiptImageName = payload.fileName;
-    inventory.billUrl = `data:${payload.mimeType};base64,${payload.data}`;
+    console.error("[pCloud] Upload failed for inventory item:", err);
+    throw new AppError(503, "Bill upload failed. Please retry after pCloud is available.");
   }
 
   if (payload.givenAmount !== undefined) {

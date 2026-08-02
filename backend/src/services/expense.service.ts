@@ -349,11 +349,8 @@ export async function uploadExpenseReceipt(
     expense.receiptImageName = pcloudResult.fileName;
     console.log(`[uploadExpenseReceipt svc] pCloud OK: ${pcloudResult.fileUrl?.substring(0, 60)}`);
   } catch (err) {
-    console.warn("[uploadExpenseReceipt svc] pCloud failed, falling back to base64:", err);
-    expense.receiptImage = payload.data;
-    expense.receiptImageMimeType = payload.mimeType;
-    expense.receiptImageName = payload.fileName;
-    expense.billUrl = `data:${payload.mimeType};base64,${payload.data}`;
+    console.error("[uploadExpenseReceipt svc] pCloud failed:", err);
+    throw new AppError(503, "Bill upload failed. Please retry after pCloud is available.");
   }
 
   if (payload.givenAmount !== undefined) {

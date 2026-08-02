@@ -26,6 +26,9 @@ const envSchema = z.object({
   QR_BASE_URL: z.string().default("agb-supervisor://invite"),
   BACKEND_PUBLIC_URL: z.string().url().optional(),
 
+  PCLOUD_BEARER_TOKEN: z.string().optional(),
+  PCLOUD_FOLDER_ID: z.string().optional(),
+
   FIREBASE_PROJECT_ID: z.string().optional(),
   FIREBASE_PRIVATE_KEY: z.string().optional(),
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
