@@ -585,8 +585,10 @@ export class WorkspaceHydrationService {
 
   private restoreFromSnapshot(): void {
     if (typeof localStorage === "undefined") return;
+    this.clearPersistedSnapshot();
+    return;
     try {
-      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      const raw = localStorage.getItem(SNAPSHOT_KEY) || "";
       if (!raw) return;
       const snap = JSON.parse(raw) as PersistedSnapshot;
       if (snap.version !== SNAPSHOT_VERSION) {

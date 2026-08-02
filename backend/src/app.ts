@@ -310,6 +310,8 @@ export async function bootstrap(): Promise<void> {
   try {
     const { Material } = await import("./models/Material.js");
     await Material.collection.createIndex({ status: 1, _id: -1 }, { background: true });
+    await Material.collection.createIndex({ projectId: 1, _id: -1 }, { background: true });
+    await Material.collection.createIndex({ siteId: 1, _id: -1 }, { background: true });
     await Material.collection.createIndex({ projectId: 1, status: 1, _id: -1 }, { background: true });
     await Material.collection.createIndex({ siteId: 1, status: 1, _id: -1 }, { background: true });
     await Material.collection.createIndex({ projectId: 1, siteId: 1, createdAt: -1 }, { background: true });
@@ -323,6 +325,14 @@ export async function bootstrap(): Promise<void> {
     const { Expense } = await import("./models/Expense.js");
     await Expense.collection.createIndex({ siteId: 1, type: 1, status: 1, date: -1 }, { background: true });
     await Expense.collection.createIndex({ siteId: 1, date: -1 }, { background: true });
+    await Expense.collection.createIndex({ type: 1, _id: -1 }, { background: true });
+    await Expense.collection.createIndex({ status: 1, _id: -1 }, { background: true });
+    await Expense.collection.createIndex({ projectId: 1, _id: -1 }, { background: true });
+    await Expense.collection.createIndex({ siteId: 1, _id: -1 }, { background: true });
+    await Expense.collection.createIndex({ projectId: 1, type: 1, _id: -1 }, { background: true });
+    await Expense.collection.createIndex({ siteId: 1, type: 1, _id: -1 }, { background: true });
+    await Expense.collection.createIndex({ projectId: 1, status: 1, _id: -1 }, { background: true });
+    await Expense.collection.createIndex({ siteId: 1, status: 1, _id: -1 }, { background: true });
     console.log("[Startup] Expense compound indexes ensured");
   } catch (e: any) {
     console.error("[Startup] Expense index creation failed (non-fatal):", e?.message || e);
@@ -332,6 +342,12 @@ export async function bootstrap(): Promise<void> {
     const { Labour } = await import("./models/Labour.js");
     await Labour.collection.createIndex({ siteId: 1, status: 1, createdAt: -1 }, { background: true });
     await Labour.collection.createIndex({ projectId: 1, createdAt: -1 }, { background: true });
+    await Labour.collection.createIndex({ status: 1, _id: -1 }, { background: true });
+    await Labour.collection.createIndex({ projectId: 1, _id: -1 }, { background: true });
+    await Labour.collection.createIndex({ siteId: 1, _id: -1 }, { background: true });
+    await Labour.collection.createIndex({ projectId: 1, siteId: 1, _id: -1 }, { background: true });
+    await Labour.collection.createIndex({ projectId: 1, status: 1, _id: -1 }, { background: true });
+    await Labour.collection.createIndex({ siteId: 1, status: 1, _id: -1 }, { background: true });
     console.log("[Startup] Labour compound indexes ensured");
   } catch (e: any) {
     console.error("[Startup] Labour index creation failed (non-fatal):", e?.message || e);
@@ -349,6 +365,9 @@ export async function bootstrap(): Promise<void> {
   try {
     const { Inventory } = await import("./models/Inventory.js");
     await Inventory.collection.createIndex({ siteId: 1, createdAt: -1 }, { background: true });
+    await Inventory.collection.createIndex({ projectId: 1, _id: -1 }, { background: true });
+    await Inventory.collection.createIndex({ siteId: 1, _id: -1 }, { background: true });
+    await Inventory.collection.createIndex({ projectId: 1, siteId: 1, _id: -1 }, { background: true });
     console.log("[Startup] Inventory compound index ensured");
   } catch (e: any) {
     console.error("[Startup] Inventory index creation failed (non-fatal):", e?.message || e);

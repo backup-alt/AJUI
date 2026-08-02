@@ -184,6 +184,7 @@ export async function addExistingMaterial(req: Request, res: Response, next: Nex
     // Invalidate relevant caches so the new data shows up immediately
     invalidateCachePrefix("/api/supervisor/materials");
     invalidateCachePrefix("/api/supervisor/material-names");
+    invalidateCachePrefix("/api/supervisor/dashboard");
     invalidateCachePrefix("/api/inventory");
     res.status(result.created ? 201 : 200).json(result);
   } catch (e) { next(e); }
@@ -256,6 +257,9 @@ export async function createMaterial(req: Request, res: Response, next: NextFunc
     // shows up immediately on either client.
     invalidateCachePrefix("/api/materials");
     invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/approvals");
+    invalidateCachePrefix("/api/supervisor/approvals");
+    invalidateCachePrefix("/api/supervisor/dashboard");
     invalidateCachePrefix("/api/dashboard/batch");
 
     res.status(201).json({ material });
@@ -274,6 +278,7 @@ export async function updateMaterialStock(req: Request, res: Response, next: Nex
 
     invalidateCachePrefix("/api/materials");
     invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/supervisor/dashboard");
     invalidateCachePrefix("/api/dashboard/batch");
 
     res.json({ material });
@@ -379,6 +384,9 @@ export async function createLabour(req: Request, res: Response, next: NextFuncti
 
     invalidateCachePrefix("/api/labour");
     invalidateCachePrefix("/api/supervisor/labour");
+    invalidateCachePrefix("/api/approvals");
+    invalidateCachePrefix("/api/supervisor/approvals");
+    invalidateCachePrefix("/api/supervisor/dashboard");
     invalidateCachePrefix("/api/dashboard/batch");
 
     res.status(201).json({ labour });
@@ -489,6 +497,9 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
 
     invalidateCachePrefix("/api/expenses");
     invalidateCachePrefix("/api/supervisor/expenses");
+    invalidateCachePrefix("/api/approvals");
+    invalidateCachePrefix("/api/supervisor/approvals");
+    invalidateCachePrefix("/api/supervisor/dashboard");
     invalidateCachePrefix("/api/dashboard/batch");
 
     res.status(201).json({ expense });

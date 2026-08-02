@@ -309,6 +309,10 @@ function approvalScopeQuery(access: SupervisorAccess, status?: "Pending" | "Appr
   return query;
 }
 
+function runMobileDb<T>(label: string, factory: () => Promise<T>): Promise<T> {
+  return dbMutex.run(() => withRetry(factory, { label }));
+}
+
 export async function ensureSupervisorSiteAccess(
   userId: string,
   projectId?: string,
@@ -430,25 +434,27 @@ export async function getAssignedSites(userId: string) {
   const siteScope = await getSiteScopeForFilter(access);
   if (siteScope) Object.assign(workerMatch, siteScope);
 
-  const workerStats = await Worker.aggregate([
-    {
-      $match: { ...workerMatch },
-    },
-    {
-      $group: {
-        _id: { site: "$site", projectId: "$projectId" },
-        workerCount: { $sum: 1 },
+  const workerStats = await runMobileDb("mobile.assignedSites.workerStats", () =>
+    Worker.aggregate([
+      {
+        $match: { ...workerMatch },
       },
-    },
-    {
-      $project: {
-        _id: 0,
-        site: "$_id.site",
-        projectId: "$_id.projectId",
-        workerCount: 1,
+      {
+        $group: {
+          _id: { site: "$site", projectId: "$projectId" },
+          workerCount: { $sum: 1 },
+        },
       },
-    },
-  ]);
+      {
+        $project: {
+          _id: 0,
+          site: "$_id.site",
+          projectId: "$_id.projectId",
+          workerCount: 1,
+        },
+      },
+    ]).option({ maxTimeMS: 20_000 })
+  );
 
   // Also get Labour-based stats for daysActive count
   const labourMatch: Record<string, unknown> = {};
@@ -457,25 +463,27 @@ export async function getAssignedSites(userId: string) {
   }
   if (siteScope) Object.assign(labourMatch, siteScope);
 
-  const labourStats = await Labour.aggregate([
-    {
-      $match: labourMatch,
-    },
-    {
-      $group: {
-        _id: { site: "$site", projectId: "$projectId" },
-        daysActive: { $addToSet: "$attendanceDate" },
+  const labourStats = await runMobileDb("mobile.assignedSites.labourStats", () =>
+    Labour.aggregate([
+      {
+        $match: labourMatch,
       },
-    },
-    {
-      $project: {
-        _id: 0,
-        site: "$_id.site",
-        projectId: "$_id.projectId",
-        daysActiveCount: { $size: "$daysActive" },
+      {
+        $group: {
+          _id: { site: "$site", projectId: "$projectId" },
+          daysActive: { $addToSet: "$attendanceDate" },
+        },
       },
-    },
-  ]);
+      {
+        $project: {
+          _id: 0,
+          site: "$_id.site",
+          projectId: "$_id.projectId",
+          daysActiveCount: { $size: "$daysActive" },
+        },
+      },
+    ]).option({ maxTimeMS: 20_000 })
+  );
 
   const workerMap = new Map<string, { workerCount: number; daysActiveCount: number }>();
   for (const stat of workerStats) {
@@ -521,9 +529,11 @@ export async function getActionableApprovals(
   const approvals = await Approval.find(
     approvalScopeQuery(access, status === "all" ? undefined : status)
   )
+    .select("_id approvalId type title projectId projectName site amount submittedAt status sourceCollection sourceId")
     .sort({ submittedAt: -1 })
     .limit(25)
-    .lean();
+    .lean()
+    .maxTimeMS(20_000);
 
   return approvals.map((a) => ({
     _id: a._id.toString(),
@@ -574,15 +584,27 @@ export async function getSupervisorDashboard(
     : { ...siteExpenseScope, date: today, transactionType: { $ne: "Cash Added" } };
 
   const [inventoryCount, labourCount, pendingMaterials, pendingLabour, pendingExpenses, todayExpenses] = await Promise.all([
-    Inventory.countDocuments(inventoryQuery),
-    Labour.countDocuments(labourQuery),
-    Material.countDocuments(pendingMaterialsQuery),
-    Labour.countDocuments(pendingLabourQuery),
-    Expense.countDocuments(pendingExpensesQuery),
-    Expense.aggregate([
-      { $match: todayExpensesQuery },
-      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
-    ]),
+    runMobileDb("mobile.dashboard.inventoryCount", () =>
+      Inventory.countDocuments(inventoryQuery).maxTimeMS(20_000)
+    ),
+    runMobileDb("mobile.dashboard.labourCount", () =>
+      Labour.countDocuments(labourQuery).maxTimeMS(20_000)
+    ),
+    runMobileDb("mobile.dashboard.pendingMaterials", () =>
+      Material.countDocuments(pendingMaterialsQuery).maxTimeMS(20_000)
+    ),
+    runMobileDb("mobile.dashboard.pendingLabour", () =>
+      Labour.countDocuments(pendingLabourQuery).maxTimeMS(20_000)
+    ),
+    runMobileDb("mobile.dashboard.pendingExpenses", () =>
+      Expense.countDocuments(pendingExpensesQuery).maxTimeMS(20_000)
+    ),
+    runMobileDb("mobile.dashboard.todayExpenses", () =>
+      Expense.aggregate([
+        { $match: todayExpensesQuery },
+        { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
+      ]).option({ maxTimeMS: 20_000 })
+    ),
   ]);
 
   // Filter projects and approvals by the selected site if provided
@@ -747,7 +769,12 @@ export async function listMaterialsForSupervisor(
 
     const [items, total] = await dbMutex.run(() => Promise.all([
       withRetry(
-        () => Inventory.find(invQuery).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(30_000),
+        () => Inventory.find(invQuery)
+          .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
+          .sort({ _id: -1 })
+          .limit(limit)
+          .lean()
+          .maxTimeMS(30_000),
         { label: "mobile.listMaterials.inv.find" }
       ),
       filters.cursor
@@ -791,7 +818,6 @@ export async function listMaterialsForSupervisor(
         vendor: m.vendor,
         poNumber: m.poNumber,
         billUrl: m.billUrl,
-        receiptImage: m.receiptImage,
         received: m.received,
         purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
           vendor: h.vendor,
@@ -818,7 +844,12 @@ export async function listMaterialsForSupervisor(
   applyCursor(query, filters.cursor);
   const [items, total] = await dbMutex.run(() => Promise.all([
     withRetry(
-      () => Material.find(query).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(30_000),
+      () => Material.find(query)
+        .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
+        .sort({ _id: -1 })
+        .limit(limit)
+        .lean()
+        .maxTimeMS(30_000),
       { label: "mobile.listMaterials.find" }
     ),
       filters.cursor
@@ -879,9 +910,24 @@ export async function listLabourForSupervisor(
   applyCursor(query, filters.cursor);
 
   const [items, total] = await dbMutex.run(() => Promise.all([
-    Labour.find(query).sort({ _id: -1 }).limit(limit).lean(),
-    filters.cursor ? Promise.resolve(0) : Labour.countDocuments(query),
-  ]));
+    withRetry(
+      () => Labour.find(query)
+        .sort({ _id: -1 })
+        .limit(limit)
+        .lean()
+        .maxTimeMS(30_000),
+      { label: "mobile.listLabour.find" }
+    ),
+    filters.cursor
+      ? Promise.resolve(0)
+      : withRetry(
+          () => Labour.countDocuments(query).maxTimeMS(30_000),
+          { label: "mobile.listLabour.count" }
+        ),
+  ])).catch((err) => {
+    console.error("[mobile.listLabour] main query failed:", (err as Error).message);
+    throw new AppError(503, "Labour is temporarily unavailable. Please retry.");
+  });
 
   return {
     labour: items.map((l) => ({
@@ -922,7 +968,12 @@ export async function listExpensesForSupervisor(
 
   const [items, total] = await dbMutex.run(() => Promise.all([
     withRetry(
-      () => Expense.find(query).sort({ _id: -1 }).limit(limit).lean().maxTimeMS(30_000),
+      () => Expense.find(query)
+        .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
+        .sort({ _id: -1 })
+        .limit(limit)
+        .lean()
+        .maxTimeMS(30_000),
       { label: "mobile.listExpenses.find" }
     ),
       filters.cursor
@@ -947,9 +998,6 @@ export async function listExpensesForSupervisor(
       site: e.site,
       transactionType: e.transactionType,
       poNumber: e.poNumber,
-      receiptImage: e.receiptImage,
-      receiptImageMimeType: e.receiptImageMimeType,
-      receiptImageName: e.receiptImageName,
       billUrl: (e as any).billUrl,
       received: (e as any).received,
       isSiteMaterial: (e as any).isSiteMaterial,

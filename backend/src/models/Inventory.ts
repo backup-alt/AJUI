@@ -104,6 +104,9 @@ inventorySchema.index(
   { projectId: 1, siteKey: 1, normalizedName: 1, normalizedUnit: 1 },
   { unique: true }
 );
+inventorySchema.index({ projectId: 1, _id: -1 });
+inventorySchema.index({ siteId: 1, _id: -1 });
+inventorySchema.index({ projectId: 1, siteId: 1, _id: -1 });
 
 inventorySchema.pre("validate", function (next) {
   this.normalizedName = String(this.name || "").trim().toLowerCase();

@@ -100,5 +100,13 @@ const expenseSchema = new Schema<IExpense>(
 expenseSchema.index({ projectId: 1, site: 1, date: 1 });
 expenseSchema.index({ type: 1, status: 1 });
 expenseSchema.index({ projectId: 1, site: 1, transactionType: 1, date: 1 });
+expenseSchema.index({ type: 1, _id: -1 });
+expenseSchema.index({ status: 1, _id: -1 });
+expenseSchema.index({ projectId: 1, _id: -1 });
+expenseSchema.index({ siteId: 1, _id: -1 });
+expenseSchema.index({ projectId: 1, type: 1, _id: -1 });
+expenseSchema.index({ siteId: 1, type: 1, _id: -1 });
+expenseSchema.index({ projectId: 1, status: 1, _id: -1 });
+expenseSchema.index({ siteId: 1, status: 1, _id: -1 });
 
 export const Expense = model<IExpense>("Expense", expenseSchema);

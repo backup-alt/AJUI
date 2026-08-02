@@ -93,4 +93,11 @@ const labourSchema = new Schema<ILabour>(
   { timestamps: true }
 );
 
+labourSchema.index({ status: 1, _id: -1 });
+labourSchema.index({ projectId: 1, _id: -1 });
+labourSchema.index({ siteId: 1, _id: -1 });
+labourSchema.index({ projectId: 1, siteId: 1, _id: -1 });
+labourSchema.index({ projectId: 1, status: 1, _id: -1 });
+labourSchema.index({ siteId: 1, status: 1, _id: -1 });
+
 export const Labour = model<ILabour>("Labour", labourSchema);
