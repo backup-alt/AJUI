@@ -298,6 +298,9 @@ export async function bootstrap(): Promise<void> {
 
   try {
     const { Material } = await import("./models/Material.js");
+    await Material.collection.createIndex({ status: 1, _id: -1 }, { background: true });
+    await Material.collection.createIndex({ projectId: 1, status: 1, _id: -1 }, { background: true });
+    await Material.collection.createIndex({ siteId: 1, status: 1, _id: -1 }, { background: true });
     await Material.collection.createIndex({ projectId: 1, siteId: 1, createdAt: -1 }, { background: true });
     await Material.collection.createIndex({ siteId: 1, status: 1, createdAt: -1 }, { background: true });
     console.log("[Startup] Material compound indexes ensured");

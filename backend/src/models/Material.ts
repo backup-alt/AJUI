@@ -88,5 +88,9 @@ materialSchema.pre("save", function (next) {
   next();
 });
 
+materialSchema.index({ status: 1, _id: -1 });
+materialSchema.index({ projectId: 1, status: 1, _id: -1 });
+materialSchema.index({ siteId: 1, status: 1, _id: -1 });
+
 export const Material = model<IMaterial>("Material", materialSchema);
 
