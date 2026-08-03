@@ -28,6 +28,10 @@ type SectionConfig = {
   columns: FieldSchema[];
 };
 
+const paymentModeOptions = ["Cash", "UPI", "Bank Transfer", "NEFT", "RTGS", "IMPS", "Cheque", "Credit Card", "Debit Card", "Net Banking", "Demand Draft", "Wallet", "Other"];
+
+const PAYMENT_MODE_STORAGE_KEY = "ajui_custom_payment_modes";
+
 const sectionConfigs: SectionConfig[] = [
   {
     key: "materials",
@@ -104,7 +108,6 @@ const sectionConfigs: SectionConfig[] = [
       { key: "transactionReference", label: "Transaction Reference" },
       { key: "receiptNumber", label: "Receipt Number" },
       { key: "collectedBy", label: "Collected By" },
-      { key: "approvalStatus", label: "Approval Status" },
     ],
   },
   {
@@ -1053,6 +1056,7 @@ export class ProjectWorkspacePage {
   readonly siteDraftOpeningBalance = signal<number | null>(null);
   readonly openSelectKey = signal("");
   readonly selectCustomValue = signal("");
+  readonly customPaymentModes = signal<string[]>(this.loadStoredPaymentModes());
   readonly labourTypeDialogOpen = signal(false);
   readonly labourTypeRowId = signal("");
   readonly labourTypeName = signal("Carpenter");
@@ -1981,6 +1985,7 @@ export class ProjectWorkspacePage {
     const currentProject = this.project();
     const selectedSite = this.activeSiteFilter();
     const draft = section === "expenses" ? this.normalizedExpenseInputRow(this.draftRow()) : this.draftRow();
+    if (section === "payments") this.registerPaymentMode(String(draft["mode"] || ""));
     if (section === "expenses") this.ensureExpenseOpeningForInput(draft);
 
     const isCashAdded = section === "expenses" && draft["transactionType"] === "Cash Added";
@@ -2275,6 +2280,7 @@ export class ProjectWorkspacePage {
     event?.preventDefault();
     const trimmedValue = value.trim();
     if (!trimmedValue) return;
+    if (section === "payments" && key === "mode") this.registerPaymentMode(trimmedValue);
     this.selectCellOptionForRow(section, row, key, trimmedValue);
   }
 
@@ -2456,7 +2462,6 @@ export class ProjectWorkspacePage {
       supervisor: project.supervisor,
       totalValue: project.totalValue,
       advanceAmount: project.advanceAmount,
-      receivedAmount: project.receivedAmount,
       openingBalance: project.expenseBalance,
       status: project.status,
     };
@@ -2662,7 +2667,6 @@ export class ProjectWorkspacePage {
       transactionReference: row.reference,
       receiptNumber: row.receipt,
       collectedBy: row.collectedBy,
-      approvalStatus: row.status,
     }));
 
     const projectMaterials = this.data.materials().filter((row) => row.projectId === projectId);
@@ -2805,8 +2809,29 @@ export class ProjectWorkspacePage {
       return ["Pending", "Approved", "Declined"];
     }
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
+    if (section === "payments" && key === "mode") {
+      const custom = this.customPaymentModes().filter((mode) => !paymentModeOptions.includes(mode));
+      return [...paymentModeOptions, ...custom];
+    }
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
     return [];
+  }
+
+  private loadStoredPaymentModes(): string[] {
+    try { return JSON.parse(localStorage.getItem(PAYMENT_MODE_STORAGE_KEY) || "[]"); } catch { return []; }
+  }
+
+  private persistPaymentModes(modes: string[]) {
+    try { localStorage.setItem(PAYMENT_MODE_STORAGE_KEY, JSON.stringify(modes)); } catch { /* ignore storage errors */ }
+  }
+
+  registerPaymentMode(mode: string) {
+    const value = mode.trim();
+    if (!value || paymentModeOptions.includes(value)) return;
+    if (this.customPaymentModes().some((existing) => existing.toLowerCase() === value.toLowerCase())) return;
+    const next = [...this.customPaymentModes(), value];
+    this.customPaymentModes.set(next);
+    this.persistPaymentModes(next);
   }
 
   private defaultRowFor(section: ModuleKey): TableRow {
@@ -2863,7 +2888,6 @@ export class ProjectWorkspacePage {
         transactionReference: "",
         receiptNumber: "",
         collectedBy: "",
-        approvalStatus: "Pending",
       },
       vendors: {
         vendorName: "",

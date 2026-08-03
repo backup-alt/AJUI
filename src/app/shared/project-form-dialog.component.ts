@@ -11,7 +11,6 @@ export type ProjectFormValue = {
   status: ProjectStatus;
   totalValue: number;
   advanceAmount: number;
-  receivedAmount: number;
   openingBalance: number;
 };
 
@@ -67,10 +66,6 @@ export type ProjectFormValue = {
             <input name="advanceAmount" required type="number" min="0" step="1" [value]="initialValue?.advanceAmount || ''" placeholder="1000000" />
           </label>
           <label>
-            <span>Received Amount</span>
-            <input name="receivedAmount" type="number" min="0" step="1" [value]="initialValue?.receivedAmount || initialValue?.advanceAmount || ''" placeholder="2200000" />
-          </label>
-          <label>
             <span>Opening Expense Balance</span>
             <input name="openingBalance" type="number" min="0" step="1" [value]="initialValue?.openingBalance || ''" placeholder="25000" />
           </label>
@@ -113,7 +108,6 @@ export class ProjectFormDialogComponent {
       sites,
       totalValue: Number(formData.get("totalValue") ?? 0),
       advanceAmount: Number(formData.get("advanceAmount") ?? 0),
-      receivedAmount: Number(formData.get("receivedAmount") ?? formData.get("advanceAmount") ?? 0),
       openingBalance: Number(formData.get("openingBalance") ?? 0),
     });
   }

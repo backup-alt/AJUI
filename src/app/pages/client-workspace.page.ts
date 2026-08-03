@@ -230,7 +230,6 @@ export class ClientWorkspacePage implements OnInit {
       supervisor: project.supervisor,
       totalValue: project.totalValue,
       advanceAmount: project.advanceAmount,
-      receivedAmount: project.receivedAmount,
       openingBalance: project.expenseBalance,
       status: project.status,
     };
