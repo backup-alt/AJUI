@@ -1003,6 +1003,13 @@ function numberToWords(num: number): string {
     .unit-panel button:hover { background: #f0f6ff; }
     .unit-panel button.selected { background: #e0ecff; font-weight: 600; }
     .unit-create { border-top: 1px solid #e2e8f0 !important; color: #2c5cff !important; font-weight: 500; background: #f8fafc !important; }
+    .items-table tr:has(.erp-select-menu.open) {
+      position: relative;
+      z-index: 30;
+    }
+    .items-table:has(.erp-select-menu.open) {
+      overflow: visible !important;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
