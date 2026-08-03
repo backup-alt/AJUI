@@ -239,6 +239,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
     .image-preview-close:hover {
       background: rgba(255, 255, 255, 0.25);
     }
+    .custom-mode-row {
+      margin-top: 6px;
+    }
+    .custom-mode-input {
+      width: 100%;
+    }
   `],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
@@ -844,31 +850,48 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div class="erp-form">
                   <label *ngFor="let column of recordFormColumns()">
                     <span>{{ formColumnLabel(column) }}</span>
-                    <input
-                      *ngIf="selectOptions(activeSection(), column.key).length > 0 && allowsCustomOption(activeSection(), column.key); else projectDraftSelect"
-                      [attr.list]="'project-draft-' + activeSection() + '-' + column.key"
-                      [type]="column.type || 'text'"
-                      [value]="draftRow()[column.key] || ''"
-                      (input)="updateDraftField(column.key, $any($event.target).value)"
-                    />
-                    <datalist [id]="'project-draft-' + activeSection() + '-' + column.key">
-                      <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option"></option>
-                    </datalist>
-                    <ng-template #projectDraftSelect>
+                    <ng-container *ngIf="isPaymentModeField(column); else standardRecordField">
                       <select
-                        *ngIf="selectOptions(activeSection(), column.key).length > 0; else projectDraftInput"
                         [value]="draftRow()[column.key] || ''"
                         (change)="updateDraftField(column.key, $any($event.target).value)"
                       >
                         <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option">{{ option }}</option>
                       </select>
-                    </ng-template>
-                    <ng-template #projectDraftInput>
+                      <div class="custom-mode-row">
+                        <input
+                          class="custom-mode-input"
+                          placeholder="Type a new mode & press Enter"
+                          (keydown.enter)="addCustomPaymentModeFromInput($any($event.target).value, $event)"
+                        />
+                      </div>
+                    </ng-container>
+                    <ng-template #standardRecordField>
                       <input
+                        *ngIf="selectOptions(activeSection(), column.key).length > 0 && allowsCustomOption(activeSection(), column.key); else projectDraftSelect"
+                        [attr.list]="'project-draft-' + activeSection() + '-' + column.key"
                         [type]="column.type || 'text'"
                         [value]="draftRow()[column.key] || ''"
                         (input)="updateDraftField(column.key, $any($event.target).value)"
                       />
+                      <datalist [id]="'project-draft-' + activeSection() + '-' + column.key">
+                        <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option"></option>
+                      </datalist>
+                      <ng-template #projectDraftSelect>
+                        <select
+                          *ngIf="selectOptions(activeSection(), column.key).length > 0; else projectDraftInput"
+                          [value]="draftRow()[column.key] || ''"
+                          (change)="updateDraftField(column.key, $any($event.target).value)"
+                        >
+                          <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option">{{ option }}</option>
+                        </select>
+                      </ng-template>
+                      <ng-template #projectDraftInput>
+                        <input
+                          [type]="column.type || 'text'"
+                          [value]="draftRow()[column.key] || ''"
+                          (input)="updateDraftField(column.key, $any($event.target).value)"
+                        />
+                      </ng-template>
                     </ng-template>
                   </label>
                   <ng-container *ngIf="showSiteMaterialDetails()">
@@ -2836,6 +2859,19 @@ export class ProjectWorkspacePage {
     const next = [...this.customPaymentModes(), value];
     this.customPaymentModes.set(next);
     this.persistPaymentModes(next);
+  }
+
+  isPaymentModeField(column: FieldSchema): boolean {
+    return this.activeSection() === "payments" && column.key === "mode";
+  }
+
+  addCustomPaymentModeFromInput(value: string, event?: Event) {
+    event?.preventDefault();
+    const mode = value.trim();
+    if (!mode) return;
+    this.registerPaymentMode(mode);
+    this.updateDraftField("mode", mode);
+    if (event?.target instanceof HTMLInputElement) event.target.value = "";
   }
 
   private defaultRowFor(section: ModuleKey): TableRow {
