@@ -72,6 +72,7 @@ export type QuotationRow = {
   rate: number;
   amount: number;
   isCustom?: boolean;
+  parentRowId?: string | null;
 };
 
 export type Quotation = {
@@ -112,6 +113,7 @@ export type TaxInvoiceRow = {
   rate: number;
   amount: number;
   isCustom?: boolean;
+  parentRowId?: string | null;
 };
 
 export type TaxInvoice = {

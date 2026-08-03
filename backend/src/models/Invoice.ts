@@ -3,6 +3,7 @@ import { Schema, model, Document, Types } from "mongoose";
 export type InvoiceStatus = "Draft" | "Sent" | "Paid";
 
 export interface IInvoiceItem extends Document {
+  id?: string;
   description: string;
   hsnCode?: string;
   unit: string;
@@ -10,6 +11,7 @@ export interface IInvoiceItem extends Document {
   rate: number;
   amount: number;
   isCustom?: boolean;
+  parentRowId?: string | null;
 }
 
 export interface IInvoice extends Document {
@@ -44,6 +46,7 @@ export interface IInvoice extends Document {
 
 const invoiceItemSchema = new Schema<IInvoiceItem>(
   {
+    id: { type: String, default: null },
     description: { type: String, required: true },
     hsnCode: { type: String, default: "" },
     unit: { type: String, default: "" },
@@ -51,6 +54,7 @@ const invoiceItemSchema = new Schema<IInvoiceItem>(
     rate: { type: Number, default: 0 },
     amount: { type: Number, default: 0 },
     isCustom: { type: Boolean, default: false },
+    parentRowId: { type: String, default: null },
   },
   { _id: false }
 );

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { objectIdSchema } from "./financial.schema.js";
 
 const quotationItemSchema = z.object({
+  id: z.string().trim().max(100).optional(),
   description: z.string().trim().min(1, "Item description is required"),
   hsnCode: z.string().trim().max(20).optional().default(""),
   unit: z.string().trim().max(40).optional().default(""),
@@ -10,6 +11,7 @@ const quotationItemSchema = z.object({
   amount: z.coerce.number().min(0).default(0),
   isCustom: z.boolean().optional().default(false),
   customValues: z.record(z.string()).optional().default({}),
+  parentRowId: z.string().trim().optional().nullable().default(null),
 });
 
 export const createQuotationSchema = z.object({

@@ -3,6 +3,7 @@ import { Schema, model, Document, Types } from "mongoose";
 export type QuotationStatus = "Draft" | "Sent" | "Accepted" | "Rejected";
 
 export interface IQuotationItem extends Document {
+  id?: string;
   description: string;
   hsnCode?: string;
   unit: string;
@@ -11,6 +12,7 @@ export interface IQuotationItem extends Document {
   amount: number;
   isCustom?: boolean;
   customValues?: Record<string, string>;
+  parentRowId?: string | null;
 }
 
 export interface IQuotation extends Document {
@@ -44,6 +46,7 @@ export interface IQuotation extends Document {
 
 const quotationItemSchema = new Schema<IQuotationItem>(
   {
+    id: { type: String, default: null },
     description: { type: String, required: true },
     hsnCode: { type: String, default: "" },
     unit: { type: String, default: "" },
@@ -52,6 +55,7 @@ const quotationItemSchema = new Schema<IQuotationItem>(
     amount: { type: Number, default: 0 },
     isCustom: { type: Boolean, default: false },
     customValues: { type: Schema.Types.Mixed, default: {} },
+    parentRowId: { type: String, default: null },
   },
   { _id: false }
 );

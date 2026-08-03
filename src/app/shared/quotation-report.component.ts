@@ -15,6 +15,7 @@ export interface QuotationReportItem {
   rate?: number;
   amount?: number;
   isCustom?: boolean;
+  parentRowId?: string | null;
   customValues?: Record<string, string>;
   [key: string]: any;
 }
@@ -124,9 +125,14 @@ export interface QuotationReportData {
               <tbody>
                 @for (item of items; track item.id || $index) {
                   @if (item.description && !item.description.startsWith('---')) {
-                    <tr>
+                    <tr [class.sub-row]="!!item.parentRowId">
                       <td class="col-sno cell-center">{{ item.sno || $index + 1 }}</td>
-                      <td class="col-desc">{{ item.description }}</td>
+                      <td class="col-desc">
+                        @if (item.parentRowId) {
+                          <span class="report-tree-icon" aria-hidden="true">↳</span>
+                        }
+                        {{ item.description }}
+                      </td>
                       <td class="col-unit cell-center">{{ item.unit || '—' }}</td>
                       <td class="col-qty cell-right">{{ item.qty || 0 }}</td>
                       <td class="col-rate cell-right">{{ formatRupee(item.rate) }}</td>
@@ -268,6 +274,12 @@ export interface QuotationReportData {
     .inv-table .section-divider td { background: #f1f5f9; }
     .inv-table .section-header { font-weight: 700; font-size: 12px; color: #1a2540; padding: 6px 10px; text-transform: uppercase; letter-spacing: 0.5px; }
     .inv-table .empty-row { text-align: center; color: #94a3b8; font-style: italic; }
+    .inv-table tr.sub-row td { background: #f8fafc; }
+    .inv-table tr.sub-row .col-desc { padding-left: 28px; font-style: italic; }
+    .report-tree-icon {
+      color: #64748b; font-size: 12px; margin-right: 6px;
+      font-family: 'Segoe UI Symbol', 'Apple Symbols', sans-serif;
+    }
     .col-sno { width: 5%; text-align: center; }
     .col-desc { width: 30%; }
     .col-unit { width: 8%; text-align: center; }

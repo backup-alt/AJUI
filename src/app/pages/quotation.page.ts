@@ -236,10 +236,15 @@ function numberToWords(num: number): string {
                       </thead>
                       <tbody>
                         @for (row of quotationRows(); track row.id; let i = $index) {
-                          <tr>
+                          <tr [class.sub-row]="!!row.parentRowId">
                             <td class="col-sno">{{ i + 1 }}</td>
                             <td class="col-desc">
-                              <input type="text" [(ngModel)]="row.description" placeholder="Description" class="table-input" />
+                              <div class="desc-cell" [class.is-sub]="!!row.parentRowId">
+                                @if (row.parentRowId) {
+                                  <span class="tree-icon" aria-hidden="true">↳</span>
+                                }
+                                <input type="text" [(ngModel)]="row.description" placeholder="Description" class="table-input" />
+                              </div>
                             </td>
                             <td class="col-unit">
                               <div class="erp-select-menu" [class.open]="openUnitMenu() === row.id">
@@ -279,7 +284,22 @@ function numberToWords(num: number): string {
                               </td>
                             }
                             <td class="col-action">
-                              <button type="button" class="remove-row-btn" (click)="removeRow(row.id)">×</button>
+                              <div class="row-actions" [class.menu-open]="openRowMenu() === row.id">
+                                @if (!row.parentRowId) {
+                                  <button type="button" class="row-action-btn" title="Add Sub Row" aria-label="Add Sub Row" (click)="toggleRowMenu(row.id, $event)">
+                                    <ion-icon name="ellipsis-vertical"></ion-icon>
+                                  </button>
+                                  @if (openRowMenu() === row.id) {
+                                    <div class="row-action-menu" (click)="$event.stopPropagation()">
+                                      <button type="button" class="row-action-item" (click)="addSubRow(row.id); toggleRowMenu('', $event)">
+                                        <ion-icon name="git-branch-outline"></ion-icon>
+                                        <span>Add Sub Row</span>
+                                      </button>
+                                    </div>
+                                  }
+                                }
+                                <button type="button" class="remove-row-btn" (click)="removeRow(row.id)">×</button>
+                              </div>
                             </td>
                           </tr>
                         }
@@ -304,6 +324,20 @@ function numberToWords(num: number): string {
                       }
                     </div>
                   </div>
+
+                  @if (deleteConfirm(); as dc) {
+                    <div class="confirm-overlay" role="presentation" (click)="cancelDeleteConfirm()">
+                      <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title" (click)="$event.stopPropagation()">
+                        <h3 id="confirm-delete-title" class="confirm-title">Delete row</h3>
+                        <p class="confirm-message">This row contains sub rows. Choose one:</p>
+                        <div class="confirm-actions">
+                          <button type="button" class="btn-confirm" (click)="confirmDeleteParentOnly()">Delete Parent Only</button>
+                          <button type="button" class="btn-confirm danger" (click)="confirmDeleteParentAndChildren()">Delete Parent and All Sub Rows</button>
+                          <button type="button" class="btn-cancel" (click)="cancelDeleteConfirm()">Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+                  }
 
                   <!-- Financial Summary -->
                   <div class="financial-summary">
@@ -668,6 +702,49 @@ function numberToWords(num: number): string {
     .col-amount { width: 110px; text-align: right; }
     .col-custom { min-width: 100px; }
     .col-action { width: 36px; text-align: center; }
+    .row-actions { position: relative; display: inline-flex; align-items: center; gap: 4px; }
+    .row-action-btn {
+      background: transparent; border: none; cursor: pointer; padding: 2px 4px;
+      color: #475569; font-size: 16px; line-height: 1; border-radius: 4px;
+    }
+    .row-action-btn:hover { background: rgba(0,0,0,0.06); color: #1e293b; }
+    .row-action-menu {
+      position: absolute; right: 0; top: 100%; margin-top: 4px;
+      background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12); min-width: 160px; z-index: 50;
+      padding: 4px 0;
+    }
+    .row-action-item {
+      display: flex; align-items: center; gap: 8px; width: 100%;
+      background: transparent; border: none; padding: 8px 12px;
+      cursor: pointer; font-size: 13px; color: #1e293b; text-align: left;
+    }
+    .row-action-item:hover { background: #f1f5f9; }
+    .row-action-item ion-icon { font-size: 16px; color: #475569; }
+    .sub-row td { background: #f8fafc; }
+    .sub-row .col-desc { padding-left: 28px; }
+    .desc-cell { display: flex; align-items: center; gap: 6px; }
+    .desc-cell.is-sub .table-input { font-style: italic; }
+    .tree-icon {
+      color: #64748b; font-size: 14px; line-height: 1; flex-shrink: 0;
+      font-family: 'Segoe UI Symbol', 'Apple Symbols', sans-serif;
+    }
+    .confirm-overlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.55);
+      display: flex; align-items: center; justify-content: center; z-index: 9999;
+      padding: 20px;
+    }
+    .confirm-dialog {
+      background: #fff; border-radius: 10px; width: 100%; max-width: 440px;
+      padding: 22px 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+    .confirm-title { font-size: 17px; font-weight: 700; color: #0f172a; margin: 0 0 8px; }
+    .confirm-message { font-size: 14px; color: #475569; margin: 0 0 18px; }
+    .confirm-actions { display: flex; flex-direction: column; gap: 10px; }
+    .confirm-actions .btn-confirm,
+    .confirm-actions .btn-cancel { width: 100%; justify-content: center; }
+    .confirm-actions .btn-confirm.danger { background: #dc2626; }
+    .confirm-actions .btn-confirm.danger:hover { background: #b91c1c; }
     .table-input {
       width: 100%;
       padding: 6px 8px;
@@ -1034,6 +1111,7 @@ readonly savingPdf = signal(false);
   readonly allUnits = computed(() => [...this.defaultUnits, ...this.customUnits()].sort((a, b) => a.localeCompare(b)));
   readonly openUnitMenu = signal("");
   readonly unitSearch = signal("");
+  readonly openRowMenu = signal("");
   readonly filteredUnits = computed(() => {
     const q = this.unitSearch().trim().toLowerCase();
     const all = this.allUnits();
@@ -1134,6 +1212,7 @@ readonly savingPdf = signal(false);
         rate: row.rate || 0,
         amount: row.amount || 0,
         isCustom: row.isCustom ?? false,
+        parentRowId: row.parentRowId || null,
         customValues,
       };
     }),
@@ -1292,7 +1371,17 @@ readonly savingPdf = signal(false);
 
   editQuotation(quote: Quotation) {
     this.editingQuoteId.set(quote.id);
-    this.quotationRows.set(quote.items.map(item => ({ ...item, ...((item as any).customValues || {}) })));
+    const rows = quote.items.map((item, idx) => {
+      const merged: any = { ...item, ...((item as any).customValues || {}) };
+      if (!merged.id) merged.id = `row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
+      return merged;
+    });
+    // Defensive: remap parentRowId for legacy items whose parent id is no longer present.
+    const idSet = new Set(rows.map((r: any) => r.id));
+    rows.forEach((r: any) => {
+      if (r.parentRowId && !idSet.has(r.parentRowId)) r.parentRowId = null;
+    });
+    this.quotationRows.set(rows as QuotationRow[]);
     this.customColumns.set(quote.customColumns || []);
     this.clientName = quote.clientName;
     this.clientAddress = quote.clientAddress;
@@ -1320,6 +1409,7 @@ readonly savingPdf = signal(false);
       qty: 0,
       rate: 0,
       amount: 0,
+      parentRowId: null,
     };
   }
 
@@ -1332,8 +1422,64 @@ readonly savingPdf = signal(false);
     this.quotationRows.update(rows => [...rows, this.createEmptyRow()]);
   }
 
+  addSubRow(parentId: string) {
+    const child = this.createEmptyRow();
+    child.parentRowId = parentId;
+    this.quotationRows.update(rows => {
+      const index = rows.findIndex(r => r.id === parentId);
+      if (index === -1) return [...rows, child];
+      const next = [...rows];
+      next.splice(index + 1, 0, child);
+      return next;
+    });
+  }
+
+  toggleRowMenu(rowId: string, event?: Event) {
+    event?.stopPropagation();
+    this.openRowMenu.set(this.openRowMenu() === rowId ? "" : rowId);
+  }
+
+  readonly deleteConfirm = signal<{ parentId: string; childCount: number } | null>(null);
+
   removeRow(rowId: string) {
+    const childCount = this.quotationRows().filter(r => r.parentRowId === rowId).length;
+    if (childCount > 0) {
+      this.deleteConfirm.set({ parentId: rowId, childCount });
+      return;
+    }
     this.quotationRows.update(rows => rows.filter(r => r.id !== rowId));
+  }
+
+  confirmDeleteParentOnly() {
+    const dc = this.deleteConfirm();
+    if (!dc) return;
+    const parentId = dc.parentId;
+    this.quotationRows.update(rows =>
+      rows
+        .filter(r => r.id !== parentId)
+        .map(r => r.parentRowId === parentId ? { ...r, parentRowId: null } : r)
+    );
+    this.deleteConfirm.set(null);
+  }
+
+  confirmDeleteParentAndChildren() {
+    const dc = this.deleteConfirm();
+    if (!dc) return;
+    const parentId = dc.parentId;
+    this.quotationRows.update(rows => rows.filter(r => r.id !== parentId && r.parentRowId !== parentId));
+    this.deleteConfirm.set(null);
+  }
+
+  cancelDeleteConfirm() {
+    this.deleteConfirm.set(null);
+  }
+
+  @HostListener("document:click", ["$event"])
+  closeRowMenu(event: MouseEvent) {
+    if (!this.openRowMenu()) return;
+    const target = event.target as HTMLElement | null;
+    if (target && target.closest(".row-action-menu, .row-action-btn")) return;
+    this.openRowMenu.set("");
   }
 
   private loadCustomUnits(): string[] {
@@ -1405,12 +1551,14 @@ readonly savingPdf = signal(false);
         const customValues: Record<string, string> = {};
         this.customColumns().forEach(col => { customValues[col] = (row as any)[col] || ""; });
         return {
+          id: row.id,
           description: (row.description || "").trim(),
           unit: row.unit || "",
           qty: Number(row.qty) || 0,
           rate: Number(row.rate) || 0,
           amount: Number(row.amount) || 0,
           isCustom: row.isCustom ?? false,
+          parentRowId: row.parentRowId || null,
           customValues,
         };
       })
@@ -1532,7 +1680,9 @@ readonly savingPdf = signal(false);
     const csvRows = [
       headers.join(","),
       ...rows.map((row, i) => {
-        const values = [i + 1, `"${row.description}"`, `"${row.unit}"`, row.qty, row.rate, row.amount];
+        const indent = row.parentRowId ? "    ↳ " : "";
+        const description = `"${indent}${(row.description || "").replace(/"/g, '""')}"`;
+        const values = [i + 1, description, `"${row.unit}"`, row.qty, row.rate, row.amount];
         this.customColumns().forEach(col => {
           values.push(`"${(row as any)[col] || ""}"`);
         });

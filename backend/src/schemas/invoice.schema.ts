@@ -2,6 +2,7 @@ import { z } from "zod";
 import { objectIdSchema } from "./financial.schema.js";
 
 const invoiceItemSchema = z.object({
+  id: z.string().trim().max(100).optional(),
   description: z.string().trim().min(1),
   hsnCode: z.string().optional(),
   unit: z.string().default(""),
@@ -9,6 +10,7 @@ const invoiceItemSchema = z.object({
   rate: z.coerce.number().default(0),
   amount: z.coerce.number().default(0),
   isCustom: z.boolean().optional(),
+  parentRowId: z.string().trim().optional().nullable().default(null),
 });
 
 export const createInvoiceSchema = z.object({
