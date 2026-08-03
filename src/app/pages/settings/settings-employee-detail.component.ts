@@ -567,12 +567,10 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   private loadSitesAndEmployee(id: string) {
     this.loading.set(true);
 
-    // Bypass the in-memory GET cache so a site created since this page was
-    // last loaded (e.g. in another tab) is visible in the picker.
-    this.api.invalidateCache("/admin/sites");
-
-    // Try the admin endpoint first (returns all sites), fall back to scoped endpoint for non-admin users
-    this.api.listSitesAdmin().subscribe({
+    // Use listSitesAll() which tries /admin/sites first (all sites for admins)
+    // and falls back to cursor-paginated /sites for non-admins. This also
+    // invalidates the cache to ensure fresh data.
+    this.api.listSitesAll().subscribe({
       next: (res) => {
         const sites = res?.sites || [];
         this.populateSiteEntities(sites);
@@ -581,19 +579,8 @@ export class SettingsEmployeeDetailComponent implements OnInit {
         this.loadEmployeeAfterSites(id);
       },
       error: () => {
-        // Admin endpoint failed (likely not an admin) - try scoped endpoint
-        this.api.listSites().subscribe({
-          next: (res2: any) => {
-            const sites = res2?.items || res2?.sites || [];
-            this.populateSiteEntities(sites);
-            this.pickerSites.set(sites);
-            this.loadEmployeeAfterSites(id);
-          },
-          error: () => {
-            // Both failed - continue anyway, sites may be loaded from cache
-            this.loadEmployeeAfterSites(id);
-          },
-        });
+        // Both admin and paginated fallbacks failed - continue anyway
+        this.loadEmployeeAfterSites(id);
       },
     });
   }

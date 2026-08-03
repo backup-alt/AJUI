@@ -579,8 +579,14 @@ export class ApiService {
    * Fetch ALL sites for picker UIs. Tries /admin/sites first (unfiltered, all sites).
    * If that fails (non-admin), falls back to cursor-paginated /sites to collect
    * all pages. The backend caps /sites at 25 items per page, so we must paginate.
+   *
+   * Always invalidates the relevant cache entries before fetching to ensure
+   * fresh data (sites created in another tab/session are visible).
    */
   listSitesAll(): Observable<{ sites: any[] }> {
+    // Invalidate caches so we don't return stale entries for /admin/sites or /sites
+    this.invalidateCache("/admin/sites");
+    this.invalidateCache("/sites");
     return this.listSitesAdmin().pipe(
       switchMap((adminRes) => {
         if (adminRes?.sites?.length) {
