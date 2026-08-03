@@ -21,6 +21,7 @@
     "@angular/platform-browser": "^20.0.0",
     "@angular/router": "^20.0.0",
     "@ionic/angular": "^8.4.0",
+    "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
     "ionicons": "^7.4.0",
     "jspdf": "^4.2.1",

@@ -16,10 +16,9 @@ import { AccessRestrictionService } from "../core/access-restriction.service";
     <ion-header class="enterprise-header" [class.client-header]="dark" [class.modal-blurred]="blurred">
       <ion-toolbar>
         <div class="enterprise-toolbar">
-          <div class="toolbar-context">
-            <span>{{ eyebrow }}</span>
-            <strong>{{ title }}</strong>
-          </div>
+<div class="toolbar-context">
+          <strong>{{ title }}</strong>
+        </div>
 
           <div class="toolbar-right">
             <div class="header-profile-wrapper">

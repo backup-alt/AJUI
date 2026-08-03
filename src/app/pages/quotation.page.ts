@@ -9,6 +9,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 import { QuotationReportComponent, QuotationReportData } from "../shared/quotation-report.component";
 import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
 import { formatMoney } from "../shared/format";
+import { buildBusinessDocumentXlsx } from "../shared/excel-export";
 import type { Quotation, QuotationRow } from "../../data/dashboardData";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -1778,65 +1779,56 @@ readonly savingPdf = signal(false);
     }
   }
 
-  exportToExcel() {
+  async exportToExcel() {
     const rows = this.quotationRows();
-    const headers = ["S.No", "Description", "Unit", "Qty", "Rate/Qty", "Amount", ...this.customColumns()];
-    const pad = (count: number) => Array(Math.max(0, count)).fill("").join(",");
-    const emptyColsForTotal = pad(headers.length - 2);
-    
-    const addrParts = (this.clientAddress || "").split('\n');
-    const addrLine1 = addrParts[0] || "";
-    const addrLine2 = addrParts.slice(1).join(' ') || "";
+    const customColumns = this.customColumns();
+    const company = this.companyProfile();
+    const items = rows.map((row) => {
+      const customValues: Record<string, string> = {};
+      customColumns.forEach((col) => {
+        customValues[col] = (row as any)[col] || "";
+      });
+      return {
+        id: row.id,
+        description: row.description || "",
+        unit: row.unit || "",
+        qty: Number(row.qty) || 0,
+        rate: Number(row.rate) || 0,
+        amount: Number(row.amount) || 0,
+        parentRowId: row.parentRowId || null,
+        customValues,
+      };
+    });
 
-    const csvRows = [
-      `${pad(headers.length - 1)}GSTIN : ${this.companyProfile().gstin || ""}`,
-      `${pad(Math.floor(headers.length / 2))}QUOTATION`,
-      ``,
-      `To`,
-      `Name :,${this.clientName}`,
-      `Address :,${addrLine1.replace(/,/g, '')}`,
-      ...(addrLine2 ? [`       ,${addrLine2.replace(/,/g, '')}`] : []),
-      `State  :,${this.clientState}`,
-      `GSTIN  :,${this.clientGstin}`,
-      ``,
-      headers.join(","),
-      ...rows.map((row) => {
-        const isHeading = this.isSectionHeading(row) || this.parentIds().has(row.id);
-        const indent = row.parentRowId ? "    * " : "";
-        const sno = isHeading || row.parentRowId ? "" : (this.parentSnoMap()[row.id] || "");
-        const description = `"${indent}${(row.description || "").replace(/"/g, '""')}"`;
-        const unit = isHeading ? "" : `"${row.unit || ""}"`;
-        const qty = isHeading ? "" : (row.qty || 0);
-        const rate = isHeading ? "" : (row.rate || 0);
-        const amount = isHeading ? "" : (row.amount || 0);
-        
-        const values = [sno, description, unit, qty, rate, amount];
-        this.customColumns().forEach(col => {
-          values.push(isHeading ? "" : `"${(row as any)[col] || ""}"`);
-        });
-        return values.join(",");
-      }),
-      ``,
-      `${emptyColsForTotal},Total Amount,${this.subtotal()}`,
-      `Extra ${this.cgstPercent() + this.sgstPercent()}% Gst`,
-      ``,
-      `${emptyColsForTotal},SGST ${this.sgstPercent()}%,${this.sgstAmount()}`,
-      `${emptyColsForTotal},CGST ${this.cgstPercent()}%,${this.cgstAmount()}`,
-      `${emptyColsForTotal},Round Off,${this.roundOff()}`,
-      `${emptyColsForTotal},Total Amount,${this.totalAmount()}`,
-      ``,
-      `Total items / Qty : ${this.quotationRows().filter(r => !this.isSectionHeading(r) && !this.parentIds().has(r.id)).length}   total amount (in words): INR ${this.amountInWords()} Only`,
-    ];
-
-    const csvContent = csvRows.join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `quotation-${this.currentQuoteNumber()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    await buildBusinessDocumentXlsx({
+      documentTitle: "QUOTATION",
+      documentNumber: this.currentQuoteNumber(),
+      documentDate: this.quotationDate(),
+      company: {
+        name: company.name,
+        address: company.address,
+        state: company.state,
+        gstin: company.gstin,
+      },
+      client: {
+        name: this.clientName,
+        address: this.clientAddress,
+        state: this.clientState,
+        gstin: this.clientGstin,
+      },
+      items,
+      customColumns,
+      totals: {
+        subtotal: this.subtotal(),
+        cgstPercent: this.cgstPercent(),
+        cgstAmount: this.cgstAmount(),
+        sgstPercent: this.sgstPercent(),
+        sgstAmount: this.sgstAmount(),
+        roundOff: this.roundOff(),
+        totalAmount: this.totalAmount(),
+        amountInWords: this.amountInWords(),
+      },
+      fileName: `quotation-${this.currentQuoteNumber()}`,
+    });
   }
 }

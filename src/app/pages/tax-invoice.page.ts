@@ -10,6 +10,7 @@ import { TaxInvoiceDialogComponent } from "../shared/tax-invoice-dialog.componen
 import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
 import type { TaxInvoice, TaxInvoiceRow } from "../../data/dashboardData";
 import { formatMoney } from "../shared/format";
+import { buildBusinessDocumentXlsx } from "../shared/excel-export";
 
 const INDIAN_STATES = [
   "Tamil Nadu", "Kerala", "Karnataka", "Andhra Pradesh", "Telangana",
@@ -451,9 +452,20 @@ function numberToWords(num: number): string {
     .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: #64748b; }
     .empty-state ion-icon { font-size: 48px; margin-bottom: 12px; }
     .quotation-list { padding: 0 24px; }
-    .quotation-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    .quotation-table th { background: #1a2540; color: #fff; padding: 10px 14px; text-align: left; font-size: 12px; }
-    .quotation-table td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+    .quotation-table { width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #cfd8e6; border-radius: 8px; overflow: hidden; }
+    .quotation-table th {
+      background: #eef4ff;
+      color: #002263;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 2px solid #cfd8e6;
+    }
+    .quotation-table td { padding: 10px 14px; border-bottom: 1px solid #e8edf4; color: #1e293b; }
+    .quotation-table tr:last-child td { border-bottom: none; }
     .quotation-table tr:hover { background: #f8fafc; }
     .status-pill { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
     .status-pill.draft { background: #fef3c7; color: #92400e; }
@@ -512,8 +524,18 @@ function numberToWords(num: number): string {
     .items-table col.col-col-amount { width: 120px; }
     .items-table col.col-col-custom { width: 110px; }
     .items-table col.col-col-action { width: 96px; }
-    .items-table th { background: #1a2540; color: #fff; padding: 7px 8px; text-align: left; font-size: 11px; }
-    .items-table td { padding: 4px 6px; border: 1px solid #cbd5e1; vertical-align: middle; box-sizing: border-box; }
+    .items-table th {
+      background: #eef4ff;
+      color: #002263;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 8px;
+      text-align: left;
+      border-bottom: 2px solid #cfd8e6;
+    }
+    .items-table td { padding: 5px 6px; border-bottom: 1px solid #e8edf4; vertical-align: middle; box-sizing: border-box; }
     .col-sno { text-align: center; }
     .col-desc { }
     .col-hsn { text-align: center; }
@@ -1219,76 +1241,58 @@ export class TaxInvoicePage {
     return match?._id || null;
   }
 
-  exportToExcel() {
+  async exportToExcel() {
     const rows = this.invoiceRows();
-    const headers = ["S.No", "Description", "HSN Code", "Unit", "Qty", "Rate/Qty", "Amount", ...this.customColumns()];
-    const pad = (count: number) => Array(Math.max(0, count)).fill("").join(",");
-    const emptyColsForTotal = pad(headers.length - 2);
+    const customColumns = this.customColumns();
+    const company = this.companyProfile();
+    const items = rows.map((row) => {
+      const customValues: Record<string, string> = {};
+      customColumns.forEach((col) => {
+        customValues[col] = (row as any)[col] || "";
+      });
+      return {
+        id: row.id,
+        description: row.description || "",
+        hsnCode: row.hsnCode || "",
+        unit: row.unit || "",
+        qty: Number(row.qty) || 0,
+        rate: Number(row.rate) || 0,
+        amount: Number(row.amount) || 0,
+        parentRowId: row.parentRowId || null,
+        customValues,
+      };
+    });
 
-    const addrParts = (this.clientAddress || "").split('\n');
-    const addrLine1 = addrParts[0] || "";
-    const addrLine2 = addrParts.slice(1).join(' ') || "";
-
-    const csvRows = [
-      `${pad(headers.length - 1)}GSTIN : ${this.companyProfile().gstin || ""}`,
-      `${pad(Math.floor(headers.length / 2))}Tax Invoice`,
-      ``,
-      `${pad(headers.length - 2)}Invoice No : ${this.currentInvoiceNumber()}`,
-      `${pad(headers.length - 2)}Invoice Date : ${this.invoiceDate()}`,
-      ``,
-      `Billing Details`,
-      `Name,${this.clientName}`,
-      `Address,${addrLine1.replace(/,/g, '')}`,
-      ...(addrLine2 ? [`       ,${addrLine2.replace(/,/g, '')}`] : []),
-      ``,
-      `State,${this.clientState}`,
-      `GSTIN,${this.clientGstin}`,
-      ``,
-      `Subject :,`,
-      ``,
-      headers.join(","),
-      ...rows.map((row) => {
-        const isHeading = this.isSectionHeading(row) || this.parentIds().has(row.id);
-        const indent = row.parentRowId ? "    * " : "";
-        const sno = isHeading || row.parentRowId ? "" : (this.parentSnoMap()[row.id] || "");
-        const description = `"${indent}${(row.description || "").replace(/"/g, '""')}"`;
-        const hsn = isHeading ? "" : `"${row.hsnCode || ""}"`;
-        const unit = isHeading ? "" : `"${row.unit || ""}"`;
-        const qty = isHeading ? "" : (row.qty || 0);
-        const rate = isHeading ? "" : (row.rate || 0);
-        const amount = isHeading ? "" : (row.amount || 0);
-        
-        const values = [sno, description, hsn, unit, qty, rate, amount];
-        this.customColumns().forEach(col => {
-          values.push(isHeading ? "" : `"${(row as any)[col] || ""}"`);
-        });
-        return values.join(",");
-      }),
-      ``,
-      `${emptyColsForTotal},,${this.subtotal()}`,
-      `${emptyColsForTotal},SGST ${this.sgstPercent()}%,${this.sgstAmount()}`,
-      `${emptyColsForTotal},CGST ${this.cgstPercent()}%,${this.cgstAmount()}`,
-      `${emptyColsForTotal},TOTAL AMOUNT,${this.totalAmount()}`,
-      ``,
-      `Total items : ${this.invoiceRows().filter(r => !this.isSectionHeading(r) && !this.parentIds().has(r.id)).length}   Total amount (in words): INR ${this.amountInWords()} Only`,
-      `Bank Details : ${pad(headers.length - 4)} For ${this.companyProfile().name || ""}`,
-      ``,
-      `Bank,${this.companyProfile().bankName || ""}`,
-      `Account,${this.companyProfile().accountNumber || ""}`,
-      `IFSC Code,${this.companyProfile().ifsc || ""} ${pad(headers.length - 4)} Authorized Signatory`,
-      `Branch,${this.companyProfile().branch || ""} ${pad(headers.length - 4)} (Managing Director)`
-    ];
-
-    const csvContent = csvRows.join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `tax-invoice-${this.currentInvoiceNumber()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    await buildBusinessDocumentXlsx({
+      documentTitle: "TAX INVOICE",
+      documentNumber: this.currentInvoiceNumber(),
+      documentDate: this.invoiceDate(),
+      company: {
+        name: company.name,
+        address: company.address,
+        state: company.state,
+        gstin: company.gstin,
+      },
+      client: {
+        name: this.clientName,
+        address: this.clientAddress,
+        state: this.clientState,
+        gstin: this.clientGstin,
+      },
+      items,
+      customColumns,
+      totals: {
+        subtotal: this.subtotal(),
+        cgstPercent: this.cgstPercent(),
+        cgstAmount: this.cgstAmount(),
+        sgstPercent: this.sgstPercent(),
+        sgstAmount: this.sgstAmount(),
+        roundOff: this.roundOff(),
+        totalAmount: this.totalAmount(),
+        amountInWords: this.amountInWords(),
+      },
+      fileName: `tax-invoice-${this.currentInvoiceNumber()}`,
+    });
   }
 
   async saveInvoice(status: "Draft" | "Sent" | "Paid") {
