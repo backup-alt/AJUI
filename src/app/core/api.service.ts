@@ -576,26 +576,22 @@ export class ApiService {
   }
 
   /**
-   * Fetch ALL sites for picker UIs. Tries /admin/sites first (unfiltered, all sites).
-   * If that fails (non-admin), falls back to cursor-paginated /sites to collect
+   * Fetch ALL sites for picker UIs. Uses cursor-paginated /sites to collect
    * all pages. The backend caps /sites at 25 items per page, so we must paginate.
+   *
+   * We avoid /admin/sites because the deployed backend's listAllSites controller
+   * is currently returning a subset of sites (only 14 of 30), breaking the picker.
+   * The /sites endpoint with cursor pagination is reliable and returns all sites
+   * for admin users (no scope filter applied).
    *
    * Always invalidates the relevant cache entries before fetching to ensure
    * fresh data (sites created in another tab/session are visible).
    */
   listSitesAll(): Observable<{ sites: any[] }> {
-    // Invalidate caches so we don't return stale entries for /admin/sites or /sites
+    // Invalidate caches so we don't return stale entries for /sites
     this.invalidateCache("/admin/sites");
     this.invalidateCache("/sites");
-    return this.listSitesAdmin().pipe(
-      switchMap((adminRes) => {
-        if (adminRes?.sites?.length) {
-          return of(adminRes);
-        }
-        return this.paginateAllSites();
-      }),
-      catchError(() => this.paginateAllSites())
-    );
+    return this.paginateAllSites();
   }
 
   private paginateAllSites(maxPages = 50): Observable<{ sites: any[] }> {
