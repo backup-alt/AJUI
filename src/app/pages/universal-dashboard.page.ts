@@ -3537,6 +3537,7 @@ visibleRows(): TableRow[] {
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
       status: row.status,
+      notes: row.notes,
       ...(row.customFields || {}),
     }));
 
@@ -3606,6 +3607,7 @@ visibleRows(): TableRow[] {
       reference: row.reference,
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       approvalStatus: row.status,
+      notes: (row as any).notes,
       ...(row.customFields || {}),
     }));
 

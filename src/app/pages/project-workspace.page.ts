@@ -2654,6 +2654,7 @@ export class ProjectWorkspacePage {
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
       status: row.status,
+      notes: row.notes,
     }));
 
     const labour = this.data.labourForProject(projectId).map((row) => ({
@@ -2695,6 +2696,7 @@ export class ProjectWorkspacePage {
         reference: row.reference,
         billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
         approvalStatus: row.status,
+        notes: (row as any).notes,
       }));
 
     const payments = this.data.paymentsForProject(projectId).map((row) => ({
