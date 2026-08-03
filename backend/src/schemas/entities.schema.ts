@@ -76,6 +76,7 @@ export const createProjectSchema = z.object({
     supervisor: z.string().trim().min(1).max(200),
     supervisorId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
     siteIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).default([]),
+    sites: z.array(z.string().trim().min(1).max(200)).optional(),
     status: z.enum(["Active", "On Hold", "Completed"]).default("Active"),
     startDate: z.string().min(1),
     totalValue: z.coerce.number().nonnegative().default(0),

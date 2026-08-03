@@ -496,6 +496,13 @@ export class ApiService {
     );
   }
 
+  updateProject(id: string, payload: any): Observable<any> {
+    return this.http.patch(`${this.baseUrl}/projects/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/projects")),
+      catchError(this.handleError)
+    );
+  }
+
   getProject(id: string): Observable<{ project: any }> {
     return this.http.get<{ project: any }>(`${this.baseUrl}/projects/${id}`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)

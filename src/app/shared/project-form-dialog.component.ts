@@ -23,6 +23,7 @@ export type ProjectFormValue = {
   sites: string[];
   startDate: string;
   supervisor: string;
+  supervisorId?: string;
   status: ProjectStatus;
   totalValue: number;
   advanceAmount: number;
@@ -314,6 +315,7 @@ export class ProjectFormDialogComponent implements OnInit {
       name: String(formData.get("name") ?? "").trim(),
       startDate: String(formData.get("startDate") ?? "").trim(),
       supervisor,
+      supervisorId: this.selectedSupervisorId() || undefined,
       status: this.projectStatusFor(String(formData.get("status") ?? "Active")),
       sites,
       totalValue: Number(formData.get("totalValue") ?? 0),

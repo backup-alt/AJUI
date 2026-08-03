@@ -603,6 +603,7 @@ export class ErpDataService {
       sites: string[];
       startDate: string;
       supervisor: string;
+      supervisorId?: string;
       status?: ProjectStatus;
       totalValue: number;
       advanceAmount: number;
@@ -653,7 +654,9 @@ export class ErpDataService {
         mobile: client.mobile,
         address: client.address,
         supervisor: input.supervisor,
+        supervisorId: input.supervisorId,
         siteIds: [],
+        sites: input.sites,
         status: input.status ?? "Active",
         startDate: input.startDate,
         totalValue: input.totalValue ?? 0,
@@ -857,6 +860,32 @@ export class ErpDataService {
 
     if (updatedProject) this.touchProject(projectId);
     return updatedProject;
+  }
+
+  /**
+   * Persist a project edit to the backend so the supervisor↔project↔sites
+   * assignment stays in sync (creates Site documents, updates Supervisor
+   * assignedProjects / assignedSiteIds / assignedSites and the access cache).
+   */
+  async persistProjectEdit(
+    projectId: string,
+    patch: {
+      name?: string;
+      sites?: string[];
+      startDate?: string;
+      supervisor?: string;
+      supervisorId?: string;
+      status?: ProjectStatus;
+      totalValue?: number;
+      advanceAmount?: number;
+      expenseBalance?: number;
+    },
+  ): Promise<void> {
+    try {
+      await lastValueFrom(this.api.updateProject(projectId, patch));
+    } catch (err) {
+      console.warn("[ErpDataService] Failed to persist project edit to backend:", (err as any)?.message ?? err);
+    }
   }
 
   deleteProject(projectId: string) {

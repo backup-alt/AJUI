@@ -2498,6 +2498,19 @@ export class ProjectWorkspacePage {
     if (editing) {
       const updated = this.data.updateProject(editing.id, { ...projectValue, expenseBalance: openingBalance });
       this.data.setExpenseOpeningBalance(editing.id, editing.sites[0] ?? "Main Site", openingBalance);
+      // Persist supervisor/site changes to the backend so the supervisor mobile
+      // app receives the updated site assignments.
+      void this.data.persistProjectEdit(editing.id, {
+        name: value.name,
+        sites: value.sites,
+        startDate: value.startDate,
+        supervisor: value.supervisor,
+        supervisorId: value.supervisorId,
+        status: value.status,
+        totalValue: value.totalValue,
+        advanceAmount: value.advanceAmount,
+        expenseBalance: openingBalance,
+      });
       this.editingProject.set(null);
       this.showProjectForm.set(false);
       if (updated && editing.id === this.projectId()) {
