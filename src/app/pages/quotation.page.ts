@@ -242,7 +242,29 @@ function numberToWords(num: number): string {
                               <input type="text" [(ngModel)]="row.description" placeholder="Description" class="table-input" />
                             </td>
                             <td class="col-unit">
-                              <input type="text" [(ngModel)]="row.unit" placeholder="Unit" class="table-input" />
+                              <div class="erp-select-menu" [class.open]="openUnitMenu() === row.id">
+                                <button type="button" class="erp-select-trigger unit-trigger" (click)="toggleUnitMenu(row.id)">
+                                  <span>{{ row.unit || 'Select' }}</span>
+                                  <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+                                </button>
+                                <div class="erp-select-panel unit-panel" *ngIf="openUnitMenu() === row.id">
+                                  <input type="text" class="unit-search" placeholder="Search or type..."
+                                    (click)="$event.stopPropagation()"
+                                    (input)="unitSearch.set($any($event.target).value)"
+                                    [value]="unitSearch()" autocomplete="off" />
+                                  <button *ngFor="let u of filteredUnits()" type="button"
+                                    [class.selected]="row.unit === u"
+                                    (mousedown)="$event.preventDefault()"
+                                    (click)="selectUnit(row, u)">{{ u }}</button>
+                                  @if (unitSearch().trim() && !filteredUnits().includes(unitSearch().trim())) {
+                                    <button type="button" class="unit-create"
+                                      (mousedown)="$event.preventDefault()"
+                                      (click)="createAndSelectUnit(row, unitSearch().trim())">
+                                      Create "{{ unitSearch().trim() }}"
+                                    </button>
+                                  }
+                                </div>
+                              </div>
                             </td>
                             <td class="col-qty">
                               <input type="number" [(ngModel)]="row.qty" (ngModelChange)="recalculateAmount(row)" min="0" class="table-input" />
@@ -971,6 +993,16 @@ function numberToWords(num: number): string {
     .client-dropdown-name { font-size: 13px; font-weight: 600; color: #1e293b; }
     .client-dropdown-meta { font-size: 11px; color: #64748b; }
     .client-dropdown-empty { padding: 12px; text-align: center; color: #94a3b8; font-size: 13px; }
+    .col-unit { position: relative; }
+    .unit-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; color: #1e293b; background: transparent; cursor: pointer; text-align: left; }
+    .unit-trigger:hover, .erp-select-menu.open .unit-trigger { border-color: #2c5cff; background: #fff; }
+    .unit-trigger .svg-icon { width: 14px; height: 14px; flex-shrink: 0; }
+    .unit-panel { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 200; max-height: 220px; overflow-y: auto; margin-top: 2px; }
+    .unit-search { width: 100%; padding: 6px 8px; border: none; border-bottom: 1px solid #e2e8f0; font-size: 12px; outline: none; box-sizing: border-box; }
+    .unit-panel button { display: block; width: 100%; padding: 6px 8px; text-align: left; border: none; background: none; cursor: pointer; font-size: 12px; color: #1e293b; }
+    .unit-panel button:hover { background: #f0f6ff; }
+    .unit-panel button.selected { background: #e0ecff; font-weight: 600; }
+    .unit-create { border-top: 1px solid #e2e8f0 !important; color: #2c5cff !important; font-weight: 500; background: #f8fafc !important; }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -989,6 +1021,17 @@ readonly savingPdf = signal(false);
   readonly quotationRows = signal<QuotationRow[]>([]);
   readonly customColumns = signal<string[]>([]);
   readonly showQuotationPreview = signal(false);
+
+  readonly defaultUnits = ["Nos","Bag","Kg","Ton","Load","Cubic Feet","Cubic Meter","Meter","Litre","Roll","Bundle","Piece","Box"];
+  readonly customUnits = signal<string[]>(this.loadCustomUnits());
+  readonly allUnits = computed(() => [...this.defaultUnits, ...this.customUnits()].sort((a, b) => a.localeCompare(b)));
+  readonly openUnitMenu = signal("");
+  readonly unitSearch = signal("");
+  readonly filteredUnits = computed(() => {
+    const q = this.unitSearch().trim().toLowerCase();
+    const all = this.allUnits();
+    return q ? all.filter(u => u.toLowerCase().includes(q)) : all;
+  });
 
   readonly clientSearchTerm = signal("");
   readonly showClientDropdown = signal(false);
@@ -1182,6 +1225,9 @@ readonly savingPdf = signal(false);
     if (target && !target.closest(".client-search-wrapper")) {
       this.showClientDropdown.set(false);
     }
+    if (target && !target.closest(".erp-select-menu")) {
+      this.openUnitMenu.set("");
+    }
   }
 
   private loadQuotationsFromBackend() {
@@ -1274,6 +1320,34 @@ readonly savingPdf = signal(false);
 
   removeRow(rowId: string) {
     this.quotationRows.update(rows => rows.filter(r => r.id !== rowId));
+  }
+
+  private loadCustomUnits(): string[] {
+    try { return JSON.parse(localStorage.getItem("ajui_custom_units") || "[]"); } catch { return []; }
+  }
+  private persistCustomUnits(units: string[]) {
+    localStorage.setItem("ajui_custom_units", JSON.stringify(units));
+  }
+  toggleUnitMenu(rowId: string) {
+    this.openUnitMenu.set(this.openUnitMenu() === rowId ? "" : rowId);
+    this.unitSearch.set("");
+  }
+  selectUnit(row: QuotationRow, unit: string) {
+    row.unit = unit;
+    this.openUnitMenu.set("");
+    this.unitSearch.set("");
+  }
+  createAndSelectUnit(row: QuotationRow, unit: string) {
+    const existing = this.allUnits().find(u => u.toLowerCase() === unit.toLowerCase());
+    const toAdd = existing || unit;
+    if (!existing) {
+      const updated = [...this.customUnits(), toAdd];
+      this.customUnits.set(updated);
+      this.persistCustomUnits(updated);
+    }
+    row.unit = toAdd;
+    this.openUnitMenu.set("");
+    this.unitSearch.set("");
   }
 
   recalculateAmount(row: QuotationRow) {
