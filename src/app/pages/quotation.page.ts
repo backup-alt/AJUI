@@ -286,7 +286,10 @@ function numberToWords(num: number): string {
                             <td class="col-action">
                               <div class="row-actions" [class.menu-open]="openRowMenu() === row.id">
                                 @if (!row.parentRowId) {
-                                  <button type="button" class="row-action-btn" title="Add Sub Row" aria-label="Add Sub Row" (click)="toggleRowMenu(row.id, $event)">
+                                  <button type="button" class="add-sub-row-btn" title="Add Sub Row" aria-label="Add Sub Row" (click)="addSubRow(row.id)">
+                                    <ion-icon name="add-outline"></ion-icon>
+                                  </button>
+                                  <button type="button" class="row-action-btn" title="More actions" aria-label="More actions" (click)="toggleRowMenu(row.id, $event)">
                                     <ion-icon name="ellipsis-vertical"></ion-icon>
                                   </button>
                                   @if (openRowMenu() === row.id) {
@@ -701,13 +704,17 @@ function numberToWords(num: number): string {
     .col-rate { width: 100px; }
     .col-amount { width: 110px; text-align: right; }
     .col-custom { min-width: 100px; }
-    .col-action { width: 36px; text-align: center; }
+    .col-action { width: 78px; text-align: center; }
     .row-actions { position: relative; display: inline-flex; align-items: center; gap: 4px; }
-    .row-action-btn {
+    .row-action-btn,
+    .add-sub-row-btn {
       background: transparent; border: none; cursor: pointer; padding: 2px 4px;
       color: #475569; font-size: 16px; line-height: 1; border-radius: 4px;
     }
-    .row-action-btn:hover { background: rgba(0,0,0,0.06); color: #1e293b; }
+    .row-action-btn:hover,
+    .add-sub-row-btn:hover { background: rgba(0,0,0,0.06); color: #1e293b; }
+    .add-sub-row-btn { color: #16a34a; font-size: 18px; font-weight: 700; }
+    .add-sub-row-btn:hover { color: #15803d; background: rgba(22,163,74,0.10); }
     .row-action-menu {
       position: absolute; right: 0; top: 100%; margin-top: 4px;
       background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;
