@@ -248,51 +248,56 @@ function numberToWords(num: number): string {
                       </thead>
                       <tbody>
                         @for (row of quotationRows(); track row.id; let i = $index) {
-                          <tr [class.sub-row]="!!row.parentRowId">
-                            <td class="col-sno">{{ row.parentRowId ? '' : parentSnoMap()[row.id] }}</td>
+                          <tr [class.sub-row]="!!row.parentRowId" [class.section-row]="isSectionHeading(row)">
+                            <td class="col-sno">{{ isSectionHeading(row) ? '' : (row.parentRowId ? '' : parentSnoMap()[row.id]) }}</td>
                             <td class="col-desc">
-                              <div class="desc-cell" [class.is-sub]="!!row.parentRowId">
-                                @if (row.parentRowId) {
-                                  <span class="tree-icon" aria-hidden="true">↳</span>
-                                }
-                                <input type="text" [(ngModel)]="row.description" placeholder="Description" class="table-input" />
+                              <div class="desc-cell" [class.is-sub]="!!row.parentRowId" [class.is-heading]="isSectionHeading(row)">
+                                <input type="text" [(ngModel)]="row.description" [placeholder]="isSectionHeading(row) ? 'Section heading (e.g. Plumbing Fittings)' : 'Description'" class="table-input" />
                               </div>
                             </td>
                             <td class="col-unit">
-                              <div class="erp-select-menu" [class.open]="openUnitMenu() === row.id">
-                                <button type="button" class="erp-select-trigger unit-trigger" (click)="toggleUnitMenu(row.id)">
-                                  <span>{{ row.unit || 'Select' }}</span>
-                                  <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
-                                </button>
-                                <div class="erp-select-panel unit-panel" *ngIf="openUnitMenu() === row.id">
-                                  <input type="text" class="unit-search" placeholder="Search or type..."
-                                    (click)="$event.stopPropagation()"
-                                    (input)="unitSearch.set($any($event.target).value)"
-                                    [value]="unitSearch()" autocomplete="off" />
-                                  <button *ngFor="let u of filteredUnits()" type="button"
-                                    [class.selected]="row.unit === u"
-                                    (mousedown)="$event.preventDefault()"
-                                    (click)="selectUnit(row, u)">{{ u }}</button>
-                                  @if (unitSearch().trim() && !filteredUnits().includes(unitSearch().trim())) {
-                                    <button type="button" class="unit-create"
+                              @if (!parentIds().has(row.id)) {
+                                <div class="erp-select-menu" [class.open]="openUnitMenu() === row.id">
+                                  <button type="button" class="erp-select-trigger unit-trigger" (click)="toggleUnitMenu(row.id)">
+                                    <span>{{ row.unit || 'Select' }}</span>
+                                    <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+                                  </button>
+                                  <div class="erp-select-panel unit-panel" *ngIf="openUnitMenu() === row.id">
+                                    <input type="text" class="unit-search" placeholder="Search or type..."
+                                      (click)="$event.stopPropagation()"
+                                      (input)="unitSearch.set($any($event.target).value)"
+                                      [value]="unitSearch()" autocomplete="off" />
+                                    <button *ngFor="let u of filteredUnits()" type="button"
+                                      [class.selected]="row.unit === u"
                                       (mousedown)="$event.preventDefault()"
-                                      (click)="createAndSelectUnit(row, unitSearch().trim())">
-                                      Create "{{ unitSearch().trim() }}"
-                                    </button>
-                                  }
+                                      (click)="selectUnit(row, u)">{{ u }}</button>
+                                    @if (unitSearch().trim() && !filteredUnits().includes(unitSearch().trim())) {
+                                      <button type="button" class="unit-create"
+                                        (mousedown)="$event.preventDefault()"
+                                        (click)="createAndSelectUnit(row, unitSearch().trim())">
+                                        Create "{{ unitSearch().trim() }}"
+                                      </button>
+                                    }
+                                  </div>
                                 </div>
-                              </div>
+                              }
                             </td>
                             <td class="col-qty">
-                              <input type="number" [(ngModel)]="row.qty" (ngModelChange)="recalculateAmount(row)" min="0" class="table-input" />
+                              @if (!parentIds().has(row.id)) {
+                                <input type="number" [(ngModel)]="row.qty" (ngModelChange)="recalculateAmount(row)" min="0" class="table-input" />
+                              }
                             </td>
                             <td class="col-rate">
-                              <input type="number" [(ngModel)]="row.rate" (ngModelChange)="recalculateAmount(row)" min="0" class="table-input" />
+                              @if (!parentIds().has(row.id)) {
+                                <input type="number" [(ngModel)]="row.rate" (ngModelChange)="recalculateAmount(row)" min="0" class="table-input" />
+                              }
                             </td>
-                            <td class="col-amount amount-cell">{{ formatMoney(row.amount) }}</td>
+                            <td class="col-amount amount-cell">{{ (isSectionHeading(row) || parentIds().has(row.id)) ? '' : formatMoney(row.amount) }}</td>
                             @for (col of customColumns(); track col) {
                               <td class="col-custom">
-                                <input type="text" [(ngModel)]="$any(row)[col]" placeholder="" class="table-input" />
+                                @if (!parentIds().has(row.id)) {
+                                  <input type="text" [(ngModel)]="$any(row)[col]" placeholder="" class="table-input" />
+                                }
                               </td>
                             }
                             <td class="col-action">
@@ -755,10 +760,9 @@ function numberToWords(num: number): string {
     .desc-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
     .desc-cell .table-input { flex: 1; min-width: 0; }
     .desc-cell.is-sub .table-input { font-style: italic; }
-    .tree-icon {
-      color: #64748b; font-size: 14px; line-height: 1; flex-shrink: 0;
-      font-family: 'Segoe UI Symbol', 'Apple Symbols', sans-serif;
-    }
+    .section-row td { background: #f1f5f9; }
+    .section-row .col-desc { padding-left: 12px; }
+    .section-row .desc-cell .table-input { font-weight: 700; color: #0f172a; font-size: 13px; }
     .confirm-overlay {
       position: fixed; inset: 0; background: rgba(15,23,42,0.55);
       display: flex; align-items: center; justify-content: center; z-index: 9999;
@@ -1117,6 +1121,7 @@ function numberToWords(num: number): string {
     .client-dropdown-meta { font-size: 11px; color: #64748b; }
     .client-dropdown-empty { padding: 12px; text-align: center; color: #94a3b8; font-size: 13px; }
     .col-unit { position: relative; }
+    .col-unit .erp-select-menu { min-width: 0; width: 100%; }
     .unit-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; color: #1e293b; background: transparent; cursor: pointer; text-align: left; }
     .unit-trigger:hover, .erp-select-menu.open .unit-trigger { border-color: #2c5cff; background: #fff; }
     .unit-trigger .svg-icon { width: 14px; height: 14px; flex-shrink: 0; }
@@ -1226,8 +1231,25 @@ readonly savingPdf = signal(false);
   });
 
   readonly subtotal = computed(() =>
-    this.quotationRows().reduce((sum, row) => sum + (row.amount || 0), 0)
+    this.quotationRows()
+      .filter(row => !this.isSectionHeading(row))
+      .reduce((sum, row) => sum + (row.amount || 0), 0)
   );
+
+  /**
+   * A parent row is treated as a section heading when it has no billable
+   * values (no unit, qty, rate or amount). Section headings are not assigned
+   * an S.No, are excluded from subtotals, GST and the final total, and
+   * never render Unit/Qty/Rate/Amount inputs in the editable table.
+   */
+  isSectionHeading(row: QuotationRow | any): boolean {
+    if (!row || row.parentRowId) return false;
+    const unit = (row.unit || "").trim();
+    const qty = Number(row.qty) || 0;
+    const rate = Number(row.rate) || 0;
+    const amount = Number(row.amount) || 0;
+    return !unit && qty === 0 && rate === 0 && amount === 0;
+  }
 
   readonly cgstAmount = computed(() => this.subtotal() * this.cgstPercent() / 100);
   readonly sgstAmount = computed(() => this.subtotal() * this.sgstPercent() / 100);
@@ -1240,17 +1262,25 @@ readonly savingPdf = signal(false);
 
   /**
    * Parent-only serial number map. Child rows keep their parent's S.No (used
-   * for the report/PDF). The editor itself leaves the S.No cell blank for
-   * children by checking row.parentRowId in the template.
+   * for the report/PDF). Section-heading parents are excluded so the S.No
+   * column only increments for actual billable parent rows.
    */
   readonly parentSnoMap = computed<Record<string, number>>(() => {
     const map: Record<string, number> = {};
     let counter = 0;
     for (const row of this.quotationRows()) {
-      if (!row.parentRowId) counter += 1;
+      if (!row.parentRowId && !this.isSectionHeading(row)) counter += 1;
       map[row.id] = counter;
     }
     return map;
+  });
+
+  readonly parentIds = computed(() => {
+    const ids = new Set<string>();
+    for (const row of this.quotationRows()) {
+      if (row.parentRowId) ids.add(row.parentRowId);
+    }
+    return ids;
   });
 
   readonly reportQuotation = computed<QuotationReportData>(() => {
@@ -1265,17 +1295,19 @@ readonly savingPdf = signal(false);
       items: this.quotationRows().map((row, idx) => {
         const customValues: Record<string, string> = {};
         this.customColumns().forEach(col => { customValues[col] = (row as any)[col] || ""; });
+        const heading = this.isSectionHeading(row);
         return {
           ...customValues,
           id: row.id || String(idx),
-          sno: row.parentRowId ? undefined : snoMap[row.id],
+          sno: heading || row.parentRowId ? undefined : snoMap[row.id],
           description: row.description || "",
           hsnCode: (row as any).hsnCode || "",
-          unit: row.unit || "",
-          qty: row.qty || 0,
-          rate: row.rate || 0,
-          amount: row.amount || 0,
+          unit: heading ? "" : (row.unit || ""),
+          qty: heading ? 0 : (row.qty || 0),
+          rate: heading ? 0 : (row.rate || 0),
+          amount: heading ? 0 : (row.amount || 0),
           isCustom: row.isCustom ?? false,
+          isSectionHeading: heading,
           parentRowId: row.parentRowId || null,
           customValues,
         };
@@ -1478,9 +1510,9 @@ readonly savingPdf = signal(false);
       sno: 0,
       description: "",
       unit: "",
-      qty: 0,
-      rate: 0,
-      amount: 0,
+      qty: null as any,
+      rate: null as any,
+      amount: null as any,
       parentRowId: null,
     };
   }
@@ -1748,25 +1780,52 @@ readonly savingPdf = signal(false);
 
   exportToExcel() {
     const rows = this.quotationRows();
-    const headers = ["S.No", "Description", "Unit", "Qty", "Rate", "Amount", ...this.customColumns()];
+    const headers = ["S.No", "Description", "Unit", "Qty", "Rate/Qty", "Amount", ...this.customColumns()];
+    const pad = (count: number) => Array(Math.max(0, count)).fill("").join(",");
+    const emptyColsForTotal = pad(headers.length - 2);
+    
+    const addrParts = (this.clientAddress || "").split('\n');
+    const addrLine1 = addrParts[0] || "";
+    const addrLine2 = addrParts.slice(1).join(' ') || "";
+
     const csvRows = [
+      `${pad(headers.length - 1)}GSTIN : ${this.companyProfile().gstin || ""}`,
+      `${pad(Math.floor(headers.length / 2))}QUOTATION`,
+      ``,
+      `To`,
+      `Name :,${this.clientName}`,
+      `Address :,${addrLine1.replace(/,/g, '')}`,
+      ...(addrLine2 ? [`       ,${addrLine2.replace(/,/g, '')}`] : []),
+      `State  :,${this.clientState}`,
+      `GSTIN  :,${this.clientGstin}`,
+      ``,
       headers.join(","),
-      ...rows.map((row, i) => {
-        const indent = row.parentRowId ? "    ↳ " : "";
+      ...rows.map((row) => {
+        const isHeading = this.isSectionHeading(row) || this.parentIds().has(row.id);
+        const indent = row.parentRowId ? "    * " : "";
+        const sno = isHeading || row.parentRowId ? "" : (this.parentSnoMap()[row.id] || "");
         const description = `"${indent}${(row.description || "").replace(/"/g, '""')}"`;
-        const values = [i + 1, description, `"${row.unit}"`, row.qty, row.rate, row.amount];
+        const unit = isHeading ? "" : `"${row.unit || ""}"`;
+        const qty = isHeading ? "" : (row.qty || 0);
+        const rate = isHeading ? "" : (row.rate || 0);
+        const amount = isHeading ? "" : (row.amount || 0);
+        
+        const values = [sno, description, unit, qty, rate, amount];
         this.customColumns().forEach(col => {
-          values.push(`"${(row as any)[col] || ""}"`);
+          values.push(isHeading ? "" : `"${(row as any)[col] || ""}"`);
         });
         return values.join(",");
       }),
-      "",
-      `Subtotal,,,,"${this.subtotal()}"`,
-      `CGST @${this.cgstPercent()}%,,,,"${this.cgstAmount()}"`,
-      `SGST @${this.sgstPercent()}%,,,,"${this.sgstAmount()}"`,
-      `Round Off,,,,,"${this.roundOff()}"`,
-      `Total,,,,,"${this.totalAmount()}"`,
-      `Amount in Words: "${this.amountInWords()}"`,
+      ``,
+      `${emptyColsForTotal},Total Amount,${this.subtotal()}`,
+      `Extra ${this.cgstPercent() + this.sgstPercent()}% Gst`,
+      ``,
+      `${emptyColsForTotal},SGST ${this.sgstPercent()}%,${this.sgstAmount()}`,
+      `${emptyColsForTotal},CGST ${this.cgstPercent()}%,${this.cgstAmount()}`,
+      `${emptyColsForTotal},Round Off,${this.roundOff()}`,
+      `${emptyColsForTotal},Total Amount,${this.totalAmount()}`,
+      ``,
+      `Total items / Qty : ${this.quotationRows().filter(r => !this.isSectionHeading(r) && !this.parentIds().has(r.id)).length}   total amount (in words): INR ${this.amountInWords()} Only`,
     ];
 
     const csvContent = csvRows.join("\n");

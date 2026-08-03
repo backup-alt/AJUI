@@ -261,54 +261,61 @@ function numberToWords(num: number): string {
                       </thead>
                       <tbody>
                         @for (row of invoiceRows(); track row.id; let i = $index) {
-                          <tr [class.sub-row]="!!row.parentRowId">
-                            <td class="col-sno cell-center">{{ row.parentRowId ? '' : parentSnoMap()[row.id] }}</td>
+                          <tr [class.sub-row]="!!row.parentRowId" [class.section-row]="isSectionHeading(row)">
+                            <td class="col-sno cell-center">{{ isSectionHeading(row) ? '' : (row.parentRowId ? '' : parentSnoMap()[row.id]) }}</td>
                             <td class="col-desc">
-                              <div class="desc-cell" [class.is-sub]="!!row.parentRowId">
-                                @if (row.parentRowId) {
-                                  <span class="tree-icon" aria-hidden="true">↳</span>
-                                }
-                                <input type="text" [(ngModel)]="row.description" placeholder="Description" class="table-input" />
+                              <div class="desc-cell" [class.is-sub]="!!row.parentRowId" [class.is-heading]="isSectionHeading(row)">
+                                <input type="text" [(ngModel)]="row.description" [placeholder]="isSectionHeading(row) ? 'Section heading (e.g. Plumbing Fittings)' : 'Description'" class="table-input" />
                               </div>
                             </td>
                             <td class="col-hsn">
-                              <input type="text" [(ngModel)]="row.hsnCode" placeholder="HSN" class="table-input narrow" />
+                              @if (!parentIds().has(row.id)) {
+                                <input type="text" [(ngModel)]="row.hsnCode" placeholder="HSN" class="table-input narrow" />
+                              }
                             </td>
                             <td class="col-unit">
-                              <div class="erp-select-menu" [class.open]="openUnitMenu() === row.id">
-                                <button type="button" class="erp-select-trigger unit-trigger" (click)="toggleUnitMenu(row.id)">
-                                  <span>{{ row.unit || 'Select' }}</span>
-                                  <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
-                                </button>
-                                <div class="erp-select-panel unit-panel" *ngIf="openUnitMenu() === row.id">
-                                  <input type="text" class="unit-search" placeholder="Search or type..."
-                                    (click)="$event.stopPropagation()"
-                                    (input)="unitSearch.set($any($event.target).value)"
-                                    [value]="unitSearch()" autocomplete="off" />
-                                  <button *ngFor="let u of filteredUnits()" type="button"
-                                    [class.selected]="row.unit === u"
-                                    (mousedown)="$event.preventDefault()"
-                                    (click)="selectUnit(row, u)">{{ u }}</button>
-                                  @if (unitSearch().trim() && !filteredUnits().includes(unitSearch().trim())) {
-                                    <button type="button" class="unit-create"
+                              @if (!parentIds().has(row.id)) {
+                                <div class="erp-select-menu" [class.open]="openUnitMenu() === row.id">
+                                  <button type="button" class="erp-select-trigger unit-trigger" (click)="toggleUnitMenu(row.id)">
+                                    <span>{{ row.unit || 'Select' }}</span>
+                                    <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+                                  </button>
+                                  <div class="erp-select-panel unit-panel" *ngIf="openUnitMenu() === row.id">
+                                    <input type="text" class="unit-search" placeholder="Search or type..."
+                                      (click)="$event.stopPropagation()"
+                                      (input)="unitSearch.set($any($event.target).value)"
+                                      [value]="unitSearch()" autocomplete="off" />
+                                    <button *ngFor="let u of filteredUnits()" type="button"
+                                      [class.selected]="row.unit === u"
                                       (mousedown)="$event.preventDefault()"
-                                      (click)="createAndSelectUnit(row, unitSearch().trim())">
-                                      Create "{{ unitSearch().trim() }}"
-                                    </button>
-                                  }
+                                      (click)="selectUnit(row, u)">{{ u }}</button>
+                                    @if (unitSearch().trim() && !filteredUnits().includes(unitSearch().trim())) {
+                                      <button type="button" class="unit-create"
+                                        (mousedown)="$event.preventDefault()"
+                                        (click)="createAndSelectUnit(row, unitSearch().trim())">
+                                        Create "{{ unitSearch().trim() }}"
+                                      </button>
+                                    }
+                                  </div>
                                 </div>
-                              </div>
+                              }
                             </td>
                             <td class="col-qty">
-                              <input type="number" [(ngModel)]="row.qty" (ngModelChange)="recalc(row)" min="0" class="table-input narrow cell-right" />
+                              @if (!parentIds().has(row.id)) {
+                                <input type="number" [(ngModel)]="row.qty" (ngModelChange)="recalc(row)" min="0" class="table-input narrow cell-right" />
+                              }
                             </td>
                             <td class="col-rate">
-                              <input type="number" [(ngModel)]="row.rate" (ngModelChange)="recalc(row)" min="0" class="table-input narrow cell-right" />
+                              @if (!parentIds().has(row.id)) {
+                                <input type="number" [(ngModel)]="row.rate" (ngModelChange)="recalc(row)" min="0" class="table-input narrow cell-right" />
+                              }
                             </td>
-                            <td class="col-amount cell-right">{{ formatMoney(row.amount) }}</td>
+                            <td class="col-amount cell-right">{{ (isSectionHeading(row) || parentIds().has(row.id)) ? '' : formatMoney(row.amount) }}</td>
                             @for (col of customColumns(); track col) {
                               <td class="col-custom">
-                                <input type="text" [(ngModel)]="$any(row)[col]" placeholder="" class="table-input" />
+                                @if (!parentIds().has(row.id)) {
+                                  <input type="text" [(ngModel)]="$any(row)[col]" placeholder="" class="table-input" />
+                                }
                               </td>
                             }
                             <td class="col-action">
@@ -593,10 +600,9 @@ function numberToWords(num: number): string {
     .desc-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
     .desc-cell .table-input { flex: 1; min-width: 0; }
     .desc-cell.is-sub .table-input { font-style: italic; }
-    .tree-icon {
-      color: #64748b; font-size: 14px; line-height: 1; flex-shrink: 0;
-      font-family: 'Segoe UI Symbol', 'Apple Symbols', sans-serif;
-    }
+    .section-row td { background: #f1f5f9; }
+    .section-row .col-desc { padding-left: 12px; }
+    .section-row .desc-cell .table-input { font-weight: 700; color: #0f172a; font-size: 13px; }
     .confirm-overlay {
       position: fixed; inset: 0; background: rgba(15,23,42,0.55);
       display: flex; align-items: center; justify-content: center; z-index: 9999;
@@ -629,6 +635,7 @@ function numberToWords(num: number): string {
     .client-dropdown-meta { font-size: 11px; color: #64748b; }
     .client-dropdown-empty { padding: 12px; text-align: center; color: #94a3b8; font-size: 13px; }
     .col-unit { position: relative; }
+    .col-unit .erp-select-menu { min-width: 0; width: 100%; }
     .unit-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; color: #1e293b; background: transparent; cursor: pointer; text-align: left; }
     .unit-trigger:hover, .erp-select-menu.open .unit-trigger { border-color: #2c5cff; background: #fff; }
     .unit-trigger .svg-icon { width: 14px; height: 14px; flex-shrink: 0; }
@@ -735,7 +742,11 @@ export class TaxInvoicePage {
     return co.state?.trim().toLowerCase() === this.clientState.trim().toLowerCase() ? "Intrastate" : "Interstate";
   });
 
-  readonly subtotal = computed(() => this.invoiceRows().reduce((sum, r) => sum + (r.amount || 0), 0));
+  readonly subtotal = computed(() =>
+    this.invoiceRows()
+      .filter(row => !this.isSectionHeading(row))
+      .reduce((sum, r) => sum + (r.amount || 0), 0)
+  );
   readonly cgstAmount = computed(() => Math.round(this.subtotal() * this.cgstPercent() / 100));
   readonly sgstAmount = computed(() => Math.round(this.subtotal() * this.sgstPercent() / 100));
   readonly totalAmount = computed(() => this.subtotal() + this.cgstAmount() + this.sgstAmount() + this.roundOff());
@@ -743,18 +754,41 @@ export class TaxInvoicePage {
 
   /**
    * Parent-only serial number map. Child rows keep their parent's S.No (used
-   * for the report/PDF). The editor itself leaves the S.No cell blank for
-   * children by checking row.parentRowId in the template.
+   * for the report/PDF). Section-heading parents are excluded so the S.No
+   * column only increments for actual billable parent rows.
    */
   readonly parentSnoMap = computed<Record<string, number>>(() => {
     const map: Record<string, number> = {};
     let counter = 0;
     for (const row of this.invoiceRows()) {
-      if (!row.parentRowId) counter += 1;
+      if (!row.parentRowId && !this.isSectionHeading(row)) counter += 1;
       map[row.id] = counter;
     }
     return map;
   });
+
+  readonly parentIds = computed(() => {
+    const ids = new Set<string>();
+    for (const row of this.invoiceRows()) {
+      if (row.parentRowId) ids.add(row.parentRowId);
+    }
+    return ids;
+  });
+
+  /**
+   * A parent row is treated as a section heading when it has no billable
+   * values (no unit, qty, rate or amount). Section headings are not assigned
+   * an S.No, are excluded from subtotals, GST and the final total, and
+   * never render Unit/Qty/Rate/Amount inputs in the editable table.
+   */
+  isSectionHeading(row: TaxInvoiceRow | any): boolean {
+    if (!row || row.parentRowId) return false;
+    const unit = (row.unit || "").trim();
+    const qty = Number(row.qty) || 0;
+    const rate = Number(row.rate) || 0;
+    const amount = Number(row.amount) || 0;
+    return !unit && qty === 0 && rate === 0 && amount === 0;
+  }
 
   readonly currentInvoiceForPreview = computed<TaxInvoice | null>(() => {
     if (!this.editingInvoice()) return null;
@@ -770,7 +804,7 @@ export class TaxInvoicePage {
       clientAddress: this.clientAddress,
       clientState: this.clientState,
       clientGstin: this.clientGstin,
-      items: this.invoiceRows(),
+      items: this.invoiceRows().map(r => ({ ...r, isSectionHeading: this.isSectionHeading(r) })) as any,
       customColumns: this.customColumns(),
       subtotal: this.subtotal(),
       cgstPercent: this.cgstPercent(),
@@ -891,7 +925,7 @@ export class TaxInvoicePage {
           clientState: i.clientState || "",
           clientGstin: i.clientGstin || "",
           items: (i.items || []).map((it: any, idx: number) => ({
-            id: String(idx),
+            id: it.id || String(idx),
             sno: it.sno ?? idx + 1,
             description: it.description || "",
             hsnCode: it.hsnCode || "",
@@ -900,6 +934,7 @@ export class TaxInvoicePage {
             rate: it.rate ?? 0,
             amount: it.amount ?? 0,
             isCustom: it.isCustom ?? false,
+            parentRowId: it.parentRowId || null,
           })),
           customColumns: i.customColumns || [],
           subtotal: i.subtotal ?? 0,
@@ -1085,7 +1120,7 @@ export class TaxInvoicePage {
   addSectionHeader() {
     this.invoiceRows.update(rows => [
       ...rows,
-      { id: `SEC-${Date.now()}`, sno: 0, description: "---", unit: "", qty: 0, rate: 0, amount: 0, isCustom: true },
+      { id: `SEC-${Date.now()}`, sno: 0, description: "", hsnCode: "", unit: "", qty: null as any, rate: null as any, amount: null as any, isCustom: false, parentRowId: null },
     ]);
   }
 
@@ -1176,7 +1211,7 @@ export class TaxInvoicePage {
   }
 
   private newRow(): TaxInvoiceRow {
-    return { id: `ROW-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, sno: 0, description: "", hsnCode: "", unit: "", qty: 1, rate: 0, amount: 0, parentRowId: null };
+    return { id: `ROW-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, sno: 0, description: "", hsnCode: "", unit: "", qty: null as any, rate: null as any, amount: null as any, parentRowId: null };
   }
 
   private findClientIdByName(name: string): string | null {
@@ -1186,25 +1221,62 @@ export class TaxInvoicePage {
 
   exportToExcel() {
     const rows = this.invoiceRows();
-    const headers = ["S.No", "Description", "HSN Code", "Unit", "Qty", "Rate", "Amount", ...this.customColumns()];
+    const headers = ["S.No", "Description", "HSN Code", "Unit", "Qty", "Rate/Qty", "Amount", ...this.customColumns()];
+    const pad = (count: number) => Array(Math.max(0, count)).fill("").join(",");
+    const emptyColsForTotal = pad(headers.length - 2);
+
+    const addrParts = (this.clientAddress || "").split('\n');
+    const addrLine1 = addrParts[0] || "";
+    const addrLine2 = addrParts.slice(1).join(' ') || "";
+
     const csvRows = [
+      `${pad(headers.length - 1)}GSTIN : ${this.companyProfile().gstin || ""}`,
+      `${pad(Math.floor(headers.length / 2))}Tax Invoice`,
+      ``,
+      `${pad(headers.length - 2)}Invoice No : ${this.currentInvoiceNumber()}`,
+      `${pad(headers.length - 2)}Invoice Date : ${this.invoiceDate()}`,
+      ``,
+      `Billing Details`,
+      `Name,${this.clientName}`,
+      `Address,${addrLine1.replace(/,/g, '')}`,
+      ...(addrLine2 ? [`       ,${addrLine2.replace(/,/g, '')}`] : []),
+      ``,
+      `State,${this.clientState}`,
+      `GSTIN,${this.clientGstin}`,
+      ``,
+      `Subject :,`,
+      ``,
       headers.join(","),
-      ...rows.map((row, i) => {
-        const indent = row.parentRowId ? "    ↳ " : "";
+      ...rows.map((row) => {
+        const isHeading = this.isSectionHeading(row) || this.parentIds().has(row.id);
+        const indent = row.parentRowId ? "    * " : "";
+        const sno = isHeading || row.parentRowId ? "" : (this.parentSnoMap()[row.id] || "");
         const description = `"${indent}${(row.description || "").replace(/"/g, '""')}"`;
-        const values = [i + 1, description, `"${row.hsnCode || ""}"`, `"${row.unit}"`, row.qty, row.rate, row.amount];
+        const hsn = isHeading ? "" : `"${row.hsnCode || ""}"`;
+        const unit = isHeading ? "" : `"${row.unit || ""}"`;
+        const qty = isHeading ? "" : (row.qty || 0);
+        const rate = isHeading ? "" : (row.rate || 0);
+        const amount = isHeading ? "" : (row.amount || 0);
+        
+        const values = [sno, description, hsn, unit, qty, rate, amount];
         this.customColumns().forEach(col => {
-          values.push(`"${(row as any)[col] || ""}"`);
+          values.push(isHeading ? "" : `"${(row as any)[col] || ""}"`);
         });
         return values.join(",");
       }),
-      "",
-      `Subtotal,,,,,"${this.subtotal()}"`,
-      `CGST @${this.cgstPercent()}%,,,,,${this.cgstAmount()}`,
-      `SGST @${this.sgstPercent()}%,,,,,${this.sgstAmount()}`,
-      `Round Off,,,,,"${this.roundOff()}"`,
-      `Total,,,,,"${this.totalAmount()}"`,
-      `Amount in Words: "${this.amountInWords()}"`,
+      ``,
+      `${emptyColsForTotal},,${this.subtotal()}`,
+      `${emptyColsForTotal},SGST ${this.sgstPercent()}%,${this.sgstAmount()}`,
+      `${emptyColsForTotal},CGST ${this.cgstPercent()}%,${this.cgstAmount()}`,
+      `${emptyColsForTotal},TOTAL AMOUNT,${this.totalAmount()}`,
+      ``,
+      `Total items : ${this.invoiceRows().filter(r => !this.isSectionHeading(r) && !this.parentIds().has(r.id)).length}   Total amount (in words): INR ${this.amountInWords()} Only`,
+      `Bank Details : ${pad(headers.length - 4)} For ${this.companyProfile().name || ""}`,
+      ``,
+      `Bank,${this.companyProfile().bankName || ""}`,
+      `Account,${this.companyProfile().accountNumber || ""}`,
+      `IFSC Code,${this.companyProfile().ifsc || ""} ${pad(headers.length - 4)} Authorized Signatory`,
+      `Branch,${this.companyProfile().branch || ""} ${pad(headers.length - 4)} (Managing Director)`
     ];
 
     const csvContent = csvRows.join("\n");
