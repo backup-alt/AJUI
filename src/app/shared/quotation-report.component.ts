@@ -15,6 +15,8 @@ export interface QuotationReportItem {
   rate?: number;
   amount?: number;
   isCustom?: boolean;
+  customValues?: Record<string, string>;
+  [key: string]: any;
 }
 
 export interface QuotationReportData {
@@ -25,6 +27,7 @@ export interface QuotationReportData {
   clientState: string;
   clientGstin: string;
   items: QuotationReportItem[];
+  customColumns: string[];
   subtotal: number;
   cgstPercent: number;
   sgstPercent: number;
@@ -109,11 +112,13 @@ export interface QuotationReportData {
                 <tr>
                   <th class="col-sno">S.No</th>
                   <th class="col-desc">Description of Goods / Services</th>
-                  <th class="col-hsn">HSN Code</th>
                   <th class="col-unit">Unit</th>
                   <th class="col-qty">Qty</th>
                   <th class="col-rate">Rate (₹)</th>
                   <th class="col-amount">Amount (₹)</th>
+                  @for (col of customColumns; track col) {
+                    <th class="col-custom">{{ col }}</th>
+                  }
                 </tr>
               </thead>
               <tbody>
@@ -122,21 +127,23 @@ export interface QuotationReportData {
                     <tr>
                       <td class="col-sno cell-center">{{ item.sno || $index + 1 }}</td>
                       <td class="col-desc">{{ item.description }}</td>
-                      <td class="col-hsn cell-center">{{ item.hsnCode || '—' }}</td>
                       <td class="col-unit cell-center">{{ item.unit || '—' }}</td>
                       <td class="col-qty cell-right">{{ item.qty || 0 }}</td>
                       <td class="col-rate cell-right">{{ formatRupee(item.rate) }}</td>
                       <td class="col-amount cell-right">{{ formatRupee(item.amount) }}</td>
+                      @for (col of customColumns; track col) {
+                        <td class="col-custom">{{ item[col] || '—' }}</td>
+                      }
                     </tr>
                   } @else {
                     <tr class="section-divider">
-                      <td colspan="7" class="section-header">{{ stripSectionPrefix(item.description || '') }}</td>
+                      <td [attr.colspan]="6 + customColumns.length" class="section-header">{{ stripSectionPrefix(item.description || '') }}</td>
                     </tr>
                   }
                 }
                 @if (items.length === 0) {
                   <tr>
-                    <td colspan="7" class="empty-row">No items found.</td>
+                    <td [attr.colspan]="6 + customColumns.length" class="empty-row">No items found.</td>
                   </tr>
                 }
               </tbody>
@@ -262,12 +269,12 @@ export interface QuotationReportData {
     .inv-table .section-header { font-weight: 700; font-size: 12px; color: #1a2540; padding: 6px 10px; text-transform: uppercase; letter-spacing: 0.5px; }
     .inv-table .empty-row { text-align: center; color: #94a3b8; font-style: italic; }
     .col-sno { width: 5%; text-align: center; }
-    .col-desc { width: 40%; }
-    .col-hsn { width: 10%; text-align: center; }
+    .col-desc { width: 30%; }
     .col-unit { width: 8%; text-align: center; }
     .col-qty { width: 7%; text-align: right; }
     .col-rate { width: 15%; text-align: right; }
     .col-amount { width: 15%; text-align: right; }
+    .col-custom { min-width: 70px; text-align: left; }
     .cell-center { text-align: center; }
     .cell-right { text-align: right; }
     .inv-summary-section {
@@ -322,6 +329,10 @@ export class QuotationReportComponent {
 
   get items() {
     return this.quotationData?.items || [];
+  }
+
+  get customColumns() {
+    return this.quotationData?.customColumns || [];
   }
 
   formatRupee(amount: number | undefined): string {

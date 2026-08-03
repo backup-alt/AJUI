@@ -1121,16 +1121,23 @@ readonly savingPdf = signal(false);
     clientAddress: this.clientAddress,
     clientState: this.clientState,
     clientGstin: this.clientGstin,
-    items: this.quotationRows().map((row, idx) => ({
-      id: row.id || String(idx),
-      description: row.description || "",
-      hsnCode: (row as any).hsnCode || "",
-      unit: row.unit || "",
-      qty: row.qty || 0,
-      rate: row.rate || 0,
-      amount: row.amount || 0,
-      isCustom: row.isCustom ?? false,
-    })),
+    items: this.quotationRows().map((row, idx) => {
+      const customValues: Record<string, string> = {};
+      this.customColumns().forEach(col => { customValues[col] = (row as any)[col] || ""; });
+      return {
+        ...customValues,
+        id: row.id || String(idx),
+        description: row.description || "",
+        hsnCode: (row as any).hsnCode || "",
+        unit: row.unit || "",
+        qty: row.qty || 0,
+        rate: row.rate || 0,
+        amount: row.amount || 0,
+        isCustom: row.isCustom ?? false,
+        customValues,
+      };
+    }),
+    customColumns: this.customColumns(),
     subtotal: this.subtotal(),
     cgstPercent: this.cgstPercent(),
     sgstPercent: this.sgstPercent(),
@@ -1285,7 +1292,7 @@ readonly savingPdf = signal(false);
 
   editQuotation(quote: Quotation) {
     this.editingQuoteId.set(quote.id);
-    this.quotationRows.set(quote.items.map(item => ({ ...item })));
+    this.quotationRows.set(quote.items.map(item => ({ ...item, ...((item as any).customValues || {}) })));
     this.customColumns.set(quote.customColumns || []);
     this.clientName = quote.clientName;
     this.clientAddress = quote.clientAddress;
@@ -1394,14 +1401,19 @@ readonly savingPdf = signal(false);
     this.savingQuote.set(true);
 
     const validItems = this.quotationRows()
-      .map((row) => ({
-        description: (row.description || "").trim(),
-        unit: row.unit || "",
-        qty: Number(row.qty) || 0,
-        rate: Number(row.rate) || 0,
-        amount: Number(row.amount) || 0,
-        isCustom: row.isCustom ?? false,
-      }))
+      .map((row) => {
+        const customValues: Record<string, string> = {};
+        this.customColumns().forEach(col => { customValues[col] = (row as any)[col] || ""; });
+        return {
+          description: (row.description || "").trim(),
+          unit: row.unit || "",
+          qty: Number(row.qty) || 0,
+          rate: Number(row.rate) || 0,
+          amount: Number(row.amount) || 0,
+          isCustom: row.isCustom ?? false,
+          customValues,
+        };
+      })
       .filter((row) => row.description.length > 0);
 
     const quotationData = {

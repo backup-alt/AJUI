@@ -9,6 +9,7 @@ const quotationItemSchema = z.object({
   rate: z.coerce.number().min(0).default(0),
   amount: z.coerce.number().min(0).default(0),
   isCustom: z.boolean().optional().default(false),
+  customValues: z.record(z.string()).optional().default({}),
 });
 
 export const createQuotationSchema = z.object({

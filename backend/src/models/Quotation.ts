@@ -10,6 +10,7 @@ export interface IQuotationItem extends Document {
   rate: number;
   amount: number;
   isCustom?: boolean;
+  customValues?: Record<string, string>;
 }
 
 export interface IQuotation extends Document {
@@ -50,6 +51,7 @@ const quotationItemSchema = new Schema<IQuotationItem>(
     rate: { type: Number, default: 0 },
     amount: { type: Number, default: 0 },
     isCustom: { type: Boolean, default: false },
+    customValues: { type: Schema.Types.Mixed, default: {} },
   },
   { _id: false }
 );

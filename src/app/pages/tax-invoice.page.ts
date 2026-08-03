@@ -239,6 +239,9 @@ function numberToWords(num: number): string {
                           <th class="col-qty">Qty</th>
                           <th class="col-rate">Rate / Item (₹)</th>
                           <th class="col-amount">Amount (₹)</th>
+                          @for (col of customColumns(); track col) {
+                            <th class="col-custom">{{ col }} <button type="button" class="remove-col-btn" (click)="removeCustomColumn(col)">×</button></th>
+                          }
                           <th class="col-action"></th>
                         </tr>
                       </thead>
@@ -284,16 +287,31 @@ function numberToWords(num: number): string {
                               <input type="number" [(ngModel)]="row.rate" (ngModelChange)="recalc(row)" min="0" class="table-input narrow cell-right" />
                             </td>
                             <td class="col-amount cell-right">{{ formatMoney(row.amount) }}</td>
+                            @for (col of customColumns(); track col) {
+                              <td class="col-custom">
+                                <input type="text" [(ngModel)]="$any(row)[col]" placeholder="" class="table-input" />
+                              </td>
+                            }
                             <td class="col-action">
                               <button type="button" class="icon-btn danger" (click)="removeRow(row.id)">×</button>
                             </td>
                           </tr>
                           @if (i === invoiceRows().length - 1) {
                             <tr class="add-row-tr">
-                              <td colspan="8">
+                              <td [attr.colspan]="8 + customColumns().length">
                                 <button type="button" class="add-item-btn" (click)="addRow()">
                                   <ion-icon name="add-outline"></ion-icon> Add Item
                                 </button>
+                                <button type="button" class="add-item-btn" (click)="showAddColumnInput.set(true)">
+                                  <ion-icon name="add-outline"></ion-icon> Add Custom Column
+                                </button>
+                                @if (showAddColumnInput()) {
+                                  <span class="add-col-inline">
+                                    <input type="text" [(ngModel)]="newColumnName" placeholder="Column name" class="col-name-input" />
+                                    <button type="button" class="btn-confirm" (click)="addCustomColumn()">Add</button>
+                                    <button type="button" class="btn-cancel" (click)="showAddColumnInput.set(false); newColumnName.set('')">Cancel</button>
+                                  </span>
+                                }
                               </td>
                             </tr>
                           }
@@ -308,15 +326,6 @@ function numberToWords(num: number): string {
                         <div class="amount-words-block">
                           <span class="totals-label">Amount Chargeable (in words):</span>
                           <strong class="amount-words">{{ amountInWords() }}</strong>
-                        </div>
-                        <div class="custom-columns-block">
-                          <div class="section-label" style="margin-top:16px">Custom Columns</div>
-                          @for (col of customColumns(); track col) {
-                            <div class="custom-col-row">
-                              <span class="custom-col-name">{{ col }}</span>
-                              <input type="text" class="table-input" placeholder="Value" />
-                            </div>
-                          }
                         </div>
                       </div>
                       <div class="totals-right">
@@ -470,6 +479,21 @@ function numberToWords(num: number): string {
     .custom-columns-block { }
     .custom-col-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
     .custom-col-name { font-size: 12px; color: #64748b; min-width: 120px; }
+    .col-custom { min-width: 90px; }
+    .col-custom .remove-col-btn {
+      margin-left: 4px;
+      font-size: 14px;
+      vertical-align: middle;
+      background: none;
+      border: none;
+      color: #dc2626;
+      cursor: pointer;
+      padding: 0;
+    }
+    .add-col-inline { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+    .col-name-input { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+    .btn-confirm { padding: 7px 12px; background: #2c5cff; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .btn-cancel { padding: 7px 12px; background: #f1f5f9; color: #64748b; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
     .client-search-wrapper { position: relative; }
     .client-search-input { width: 100%; padding: 7px 10px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #1e293b; background: #fff; outline: none; transition: border-color 140ms; box-sizing: border-box; }
     .client-search-input:focus { border-color: #2c5cff; }
@@ -509,6 +533,8 @@ export class TaxInvoicePage {
 
   readonly invoiceRows = signal<TaxInvoiceRow[]>([]);
   readonly customColumns = signal<string[]>([]);
+  readonly showAddColumnInput = signal(false);
+  readonly newColumnName = signal("");
 
   readonly defaultUnits = ["Nos","Bag","Kg","Ton","Load","Cubic Feet","Cubic Meter","Meter","Litre","Roll","Bundle","Piece","Box"];
   readonly customUnits = signal<string[]>(this.loadCustomUnits());
@@ -760,6 +786,8 @@ export class TaxInvoicePage {
     this.editingInvoiceId.set(null);
     this.invoiceRows.set([this.newRow()]);
     this.customColumns.set([]);
+    this.showAddColumnInput.set(false);
+    this.newColumnName.set("");
     this.clientName = "";
     this.clientAddress = "";
     this.clientState = "Tamil Nadu";
@@ -774,8 +802,12 @@ export class TaxInvoicePage {
 
   editInvoice(inv: TaxInvoice) {
     this.editingInvoiceId.set(inv.id);
-    this.invoiceRows.set(inv.items.length > 0 ? inv.items.map((it, idx) => ({ ...it, id: String(idx) })) : [this.newRow()]);
+    const rows = inv.items.length > 0 ? inv.items.map((it, idx) => ({ ...it, id: String(idx) })) : [this.newRow()];
+    this.mergeCustomValues(rows, inv.invoiceNumber);
+    this.invoiceRows.set(rows);
     this.customColumns.set(inv.customColumns || []);
+    this.showAddColumnInput.set(false);
+    this.newColumnName.set("");
     this.clientName = inv.clientName;
     this.clientAddress = inv.clientAddress;
     this.clientState = inv.clientState || "Tamil Nadu";
@@ -790,7 +822,9 @@ export class TaxInvoicePage {
 
   previewInvoice(inv: TaxInvoice) {
     this.editingInvoiceId.set(inv.id);
-    this.invoiceRows.set(inv.items);
+    const rows = inv.items.map((it) => ({ ...it }));
+    this.mergeCustomValues(rows, inv.invoiceNumber);
+    this.invoiceRows.set(rows);
     this.customColumns.set(inv.customColumns || []);
     this.clientName = inv.clientName;
     this.clientAddress = inv.clientAddress;
@@ -812,6 +846,8 @@ export class TaxInvoicePage {
 
   deleteInvoice(id: string) {
     if (!confirm("Delete this invoice?")) return;
+    const inv = this.data.taxInvoiceById(id);
+    if (inv?.invoiceNumber) this.removeStoredCustomValues(inv.invoiceNumber);
     this.data.deleteTaxInvoice(id);
     this.loadInvoicesFromBackend();
   }
@@ -829,6 +865,55 @@ export class TaxInvoicePage {
 
   removeRow(id: string) {
     this.invoiceRows.update(rows => rows.filter(r => r.id !== id));
+  }
+
+  addCustomColumn() {
+    const name = this.newColumnName().trim();
+    if (!name) return;
+    if (this.customColumns().includes(name)) return;
+    this.customColumns.update(cols => [...cols, name]);
+    this.newColumnName.set("");
+    this.showAddColumnInput.set(false);
+  }
+
+  removeCustomColumn(colName: string) {
+    this.customColumns.update(cols => cols.filter(c => c !== colName));
+    this.invoiceRows.update(rows =>
+      rows.map(row => {
+        const { [colName]: _, ...rest } = row as any;
+        return rest as TaxInvoiceRow;
+      })
+    );
+  }
+
+  private loadCustomValues(docNumber: string): Array<Record<string, string>> {
+    try {
+      const store = JSON.parse(localStorage.getItem("ajui_custom_values") || "{}");
+      return store?.[docNumber] || [];
+    } catch { return []; }
+  }
+
+  private persistCustomValues(docNumber: string, values: Array<Record<string, string>>) {
+    try {
+      const store = JSON.parse(localStorage.getItem("ajui_custom_values") || "{}") || {};
+      store[docNumber] = values;
+      localStorage.setItem("ajui_custom_values", JSON.stringify(store));
+    } catch { /* ignore storage errors */ }
+  }
+
+  private removeStoredCustomValues(docNumber: string) {
+    try {
+      const store = JSON.parse(localStorage.getItem("ajui_custom_values") || "{}") || {};
+      delete store[docNumber];
+      localStorage.setItem("ajui_custom_values", JSON.stringify(store));
+    } catch { /* ignore storage errors */ }
+  }
+
+  private mergeCustomValues(rows: TaxInvoiceRow[], docNumber: string) {
+    const values = this.loadCustomValues(docNumber);
+    rows.forEach((row, i) => {
+      if (values[i]) Object.assign(row, values[i]);
+    });
   }
 
   private loadCustomUnits(): string[] {
@@ -897,6 +982,13 @@ export class TaxInvoicePage {
         isCustom: row.isCustom ?? false,
       }))
       .filter(row => row.description.length > 0 || row.isCustom);
+
+    const customValues = this.invoiceRows().map((row) => {
+      const values: Record<string, string> = {};
+      this.customColumns().forEach(col => { values[col] = (row as any)[col] || ""; });
+      return values;
+    });
+    this.persistCustomValues(this.currentInvoiceNumber(), customValues);
 
     const payload = {
       date: this.invoiceDate(),
