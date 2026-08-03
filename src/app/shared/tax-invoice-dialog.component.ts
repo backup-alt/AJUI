@@ -91,7 +91,7 @@ import { jsPDF } from "jspdf";
                 @for (item of items; track item.id || $index) {
                   @if (item.description && !item.description.startsWith('---')) {
                     <tr [class.sub-row]="!!item.parentRowId">
-                      <td class="col-sno cell-center">{{ item.sno || $index + 1 }}</td>
+                      <td class="col-sno cell-center">{{ item.parentRowId ? '' : (item.sno || parentSno($index)) }}</td>
                       <td class="col-desc">
                         @if (item.parentRowId) {
                           <span class="report-tree-icon" aria-hidden="true">↳</span>
@@ -257,7 +257,7 @@ import { jsPDF } from "jspdf";
     .inv-table .section-header { font-weight: 700; font-size: 12px; color: #1a2540; padding: 6px 10px; text-transform: uppercase; letter-spacing: 0.5px; }
     .inv-table .empty-row { text-align: center; color: #94a3b8; font-style: italic; }
     .inv-table tr.sub-row td { background: #f8fafc; }
-    .inv-table tr.sub-row .col-desc { padding-left: 28px; font-style: italic; }
+    .inv-table tr.sub-row .col-desc { padding-left: 30px; font-style: italic; }
     .report-tree-icon {
       color: #64748b; font-size: 12px; margin-right: 6px;
       font-family: 'Segoe UI Symbol', 'Apple Symbols', sans-serif;
@@ -354,6 +354,21 @@ export class TaxInvoiceDialogComponent {
 
   stripSectionPrefix(desc: string): string {
     return desc.replace(/^---\s*/, "");
+  }
+
+  /**
+   * Returns the parent-only serial number for the item at the given index.
+   * Child rows (parentRowId set) are excluded from the counter so the S.No
+   * column only increments once per parent group.
+   */
+  parentSno(index: number): number {
+    let counter = 0;
+    const list = this.items as any[];
+    for (let i = 0; i <= index; i++) {
+      const it = list[i];
+      if (!it || !it.parentRowId) counter += 1;
+    }
+    return counter;
   }
 
   closeIfOverlay(event: MouseEvent) {

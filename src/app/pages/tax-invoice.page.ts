@@ -231,6 +231,19 @@ function numberToWords(num: number): string {
                   <div class="items-section">
                     <div class="section-label">Items</div>
                     <table class="items-table">
+                      <colgroup>
+                        <col class="col-col-sno" />
+                        <col class="col-col-desc" />
+                        <col class="col-col-hsn" />
+                        <col class="col-col-unit" />
+                        <col class="col-col-qty" />
+                        <col class="col-col-rate" />
+                        <col class="col-col-amount" />
+                        @for (col of customColumns(); track col) {
+                          <col class="col-col-custom" />
+                        }
+                        <col class="col-col-action" />
+                      </colgroup>
                       <thead>
                         <tr>
                           <th class="col-sno">S.No</th>
@@ -249,7 +262,7 @@ function numberToWords(num: number): string {
                       <tbody>
                         @for (row of invoiceRows(); track row.id; let i = $index) {
                           <tr [class.sub-row]="!!row.parentRowId">
-                            <td class="col-sno cell-center">{{ i + 1 }}</td>
+                            <td class="col-sno cell-center">{{ row.parentRowId ? '' : parentSnoMap()[row.id] }}</td>
                             <td class="col-desc">
                               <div class="desc-cell" [class.is-sub]="!!row.parentRowId">
                                 @if (row.parentRowId) {
@@ -482,22 +495,31 @@ function numberToWords(num: number): string {
     .form-field input, .form-field textarea, .form-field select { padding: 7px 10px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #1e293b; background: #fff; outline: none; transition: border-color 140ms; }
     .form-field input:focus, .form-field textarea:focus, .form-field select:focus { border-color: #2c5cff; }
     .items-section { margin-bottom: 20px; }
-    .items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .items-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+    .items-table col.col-col-sno { width: 50px; }
+    .items-table col.col-col-desc { width: auto; }
+    .items-table col.col-col-hsn { width: 90px; }
+    .items-table col.col-col-unit { width: 90px; }
+    .items-table col.col-col-qty { width: 80px; }
+    .items-table col.col-col-rate { width: 110px; }
+    .items-table col.col-col-amount { width: 120px; }
+    .items-table col.col-col-custom { width: 110px; }
+    .items-table col.col-col-action { width: 96px; }
     .items-table th { background: #1a2540; color: #fff; padding: 7px 8px; text-align: left; font-size: 11px; }
-    .items-table td { padding: 4px 6px; border: 1px solid #cbd5e1; vertical-align: middle; }
-    .col-sno { width: 5%; text-align: center; }
-    .col-desc { width: 35%; }
-    .col-hsn { width: 10%; }
-    .col-unit { width: 8%; }
-    .col-qty { width: 8%; }
-    .col-rate { width: 14%; }
-    .col-amount { width: 14%; }
-    .col-action { width: 6%; text-align: center; }
+    .items-table td { padding: 4px 6px; border: 1px solid #cbd5e1; vertical-align: middle; box-sizing: border-box; }
+    .col-sno { text-align: center; }
+    .col-desc { }
+    .col-hsn { text-align: center; }
+    .col-unit { }
+    .col-qty { }
+    .col-rate { }
+    .col-amount { }
+    .col-action { text-align: center; }
     .cell-center { text-align: center; }
     .cell-right { text-align: right; }
-    .table-input { width: 100%; padding: 5px 6px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; background: transparent; outline: none; transition: background 140ms; }
+    .table-input { width: 100%; padding: 5px 6px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; background: transparent; outline: none; transition: background 140ms; box-sizing: border-box; }
     .table-input:focus { background: #f0f6ff; border-color: #2c5cff; }
-    .table-input.narrow { width: 90px; }
+    .table-input.narrow { width: 100%; }
     .add-row-tr td { border: none; padding: 6px 8px; }
     .add-item-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #f0f6ff; color: #2c5cff; border: 1.5px dashed #2c5cff; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 8px; }
     .add-item-btn.secondary { color: #64748b; border-color: #94a3b8; background: none; }
@@ -552,8 +574,9 @@ function numberToWords(num: number): string {
     .row-action-item:hover { background: #f1f5f9; }
     .row-action-item ion-icon { font-size: 16px; color: #475569; }
     tr.sub-row td { background: #f8fafc; }
-    tr.sub-row .col-desc { padding-left: 28px; }
-    .desc-cell { display: flex; align-items: center; gap: 6px; }
+    tr.sub-row .col-desc { padding-left: 30px; }
+    .desc-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .desc-cell .table-input { flex: 1; min-width: 0; }
     .desc-cell.is-sub .table-input { font-style: italic; }
     .tree-icon {
       color: #64748b; font-size: 14px; line-height: 1; flex-shrink: 0;
@@ -702,6 +725,21 @@ export class TaxInvoicePage {
   readonly sgstAmount = computed(() => Math.round(this.subtotal() * this.sgstPercent() / 100));
   readonly totalAmount = computed(() => this.subtotal() + this.cgstAmount() + this.sgstAmount() + this.roundOff());
   readonly amountInWords = computed(() => numberToWords(Math.round(this.totalAmount())));
+
+  /**
+   * Parent-only serial number map. Child rows keep their parent's S.No (used
+   * for the report/PDF). The editor itself leaves the S.No cell blank for
+   * children by checking row.parentRowId in the template.
+   */
+  readonly parentSnoMap = computed<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    let counter = 0;
+    for (const row of this.invoiceRows()) {
+      if (!row.parentRowId) counter += 1;
+      map[row.id] = counter;
+    }
+    return map;
+  });
 
   readonly currentInvoiceForPreview = computed<TaxInvoice | null>(() => {
     if (!this.editingInvoice()) return null;

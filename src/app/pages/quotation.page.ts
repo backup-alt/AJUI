@@ -220,6 +220,18 @@ function numberToWords(num: number): string {
                   <!-- Items Table -->
                   <div class="items-section">
                     <table class="items-table" id="quotation-items-table">
+                      <colgroup>
+                        <col class="col-col-sno" />
+                        <col class="col-col-desc" />
+                        <col class="col-col-unit" />
+                        <col class="col-col-qty" />
+                        <col class="col-col-rate" />
+                        <col class="col-col-amount" />
+                        @for (col of customColumns(); track col) {
+                          <col class="col-col-custom" />
+                        }
+                        <col class="col-col-action" />
+                      </colgroup>
                       <thead>
                         <tr>
                           <th class="col-sno">S.No</th>
@@ -237,7 +249,7 @@ function numberToWords(num: number): string {
                       <tbody>
                         @for (row of quotationRows(); track row.id; let i = $index) {
                           <tr [class.sub-row]="!!row.parentRowId">
-                            <td class="col-sno">{{ i + 1 }}</td>
+                            <td class="col-sno">{{ row.parentRowId ? '' : parentSnoMap()[row.id] }}</td>
                             <td class="col-desc">
                               <div class="desc-cell" [class.is-sub]="!!row.parentRowId">
                                 @if (row.parentRowId) {
@@ -675,11 +687,20 @@ function numberToWords(num: number): string {
     }
     .items-table {
       width: 100%;
+      table-layout: fixed;
       border-collapse: collapse;
       border: 1px solid #cfd8e6;
       border-radius: 8px;
       overflow: hidden;
     }
+    .items-table col.col-col-sno { width: 50px; }
+    .items-table col.col-col-desc { width: auto; }
+    .items-table col.col-col-unit { width: 90px; }
+    .items-table col.col-col-qty { width: 90px; }
+    .items-table col.col-col-rate { width: 110px; }
+    .items-table col.col-col-amount { width: 120px; }
+    .items-table col.col-col-custom { width: 110px; }
+    .items-table col.col-col-action { width: 96px; }
     .items-table th {
       background: #eef4ff;
       color: #002263;
@@ -695,6 +716,7 @@ function numberToWords(num: number): string {
       padding: 6px 8px;
       border-bottom: 1px solid #e8edf4;
       vertical-align: middle;
+      box-sizing: border-box;
     }
     .items-table tr:last-child td { border-bottom: none; }
     .col-sno { width: 50px; text-align: center; }
@@ -729,8 +751,9 @@ function numberToWords(num: number): string {
     .row-action-item:hover { background: #f1f5f9; }
     .row-action-item ion-icon { font-size: 16px; color: #475569; }
     .sub-row td { background: #f8fafc; }
-    .sub-row .col-desc { padding-left: 28px; }
-    .desc-cell { display: flex; align-items: center; gap: 6px; }
+    .sub-row .col-desc { padding-left: 30px; }
+    .desc-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .desc-cell .table-input { flex: 1; min-width: 0; }
     .desc-cell.is-sub .table-input { font-style: italic; }
     .tree-icon {
       color: #64748b; font-size: 14px; line-height: 1; flex-shrink: 0;
@@ -1199,40 +1222,59 @@ readonly savingPdf = signal(false);
 
   readonly amountInWords = computed(() => numberToWords(Math.round(this.totalAmount())));
 
-  readonly reportQuotation = computed<QuotationReportData>(() => ({
-    quotationNumber: this.currentQuoteNumber(),
-    date: this.quotationDate(),
-    clientName: this.clientName,
-    clientAddress: this.clientAddress,
-    clientState: this.clientState,
-    clientGstin: this.clientGstin,
-    items: this.quotationRows().map((row, idx) => {
-      const customValues: Record<string, string> = {};
-      this.customColumns().forEach(col => { customValues[col] = (row as any)[col] || ""; });
-      return {
-        ...customValues,
-        id: row.id || String(idx),
-        description: row.description || "",
-        hsnCode: (row as any).hsnCode || "",
-        unit: row.unit || "",
-        qty: row.qty || 0,
-        rate: row.rate || 0,
-        amount: row.amount || 0,
-        isCustom: row.isCustom ?? false,
-        parentRowId: row.parentRowId || null,
-        customValues,
-      };
-    }),
-    customColumns: this.customColumns(),
-    subtotal: this.subtotal(),
-    cgstPercent: this.cgstPercent(),
-    sgstPercent: this.sgstPercent(),
-    cgstAmount: this.cgstAmount(),
-    sgstAmount: this.sgstAmount(),
-    roundOff: this.roundOff(),
-    totalAmount: this.totalAmount(),
-    amountInWords: this.amountInWords(),
-  }));
+  /**
+   * Parent-only serial number map. Child rows keep their parent's S.No (used
+   * for the report/PDF). The editor itself leaves the S.No cell blank for
+   * children by checking row.parentRowId in the template.
+   */
+  readonly parentSnoMap = computed<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    let counter = 0;
+    for (const row of this.quotationRows()) {
+      if (!row.parentRowId) counter += 1;
+      map[row.id] = counter;
+    }
+    return map;
+  });
+
+  readonly reportQuotation = computed<QuotationReportData>(() => {
+    const snoMap = this.parentSnoMap();
+    return {
+      quotationNumber: this.currentQuoteNumber(),
+      date: this.quotationDate(),
+      clientName: this.clientName,
+      clientAddress: this.clientAddress,
+      clientState: this.clientState,
+      clientGstin: this.clientGstin,
+      items: this.quotationRows().map((row, idx) => {
+        const customValues: Record<string, string> = {};
+        this.customColumns().forEach(col => { customValues[col] = (row as any)[col] || ""; });
+        return {
+          ...customValues,
+          id: row.id || String(idx),
+          sno: row.parentRowId ? undefined : snoMap[row.id],
+          description: row.description || "",
+          hsnCode: (row as any).hsnCode || "",
+          unit: row.unit || "",
+          qty: row.qty || 0,
+          rate: row.rate || 0,
+          amount: row.amount || 0,
+          isCustom: row.isCustom ?? false,
+          parentRowId: row.parentRowId || null,
+          customValues,
+        };
+      }),
+      customColumns: this.customColumns(),
+      subtotal: this.subtotal(),
+      cgstPercent: this.cgstPercent(),
+      sgstPercent: this.sgstPercent(),
+      cgstAmount: this.cgstAmount(),
+      sgstAmount: this.sgstAmount(),
+      roundOff: this.roundOff(),
+      totalAmount: this.totalAmount(),
+      amountInWords: this.amountInWords(),
+    };
+  });
 
   readonly previewQuotation = computed<QuotationReportData>(() => this.reportQuotation());
 
