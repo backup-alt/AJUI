@@ -5,12 +5,38 @@ import { paginateByCursor } from "../utils/cursor-pagination.js";
 
 const MAX_CREATE_ATTEMPTS = 3;
 
+/**
+ * Normalise every line item so that the client-generated `id` and the
+ * optional `parentRowId` are always persisted verbatim, regardless of any
+ * Mongoose update casting quirks. This guarantees the parent / child
+ * hierarchy survives a save → reload round-trip.
+ */
+function normalizeItems(items: any[] | undefined): any[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((raw) => {
+    const item = (raw && typeof raw === "object") ? raw : {};
+    return {
+      ...item,
+      id: item.id != null ? String(item.id) : null,
+      parentRowId:
+        item.parentRowId === null || item.parentRowId === undefined
+          ? null
+          : String(item.parentRowId),
+    };
+  });
+}
+
 export async function createQuotation(input: Partial<IQuotation> & { quotationNumber: string }) {
   let lastError: any;
   for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt++) {
     try {
       const num = await generateId("QUO", 4);
-      const quotation = await Quotation.create({ ...input, quotationNumber: num, archived: false });
+      const quotation = await Quotation.create({
+        ...input,
+        quotationNumber: num,
+        items: normalizeItems(input.items),
+        archived: false,
+      });
       return quotation.toObject();
     } catch (err: any) {
       lastError = err;
@@ -52,7 +78,9 @@ export async function getQuotationById(id: string) {
 }
 
 export async function updateQuotation(id: string, patch: Partial<IQuotation>) {
-  const quotation = await Quotation.findByIdAndUpdate(id, patch, { new: true });
+  const update: Partial<IQuotation> = { ...patch };
+  if (patch.items) update.items = normalizeItems(patch.items);
+  const quotation = await Quotation.findByIdAndUpdate(id, update, { new: true });
   if (!quotation) throw new AppError(404, "Quotation not found");
   return quotation.toObject();
 }

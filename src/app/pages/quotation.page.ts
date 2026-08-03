@@ -791,6 +791,22 @@ function numberToWords(num: number): string {
     }
     .table-input[type="number"] {
       text-align: right;
+      min-width: 0;
+      padding-right: 8px;
+    }
+    /* Hide the browser number spinners so the entire Qty / Rate cell stays
+       clickable and the typed value remains fully visible. */
+    .col-qty input[type="number"],
+    .col-rate input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+    .col-qty input[type="number"]::-webkit-outer-spin-button,
+    .col-qty input[type="number"]::-webkit-inner-spin-button,
+    .col-rate input[type="number"]::-webkit-outer-spin-button,
+    .col-rate input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
     .amount-cell {
       font-weight: 600;
@@ -1420,13 +1436,20 @@ readonly savingPdf = signal(false);
 
   editQuotation(quote: Quotation) {
     this.editingQuoteId.set(quote.id);
-    const rows = quote.items.map((item, idx) => {
-      const merged: any = { ...item, ...((item as any).customValues || {}) };
-      if (!merged.id) merged.id = `row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
+    const rows = (quote.items || []).map((item: any, idx) => {
+      const merged: any = { ...item, ...((item && item.customValues) || {}) };
+      // Preserve the hierarchy metadata explicitly so parent/child
+      // relationships survive the save → reload round-trip.
+      merged.id = merged.id != null ? String(merged.id) : `row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
+      merged.parentRowId =
+        merged.parentRowId === null || merged.parentRowId === undefined || merged.parentRowId === ""
+          ? null
+          : String(merged.parentRowId);
       return merged;
     });
-    // Defensive: remap parentRowId for legacy items whose parent id is no longer present.
-    const idSet = new Set(rows.map((r: any) => r.id));
+    // Defensive: remap any dangling parentRowId references to null so we
+    // never end up with orphans after the load.
+    const idSet = new Set<string>(rows.map((r: any) => r.id));
     rows.forEach((r: any) => {
       if (r.parentRowId && !idSet.has(r.parentRowId)) r.parentRowId = null;
     });

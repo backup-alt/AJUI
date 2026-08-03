@@ -520,6 +520,21 @@ function numberToWords(num: number): string {
     .table-input { width: 100%; padding: 5px 6px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; background: transparent; outline: none; transition: background 140ms; box-sizing: border-box; }
     .table-input:focus { background: #f0f6ff; border-color: #2c5cff; }
     .table-input.narrow { width: 100%; }
+    .table-input[type="number"] { text-align: right; min-width: 0; }
+    /* Hide the browser number spinners so the entire Qty / Rate cell stays
+       clickable and the typed value remains fully visible. */
+    .col-qty input[type="number"],
+    .col-rate input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+    .col-qty input[type="number"]::-webkit-outer-spin-button,
+    .col-qty input[type="number"]::-webkit-inner-spin-button,
+    .col-rate input[type="number"]::-webkit-outer-spin-button,
+    .col-rate input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
     .add-row-tr td { border: none; padding: 6px 8px; }
     .add-item-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #f0f6ff; color: #2c5cff; border: 1.5px dashed #2c5cff; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 8px; }
     .add-item-btn.secondary { color: #64748b; border-color: #94a3b8; background: none; }
@@ -926,12 +941,19 @@ export class TaxInvoicePage {
 
   editInvoice(inv: TaxInvoice) {
     this.editingInvoiceId.set(inv.id);
-    const rows = inv.items.length > 0 ? inv.items.map((it, idx) => {
+    const rows = inv.items.length > 0 ? inv.items.map((it: any, idx) => {
       const merged: any = { ...it };
-      if (!merged.id) merged.id = `ROW-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
+      // Preserve the hierarchy metadata explicitly so parent/child
+      // relationships survive the save → reload round-trip.
+      merged.id = merged.id != null ? String(merged.id) : `ROW-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
+      merged.parentRowId =
+        merged.parentRowId === null || merged.parentRowId === undefined || merged.parentRowId === ""
+          ? null
+          : String(merged.parentRowId);
       return merged;
     }) : [this.newRow()];
-    const idSet = new Set(rows.map((r: any) => r.id));
+    // Defensive: remap any dangling parentRowId references to null.
+    const idSet = new Set<string>(rows.map((r: any) => r.id));
     rows.forEach((r: any) => {
       if (r.parentRowId && !idSet.has(r.parentRowId)) r.parentRowId = null;
     });
@@ -954,12 +976,16 @@ export class TaxInvoicePage {
 
   previewInvoice(inv: TaxInvoice) {
     this.editingInvoiceId.set(inv.id);
-    const rows = inv.items.map((it, idx) => {
+    const rows = inv.items.map((it: any, idx) => {
       const merged: any = { ...it };
-      if (!merged.id) merged.id = `ROW-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
+      merged.id = merged.id != null ? String(merged.id) : `ROW-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
+      merged.parentRowId =
+        merged.parentRowId === null || merged.parentRowId === undefined || merged.parentRowId === ""
+          ? null
+          : String(merged.parentRowId);
       return merged;
     });
-    const idSet = new Set(rows.map((r: any) => r.id));
+    const idSet = new Set<string>(rows.map((r: any) => r.id));
     rows.forEach((r: any) => {
       if (r.parentRowId && !idSet.has(r.parentRowId)) r.parentRowId = null;
     });
