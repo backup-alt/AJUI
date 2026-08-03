@@ -564,6 +564,10 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   private loadSitesAndEmployee(id: string) {
     this.loading.set(true);
 
+    // Bypass the in-memory GET cache so a site created since this page was
+    // last loaded (e.g. in another tab) is visible in the picker.
+    this.api.invalidateCache("/admin/sites");
+
     // Try the admin endpoint first (returns all sites), fall back to scoped endpoint for non-admin users
     this.api.listSitesAdmin().subscribe({
       next: (res) => {
@@ -591,8 +595,10 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   private populateSiteEntities(sites: any[]) {
     this.erp.siteEntities.update(() => (sites || []).map((s: any) => {
       const projectIds = Array.isArray(s.projectIds) ? s.projectIds : (s.projectId ? [s.projectId] : []);
+      const id = String(s._id || s.id || "");
       return {
-        id: String(s._id || s.id),
+        id,
+        _id: id,
         name: s.name || "Unnamed Site",
         status: s.status || "Active",
         projectId: projectIds[0] || "",
@@ -759,6 +765,27 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     );
     this.pendingSiteIds.set(currentIds);
     this.showSitePicker.set(true);
+    // Refresh the site list fresh from the backend so sites created after this
+    // page loaded (e.g. in another tab/browser) are available to assign.
+    this.refreshSitesForPicker();
+  }
+
+  /**
+   * Refetches the full site list bypassing the in-memory GET cache and updates
+   * siteEntities, which drives the picker. Falls back to the scoped /sites
+   * endpoint when the caller is not an admin.
+   */
+  private refreshSitesForPicker() {
+    this.api.invalidateCache("/admin/sites");
+    this.api.listSitesAdmin().subscribe({
+      next: (res) => this.populateSiteEntities(res?.sites),
+      error: () => {
+        this.api.listSites().subscribe({
+          next: (res2: any) => this.populateSiteEntities(res2?.items || res2?.sites || []),
+          error: () => undefined,
+        });
+      },
+    });
   }
 
   /** Toggle a site's checked state in the picker */

@@ -1,4 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from "@angular/core";
+import { lastValueFrom } from "rxjs";
 import {
   type ExpenseRow,
   type InventoryRow,
@@ -410,7 +411,16 @@ export class ErpDataService {
     this.writeState(seedKey, true);
   }
 
-  addClient(input: { name: string; mobile: string; address: string; gstNumber?: string; supervisor: string; status?: ClientStatus }): Client {
+  addClient(input: {
+    name: string;
+    mobile: string;
+    address: string;
+    gstNumber?: string;
+    supervisor: string;
+    status?: ClientStatus;
+    id?: string;
+    _id?: string;
+  }): Client {
     const nextNumber =
       Math.max(
         1000,
@@ -425,7 +435,8 @@ export class ErpDataService {
       .map((word) => word[0]?.toUpperCase() ?? "")
       .join("");
     const client: Client = {
-      id: `CL-${nextNumber}`,
+      id: input.id || `CL-${nextNumber}`,
+      _id: input._id,
       initials: initials || "AG",
       name: input.name,
       mobile: input.mobile,
@@ -569,7 +580,7 @@ export class ErpDataService {
     this.materials.update((materials) => materials.filter((m) => m.id !== materialId));
   }
 
-  createDefaultProject(client: Client): Project {
+  async createDefaultProject(client: Client): Promise<Project> {
     return this.addProject(client, {
       name: `${client.name} Project`,
       sites: ["Main Site"],
@@ -585,7 +596,7 @@ export class ErpDataService {
     return this.projectsForClient(client)[0];
   }
 
-  addProject(
+  async addProject(
     client: Client,
     input: {
       name: string;
@@ -598,28 +609,78 @@ export class ErpDataService {
       receivedAmount?: number;
       openingBalance?: number;
     },
-  ): Project {
-    const numericIds = this.projects()
-      .map((project) => Number(project.id.replace(/\D/g, "")))
-      .filter((value) => Number.isFinite(value));
-    const nextId = Math.max(...numericIds, 1031) + 1;
+  ): Promise<Project> {
+    // Local-only fallback for demo clients that were never persisted to the
+    // backend (no Mongo _id). Real backend clients are always persisted.
+    if (!client._id) {
+      const numericIds = this.projects()
+        .map((project) => Number(project.id.replace(/\D/g, "")))
+        .filter((value) => Number.isFinite(value));
+      const nextId = Math.max(...numericIds, 1031) + 1;
+      const localProject: Project = {
+        id: `AB-${nextId}`,
+        name: input.name,
+        client: client.name,
+        mobile: client.mobile,
+        address: client.address,
+        supervisor: input.supervisor,
+        sites: input.sites.length ? input.sites : ["Main Site"],
+        status: input.status ?? "Active",
+        startDate: input.startDate,
+        totalValue: input.totalValue,
+        advanceAmount: input.advanceAmount,
+        receivedAmount: input.receivedAmount ?? input.advanceAmount,
+        materialSpend: 0,
+        labourPayable: 0,
+        expenseBalance: input.openingBalance ?? 0,
+        completion: 0,
+      };
+      this.projects.update((projects) => [localProject, ...projects]);
+      if (localProject.expenseBalance) this.setExpenseOpeningBalance(localProject.id, localProject.sites[0] ?? "Main Site", localProject.expenseBalance);
+      this.clients.update((clients) =>
+        clients.map((existingClient) =>
+          existingClient.id === client.id ? { ...existingClient, projectIds: [localProject.id, ...existingClient.projectIds] } : existingClient,
+        ),
+      );
+      this.touchProject(localProject.id);
+      return localProject;
+    }
+
+    const res: any = await lastValueFrom(
+      this.api.createProject({
+        name: input.name,
+        clientId: client._id || client.id,
+        mobile: client.mobile,
+        address: client.address,
+        supervisor: input.supervisor,
+        siteIds: [],
+        status: input.status ?? "Active",
+        startDate: input.startDate,
+        totalValue: input.totalValue ?? 0,
+        advanceAmount: input.advanceAmount ?? 0,
+        receivedAmount: input.receivedAmount ?? input.advanceAmount ?? 0,
+        expenseBalance: input.openingBalance ?? 0,
+      }),
+    );
+    const created: any = res?.project ?? res;
+
     const project: Project = {
-      id: `AB-${nextId}`,
-      name: input.name,
-      client: client.name,
-      mobile: client.mobile,
-      address: client.address,
-      supervisor: input.supervisor,
-      sites: input.sites.length ? input.sites : ["Main Site"],
-      status: input.status ?? "Active",
-      startDate: input.startDate,
-      totalValue: input.totalValue,
-      advanceAmount: input.advanceAmount,
-      receivedAmount: input.receivedAmount ?? input.advanceAmount,
-      materialSpend: 0,
-      labourPayable: 0,
-      expenseBalance: input.openingBalance ?? 0,
-      completion: 0,
+      id: String(created._id || created.id || ""),
+      name: created.name ?? input.name,
+      client: created.client ?? client.name,
+      mobile: created.mobile ?? client.mobile,
+      address: created.address ?? client.address,
+      supervisor: created.supervisor ?? input.supervisor,
+      sites: created.siteNames?.length ? created.siteNames : input.sites.length ? input.sites : ["Main Site"],
+      status: (created.status ?? "Active") as ProjectStatus,
+      startDate: created.startDate ?? input.startDate,
+      totalValue: Number(created.totalValue) || 0,
+      advanceAmount: Number(created.advanceAmount) || 0,
+      receivedAmount: created.receivedAmount !== undefined ? Number(created.receivedAmount) : Number(created.advanceAmount) || 0,
+      materialSpend: Number(created.materialSpend) || 0,
+      labourPayable: Number(created.labourPayable) || 0,
+      expenseBalance: created.expenseBalance !== undefined ? Number(created.expenseBalance) : input.openingBalance ?? 0,
+      completion: Number(created.completion) || 0,
     };
 
     this.projects.update((projects) => [project, ...projects]);
@@ -652,6 +713,25 @@ export class ErpDataService {
           if (res?.site?._id) {
             const siteKey = this.siteKeyFor(projectId, cleanName);
             this.siteKeys.update((keys) => ({ ...keys, [siteKey]: res.site!._id }));
+            // Make the new site immediately available to the supervisor site
+            // picker / sites directory without waiting for a refetch.
+            const newSite = res.site as any;
+            const newSiteId = String(newSite._id || newSite.id || "");
+            this.siteEntities.update((entities) => {
+              if (!newSiteId || entities.some((e) => String(e.id) === newSiteId)) return entities;
+              const projectIds = Array.isArray(newSite.projectIds)
+                ? newSite.projectIds.map((pid: any) => String(pid))
+                : (newSite.projectId ? [String(newSite.projectId)] : [projectId]);
+              return [...entities, {
+                id: newSiteId,
+                _id: newSiteId,
+                name: newSite.name || cleanName,
+                status: (newSite.status || "Active") as "Active" | "On Hold" | "Completed",
+                projectId: projectIds[0] || projectId,
+                projectIds,
+                siteId: newSite.siteId,
+              }];
+            });
           }
         },
         error: (err) => console.warn("[ERP] createSite failed:", err?.message ?? err),
@@ -993,6 +1073,7 @@ export class ErpDataService {
       "payments", "vendors", "subcontractors",
     ];
     const merged: Record<SharedModuleKey, SharedTableField[]> = { ...this.customTableFields() };
+    const backendLoaded: Record<SharedModuleKey, boolean> = {} as Record<SharedModuleKey, boolean>;
 
     const promises = modules.map(async (module) => {
       const entityType = this.entityTypeForModule(module) as CustomFieldEntityType;
@@ -1012,17 +1093,27 @@ export class ErpDataService {
               allFields.set(f.key, { key: f.key, label: f.label });
             }
           }
+          backendLoaded[module] = true;
         } catch {
           // silently skip — site may not have fields for this entityType
         }
       }
 
-      if (allFields.size > 0) {
+      if (backendLoaded[module]) {
         const backendFields = Array.from(allFields.values());
-        const existingKeys = new Set(merged[module]?.map((f) => f.key) ?? []);
-        const newFields = backendFields.filter((f) => !existingKeys.has(f.key));
-        if (newFields.length) {
-          merged[module] = [...(merged[module] ?? []), ...newFields];
+        if (module === "labour") {
+          // Labour keeps locally-added wage columns (never persisted), so only
+          // append new backend fields instead of replacing the cached set.
+          const existingKeys = new Set(merged[module]?.map((f) => f.key) ?? []);
+          const newFields = backendFields.filter((f) => !existingKeys.has(f.key));
+          if (newFields.length) {
+            merged[module] = [...(merged[module] ?? []), ...newFields];
+          }
+        } else {
+          // The backend is the source of truth for every other module, so the
+          // backend field list replaces the cached one. This prunes stale
+          // columns (e.g. test fields) that were removed from the database.
+          merged[module] = backendFields;
         }
       }
     });
@@ -1031,11 +1122,16 @@ export class ErpDataService {
     const current = this.customTableFields();
     const next: Record<SharedModuleKey, SharedTableField[]> = { ...current };
     for (const module of modules) {
-      const backendFields = merged[module] ?? [];
-      const existingKeys = new Set((current[module] ?? []).map((f) => f.key));
-      const newFields = backendFields.filter((f) => !existingKeys.has(f.key));
-      if (newFields.length) {
-        next[module] = [...(current[module] ?? []), ...newFields];
+      if (!backendLoaded[module]) continue;
+      if (module === "labour") {
+        const backendFields = merged[module] ?? [];
+        const existingKeys = new Set((current[module] ?? []).map((f) => f.key));
+        const newFields = backendFields.filter((f) => !existingKeys.has(f.key));
+        if (newFields.length) {
+          next[module] = [...(current[module] ?? []), ...newFields];
+        }
+      } else {
+        next[module] = merged[module] ?? [];
       }
     }
     this.customTableFields.set(next);

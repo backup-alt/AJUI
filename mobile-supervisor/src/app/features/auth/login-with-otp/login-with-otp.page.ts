@@ -9,6 +9,8 @@ import {
   IonSpinner,
   IonBackButton,
   IonButtons,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
@@ -40,6 +42,8 @@ import { OtpInputComponent } from '../../../shared/components';
     IonSpinner,
     IonBackButton,
     IonButtons,
+    IonRefresher,
+    IonRefresherContent,
     FormsModule,
     OtpInputComponent,
   ],
@@ -54,6 +58,9 @@ import { OtpInputComponent } from '../../../shared/components';
     </ion-header>
 
     <ion-content class="content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="container">
         @if (state() === 'request') {
           <div class="icon-circle">
@@ -347,5 +354,9 @@ export class LoginWithOtpPage implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.resendInterval) clearInterval(this.resendInterval);
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

@@ -9,6 +9,8 @@ import {
   IonSpinner,
   IonBackButton,
   IonButtons,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -36,6 +38,8 @@ import { OtpInputComponent } from '../../../shared/components';
     IonSpinner,
     IonBackButton,
     IonButtons,
+    IonRefresher,
+    IonRefresherContent,
     OtpInputComponent,
   ],
   template: `
@@ -49,6 +53,9 @@ import { OtpInputComponent } from '../../../shared/components';
     </ion-header>
 
     <ion-content class="content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="container">
         <div class="icon-circle">
           <ion-icon name="shield-checkmark-outline"></ion-icon>
@@ -212,5 +219,9 @@ export class VerifyOtpPage implements OnInit {
         this.resendCooldown.set(cur - 1);
       }
     }, 1000);
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

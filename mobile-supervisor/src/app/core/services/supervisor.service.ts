@@ -74,7 +74,12 @@ export class SupervisorService {
     try {
       const userId = await this.api.getUserId();
       if (!userId) return null;
-      const { value } = await Preferences.get({ key: `dashboardCache:${userId}` });
+      const sel = this._selection();
+      const siteKey = sel?.siteId || 'all';
+      const projectKey = sel?.projectId || 'all';
+      const { value } = await Preferences.get({
+        key: `dashboardCache:${userId}:${siteKey}:${projectKey}`,
+      });
       if (!value) return null;
       const cached = JSON.parse(value) as { data?: DashboardData };
       return cached.data || null;
@@ -87,8 +92,11 @@ export class SupervisorService {
     try {
       const userId = await this.api.getUserId();
       if (!userId) return;
+      const sel = this._selection();
+      const siteKey = sel?.siteId || 'all';
+      const projectKey = sel?.projectId || 'all';
       await Preferences.set({
-        key: `dashboardCache:${userId}`,
+        key: `dashboardCache:${userId}:${siteKey}:${projectKey}`,
         value: JSON.stringify({ savedAt: Date.now(), data }),
       });
     } catch {

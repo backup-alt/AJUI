@@ -18,6 +18,8 @@ import {
   IonIcon,
   IonSpinner,
   IonCheckbox,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -51,6 +53,8 @@ import { Vendor } from '../../../shared/models';
     IonIcon,
     IonSpinner,
     IonCheckbox,
+    IonRefresher,
+    IonRefresherContent,
     FormsModule,
   ],
   template: `
@@ -64,6 +68,9 @@ import { Vendor } from '../../../shared/models';
     </ion-header>
 
     <ion-content class="create-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="form-container">
         <div class="page-header">
           <div class="page-icon">
@@ -515,5 +522,9 @@ export class MaterialCreatePage implements OnInit {
         await toast.present();
       },
     });
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

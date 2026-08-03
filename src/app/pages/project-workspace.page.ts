@@ -2467,7 +2467,7 @@ export class ProjectWorkspacePage {
     };
   }
 
-  saveProject(value: ProjectFormValue) {
+  async saveProject(value: ProjectFormValue) {
     const currentClient = this.client();
     if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
     const editing = this.editingProject();
@@ -2482,9 +2482,13 @@ export class ProjectWorkspacePage {
       }
       return;
     }
-    const project = this.data.addProject(currentClient, { ...projectValue, openingBalance });
-    this.showProjectForm.set(false);
-    setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]));
+    try {
+      const project = await this.data.addProject(currentClient, { ...projectValue, openingBalance });
+      this.showProjectForm.set(false);
+      setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]));
+    } catch (err) {
+      console.error("[ProjectWorkspace] Failed to create project:", (err as any)?.message ?? err);
+    }
   }
 
   updateProjectStatus(value: string, event?: Event) {

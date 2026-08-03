@@ -190,7 +190,12 @@ export class ClientWorkspacePage implements OnInit {
   ngOnInit() {
     const currentClient = this.client();
     if (!currentClient) return;
-    const project = this.data.firstProjectForClient(currentClient) ?? this.data.createDefaultProject(currentClient);
+    void this.openClientWorkspace(currentClient);
+  }
+
+  private async openClientWorkspace(currentClient: NonNullable<ReturnType<ErpDataService["clientById"]>>) {
+    let project = this.data.firstProjectForClient(currentClient);
+    if (!project) project = await this.data.createDefaultProject(currentClient);
     this.data.touchProject(project.id);
     void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"], { replaceUrl: true });
   }
@@ -243,7 +248,7 @@ export class ClientWorkspacePage implements OnInit {
     return this.data.projectPendingAmount(project);
   }
 
-  saveProject(value: ProjectFormValue) {
+  async saveProject(value: ProjectFormValue) {
     const currentClient = this.client();
     if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
     const { openingBalance, ...projectValue } = value;
@@ -255,9 +260,13 @@ export class ClientWorkspacePage implements OnInit {
       this.showProjectForm.set(false);
       return;
     }
-    const project = this.data.addProject(currentClient, { ...projectValue, openingBalance });
-    this.showProjectForm.set(false);
-    setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id]));
+    try {
+      const project = await this.data.addProject(currentClient, { ...projectValue, openingBalance });
+      this.showProjectForm.set(false);
+      setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id]));
+    } catch (err) {
+      console.error("[ClientWorkspace] Failed to create project:", (err as any)?.message ?? err);
+    }
   }
 
   deleteProject(project: Project, event?: Event) {

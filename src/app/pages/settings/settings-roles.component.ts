@@ -1308,6 +1308,9 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
 
   loadAvailableSites() {
     this.sitesLoading.set(true);
+    // Bypass the in-memory GET cache so sites created since the app loaded
+    // (e.g. in another tab) are available to assign.
+    this.api.invalidateCache("/admin/sites");
     this.api.listSitesAdmin().subscribe({
       next: (res) => {
         this.availableSites.set(res.sites || []);

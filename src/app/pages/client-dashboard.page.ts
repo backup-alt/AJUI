@@ -147,8 +147,9 @@ export class ClientDashboardPage {
   }
   readonly statusClass = statusClass;
 
-  openClient(client: Client) {
-    const project = this.data.firstProjectForClient(client) ?? this.data.createDefaultProject(client);
+  async openClient(client: Client) {
+    let project = this.data.firstProjectForClient(client);
+    if (!project) project = await this.data.createDefaultProject(client);
     this.data.touchProject(project.id);
     void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]);
   }
@@ -165,15 +166,21 @@ export class ClientDashboardPage {
     };
 
     this.api.createClient(payload).subscribe({
-      next: (res) => {
-        const clientId = res?.clientId || res?.id;
-        const client = this.data.addClient({
-          ...value,
-          id: clientId,
-        } as Client);
-        const project = this.data.createDefaultProject(client);
-        this.showClientForm.set(false);
-        setTimeout(() => void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]));
+      next: async (res) => {
+        try {
+          const created = res?.client || res;
+          const clientId = created?.clientId || created?.id || res?.clientId || res?.id;
+          const client = this.data.addClient({
+            ...value,
+            id: clientId,
+            _id: created?._id,
+          } as Client);
+          const project = await this.data.createDefaultProject(client);
+          this.showClientForm.set(false);
+          setTimeout(() => void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]));
+        } catch (err) {
+          console.error("[ClientDashboard] Failed to create default project:", (err as any)?.message ?? err);
+        }
       },
       error: (err) => {
         console.error("Failed to create client", err);

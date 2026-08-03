@@ -2,6 +2,8 @@ import { Component, OnInit, inject } from '@angular/core';
 import {
   IonContent,
   IonIcon,
+  IonRefresher,
+  IonRefresherContent,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
@@ -17,9 +19,12 @@ import { AuthService } from '../../../core/services/auth.service';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [IonContent, IonIcon],
+  imports: [IonContent, IonIcon, IonRefresher, IonRefresherContent],
   template: `
     <ion-content class="login-content" [fullscreen]="true">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="login-shell">
         <div class="login-card">
           <header class="hero">
@@ -300,5 +305,9 @@ export class LoginPage implements OnInit {
 
   goToPassword(): void {
     void this.router.navigate(['/auth/password-login']);
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

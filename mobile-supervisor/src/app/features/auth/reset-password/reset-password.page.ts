@@ -10,6 +10,8 @@ import {
   IonSpinner,
   IonBackButton,
   IonButtons,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -39,6 +41,8 @@ import { AuthService } from '../../../core/services/auth.service';
     IonSpinner,
     IonBackButton,
     IonButtons,
+    IonRefresher,
+    IonRefresherContent,
     FormsModule,
   ],
   template: `
@@ -52,6 +56,9 @@ import { AuthService } from '../../../core/services/auth.service';
     </ion-header>
 
     <ion-content class="content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="container">
         <div class="icon-circle">
           <ion-icon name="shield-checkmark-outline"></ion-icon>
@@ -237,5 +244,9 @@ export class ResetPasswordPage implements OnInit {
         await toast.present();
       },
     });
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

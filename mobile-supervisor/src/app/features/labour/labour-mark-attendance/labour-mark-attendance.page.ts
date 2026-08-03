@@ -18,6 +18,8 @@ import {
   IonSpinner,
   IonSegment,
   IonSegmentButton,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -51,6 +53,8 @@ import { CurrencyPipe } from '@angular/common';
     IonSpinner,
     IonSegment,
     IonSegmentButton,
+    IonRefresher,
+    IonRefresherContent,
     FormsModule,
     CurrencyPipe,
   ],
@@ -65,6 +69,9 @@ import { CurrencyPipe } from '@angular/common';
     </ion-header>
 
     <ion-content class="create-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="form-container">
         <div class="page-header">
           <div class="page-icon">
@@ -348,6 +355,14 @@ export class LabourMarkAttendancePage implements OnInit {
       sc >= 1 &&
       sc <= 2
     );
+  }
+
+  async handleRefresh(event: CustomEvent): Promise<void> {
+    if (this.workerId) {
+      await this.loadWorker();
+      await this.checkExistingAttendance();
+    }
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 
   async onDateChange(value: string): Promise<void> {

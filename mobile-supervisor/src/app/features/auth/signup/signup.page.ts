@@ -10,6 +10,8 @@ import {
   IonSpinner,
   IonBackButton,
   IonButtons,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -45,6 +47,8 @@ import { VerifyInviteResponse } from '../../../shared/models';
     IonSpinner,
     IonBackButton,
     IonButtons,
+    IonRefresher,
+    IonRefresherContent,
     FormsModule,
   ],
   template: `
@@ -58,6 +62,9 @@ import { VerifyInviteResponse } from '../../../shared/models';
     </ion-header>
 
     <ion-content class="signup-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="signup-container">
         @if (isSuccess()) {
           <div class="success-card">
@@ -421,5 +428,9 @@ export class SignupPage implements OnInit {
 
   goToDashboard(): void {
     this.router.navigate(['/tabs/dashboard']);
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

@@ -16,6 +16,8 @@ import {
   IonIcon,
   IonSpinner,
   IonToggle,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
   ActionSheetController,
 } from '@ionic/angular/standalone';
@@ -58,6 +60,8 @@ import { Vendor } from '../../../shared/models';
     IonIcon,
     IonSpinner,
     IonToggle,
+    IonRefresher,
+    IonRefresherContent,
     FormsModule,
     CurrencyPipe,
   ],
@@ -72,6 +76,9 @@ import { Vendor } from '../../../shared/models';
     </ion-header>
 
     <ion-content class="create-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="form-container">
         @if (step() === 1) {
           <div class="page-header">
@@ -712,5 +719,9 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
         await toast.present();
       },
     });
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

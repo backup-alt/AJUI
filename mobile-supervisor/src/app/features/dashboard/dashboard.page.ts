@@ -174,10 +174,10 @@ import { firstValueFrom } from 'rxjs';
           </div>
         </section>
 
-        <!-- ═══ ACTIVE SITES ═══ -->
+        <!-- ═══ ACTIVE SITES (OTHERS) ═══ -->
         <section class="sites-section">
           <div class="sites-head">
-            <h2 class="sites-title">Active Sites</h2>
+            <h2 class="sites-title">Other Sites</h2>
             <button class="viewall-btn" (click)="navigateTo('/tabs/sites')">View All</button>
           </div>
 
@@ -186,8 +186,7 @@ import { firstValueFrom } from 'rxjs';
               <div class="sites-empty-icon">
                 <ion-icon name="location-outline"></ion-icon>
               </div>
-              <span class="sites-empty-text">No active sites assigned</span>
-              <button class="sites-empty-cta" (click)="navigateTo('/tabs/sites')">Add a site</button>
+              <span class="sites-empty-text">No other sites assigned</span>
             </div>
           } @else {
             @for (site of sites(); track site.id) {
@@ -771,7 +770,15 @@ export class DashboardPage implements OnInit, OnDestroy {
     if (typeof window !== 'undefined') {
       this.supervisor.siteChanged$
         .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe(() => void this.loadDashboard(true, true));
+        .subscribe(() => {
+          // Clear stale data so cards don't show the previous site while the
+          // fresh fetch for the newly selected site is in flight.
+          this.dashboard.set(null);
+          this.sites.set([]);
+          this.todayExpenses.set([]);
+          this.loading.set(true);
+          void this.loadDashboard(true);
+        });
     }
 
     await this.supervisor.init().catch(() => {});
@@ -814,7 +821,16 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.error.set(false);
 
     try {
-      const response = await firstValueFrom(this.supervisor.getDashboard(undefined, force));
+      const siteId = this.supervisor.selectedSiteId() || undefined;
+      const projectId = this.supervisor.selectedProjectId() || undefined;
+
+      // Fetch dashboard (per-site counts) and the full assigned sites list in parallel.
+      // The sites list is needed to derive the total assigned sites count and the
+      // "other sites" the supervisor can switch to.
+      const [response, sitesRes] = await Promise.all([
+        firstValueFrom(this.supervisor.getDashboard({ siteId, projectId }, force)),
+        firstValueFrom(this.supervisor.getSites()).catch(() => null),
+      ]);
       const dashData = response?.dashboard || null;
 
       // Dashboard is critical — if it failed, show error state
@@ -827,7 +843,14 @@ export class DashboardPage implements OnInit, OnDestroy {
         return false;
       }
 
-      this.applyDashboard(dashData);
+      const allSites = (sitesRes?.sites || []) as Site[];
+      const currentId = this.supervisor.selectedSiteId();
+      // Total assigned sites stays global; the "Other Sites" list excludes the
+      // currently selected site so the supervisor can switch to the others.
+      const totalAssignedSites = allSites.length;
+      const otherSites = allSites.filter((s) => s.id !== currentId);
+
+      this.applyDashboard(dashData, totalAssignedSites, otherSites);
       void this.supervisor.cacheDashboard(dashData);
 
       this.loading.set(false);
@@ -842,9 +865,19 @@ export class DashboardPage implements OnInit, OnDestroy {
     }
   }
 
-  private applyDashboard(data: DashboardData): void {
-    this.dashboard.set(data);
-    this.sites.set((data.sites || []) as Site[]);
+  private applyDashboard(
+    data: DashboardData,
+    totalAssignedSites: number | null = null,
+    otherSites: Site[] | null = null,
+  ): void {
+    // The "Sites" card shows the total number of sites the supervisor is
+    // assigned to (global), not a per-site count. The other cards (inventory,
+    // labour, approvals) remain scoped to the currently selected site.
+    const counts = data.counts
+      ? { ...data.counts, sites: totalAssignedSites ?? data.counts.sites }
+      : data.counts;
+    this.dashboard.set({ ...data, counts });
+    this.sites.set(otherSites ?? ((data.sites || []) as Site[]));
     this.todayExpenses.set((data.todayExpenses || []) as Expense[]);
   }
 

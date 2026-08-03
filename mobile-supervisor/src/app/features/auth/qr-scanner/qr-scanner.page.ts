@@ -9,6 +9,8 @@ import {
   IonBackButton,
   IonButtons,
   IonSpinner,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
@@ -39,6 +41,8 @@ import { AuthService } from '../../../core/services/auth.service';
     IonBackButton,
     IonButtons,
     IonSpinner,
+    IonRefresher,
+    IonRefresherContent,
   ],
   template: `
     <ion-header class="agb-header">
@@ -51,6 +55,9 @@ import { AuthService } from '../../../core/services/auth.service';
     </ion-header>
 
     <ion-content class="scanner-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="scanner-container">
         @if (state() === 'scanning') {
           <div class="scanner-stage">
@@ -320,5 +327,9 @@ export class QrScannerPage implements OnInit {
 
   showManualEntry(): void {
     this.router.navigate(['/auth/manual-token']);
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

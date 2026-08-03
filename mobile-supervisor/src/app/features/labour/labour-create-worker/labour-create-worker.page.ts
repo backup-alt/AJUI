@@ -16,6 +16,8 @@ import {
   IonTextarea,
   IonIcon,
   IonSpinner,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -59,6 +61,8 @@ const LABOUR_TYPES = [
     IonTextarea,
     IonIcon,
     IonSpinner,
+    IonRefresher,
+    IonRefresherContent,
     FormsModule,
   ],
   template: `
@@ -72,6 +76,9 @@ const LABOUR_TYPES = [
     </ion-header>
 
     <ion-content class="create-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="form-container">
         <div class="page-header">
           <div class="page-icon">
@@ -328,5 +335,9 @@ export class LabourCreateWorkerPage implements OnInit {
         await toast.present();
       },
     });
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }

@@ -489,6 +489,13 @@ export class ApiService {
     return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/projects${query}`);
   }
 
+  createProject(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/projects`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/projects")),
+      catchError(this.handleError)
+    );
+  }
+
   getProject(id: string): Observable<{ project: any }> {
     return this.http.get<{ project: any }>(`${this.baseUrl}/projects/${id}`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)

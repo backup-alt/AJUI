@@ -18,6 +18,8 @@ import {
   IonSpinner,
   IonSegment,
   IonSegmentButton,
+  IonRefresher,
+  IonRefresherContent,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -50,6 +52,8 @@ import { EmptyStateComponent } from '../../../shared/components';
     IonSpinner,
     IonSegment,
     IonSegmentButton,
+    IonRefresher,
+    IonRefresherContent,
     FormsModule,
     EmptyStateComponent,
   ],
@@ -64,6 +68,9 @@ import { EmptyStateComponent } from '../../../shared/components';
     </ion-header>
 
     <ion-content class="create-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="form-container">
         <div class="page-header">
           <div class="page-icon">
@@ -436,5 +443,10 @@ export class LabourEditAttendancePage implements OnInit {
         await toast.present();
       },
     });
+  }
+
+  async handleRefresh(event: CustomEvent): Promise<void> {
+    await this.loadAttendance();
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
   }
 }
