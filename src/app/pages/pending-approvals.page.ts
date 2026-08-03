@@ -7,7 +7,6 @@ import { ErpDataService, type SharedModuleKey } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ApprovalsService } from "../core/approvals.service";
-import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
 import { mapExpense } from "../core/mappers";
 
@@ -206,7 +205,7 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         </td>
                         <td>
                           <select class="approval-table-select" [(ngModel)]="row.vendor">
-                            <option *ngFor="let vendor of vendorOptions(row.vendor)" [value]="vendor">{{ vendor }}</option>
+                            <option *ngFor="let vendor of vendorOptions()" [value]="vendor">{{ vendor }}</option>
                           </select>
                         </td>
                         <td>{{ row.supervisor || "-" }}</td>
@@ -380,7 +379,6 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
 export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
   private readonly approvalsService = inject(ApprovalsService);
-  private readonly materialsService = inject(MaterialsService);
   private readonly api = inject(ApiService);
 
   readonly showMaterial = signal(false);
@@ -455,13 +453,8 @@ export class PendingApprovalsPage implements OnInit {
     }
   }
 
-  vendorOptions(currentVendor = ""): string[] {
-    return this.sortedUnique([
-      currentVendor,
-      ...this.data.vendors().map((vendor) => vendor.name),
-      ...this.materialsService.materials().map((material) => material.vendor),
-      ...this._materialRows().map((r) => r.vendor).filter(Boolean),
-    ]);
+  vendorOptions(): string[] {
+    return this.sortedUnique(this.data.vendors().map((vendor) => vendor.name));
   }
 
   updateApprovalCell(row: ApprovalBaseRow, key: string, value: string) {
