@@ -456,6 +456,9 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly showSitePicker = signal(false);
   readonly pendingSiteIds = signal<Set<string>>(new Set());
   readonly siteSaving = signal(false);
+  // Picker-local site list (independent of shared siteEntities) — always shows all available sites
+  readonly pickerSites = signal<any[]>([]);
+  readonly pickerSitesLoading = signal(false);
 
   // Activity
   readonly activity = signal<ActivityEntry[]>([]);
@@ -487,7 +490,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   /** All sites for the checkbox picker — each with an id and annotated display name */
   readonly allSitesForPicker = computed<Array<{ id: string; name: string }>>(() => {
-    const allSites = this.erp.siteEntities();
+    const allSites = this.pickerSites();
     return allSites.map((s) => this.annotateProject(s));
   });
 
@@ -571,7 +574,9 @@ export class SettingsEmployeeDetailComponent implements OnInit {
     // Try the admin endpoint first (returns all sites), fall back to scoped endpoint for non-admin users
     this.api.listSitesAdmin().subscribe({
       next: (res) => {
-        this.populateSiteEntities(res?.sites);
+        const sites = res?.sites || [];
+        this.populateSiteEntities(sites);
+        this.pickerSites.set(sites);
         // Now load the employee after sites are ready
         this.loadEmployeeAfterSites(id);
       },
@@ -581,6 +586,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           next: (res2: any) => {
             const sites = res2?.items || res2?.sites || [];
             this.populateSiteEntities(sites);
+            this.pickerSites.set(sites);
             this.loadEmployeeAfterSites(id);
           },
           error: () => {
@@ -772,18 +778,20 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   /**
    * Refetches the full site list bypassing the in-memory GET cache and updates
-   * siteEntities, which drives the picker. Falls back to the scoped /sites
-   * endpoint when the caller is not an admin.
+   * the picker-local site list, which drives the picker. Uses /admin/sites for
+   * admins (returns all sites) and falls back to cursor-paginated /sites for
+   * non-admins to collect all pages.
    */
   private refreshSitesForPicker() {
-    this.api.invalidateCache("/admin/sites");
-    this.api.listSitesAdmin().subscribe({
-      next: (res) => this.populateSiteEntities(res?.sites),
+    this.pickerSitesLoading.set(true);
+    this.api.listSitesAll().subscribe({
+      next: (res) => {
+        this.pickerSites.set(res?.sites || []);
+        this.pickerSitesLoading.set(false);
+      },
       error: () => {
-        this.api.listSites().subscribe({
-          next: (res2: any) => this.populateSiteEntities(res2?.items || res2?.sites || []),
-          error: () => undefined,
-        });
+        this.pickerSites.set([]);
+        this.pickerSitesLoading.set(false);
       },
     });
   }

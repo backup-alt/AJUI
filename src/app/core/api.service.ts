@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, inject } from "@angular/core";
 import { HttpClient, HttpHeaders, HttpInterceptorFn, HttpHandlerFn, HttpRequest, HttpEvent, HttpErrorResponse } from "@angular/common/http";
-import { Observable, from, throwError, catchError, switchMap, tap, of, shareReplay } from "rxjs";
+import { Observable, from, throwError, catchError, switchMap, tap, of, shareReplay, expand, EMPTY, firstValueFrom, map, reduce } from "rxjs";
 import { environment } from "../../environments/environment";
 
 /**
@@ -566,6 +566,54 @@ export class ApiService {
 
   listSitesAdmin(): Observable<{ sites: any[] }> {
     return this.cachedGet<{ sites: any[] }>(`${this.baseUrl}/admin/sites`);
+  }
+
+  /**
+   * Fetch ALL sites for picker UIs. Tries /admin/sites first (unfiltered, all sites).
+   * If that fails (non-admin), falls back to cursor-paginated /sites to collect
+   * all pages. The backend caps /sites at 25 items per page, so we must paginate.
+   */
+  listSitesAll(): Observable<{ sites: any[] }> {
+    return this.listSitesAdmin().pipe(
+      switchMap((adminRes) => {
+        if (adminRes?.sites?.length) {
+          return of(adminRes);
+        }
+        return this.paginateAllSites();
+      }),
+      catchError(() => this.paginateAllSites())
+    );
+  }
+
+  private paginateAllSites(maxPages = 50): Observable<{ sites: any[] }> {
+    const fetchPage = (cursor: string | null): Observable<PaginatedResponse<any>> => {
+      const params = new URLSearchParams();
+      params.set("limit", "25");
+      if (cursor) {
+        params.set("cursor", cursor);
+      } else {
+        params.set("page", "1");
+      }
+      const url = `${this.baseUrl}/sites?${params.toString()}`;
+      this.invalidateCache(`GET:${url}`);
+      return this.http.get<PaginatedResponse<any>>(url, { headers: this.authHeaders() });
+    };
+
+    return fetchPage(null).pipe(
+      expand((res, idx) => {
+        if (idx + 1 >= maxPages || !res?.nextCursor) {
+          return EMPTY;
+        }
+        return fetchPage(res.nextCursor);
+      }),
+      reduce((acc, res) => {
+        if (res?.items?.length) {
+          acc.items.push(...res.items);
+        }
+        return acc;
+      }, { items: [] as any[] }),
+      map((acc) => ({ sites: acc.items }))
+    );
   }
 
   getSiteMaterials(siteId: string): Observable<{ materials: any[] }> {
