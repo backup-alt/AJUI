@@ -501,6 +501,21 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
     const body = adminCreateInviteSchema.parse(req.body);
     if (!req.user?.sub) throw new AppError(401, "Not authenticated");
 
+    const existingUser = await User.findOne({
+      $or: [
+        { email: body.supervisorEmail },
+        ...(body.supervisorPhone ? [{ phone: body.supervisorPhone }] : []),
+      ],
+    });
+    if (existingUser) {
+      res.status(409).json({
+        error: "A user with this email or phone already exists.",
+        duplicate: true,
+        field: existingUser.email === body.supervisorEmail ? "email" : "phone",
+      });
+      return;
+    }
+
     const { invite, qrUrl, qrPayload, expiresAt, otp, emailSent } = await inviteService.createInvite({
       createdByAdmin: req.user.sub,
       supervisorName: body.supervisorName,

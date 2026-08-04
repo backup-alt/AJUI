@@ -1453,10 +1453,17 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         this.refreshInvites();
       },
       error: (err) => {
+        this.supervisorLoading.set(false);
+        if (err?.status === 409 || err?.details?.duplicate) {
+          const field = err?.details?.field || "email";
+          this.supervisorError.set(
+            `A user with this ${field} already exists. Please use a different ${field} or ask the admin to remove the existing user first.`
+          );
+          return;
+        }
         const status = err?.status ?? err?.statusCode;
         const detail = err?.error?.error || err?.message || "Failed to create invite.";
         this.supervisorError.set(`[${status ?? "?"}] ${detail}`);
-        this.supervisorLoading.set(false);
       },
     });
   }
