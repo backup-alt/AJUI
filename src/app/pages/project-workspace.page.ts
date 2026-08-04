@@ -369,14 +369,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         (input)="siteDraftName.set($any($event.target).value)"
                         placeholder="New site"
                       />
-                      <input
-                        type="number"
-                        class="site-opening-balance"
-                        [value]="siteDraftOpeningBalance() ?? ''"
-                        (input)="onSiteOpeningBalanceInput($any($event.target))"
-                        placeholder="Opening Balance"
-                        min="0"
-                      />
                       <button type="submit" class="site-confirm" aria-label="Add site">
                         <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                           <path d="m5 12 4 4L19 6" />
@@ -552,7 +544,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
               </div>
 
               <div class="expense-ledger-summary" *ngIf="!tableViewExpanded() && activeSection() === 'expenses'">
-                <div><span>Opening</span><strong>{{ expenseOpeningBalanceLabel() }}</strong></div>
                 <div><span>Cash Added</span><strong>{{ expenseCashAddedLabel() }}</strong></div>
                 <div><span>Expenses</span><strong>{{ expenseSpentLabel() }}</strong></div>
                 <div><span>Current Balance</span><strong>{{ expenseCurrentBalanceLabel() }}</strong></div>
@@ -1076,7 +1067,6 @@ export class ProjectWorkspacePage {
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
   readonly siteDraftName = signal("");
-  readonly siteDraftOpeningBalance = signal<number | null>(null);
   readonly openSelectKey = signal("");
   readonly selectCustomValue = signal("");
   readonly customPaymentModes = signal<string[]>(this.loadStoredPaymentModes());
@@ -1085,7 +1075,6 @@ export class ProjectWorkspacePage {
   readonly labourTypeName = signal("Carpenter");
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
-  readonly expenseOpeningEdit = signal(false);
   readonly handledEditProjectQuery = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly previewImageUrl = signal<string | null>(null);
@@ -2163,7 +2152,6 @@ export class ProjectWorkspacePage {
 
   selectSite(site: string) {
     this.activeSite.set(site);
-    this.expenseOpeningEdit.set(false);
     this.tableSearch.set("");
     this.closeDropdowns();
     this.clearRowSelection();
@@ -2171,7 +2159,6 @@ export class ProjectWorkspacePage {
 
   openSiteDraft() {
     this.siteDraftName.set("");
-    this.siteDraftOpeningBalance.set(null);
     this.siteDraftOpen.set(true);
   }
 
@@ -2179,18 +2166,9 @@ export class ProjectWorkspacePage {
     event.preventDefault();
     const site = this.siteDraftName().trim();
     if (!site) return;
-    const openingBalance = this.siteDraftOpeningBalance() ?? 0;
-    this.data.addSiteToProject(this.projectId(), site, openingBalance);
-    if (openingBalance > 0) {
-      this.data.setExpenseOpeningBalance(this.projectId(), site, openingBalance);
-    }
+    this.data.addSiteToProject(this.projectId(), site);
     this.activeSite.set(site);
     this.siteDraftOpen.set(false);
-  }
-
-  onSiteOpeningBalanceInput(target: HTMLInputElement) {
-    const val = target.valueAsNumber;
-    this.siteDraftOpeningBalance.set(isNaN(val) ? null : val);
   }
 
   deleteSite(site: string, event: Event) {
@@ -3212,43 +3190,6 @@ export class ProjectWorkspacePage {
       .split(/\s+/)
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
       .join(" ");
-  }
-
-  expenseOpeningSiteLabel(): string {
-    const site = this.activeSiteFilter();
-    return site === "All" ? "Select a site to edit opening balance" : `${site} opening balance`;
-  }
-
-  expenseOpeningTitleLabel(): string {
-    return this.activeSiteFilter() === "All" ? "Total Opening Balance" : "Opening Balance";
-  }
-
-  expenseOpeningBalanceInput(): string {
-    return String(this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.expenseEditableSite() }));
-  }
-
-  updateExpenseOpeningBalance(value: string) {
-    this.data.persistSiteOpeningBalance(this.projectId(), this.expenseEditableSite(), this.moneyNumber(value));
-  }
-
-  toggleExpenseOpeningEdit() {
-    if (this.activeSiteFilter() === "All") {
-      this.expenseOpeningEdit.set(false);
-      return;
-    }
-    this.expenseOpeningEdit.update((isEditing) => !isEditing);
-  }
-
-  expenseDraftSiteLabel(): string {
-    return this.expenseDraftSite();
-  }
-
-  expenseDraftOpeningBalanceInput(): string {
-    return String(this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.expenseDraftSite() }));
-  }
-
-  updateExpenseDraftOpeningBalance(value: string) {
-    this.data.persistSiteOpeningBalance(this.projectId(), this.expenseDraftSite(), this.moneyNumber(value));
   }
 
   expenseOpeningBalanceLabel(): string {
