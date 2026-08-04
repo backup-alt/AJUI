@@ -1312,7 +1312,13 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     // and falls back to cursor-paginated /sites for non-admins to collect all pages.
     this.api.listSitesAll().subscribe({
       next: (res) => {
-        this.availableSites.set(res.sites || []);
+        const rawSites = res.sites || [];
+        this.availableSites.set(
+          rawSites.map((site: any, index: number) => ({
+            ...site,
+            id: site.id || site._id || `site-${index}`,
+          }))
+        );
         this.sitesLoading.set(false);
       },
       error: () => {
