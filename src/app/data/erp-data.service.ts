@@ -751,6 +751,7 @@ export class ErpDataService {
             if (res?.site?._id) {
               this.siteKeys.update((keys) => ({ ...keys, [siteKey]: res.site!._id }));
               this.mergeSiteEntity(res.site, projectId);
+              this.migrateOpeningBalanceToSiteId(projectId, cleanName, String(res.site._id));
             }
           },
           error: (err) => console.warn("[ERP] createSite failed:", err?.message ?? err),
@@ -780,6 +781,17 @@ export class ErpDataService {
         siteId: rawSite.siteId,
         openingBalance: Number(rawSite.openingBalance) || 0,
       }];
+    });
+  }
+
+  private migrateOpeningBalanceToSiteId(projectId: string, siteName: string, siteId: string) {
+    const nameKey = `${projectId}::${siteName.trim().toLowerCase() || "project"}`;
+    const siteKey = `${projectId}::site::${siteId}`;
+    this.expenseOpeningBalances.update((balances) => {
+      const nameValue = balances[nameKey];
+      if (nameValue === undefined) return balances;
+      const { [nameKey]: _migrated, ...rest } = balances;
+      return { ...rest, [siteKey]: nameValue };
     });
   }
 
@@ -843,6 +855,7 @@ export class ErpDataService {
           if (res?.site?._id) {
             this.siteKeys.update((keys) => ({ ...keys, [siteKey]: res.site!._id }));
             this.mergeSiteEntity(res.site, projectId);
+            this.migrateOpeningBalanceToSiteId(projectId, siteName, String(res.site._id));
           }
         },
         error: (err) => console.warn("[ERP] createSite for openingBalance failed:", err?.message ?? err),
