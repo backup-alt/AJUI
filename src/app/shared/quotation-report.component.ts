@@ -127,17 +127,17 @@ export interface QuotationReportData {
                 @for (item of items; track item.id || $index) {
                   @if (item.isSectionHeading) {
                     <tr class="section-row">
-                      <td class="col-sno"></td>
+                      <td class="col-sno sno-bold">{{ item.sno || '' }}</td>
                       <td [attr.colspan]="5 + customColumns.length" class="section-header">{{ item.description }}</td>
                     </tr>
                   } @else if (item.description) {
                     <tr [class.sub-row]="!!item.parentRowId" [class.parent-row]="!item.parentRowId">
-                      <td class="col-sno cell-center" [class.sno-bold]="!item.parentRowId">{{ item.isSectionHeading ? '' : (item.sno || ($index + 1)) }}</td>
+                      <td class="col-sno cell-center" [class.sno-bold]="!item.parentRowId">{{ item.sno || ($index + 1) }}</td>
                       <td class="col-desc">{{ item.description }}</td>
-                      <td class="col-unit cell-center">{{ item.unit || '—' }}</td>
-                      <td class="col-qty cell-right">{{ item.qty || 0 }}</td>
-                      <td class="col-rate cell-right">{{ formatRupee(item.rate) }}</td>
-                      <td class="col-amount cell-right">{{ formatRupee(item.amount) }}</td>
+                      <td class="col-unit cell-center">{{ item.parentRowId ? '' : (item.unit || '—') }}</td>
+                      <td class="col-qty cell-right">{{ item.parentRowId ? '' : (item.qty || 0) }}</td>
+                      <td class="col-rate cell-right">{{ item.parentRowId ? '' : formatRupee(item.rate) }}</td>
+                      <td class="col-amount cell-right">{{ item.parentRowId ? '' : formatRupee(item.amount) }}</td>
                       @for (col of customColumns; track col) {
                         <td class="col-custom">{{ item[col] || '—' }}</td>
                       }

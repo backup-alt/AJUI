@@ -858,7 +858,7 @@ export class TaxInvoicePage {
       items: this.invoiceRows().map(r => ({
         ...r,
         isSectionHeading: this.isSectionHeading(r),
-        sno: this.isSectionHeading(r) ? undefined : rowSno[r.id],
+        sno: rowSno[r.id],
       })) as any,
       customColumns: this.customColumns(),
       subtotal: this.subtotal(),
@@ -1339,7 +1339,7 @@ export class TaxInvoicePage {
     const rowSno = this.rowSnoMap();
     const validItems = this.invoiceRows()
       .map((row) => ({
-        sno: this.isSectionHeading(row) ? 0 : (rowSno[row.id] || 0),
+        sno: rowSno[row.id] || 0,
         id: row.id,
         description: (row.description || "").trim(),
         hsnCode: row.hsnCode || "",

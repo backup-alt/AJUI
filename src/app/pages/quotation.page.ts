@@ -1328,7 +1328,7 @@ readonly savingPdf = signal(false);
         return {
           ...customValues,
           id: row.id || String(idx),
-          sno: heading ? undefined : rowSno[row.id],
+          sno: rowSno[row.id],
           description: row.description || "",
           hsnCode: (row as any).hsnCode || "",
           unit: heading ? "" : (row.unit || ""),
