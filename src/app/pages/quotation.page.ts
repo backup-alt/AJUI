@@ -250,7 +250,7 @@ function numberToWords(num: number): string {
                       <tbody>
                         @for (row of quotationRows(); track row.id; let i = $index) {
                           <tr [class.sub-row]="!!row.parentRowId" [class.section-row]="isSectionHeading(row)">
-                            <td class="col-sno">{{ isSectionHeading(row) ? '' : (row.parentRowId ? '' : parentSnoMap()[row.id]) }}</td>
+                            <td class="col-sno">{{ isSectionHeading(row) ? '' : rowSnoMap()[row.id] }}</td>
                             <td class="col-desc">
                               <div class="desc-cell" [class.is-sub]="!!row.parentRowId" [class.is-heading]="isSectionHeading(row)">
                                 <input type="text" [(ngModel)]="row.description" [placeholder]="isSectionHeading(row) ? 'Section heading (e.g. Plumbing Fittings)' : 'Description'" class="table-input" />
@@ -1262,8 +1262,12 @@ readonly savingPdf = signal(false);
   readonly amountInWords = computed(() => numberToWords(Math.round(this.totalAmount())));
 
   /**
-   * Parent-only serial number map. Child rows keep their parent's S.No (used
-   * for the report/PDF). Section-heading parents are excluded so the S.No
+   * Serial number map for every visible row.
+   *  - Parent rows (and section headings) get a sequential counter (1, 2, 3…)
+   *    that is shared with the report/PDF.
+   *  - Child rows (rows with parentRowId) get their own counter that resets
+   *    to 1 within each parent group, so every child has its own number.
+   * Section-heading parents are excluded from the parent counter so the S.No
    * column only increments for actual billable parent rows.
    */
   readonly parentSnoMap = computed<Record<string, number>>(() => {
@@ -1272,6 +1276,24 @@ readonly savingPdf = signal(false);
     for (const row of this.quotationRows()) {
       if (!row.parentRowId && !this.isSectionHeading(row)) counter += 1;
       map[row.id] = counter;
+    }
+    return map;
+  });
+
+  readonly rowSnoMap = computed<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    const childCounters: Record<string, number> = {};
+    for (const row of this.quotationRows()) {
+      if (this.isSectionHeading(row)) {
+        map[row.id] = 0;
+        continue;
+      }
+      if (row.parentRowId) {
+        childCounters[row.parentRowId] = (childCounters[row.parentRowId] || 0) + 1;
+        map[row.id] = childCounters[row.parentRowId];
+      } else {
+        map[row.id] = this.parentSnoMap()[row.id] || 0;
+      }
     }
     return map;
   });
@@ -1285,7 +1307,7 @@ readonly savingPdf = signal(false);
   });
 
   readonly reportQuotation = computed<QuotationReportData>(() => {
-    const snoMap = this.parentSnoMap();
+    const rowSno = this.rowSnoMap();
     return {
       quotationNumber: this.currentQuoteNumber(),
       date: this.quotationDate(),
@@ -1300,7 +1322,7 @@ readonly savingPdf = signal(false);
         return {
           ...customValues,
           id: row.id || String(idx),
-          sno: heading || row.parentRowId ? undefined : snoMap[row.id],
+          sno: heading ? undefined : rowSno[row.id],
           description: row.description || "",
           hsnCode: (row as any).hsnCode || "",
           unit: heading ? "" : (row.unit || ""),

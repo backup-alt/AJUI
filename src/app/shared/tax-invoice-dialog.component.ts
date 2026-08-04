@@ -96,7 +96,7 @@ import { jsPDF } from "jspdf";
                     </tr>
                   } @else if (item.description) {
                     <tr [class.sub-row]="!!item.parentRowId">
-                      <td class="col-sno cell-center">{{ item.parentRowId ? '' : (item.sno || parentSno($index)) }}</td>
+                      <td class="col-sno cell-center">{{ item.isSectionHeading ? '' : (item.sno || ($index + 1)) }}</td>
                       <td class="col-desc">{{ item.description }}</td>
                       <td class="col-hsn cell-center">{{ item.hsnCode || '—' }}</td>
                       <td class="col-unit cell-center">{{ item.unit || '—' }}</td>

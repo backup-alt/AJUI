@@ -263,7 +263,7 @@ function numberToWords(num: number): string {
                       <tbody>
                         @for (row of invoiceRows(); track row.id; let i = $index) {
                           <tr [class.sub-row]="!!row.parentRowId" [class.section-row]="isSectionHeading(row)">
-                            <td class="col-sno cell-center">{{ isSectionHeading(row) ? '' : (row.parentRowId ? '' : parentSnoMap()[row.id]) }}</td>
+                            <td class="col-sno cell-center">{{ isSectionHeading(row) ? '' : rowSnoMap()[row.id] }}</td>
                             <td class="col-desc">
                               <div class="desc-cell" [class.is-sub]="!!row.parentRowId" [class.is-heading]="isSectionHeading(row)">
                                 <input type="text" [(ngModel)]="row.description" [placeholder]="isSectionHeading(row) ? 'Section heading (e.g. Plumbing Fittings)' : 'Description'" class="table-input" />
@@ -789,6 +789,24 @@ export class TaxInvoicePage {
     return map;
   });
 
+  readonly rowSnoMap = computed<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    const childCounters: Record<string, number> = {};
+    for (const row of this.invoiceRows()) {
+      if (this.isSectionHeading(row)) {
+        map[row.id] = 0;
+        continue;
+      }
+      if (row.parentRowId) {
+        childCounters[row.parentRowId] = (childCounters[row.parentRowId] || 0) + 1;
+        map[row.id] = childCounters[row.parentRowId];
+      } else {
+        map[row.id] = this.parentSnoMap()[row.id] || 0;
+      }
+    }
+    return map;
+  });
+
   readonly parentIds = computed(() => {
     const ids = new Set<string>();
     for (const row of this.invoiceRows()) {
@@ -814,6 +832,7 @@ export class TaxInvoicePage {
 
   readonly currentInvoiceForPreview = computed<TaxInvoice | null>(() => {
     if (!this.editingInvoice()) return null;
+    const rowSno = this.rowSnoMap();
     return {
       id: this.editingInvoiceId() || "",
       invoiceNumber: this.currentInvoiceNumber(),
@@ -826,7 +845,11 @@ export class TaxInvoicePage {
       clientAddress: this.clientAddress,
       clientState: this.clientState,
       clientGstin: this.clientGstin,
-      items: this.invoiceRows().map(r => ({ ...r, isSectionHeading: this.isSectionHeading(r) })) as any,
+      items: this.invoiceRows().map(r => ({
+        ...r,
+        isSectionHeading: this.isSectionHeading(r),
+        sno: this.isSectionHeading(r) ? undefined : rowSno[r.id],
+      })) as any,
       customColumns: this.customColumns(),
       subtotal: this.subtotal(),
       cgstPercent: this.cgstPercent(),
@@ -1303,9 +1326,10 @@ export class TaxInvoicePage {
 
     this.saving.set(true);
 
+    const rowSno = this.rowSnoMap();
     const validItems = this.invoiceRows()
-      .map((row, idx) => ({
-        sno: idx + 1,
+      .map((row) => ({
+        sno: this.isSectionHeading(row) ? 0 : (rowSno[row.id] || 0),
         id: row.id,
         description: (row.description || "").trim(),
         hsnCode: row.hsnCode || "",

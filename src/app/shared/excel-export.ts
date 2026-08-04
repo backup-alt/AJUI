@@ -223,17 +223,30 @@ export async function buildBusinessDocumentXlsx(args: BuildExportArgs): Promise<
   });
 
   // ─── Items table body ───────────────────────────────────────────────────
-  // Compute parent-only serial numbers (children skip).
+  // Compute serial numbers:
+  //  - Parent rows get a sequential counter (1, 2, 3…) shared with the PDF.
+  //  - Child rows get their own counter that resets to 1 within each parent
+  //    group, so every child has its own number.
   const parentSnoMap: Record<string, number> = {};
   let counter = 0;
   for (const row of args.items) {
     if (!row.parentRowId) counter += 1;
     parentSnoMap[row.id] = counter;
   }
+  const rowSnoMap: Record<string, number> = {};
+  const childCounters: Record<string, number> = {};
+  for (const row of args.items) {
+    if (row.parentRowId) {
+      childCounters[row.parentRowId] = (childCounters[row.parentRowId] || 0) + 1;
+      rowSnoMap[row.id] = childCounters[row.parentRowId];
+    } else {
+      rowSnoMap[row.id] = parentSnoMap[row.id] || 0;
+    }
+  }
 
   for (const row of args.items) {
     const values: Array<string | number> = [];
-    values.push(row.parentRowId ? "" : parentSnoMap[row.id]); // S.No
+    values.push(rowSnoMap[row.id] || ""); // S.No
     values.push(row.description || ""); // Description
     if (hasHsn) values.push(row.hsnCode || "");
     values.push(row.unit || "");
