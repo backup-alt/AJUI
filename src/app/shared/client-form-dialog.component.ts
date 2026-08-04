@@ -22,10 +22,18 @@ export type ClientFormValue = {
   mobile: string;
   address: string;
   gstNumber?: string;
+  state?: string;
   supervisor?: string;
   supervisorId?: string;
   status?: "Active" | "On Hold" | "Completed";
 };
+
+const INDIAN_STATES = [
+  "Tamil Nadu", "Kerala", "Karnataka", "Andhra Pradesh", "Telangana",
+  "Maharashtra", "Gujarat", "Rajasthan", "Madhya Pradesh", "Uttar Pradesh",
+  "Bihar", "West Bengal", "Odisha", "Punjab", "Haryana", "Delhi",
+  "Chandigarh", "Goa", "Other",
+];
 
 type SupervisorOption = { id: string; name: string };
 
@@ -63,6 +71,15 @@ type SupervisorOption = { id: string; name: string };
           <label>
             <span>GSTIN</span>
             <input name="gstNumber" [value]="initialValue?.gstNumber || ''" placeholder="22AAAAA0000A1Z5" maxlength="15" />
+          </label>
+          <label>
+            <span>State</span>
+            <select name="state" [value]="initialValue?.state || ''">
+              <option value="">Select state</option>
+              @for (state of states; track state) {
+                <option [value]="state">{{ state }}</option>
+              }
+            </select>
           </label>
           <label>
             <span>Assigned Supervisor</span>
@@ -186,6 +203,7 @@ export class ClientFormDialogComponent implements OnInit {
   readonly selectedSupervisorId = signal<string | null>(null);
   readonly selectedSupervisorName = signal<string>("");
   readonly showSupervisorPanel = signal(false);
+  readonly states = INDIAN_STATES;
   private initialSupervisorHandled = false;
 
   readonly filteredSupervisors = computed<SupervisorOption[]>(() => {
@@ -298,6 +316,7 @@ export class ClientFormDialogComponent implements OnInit {
       mobile: String(formData.get("mobile") ?? "").trim(),
       address: String(formData.get("address") ?? "").trim(),
       gstNumber: String(formData.get("gstNumber") ?? "").trim(),
+      state: String(formData.get("state") ?? "").trim() || undefined,
       supervisor: String(formData.get("supervisor") ?? "").trim(),
       supervisorId: this.selectedSupervisorId() || undefined,
       status: status as "Active" | "On Hold" | "Completed",

@@ -28,6 +28,7 @@ export type Client = {
   mobile: string;
   address: string;
   gstNumber?: string;
+  state?: string;
   status: ClientStatus;
   projectIds: string[];
   supervisor: string;

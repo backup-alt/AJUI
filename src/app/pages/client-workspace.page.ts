@@ -303,6 +303,8 @@ export class ClientWorkspacePage implements OnInit {
       name: currentClient.name,
       mobile: currentClient.mobile,
       address: currentClient.address,
+      gstNumber: currentClient.gstNumber || "",
+      state: currentClient.state || "",
       supervisor: currentClient.supervisor || "",
       status: currentClient.status,
     };

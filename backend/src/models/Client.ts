@@ -10,6 +10,7 @@ export interface IClient extends Document {
   mobile: string;
   address: string;
   gstNumber?: string;
+  state?: string;
   status: ClientStatus;
   supervisor?: string;
   supervisorId?: Types.ObjectId;
@@ -31,6 +32,7 @@ const clientSchema = new Schema<IClient>(
     mobile: { type: String, required: true, trim: true },
     address: { type: String, required: true },
     gstNumber: { type: String, trim: true },
+    state: { type: String, trim: true },
     status: {
       type: String,
       enum: ["Active", "On Hold", "Completed"],

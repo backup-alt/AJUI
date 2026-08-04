@@ -34,6 +34,7 @@ export function mapClient(c: any): Client {
     mobile: c.mobile,
     address: c.address,
     gstNumber: c.gstNumber || "",
+    state: c.state || "",
     status: (c.status || "Active") as ClientStatus,
     projectIds: c.projectIds || [],
     supervisor: c.supervisor || "",

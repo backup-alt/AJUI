@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ErpDataService } from "../data/erp-data.service";
 import type { Quotation, TaxInvoice } from "../../data/dashboardData";
@@ -54,10 +54,6 @@ import { jsPDF } from "jspdf";
                   <div class="inv-meta-row">
                     <span class="inv-meta-label">Place of Supply</span>
                     <span class="inv-meta-value">{{ invoice?.state || '—' }}</span>
-                  </div>
-                  <div class="inv-meta-row">
-                    <span class="inv-meta-label">Supply Type</span>
-                    <span class="inv-meta-value" [class.intrastate]="supplyType() === 'Intrastate'" [class.interstate]="supplyType() === 'Interstate'">{{ supplyType() }}</span>
                   </div>
                 </div>
               </div>
@@ -321,15 +317,6 @@ export class TaxInvoiceDialogComponent {
   readonly profile = this.data.companyProfile;
   readonly currentPage = signal(1);
   readonly totalPages = signal(1);
-
-  readonly supplyType = computed(() => {
-    const inv = this.invoice as (Quotation | TaxInvoice) | null;
-    if (!inv) return "—";
-    if ("supplyType" in inv && inv.supplyType) return inv.supplyType;
-    const co = this.profile();
-    if (!co?.state || !inv.state) return "—";
-    return co.state.trim().toLowerCase() === inv.state.trim().toLowerCase() ? "Intrastate" : "Interstate";
-  });
 
   get items() {
     return (this.invoice as any)?.items || [];

@@ -1190,6 +1190,7 @@ readonly savingPdf = signal(false);
       mobile: "",
       address: d.clientAddress,
       gstNumber: d.clientGstin,
+      state: d.clientState,
       supervisor: "",
       status: "Active",
     };
@@ -1380,6 +1381,7 @@ readonly savingPdf = signal(false);
     this.clientName = client.name;
     this.clientAddress = client.address;
     this.clientGstin = client.gstNumber || "";
+    this.clientState = client.state || "Tamil Nadu";
     this.clientSearchTerm.set(client.name);
     this.selectedClientId.set(client._id || "");
     this.showClientDropdown.set(false);
@@ -1417,6 +1419,7 @@ readonly savingPdf = signal(false);
       mobile: value.mobile,
       address: value.address,
       gstNumber: value.gstNumber || "",
+      state: value.state || "",
       supervisor: value.supervisor || "",
       status: value.status || "Active",
     }).subscribe({

@@ -169,6 +169,8 @@ export class ClientDashboardPage {
       name: value.name,
       mobile: value.mobile,
       address: value.address,
+      gstNumber: value.gstNumber || "",
+      state: value.state || "",
       supervisor: value.supervisor || "",
       status: value.status || 'Active',
     };
@@ -214,6 +216,8 @@ export class ClientDashboardPage {
       name: client.name,
       mobile: client.mobile,
       address: client.address,
+      gstNumber: client.gstNumber || "",
+      state: client.state || "",
       supervisor: client.supervisor || "",
       status: client.status,
     };

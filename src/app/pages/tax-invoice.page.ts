@@ -172,10 +172,6 @@ function numberToWords(num: number): string {
                           <span class="meta-label">Place of Supply:</span>
                           <span class="meta-value">{{ invoiceState() }}</span>
                         </div>
-                        <div class="meta-row">
-                          <span class="meta-label">Supply Type:</span>
-                          <span class="meta-value supply-type" [class]="supplyType() === 'Intrastate' ? 'intrastate' : 'interstate'">{{ supplyType() }}</span>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -502,9 +498,6 @@ function numberToWords(num: number): string {
     .meta-row { display: flex; justify-content: flex-end; gap: 10px; }
     .meta-label { font-size: 11px; color: #64748b; min-width: 90px; text-align: right; }
     .meta-value { font-size: 12px; font-weight: 600; color: #1e293b; min-width: 120px; }
-    .supply-type { font-weight: 700; }
-    .supply-type.intrastate { color: #16a34a; }
-    .supply-type.interstate { color: #d97706; }
     .client-section { margin-bottom: 20px; }
     .section-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px; }
     .client-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -720,6 +713,7 @@ export class TaxInvoicePage {
       mobile: "",
       address: d.clientAddress,
       gstNumber: d.clientGstin,
+      state: d.clientState,
       supervisor: "",
       status: "Active",
     };
@@ -897,6 +891,7 @@ export class TaxInvoicePage {
     this.clientName = client.name;
     this.clientAddress = client.address;
     this.clientGstin = client.gstNumber || "";
+    this.clientState = client.state || "Tamil Nadu";
     this.clientSearchTerm.set(client.name);
     this.selectedClientId.set(client._id || "");
     this.showClientDropdown.set(false);
@@ -934,6 +929,7 @@ export class TaxInvoicePage {
       mobile: value.mobile,
       address: value.address,
       gstNumber: value.gstNumber || "",
+      state: value.state || "",
       supervisor: value.supervisor || "",
       status: value.status || "Active",
     }).subscribe({
