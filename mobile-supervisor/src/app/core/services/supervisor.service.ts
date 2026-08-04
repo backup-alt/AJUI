@@ -113,6 +113,11 @@ export class SupervisorService {
     const siteId = this.selectedSiteId();
     if (!siteId) return 0;
     try {
+      // The opening balance is admin-controlled from the web and changes
+      // out-of-band, so always bypass the 5-minute GET cache for this fetch —
+      // otherwise a freshly created site (or a just-edited opening balance)
+      // would still read as 0 until the cache expired.
+      this.api.invalidateGetCache('/supervisor/sites');
       const res = await this.getSites().toPromise();
       const site = res?.sites?.find((s) => s.id === siteId || s.siteId === siteId);
       return Number(site?.openingBalance) || 0;
