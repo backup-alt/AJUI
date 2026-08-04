@@ -312,12 +312,11 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         } @else {
                           <td>
                             <input
-                              class="approval-table-input"
-                              inputmode="decimal"
+                              class="approval-table-input readonly-field"
                               type="number"
-                              [(ngModel)]="row.givenAmount"
-                              aria-label="Given amount"
-                              min="0"
+                              [value]="row.givenAmount ?? ''"
+                              aria-label="Given amount (from supervisor)"
+                              readonly
                             />
                           </td>
                           <td>

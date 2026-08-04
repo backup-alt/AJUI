@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenu } from "@ionic/angular/standalone";
+import { MenuController } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import type { Project, ProjectStatus } from "../../data/dashboardData";
@@ -31,6 +32,7 @@ type SidebarItem = {
               *ngFor="let item of items"
               button
               [routerLink]="item.route"
+              (click)="closeMenu()"
               [class.selected]="active === item.key"
               [class.disabled]="item.disabled"
               [disabled]="item.disabled"
@@ -95,6 +97,11 @@ export class EnterpriseSidebarComponent {
   private readonly data = inject(ErpDataService);
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  private readonly menuController = inject(MenuController);
+
+  closeMenu() {
+    void this.menuController.close();
+  }
 
   @Input() active = "dashboard";
   @Input() clientId: string | null = null;

@@ -255,7 +255,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         </th>
                       }
                       <th class="col-status">Status</th>
-                      <th class="col-action">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -369,28 +368,13 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                           </td>
                         }
                         <td class="col-status">
-                          @if (editingRowId() === row.id) {
-                            <select [value]="row.status" (blur)="updateField(row, 'status', $any($event.target).value)" class="table-input">
-                              <option value="Received">Received</option>
-                              <option value="Not Received">Not Received</option>
-                            </select>
-                          } @else {
-                            <span class="status-badge" [ngClass]="statusBadgeClass(row.status)">{{ row.status || 'Not Received' }}</span>
-                          }
-                        </td>
-                        <td class="col-action">
-                          @if (editingRowId() === row.id) {
-                            <button type="button" class="btn-save" (click)="saveRow(row)">Save</button>
-                          } @else {
-                            <button type="button" class="btn-edit" (click)="editRow(row)">Edit</button>
-                            <button type="button" class="btn-delete" (click)="deleteRow(row.id)">Delete</button>
-                          }
+                          <span class="status-badge" [ngClass]="statusBadgeClass(normalizedReceivedStatus(row.status))">{{ normalizedReceivedStatus(row.status) }}</span>
                         </td>
                       </tr>
                     }
                     @if (filteredSiteMaterials().length === 0 && !loadingMaterials()) {
                       <tr>
-                        <td class="empty-row" [attr.colspan]="9 + customColumns().length">
+                        <td class="empty-row" [attr.colspan]="11 + customColumns().length">
                           <span>{{ materialSearchQuery() ? 'No materials match your search.' : 'No material purchases recorded for this site.' }}</span>
                         </td>
                       </tr>
@@ -1384,6 +1368,10 @@ export class VendorDashboardPage {
 
   statusBadgeClass(status: string): string {
     return (status || "not-received").toLowerCase().replace(/\s+/g, "-");
+  }
+
+  normalizedReceivedStatus(status: string | undefined | null): "Received" | "Not Received" {
+    return (status || "").trim() === "Received" ? "Received" : "Not Received";
   }
 
   async createVendor(value: VendorFormValue) {
