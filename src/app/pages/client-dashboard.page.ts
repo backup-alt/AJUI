@@ -155,13 +155,13 @@ export class ClientDashboardPage {
   }
 
   createClient(value: ClientFormValue) {
-    if (!value.name || !value.mobile || !value.address || !value.supervisor) return;
-    
+    if (!value.name || !value.mobile || !value.address) return;
+
     const payload = {
       name: value.name,
       mobile: value.mobile,
       address: value.address,
-      supervisor: value.supervisor,
+      supervisor: value.supervisor || "",
       status: value.status || 'Active',
     };
 
@@ -174,6 +174,7 @@ export class ClientDashboardPage {
             ...value,
             id: clientId,
             _id: created?._id,
+            supervisor: value.supervisor || "",
           } as Client);
           const project = await this.data.createDefaultProject(client);
           this.showClientForm.set(false);
@@ -203,14 +204,14 @@ export class ClientDashboardPage {
       name: client.name,
       mobile: client.mobile,
       address: client.address,
-      supervisor: client.supervisor,
+      supervisor: client.supervisor || "",
       status: client.status,
     };
   }
 
   updateClient(value: ClientFormValue) {
     const client = this.editingClient();
-    if (!client || !value.name || !value.mobile || !value.address || !value.supervisor) return;
+    if (!client || !value.name || !value.mobile || !value.address) return;
     this.data.updateClient(client.id, value);
     this.closeClientForm();
   }

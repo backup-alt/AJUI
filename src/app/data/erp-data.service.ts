@@ -585,7 +585,7 @@ export class ErpDataService {
       name: `${client.name} Project`,
       sites: ["Main Site"],
       startDate: new Date().toISOString().slice(0, 10),
-      supervisor: client.supervisor,
+      supervisor: client.supervisor || "",
       status: "Active",
       totalValue: 0,
       advanceAmount: 0,

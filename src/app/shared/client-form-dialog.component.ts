@@ -22,7 +22,7 @@ export type ClientFormValue = {
   mobile: string;
   address: string;
   gstNumber?: string;
-  supervisor: string;
+  supervisor?: string;
   supervisorId?: string;
   status?: "Active" | "On Hold" | "Completed";
 };
@@ -70,7 +70,6 @@ type SupervisorOption = { id: string; name: string };
               <input
                 #supervisorInput
                 type="text"
-                required
                 autocomplete="off"
                 [value]="supervisorDisplayValue()"
                 (input)="onSupervisorSearchInput($event)"

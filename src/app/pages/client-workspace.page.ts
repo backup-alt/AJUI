@@ -296,14 +296,14 @@ export class ClientWorkspacePage implements OnInit {
       name: currentClient.name,
       mobile: currentClient.mobile,
       address: currentClient.address,
-      supervisor: currentClient.supervisor,
+      supervisor: currentClient.supervisor || "",
       status: currentClient.status,
     };
   }
 
   saveClient(value: ClientFormValue) {
     const currentClient = this.client();
-    if (!currentClient || !value.name || !value.mobile || !value.address || !value.supervisor) return;
+    if (!currentClient || !value.name || !value.mobile || !value.address) return;
     this.data.updateClient(currentClient.id, value);
     this.editingClient.set(false);
   }

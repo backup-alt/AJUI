@@ -39,7 +39,7 @@ const projectSchema = new Schema<IProject>(
     clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true, index: true },
     mobile: { type: String, required: true },
     address: { type: String, required: true },
-    supervisor: { type: String, required: true },
+    supervisor: { type: String, trim: true },
     supervisorId: { type: Schema.Types.ObjectId, ref: "Supervisor" },
     siteIds: [{ type: Schema.Types.ObjectId, ref: "Site" }],
     siteNames: { type: [String], default: [] },
