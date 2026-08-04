@@ -2179,9 +2179,9 @@ export class ProjectWorkspacePage {
     event.preventDefault();
     const site = this.siteDraftName().trim();
     if (!site) return;
-    const openingBalance = this.siteDraftOpeningBalance();
-    this.data.addSiteToProject(this.projectId(), site);
-    if (openingBalance != null && openingBalance > 0) {
+    const openingBalance = this.siteDraftOpeningBalance() ?? 0;
+    this.data.addSiteToProject(this.projectId(), site, openingBalance);
+    if (openingBalance > 0) {
       this.data.setExpenseOpeningBalance(this.projectId(), site, openingBalance);
     }
     this.activeSite.set(site);
@@ -2509,7 +2509,11 @@ export class ProjectWorkspacePage {
     const { openingBalance, ...projectValue } = value;
     if (editing) {
       const updated = this.data.updateProject(editing.id, { ...projectValue, expenseBalance: openingBalance });
-      this.data.setExpenseOpeningBalance(editing.id, editing.sites[0] ?? "Main Site", openingBalance);
+      if (editing.sites[0]) {
+        this.data.persistSiteOpeningBalance(editing.id, editing.sites[0], openingBalance);
+      } else {
+        this.data.setExpenseOpeningBalance(editing.id, "Main Site", openingBalance);
+      }
       // Persist supervisor/site changes to the backend so the supervisor mobile
       // app receives the updated site assignments.
       void this.data.persistProjectEdit(editing.id, {
@@ -3224,7 +3228,7 @@ export class ProjectWorkspacePage {
   }
 
   updateExpenseOpeningBalance(value: string) {
-    this.data.setExpenseOpeningBalance(this.projectId(), this.expenseEditableSite(), this.moneyNumber(value));
+    this.data.persistSiteOpeningBalance(this.projectId(), this.expenseEditableSite(), this.moneyNumber(value));
   }
 
   toggleExpenseOpeningEdit() {
@@ -3244,7 +3248,7 @@ export class ProjectWorkspacePage {
   }
 
   updateExpenseDraftOpeningBalance(value: string) {
-    this.data.setExpenseOpeningBalance(this.projectId(), this.expenseDraftSite(), this.moneyNumber(value));
+    this.data.persistSiteOpeningBalance(this.projectId(), this.expenseDraftSite(), this.moneyNumber(value));
   }
 
   expenseOpeningBalanceLabel(): string {

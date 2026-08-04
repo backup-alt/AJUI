@@ -109,6 +109,18 @@ export class SupervisorService {
     return this.api.get<SitesResponse>('/supervisor/sites');
   }
 
+  async getSelectedSiteOpeningBalance(): Promise<number> {
+    const siteId = this.selectedSiteId();
+    if (!siteId) return 0;
+    try {
+      const res = await this.getSites().toPromise();
+      const site = res?.sites?.find((s) => s.id === siteId || s.siteId === siteId);
+      return Number(site?.openingBalance) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
   // ---------------- Approvals ----------------
   getApprovals() {
     return this.api.get<ApprovalsListResponse>('/supervisor/approvals');

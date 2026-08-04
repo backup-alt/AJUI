@@ -89,6 +89,7 @@ export type Site = {
   name: string;
   status: "Active" | "On Hold" | "Completed";
   projectId?: string;
+  openingBalance?: number;
   materialEntryCount?: number;
   materialNames?: string[];
 };
@@ -738,38 +739,48 @@ export class ErpDataService {
     );
 
     if (updatedProject) {
-      this.api.createSite({ name: cleanName, projectIds: [projectId], openingBalance }).subscribe({
-        next: (res) => {
-          if (res?.site?._id) {
-            const siteKey = this.siteKeyFor(projectId, cleanName);
-            this.siteKeys.update((keys) => ({ ...keys, [siteKey]: res.site!._id }));
-            // Make the new site immediately available to the supervisor site
-            // picker / sites directory without waiting for a refetch.
-            const newSite = res.site as any;
-            const newSiteId = String(newSite._id || newSite.id || "");
-            this.siteEntities.update((entities) => {
-              if (!newSiteId || entities.some((e) => String(e.id) === newSiteId)) return entities;
-              const projectIds = Array.isArray(newSite.projectIds)
-                ? newSite.projectIds.map((pid: any) => String(pid))
-                : (newSite.projectId ? [String(newSite.projectId)] : [projectId]);
-              return [...entities, {
-                id: newSiteId,
-                _id: newSiteId,
-                name: newSite.name || cleanName,
-                status: (newSite.status || "Active") as "Active" | "On Hold" | "Completed",
-                projectId: projectIds[0] || projectId,
-                projectIds,
-                siteId: newSite.siteId,
-              }];
-            });
-          }
-        },
-        error: (err) => console.warn("[ERP] createSite failed:", err?.message ?? err),
-      });
+      const siteKey = this.siteKeyFor(projectId, cleanName);
+      const existingSiteId = this.siteKeys()[siteKey];
+      if (existingSiteId) {
+        this.api.updateSite(existingSiteId, { openingBalance }).subscribe({
+          error: (err) => console.warn("[ERP] updateSite failed:", err?.message ?? err),
+        });
+      } else {
+        this.api.createSite({ name: cleanName, projectIds: [projectId], openingBalance }).subscribe({
+          next: (res) => {
+            if (res?.site?._id) {
+              this.siteKeys.update((keys) => ({ ...keys, [siteKey]: res.site!._id }));
+              this.mergeSiteEntity(res.site, projectId);
+            }
+          },
+          error: (err) => console.warn("[ERP] createSite failed:", err?.message ?? err),
+        });
+      }
 
       this.touchProject(projectId);
     }
     return updatedProject;
+  }
+
+  private mergeSiteEntity(rawSite: any, fallbackProjectId?: string) {
+    const rawId = String(rawSite._id || rawSite.id || "");
+    if (!rawId) return;
+    this.siteEntities.update((entities) => {
+      if (entities.some((e) => String(e.id) === rawId)) return entities;
+      const projectIds = Array.isArray(rawSite.projectIds)
+        ? rawSite.projectIds.map((pid: any) => String(pid))
+        : (rawSite.projectId ? [String(rawSite.projectId)] : (fallbackProjectId ? [fallbackProjectId] : []));
+      return [...entities, {
+        id: rawId,
+        _id: rawId,
+        name: rawSite.name,
+        status: (rawSite.status || "Active") as "Active" | "On Hold" | "Completed",
+        projectId: projectIds[0] || fallbackProjectId,
+        projectIds,
+        siteId: rawSite.siteId,
+        openingBalance: Number(rawSite.openingBalance) || 0,
+      }];
+    });
   }
 
   removeSiteFromProject(projectId: string, siteName: string): Project | undefined {
@@ -813,6 +824,30 @@ export class ErpDataService {
     const key = this.expenseOpeningBalanceKey(projectId, siteName);
     this.expenseOpeningBalances.update((balances) => ({ ...balances, [key]: amount }));
     this.touchProject(projectId);
+  }
+
+  persistSiteOpeningBalance(projectId: string, siteName: string, amount: number) {
+    this.setExpenseOpeningBalance(projectId, siteName, amount);
+    const siteKey = this.siteKeyFor(projectId, siteName);
+    const siteId = this.siteKeys()[siteKey];
+    if (siteId) {
+      this.api.updateSite(siteId, { openingBalance: amount }).subscribe({
+        next: (res) => {
+          if (res?.site?._id) this.mergeSiteEntity(res.site, projectId);
+        },
+        error: (err) => console.warn("[ERP] updateSite openingBalance failed:", err?.message ?? err),
+      });
+    } else {
+      this.api.createSite({ name: siteName, projectIds: [projectId], openingBalance: amount }).subscribe({
+        next: (res) => {
+          if (res?.site?._id) {
+            this.siteKeys.update((keys) => ({ ...keys, [siteKey]: res.site!._id }));
+            this.mergeSiteEntity(res.site, projectId);
+          }
+        },
+        error: (err) => console.warn("[ERP] createSite for openingBalance failed:", err?.message ?? err),
+      });
+    }
   }
 
   setExpenses(rows: ExpenseRow[]) {

@@ -561,6 +561,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   async loadBalance() {
     const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
+    const openingBalance = await this.supervisor.getSelectedSiteOpeningBalance();
     this.supervisor
       .getExpenses({
         siteId: siteId ?? undefined,
@@ -577,7 +578,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
           const spent = res.expenses
             .filter((e) => e.transactionType !== 'Cash Added')
             .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-          this.currentBalance.set(cashAdded - spent);
+          this.currentBalance.set(openingBalance + cashAdded - spent);
         },
         error: () => this.currentBalance.set(0),
       });

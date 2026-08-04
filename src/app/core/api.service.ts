@@ -571,6 +571,13 @@ export class ApiService {
     );
   }
 
+  updateSite(id: string, payload: { name?: string; status?: string; openingBalance?: number }): Observable<{ site: any }> {
+    return this.http.patch<{ site: any }>(`${this.baseUrl}/sites/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.invalidateCache()),
+      catchError(this.handleError)
+    );
+  }
+
   listSitesAdmin(): Observable<{ sites: any[] }> {
     return this.cachedGet<{ sites: any[] }>(`${this.baseUrl}/admin/sites`);
   }

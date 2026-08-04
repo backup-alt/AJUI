@@ -32,6 +32,7 @@ export interface Site {
   projectName?: string;
   employeeCount?: number;
   daysActive?: number;
+  openingBalance?: number;
   updatedAt?: string;
 }
 

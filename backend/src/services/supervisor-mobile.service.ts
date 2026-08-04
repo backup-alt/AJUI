@@ -523,6 +523,7 @@ export async function getAssignedSites(userId: string) {
       projectName: firstProjectId ? projectIdToName.get(firstProjectId) : undefined,
       employeeCount: stats.workerCount,
       daysActive: stats.daysActiveCount,
+      openingBalance: Number(s.openingBalance) || 0,
       updatedAt: (s as any).updatedAt?.toISOString?.() || s.createdAt?.toISOString?.(),
     };
   });
@@ -610,7 +611,7 @@ export async function getSupervisorDashboard(
       .lean()
       .maxTimeMS(8_000)),
     safeDashboardList("sites", Site.find(siteQuery)
-      .select("_id siteId name status supervisor startDate targetEndDate projectIds updatedAt createdAt")
+      .select("_id siteId name status supervisor startDate targetEndDate projectIds openingBalance updatedAt createdAt")
       .sort({ createdAt: -1, _id: -1 })
       .limit(25)
       .lean()
@@ -695,6 +696,7 @@ export async function getSupervisorDashboard(
       projectName: firstProjectId ? projectIdToName.get(firstProjectId) : undefined,
       employeeCount,
       daysActive: 0,
+      openingBalance: Number(s.openingBalance) || 0,
       updatedAt: (s as any).updatedAt?.toISOString?.() || s.createdAt?.toISOString?.(),
     };
   });

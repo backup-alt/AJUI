@@ -344,6 +344,7 @@ export class ExpensesPage implements OnInit {
   searchQuery = '';
   statusFilter: ExpenseStatus | '' = '';
   selectedSiteName = signal<string | null>(null);
+  openingBalance = signal(0);
 
   viewerUrl = signal<string | null>(null);
   zoomScale = 1;
@@ -375,7 +376,7 @@ export class ExpensesPage implements OnInit {
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
   );
 
-  balance = computed(() => this.cashAdded() - this.cashSpent());
+  balance = computed(() => this.openingBalance() + this.cashAdded() - this.cashSpent());
 
   async ngOnInit(): Promise<void> {
     addIcons({
@@ -384,12 +385,14 @@ export class ExpensesPage implements OnInit {
     });
     await this.supervisor.init();
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
+    this.openingBalance.set(await this.supervisor.getSelectedSiteOpeningBalance());
     await this.loadExpenses();
 
     this.supervisor.siteChanged$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         this.selectedSiteName.set(this.supervisor.selectedSiteName());
+        void this.supervisor.getSelectedSiteOpeningBalance().then((value) => this.openingBalance.set(value));
         void this.loadExpenses();
       });
   }

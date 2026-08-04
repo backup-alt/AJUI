@@ -274,7 +274,12 @@ export class ClientWorkspacePage {
     const editing = this.editingProject();
     if (editing) {
       const updated = this.data.updateProject(editing.id, { ...projectValue, expenseBalance: openingBalance });
-      this.data.setExpenseOpeningBalance(editing.id, updated?.sites[0] ?? editing.sites[0] ?? "Main Site", openingBalance);
+      const firstSite = updated?.sites[0] ?? editing.sites[0];
+      if (firstSite) {
+        this.data.persistSiteOpeningBalance(editing.id, firstSite, openingBalance);
+      } else {
+        this.data.setExpenseOpeningBalance(editing.id, "Main Site", openingBalance);
+      }
       // Persist supervisor/site changes to the backend so the supervisor mobile
       // app receives the updated site assignments.
       void this.data.persistProjectEdit(editing.id, {
