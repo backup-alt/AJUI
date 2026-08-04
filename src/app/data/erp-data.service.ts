@@ -581,16 +581,31 @@ export class ErpDataService {
     this.materials.update((materials) => materials.filter((m) => m.id !== materialId));
   }
 
+  private readonly defaultProjectInFlight = new Set<string>();
+
   async createDefaultProject(client: Client): Promise<Project> {
-    return this.addProject(client, {
-      name: `${client.name} Project`,
-      sites: [],
-      startDate: new Date().toISOString().slice(0, 10),
-      supervisor: client.supervisor || "",
-      status: "Active",
-      totalValue: 0,
-      advanceAmount: 0,
-    });
+    const existing = this.firstProjectForClient(client);
+    if (existing) return existing;
+    if (this.defaultProjectInFlight.has(client.id)) {
+      const inFlight = this.firstProjectForClient(client);
+      if (inFlight) return inFlight;
+    }
+    this.defaultProjectInFlight.add(client.id);
+    try {
+      const recheck = this.firstProjectForClient(client);
+      if (recheck) return recheck;
+      return await this.addProject(client, {
+        name: `${client.name} Project`,
+        sites: [],
+        startDate: new Date().toISOString().slice(0, 10),
+        supervisor: client.supervisor || "",
+        status: "Active",
+        totalValue: 0,
+        advanceAmount: 0,
+      });
+    } finally {
+      this.defaultProjectInFlight.delete(client.id);
+    }
   }
 
   firstProjectForClient(client: Client | undefined): Project | undefined {

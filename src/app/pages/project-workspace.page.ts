@@ -1120,6 +1120,15 @@ export class ProjectWorkspacePage {
       const projectId = this.projectId();
       if (projectId) this.data.touchProject(projectId);
     });
+    // Keep the active section in sync with the URL param so browser
+    // back/forward or direct navigation doesn't leave the previous
+    // section's table on screen.
+    effect(() => {
+      const urlSection = this.normalizeSection(this.paramMap().get("section"));
+      if (urlSection !== this.activeSection()) {
+        this.activeSection.set(urlSection);
+      }
+    });
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.fetchAttendanceData(projectId);

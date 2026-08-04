@@ -164,7 +164,7 @@ export class ProjectsDirectoryPage implements OnInit {
       next: (res) => {
         const client = res.items.find((c) => c.name === project.client);
         if (client) {
-          void this.router.navigate(["/clients", client._id, "projects", project._id, "materials"]);
+          void this.router.navigate(["/clients", client.clientId || client._id, "projects", project._id, "materials"]);
         }
       },
       error: () => {},

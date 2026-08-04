@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import {
   IonBadge,
@@ -173,11 +174,12 @@ import { formatMoney, statusClass } from "../shared/format";
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ClientWorkspacePage implements OnInit {
+export class ClientWorkspacePage {
   readonly data = inject(ErpDataService);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
-  readonly clientId = signal(this.route.snapshot.paramMap.get("clientId") ?? "");
+  readonly paramMap = toSignal(this.route.paramMap, { initialValue: this.route.snapshot.paramMap });
+  readonly clientId = computed(() => this.paramMap().get("clientId") ?? "");
   readonly showProjectForm = signal(false);
   readonly editingProject = signal<Project | null>(null);
   readonly editingClient = signal(false);
@@ -187,10 +189,20 @@ export class ClientWorkspacePage implements OnInit {
   readonly client = computed(() => this.data.clientById(this.clientId()));
   readonly projects = computed(() => this.data.projectsForClient(this.client()));
 
-  ngOnInit() {
-    const currentClient = this.client();
-    if (!currentClient) return;
-    void this.openClientWorkspace(currentClient);
+  private readonly autoOpenedClientId = new Set<string>();
+
+  constructor() {
+    // Route params are reactive so a reused component instance (e.g. navigating
+    // from one client's workspace to another) always resolves the correct
+    // client instead of the snapshot from the previous URL.
+    effect(() => {
+      const clientId = this.clientId();
+      if (!clientId || this.autoOpenedClientId.has(clientId)) return;
+      const currentClient = this.client();
+      if (!currentClient) return;
+      this.autoOpenedClientId.add(clientId);
+      void this.openClientWorkspace(currentClient);
+    });
   }
 
   private async openClientWorkspace(currentClient: NonNullable<ReturnType<ErpDataService["clientById"]>>) {

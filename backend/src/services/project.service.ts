@@ -350,7 +350,15 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
   if (!project) throw new AppError(404, "Project not found");
 
   if (patch.clientId) {
-    await Client.findByIdAndUpdate(patch.clientId, { $addToSet: { projectIds: project.projectId } });
+    const oldClientId = String((existing.clientId as Types.ObjectId | undefined)?.toString() ?? "");
+    const newClientId = patch.clientId;
+    // A project must belong to exactly one client — detach it from the
+    // previous client when it is reassigned, otherwise it would appear
+    // under both clients.
+    if (oldClientId && oldClientId !== newClientId) {
+      await Client.findByIdAndUpdate(oldClientId, { $pull: { projectIds: project.projectId } });
+    }
+    await Client.findByIdAndUpdate(newClientId, { $addToSet: { projectIds: project.projectId } });
   }
 
   // Sync supervisor↔project↔sites if the supervisor changed OR if sites
