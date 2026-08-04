@@ -136,7 +136,7 @@ function numberToWords(num: number): string {
                     Back to Quotations
                   </button>
                   <div class="editor-actions">
-                    <button type="button" class="btn-outline" (click)="exportToExcel()">Export Excel</button>
+                    <button type="button" class="btn-outline" (click)="exportToExcel()" [disabled]="savingExcel()">Export Excel</button>
                     <button type="button" class="btn-secondary" (click)="saveQuotation('Draft')" [disabled]="savingQuote()">Save as Draft</button>
                     <button type="button" class="btn-primary" (click)="saveQuotation('Sent')" [disabled]="savingQuote()">Save & Send</button>
                     <button type="button" class="btn-outline" (click)="showQuotationPreview.set(true)" [disabled]="savingQuote()">Preview</button>
@@ -1157,6 +1157,7 @@ export class QuotationPage {
   readonly showAddColumnInput = signal(false);
   readonly newColumnName = signal("");
 readonly savingPdf = signal(false);
+  readonly savingExcel = signal(false);
   readonly savingQuote = signal(false);
   readonly editingQuoteId = signal<string | null>(null);
   readonly quotationRows = signal<QuotationRow[]>([]);
@@ -1808,55 +1809,63 @@ readonly savingPdf = signal(false);
   }
 
   async exportToExcel() {
-    const rows = this.quotationRows();
-    const customColumns = this.customColumns();
-    const company = this.companyProfile();
-    const items = rows.map((row) => {
-      const customValues: Record<string, string> = {};
-      customColumns.forEach((col) => {
-        customValues[col] = (row as any)[col] || "";
+    this.savingExcel.set(true);
+    try {
+      const rows = this.quotationRows();
+      const customColumns = this.customColumns();
+      const company = this.companyProfile();
+      const items = rows.map((row) => {
+        const customValues: Record<string, string> = {};
+        customColumns.forEach((col) => {
+          customValues[col] = (row as any)[col] || "";
+        });
+        return {
+          id: row.id,
+          description: row.description || "",
+          unit: row.unit || "",
+          qty: Number(row.qty) || 0,
+          rate: Number(row.rate) || 0,
+          amount: Number(row.amount) || 0,
+          parentRowId: row.parentRowId || null,
+          customValues,
+        };
       });
-      return {
-        id: row.id,
-        description: row.description || "",
-        unit: row.unit || "",
-        qty: Number(row.qty) || 0,
-        rate: Number(row.rate) || 0,
-        amount: Number(row.amount) || 0,
-        parentRowId: row.parentRowId || null,
-        customValues,
-      };
-    });
 
-    await buildBusinessDocumentXlsx({
-      documentTitle: "QUOTATION",
-      documentNumber: this.currentQuoteNumber(),
-      documentDate: this.quotationDate(),
-      company: {
-        name: company.name,
-        address: company.address,
-        state: company.state,
-        gstin: company.gstin,
-      },
-      client: {
-        name: this.clientName,
-        address: this.clientAddress,
-        state: this.clientState,
-        gstin: this.clientGstin,
-      },
-      items,
-      customColumns,
-      totals: {
-        subtotal: this.subtotal(),
-        cgstPercent: this.cgstPercent(),
-        cgstAmount: this.cgstAmount(),
-        sgstPercent: this.sgstPercent(),
-        sgstAmount: this.sgstAmount(),
-        roundOff: this.roundOff(),
-        totalAmount: this.totalAmount(),
-        amountInWords: this.amountInWords(),
-      },
-      fileName: `quotation-${this.currentQuoteNumber()}`,
-    });
+      await buildBusinessDocumentXlsx({
+        documentTitle: "QUOTATION",
+        documentNumber: this.currentQuoteNumber(),
+        documentDate: this.quotationDate(),
+        company: {
+          name: company.name,
+          address: company.address,
+          state: company.state,
+          gstin: company.gstin,
+        },
+        client: {
+          name: this.clientName,
+          address: this.clientAddress,
+          state: this.clientState,
+          gstin: this.clientGstin,
+        },
+        items,
+        customColumns,
+        totals: {
+          subtotal: this.subtotal(),
+          cgstPercent: this.cgstPercent(),
+          cgstAmount: this.cgstAmount(),
+          sgstPercent: this.sgstPercent(),
+          sgstAmount: this.sgstAmount(),
+          roundOff: this.roundOff(),
+          totalAmount: this.totalAmount(),
+          amountInWords: this.amountInWords(),
+        },
+        fileName: `quotation-${this.currentQuoteNumber()}`,
+      });
+    } catch (err) {
+      console.error("Excel export failed:", err);
+      alert("Failed to export Excel. Please try again.");
+    } finally {
+      this.savingExcel.set(false);
+    }
   }
 }

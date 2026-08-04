@@ -109,20 +109,23 @@ export async function buildBusinessDocumentXlsx(args: BuildExportArgs): Promise<
   const lastColLetter = sheet.getColumn(dataColCount).letter;
 
   // ─── Header block (company info) ────────────────────────────────────────
-  sheet.mergeCells(`A1:${lastColLetter}1`);
+  // The rightmost 2 columns are reserved for the document title block, so the
+  // company info spans column A through the column before the title block.
+  const companyEndCol = sheet.getColumn(Math.max(dataColCount - 2, 1)).letter;
+  sheet.mergeCells(`A1:${companyEndCol}1`);
   const companyNameCell = sheet.getCell("A1");
   companyNameCell.value = args.company.name || "Company Name";
   companyNameCell.font = { ...baseFont, bold: true, size: 16, color: { argb: "FF0F172A" } };
   companyNameCell.alignment = { vertical: "middle", horizontal: "left" };
   sheet.getRow(1).height = 26;
 
-  sheet.mergeCells(`A2:${lastColLetter}2`);
+  sheet.mergeCells(`A2:${companyEndCol}2`);
   const addrCell = sheet.getCell("A2");
   addrCell.value = args.company.address || "";
   addrCell.font = { ...baseFont, size: 10, color: { argb: "FF475569" } };
   addrCell.alignment = { vertical: "middle", horizontal: "left" };
 
-  sheet.mergeCells(`A3:${lastColLetter}3`);
+  sheet.mergeCells(`A3:${companyEndCol}3`);
   const gstCell = sheet.getCell("A3");
   const stateGst = [args.company.state, args.company.gstin ? `GSTIN: ${args.company.gstin}` : ""]
     .filter(Boolean)
