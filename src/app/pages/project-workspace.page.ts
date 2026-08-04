@@ -348,7 +348,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <span>Site</span>
                   <div class="site-chip-strip">
                     <button type="button" [class.active]="activeSiteFilter() === 'All'" (click)="selectSite('All')">All Sites</button>
-                    <span class="site-chip-unit" *ngFor="let site of projectSites()">
+                    <span class="site-chip-unit" *ngFor="let site of displaySites()">
                       <button
                         type="button"
                         [class.active]="activeSiteFilter() === site"
@@ -1101,6 +1101,9 @@ export class ProjectWorkspacePage {
   readonly client = computed(() => this.data.clientById(this.clientId()));
   readonly project = computed(() => this.data.projectById(this.projectId()));
   readonly projectSites = computed(() => this.project()?.sites ?? []);
+  readonly displaySites = computed(() =>
+    this.projectSites().filter((site) => site.trim().toLowerCase() !== "main site")
+  );
   readonly activeSiteFilter = computed(() => {
     const site = this.activeSite();
     return site === "All" || this.projectSites().includes(site) ? site : "All";

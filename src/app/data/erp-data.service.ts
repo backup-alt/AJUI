@@ -322,7 +322,7 @@ export class ErpDataService {
     const sitePool = [
       ["North Wing", "South Wing", "Stock Yard"],
       ["Level 1", "Level 2", "Terrace"],
-      ["Main Site", "Finishing", "MEP"],
+      ["Workshop", "Finishing", "MEP"],
     ];
     const supervisors = ["R. Karthik", "S. Prabhu", "M. Saravanan"];
     const allClients = this.clients();
@@ -584,7 +584,7 @@ export class ErpDataService {
   async createDefaultProject(client: Client): Promise<Project> {
     return this.addProject(client, {
       name: `${client.name} Project`,
-      sites: ["Main Site"],
+      sites: [],
       startDate: new Date().toISOString().slice(0, 10),
       supervisor: client.supervisor || "",
       status: "Active",
@@ -612,9 +612,7 @@ export class ErpDataService {
       openingBalance?: number;
     },
   ): Promise<Project> {
-    // Local-only fallback for demo clients that were never persisted to the
-    // backend (no Mongo _id). Real backend clients are always persisted.
-    if (!client._id) {
+    const createLocalProject = (): Project => {
       const numericIds = this.projects()
         .map((project) => Number(project.id.replace(/\D/g, "")))
         .filter((value) => Number.isFinite(value));
@@ -626,7 +624,7 @@ export class ErpDataService {
         mobile: client.mobile,
         address: client.address,
         supervisor: input.supervisor,
-        sites: input.sites.length ? input.sites : ["Main Site"],
+        sites: input.sites,
         status: input.status ?? "Active",
         startDate: input.startDate,
         totalValue: input.totalValue,
@@ -646,26 +644,39 @@ export class ErpDataService {
       );
       this.touchProject(localProject.id);
       return localProject;
+    };
+
+    // Local-only fallback for demo clients that were never persisted to the
+    // backend (no Mongo _id), or when the backend rejects project creation
+    // (e.g. an older deployed backend). Keeps the project openable locally.
+    if (!client._id) {
+      return createLocalProject();
     }
 
-    const res: any = await lastValueFrom(
-      this.api.createProject({
-        name: input.name,
-        clientId: client._id || client.id,
-        mobile: client.mobile,
-        address: client.address,
-        supervisor: input.supervisor,
-        supervisorId: input.supervisorId,
-        siteIds: [],
-        sites: input.sites,
-        status: input.status ?? "Active",
-        startDate: input.startDate,
-        totalValue: input.totalValue ?? 0,
-        advanceAmount: input.advanceAmount ?? 0,
-        receivedAmount: input.receivedAmount ?? input.advanceAmount ?? 0,
-        expenseBalance: input.openingBalance ?? 0,
-      }),
-    );
+    let res: any;
+    try {
+      res = await lastValueFrom(
+        this.api.createProject({
+          name: input.name,
+          clientId: client._id || client.id,
+          mobile: client.mobile,
+          address: client.address,
+          supervisor: input.supervisor,
+          supervisorId: input.supervisorId,
+          siteIds: [],
+          sites: input.sites,
+          status: input.status ?? "Active",
+          startDate: input.startDate,
+          totalValue: input.totalValue ?? 0,
+          advanceAmount: input.advanceAmount ?? 0,
+          receivedAmount: input.receivedAmount ?? input.advanceAmount ?? 0,
+          expenseBalance: input.openingBalance ?? 0,
+        }),
+      );
+    } catch (err) {
+      console.error("[ErpDataService] Failed to create project on backend; creating locally:", err);
+      return createLocalProject();
+    }
     const created: any = res?.project ?? res;
 
     const project: Project = {
@@ -675,7 +686,7 @@ export class ErpDataService {
       mobile: created.mobile ?? client.mobile,
       address: created.address ?? client.address,
       supervisor: created.supervisor ?? input.supervisor,
-      sites: created.siteNames?.length ? created.siteNames : input.sites.length ? input.sites : ["Main Site"],
+      sites: created.siteNames?.length ? created.siteNames : input.sites,
       status: (created.status ?? "Active") as ProjectStatus,
       startDate: created.startDate ?? input.startDate,
       totalValue: Number(created.totalValue) || 0,

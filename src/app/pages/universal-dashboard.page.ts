@@ -2566,6 +2566,7 @@ visibleRows(): TableRow[] {
     for (const r of raw) {
       const name = (r.name || r.id || "").trim();
       if (!name) continue;
+      if (name.toLowerCase() === "main site") continue;
       const key = name.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
@@ -4009,7 +4010,8 @@ const inventory = this.data.inventory().map((row) => ({
       const site = String(row["site"] || "").trim();
       if (site) sites.add(site);
     }
-    return [...sites].sort((a, b) => a.localeCompare(b));
+    const isPlaceholder = (site: string) => site.trim().toLowerCase() === "main site";
+    return [...sites].filter((site) => !isPlaceholder(site)).sort((a, b) => a.localeCompare(b));
   }
 
   private projectNameOptions(): string[] {
