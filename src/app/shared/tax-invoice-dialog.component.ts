@@ -98,11 +98,11 @@ import { jsPDF } from "jspdf";
                     <tr [class.sub-row]="!!item.parentRowId" [class.parent-row]="!item.parentRowId">
                       <td class="col-sno cell-center" [class.sno-bold]="!item.parentRowId">{{ item.sno || ($index + 1) }}</td>
                       <td class="col-desc">{{ item.description }}</td>
-                      <td class="col-hsn cell-center">{{ item.parentRowId ? '' : (item.hsnCode || '—') }}</td>
-                      <td class="col-unit cell-center">{{ item.parentRowId ? '' : (item.unit || '—') }}</td>
-                      <td class="col-qty cell-right">{{ item.parentRowId ? '' : (item.qty || 0) }}</td>
-                      <td class="col-rate cell-right">{{ item.parentRowId ? '' : formatRupee(item.rate) }}</td>
-                      <td class="col-amount cell-right">{{ item.parentRowId ? '' : formatRupee(item.amount) }}</td>
+                      <td class="col-hsn cell-center">{{ isGroupParent(item) ? '' : (item.hsnCode || '—') }}</td>
+                      <td class="col-unit cell-center">{{ isGroupParent(item) ? '' : (item.unit || '—') }}</td>
+                      <td class="col-qty cell-right">{{ isGroupParent(item) ? '' : (item.qty || 0) }}</td>
+                      <td class="col-rate cell-right">{{ isGroupParent(item) ? '' : formatRupee(item.rate) }}</td>
+                      <td class="col-amount cell-right">{{ isGroupParent(item) ? '' : formatRupee(item.amount) }}</td>
                       @for (col of customColumns; track col) {
                         <td class="col-custom">{{ item[col] || '—' }}</td>
                       }
@@ -337,6 +337,17 @@ export class TaxInvoiceDialogComponent {
 
   get customColumns() {
     return (this.invoice as any)?.customColumns || [];
+  }
+
+  /**
+   * A row is a "group parent" when another row references it via parentRowId.
+   * In the editor those rows have no pricing inputs of their own, so the
+   * preview must keep HSN/Unit/Qty/Rate/Amount blank for them.
+   */
+  isGroupParent(item: any): boolean {
+    const id = item?.id;
+    if (!id) return false;
+    return (this.items as any[]).some((r) => !!r && !!r.parentRowId && r.parentRowId === id);
   }
 
   getInvoiceNumber(): string {
