@@ -149,7 +149,15 @@ export class ClientDashboardPage {
 
   async openClient(client: Client) {
     let project = this.data.firstProjectForClient(client);
-    if (!project) project = await this.data.createDefaultProject(client);
+    if (!project) {
+      try {
+        project = await this.data.createDefaultProject(client);
+      } catch (err) {
+        console.error("[ClientDashboard] Failed to create default project:", (err as any)?.message ?? err);
+        void this.router.navigate(["/clients", client.id]);
+        return;
+      }
+    }
     this.data.touchProject(project.id);
     void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]);
   }
@@ -167,20 +175,22 @@ export class ClientDashboardPage {
 
     this.api.createClient(payload).subscribe({
       next: async (res) => {
+        const created = res?.client || res;
+        const clientId = created?.clientId || created?.id || res?.clientId || res?.id;
+        const client = this.data.addClient({
+          ...value,
+          id: clientId,
+          _id: created?._id,
+          supervisor: value.supervisor || "",
+        } as Client);
         try {
-          const created = res?.client || res;
-          const clientId = created?.clientId || created?.id || res?.clientId || res?.id;
-          const client = this.data.addClient({
-            ...value,
-            id: clientId,
-            _id: created?._id,
-            supervisor: value.supervisor || "",
-          } as Client);
           const project = await this.data.createDefaultProject(client);
           this.showClientForm.set(false);
           setTimeout(() => void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]));
         } catch (err) {
           console.error("[ClientDashboard] Failed to create default project:", (err as any)?.message ?? err);
+          this.showClientForm.set(false);
+          setTimeout(() => void this.router.navigate(["/clients", client.id]));
         }
       },
       error: (err) => {

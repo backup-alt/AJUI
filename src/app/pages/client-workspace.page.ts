@@ -195,7 +195,14 @@ export class ClientWorkspacePage implements OnInit {
 
   private async openClientWorkspace(currentClient: NonNullable<ReturnType<ErpDataService["clientById"]>>) {
     let project = this.data.firstProjectForClient(currentClient);
-    if (!project) project = await this.data.createDefaultProject(currentClient);
+    if (!project) {
+      try {
+        project = await this.data.createDefaultProject(currentClient);
+      } catch (err) {
+        console.error("[ClientWorkspace] Failed to create default project:", (err as any)?.message ?? err);
+        return;
+      }
+    }
     this.data.touchProject(project.id);
     void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"], { replaceUrl: true });
   }
