@@ -249,7 +249,7 @@ function numberToWords(num: number): string {
                       </thead>
                       <tbody>
                         @for (row of quotationRows(); track row.id; let i = $index) {
-                          <tr [class.sub-row]="!!row.parentRowId" [class.section-row]="isSectionHeading(row)">
+                          <tr [class.sub-row]="!!row.parentRowId" [class.section-row]="isSectionHeading(row)" [class.parent-row]="!row.parentRowId && !isSectionHeading(row)">
                             <td class="col-sno">{{ rowSnoMap()[row.id] }}</td>
                             <td class="col-desc">
                               <div class="desc-cell" [class.is-sub]="!!row.parentRowId" [class.is-heading]="isSectionHeading(row)">
@@ -758,6 +758,11 @@ function numberToWords(num: number): string {
     .row-action-item ion-icon { font-size: 16px; color: #475569; }
     .sub-row td { background: #f8fafc; }
     .sub-row .col-desc { padding-left: 30px; }
+    .sub-row .desc-cell .table-input { color: #475569; }
+    .parent-row td { background: #ffffff; }
+    .parent-row .desc-cell .table-input { font-weight: 600; color: #0f172a; }
+    .parent-row .col-sno { font-weight: 700; color: #0f172a; }
+    .sub-row .col-sno { color: #64748b; }
     .desc-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
     .desc-cell .table-input { flex: 1; min-width: 0; }
     .desc-cell.is-sub .table-input { font-style: italic; }

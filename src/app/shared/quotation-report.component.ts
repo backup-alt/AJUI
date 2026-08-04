@@ -131,8 +131,8 @@ export interface QuotationReportData {
                       <td [attr.colspan]="5 + customColumns.length" class="section-header">{{ item.description }}</td>
                     </tr>
                   } @else if (item.description) {
-                    <tr [class.sub-row]="!!item.parentRowId">
-                      <td class="col-sno cell-center">{{ item.isSectionHeading ? '' : (item.sno || ($index + 1)) }}</td>
+                    <tr [class.sub-row]="!!item.parentRowId" [class.parent-row]="!item.parentRowId">
+                      <td class="col-sno cell-center" [class.sno-bold]="!item.parentRowId">{{ item.isSectionHeading ? '' : (item.sno || ($index + 1)) }}</td>
                       <td class="col-desc">{{ item.description }}</td>
                       <td class="col-unit cell-center">{{ item.unit || '—' }}</td>
                       <td class="col-qty cell-right">{{ item.qty || 0 }}</td>
@@ -271,8 +271,12 @@ export interface QuotationReportData {
     .inv-table .section-row td { background: #f1f5f9; }
     .inv-table .section-header { font-weight: 700; font-size: 13px; color: #0f172a; padding: 6px 8px; text-transform: none; letter-spacing: 0; }
     .inv-table .empty-row { text-align: center; color: #94a3b8; font-style: italic; }
-    .inv-table tr.sub-row td { background: #f8fafc; }
+    .inv-table tr.parent-row td { font-weight: 600; color: #0f172a; }
+    .inv-table tr.parent-row .col-desc { font-weight: 700; }
+    .inv-table .sno-bold { font-weight: 800; color: #0f172a; }
+    .inv-table tr.sub-row td { background: #f8fafc; color: #475569; }
     .inv-table tr.sub-row .col-desc { padding-left: 30px; font-style: italic; }
+    .inv-table tr.sub-row .col-sno { font-weight: 400; color: #64748b; }
     .col-sno { width: 50px; text-align: center; }
     .col-desc { min-width: 200px; }
     .col-unit { width: 80px; text-align: center; }
