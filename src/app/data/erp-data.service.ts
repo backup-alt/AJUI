@@ -220,6 +220,7 @@ export class ErpDataService {
   );
   readonly expenseOpeningBalances = signal<Record<string, number>>(this.readState<Record<string, number>>("expenseOpeningBalances", {}));
   readonly siteKeys = signal<Record<string, string>>(this.readState<Record<string, string>>("siteKeys", {}));
+  readonly siteError = signal<string | null>(null);
   readonly projectActivity = signal<Record<string, number>>(this.readState<Record<string, number>>("projectActivity", {}));
   readonly settings = signal<ErpSettings>(
     this.normalizeSettings(this.readState<Partial<ErpSettings>>("settings", this.defaultSettings())),
@@ -730,6 +731,7 @@ export class ErpDataService {
     if (!cleanName) return undefined;
     let updatedProject: Project | undefined;
 
+    this.siteError.set(null);
     this.projects.update((projectRows) =>
       projectRows.map((project) => {
         if (project.id !== projectId) return project;
@@ -754,7 +756,17 @@ export class ErpDataService {
               this.migrateOpeningBalanceToSiteId(projectId, cleanName, String(res.site._id));
             }
           },
-          error: (err) => console.warn("[ERP] createSite failed:", err?.message ?? err),
+          error: (err) => {
+            console.warn("[ERP] createSite failed:", err?.message ?? err);
+            const msg = err?.error?.error || err?.error?.message || "Failed to save site. It will not persist after reload.";
+            this.siteError.set(msg);
+            this.projects.update((projectRows) =>
+              projectRows.map((project) => {
+                if (project.id !== projectId) return project;
+                return { ...project, sites: project.sites.filter((s) => s.trim().toLowerCase() !== cleanName.toLowerCase()) };
+              }),
+            );
+          },
         });
       }
 

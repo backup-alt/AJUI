@@ -12,6 +12,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 import { WorkspaceHydrationService, type PageModule } from "../core/workspace-hydration.service";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
+import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.component";
 
 type DashboardModule =
   | "materials"
@@ -273,7 +274,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
+  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent, InventoryInitDialogComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="dashboard"></agb-enterprise-sidebar>
@@ -876,194 +877,14 @@ const siteMaterialDetailFields: FieldSchema[] = [
         }
 
         @if (showInventoryInitDialog()) {
-          <section class="form-overlay" role="presentation">
-            <section class="erp-dialog inventory-init-dialog" role="dialog" aria-modal="true" aria-labelledby="inv-init-title">
-              <div class="dialog-head">
-                <div>
-                  <span>Add Materials</span>
-                  <h2 id="inv-init-title">Add a material to this site</h2>
-                  <p>Pick a site, then enter the material name, unit, and starting stock. New material names are saved automatically.</p>
-                </div>
-                <button type="button" class="icon-button" aria-label="Close add material dialog" (click)="closeInventoryInitDialog()">
-                  <ion-icon name="close-outline"></ion-icon>
-                </button>
-              </div>
-
-              <div class="inventory-init-body" (click)="closeAddMaterialMenusOnInsideClick($event)">
-                @if (addMaterialToast()) {
-                  <div class="inventory-init-toast">{{ addMaterialToast() }}</div>
-                }
-                @if (addMaterialError()) {
-                  <div class="inventory-init-error">{{ addMaterialError() }}</div>
-                }
-
-                <div class="inventory-init-field" [class.has-error]="!!addMaterialFieldErrors()['siteId']">
-                  <label class="inventory-init-label">
-                    <span>Site <em class="required">*</em></span>
-                  </label>
-                  <div class="erp-select-menu" [class.open]="addMaterialOpenMenu() === 'site'">
-                    <button type="button" class="erp-select-trigger" (click)="toggleAddMaterialMenu('site')" aria-haspopup="listbox" [attr.aria-expanded]="addMaterialOpenMenu() === 'site'">
-                      <span>{{ selectedAddMaterialSiteName() || 'Select a site…' }}</span>
-                      <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                        <path d="M5.5 7.5 10 12l4.5-4.5" />
-                      </svg>
-                    </button>
-                    <small class="inventory-init-site-count" *ngIf="addMaterialSiteOptions().length > 0">
-                      {{ addMaterialSiteOptions().length }} site{{ addMaterialSiteOptions().length === 1 ? '' : 's' }} available
-                    </small>
-                    <div class="erp-select-panel" *ngIf="addMaterialOpenMenu() === 'site'">
-                      <input
-                        type="text"
-                        class="inventory-init-menu-search"
-                        placeholder="Search sites…"
-                        (click)="$event.stopPropagation()"
-                        (input)="addMaterialMenuSearch.set($any($event.target).value); $event.stopPropagation()"
-                        [value]="addMaterialMenuSearch()"
-                        autocomplete="off"
-                      />
-                      <button
-                        *ngFor="let site of filteredAddMaterialSites(); trackBy: trackAddMaterialSiteById"
-                        type="button"
-                        [class.selected]="addMaterialForm().siteId === site.id"
-                        (click)="pickAddMaterialFromMenu('siteId', site.id)"
-                        [attr.data-site-id]="site.id"
-                      >{{ site.name }}</button>
-                      <div *ngIf="addMaterialSiteOptions().length === 0" class="inventory-init-menu-empty inventory-init-menu-empty--friendly">
-                        <strong>No sites available.</strong>
-                        <span class="inventory-init-menu-empty-help">0 sites returned from MongoDB for your access scope. Sites in the database that aren't linked to your assigned projects are hidden by role-based filtering. Ask an admin to assign you to a project so its sites become visible here.</span>
-                      </div>
-                      <div *ngIf="addMaterialSiteOptions().length > 0 && filteredAddMaterialSites().length === 0" class="inventory-init-menu-empty">No sites match.</div>
-                    </div>
-                  </div>
-                  @if (addMaterialFieldErrors()['siteId']) {
-                    <small class="inventory-init-field-error">{{ addMaterialFieldErrors()['siteId'] }}</small>
-                  }
-                </div>
-
-                <div class="inventory-init-field" [class.has-error]="!!addMaterialFieldErrors()['name']">
-                  <label class="inventory-init-label">
-                    <span>Material Name <em class="required">*</em></span>
-                  </label>
-                  <div class="erp-select-menu" [class.open]="addMaterialOpenMenu() === 'material'">
-                    <button type="button" class="erp-select-trigger" (click)="toggleAddMaterialMenu('material')" aria-haspopup="listbox" [attr.aria-expanded]="addMaterialOpenMenu() === 'material'">
-                      <span>{{ addMaterialForm().name || 'Choose or type a new material name' }}</span>
-                      <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                        <path d="M5.5 7.5 10 12l4.5-4.5" />
-                      </svg>
-                    </button>
-                    <div class="erp-select-panel" *ngIf="addMaterialOpenMenu() === 'material'">
-                      <input
-                        type="text"
-                        class="inventory-init-menu-search"
-                        placeholder="Search or type a new name…"
-                        (click)="$event.stopPropagation()"
-                        (input)="addMaterialMenuSearch.set($any($event.target).value); $event.stopPropagation()"
-                        [value]="addMaterialMenuSearch()"
-                        autocomplete="off"
-                      />
-                      <button
-                        *ngFor="let name of filteredAddMaterialMaterials(); track name"
-                        type="button"
-                        [class.selected]="addMaterialForm().name === name"
-                        (click)="pickAddMaterialFromMenu('name', name)"
-                      >{{ name }}</button>
-                      @if (addMaterialMenuSearch().trim() && !filteredAddMaterialMaterials().includes(addMaterialMenuSearch().trim())) {
-                        <button type="button" class="inventory-init-menu-confirm" (click)="commitAddMaterialFreeText('name')">
-                          Use "{{ addMaterialMenuSearch().trim() }}"
-                        </button>
-                      }
-                      <div *ngIf="filteredAddMaterialMaterials().length === 0 && !addMaterialMenuSearch().trim()" class="inventory-init-menu-empty">Type to add a new material name.</div>
-                    </div>
-                  </div>
-                  @if (addMaterialFieldErrors()['name']) {
-                    <small class="inventory-init-field-error">{{ addMaterialFieldErrors()['name'] }}</small>
-                  }
-                </div>
-
-                <div class="inventory-init-field" [class.has-error]="!!addMaterialFieldErrors()['unit']">
-                  <label class="inventory-init-label">
-                    <span>Unit <em class="required">*</em></span>
-                  </label>
-                  <div class="erp-select-menu" [class.open]="addMaterialOpenMenu() === 'unit'">
-                    <button type="button" class="erp-select-trigger" (click)="toggleAddMaterialMenu('unit')" aria-haspopup="listbox" [attr.aria-expanded]="addMaterialOpenMenu() === 'unit'">
-                      <span>{{ addMaterialForm().unit || 'Choose or type a unit' }}</span>
-                      <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                        <path d="M5.5 7.5 10 12l4.5-4.5" />
-                      </svg>
-                    </button>
-                    <div class="erp-select-panel" *ngIf="addMaterialOpenMenu() === 'unit'">
-                      <input
-                        type="text"
-                        class="inventory-init-menu-search"
-                        placeholder="Search or type a custom unit…"
-                        (click)="$event.stopPropagation()"
-                        (input)="addMaterialMenuSearch.set($any($event.target).value); $event.stopPropagation()"
-                        [value]="addMaterialMenuSearch()"
-                        autocomplete="off"
-                      />
-                      <button
-                        *ngFor="let u of filteredAddMaterialUnits(); track u"
-                        type="button"
-                        [class.selected]="addMaterialForm().unit === u"
-                        (click)="pickAddMaterialFromMenu('unit', u)"
-                      >{{ u }}</button>
-                      @if (addMaterialMenuSearch().trim() && !filteredAddMaterialUnits().includes(addMaterialMenuSearch().trim())) {
-                        <button type="button" class="inventory-init-menu-confirm" (click)="commitAddMaterialFreeText('unit')">
-                          Use "{{ addMaterialMenuSearch().trim() }}"
-                        </button>
-                      }
-                    </div>
-                  </div>
-                  @if (addMaterialFieldErrors()['unit']) {
-                    <small class="inventory-init-field-error">{{ addMaterialFieldErrors()['unit'] }}</small>
-                  }
-                </div>
-
-                <div class="inventory-init-field" [class.has-error]="!!addMaterialFieldErrors()['quantity']">
-                  <label class="inventory-init-label">
-                    <span>Quantity / Current Stock <em class="required">*</em></span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      class="inventory-init-input"
-                      [value]="addMaterialForm().quantity"
-                      (input)="patchAddMaterialForm({ quantity: $any($event.target).value })"
-                      [class.input-error]="!!addMaterialFieldErrors()['quantity']"
-                    />
-                  </label>
-                  @if (addMaterialFieldErrors()['quantity']) {
-                    <small class="inventory-init-field-error">{{ addMaterialFieldErrors()['quantity'] }}</small>
-                  }
-                </div>
-
-                <div class="inventory-init-field">
-                  <label class="inventory-init-label">
-                    <span>Remarks</span>
-                    <textarea
-                      class="inventory-init-input inventory-init-textarea"
-                      rows="3"
-                      placeholder="Optional notes"
-                      [value]="addMaterialForm().remarks"
-                      (input)="patchAddMaterialForm({ remarks: $any($event.target).value })"
-                    ></textarea>
-                  </label>
-                </div>
-              </div>
-
-              <div class="dialog-actions">
-                <button type="button" class="secondary-action" (click)="closeInventoryInitDialog()" [disabled]="addMaterialSaving()">Cancel</button>
-                <button
-                  type="button"
-                  class="primary-action"
-                  (click)="submitAddMaterial()"
-                  [disabled]="!canSubmitAddMaterial()"
-                >
-                  {{ addMaterialSaving() ? 'Saving…' : 'Save Material' }}
-                </button>
-              </div>
-            </section>
-          </section>
+          <agb-inventory-init-dialog
+            [sites]="addMaterialSiteOptions()"
+            [materialNames]="materialNameSuggestions()"
+            [materialRows]="inventoryInitMaterialRows()"
+            [presetSiteId]="activeSiteFilter() !== 'All' ? activeSiteFilter() : ''"
+            (saved)="onInventoryInitSaved()"
+            (cancelled)="closeInventoryInitDialog()"
+          />
         }
       </div>
     </ion-split-pane>
@@ -1825,6 +1646,26 @@ readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inven
     }
     return [...set].filter(Boolean).sort();
   });
+  readonly inventoryInitMaterialRows = computed(() => {
+    const rows: Array<{ name?: string; unit?: string; site?: string; siteId?: string }> = [];
+    for (const m of this.data.materials()) {
+      rows.push({
+        name: (m as any).name,
+        unit: (m as any).unit,
+        site: (m as any).site,
+        siteId: (m as any).siteId,
+      });
+    }
+    for (const i of this.data.inventory()) {
+      rows.push({
+        name: (i as any).name,
+        unit: (i as any).unit,
+        site: (i as any).site,
+        siteId: (i as any).siteId,
+      });
+    }
+    return rows;
+  });
   readonly addMaterialAllowedUnits = ["Nos", "Bag", "Kg", "Ton", "Load", "Cubic Feet", "Cubic Meter", "Meter", "Litre", "Roll", "Bundle", "Piece", "Box"];
   readonly filteredAddMaterialSites = computed(() => {
     const term = this.addMaterialMenuSearch().trim().toLowerCase();
@@ -2130,21 +1971,12 @@ let cards = [...map.values()].map((v) => {
   }
 
   openInventoryInitDialog() {
-    this.addMaterialError.set(null);
-    this.addMaterialToast.set(null);
-    this.addMaterialFieldErrors.set({});
-    this.addMaterialOpenMenu.set("");
-    this.addMaterialMenuSearch.set("");
-    const presetSite = this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : "";
-    this.addMaterialForm.set({
-      siteId: presetSite,
-      name: "",
-      unit: "",
-      quantity: 0,
-      remarks: "",
-    });
     this.refreshSitesForInventoryDialog();
     this.showInventoryInitDialog.set(true);
+  }
+
+  onInventoryInitSaved() {
+    this.refreshMaterialsAfterSave();
   }
 
   private refreshSitesForInventoryDialog() {
@@ -2205,18 +2037,6 @@ let cards = [...map.values()].map((v) => {
 
   closeInventoryInitDialog() {
     this.showInventoryInitDialog.set(false);
-    this.addMaterialError.set(null);
-    this.addMaterialToast.set(null);
-    this.addMaterialFieldErrors.set({});
-    this.addMaterialOpenMenu.set("");
-    this.addMaterialMenuSearch.set("");
-    this.addMaterialForm.set({
-      siteId: "",
-      name: "",
-      unit: "",
-      quantity: 0,
-      remarks: "",
-    });
   }
 
   patchAddMaterialForm(patch: Partial<{ siteId: string; name: string; unit: string; quantity: number; remarks: string }>) {

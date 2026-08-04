@@ -15,6 +15,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
+import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.component";
 
 type ModuleKey = Exclude<SharedModuleKey, "clients" | "generalExpenses" | "settings" | "supervisors">;
 type TableRow = SharedTableRow;
@@ -198,6 +199,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
     EnterpriseSidebarComponent,
     ProjectFormDialogComponent,
     VendorFormDialogComponent,
+    InventoryInitDialogComponent,
   ],
   styles: [`
     .image-preview-overlay {
@@ -382,6 +384,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         </svg>
                       </button>
                     </form>
+                    @if (data.siteError()) {
+                      <div class="site-toast" (click)="data.siteError.set(null)">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-2h2v2h-2zm0-4V7h2v6h-2z"/></svg>
+                        <span>{{ data.siteError() }}</span>
+                      </div>
+                    }
                   </div>
                 </div>
               </div>
@@ -1014,6 +1022,16 @@ const siteMaterialDetailFields: FieldSchema[] = [
               (cancel)="closeVendorDialog()"
               (create)="editingInlineVendor() ? updateInlineVendor($event) : createInlineVendor($event)"
             ></agb-vendor-form-dialog>
+
+            <agb-inventory-init-dialog
+              *ngIf="showInventoryInitDialog()"
+              [sites]="inventoryInitSites()"
+              [materialNames]="inventoryInitMaterialNames()"
+              [materialRows]="inventoryInitMaterialRows()"
+              [presetSiteId]="activeSiteFilter() !== 'All' ? activeSiteId() : ''"
+              (saved)="onInventoryInitSaved()"
+              (cancelled)="closeInventoryInitDialog()"
+            ></agb-inventory-init-dialog>
           </main>
         </ion-content>
       </div>
@@ -1062,6 +1080,7 @@ export class ProjectWorkspacePage {
   readonly tableViewExpanded = signal(false);
   readonly recordDialogOpen = signal(false);
   readonly showVendorDialog = signal(false);
+  readonly showInventoryInitDialog = signal(false);
   readonly editingInlineVendor = signal<{ id: string; vendorName: string; materialType: string; phoneNumber: string; address: string; gstNumber: string } | null>(null);
   readonly draftRow = signal<TableRow>({});
   readonly activeSite = signal("All");
@@ -1093,6 +1112,51 @@ export class ProjectWorkspacePage {
   readonly displaySites = computed(() =>
     this.projectSites().filter((site) => site.trim().toLowerCase() !== "main site")
   );
+  readonly inventoryInitSites = computed((): Array<{ id: string; name: string }> => {
+    const projectId = this.projectId();
+    const seen = new Map<string, { id: string; name: string }>();
+    for (const r of this.data.siteEntities()) {
+      const name = ((r as any).name || "").trim();
+      const id = (r as any)._id || (r as any).id;
+      if (!id || !name) continue;
+      const belongs = !projectId
+        || String((r as any).projectId || "") === projectId
+        || (Array.isArray((r as any).projectIds) && ((r as any).projectIds as any[]).some((p) => String(p) === projectId));
+      if (!belongs) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.set(key, { id: String(id), name });
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  });
+  readonly inventoryInitMaterialNames = computed((): string[] => {
+    const projectId = this.projectId();
+    const set = new Set<string>();
+    for (const m of [...this.data.materials(), ...this.data.inventory()]) {
+      if (projectId && String((m as any).projectId || "") !== projectId) continue;
+      const n = (m as any).name;
+      if (n) set.add(String(n).trim());
+    }
+    return [...set].filter(Boolean).sort();
+  });
+  readonly inventoryInitMaterialRows = computed(() => {
+    const projectId = this.projectId();
+    const rows: Array<{ name?: string; unit?: string; site?: string; siteId?: string }> = [];
+    for (const m of this.data.materials()) {
+      if (projectId && String((m as any).projectId || "") !== projectId) continue;
+      rows.push({ name: (m as any).name, unit: (m as any).unit, site: (m as any).site, siteId: (m as any).siteId });
+    }
+    for (const i of this.data.inventory()) {
+      if (projectId && String((i as any).projectId || "") !== projectId) continue;
+      rows.push({ name: (i as any).name, unit: (i as any).unit, site: (i as any).site, siteId: (i as any).siteId });
+    }
+    return rows;
+  });
+  readonly activeSiteId = computed(() => {
+    const site = this.activeSiteFilter();
+    if (!site || site === "All") return "";
+    return this.data.resolveSiteNameToId(site) ?? "";
+  });
   readonly activeSiteFilter = computed(() => {
     const site = this.activeSite();
     return site === "All" || this.projectSites().includes(site) ? site : "All";
@@ -1863,6 +1927,10 @@ export class ProjectWorkspacePage {
       this.showVendorDialog.set(true);
       return;
     }
+    if (this.activeSection() === "inventory") {
+      this.showInventoryInitDialog.set(true);
+      return;
+    }
     const row: TableRow = { ...this.defaultRowFor(this.activeSection()) };
     this.draftRow.set(row);
     for (const column of this.recordFormColumns()) {
@@ -1871,6 +1939,32 @@ export class ProjectWorkspacePage {
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
+  }
+
+  closeInventoryInitDialog() {
+    this.showInventoryInitDialog.set(false);
+  }
+
+  onInventoryInitSaved() {
+    const pid = this.projectId();
+    this.api.listMaterials({ limit: 200, projectId: pid }).subscribe({
+      next: (r: any) => {
+        try {
+          const items = ((r as any).items || []).map(mapMaterial);
+          this.data.materials.set(items);
+        } catch {}
+      },
+      error: () => {},
+    });
+    this.api.listInventory({ limit: 200, projectId: pid }).subscribe({
+      next: (r: any) => {
+        try {
+          const items = ((r as any).items || []).map(mapInventory);
+          this.data.inventory.set(items);
+        } catch {}
+      },
+      error: () => {},
+    });
   }
 
   closeVendorDialog() {

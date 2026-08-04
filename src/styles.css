@@ -6348,6 +6348,27 @@ body {
   padding: 0;
 }
 
+.site-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.site-toast .svg-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .site-module-row button {
   min-width: 86px;
 }
