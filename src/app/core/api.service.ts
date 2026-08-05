@@ -549,12 +549,34 @@ export class ApiService {
 
   approveApproval(id: string, payload: any = {}): Observable<{ approval: any }> {
     return this.http.put<{ approval: any }>(`${this.baseUrl}/approvals/${id}/approve`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        // Approving an approval mutates the source record (Material / Labour /
+        // Expense / Payment / Subcontractor) and recomputes project totals.
+        // Invalidate every cached list that may have shown the stale state so
+        // the next visit (Dashboard, Universal Dashboard, Project Workspace)
+        // fetches fresh data instead of returning a stale cached response.
+        this.invalidateCache("/approvals");
+        this.invalidateCache("/materials");
+        this.invalidateCache("/labour");
+        this.invalidateCache("/expenses");
+        this.invalidateCache("/payments");
+        this.invalidateCache("/subcontractors");
+        this.invalidateCache("/inventory");
+      }),
       catchError(this.handleError)
     );
   }
 
   rejectApproval(id: string): Observable<{ approval: any }> {
     return this.http.put<{ approval: any }>(`${this.baseUrl}/approvals/${id}/reject`, {}, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.invalidateCache("/approvals");
+        this.invalidateCache("/materials");
+        this.invalidateCache("/labour");
+        this.invalidateCache("/expenses");
+        this.invalidateCache("/payments");
+        this.invalidateCache("/subcontractors");
+      }),
       catchError(this.handleError)
     );
   }

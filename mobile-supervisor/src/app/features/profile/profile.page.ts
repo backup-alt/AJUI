@@ -7,9 +7,11 @@ import { addIcons } from 'ionicons';
 import {
   personCircleOutline, mailOutline,
   logOutOutline, shieldCheckmarkOutline,
+  notificationsOutline, notificationsOffOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-profile',
@@ -61,6 +63,38 @@ import { SupervisorService } from '../../core/services/supervisor.service';
           </div>
         </section>
 
+        <section class="profile-card">
+          <header class="card-head">
+            <span class="head-tile"><ion-icon name="notifications-outline"></ion-icon></span>
+            <h3>Notifications</h3>
+          </header>
+          <div class="notif-row">
+            <div class="notif-row-text">
+              <strong class="notif-row-title">
+                <ion-icon [name]="pushEnabled() ? 'notifications-outline' : 'notifications-off-outline'"></ion-icon>
+                Push notifications
+              </strong>
+              <small class="notif-row-sub">
+                @if (pushEnabled()) {
+                  You'll get an alert on this device when your requests are approved or rejected.
+                } @else {
+                  Turn on to receive approval and rejection alerts on this device, even when the app is closed.
+                }
+              </small>
+            </div>
+            <button
+              type="button"
+              class="notif-toggle"
+              [class.on]="pushEnabled()"
+              [disabled]="busy()"
+              (click)="togglePush()"
+              [attr.aria-label]="pushEnabled() ? 'Turn off push notifications' : 'Turn on push notifications'"
+            >
+              <span class="notif-toggle-knob"></span>
+            </button>
+          </div>
+        </section>
+
         <button class="logout-btn" (click)="logout()">
           <ion-icon name="log-out-outline" slot="start"></ion-icon>
           Sign out
@@ -74,7 +108,7 @@ import { SupervisorService } from '../../core/services/supervisor.service';
     </ion-content>
   `,
   styles: [`
-    .profile-content { --background: #f5f6f8; }
+    .profile-content { --background: #f5f6f8; background: #f5f6f8; color: #0f172a; }
 
     .profile-hero {
       position: relative;
@@ -83,7 +117,7 @@ import { SupervisorService } from '../../core/services/supervisor.service';
       padding: 32px 20px 64px;
       overflow: hidden;
     }
-    .hero-content { position: relative; text-align: center; }
+    .hero-content { position: relative; text-align: center; color: #ffffff; }
     .avatar-wrap { position: relative; display: inline-block; margin-bottom: 14px; }
     .avatar {
       width: 84px; height: 84px;
@@ -102,19 +136,43 @@ import { SupervisorService } from '../../core/services/supervisor.service';
       border: 3px solid #002263;
       border-radius: 50%;
     }
-    .user-name { font-size: 22px; font-weight: 800; margin: 0 0 4px; letter-spacing: -0.3px; }
-    .user-role { font-size: 11px; opacity: 0.78; text-transform: uppercase; letter-spacing: 0.6px; margin: 0 0 8px; font-weight: 600; }
-    .user-email { font-size: 13px; opacity: 0.85; margin: 0; display: inline-flex; align-items: center; gap: 4px; }
+    .user-name {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 0 4px;
+      letter-spacing: -0.3px;
+      color: #ffffff;
+    }
+    .user-role {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.92);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin: 0 0 8px;
+      font-weight: 700;
+    }
+    .user-email {
+      font-size: 13px;
+      color: #ffffff;
+      margin: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0.95;
+    }
     .user-email ion-icon { font-size: 14px; color: #c9a227; }
 
     .content-stack {
       margin: -36px 16px 24px;
       position: relative;
       z-index: 2;
+      background: transparent;
+      color: #0f172a;
     }
 
     .profile-card {
       background: #ffffff;
+      color: #0f172a;
       border: 1px solid #eef0f3;
       border-radius: 20px;
       padding: 16px 18px;
@@ -124,6 +182,7 @@ import { SupervisorService } from '../../core/services/supervisor.service';
     .card-head {
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 12px;
+      color: #0f172a;
     }
     .head-tile {
       width: 32px; height: 32px;
@@ -133,7 +192,14 @@ import { SupervisorService } from '../../core/services/supervisor.service';
       display: flex; align-items: center; justify-content: center;
     }
     .head-tile ion-icon { font-size: 16px; }
-    .card-head h3 { font-size: 13px; font-weight: 700; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; }
+    .card-head h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
 
     .kv-list { display: flex; flex-direction: column; gap: 10px; }
     .kv {
@@ -141,17 +207,30 @@ import { SupervisorService } from '../../core/services/supervisor.service';
       padding: 10px 12px;
       background: #f8fafc;
       border-radius: 12px;
+      color: #0f172a;
     }
-    .kv-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; }
-    .kv-value { font-size: 14px; font-weight: 600; color: #0f172a; }
+    .kv-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .kv-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+      word-break: break-word;
+    }
 
     .row-item {
       display: flex; align-items: center; gap: 12px;
       padding: 10px 0;
       border-bottom: 1px solid #f1f5f9;
+      color: #0f172a;
     }
     .row-item:last-child { border-bottom: none; padding-bottom: 0; }
-    .row-item.action { background: transparent; border: 0; width: 100%; text-align: left; cursor: pointer; font-family: inherit; }
+    .row-item.action { background: transparent; border: 0; width: 100%; text-align: left; cursor: pointer; font-family: inherit; color: #0f172a; }
     .row-tile {
       width: 36px; height: 36px;
       border-radius: 11px;
@@ -161,10 +240,10 @@ import { SupervisorService } from '../../core/services/supervisor.service';
       flex-shrink: 0;
     }
     .row-tile ion-icon { font-size: 18px; }
-    .row-content { flex: 1; min-width: 0; }
+    .row-content { flex: 1; min-width: 0; color: #0f172a; }
     .row-title { font-size: 14px; font-weight: 600; color: #0f172a; }
-    .row-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
-    .chev { color: #cbd5e1; font-size: 16px; }
+    .row-sub { font-size: 12px; color: #475569; margin-top: 2px; }
+    .chev { color: #94a3b8; font-size: 16px; }
 
     .logout-btn {
       width: 100%;
@@ -190,7 +269,7 @@ import { SupervisorService } from '../../core/services/supervisor.service';
     .version-text {
       text-align: center;
       font-size: 11px;
-      color: #94a3b8;
+      color: #475569;
       margin: 16px 0 0;
       display: inline-flex;
       align-items: center;
@@ -198,16 +277,75 @@ import { SupervisorService } from '../../core/services/supervisor.service';
       width: 100%;
       justify-content: center;
     }
-    .version-text ion-icon { font-size: 12px; }
+    .version-text ion-icon { font-size: 12px; color: #475569; }
+
+    /* Notifications card */
+    .notif-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 12px;
+      color: #0f172a;
+    }
+    .notif-row-text { flex: 1 1 auto; min-width: 0; color: #0f172a; }
+    .notif-row-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .notif-row-title ion-icon { font-size: 16px; color: #002263; }
+    .notif-row-sub {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #475569;
+    }
+    .notif-toggle {
+      flex: 0 0 auto;
+      position: relative;
+      width: 48px;
+      height: 28px;
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      background: #e2e8f0;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.18s ease, border-color 0.18s ease;
+      font-family: inherit;
+    }
+    .notif-toggle:disabled { opacity: 0.6; cursor: not-allowed; }
+    .notif-toggle.on { background: #002263; border-color: #002263; }
+    .notif-toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+      transition: transform 0.18s ease;
+    }
+    .notif-toggle.on .notif-toggle-knob { transform: translateX(20px); }
   `],
 })
 export class ProfilePage implements OnInit {
   private auth = inject(AuthService);
   private supervisor = inject(SupervisorService);
+  private notifications = inject(NotificationService);
   private alertCtrl = inject(AlertController);
   private toastCtrl = inject(ToastController);
 
   currentUser = signal<{ name: string; email: string; phone: string } | null>(null);
+  readonly pushEnabled = this.notifications.pushEnabled;
+  readonly busy = signal<boolean>(false);
 
   userInitials(): string {
     const name = this.currentUser()?.name || 'S';
@@ -220,6 +358,7 @@ export class ProfilePage implements OnInit {
     addIcons({
       personCircleOutline, mailOutline,
       logOutOutline, shieldCheckmarkOutline,
+      notificationsOutline, notificationsOffOutline,
     });
     this.currentUser.set(this.auth.currentUser());
   }
@@ -227,6 +366,54 @@ export class ProfilePage implements OnInit {
   async handleRefresh(event: CustomEvent): Promise<void> {
     this.currentUser.set(this.auth.currentUser());
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
+  }
+
+  /**
+   * Toggle push notifications on/off. When turning ON, we request the
+   * system permission and (on success) register the FCM token with the
+   * backend so the supervisor starts receiving approval/rejection alerts.
+   * When turning OFF, we unregister the token and stop Capacitor listeners.
+   */
+  async togglePush(): Promise<void> {
+    if (this.busy()) return;
+    this.busy.set(true);
+    try {
+      if (this.pushEnabled()) {
+        await this.notifications.disable();
+        await this.notifications.markOptedOut();
+        await this.showToast('Push notifications turned off', 'success');
+      } else {
+        const granted = await this.notifications.requestPermission();
+        if (granted) {
+          await this.notifications.markOptedOut(); // already opted in
+          await this.showToast('Push notifications enabled', 'success');
+        } else {
+          // The user dismissed the system prompt — record opt-out so we
+          // don't pester them again.
+          await this.notifications.markOptedOut();
+          await this.showToast('Push notifications were not enabled', 'warning');
+        }
+      }
+    } catch (err) {
+      console.error('[Profile] toggle push failed', err);
+      await this.showToast('Could not change notification settings', 'danger');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private async showToast(message: string, color: 'success' | 'danger' | 'warning' = 'success'): Promise<void> {
+    try {
+      const toast = await this.toastCtrl.create({
+        message,
+        duration: color === 'danger' ? 3500 : 2000,
+        color,
+        position: 'bottom',
+      });
+      await toast.present();
+    } catch {
+      console.log(`[Profile] ${color}: ${message}`);
+    }
   }
 
   async logout(): Promise<void> {

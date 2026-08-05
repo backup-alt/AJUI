@@ -3,6 +3,10 @@ import { Attendance } from "../models/Attendance.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 
 export interface GroupedAttendance {
+  projectId?: string;
+  projectName?: string;
+  clientId?: string;
+  clientName?: string;
   date: string;
   shift: number;
   paymentMode: string;
@@ -62,6 +66,7 @@ export async function listGroupedAttendance(filter: {
     {
       $group: {
         _id: {
+          projectId: "$projectId",
           attendanceDate: "$attendanceDate",
           shiftCount: "$shiftCount",
           paymentMode: "$paymentMode",
@@ -70,6 +75,9 @@ export async function listGroupedAttendance(filter: {
           labourType: "$labourType",
         },
         supervisorName: { $first: "$supervisor.name" },
+        projectName: { $first: "$projectName" },
+        clientId: { $first: "$clientId" },
+        clientName: { $first: "$clientName" },
         workers: {
           $push: {
             workerId: { $toString: "$workerId" },
@@ -110,6 +118,10 @@ export async function listGroupedAttendance(filter: {
     });
 
     return {
+      projectId: r._id.projectId ? String(r._id.projectId) : undefined,
+      projectName: r.projectName || "",
+      clientId: r.clientId ? String(r.clientId) : undefined,
+      clientName: r.clientName || "",
       date: r._id.attendanceDate,
       shift: r._id.shiftCount,
       paymentMode: r._id.paymentMode,

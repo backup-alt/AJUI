@@ -106,13 +106,11 @@ const dashboardModules: ModuleConfig[] = [
       { key: "overtime", label: "Overtime" },
       { key: "lateFine", label: "Late Fine" },
       { key: "paymentMode", label: "Payment Mode" },
-      { key: "status", label: "Status" },
     ],
     filters: [
       { key: "project", label: "Project" },
       { key: "site", label: "Site" },
       { key: "attendance", label: "Attendance" },
-      { key: "status", label: "Status" },
     ],
   },
   {
@@ -241,6 +239,7 @@ const dashboardModules: ModuleConfig[] = [
     ],
     filters: [
       { key: "materialName", label: "Material" },
+      { key: "site", label: "Site" },
     ],
   },
   {
@@ -833,7 +832,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div>
                   <span>Inventory Breakdown</span>
                   <h2 id="inv-breakdown-title">{{ selectedInventoryCard()!.materialName }}</h2>
-                  <p>Site-wise stock distribution for this material</p>
+                  <p>Full add/issue history at {{ selectedInventoryCard()!.siteName }}, newest first</p>
                 </div>
                 <button type="button" class="icon-button" aria-label="Close breakdown" (click)="closeInventoryBreakdown()">
                   <ion-icon name="close-outline"></ion-icon>
@@ -1588,6 +1587,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly calendarWeekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   readonly tableViewExpanded = signal(false);
   readonly recordDialogOpen = signal(false);
+  readonly attendanceRows = signal<TableRow[]>([]);
   readonly showVendorDialog = signal(false);
   readonly editingInlineVendor = signal<{ id: string; vendorName: string; materialType: string; phoneNumber: string; address: string; gstNumber: string } | null>(null);
   readonly draftRow = signal<TableRow>({});
@@ -1605,10 +1605,49 @@ readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inven
   readonly inventoryBreakdownRows = computed(() => {
     const card = this.selectedInventoryCard();
     if (!card) return [] as any[];
-    return this.data.inventory().filter((m: any) =>
-      String(m.name || "").trim().toLowerCase() === card.materialName.trim().toLowerCase() &&
-      String(m.site || "").trim().toLowerCase() === card.siteKey.trim().toLowerCase()
-    );
+    const name = card.materialName.trim().toLowerCase();
+    const siteKey = card.siteKey.trim().toLowerCase();
+    const matches = this.data.inventory().filter((m: any) =>
+      String(m.name || "").trim().toLowerCase() === name &&
+      String(m.site || "").trim().toLowerCase() === siteKey
+    ) as any[];
+    const rows: any[] = [];
+    for (const raw of matches) {
+      const m: any = raw;
+      const site = (m.site || "").trim() || "Unknown Site";
+      const unit = m.unit || card.unit || "";
+      let added = false;
+      for (const h of m.purchaseHistory || []) {
+        rows.push({
+          id: `p-${m._id || m.id}-${rows.length}`,
+          site,
+          quantity: Number(h.quantity) || 0,
+          unit,
+          updatedAt: h.date || m.updatedAt || m.createdAt || "",
+        });
+        added = true;
+      }
+      for (const h of m.consumptionHistory || []) {
+        rows.push({
+          id: `c-${m._id || m.id}-${rows.length}`,
+          site,
+          quantity: -(Math.abs(Number(h.quantity)) || 0),
+          unit,
+          updatedAt: h.date || m.updatedAt || m.createdAt || "",
+        });
+        added = true;
+      }
+      if (!added) {
+        rows.push({
+          id: `r-${m._id || m.id}`,
+          site,
+          quantity: Math.max(0, Number(m.remainingStock ?? m.quantity ?? 0)) || 0,
+          unit,
+          updatedAt: m.updatedAt || m.createdAt || "",
+        });
+      }
+    }
+    return rows.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
   });
   readonly showInventoryBreakdown = signal(false);
   readonly showInventoryInitDialog = signal(false);
@@ -1707,6 +1746,9 @@ readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inven
   /** Total records from MongoDB (not loaded array length). */
   readonly totalCount = computed(() => {
     const module = this.activeModule();
+    if (module === "labour") {
+      return this.hydration.getTotalCount("labour") + this.attendanceRows().length;
+    }
     return this.hydration.getTotalCount(module === "generalExpenses" ? "expenses" : module);
   });
   /** True while fetching the next page from server. */
@@ -1717,6 +1759,7 @@ readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inven
 
   ngOnInit(): void {
     void this.data.loadCustomFieldsFromBackend();
+    void this.fetchAttendanceData();
   }
 
   ngOnDestroy(): void {
@@ -1845,10 +1888,58 @@ readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inven
       void this.hydration.loadModule("inventory");
     } else if (module === "labour") {
       void this.hydration.loadModule("labour");
+      void this.fetchAttendanceData();
     } else if (module === "payments") {
       void this.hydration.loadModule("payments");
     } else if (module === "subcontractors") {
       void this.hydration.loadModule("subcontractors");
+    }
+  }
+
+  /**
+   * Load worker attendance (created via the mobile supervisor app) and append
+   * it to the Labour table so ALL labour attendance rows appear — not just the
+   * legacy party-level entries stored in the `labour` collection. Mirrors the
+   * mapping in project-workspace.page.ts fetchAttendanceData().
+   */
+  private attendanceFetchInFlight = false;
+
+  private async fetchAttendanceData(): Promise<void> {
+    if (this.attendanceFetchInFlight) return;
+    this.attendanceFetchInFlight = true;
+    try {
+      const result = await firstValueFrom(this.api.listGroupedAttendance({ limit: 500 }));
+      const rows: TableRow[] = (result.items || []).flatMap((group: any) => {
+        const project = group.projectId ? this.data.projectById(String(group.projectId)) : undefined;
+        return (group.workers || []).map((w: any, idx: number) => ({
+          __rowId: `attendance:${group.date}:${group.shift}:${w.workerId}:${idx}`,
+          __projectId: String(group.projectId || ""),
+          projectId: String(group.projectId || ""),
+          client: project?.client || group.clientName || "",
+          project: project?.name || group.projectName || "",
+          clientId: group.clientId ? String(group.clientId) : "",
+          site: group.site || "",
+          attendanceDate: group.date,
+          staffName: group.supervisorName || w.workerName,
+          supervisorName: group.supervisorName || w.workerName,
+          labourTypes: group.labourType || "",
+          staffCount: 1,
+          attendance: "Present",
+          shift: group.shift,
+          overtime: `${w.overtimeHours || 0} hrs`,
+          lateFine: formatMoney(w.lateFine || 0),
+          paymentMode: group.paymentMode || "Cash",
+          notes: "",
+          status: "Active",
+          dailyPay: w.dailyPay,
+        }));
+      });
+      this.attendanceRows.set(rows);
+    } catch (err) {
+      console.warn("[UniversalDashboard] failed to fetch attendance data", err);
+      this.attendanceRows.set([]);
+    } finally {
+      this.attendanceFetchInFlight = false;
     }
   }
 
@@ -1931,15 +2022,19 @@ let cards = [...map.values()].map((v) => {
         lastUpdated: v.lastUpdated,
       };
     });
-    const query = (searchText || "").trim().toLowerCase();
-    if (query) {
-      cards = cards.filter((c) => Object.values(c).some((v) => String(v).toLowerCase().includes(query)));
+    const tokens = (searchText || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.length > 0) {
+      cards = cards.filter((c) => {
+        const haystack = Object.values(c).map((value) => String(value).toLowerCase()).join(" ");
+        return tokens.every((tok) => haystack.includes(tok));
+      });
     }
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
         if (!value) continue;
         const needle = value.trim().toLowerCase();
-        cards = cards.filter((c) => String((c as any)[key] ?? "").toLowerCase().includes(needle));
+        const field = key === "site" ? "siteName" : key;
+        cards = cards.filter((c) => String((c as any)[field] ?? "").toLowerCase().includes(needle));
       }
     }
     return cards.sort((a, b) => {
@@ -2233,6 +2328,7 @@ let cards = [...map.values()].map((v) => {
       setTimeout(() => this.backendSyncMessage.set(null), 3000);
     });
 
+    void this.fetchAttendanceData();
     void this.data.loadCustomFieldsFromBackend();
   }
 
@@ -2342,7 +2438,12 @@ visibleRows(): TableRow[] {
           matchesSite = rowSiteName.toLowerCase() === activeSiteName.toLowerCase();
         }
       }
-      const matchesSearch = !query || Object.values(row).some((value) => String(value).toLowerCase().includes(query));
+      const matchesSearch =
+        !query ||
+        (() => {
+          const haystack = Object.values(row).map((value) => String(value).toLowerCase()).join(" ");
+          return query.split(/\s+/).filter(Boolean).every((tok) => haystack.includes(tok));
+        })();
       const matchesFilters = Object.entries(filters).every(
         ([key, value]) => !value || String(row[key] ?? "").toLowerCase().includes(value.trim().toLowerCase()),
       );
@@ -3393,7 +3494,7 @@ visibleRows(): TableRow[] {
       projectId: row.projectId,
       project: projectName(row.projectId),
       site: row.site,
-      attendanceDate: "2026-06-05",
+      attendanceDate: (row as any)["attendanceDate"] || "",
       staffName: row["supervisorName"] || row.party,
       supervisorName: row["supervisorName"] || "",
       dailyWage: row.dailyWage,
@@ -3568,6 +3669,12 @@ const inventory = this.data.inventory().map((row) => ({
         siteCount: card.siteCount,
         lastUpdated: card.lastUpdated,
       })) as TableRow[];
+    }
+    if (module === "labour" && this.attendanceRows().length) {
+      const srs = this.serverSearchResults();
+      if (srs && srs.module === module) return srs.items;
+      const labourRows = this.data.tableRowsFor(module, this.dashboardRows()[module]);
+      return [...labourRows, ...this.attendanceRows()];
     }
     const srs = this.serverSearchResults();
     if (srs && srs.module === module) return srs.items;

@@ -176,7 +176,10 @@ export function mapLabour(l: any): any {
     laborTypes: l.laborTypes || [],
     notes: l.notes,
     status: l.status,
-    supervisorName: l.supervisorName || "",
+    supervisorName:
+      l.supervisorName ||
+      (typeof l.submittedBy === "string" && !/^[0-9a-fA-F]{24}$/.test(l.submittedBy) ? l.submittedBy : "") ||
+      "",
     customFields: l.customFields || {},
   };
 }
@@ -342,6 +345,7 @@ export function mapInventory(i: any): any {
     poNumber: i.poNumber,
     billUrl: billUrlFor(i),
     purchaseHistory: i.purchaseHistory || [],
+    consumptionHistory: i.consumptionHistory || [],
     requestDate: i.updatedAt || i.createdAt || "",
     createdAt: i.createdAt,
     updatedAt: i.updatedAt,

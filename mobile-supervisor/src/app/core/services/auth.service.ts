@@ -6,6 +6,7 @@ import { firstValueFrom, from, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import { SupervisorService } from './supervisor.service';
+import { NotificationService } from './notification.service';
 import {
   LoginResponse,
   QRInvitePayload,
@@ -25,6 +26,7 @@ export class AuthService {
   private api = inject(ApiService);
   private router = inject(Router);
   private supervisorService = inject(SupervisorService);
+  private notifications = inject(NotificationService);
 
   readonly currentUser = signal<User | null>(null);
   readonly isAuthenticated = signal<boolean>(false);
@@ -36,6 +38,9 @@ export class AuthService {
     this.isAuthenticated.set(!!token);
 
     if (token) {
+      // Show the cached user immediately so the UI doesn't flash empty,
+      // then refresh from the server in the background to ensure we never
+      // show another account's stale data.
       const userData = await Preferences.get({ key: 'currentUser' });
       if (userData.value) {
         try {
@@ -43,6 +48,20 @@ export class AuthService {
         } catch {
           this.currentUser.set(null);
         }
+      }
+      // Always re-verify against /auth/me so the cached user matches the
+      // access token currently in storage.
+      try {
+        const fresh = await firstValueFrom(this.api.get<{ user: User }>('/auth/me'));
+        if (fresh?.user) {
+          this.currentUser.set(fresh.user);
+          await Preferences.set({ key: 'currentUser', value: JSON.stringify(fresh.user) });
+          if (fresh.user.id) await this.api.setUserId(fresh.user.id);
+          if ((fresh.user as any).role) await this.api.setUserRole((fresh.user as any).role);
+        }
+      } catch {
+        // Network failure — keep cached user; the interceptor will refresh
+        // the token on the next request and we'll re-fetch then.
       }
     }
   }
@@ -237,11 +256,34 @@ export class AuthService {
       // ignore
     }
 
-    await this.api.clearTokens();
+    // Wipe ALL user-scoped data: tokens, identity, site selection, dashboard cache,
+    // and every other per-user Preferences key. Also clears the in-memory HTTP
+    // cache so the next login starts with a fresh slate and cannot inherit
+    // stale responses from the previous session.
+    await this.api.clearAllUserData();
     await Preferences.remove({ key: 'currentUser' });
+
+    // Reset supervisor-side in-memory state so the next user does not inherit
+    // the previous user's selected site.
+    try {
+      await this.supervisorService.clearSiteSelection();
+    } catch {
+      // best-effort
+    }
+
     this.currentUser.set(null);
     this.isAuthenticated.set(false);
     this.sessionExpired.set(false);
+
+    // Stop the periodic notification poll so it doesn't keep hitting the
+    // backend with the old (now-cleared) credentials while the user is
+    // on the login screen. It will be restarted by AppComponent.ngOnInit
+    // after the next successful login.
+    try {
+      this.notifications.stopPolling();
+    } catch {
+      // best-effort
+    }
 
     await this.router.navigate(['/auth/login']);
   }

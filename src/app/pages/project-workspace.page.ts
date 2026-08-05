@@ -2679,6 +2679,8 @@ export class ProjectWorkspacePage {
 
   private async fetchAttendanceData(projectId: string): Promise<void> {
     try {
+      const currentProject = this.project();
+      const currentClient = this.client();
       const today = new Date();
       const thirtyDaysAgo = new Date(today);
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -2695,9 +2697,10 @@ export class ProjectWorkspacePage {
       const rows: TableRow[] = (result.items || []).flatMap((group: any) =>
         (group.workers || []).map((w: any, idx: number) => ({
           __rowId: `attendance:${group.date}:${group.shift}:${w.workerId}:${idx}`,
-          __projectId: projectId,
-          projectId,
-          client: "",
+          __projectId: group.projectId || projectId,
+          projectId: group.projectId || projectId,
+          client: group.clientName || currentProject?.client || "",
+          clientId: group.clientId || currentClient?.id || this.clientId(),
           site: group.site || "",
           attendanceDate: group.date,
           staffName: group.supervisorName || w.workerName,
@@ -2752,7 +2755,7 @@ export class ProjectWorkspacePage {
       client: currentProject?.client ?? "",
       clientId: currentClient?.id ?? this.clientId(),
       attendanceDate: "2026-06-05",
-      staffName: row.party,
+      staffName: row["supervisorName"] || (row as any)["partyName"] || row.party,
       site: row.site,
       dailyWage: row.dailyWage,
       labourTypes: this.labourTypesFromRow(row),

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, DestroyRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonContent,
@@ -718,12 +718,18 @@ export class DashboardPage implements OnInit, OnDestroy {
   dashboard = signal<DashboardData | null>(null);
   sites = signal<Site[]>([]);
   todayExpenses = signal<Expense[]>([]);
-  userName = signal<string>('Supervisor');
+  userName = computed<string>(() => {
+    const u = this.auth.currentUser();
+    const name = (u?.name || '').trim();
+    if (name) return name;
+    return this.auth.isAuthenticated() ? 'Supervisor' : 'Guest';
+  });
   loading = signal<boolean>(true);
   error = signal<boolean>(false);
 
   userInitial(): string {
-    return this.userName().charAt(0).toUpperCase();
+    const name = (this.userName() || '').trim();
+    return name.charAt(0).toUpperCase() || 'S';
   }
 
   greeting(): string {

@@ -48,17 +48,18 @@ export class AppComponent implements OnInit {
     // 4b. Defer backend notification fetch — not needed for dashboard display
     setTimeout(() => this.notifications.fetchFromBackend(), 3000);
 
-    if (this.notifications.pushEnabled()) {
-      try {
-        // PushNotifications.requestPermissions() can hang on some devices.
-        // Race it against a short timeout so the splash always hides.
-        await Promise.race([
-          this.notifications.requestPermission(),
-          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
-        ]);
-      } catch {
-        // ignore
-      }
+    // 4c. Start polling for new approval notifications every 30s while the
+    // app is foregrounded. This makes in-app approval notifications appear
+    // even when the user isn't on the notifications screen.
+    this.notifications.startPolling(30_000);
+
+    // 4d. Auto-prompt for push permission once after login so supervisors
+    // actually receive notifications on their device. We only show this
+    // opt-in once per install; if the user declines we never ask again.
+    if (this.auth.isAuthenticated()) {
+      setTimeout(() => {
+        void this.notifications.ensurePushPermissionOnce();
+      }, 4_000);
     }
 
     this.registerDeepLink();
@@ -140,6 +141,10 @@ export class AppComponent implements OnInit {
           next: () => { /* touch endpoint to validate token */ },
           error: () => { /* interceptor handles 401 retry; sessionExpired signal handles true expiry */ },
         });
+
+        // Fetch any approval notifications that may have arrived while
+        // the app was backgrounded.
+        void this.notifications.fetchFromBackend();
       }
     });
   }

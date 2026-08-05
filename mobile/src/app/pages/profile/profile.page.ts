@@ -173,6 +173,7 @@ import { environment } from '../../../environments/environment';
     </ion-content>
   `,
   styles: [`
+    ion-content { --background: #f4f6fb; }
     .profile-hero {
       background: var(--agb-gradient-primary);
       color: #ffffff;
@@ -185,11 +186,13 @@ import { environment } from '../../../environments/environment';
       margin: 12px 0 4px;
       font-size: 22px;
       font-weight: 700;
+      color: #ffffff;
     }
     .profile-hero p {
       margin: 0 0 10px;
-      opacity: 0.85;
       font-size: 13px;
+      color: #ffffff;
+      opacity: 0.95;
     }
     .profile-hero ion-chip {
       --background: rgba(255,255,255,0.18);
@@ -209,12 +212,12 @@ import { environment } from '../../../environments/environment';
       margin: 0 auto;
       box-shadow: 0 12px 24px rgba(0,0,0,0.25);
     }
-    .container { padding: 18px; }
+    .container { padding: 18px; color: #1a2238; background: transparent; }
     .phase-note {
       margin-top: 18px;
       padding: 12px;
       font-size: 12px;
-      color: var(--agb-text-muted);
+      color: #475569;
       text-align: center;
       font-style: italic;
     }
@@ -229,6 +232,7 @@ import { environment } from '../../../environments/environment';
       --inner-padding-end: 0;
       --padding-start: 0;
       --border-color: transparent;
+      --color: #1a2238;
     }
   `],
 })

@@ -27,6 +27,15 @@ export class NotificationService {
   /** Timestamp (ms) when the user last cleared all notifications. */
   private clearedAt = 0;
 
+  /** Tracks whether we've already shown the push opt-in dialog this install. */
+  private optInPromptShown = false;
+
+  /** Tracks whether the user explicitly declined push (we'll never ask again). */
+  private optedOut = false;
+
+  /** Set when a periodic fetch is running to avoid duplicate timers. */
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+
   async requestPermission(): Promise<boolean> {
     try {
       const result = await PushNotifications.requestPermissions();
@@ -63,8 +72,29 @@ export class NotificationService {
   async initFromStorage(): Promise<void> {
     const { value } = await Preferences.get({ key: 'pushEnabled' });
     this.pushEnabled.set(value === 'true');
+    const { value: optedOut } = await Preferences.get({ key: 'pushOptedOut' });
+    this.optedOut = optedOut === 'true';
     await this.loadClearedAt();
     await this.loadFromStorage();
+  }
+
+  /**
+   * Show the system push-permission prompt exactly once per install (unless
+   * the user already opted in or explicitly opted out). Returns true if push
+   * became available, false otherwise.
+   *
+   * Safe to call multiple times — we self-debounce via optInPromptShown.
+   */
+  async ensurePushPermissionOnce(): Promise<boolean> {
+    if (this.pushEnabled() || this.optedOut || this.optInPromptShown) return false;
+    this.optInPromptShown = true;
+    return this.requestPermission();
+  }
+
+  /** Mark the user as opted out so we never ask again. */
+  async markOptedOut(): Promise<void> {
+    this.optedOut = true;
+    await Preferences.set({ key: 'pushOptedOut', value: 'true' });
   }
 
   private async register(): Promise<void> {
@@ -244,6 +274,28 @@ export class NotificationService {
       }
     } catch (err) {
       console.error('[Notification] failed to fetch from backend', err);
+    }
+  }
+
+  /**
+   * Start polling the backend for new notifications every `intervalMs`
+   * milliseconds. Idempotent — calling this multiple times is a no-op.
+   * Stops automatically on logout (cleared via clearPolling()).
+   */
+  startPolling(intervalMs: number = 30_000): void {
+    if (this.pollTimer) return;
+    // Fire one fetch immediately, then on the interval.
+    void this.fetchFromBackend();
+    this.pollTimer = setInterval(() => {
+      void this.fetchFromBackend();
+    }, intervalMs);
+  }
+
+  /** Stop the periodic fetch (e.g. on logout). */
+  stopPolling(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
   }
 

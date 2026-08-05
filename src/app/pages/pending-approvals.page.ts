@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
-import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
+import { IonContent, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { FormsModule } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 import { ErpDataService, type SharedModuleKey } from "../data/erp-data.service";
@@ -8,7 +8,6 @@ import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ApprovalsService } from "../core/approvals.service";
 import { ApiService } from "../core/api.service";
-import { mapExpense } from "../core/mappers";
 
 type ApprovalField = "status" | "approvalStatus";
 
@@ -126,6 +125,27 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
     .image-preview-close:hover {
       background: rgba(255, 255, 255, 0.25);
     }
+
+    /* Inline spinner shown on the approve/decline buttons while a row is in-flight. */
+    .approval-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: approval-spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes approval-spin {
+      to { transform: rotate(360deg); }
+    }
+    .approval-actions button[disabled] {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
   `],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
@@ -242,12 +262,20 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         <td>{{ row.notes || "-" }}</td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
                         <td class="approval-actions">
-                          <button type="button" class="approve-action" (click)="approve(row)" aria-label="Approve material">
-                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
+                          <button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)" aria-label="Approve material">
+                            @if (isRowProcessing(row.rowId)) {
+                              <span class="approval-spinner" aria-hidden="true"></span>
+                            } @else {
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
+                            }
                             Approve
                           </button>
-                          <button type="button" class="decline-action" (click)="decline(row)" aria-label="Decline material">
-                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>
+                          <button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)" aria-label="Decline material">
+                            @if (isRowProcessing(row.rowId)) {
+                              <span class="approval-spinner" aria-hidden="true"></span>
+                            } @else {
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>
+                            }
                             Decline
                           </button>
                         </td>
@@ -344,8 +372,22 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
                         </td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
                         <td class="approval-actions">
-                          <button type="button" class="approve-action" (click)="approve(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>Approve</button>
-                          <button type="button" class="decline-action" (click)="decline(row)"><svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>Decline</button>
+                          <button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">
+                            @if (isRowProcessing(row.rowId)) {
+                              <span class="approval-spinner" aria-hidden="true"></span>
+                            } @else {
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
+                            }
+                            Approve
+                          </button>
+                          <button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)">
+                            @if (isRowProcessing(row.rowId)) {
+                              <span class="approval-spinner" aria-hidden="true"></span>
+                            } @else {
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>
+                            }
+                            Decline
+                          </button>
                         </td>
                       </tr>
                       <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="15"><span>No pending site expense approvals.</span></td></tr>
@@ -379,6 +421,7 @@ export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
   private readonly approvalsService = inject(ApprovalsService);
   private readonly api = inject(ApiService);
+  private readonly toastController = inject(ToastController);
 
   readonly showMaterial = signal(false);
   readonly showLabour = signal(false);
@@ -387,6 +430,10 @@ export class PendingApprovalsPage implements OnInit {
   readonly loadError = signal(false);
 
   readonly previewImageUrl = signal<string | null>(null);
+
+  // Tracks rows currently mid-action so the buttons can show a spinner and
+  // ignore duplicate clicks while the server is processing.
+  private readonly pendingActionRows = new Set<string>();
 
   private _materialRows = signal<MaterialApprovalRow[]>([]);
   private _labourRows = signal<LabourApprovalRow[]>([]);
@@ -478,12 +525,39 @@ export class PendingApprovalsPage implements OnInit {
     void this.applyApproval(row, "Rejected");
   }
 
+  /**
+   * Optimistic approve / decline:
+   *   1. Disable the row's buttons immediately and mark it as processing.
+   *   2. Remove the row from the local lists so the UI is responsive
+   *      (no waiting on a server round-trip to see the queue shrink).
+   *   3. Fire the PUT to the server.
+   *   4. Show a lightweight toast on success.
+   *   5. On failure, restore the row and surface an error toast.
+   *
+   * The expensive `refreshExpensesFromBackend()` call from the old flow is
+   * dropped because:
+   *   - The backend already updates the source record (Material / Labour / Expense)
+   *     and recomputes project totals before sending the response.
+   *   - The approval row itself is removed from the pending queue.
+   *   - If the user wants the latest expense list, a separate refresh button
+   *     is already wired up.
+   */
   private async applyApproval(row: ApprovalBaseRow, status: "Approved" | "Rejected"): Promise<void> {
+    // Guard against duplicate clicks while a request is in flight.
+    if (this.pendingActionRows.has(row.rowId)) return;
+    this.pendingActionRows.add(row.rowId);
+
+    // Snapshot the row so we can restore on error.
+    const snapshot = this.snapshotRow(row.rowId);
+
+    // Optimistically drop the row from local lists so the UI updates instantly.
+    this.removeRowFromLists(row.rowId);
+
     try {
       if (status === "Approved") {
         let payload: any = {};
         if (row.module === "expenses") {
-          const expenseRow = this._siteExpenseRows().find((r) => r.rowId === row.rowId);
+          const expenseRow = this._siteExpenseRows().find((r) => r.rowId === row.rowId) || (snapshot as ExpenseApprovalRow | undefined);
           if (expenseRow) {
             if (this.isCashAddedTransaction(expenseRow.transactionType)) {
               if (expenseRow.approvedAmount !== undefined) payload.approvedAmount = expenseRow.approvedAmount;
@@ -494,34 +568,76 @@ export class PendingApprovalsPage implements OnInit {
             }
           }
         } else if (row.module === "materials") {
-          const materialRow = this._materialRows().find((r) => r.rowId === row.rowId);
+          const materialRow = this._materialRows().find((r) => r.rowId === row.rowId) || (snapshot as MaterialApprovalRow | undefined);
           if (materialRow) {
             payload.approvedQuantity = Number(materialRow.approvedQuantity) || 0;
-            if (materialRow.vendor !== undefined && materialRow.vendor.trim() !== '') payload.vendor = materialRow.vendor;
+            if (materialRow.vendor && materialRow.vendor.trim() !== '') payload.vendor = materialRow.vendor;
             if (materialRow.issuedAmount !== undefined) payload.issuedAmount = materialRow.issuedAmount;
             if (materialRow.givenAmount !== undefined) payload.givenAmount = materialRow.givenAmount;
           }
         }
         await firstValueFrom(this.approvalsService.approve(row.rowId, payload));
-        await this.refreshExpensesFromBackend();
       } else {
         await firstValueFrom(this.approvalsService.reject(row.rowId));
       }
-      this.removeRowFromLists(row.rowId);
-      window.alert(`Approval ${status.toLowerCase()} successfully.`);
-    } catch (e) {
-      window.alert("Failed to process approval. Please try again.");
+
+      await this.showToast(`Approval ${status.toLowerCase()} successfully`, "success");
+    } catch (e: any) {
+      // Restore the row so the user can retry.
+      this.restoreRow(row.rowId, snapshot);
+      const message = (e?.error?.message || e?.message || "Failed to process approval. Please try again.").toString();
+      await this.showToast(message, "danger");
+    } finally {
+      this.pendingActionRows.delete(row.rowId);
     }
   }
 
-  private async refreshExpensesFromBackend(): Promise<void> {
+  /**
+   * Returns true while the row is being processed (so the UI can disable the
+   * buttons / show a spinner).
+   */
+  isRowProcessing(rowId: string): boolean {
+    return this.pendingActionRows.has(rowId);
+  }
+
+  private snapshotRow(rowId: string): ApprovalBaseRow | null {
+    const all = [
+      ...this._materialRows(),
+      ...this._labourRows(),
+      ...this._siteExpenseRows(),
+    ];
+    return all.find((r) => r.rowId === rowId) ?? null;
+  }
+
+  private restoreRow(rowId: string, row: ApprovalBaseRow | null): void {
+    if (!row) return;
+    if (row.module === "materials") {
+      this._materialRows.update((rows) =>
+        rows.some((r) => r.rowId === rowId) ? rows : [...rows, row as MaterialApprovalRow]
+      );
+    } else if (row.module === "labour") {
+      this._labourRows.update((rows) =>
+        rows.some((r) => r.rowId === rowId) ? rows : [...rows, row as LabourApprovalRow]
+      );
+    } else if (row.module === "expenses") {
+      this._siteExpenseRows.update((rows) =>
+        rows.some((r) => r.rowId === rowId) ? rows : [...rows, row as ExpenseApprovalRow]
+      );
+    }
+  }
+
+  private async showToast(message: string, color: "success" | "danger" | "warning" = "success"): Promise<void> {
     try {
-      // limit <= 25 — listExpenses schema caps at max(25).
-      const result = await firstValueFrom(this.api.listExpenses({ limit: 25 }));
-      const mapped = (result.items || []).map(mapExpense);
-      this.data.setExpenses(mapped);
-    } catch (e) {
-      console.warn("[PendingApprovals] Failed to refresh expenses", e);
+      const toast = await this.toastController.create({
+        message,
+        duration: color === "danger" ? 3500 : 2000,
+        color,
+        position: "top",
+      });
+      await toast.present();
+    } catch {
+      // Fall back to console if the toast service is unavailable (e.g. SSR).
+      console.log(`[Approval] ${color}: ${message}`);
     }
   }
 

@@ -295,6 +295,60 @@ export class ApiService {
     await Preferences.remove({ key: 'selectedSiteName' });
   }
 
+  /**
+   * Wipe ALL user-scoped data from Preferences and the in-memory HTTP cache.
+   * Called from AuthService.logout() so the next login starts from a clean slate.
+   * Includes:
+   *   - tokens (access + refresh)
+   *   - userId / userRole / currentUser (caller also clears currentUser Preferences key)
+   *   - selected site / project / names
+   *   - every dashboardCache:* and per-user cache key (iteration via Preferences.keys)
+   * Also clears the in-memory GET cache to prevent stale responses from being
+   * shown to a freshly logged-in user.
+   */
+  async clearAllUserData(): Promise<void> {
+    // Always clear tokens + site selection + role / id
+    this.clearGetCache();
+    await this.clearTokens();
+    await this.clearSiteSelection();
+    await Preferences.remove({ key: 'userId' });
+    await Preferences.remove({ key: 'userRole' });
+
+    // Iterate every Preferences key and remove anything user-scoped.
+    // We intentionally use the underlying storage so we don't miss keys added
+    // by features we haven't audited yet.
+    try {
+      const allKeys: string[] = [];
+      // Capacitor Preferences exposes .keys() to enumerate stored keys.
+      const keysApi = (Preferences as unknown as { keys?: () => Promise<{ keys: string[] }> }).keys;
+      if (typeof keysApi === 'function') {
+        const result = await keysApi.call(Preferences);
+        allKeys.push(...(result?.keys || []));
+      } else if (typeof (Preferences as any).configKeys === 'function') {
+        const result = await (Preferences as any).configKeys();
+        allKeys.push(...(result?.keys || []));
+      }
+      const userKeyPrefixes = [
+        'currentUser',
+        'dashboardCache:',
+        'attendanceCache:',
+        'materialsCache:',
+        'expensesCache:',
+        'labourCache:',
+        'sitesCache:',
+        'profileCache:',
+        'notificationsCache:',
+      ];
+      for (const key of allKeys) {
+        if (userKeyPrefixes.some((prefix) => key === prefix || key.startsWith(prefix))) {
+          await Preferences.remove({ key });
+        }
+      }
+    } catch {
+      // Best-effort cleanup — never throw from logout.
+    }
+  }
+
   async isAuthenticated(): Promise<boolean> {
     const token = await this.getAccessToken();
     return !!token;
