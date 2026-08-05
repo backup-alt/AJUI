@@ -53,14 +53,12 @@ export class AppComponent implements OnInit {
     // even when the user isn't on the notifications screen.
     this.notifications.startPolling(30_000);
 
-    // 4d. Auto-prompt for push permission once after login so supervisors
-    // actually receive notifications on their device. We only show this
-    // opt-in once per install; if the user declines we never ask again.
-    if (this.auth.isAuthenticated()) {
-      setTimeout(() => {
-        void this.notifications.ensurePushPermissionOnce();
-      }, 4_000);
-    }
+    // NOTE: We deliberately do NOT auto-prompt for push permission at app
+    // start. Showing the system permission dialog steals focus from the
+    // WebView and on devices where Firebase is misconfigured (e.g. no
+    // google-services.json) the subsequent register() call can force-close
+    // the app. Push opt-in is exposed as a toggle in the Profile screen so
+    // users explicitly enable it when they want it.
 
     this.registerDeepLink();
     this.registerAppStateListener();

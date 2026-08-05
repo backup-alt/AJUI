@@ -72,6 +72,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Android 13 (API 33) requires runtime permission for posting notifications.
+         Without this declaration, requestPermissions() returns DENIED and the
+         Capacitor Push plugin throws on subsequent register() calls. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required by Firebase Messaging on Android 13+ when the app process is
+         killed and a push needs to wake it up. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />

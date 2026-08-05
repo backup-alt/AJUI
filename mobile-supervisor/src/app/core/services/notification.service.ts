@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { PushNotifications, Token, DeliveredNotifications } from '@capacitor/push-notifications';
+import { PushNotifications, Token } from '@capacitor/push-notifications';
 import { Preferences } from '@capacitor/preferences';
+import { firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
 import { SupervisorService } from './supervisor.service';
 import { environment } from '../../../environments/environment';
@@ -38,17 +39,29 @@ export class NotificationService {
 
   async requestPermission(): Promise<boolean> {
     try {
-      const result = await PushNotifications.requestPermissions();
-      if (result.receive !== 'granted') {
+      const result = await this.raceWithTimeout(
+        PushNotifications.requestPermissions(),
+        8000,
+        'PushNotifications.requestPermissions'
+      );
+      if (!result || result.receive !== 'granted') {
         this.pushEnabled.set(false);
         return false;
       }
       this.pushEnabled.set(true);
+      // CRITICAL: register() must NEVER throw out of this method. Firebase can
+      // throw IllegalStateException ("Default FirebaseApp is not initialized")
+      // when google-services.json is missing, and that throw can crash the
+      // WebView on some Android devices. register() itself is hardened below
+      // to swallow every failure and still let the app keep working.
       await this.register();
       await this.persistPreference(true);
       return true;
     } catch (err) {
       console.error('[Notification] permission request failed', err);
+      // Make sure the UI doesn't get stuck in the "enabled" state if anything
+      // went sideways during registration.
+      this.pushEnabled.set(false);
       return false;
     }
   }
@@ -57,16 +70,36 @@ export class NotificationService {
     try {
       const token = this.fcmToken();
       if (token) {
-        await this.api.post('/supervisor/device/unregister', { fcmToken: token });
+        await this.raceWithTimeout(
+          firstValueFrom(this.api.post('/supervisor/device/unregister', { fcmToken: token })),
+          5000,
+          'device unregister'
+        );
       }
-      await PushNotifications.removeAllListeners();
-      await PushNotifications.unregister();
-      this.fcmToken.set(null);
-      this.pushEnabled.set(false);
-      await this.persistPreference(false);
     } catch (err) {
-      console.error('[Notification] disable failed', err);
+      console.warn('[Notification] device unregister failed', err);
     }
+    try {
+      await this.raceWithTimeout(
+        PushNotifications.removeAllListeners(),
+        3000,
+        'removeAllListeners'
+      );
+    } catch (err) {
+      console.warn('[Notification] removeAllListeners failed', err);
+    }
+    try {
+      await this.raceWithTimeout(
+        PushNotifications.unregister(),
+        3000,
+        'unregister'
+      );
+    } catch (err) {
+      console.warn('[Notification] unregister failed', err);
+    }
+    this.fcmToken.set(null);
+    this.pushEnabled.set(false);
+    await this.persistPreference(false);
   }
 
   async initFromStorage(): Promise<void> {
@@ -84,6 +117,11 @@ export class NotificationService {
    * became available, false otherwise.
    *
    * Safe to call multiple times — we self-debounce via optInPromptShown.
+   *
+   * We deliberately do NOT call this automatically from ngOnInit. The system
+   * permission dialog steals focus from the app and on some devices a Firebase
+   * crash during register() can force-close the WebView. Pushing must be an
+   * explicit, user-initiated action (via the profile toggle).
    */
   async ensurePushPermissionOnce(): Promise<boolean> {
     if (this.pushEnabled() || this.optedOut || this.optInPromptShown) return false;
@@ -97,31 +135,58 @@ export class NotificationService {
     await Preferences.set({ key: 'pushOptedOut', value: 'true' });
   }
 
+  /**
+   * Register for push notifications. EVERY step is wrapped — if Firebase is
+   * not configured (no google-services.json) or the device lacks Google
+   * Play Services, we still let the app keep working. Worst case the user
+   * simply doesn't receive remote pushes; in-app notifications (driven by
+   * the 30s backend poll) keep working regardless.
+   */
   private async register(): Promise<void> {
-    await PushNotifications.register();
+    // 1. Tell Capacitor we want to receive pushes. Without google-services.json
+    // the native side throws IllegalStateException which on some Android
+    // versions escapes into the main thread and kills the WebView process.
+    try {
+      await this.raceWithTimeout(
+        PushNotifications.register(),
+        5000,
+        'PushNotifications.register'
+      );
+    } catch (err) {
+      console.warn('[Notification] register failed (push disabled):', err);
+      return;
+    }
 
-    await PushNotifications.addListener('registration', async (token: Token) => {
+    // 2. Add listeners — each is wrapped independently so a single failure
+    // does not abort the others and does not propagate out of register().
+    this.safeAddListener('registration', async (token: Token) => {
+      if (!token?.value) return;
       this.fcmToken.set(token.value);
       try {
         const deviceId = await this.getDeviceId();
-        await this.api.post('/supervisor/device/register', {
-          fcmToken: token.value,
-          platform: this.getPlatform(),
-          deviceId,
-          appVersion: environment.version,
-        });
+        await this.raceWithTimeout(
+          firstValueFrom(
+            this.api.post('/supervisor/device/register', {
+              fcmToken: token.value,
+              platform: this.getPlatform(),
+              deviceId,
+              appVersion: environment.version,
+            })
+          ),
+          8000,
+          'device register'
+        );
       } catch (err) {
-        console.error('[Notification] failed to register device with backend', err);
+        console.warn('[Notification] failed to register device with backend:', err);
       }
     });
 
-    await PushNotifications.addListener('registrationError', (err) => {
-      console.error('[Notification] FCM registration error', err);
+    this.safeAddListener('registrationError', (err) => {
+      console.warn('[Notification] FCM registration error:', err);
     });
 
-    await PushNotifications.addListener(
-      'pushNotificationReceived',
-      (notification) => {
+    this.safeAddListener('pushNotificationReceived', (notification) => {
+      try {
         this.addInApp({
           id: notification.id || String(Date.now()),
           title: notification.title || 'Notification',
@@ -130,31 +195,103 @@ export class NotificationService {
           receivedAt: Date.now(),
           read: false,
         });
+      } catch (err) {
+        console.warn('[Notification] failed to add in-app notification:', err);
       }
-    );
+    });
 
-    await PushNotifications.addListener(
-      'pushNotificationActionPerformed',
-      (action) => {
+    this.safeAddListener('pushNotificationActionPerformed', (action) => {
+      try {
         const data = action.notification?.data;
         if (data?.['route']) {
           window.dispatchEvent(
             new CustomEvent('agb:push-navigate', { detail: data['route'] })
           );
         }
+      } catch (err) {
+        console.warn('[Notification] action handler failed:', err);
       }
-    );
+    });
 
-    await PushNotifications.getDeliveredNotifications().then((delivered: DeliveredNotifications) => {
-      for (const n of delivered.notifications) {
-        this.addInApp({
-          id: n.id || String(Date.now()),
-          title: n.title || 'Notification',
-          body: n.body || '',
-          receivedAt: Date.now(),
-          read: false,
-        });
+    // 3. Drain any already-delivered notifications into the in-app list.
+    try {
+      await this.raceWithTimeout(
+        PushNotifications.getDeliveredNotifications(),
+        4000,
+        'getDeliveredNotifications'
+      ).then((delivered) => {
+        for (const n of (delivered?.notifications || []) as any[]) {
+          this.addInApp({
+            id: n.id || String(Date.now()),
+            title: n.title || 'Notification',
+            body: n.body || '',
+            receivedAt: Date.now(),
+            read: false,
+          });
+        }
+      }).catch((err) => {
+        console.warn('[Notification] getDeliveredNotifications failed:', err);
+      });
+    } catch (err) {
+      console.warn('[Notification] getDeliveredNotifications outer failure:', err);
+    }
+  }
+
+  /**
+   * Wraps `PushNotifications.addListener` so a single failure (or a
+   * missing native side) does not propagate. Returns silently.
+   *
+   * The plugin exposes four overloaded addListener signatures — one per
+   * event name — so we resolve to the correct overload via a small
+   * type-erased wrapper. We intentionally swallow the typed payload
+   * because the only thing this layer cares about is whether the
+   * listener was attached.
+   */
+  private async safeAddListener(
+    eventName: 'registration' | 'registrationError' | 'pushNotificationReceived' | 'pushNotificationActionPerformed',
+    handler: (payload: any) => void | Promise<void>
+  ): Promise<void> {
+    try {
+      // Pick the matching overload so we don't fall through to the last
+      // overload that only accepts 'pushNotificationActionPerformed'.
+      let registration: Promise<unknown>;
+      switch (eventName) {
+        case 'registration':
+          registration = PushNotifications.addListener('registration', handler as any);
+          break;
+        case 'registrationError':
+          registration = PushNotifications.addListener('registrationError', handler as any);
+          break;
+        case 'pushNotificationReceived':
+          registration = PushNotifications.addListener('pushNotificationReceived', handler as any);
+          break;
+        case 'pushNotificationActionPerformed':
+        default:
+          registration = PushNotifications.addListener(
+            'pushNotificationActionPerformed',
+            handler as any
+          );
+          break;
       }
+      await this.raceWithTimeout(registration, 3000, `addListener(${eventName})`);
+    } catch (err) {
+      console.warn(`[Notification] addListener(${eventName}) failed:`, err);
+    }
+  }
+
+  /**
+   * Race a promise against a timeout so a stuck native call (e.g.
+   * Firebase init hanging on a device without Play Services) can never
+   * block the Angular zone forever. Rejects on timeout or on the
+   * underlying promise's rejection.
+   */
+  private raceWithTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      p.then(
+        (value) => { clearTimeout(timer); resolve(value); },
+        (err) => { clearTimeout(timer); reject(err); }
+      );
     });
   }
 
