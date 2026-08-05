@@ -370,9 +370,14 @@ export class ProfilePage implements OnInit {
 
   /**
    * Toggle push notifications on/off. When turning ON, we request the
-   * system permission and (on success) register the FCM token with the
-   * backend so the supervisor starts receiving approval/rejection alerts.
-   * When turning OFF, we unregister the token and stop Capacitor listeners.
+   * system permission and (if Firebase is configured) register the FCM
+   * token with the backend so the supervisor starts receiving approval /
+   * rejection alerts. When turning OFF, we unregister the token and stop
+   * Capacitor listeners.
+   *
+   * If Firebase isn't configured for this build, the system permission is
+   * still granted (so future builds can take over) and notifications
+   * continue to be delivered via the in-app polling channel.
    */
   async togglePush(): Promise<void> {
     if (this.busy()) return;
@@ -386,7 +391,14 @@ export class ProfilePage implements OnInit {
         const granted = await this.notifications.requestPermission();
         if (granted) {
           await this.notifications.markOptedOut(); // already opted in
-          await this.showToast('Push notifications enabled', 'success');
+          if (this.notifications.fcmAvailable()) {
+            await this.showToast('Push notifications enabled', 'success');
+          } else {
+            await this.showToast(
+              'Permission granted. Push delivery is currently disabled in this build; you will still receive in-app notifications.',
+              'success'
+            );
+          }
         } else {
           // The user dismissed the system prompt — record opt-out so we
           // don't pester them again.

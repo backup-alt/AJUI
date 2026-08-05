@@ -25,6 +25,9 @@ export class NotificationService {
   readonly notifications = signal<InAppNotification[]>([]);
   readonly unreadCount = signal<number>(0);
 
+  /** True once we've verified that PushNotifications.register() works on this device. */
+  readonly fcmAvailable = signal<boolean>(true);
+
   /** Timestamp (ms) when the user last cleared all notifications. */
   private clearedAt = 0;
 
@@ -37,8 +40,41 @@ export class NotificationService {
   /** Set when a periodic fetch is running to avoid duplicate timers. */
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * One-time check for whether Firebase is actually configured for this
+   * app build. The Capacitor sync step copies `google-services.json` (when
+   * present) into the APK as `assets/public/google-services.json`. If that
+   * file is absent `PushNotifications.register()` will synchronously throw
+   * `IllegalStateException("Default FirebaseApp is not initialized")` on
+   * the bridge's main thread — Capacitor rethrows that as a RuntimeException
+   * which Android treats as a fatal crash and force-closes the WebView.
+   *
+   * So before we ever call `register()` we probe for the file. The probe
+   * result is cached for the lifetime of the app install.
+   */
+  private async probeFirebaseConfigured(): Promise<boolean> {
+    if (!this.fcmAvailable()) return false;
+    if (typeof fetch === 'undefined') return true;
+    try {
+      const res = await fetch('google-services.json', { method: 'HEAD', cache: 'no-store' });
+      if (!res.ok) {
+        console.warn('[Notification] google-services.json missing — push disabled');
+        this.fcmAvailable.set(false);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      // fetch may fail in offline scenarios — treat as "unknown / unavailable"
+      console.warn('[Notification] google-services.json probe failed (push disabled):', err);
+      this.fcmAvailable.set(false);
+      return false;
+    }
+  }
+
   async requestPermission(): Promise<boolean> {
     try {
+      // 1. Ask for the system permission. This is safe even when FCM is
+      //    unconfigured — it touches Android's permission framework only.
       const result = await this.raceWithTimeout(
         PushNotifications.requestPermissions(),
         8000,
@@ -49,18 +85,26 @@ export class NotificationService {
         return false;
       }
       this.pushEnabled.set(true);
-      // CRITICAL: register() must NEVER throw out of this method. Firebase can
-      // throw IllegalStateException ("Default FirebaseApp is not initialized")
-      // when google-services.json is missing, and that throw can crash the
-      // WebView on some Android devices. register() itself is hardened below
-      // to swallow every failure and still let the app keep working.
+
+      // 2. Probe Firebase BEFORE attempting register(). If google-services.json
+      //    is missing the register() call crashes the WebView via Capacitor's
+      //    RuntimeException rethrow (see probeFirebaseConfigured for details).
+      const fcmOk = await this.probeFirebaseConfigured();
+      if (!fcmOk) {
+        console.warn('[Notification] FCM unavailable — keeping permission but skipping register()');
+        // Persist pushEnabled=true so the toggle UI reflects what the user
+        // asked for; they still get notifications via in-app polling.
+        await this.persistPreference(true);
+        return true;
+      }
+
+      // 3. Firebase is configured. register() is wrapped defensively so an
+      //    unexpected failure here cannot crash the app.
       await this.register();
       await this.persistPreference(true);
       return true;
     } catch (err) {
       console.error('[Notification] permission request failed', err);
-      // Make sure the UI doesn't get stuck in the "enabled" state if anything
-      // went sideways during registration.
       this.pushEnabled.set(false);
       return false;
     }
@@ -79,23 +123,27 @@ export class NotificationService {
     } catch (err) {
       console.warn('[Notification] device unregister failed', err);
     }
-    try {
-      await this.raceWithTimeout(
-        PushNotifications.removeAllListeners(),
-        3000,
-        'removeAllListeners'
-      );
-    } catch (err) {
-      console.warn('[Notification] removeAllListeners failed', err);
-    }
-    try {
-      await this.raceWithTimeout(
-        PushNotifications.unregister(),
-        3000,
-        'unregister'
-      );
-    } catch (err) {
-      console.warn('[Notification] unregister failed', err);
+    // Only call the native unregister/listener calls if FCM is actually
+    // available — otherwise they may hit the same Firebase-init crash.
+    if (this.fcmAvailable()) {
+      try {
+        await this.raceWithTimeout(
+          PushNotifications.removeAllListeners(),
+          3000,
+          'removeAllListeners'
+        );
+      } catch (err) {
+        console.warn('[Notification] removeAllListeners failed', err);
+      }
+      try {
+        await this.raceWithTimeout(
+          PushNotifications.unregister(),
+          3000,
+          'unregister'
+        );
+      } catch (err) {
+        console.warn('[Notification] unregister failed', err);
+      }
     }
     this.fcmToken.set(null);
     this.pushEnabled.set(false);
@@ -136,16 +184,13 @@ export class NotificationService {
   }
 
   /**
-   * Register for push notifications. EVERY step is wrapped — if Firebase is
-   * not configured (no google-services.json) or the device lacks Google
-   * Play Services, we still let the app keep working. Worst case the user
-   * simply doesn't receive remote pushes; in-app notifications (driven by
-   * the 30s backend poll) keep working regardless.
+   * Register for push notifications. Only called after the FCM availability
+   * probe has succeeded, so this is safe on devices where Firebase is
+   * actually wired up. Every step is still wrapped defensively — a stuck
+   * Firebase init can never block the Angular zone.
    */
   private async register(): Promise<void> {
-    // 1. Tell Capacitor we want to receive pushes. Without google-services.json
-    // the native side throws IllegalStateException which on some Android
-    // versions escapes into the main thread and kills the WebView process.
+    // 1. Tell Capacitor we want to receive pushes.
     try {
       await this.raceWithTimeout(
         PushNotifications.register(),
@@ -154,6 +199,7 @@ export class NotificationService {
       );
     } catch (err) {
       console.warn('[Notification] register failed (push disabled):', err);
+      this.fcmAvailable.set(false);
       return;
     }
 
@@ -240,20 +286,12 @@ export class NotificationService {
   /**
    * Wraps `PushNotifications.addListener` so a single failure (or a
    * missing native side) does not propagate. Returns silently.
-   *
-   * The plugin exposes four overloaded addListener signatures — one per
-   * event name — so we resolve to the correct overload via a small
-   * type-erased wrapper. We intentionally swallow the typed payload
-   * because the only thing this layer cares about is whether the
-   * listener was attached.
    */
   private async safeAddListener(
     eventName: 'registration' | 'registrationError' | 'pushNotificationReceived' | 'pushNotificationActionPerformed',
     handler: (payload: any) => void | Promise<void>
   ): Promise<void> {
     try {
-      // Pick the matching overload so we don't fall through to the last
-      // overload that only accepts 'pushNotificationActionPerformed'.
       let registration: Promise<unknown>;
       switch (eventName) {
         case 'registration':
