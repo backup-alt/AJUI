@@ -121,6 +121,13 @@ export interface Subcontractor {
   subcontractorName: string;
   site?: string;
   projectId?: string;
+  // The /api/supervisor/subcontractors endpoint returns the full
+  // record (since sub-contractors are shared across projects/sites).
+  // These fields help disambiguate when several sub-contractors
+  // share similar names.
+  phone?: string;
+  address?: string;
+  note?: string;
 }
 
 // =================== ATTENDANCE ===================

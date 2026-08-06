@@ -129,6 +129,33 @@ export async function listSubcontractorsForSupervisor(userId: string) {
   }));
 }
 
+/**
+ * Universal list — every ACTIVE sub-contractor across all projects.
+ * Used by the mobile worker-create page so a sub-contractor that works
+ * across multiple projects/sites can be picked from a single dropdown.
+ *
+ * The Subcontractor model is intentionally project-agnostic: a single
+ * party ("Sri Balaji Electricals") can be assigned to many projects
+ * concurrently, so the worker-create flow should show every active
+ * sub-contractor regardless of which site/project is currently
+ * selected. Project-scoping is still applied where it matters
+ * (e.g. the admin subcontractor list, the financial rollup).
+ */
+export async function listAllActiveSubcontractors() {
+  const items = await Subcontractor.find({ status: "active" })
+    .select("_id subcontractorName projectId address phone note")
+    .sort({ subcontractorName: 1 })
+    .lean();
+  return items.map((s) => ({
+    _id: String(s._id),
+    subcontractorName: s.subcontractorName,
+    projectId: s.projectId ? String(s.projectId) : "",
+    address: s.address || "",
+    phone: s.phone || "",
+    note: s.note || "",
+  }));
+}
+
 export async function getSubcontractorById(id: string) {
   if (!Types.ObjectId.isValid(id)) throw new AppError(400, "Invalid subcontractor id");
   const sub = await Subcontractor.findById(id).lean();

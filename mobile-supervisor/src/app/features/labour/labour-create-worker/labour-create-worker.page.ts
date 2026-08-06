@@ -172,7 +172,7 @@ interface SupervisorOption {
               >
                 @for (sub of subcontractors(); track sub._id) {
                   <ion-select-option [value]="sub._id">
-                    {{ sub.subcontractorName }}
+                    {{ sub.subcontractorName }}{{ sub.phone ? ' · ' + sub.phone : '' }}
                   </ion-select-option>
                 }
               </ion-select>
@@ -181,7 +181,7 @@ interface SupervisorOption {
               }
             </ion-item>
             @if (!loadingSubcontractors() && subcontractors().length === 0) {
-              <p class="empty-hint">No sub-contractors available for your projects. Add one from the web app first.</p>
+              <p class="empty-hint">No sub-contractors on file. Add one from the web app first.</p>
             }
           } @else {
             <ion-item class="form-item">

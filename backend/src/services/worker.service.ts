@@ -35,19 +35,23 @@ export async function createWorker(input: {
   let subcontractorObjectId: Types.ObjectId | undefined;
   if (input.isSubcontract && input.subcontractorId) {
     // The mobile worker-create form sends the subcontractor's Mongo `_id`
-    // (24-char ObjectId). The legacy `subcontractId` field was removed
-    // from the Subcontractor model, so we look up by `_id` and verify
-    // the subcontractor actually lives under the selected project.
+    // (24-char ObjectId). Sub-contractors are intentionally shared
+    // resources: the same party ("Sri Balaji Electricals") can be
+    // active under multiple projects and sites, so we look the
+    // subcontractor up by `_id` alone — without constraining to the
+    // current project. The supervisor-role check on the route + the
+    // universal list endpoint together ensure cross-tenant data
+    // isn't reachable.
     if (!Types.ObjectId.isValid(input.subcontractorId)) {
       throw new AppError(400, "Invalid subcontractor id");
     }
     const sub = await Subcontractor.findOne({
       _id: new Types.ObjectId(input.subcontractorId),
-      projectId: project._id,
+      status: "active",
     })
-      .select("_id")
+      .select("_id subcontractorName projectId")
       .lean();
-    if (!sub) throw new AppError(404, "Subcontractor not found for this project");
+    if (!sub) throw new AppError(404, "Subcontractor not found or inactive");
     subcontractorObjectId = sub._id;
   }
 

@@ -767,12 +767,17 @@ export async function getLabourTypeCounts(req: Request, res: Response, next: Nex
 // =================== SUBCONTRACTORS (mobile) ===================
 export async function listSubcontractors(req: Request, res: Response, next: NextFunction) {
   try {
-    // Scoped list — every active sub-contractor under the projects this
-    // supervisor is assigned to. The worker create page picks from this
-    // directly, so we MUST respect project access or a supervisor at
-    // site A could create a worker for a subcontractor at site B.
+    // Universal list — every active sub-contractor across ALL projects
+    // (not scoped to the calling supervisor's assigned projects).
+    //
+    // A sub-contractor is a shared resource: the same party (e.g. "Sri
+    // Balaji Electricals") may be working under multiple projects and
+    // multiple sites simultaneously, so the worker-create page must
+    // show every active sub-contractor — not just the ones tied to
+    // the currently selected site. The supervisor's role check still
+    // applies (only `supervisor` role tokens reach this endpoint).
     const userId = requireSupervisor(req);
-    const items = await subcontractorService.listSubcontractorsForSupervisor(userId);
+    const items = await subcontractorService.listAllActiveSubcontractors();
     res.json({ subcontractors: items });
   } catch (e) { next(e); }
 }
