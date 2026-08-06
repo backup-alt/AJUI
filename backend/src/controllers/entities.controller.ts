@@ -232,13 +232,31 @@ export async function createCustomField(req: Request, res: Response, next: NextF
 
 export async function listCustomFields(req: Request, res: Response, next: NextFunction) {
   try {
-    const includeSupervisorOnly = req.query.supervisorOnly === "true";
-    const fields = await customFieldService.listCustomFields(
-      req.query.entityType as never,
-      req.query.entityId as string,
-      includeSupervisorOnly
-    );
-    res.json({ fields });
+    // The per-(entityType, entityId) endpoint is DEPRECATED.
+    //
+    // Reason: when the admin dashboard loaded custom fields for every
+    // site × every module, this endpoint produced an
+    // (entityType × N_sites) call storm that hammered the rate-limiter
+    // (Render returned 429 after a few pages of navigation). The bulk
+    // endpoint at POST /api/custom-fields/list now collapses the same
+    // workload into one HTTP roundtrip per entityType, regardless of
+    // N_sites.
+    //
+    // Returning 410 Gone (instead of 404) tells clients "this route
+    // intentionally no longer exists" — a 404 would invite retry
+    // loops. The body points callers to the bulk alternative.
+    res.status(410).json({
+      error: "Endpoint removed",
+      message:
+        "GET /api/custom-fields?entityType=...&entityId=... has been removed to stop a per-row call storm. " +
+        "Use POST /api/custom-fields/list with { entityType, entityIds[] } instead.",
+      replacement: {
+        method: "POST",
+        path: "/api/custom-fields/list",
+        body: { entityType: "<string>", entityIds: ["<string>"] },
+        query: { supervisorOnly: "true|false (optional)" },
+      },
+    });
   } catch (e) { next(e); }
 }
 

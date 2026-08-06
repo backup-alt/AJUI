@@ -30,36 +30,55 @@ export class CustomFieldsService {
   private api = inject(ApiService);
 
   /**
-   * Per-(entityType, entityId) in-flight cache. Multiple callers asking
-   * for the same fields get the same Observable — and the same backend
-   * response — instead of triggering duplicate HTTP calls (which is what
-   * was hammering the rate limiter when the dashboard hydrated many
-   * tables at once).
+   * In-flight caches.
+   *
+   * IMPORTANT: there is no per-(entityType, entityId) cache key. The
+   * `list()` and `listBulk()` paths BOTH go through the bulk endpoint
+   * (`POST /api/custom-fields/list`). The legacy single-entity GET
+   * (`GET /api/custom-fields?entityType=X&entityId=Y`) was removed
+   * server-side because it produced an N×M call storm that tripped
+   * Render's rate limiter (HTTP 429). Every consumer — admin pages,
+   * workspace hydration, supervisor mobile — must use the bulk
+   * endpoint, even when they only need fields for one entityId, so
+   * that the in-flight cache can dedupe across all callers.
+   *
+   * `listBulkCache` is keyed by the canonicalised (entityType,
+   * sortedEntityIds, supervisorOnly) tuple so a request for entityIds
+   * `[A]` and `[A, B]` share a cache entry when A is in both — but
+   * the cached response is filtered to just `[A]` when needed.
    */
-  private listCache = new Map<string, Observable<{ fields: CustomField[] }>>();
   private listBulkCache = new Map<string, Observable<{ grouped: Record<string, CustomField[]> }>>();
 
-  private listKey(entityType: string, entityId: string, supervisorOnly: boolean): string {
-    return `${entityType}|${entityId}|${supervisorOnly ? 1 : 0}`;
-  }
   private bulkKey(entityType: string, ids: string[], supervisorOnly: boolean): string {
     return `${entityType}|${ids.slice().sort().join(",")}|${supervisorOnly ? 1 : 0}`;
   }
 
+  /**
+   * Get fields for a single (entityType, entityId). Internally routes
+   * through `listBulk([entityId])` so all callers share one HTTP
+   * roundtrip when possible. Cached per-(entityType, sortedIds,
+   * supervisorOnly).
+   */
   list(entityType: CustomFieldEntityType, entityId: string, supervisorOnly = false): Observable<{ fields: CustomField[] }> {
-    const key = this.listKey(entityType, entityId, supervisorOnly);
-    const cached = this.listCache.get(key);
-    if (cached) return cached;
     if (!entityId) {
-      // Skip the HTTP call entirely for empty IDs — protects against the
-      // legacy code path looping over rows with no _id field.
+      // Skip the HTTP call entirely for empty IDs — protects against
+      // legacy code paths looping over rows that lack an _id field.
       return of({ fields: [] });
     }
-    const req = this.api.listCustomFields({ entityType, entityId, supervisorOnly }).pipe(
-      shareReplay({ bufferSize: 1, refCount: false })
-    );
-    this.listCache.set(key, req);
-    return req;
+    // Reuse the bulk cache by going through listBulk. We map the
+    // grouped response back to the single-entity shape so callers
+    // don't need to change their imports / types.
+    return new Observable<{ fields: CustomField[] }>((subscriber) => {
+      const sub = this.listBulk(entityType, [entityId], supervisorOnly).subscribe({
+        next: (res) => {
+          const fields = res.grouped?.[entityId] || [];
+          subscriber.next({ fields });
+        },
+        error: (err) => subscriber.error(err),
+        complete: () => subscriber.complete(),
+      });
+      return () => sub.unsubscribe();
+    });
   }
 
   listBulk(
@@ -68,12 +87,12 @@ export class CustomFieldsService {
     supervisorOnly = false
   ): Observable<{ grouped: Record<string, CustomField[]> }> {
     const cleaned = entityIds.map((id) => String(id || "").trim()).filter((id) => id);
-    const key = this.bulkKey(entityType, cleaned, supervisorOnly);
-    const cached = this.listBulkCache.get(key);
-    if (cached) return cached;
     if (!cleaned.length) {
       return of({ grouped: {} });
     }
+    const key = this.bulkKey(entityType, cleaned, supervisorOnly);
+    const cached = this.listBulkCache.get(key);
+    if (cached) return cached;
     const req = this.api.listCustomFieldsBulk({ entityType, entityIds: cleaned, supervisorOnly }).pipe(
       shareReplay({ bufferSize: 1, refCount: false })
     );
@@ -112,12 +131,11 @@ export class CustomFieldsService {
   }
 
   /**
-   * Drop the per-(entityType, entityId) in-flight caches. Called by the
-   * ERP data service when the workspace hydration cache is invalidated
-   * (e.g. after a user-triggered full refresh).
+   * Drop the in-flight bulk cache. Called by the ERP data service
+   * when the workspace hydration cache is invalidated (e.g. after a
+   * user-triggered full refresh).
    */
   clearCache(): void {
-    this.listCache.clear();
     this.listBulkCache.clear();
   }
 }
