@@ -60,12 +60,43 @@ export interface LoginResponse {
 
 export interface PaginatedResponse<T> {
   items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
-  /** When set, pass this back as `cursor` to fetch the next page. */
+  total?: number;
+  page?: number;
+  limit?: number;
   nextCursor?: string | null;
+  hasMore?: boolean;
+}
+
+// =================== SUBCONTRACTOR PAYMENTS ===================
+// Payments live in their own collection so the project workspace
+// table and the main subcontractor page can share the same records
+// without double-counting.
+export interface SubcontractorPayment {
+  _id: string;
+  subcontractorId: string;
+  projectId: string;
+  siteId?: string;
+  subcontractorName: string;
+  projectName: string;
+  siteName?: string;
+  date: string;
+  description: string;
+  employeeCount: number;
+  amount: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateSubcontractorPaymentPayload {
+  subcontractorId: string;
+  projectId: string;
+  siteId?: string;
+  date: string;
+  description: string;
+  employeeCount: number;
+  amount: number;
+  notes?: string;
 }
 
 const STORAGE_KEYS = {
@@ -108,7 +139,15 @@ export class ApiService {
   // =================== AUTH ===================
   login(identifier: string, password: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login`, { identifier, password }).pipe(
-      tap((res) => this.setSession(res)),
+      tap((res) => {
+        // The ResponseCache is keyed by URL only — not by user. So the
+        // previous session's data (admin's full project list, PM's empty
+        // list, etc.) would be replayed on the new login unless we drop
+        // every cached entry on a session change. This was the cause of
+        // PMs seeing no projects after logging in behind an admin.
+        this.cache.clear();
+        this.setSession(res);
+      }),
       catchError(this.handleError)
     );
   }
@@ -445,6 +484,144 @@ export class ApiService {
   }
 
   // =================== SUBCONTRACTORS ===================
+  listSubcontractors(params?: { projectId?: string; status?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/subcontractors${query}`);
+  }
+
+  createSubcontractor(payload: {
+    projectId: string;
+    subcontractorName: string;
+    description?: string;
+    employeeCount?: number;
+    note?: string;
+    address?: string;
+    phone?: string;
+    status?: "active" | "inactive";
+  }): Observable<{ subcontractor: any }> {
+    return this.http.post<{ subcontractor: any }>(`${this.baseUrl}/subcontractors`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(
+      tap(() => this.cache.invalidate("/subcontractors")),
+      catchError(this.handleError)
+    );
+  }
+
+  /**
+   * Spend rollup — used by the project workspace "total expense" line
+   * to fold subcontractor payments into the project total.
+   */
+  getSubcontractorSpendRollup(projectId?: string): Observable<{ totalPaid: number; perProject: Record<string, number> }> {
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+    return this.http
+      .get<{ totalPaid: number; perProject: Record<string, number> }>(
+        `${this.baseUrl}/subcontractors/spend-rollup${query}`,
+        { headers: this.authHeaders() }
+      )
+      .pipe(catchError(this.handleError));
+  }
+
+  // =================== SUBCONTRACTOR PAYMENTS ===================
+  // Payments live in their own collection so the project workspace
+  // table and the main subcontractor page can share the same records
+  // without double-counting.
+
+  listSubcontractorPayments(params?: {
+    subcontractorId?: string;
+    projectId?: string;
+    siteId?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+    cursor?: string;
+  }): Observable<PaginatedResponse<SubcontractorPayment>> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.http
+      .get<PaginatedResponse<SubcontractorPayment>>(
+        `${this.baseUrl}/subcontractor-payments${query}`,
+        { headers: this.authHeaders() }
+      )
+      .pipe(catchError(this.handleError));
+  }
+
+  getSubcontractorPaymentSummary(subcontractorId: string): Observable<{
+    totalPaid: number;
+    recordCount: number;
+    projectCount: number;
+    siteCount: number;
+  }> {
+    return this.http
+      .get<{ totalPaid: number; recordCount: number; projectCount: number; siteCount: number }>(
+        `${this.baseUrl}/subcontractor-payments/summary/${subcontractorId}`,
+        { headers: this.authHeaders() }
+      )
+      .pipe(catchError(this.handleError));
+  }
+
+  createSubcontractorPayment(payload: CreateSubcontractorPaymentPayload): Observable<{ payment: SubcontractorPayment }> {
+    return this.http
+      .post<{ payment: SubcontractorPayment }>(
+        `${this.baseUrl}/subcontractor-payments`,
+        payload,
+        { headers: this.authHeaders() }
+      )
+      .pipe(
+        tap(() => {
+          this.cache.invalidate("/subcontractor-payments");
+          this.cache.invalidate("/subcontractors");
+          this.cache.invalidate("/dashboard/batch");
+        }),
+        catchError(this.handleError)
+      );
+  }
+
+  updateSubcontractorPayment(
+    id: string,
+    payload: Partial<CreateSubcontractorPaymentPayload>
+  ): Observable<{ payment: SubcontractorPayment }> {
+    return this.http
+      .patch<{ payment: SubcontractorPayment }>(
+        `${this.baseUrl}/subcontractor-payments/${id}`,
+        payload,
+        { headers: this.authHeaders() }
+      )
+      .pipe(
+        tap(() => {
+          this.cache.invalidate("/subcontractor-payments");
+          this.cache.invalidate("/subcontractors");
+          this.cache.invalidate("/dashboard/batch");
+        }),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteSubcontractorPayment(id: string): Observable<{ success: boolean }> {
+    return this.http
+      .delete<{ success: boolean }>(
+        `${this.baseUrl}/subcontractor-payments/${id}`,
+        { headers: this.authHeaders() }
+      )
+      .pipe(
+        tap(() => {
+          this.cache.invalidate("/subcontractor-payments");
+          this.cache.invalidate("/subcontractors");
+          this.cache.invalidate("/dashboard/batch");
+        }),
+        catchError(this.handleError)
+      );
+  }
+
   deleteSubcontractor(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/subcontractors/${id}`, { headers: this.authHeaders() }).pipe(
       tap(() => this.cache.invalidate("/subcontractors")),
@@ -833,17 +1010,6 @@ export class ApiService {
     }).pipe(catchError(this.handleError));
   }
 
-  // =================== SUBCONTRACTORS ===================
-  listSubcontractors(params?: { projectId?: string; approvalStatus?: string; paymentStatus?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
-    let query = "";
-    if (params) {
-      const q = new URLSearchParams();
-      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
-      query = `?${q.toString()}`;
-    }
-    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/subcontractors${query}`);
-  }
-
   // =================== ACCOUNT ===================
   patchMe(payload: { name?: string; phone?: string }): Observable<{ user: ApiUser }> {
     return this.http.patch<{ user: ApiUser }>(`${this.baseUrl}/auth/me`, payload, { headers: this.authHeaders() }).pipe(
@@ -979,6 +1145,22 @@ export class ApiService {
     return this.http.put<{ success: boolean }>(`${this.baseUrl}/admin/users/${id}/request-permissions`, payload, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
     );
+  }
+
+  /**
+   * Replace a non-admin user's project scope. Use this from the
+   * employee detail drawer to (re)assign projects to a project manager
+   * or accountant after they've already accepted their invite.
+   */
+  saveEmployeeManagedProjects(
+    id: string,
+    managedProjectIds: string[]
+  ): Observable<{ employee: { _id: string; managedProjectIds: string[] } }> {
+    return this.http.put<{ employee: { _id: string; managedProjectIds: string[] } }>(
+      `${this.baseUrl}/admin/users/${id}/managed-projects`,
+      { managedProjectIds },
+      { headers: this.authHeaders() }
+    ).pipe(catchError(this.handleError));
   }
 
   getEmployeeActivity(id: string, params?: { days?: number; limit?: number }): Observable<{
@@ -1210,6 +1392,26 @@ export class ApiService {
     }).pipe(catchError(this.handleError));
   }
 
+  /**
+   * Bulk list — accepts an array of entityIds and returns a map of
+   * `entityId -> fields[]`. Used by the admin dashboard's custom field
+   * loader to avoid the (entityType × N_sites) request storm.
+   */
+  listCustomFieldsBulk(params: {
+    entityType: string;
+    entityIds: string[];
+    supervisorOnly?: boolean;
+  }): Observable<{ grouped: Record<string, any[]> }> {
+    const q = new URLSearchParams();
+    if (params.supervisorOnly) q.set("supervisorOnly", "true");
+    const qs = q.toString();
+    return this.http.post<{ grouped: Record<string, any[]> }>(
+      `${this.baseUrl}/custom-fields/list${qs ? `?${qs}` : ""}`,
+      { entityType: params.entityType, entityIds: params.entityIds },
+      { headers: this.authHeaders() }
+    ).pipe(catchError(this.handleError));
+  }
+
   createCustomField(payload: {
     entityType: string;
     entityId: string;
@@ -1249,12 +1451,22 @@ export class ApiService {
   // =================== HELPERS ===================
 
   /**
+   * Build the cache key for a request URL. Namespaced by the current
+   * user ID so concurrent role-switches (e.g. logging out of one
+   * account and into another) can't leak cached data between users.
+   */
+  private cacheKeyFor(url: string): string {
+    const userId = this.userSignal()?.id || "anon";
+    return `GET:${userId}:${url}`;
+  }
+
+  /**
    * GET with in-memory caching. Prevents duplicate requests when multiple
    * components request the same data simultaneously. Returns a shared
    * observable so concurrent subscribers share one HTTP call.
    */
   private cachedGet<T>(url: string, ttlMs: number = this.LIST_TTL): Observable<T> {
-    const cacheKey = `GET:${url}`;
+    const cacheKey = this.cacheKeyFor(url);
     const cached = this.cache.get<T>(cacheKey);
     if (cached) return of(cached);
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, Input } from '@angular/core';
+import { Component, OnInit, inject, signal, Input } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -16,18 +16,22 @@ import {
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
-import { closeOutline, checkmarkOutline, searchOutline } from 'ionicons/icons';
+import { closeOutline, checkmarkOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { InventoryItem } from '../inventory.page';
 import { ModalController } from '@ionic/angular/standalone';
 import { Vendor } from '../../../shared/models';
+import {
+  MaterialAutocompleteComponent,
+  MaterialAutocompleteMatch,
+} from '../../../shared/components';
 
 const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Litre', 'Cft'];
 
 @Component({
   selector: 'app-inventory-request-modal',
   standalone: true,
-  imports: [
+imports: [
     IonContent,
     IonHeader,
     IonToolbar,
@@ -41,6 +45,7 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
     IonIcon,
     IonSpinner,
     FormsModule,
+    MaterialAutocompleteComponent,
   ],
   template: `
     <ion-header class="modal-header">
@@ -71,25 +76,13 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
         <div class="form-section">
           <div class="form-group">
             <label class="form-label">Material Name *</label>
-            <div class="search-wrap" (pointerdown)="onSearchWrapClick($event)">
-              <ion-input
-                class="form-input"
-                [(ngModel)]="name"
-                [clearInput]="true"
-                placeholder="Search or enter material name"
-                (ionInput)="onNameInput($event)"
-              ></ion-input>
-              @if (filteredNames().length > 0 && showSuggestions()) {
-                <div class="suggestions-list">
-                  @for (n of filteredNames(); track n) {
-                    <div class="suggestion-item" (pointerdown)="onSelectSuggestion($event, n)">
-                      <ion-icon name="search-outline"></ion-icon>
-                      {{ n }}
-                    </div>
-                  }
-                </div>
-              }
-            </div>
+            <app-material-autocomplete
+              [ngModel]="name"
+              (ngModelChange)="name = $event"
+              (matchSelected)="onMaterialMatch($event)"
+              [catalog]="materialCatalog"
+              placeholder="Search or enter material name"
+            ></app-material-autocomplete>
           </div>
 
           <div class="form-row">
@@ -371,69 +364,16 @@ const MATERIAL_UNITS = ['Bag', 'Nos', 'Kg', 'Load', 'Piece', 'Item', 'Ton', 'Lit
     .submit-btn:active {
       transform: scale(0.98);
     }
-
-    .search-wrap {
-      position: relative;
-    }
-
-    .suggestions-list {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      background: var(--m3-surface-bright);
-      border: 1px solid var(--m3-outline-variant);
-      border-top: none;
-      border-radius: 0 0 var(--md-radius-lg) var(--md-radius-lg);
-      max-height: 180px;
-      overflow-y: auto;
-      box-shadow: var(--md-elevation-3);
-      animation: slideDown 0.15s ease;
-    }
-
-    @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateY(-4px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .suggestion-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px var(--md-space-4);
-      font-size: 14px;
-      color: var(--m3-on-surface);
-      cursor: pointer;
-      transition: background 0.1s ease;
-    }
-
-    .suggestion-item:hover,
-    .suggestion-item:active {
-      background: var(--m3-primary-container);
-    }
-
-    .suggestion-item ion-icon {
-      font-size: 14px;
-      color: var(--m3-on-surface-muted);
-      flex-shrink: 0;
-    }
   `],
 })
-export class InventoryRequestModalComponent implements OnInit, OnDestroy {
-  private modalCtrl = inject(ModalController);
+export class InventoryRequestModalComponent implements OnInit {
+private modalCtrl = inject(ModalController);
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
 
   @Input() preSelected: InventoryItem | null = null;
   @Input() mode: 'request' | 'existing' = 'request';
-  @Input() materialCatalog: Array<{ name: string; unit: string }> = [];
+  @Input() materialCatalog: MaterialAutocompleteMatch[] = [];
   name = '';
   quantity: number | null = null;
   unit = '';
@@ -446,92 +386,33 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   unitOptions = MATERIAL_UNITS;
   vendors = signal<Vendor[]>([]);
   isSubmitting = signal(false);
-  materialNames = signal<string[]>([]);
-  filteredNames = signal<string[]>([]);
-  showSuggestions = signal(false);
-  private selectingName = false;
-  private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit(): void {
-    addIcons({ closeOutline, checkmarkOutline, searchOutline });
+    addIcons({ closeOutline, checkmarkOutline });
     if (this.preSelected) {
       this.name = this.preSelected.name;
       this.unit = this.preSelected.unit;
       this.vendorName = this.preSelected.vendor || '';
+      this.poNumber = this.preSelected.poNumber || '';
+      if (this.preSelected.minimumQuantity != null) {
+        this.minimumQuantity = this.preSelected.minimumQuantity;
+      }
     }
     this.loadVendors();
-    this.loadMaterialNames();
-    if (typeof document !== 'undefined') {
-      document.addEventListener('pointerdown', this.onDocClick);
+  }
+
+  onMaterialMatch(match: MaterialAutocompleteMatch | null): void {
+    // Fired by the autocomplete component when a suggestion is picked
+    // OR the input is blurred with a value that exactly matches a
+    // catalog entry. We never autofill on partial / in-progress typing.
+    if (!match) return;
+    if (match.unit && !this.unit) this.unit = match.unit;
+    if (match.vendor && !this.vendorName) this.vendorName = match.vendor;
+    if (match.vendorId && !this.vendorId) this.vendorId = match.vendorId;
+    if (match.poNumber && !this.poNumber) this.poNumber = match.poNumber;
+    if (match.minimumQuantity != null && this.minimumQuantity == null) {
+      this.minimumQuantity = match.minimumQuantity;
     }
-  }
-
-  ngOnDestroy(): void {
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('pointerdown', this.onDocClick);
-    }
-  }
-
-  private onDocClick = (): void => {
-    this.showSuggestions.set(false);
-  };
-
-  loadMaterialNames(): void {
-    this.supervisor.getMaterialNames().subscribe({
-      next: (res) => this.materialNames.set(res.names || []),
-      error: () => this.materialNames.set([]),
-    });
-  }
-
-  onNameInput(event: Event): void {
-    if (this.selectingName) return;
-    const value = (event as CustomEvent).detail?.value?.toLowerCase() || '';
-    this.showSuggestions.set(true);
-    if (!value) {
-      this.filteredNames.set(this.materialNames().slice(0, 10));
-    } else {
-      this.filteredNames.set(
-        this.materialNames().filter(n => n.toLowerCase().includes(value)).slice(0, 10)
-      );
-    }
-  }
-
-  onSearchWrapClick(event: Event): void {
-    event.stopPropagation();
-    this.showSuggestions.set(true);
-    if (this.filteredNames().length === 0) {
-      this.filteredNames.set(this.materialNames().slice(0, 10));
-    }
-  }
-
-  selectName(n: string): void {
-    this.selectingName = true;
-    this.name = n;
-    const known = this.materialCatalog.find((item) => item.name.trim().toLowerCase() === n.trim().toLowerCase());
-    if (known?.unit) this.unit = known.unit;
-    this.showSuggestions.set(false);
-    this.filteredNames.set([]);
-    setTimeout(() => { this.selectingName = false; }, 100);
-  }
-
-  onSelectSuggestion(event: Event, n: string): void {
-    event.stopPropagation();
-    this.selectName(n);
-  }
-
-  hideSuggestionsDelayed(): void {
-    this.hideTimer = setTimeout(() => this.showSuggestions.set(false), 150);
-  }
-
-  isValid(): boolean {
-    const baseValid = !!this.name.trim()
-      && this.quantity !== null
-      && this.quantity > 0
-      && !!this.unit.trim();
-    if (this.mode === 'existing') return baseValid;
-    return baseValid && this.issuedAmount !== null
-      && this.issuedAmount >= 0
-      && !!this.vendorName.trim();
   }
 
   loadVendors(): void {
@@ -544,6 +425,17 @@ export class InventoryRequestModalComponent implements OnInit, OnDestroy {
   onVendorChange(): void {
     const selected = this.vendors().find((vendor) => vendor._id === this.vendorId);
     this.vendorName = selected?.name || '';
+  }
+
+  isValid(): boolean {
+    const baseValid = !!this.name.trim()
+      && this.quantity !== null
+      && this.quantity > 0
+      && !!this.unit.trim();
+    if (this.mode === 'existing') return baseValid;
+    return baseValid && this.issuedAmount !== null
+      && this.issuedAmount >= 0
+      && !!this.vendorName.trim();
   }
 
   dismiss(): void {

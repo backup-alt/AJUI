@@ -29,8 +29,8 @@ import { locationOutline, cubeOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { CustomFieldsService } from '../../../core/services/custom-fields.service';
-import { CustomField } from '../../../shared/models';
-import { Vendor } from '../../../shared/models';
+import { MaterialAutocompleteComponent, MaterialAutocompleteMatch } from '../../../shared/components';
+import { CustomField, Vendor } from '../../../shared/models';
 
 @Component({
   selector: 'app-material-create',
@@ -56,6 +56,7 @@ import { Vendor } from '../../../shared/models';
     IonRefresher,
     IonRefresherContent,
     FormsModule,
+    MaterialAutocompleteComponent,
   ],
   template: `
     <ion-header>
@@ -95,11 +96,13 @@ import { Vendor } from '../../../shared/models';
         <ion-list lines="none" class="form-list">
           <ion-item class="form-item">
             <ion-label position="stacked">Material Name *</ion-label>
-            <ion-input
+            <app-material-autocomplete
+              [ngModel]="material.name"
+              (ngModelChange)="material.name = $event"
+              (matchSelected)="onMaterialMatch($event)"
+              [catalog]="autofillCatalog()"
               placeholder="e.g., Cement 53 Grade"
-              [(ngModel)]="material.name"
-              [clearInput]="true"
-            ></ion-input>
+            ></app-material-autocomplete>
           </ion-item>
 
           <div class="form-row">
@@ -366,6 +369,13 @@ export class MaterialCreatePage implements OnInit {
   customFields = signal<CustomField[]>([]);
   customFieldValues = signal<Record<string, string | number | boolean | null>>({});
   vendors = signal<Vendor[]>([]);
+  /**
+   * Lightweight autofill catalog built from the most-recent inventory
+   * record per material name. Powers the Material Name autocomplete's
+   * autofill of unit / vendor / PO / stock when a known material is
+   * picked.
+   */
+  autofillCatalog = signal<MaterialAutocompleteMatch[]>([]);
 
   async ngOnInit(): Promise<void> {
     addIcons({ locationOutline, cubeOutline });
@@ -373,7 +383,93 @@ export class MaterialCreatePage implements OnInit {
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
-    await Promise.all([this.loadCustomFields(), this.loadVendors()]);
+    await Promise.all([
+      this.loadCustomFields(),
+      this.loadVendors(),
+      this.loadAutofillCatalog(),
+    ]);
+  }
+
+  /**
+   * Loads up to 200 material records for the selected site/project and
+   * collapses them to one entry per name (taking the most recent). The
+   * resulting list is passed to the Material Name autocomplete as the
+   * autofill catalog.
+   */
+  private async loadAutofillCatalog(): Promise<void> {
+    const siteId = this.selectedSiteId();
+    const projectId = this.siteProjectId();
+    if (!siteId && !projectId) {
+      this.autofillCatalog.set([]);
+      return;
+    }
+    try {
+      const res = await firstValueFrom(
+        this.supervisor.getMaterials({
+          siteId: siteId || undefined,
+          projectId: projectId || undefined,
+          limit: 200,
+          stockStatus: 'all',
+        })
+      );
+      const items = res?.materials ?? [];
+      const byName = new Map<string, MaterialAutocompleteMatch>();
+      for (const m of items) {
+        const key = m.name?.trim().toLowerCase();
+        if (!key) continue;
+        // Keep the entry with the largest remaining stock so the user
+        // sees the most useful autofill numbers.
+        const existing = byName.get(key);
+        const candidate: MaterialAutocompleteMatch = {
+          name: m.name,
+          unit: m.unit,
+          vendor: m.vendor,
+          vendorId: m.vendorId,
+          poNumber: m.poNumber,
+          minimumQuantity: m.minimumQuantity ?? null,
+          remainingStock: m.remainingStock ?? null,
+          approvedQuantity: m.approvedQuantity ?? null,
+        };
+        if (!existing || (candidate.remainingStock ?? 0) > (existing.remainingStock ?? 0)) {
+          byName.set(key, candidate);
+        }
+      }
+      this.autofillCatalog.set(Array.from(byName.values()));
+    } catch (err) {
+      console.warn('[MaterialCreate] failed to load material catalog', err);
+      this.autofillCatalog.set([]);
+    }
+  }
+
+  /**
+   * Autofill handler — fires when the Material Name autocomplete finds
+   * a strong match (either exact or partial) in the inventory catalog.
+   * Only fills fields the user hasn't typed yet so we don't clobber
+   * deliberate edits.
+   */
+  onMaterialMatch(match: MaterialAutocompleteMatch | null): void {
+    if (!match) return;
+    if (match.unit && !this.material.unit) this.material.unit = match.unit;
+    if (match.vendor && !this.material.vendor) this.material.vendor = match.vendor;
+    if (match.poNumber && !this.material.notes) {
+      // PO number from the existing record is informational only — we
+      // append it to notes rather than overwriting notes outright.
+      const poLine = `PO: ${match.poNumber}`;
+      if (!this.material.notes?.includes(poLine)) {
+        this.material.notes = this.material.notes
+          ? `${this.material.notes}\n${poLine}`
+          : poLine;
+      }
+    }
+    if (
+      match.remainingStock != null &&
+      this.material.remainingStock == null
+    ) {
+      // Pre-fill the form's "Remaining Stock" field with the on-site
+      // stock from the matched inventory record. The supervisor can
+      // adjust before submitting.
+      this.material.remainingStock = match.remainingStock;
+    }
   }
 
   async loadVendors(): Promise<void> {

@@ -254,18 +254,16 @@ export function mapPayment(p: any): any {
 export function mapSubcontractor(s: any): Subcontractor {
   return {
     _id: s._id,
-    id: s.subcontractId,
-    projectId: s.projectName || "",
-    site: s.site || "",
-    name: s.subcontractorName,
-    workPackage: s.workPackage,
-    contractValue: s.contractValue,
-    advancePaid: s.advancePaid,
-    startDate: s.startDate,
-    dueDate: s.dueDate,
-    supervisor: s.supervisor,
-    approvalStatus: s.approvalStatus || "Pending",
-    paymentStatus: s.paymentStatus || "Not Started",
+    id: s._id || s.id,
+    projectId: s.projectId ? String(s.projectId) : "",
+    projectName: s.projectName || "",
+    subcontractorName: s.subcontractorName || "",
+    description: s.description || "",
+    employeeCount: s.employeeCount !== undefined && s.employeeCount !== null ? Number(s.employeeCount) : undefined,
+    note: s.note || "",
+    address: s.address || "",
+    phone: s.phone || "",
+    status: s.status === "inactive" ? "inactive" : "active",
     customFields: s.customFields || {},
   };
 }
@@ -321,6 +319,9 @@ function getInitials(name: string): string {
 }
 
 export function mapInventory(i: any): any {
+  const lastPurchaseNote = Array.isArray(i?.purchaseHistory) && i.purchaseHistory.length
+    ? (i.purchaseHistory[i.purchaseHistory.length - 1]?.notes || "")
+    : "";
   return {
     _id: i._id,
     id: i._id || `${i.projectId}-${i.siteKey || (i.siteId ? i.siteId.toString() : (i.site || ""))}-${i.normalizedName || (i.name || "").toLowerCase()}`,
@@ -344,6 +345,10 @@ export function mapInventory(i: any): any {
     vendor: i.vendor,
     poNumber: i.poNumber,
     billUrl: billUrlFor(i),
+    // Prefer the top-level notes (latest "Add existing material" entry wins)
+    // but fall back to the most recent purchaseHistory entry's note so older
+    // records that pre-date the schema change still surface in the UI.
+    notes: i.notes || lastPurchaseNote || "",
     purchaseHistory: i.purchaseHistory || [],
     consumptionHistory: i.consumptionHistory || [],
     requestDate: i.updatedAt || i.createdAt || "",

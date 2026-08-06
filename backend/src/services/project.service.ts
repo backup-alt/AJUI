@@ -454,6 +454,7 @@ export async function getProjectsSummary(scopeProjectIds?: ProjectScopeIds) {
           pendingBalance: { $sum: "$pendingBalance" },
           materialSpend: { $sum: "$materialSpend" },
           labourPayable: { $sum: "$labourPayable" },
+          subcontractorSpend: { $sum: "$subcontractorSpend" },
         },
       },
     ]),
@@ -467,6 +468,7 @@ export async function getProjectsSummary(scopeProjectIds?: ProjectScopeIds) {
       pendingBalance: 0,
       materialSpend: 0,
       labourPayable: 0,
+      subcontractorSpend: 0,
     },
   };
 }

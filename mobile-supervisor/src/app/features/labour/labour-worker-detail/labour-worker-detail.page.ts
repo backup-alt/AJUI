@@ -46,7 +46,10 @@ import { DatePipe, CurrencyPipe, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EmptyStateComponent } from '../../../shared/components/empty-state.component';
 
-type Tab = 'info' | 'attendance' | 'wage';
+// Wage tab was removed per the latest spec — wage/payroll data lives
+// only on the admin web dashboard now, so mobile users see just the
+// worker info and attendance history.
+type Tab = 'info' | 'attendance';
 
 interface WageCalculation {
   weeklyPay: number;
@@ -147,9 +150,6 @@ interface WageCalculation {
             <ion-segment-button value="attendance">
               <ion-label>Attendance</ion-label>
             </ion-segment-button>
-            <ion-segment-button value="wage">
-              <ion-label>Wage</ion-label>
-            </ion-segment-button>
           </ion-segment>
         </div>
 
@@ -196,13 +196,6 @@ interface WageCalculation {
               <h2 class="section-title">Employment Information</h2>
               <div class="info-card">
                 <div class="info-row">
-                  <span class="info-icon"><ion-icon name="time-outline"></ion-icon></span>
-                  <div class="info-data">
-                    <span class="info-label">Daily Wage</span>
-                    <span class="info-value">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</span>
-                  </div>
-                </div>
-                <div class="info-row">
                   <span class="info-icon"><ion-icon name="briefcase-outline"></ion-icon></span>
                   <div class="info-data">
                     <span class="info-label">Shift Type</span>
@@ -238,10 +231,6 @@ interface WageCalculation {
               <div class="summary-stat">
                 <span class="stat-value">{{ totalOvertime() }}h</span>
                 <span class="stat-label">Overtime</span>
-              </div>
-              <div class="summary-stat">
-                <span class="stat-value">{{ totalLateFines() | currency:'INR':'symbol':'1.0-0' }}</span>
-                <span class="stat-label">Late Fines</span>
               </div>
             </div>
 
@@ -279,16 +268,6 @@ interface WageCalculation {
                               <span class="cell-value">{{ day.overtimeHours }}h</span>
                             </div>
                             <div class="att-day-cell">
-                              <span class="cell-label">OT Amount</span>
-                              <span class="cell-value">{{ (day.overtimeAmount || 0) | currency:'INR':'symbol':'1.0-0' }}</span>
-                            </div>
-                            <div class="att-day-cell">
-                              <span class="cell-label">Late Fine</span>
-                              <span class="cell-value" [class.has-fine]="day.lateFine > 0">
-                                {{ day.lateFine > 0 ? ('-' + (day.lateFine | currency:'INR':'symbol':'1.0-0')) : '—' }}
-                              </span>
-                            </div>
-                            <div class="att-day-cell">
                               <span class="cell-label">Payment</span>
                               <span class="cell-value">{{ day.paymentMode }}</span>
                             </div>
@@ -301,85 +280,6 @@ interface WageCalculation {
                   </div>
                 }
               </div>
-            }
-          </div>
-        }
-
-        <!-- Wage Tab -->
-        @if (activeTab === 'wage') {
-          <div class="tab-content">
-            <div class="wage-card">
-              <h2 class="wage-title">Weekly Earnings</h2>
-
-              <div class="wage-display">
-                <div class="wage-display-amount">{{ weeklyEarnings() | currency:'INR':'symbol':'1.0-0' }}</div>
-                <div class="wage-display-suffix">this week</div>
-              </div>
-
-              <div class="wage-divider"></div>
-
-              <div class="wage-row">
-                <span class="wage-label">Daily Wage</span>
-                <span class="wage-value">{{ dailyWage() | currency:'INR':'symbol':'1.0-0' }}</span>
-              </div>
-
-              <div class="wage-edit-row">
-                <label class="wage-label" for="dailyWageInput">Set New Daily Pay</label>
-                <div class="wage-edit-input-wrap">
-                  <span class="wage-currency">₹</span>
-                  <input
-                    id="dailyWageInput"
-                    type="number"
-                    class="wage-edit-input"
-                    [value]="dailyWageInput()"
-                    (input)="onDailyWageChange($event)"
-                    min="0"
-                    placeholder="0"
-                  />
-                  <button class="wage-save-btn" (click)="saveDailyWage()">Save</button>
-                </div>
-              </div>
-              <div class="wage-row">
-                <span class="wage-label">Days Worked</span>
-                <span class="wage-value">{{ attendanceDays().length }}</span>
-              </div>
-              <div class="wage-row">
-                <span class="wage-label">Total Shifts</span>
-                <span class="wage-value">{{ totalShifts() }}</span>
-              </div>
-              <div class="wage-row">
-                <span class="wage-label">Overtime Hours</span>
-                <span class="wage-value">{{ totalOvertime() }}h</span>
-              </div>
-              <div class="wage-row fine">
-                <span class="wage-label">Late Fines</span>
-                <span class="wage-value">-{{ totalLateFines() | currency:'INR':'symbol':'1.0-0' }}</span>
-              </div>
-            </div>
-
-            <!-- Per-day breakdown -->
-            @if (groupedAttendance().length > 0) {
-              <h3 class="breakdown-title">Daily Breakdown</h3>
-              @for (week of groupedAttendance(); track week.weekLabel) {
-                <div class="week-group">
-                  <div class="week-label">Week of {{ week.weekLabel }}</div>
-                  @for (day of week.days; track day.attendanceDate) {
-                    <div class="day-row">
-                      <div class="day-info">
-                        <span class="day-name">{{ day.dayName }}</span>
-                        <span class="day-date">{{ day.attendanceDate }}</span>
-                      </div>
-                      <div class="day-details">
-                        <span class="day-shifts">{{ day.shiftCount }} shift{{ day.shiftCount !== 1 ? 's' : '' }}</span>
-                        <span class="day-earning">{{ dayEarning(day) | currency:'INR':'symbol':'1.0-0' }}</span>
-                      </div>
-                      @if (day.lateFine > 0) {
-                        <span class="day-fine">-{{ day.lateFine | currency:'INR':'symbol':'1.0-0' }}</span>
-                      }
-                    </div>
-                  }
-                </div>
-              }
             }
           </div>
         }

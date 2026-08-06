@@ -242,6 +242,24 @@ export async function listCustomFields(req: Request, res: Response, next: NextFu
   } catch (e) { next(e); }
 }
 
+/**
+ * Bulk list — accepts `entityType` + `entityIds[]` and returns a map of
+ * `entityId -> fields[]`. This collapses the (entityType × N_sites) call
+ * storm that the admin dashboard's custom-field loader used to produce.
+ */
+export async function listCustomFieldsBulk(req: Request, res: Response, next: NextFunction) {
+  try {
+    const includeSupervisorOnly = req.query.supervisorOnly === "true";
+    const entityIds = Array.isArray(req.body?.entityIds) ? req.body.entityIds : [];
+    const grouped = await customFieldService.listCustomFieldsBulk(
+      req.body?.entityType as never,
+      entityIds,
+      includeSupervisorOnly
+    );
+    res.json({ grouped });
+  } catch (e) { next(e); }
+}
+
 export async function updateCustomField(req: Request, res: Response, next: NextFunction) {
   try {
     const field = await customFieldService.updateCustomField(req.params.id, req.body);

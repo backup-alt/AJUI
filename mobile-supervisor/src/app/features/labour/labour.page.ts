@@ -207,20 +207,12 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
                 </div>
                 <div class="att-details">
                   <div class="att-detail">
+                    <span class="detail-label">Shifts</span>
+                    <span class="detail-value">{{ att.shiftCount }}</span>
+                  </div>
+                  <div class="att-detail">
                     <span class="detail-label">OT Hours</span>
                     <span class="detail-value">{{ att.overtimeHours }}h</span>
-                  </div>
-                  <div class="att-detail">
-                    <span class="detail-label">OT Amount</span>
-                    <span class="detail-value">{{ att.overtimeAmount | currency:'INR':'symbol':'1.0-0' }}</span>
-                  </div>
-                  <div class="att-detail">
-                    <span class="detail-label">Late Fine</span>
-                    <span class="detail-value">{{ att.lateFine | currency:'INR':'symbol':'1.0-0' }}</span>
-                  </div>
-                  <div class="att-detail">
-                    <span class="detail-label">Payment</span>
-                    <span class="detail-value">{{ att.paymentMode }}</span>
                   </div>
                 </div>
                 @if (att.notes) {

@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
-import { IonContent, IonSplitPane, ToastController } from "@ionic/angular/standalone";
+import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
 import { FormsModule } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 import { ErpDataService, type SharedModuleKey } from "../data/erp-data.service";
@@ -80,6 +80,10 @@ type SubcontractApprovalRow = ApprovalBaseRow & {
   supervisor: string;
   dueDate: string;
   paymentStatus: string;
+};
+
+type ToastManager = {
+  addToast(content: string, type?: string, options?: { autoClose?: boolean; duration?: number; allowHtml?: boolean; onClose?: () => void }): unknown;
 };
 
 @Component({
@@ -421,7 +425,6 @@ export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
   private readonly approvalsService = inject(ApprovalsService);
   private readonly api = inject(ApiService);
-  private readonly toastController = inject(ToastController);
 
   readonly showMaterial = signal(false);
   readonly showLabour = signal(false);
@@ -430,6 +433,14 @@ export class PendingApprovalsPage implements OnInit {
   readonly loadError = signal(false);
 
   readonly previewImageUrl = signal<string | null>(null);
+
+  // Toaster-ui (https://unpkg.com/toaster-ui@1.1.5) attaches a global
+  // `ToasterUi` constructor. We instantiate it once per page and route
+  // approve / reject feedback through it.
+  private readonly toastManager: ToastManager | null =
+    typeof (globalThis as unknown as { ToasterUi?: new () => ToastManager }).ToasterUi === "function"
+      ? new (globalThis as unknown as { ToasterUi: new () => ToastManager }).ToasterUi()
+      : null;
 
   // Tracks rows currently mid-action so the buttons can show a spinner and
   // ignore duplicate clicks while the server is processing.
@@ -581,12 +592,12 @@ export class PendingApprovalsPage implements OnInit {
         await firstValueFrom(this.approvalsService.reject(row.rowId));
       }
 
-      await this.showToast(`Approval ${status.toLowerCase()} successfully`, "success");
+      this.showToast(status === "Approved" ? "Request approved successfully" : "Request rejected successfully", "success");
     } catch (e: any) {
       // Restore the row so the user can retry.
       this.restoreRow(row.rowId, snapshot);
       const message = (e?.error?.message || e?.message || "Failed to process approval. Please try again.").toString();
-      await this.showToast(message, "danger");
+      this.showToast(message, "danger");
     } finally {
       this.pendingActionRows.delete(row.rowId);
     }
@@ -626,19 +637,22 @@ export class PendingApprovalsPage implements OnInit {
     }
   }
 
-  private async showToast(message: string, color: "success" | "danger" | "warning" = "success"): Promise<void> {
+  private showToast(message: string, type: "success" | "danger" | "warning" = "success"): void {
+    const mappedType = type === "danger" ? "error" : type;
+    const duration = type === "danger" ? 4000 : 2600;
     try {
-      const toast = await this.toastController.create({
-        message,
-        duration: color === "danger" ? 3500 : 2000,
-        color,
-        position: "top",
-      });
-      await toast.present();
+      if (this.toastManager) {
+        this.toastManager.addToast(message, mappedType, {
+          autoClose: true,
+          duration,
+          allowHtml: false,
+        });
+        return;
+      }
     } catch {
-      // Fall back to console if the toast service is unavailable (e.g. SSR).
-      console.log(`[Approval] ${color}: ${message}`);
+      // Fall through to console fallback below.
     }
+    console.log(`[Approval] ${type}: ${message}`);
   }
 
   private removeRowFromLists(rowId: string) {

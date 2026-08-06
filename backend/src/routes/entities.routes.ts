@@ -117,6 +117,7 @@ router.delete("/supervisors/:id", requireRole("admin"), ctrl.deleteSupervisor);
  */
 router.post("/custom-fields", validate(createCustomFieldSchema), ctrl.createCustomField);
 router.get("/custom-fields", validate(getCustomFieldsSchema, "query"), ctrl.listCustomFields);
+router.post("/custom-fields/list", ctrl.listCustomFieldsBulk);
 router.patch("/custom-fields/:id", validate(updateCustomFieldSchema), ctrl.updateCustomField);
 router.delete("/custom-fields/:id", ctrl.deleteCustomField);
 

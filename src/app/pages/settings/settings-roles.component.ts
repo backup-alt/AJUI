@@ -314,15 +314,53 @@ type CombinedInvite = {
           }
 
           @if (drawerTab() === 'projects') {
-            <h3 class="settings-w11-drawer-h3">Assigned Projects</h3>
-            @if (selected()!.projectIds.length > 0) {
-              <ul class="settings-w11-proj-list">
-                @for (pid of selected()!.projectIds; track pid) {
-                  <li><span class="settings-w11-proj-chip">{{ pid }}</span></li>
+            @if (canEditProjects()) {
+              <p class="settings-w11-drawer-hint">
+                Pick which projects this employee can access. Changes save immediately.
+              </p>
+              <div class="settings-w11-proj-picker">
+                @for (p of allProjects(); track p.id) {
+                  <label class="settings-w11-proj-row">
+                    <input
+                      type="checkbox"
+                      [checked]="isDrawerProjectSelected(p.id)"
+                      (change)="toggleDrawerProject(p.id)"
+                    />
+                    <span class="settings-w11-proj-name">{{ p.name }}</span>
+                    <small class="settings-w11-proj-meta">{{ p.status }}</small>
+                  </label>
                 }
-              </ul>
+                @if (allProjects().length === 0) {
+                  <p class="settings-w11-drawer-hint">No projects available yet.</p>
+                }
+              </div>
+              <div class="settings-w11-drawer-actions">
+                <button
+                  type="button"
+                  class="settings-w11-btn settings-w11-btn-primary"
+                  [disabled]="savingProjects()"
+                  (click)="saveDrawerProjects()"
+                >
+                  {{ savingProjects() ? "Saving…" : "Save project assignments" }}
+                </button>
+                @if (saveError()) {
+                  <small class="settings-w11-error">{{ saveError() }}</small>
+                }
+                @if (saveOk()) {
+                  <small class="settings-w11-ok">Saved.</small>
+                }
+              </div>
             } @else {
-              <p class="settings-w11-drawer-hint">No projects assigned yet.</p>
+              <h3 class="settings-w11-drawer-h3">Assigned Projects</h3>
+              @if (selected()!.projectIds.length > 0) {
+                <ul class="settings-w11-proj-list">
+                  @for (pid of selected()!.projectIds; track pid) {
+                    <li><span class="settings-w11-proj-chip">{{ pid }}</span></li>
+                  }
+                </ul>
+              } @else {
+                <p class="settings-w11-drawer-hint">No projects assigned yet.</p>
+              }
             }
           }
 
@@ -663,6 +701,56 @@ type CombinedInvite = {
     }
   `,
   styles: [`
+    .settings-w11-proj-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 4px 0;
+      border-top: 1px solid #e5e7eb;
+      border-bottom: 1px solid #e5e7eb;
+      margin-top: 8px;
+    }
+    .settings-w11-proj-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .settings-w11-proj-row:hover {
+      background: #f3f4f6;
+    }
+    .settings-w11-proj-row input[type="checkbox"] {
+      accent-color: #002263;
+      width: 16px;
+      height: 16px;
+    }
+    .settings-w11-proj-name {
+      flex: 1;
+      color: #111827;
+    }
+    .settings-w11-proj-meta {
+      color: #6b7280;
+      font-size: 12px;
+    }
+    .settings-w11-drawer-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .settings-w11-error {
+      color: #b91c1c;
+      font-size: 13px;
+    }
+    .settings-w11-ok {
+      color: #047857;
+      font-size: 13px;
+    }
     .settings-w11-invite-method-choice {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -805,6 +893,14 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly search = signal("");
   readonly selected = signal<Employee | null>(null);
   readonly drawerTab = signal<"profile" | "permissions" | "projects" | "activity">("profile");
+
+  // Drawer project picker — admins can (re)assign projects to a PM/
+  // accountant here when their scope was empty at invite time.
+  readonly drawerProjectIds = signal<string[]>([]);
+  readonly savingProjects = signal(false);
+  readonly saveError = signal<string | null>(null);
+  readonly saveOk = signal(false);
+  readonly allProjects = computed(() => this.projects());
 
   // Invite Employee modal
   readonly showInvite = signal(false);
@@ -1197,9 +1293,71 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   select(e: Employee) {
     this.selected.set(e);
     this.drawerTab.set("profile");
+    // Seed the project picker with the employee's current scope so the
+    // admin can see what's there and add/remove.
+    this.drawerProjectIds.set([...(e.projectIds || [])]);
+    this.saveError.set(null);
+    this.saveOk.set(false);
   }
   close() {
     this.selected.set(null);
+    this.drawerProjectIds.set([]);
+    this.saveError.set(null);
+    this.saveOk.set(false);
+  }
+
+  /**
+   * Only PMs and accountants have a project scope to edit. Admins are
+   * unscoped (they see every project by default) and supervisors get
+   * their scope via the supervisor-profile flow, not via User.
+   */
+  canEditProjects(): boolean {
+    const e = this.selected();
+    if (!e) return false;
+    return e.role === "Project Manager" || e.role === "Accountant";
+  }
+
+  isDrawerProjectSelected(id: string): boolean {
+    return this.drawerProjectIds().includes(id);
+  }
+
+  toggleDrawerProject(id: string) {
+    this.drawerProjectIds.update((ids) =>
+      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
+    );
+    this.saveOk.set(false);
+    this.saveError.set(null);
+  }
+
+  saveDrawerProjects() {
+    const e = this.selected();
+    if (!e) return;
+    this.savingProjects.set(true);
+    this.saveError.set(null);
+    this.saveOk.set(false);
+    const ids = [...this.drawerProjectIds()];
+    this.api.saveEmployeeManagedProjects(e.id, ids).subscribe({
+      next: (res) => {
+        const returned = res?.employee?.managedProjectIds || ids;
+        this.drawerProjectIds.set(returned);
+        // Keep the local Employee in sync so the chip list and the
+        // employee table reflect the new scope immediately.
+        this.employees.update((list) =>
+          list.map((x) =>
+            x.id === e.id ? { ...x, projectIds: returned.map((id: any) => String(id)) } : x
+          )
+        );
+        this.selected.update((s) => (s ? { ...s, projectIds: returned.map((id: any) => String(id)) } : s));
+        this.savingProjects.set(false);
+        this.saveOk.set(true);
+      },
+      error: (err) => {
+        this.savingProjects.set(false);
+        this.saveError.set(
+          err?.error?.error || err?.error?.message || err?.message || "Could not save project assignments."
+        );
+      },
+    });
   }
   deactivate() {
     const e = this.selected();

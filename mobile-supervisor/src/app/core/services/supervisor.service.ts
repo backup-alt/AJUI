@@ -302,10 +302,32 @@ export class SupervisorService {
   }
 
   // ---------------- Subcontractors ----------------
-  getSubcontractors(projectId: string, siteId?: string) {
-    const params: Record<string, string> = { projectId };
+  getSubcontractors(projectId?: string, siteId?: string) {
+    // Universal list by default — the worker create page needs every
+    // active sub-contractor the supervisor has access to, regardless of
+    // which site they happen to be working on. Pass `projectId` only
+    // when you actually need it scoped.
+    const params: Record<string, string> = {};
+    if (projectId) params['projectId'] = projectId;
     if (siteId) params['siteId'] = siteId;
     return this.api.get<{ subcontractors: Subcontractor[] }>('/supervisor/subcontractors', params);
+  }
+
+  // ---------------- Supervisors (mobile) ----------------
+  // Lightweight list used by the worker-create page's "Direct Hire"
+  // mode. Returns every active supervisor assigned to the calling
+  // supervisor's accessible projects (server-side scope).
+  getSupervisorsForWorker() {
+    return this.api.get<{
+      supervisors: Array<{
+        _id: string;
+        name: string;
+        phone?: string;
+        email?: string;
+        supervisorId?: string;
+        projectId?: string;
+      }>;
+    }>('/supervisor/supervisors');
   }
 
   // ---------------- Expenses ----------------

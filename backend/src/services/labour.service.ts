@@ -158,6 +158,12 @@ export async function listLabour(filter: {
   try {
     const tDb = Date.now();
     if (!internalCursor && effectivePage === 1) {
+      // Run find + count under the mutex so they serialize against
+      // other Labour queries (Atlas M0 only tolerates ~2 concurrent ops
+      // per project), but use a 20s maxTimeMS instead of 60s — on M0
+      // a hanging query will reset the whole pool, so failing fast and
+      // letting withRetry hit a fresh pool is more reliable than
+      // waiting the full minute.
       const [foundItems, foundTotal] = await dbMutex.run(() =>
         withRetry(async () => {
           const findPromise = Labour.find(query)
@@ -165,10 +171,10 @@ export async function listLabour(filter: {
             .skip(skip)
             .limit(effectiveLimit)
             .lean()
-            .maxTimeMS(60_000);
-          const countPromise = Labour.countDocuments(query).maxTimeMS(30_000);
+            .maxTimeMS(20_000);
+          const countPromise = Labour.countDocuments(query).maxTimeMS(20_000);
           return Promise.all([findPromise, countPromise]) as Promise<[any[], number]>;
-        }, { label: "listLabour.find+count" })
+        }, { label: "listLabour.find+count", maxAttempts: 3, baseDelayMs: 400 })
       );
       items = foundItems as unknown as LabourLike[];
       total = foundTotal;
@@ -182,8 +188,8 @@ export async function listLabour(filter: {
             .skip(skip)
             .limit(effectiveLimit)
             .lean()
-            .maxTimeMS(60_000),
-          { label: "listLabour.find" }
+            .maxTimeMS(20_000),
+          { label: "listLabour.find", maxAttempts: 3, baseDelayMs: 400 }
         )
       );
       items = foundItems as unknown as LabourLike[];
@@ -205,7 +211,11 @@ export async function listLabour(filter: {
       }
     }
   } catch (err) {
-    console.error("[listLabour] query failed:", (err as Error).message);
+    const e = err as { name?: string; code?: string; message?: string };
+    const message = e?.message ?? (typeof err === "string" ? err : (err as Error)?.message ?? String(err));
+    console.error(
+      `[listLabour] query failed: name=${e?.name ?? "?"} code=${e?.code ?? "?"} message=${String(message).slice(0, 200)}`
+    );
     items = [];
     total = 0;
     queryFailed = true;

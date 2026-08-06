@@ -5,6 +5,7 @@ import { Material } from "../models/Material.js";
 import { Labour } from "../models/Labour.js";
 import { Expense } from "../models/Expense.js";
 import { Payment } from "../models/Payment.js";
+import { SubcontractorPayment } from "../models/SubcontractorPayment.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 export interface ProjectFinancialSummary {
@@ -14,6 +15,7 @@ export interface ProjectFinancialSummary {
   advanceAmount: number;
   receivedAmount: number;
   totalExpenseReceived: number;
+  subcontractorSpend: number;
   pendingBalance: number;
   materialSpend: number;
   labourPayable: number;
@@ -26,7 +28,7 @@ export async function recomputeProjectTotals(projectObjectId: Types.ObjectId): P
   if (!project) throw new AppError(404, "Project not found");
 
   // Only approved records contribute to project totals
-  const [paymentAgg, materialAgg, labourAgg, expenseAgg] = await Promise.all([
+  const [paymentAgg, materialAgg, labourAgg, expenseAgg, subcontractorAgg] = await Promise.all([
     Payment.aggregate([
       { $match: { projectId: projectObjectId, status: "Approved" } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
@@ -66,12 +68,17 @@ export async function recomputeProjectTotals(projectObjectId: Types.ObjectId): P
       { $match: { projectId: projectObjectId, type: "site", status: "Approved", transactionType: { $ne: "Cash Added" } } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
+    SubcontractorPayment.aggregate([
+      { $match: { projectId: projectObjectId } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
   ]);
 
   project.receivedAmount = paymentAgg[0]?.total ?? 0;
   project.materialSpend = materialAgg[0]?.total ?? 0;
   project.labourPayable = labourAgg[0]?.total ?? 0;
   project.totalExpenseReceived = expenseAgg[0]?.total ?? 0;
+  project.subcontractorSpend = subcontractorAgg[0]?.total ?? 0;
 
   project.pendingBalance = Math.max(0, project.totalValue - project.receivedAmount);
   project.lastActivityAt = new Date();
@@ -100,6 +107,7 @@ export function computeProjectLedger(p: {
   advanceAmount: number;
   receivedAmount: number;
   totalExpenseReceived: number;
+  subcontractorSpend: number;
   materialSpend: number;
   labourPayable: number;
   expenseBalance: number;
@@ -112,6 +120,7 @@ export function computeProjectLedger(p: {
     advanceAmount: p.advanceAmount,
     receivedAmount: p.receivedAmount,
     totalExpenseReceived: p.totalExpenseReceived,
+    subcontractorSpend: p.subcontractorSpend,
     pendingBalance: Math.max(0, p.totalValue - p.receivedAmount),
     materialSpend: p.materialSpend,
     labourPayable: p.labourPayable,

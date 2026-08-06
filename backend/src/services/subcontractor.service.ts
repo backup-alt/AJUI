@@ -1,83 +1,136 @@
 import { Types } from "mongoose";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { Project } from "../models/Project.js";
-import { Client } from "../models/Client.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { generateId } from "./id-generator.service.js";
-import { createApproval } from "./approval.service.js";
-import { CreateSubcontractorInput } from "../schemas/financial.schema.js";
-import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
+import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { getSupervisorAccess } from "./supervisor-mobile.service.js";
+
+export interface CreateSubcontractorInput {
+  projectId: string;
+  subcontractorName: string;
+  description?: string;
+  employeeCount?: number;
+  note?: string;
+  address?: string;
+  phone?: string;
+  status?: "active" | "inactive";
+}
+
+function toObjectId(id: string | undefined | null): Types.ObjectId | undefined {
+  if (!id) return undefined;
+  if (!Types.ObjectId.isValid(id)) throw new AppError(400, "Invalid projectId");
+  return new Types.ObjectId(id);
+}
 
 export async function createSubcontractor(input: CreateSubcontractorInput) {
-  const project = await Project.findById(input.projectId);
+  const projectId = toObjectId(input.projectId);
+  const project = projectId ? await Project.findById(projectId) : null;
   if (!project) throw new AppError(404, "Project not found");
 
-  const client = await Client.findById(project.clientId);
-  if (!client) throw new AppError(404, "Client not found");
-
-  const subcontractId = await generateId("SUB");
   const sub = await Subcontractor.create({
-    subcontractId,
     projectId: project._id,
     projectName: project.name,
-    clientId: client._id,
-    siteId: input.siteId ? new Types.ObjectId(input.siteId) : undefined,
-    site: input.site,
+    clientId: project.clientId,
     subcontractorName: input.subcontractorName,
-    workPackage: input.workPackage,
-    contractValue: input.contractValue,
-    advancePaid: input.advancePaid,
-    balance: input.contractValue - input.advancePaid,
-    startDate: input.startDate,
-    dueDate: input.dueDate,
-    supervisor: input.supervisor,
-    supervisorId: input.supervisorId ? new Types.ObjectId(input.supervisorId) : undefined,
+    description: input.description || "",
+    employeeCount: input.employeeCount,
+    note: input.note || "",
+    address: input.address || "",
+    phone: input.phone || "",
+    status: input.status || "active",
   });
-
-  await createApproval({
-    type: "subcontract",
-    title: `Subcontract: ${input.subcontractorName} - ${input.workPackage}`,
-    sourceCollection: "subcontractors",
-    sourceId: sub._id,
-    projectId: project._id,
-    projectName: project.name,
-    site: input.site,
-    owner: input.subcontractorName,
-    amount: input.contractValue,
-    detail: `${input.workPackage} for ${input.contractValue}`,
-  });
-
   return sub.toObject();
 }
 
 export async function listSubcontractors(filter: {
   projectId?: string;
-  siteId?: string;
-  site?: string;
-  approvalStatus?: string;
-  paymentStatus?: string;
+  status?: string;
   page: number;
   limit: number;
   cursor?: string;
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
-  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
-  if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
-  if (filter.site) query.site = filter.site;
-  if (filter.approvalStatus) query.approvalStatus = filter.approvalStatus;
-  if (filter.paymentStatus) query.paymentStatus = filter.paymentStatus;
+  if (filter.projectId) query.projectId = toObjectId(filter.projectId);
+  if (filter.status) query.status = filter.status;
   applyProjectScope(query, "projectId", filter.scopeProjectIds);
 
   return paginateByCursor(Subcontractor, query, {
     page: filter.page,
     limit: filter.limit,
     cursor: filter.cursor,
+    maxLimit: 500,
   });
 }
 
+/**
+ * Lightweight list — just `{ _id, subcontractorName, status, projectId }`
+ * per row. Used by the mobile worker create page to populate the
+ * universal dropdown.
+ *
+ * When no `scopeProjectIds` is passed the call returns EVERY active
+ * subcontractor in the database — appropriate for admin tooling but
+ * dangerous for a supervisor-scoped API. Always prefer
+ * {@link listSubcontractorsForSupervisor} from supervisor endpoints.
+ */
+export async function listSubcontractorsForWorker(filter: {
+  scopeProjectIds?: ProjectScopeIds;
+} = {}) {
+  const query: Record<string, unknown> = { status: "active" };
+  applyProjectScope(query, "projectId", filter.scopeProjectIds);
+
+  const items = await Subcontractor.find(query)
+    .select("_id subcontractorName projectId")
+    .sort({ subcontractorName: 1 })
+    .lean();
+  return items.map((s) => ({
+    _id: String(s._id),
+    subcontractorName: s.subcontractorName,
+    projectId: s.projectId ? String(s.projectId) : "",
+  }));
+}
+
+/**
+ * Supervisor-scoped variant: only sub-contractors belonging to projects
+ * the calling supervisor is assigned to. Returns an empty list (not 403)
+ * when the supervisor has no accessible projects — the worker-create
+ * UI then shows the empty-state message.
+ */
+export async function listSubcontractorsForSupervisor(userId: string) {
+  const access = await getSupervisorAccess(userId);
+  const query: Record<string, unknown> = { status: "active" };
+
+  if (access.projectIds.length > 0) {
+    query.projectId = { $in: access.projectIds };
+  } else if (access.siteNames.length > 0) {
+    // No explicit project assignment, but the supervisor is bound to
+    // sites by name — match subcontractors whose project contains
+    // those sites by looking up the projects by site name.
+    const { Project } = await import("../models/Project.js");
+    const projects = await Project.find({ "sites.name": { $in: access.siteNames } })
+      .select("_id")
+      .lean();
+    const projectIds = projects.map((p) => p._id);
+    if (projectIds.length === 0) return [];
+    query.projectId = { $in: projectIds };
+  } else {
+    return [];
+  }
+
+  const items = await Subcontractor.find(query)
+    .select("_id subcontractorName projectId")
+    .sort({ subcontractorName: 1 })
+    .lean();
+  return items.map((s) => ({
+    _id: String(s._id),
+    subcontractorName: s.subcontractorName,
+    projectId: s.projectId ? String(s.projectId) : "",
+  }));
+}
+
 export async function getSubcontractorById(id: string) {
+  if (!Types.ObjectId.isValid(id)) throw new AppError(400, "Invalid subcontractor id");
   const sub = await Subcontractor.findById(id).lean();
   if (!sub) throw new AppError(404, "Subcontractor not found");
   return sub;
@@ -85,33 +138,16 @@ export async function getSubcontractorById(id: string) {
 
 export async function updateSubcontractor(
   id: string,
-  patch: Partial<CreateSubcontractorInput> & { approvalStatus?: string; paymentStatus?: string }
+  patch: Partial<CreateSubcontractorInput>
 ) {
-  const update: Record<string, unknown> = { ...patch };
-  if (patch.siteId) update.siteId = new Types.ObjectId(patch.siteId);
-  if (patch.supervisorId) update.supervisorId = new Types.ObjectId(patch.supervisorId);
-  if (patch.projectId) update.projectId = new Types.ObjectId(patch.projectId);
-
-  const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
-  if (customFields) {
-    delete update.customFields;
-    for (const [key, val] of Object.entries(customFields)) {
-      update[`customFields.${key}`] = val;
-    }
-  }
-
-  const sub = await Subcontractor.findByIdAndUpdate(id, update, { new: true });
+  if (!Types.ObjectId.isValid(id)) throw new AppError(400, "Invalid subcontractor id");
+  const sub = await Subcontractor.findByIdAndUpdate(id, patch, { new: true });
   if (!sub) throw new AppError(404, "Subcontractor not found");
   return sub.toObject();
 }
 
 export async function deleteSubcontractor(id: string) {
+  if (!Types.ObjectId.isValid(id)) throw new AppError(400, "Invalid subcontractor id");
   const result = await Subcontractor.deleteOne({ _id: id });
   if (result.deletedCount === 0) throw new AppError(404, "Subcontractor not found");
-}
-
-export async function getPendingSubcontractors(scopeProjectIds?: ProjectScopeIds) {
-  const query: Record<string, unknown> = { approvalStatus: "Pending" };
-  applyProjectScope(query, "projectId", scopeProjectIds);
-  return Subcontractor.find(query).sort({ createdAt: -1 }).lean();
 }

@@ -157,11 +157,21 @@ export const createWorkerSchema = z.object({
     name: z.string().trim().min(1).max(200),
     address: z.string().trim().max(500).optional(),
     labourType: z.string().trim().min(1).max(100),
-    weeklyPay: z.coerce.number().nonnegative().min(0),
+    // The supervisor mobile worker-create form no longer collects
+    // weeklyPay (per-project wages are tracked via admin-side custom
+    // fields). It remains available for the web admin / API clients.
+    weeklyPay: z.coerce.number().nonnegative().min(0).optional(),
     isSubcontract: z.boolean().default(false),
     subcontractorId: z.string().trim().min(1).max(100).optional(),
     subcontractorName: z.string().trim().max(200).optional(),
-  }),
+    // For non-subcontract workers: the supervising user responsible
+    // for this worker. Required when isSubcontract=false.
+    supervisorId: objectIdSchema.optional(),
+    supervisorName: z.string().trim().max(200).optional(),
+  })
+  // Cross-field rule: at most one of (subcontractorId, supervisorId)
+  // is set. Enforced at the controller/service layer; Zod refinement
+  // here would force a breaking order-of-keys check.
 });
 
 export const markAttendanceSchema = z.object({

@@ -65,16 +65,13 @@ const sectionConfigs: SectionConfig[] = [
       { key: "client", label: "Client" },
       { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date", type: "date" },
-      { key: "staffName", label: "Supervisor Name" },
+      { key: "subcontractorName", label: "Subcontractor" },
       { key: "labourTypes", label: "Labour Types" },
       { key: "staffCount", label: "Staff Count", type: "number" },
       { key: "attendance", label: "Attendance" },
       { key: "shift", label: "Shift", type: "number" },
       { key: "overtime", label: "Overtime" },
-      { key: "lateFine", label: "Late Fine" },
-      { key: "paymentMode", label: "Payment Mode" },
       { key: "notes", label: "Notes" },
-      { key: "status", label: "Status" },
     ],
   },
   {
@@ -127,21 +124,17 @@ const sectionConfigs: SectionConfig[] = [
   },
   {
     key: "subcontractors",
-    label: "Subcontracts",
-    title: "Subcontractor Register",
-    description: "Project subcontractor work packages with site, value, advances, due dates, supervisor, and payment status.",
+    label: "Subcontractor Payments",
+    title: "Subcontractor Payments",
+    description: "Every payment recorded against sub-contractors for this project. Each row is a separate record and folds into the project total expense.",
     columns: [
-      { key: "site", label: "Site" },
-      { key: "subcontractorName", label: "Subcontractor Name" },
-      { key: "workPackage", label: "Work Package" },
-      { key: "contractValue", label: "Contract Value" },
-      { key: "advancePaid", label: "Advance Paid" },
-      { key: "balance", label: "Balance" },
-      { key: "startDate", label: "Start Date", type: "date" },
-      { key: "dueDate", label: "Due Date", type: "date" },
-      { key: "supervisor", label: "Supervisor" },
-      { key: "approvalStatus", label: "Approval Status" },
-      { key: "paymentStatus", label: "Payment Status" },
+      { key: "date", label: "Date", type: "date" },
+      { key: "subcontractorName", label: "Subcontractor" },
+      { key: "siteName", label: "Site" },
+      { key: "description", label: "Work Description" },
+      { key: "employeeCount", label: "Number of Employees", type: "number" },
+      { key: "amount", label: "Total Paid", type: "number" },
+      { key: "notes", label: "Notes" },
     ],
   },
   {
@@ -202,6 +195,18 @@ const siteMaterialDetailFields: FieldSchema[] = [
     InventoryInitDialogComponent,
   ],
   styles: [`
+    .operations-dialog:has(.draft-select-menu.open) {
+      overflow: visible;
+    }
+    .operations-dialog:has(.draft-select-menu.open) > .erp-form {
+      overflow: visible;
+    }
+    .draft-select-menu .erp-select-panel {
+      width: 100%;
+      min-width: 220px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
     .image-preview-overlay {
       position: fixed;
       top: 0;
@@ -611,7 +616,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           [style.top.px]="rowToolbarPosition().y"
                           (click)="$event.stopPropagation()"
                         >
-                          <button type="button" class="icon-row-action" aria-label="Edit row" title="Edit row" (click)="startRowEdit(row, $event)">
+                          <button *ngIf="!isLabourGroupRow(row)" type="button" class="icon-row-action" aria-label="Edit row" title="Edit row" (click)="startRowEdit(row, $event)">
                             <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                               <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20Z" />
                               <path d="m13.5 6 4.5 4.5" />
@@ -643,6 +648,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         </div>
                         <ng-container *ngIf="activeSection() === 'labour' && column.key === 'labourTypes'; else standardProjectCell">
                           <div class="labour-types-cell">
+                            <span class="labour-group-badge" *ngIf="isLabourGroupRow(row)">{{ labourGroupCount(row) }} entries</span>
                             <div class="labour-type-chip-row" *ngIf="labourTypeCards(row).length; else emptyLabourTypes">
                               <span class="labour-type-chip" *ngFor="let type of labourTypeCards(row)">
                                 <span>{{ type.type }}</span>
@@ -865,25 +871,63 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       </div>
                     </ng-container>
                     <ng-template #standardRecordField>
-                      <input
-                        *ngIf="selectOptions(activeSection(), column.key).length > 0 && allowsCustomOption(activeSection(), column.key); else projectDraftSelect"
-                        [attr.list]="'project-draft-' + activeSection() + '-' + column.key"
-                        [type]="column.type || 'text'"
-                        [value]="draftRow()[column.key] || ''"
-                        (input)="updateDraftField(column.key, $any($event.target).value)"
-                      />
-                      <datalist [id]="'project-draft-' + activeSection() + '-' + column.key">
-                        <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option"></option>
-                      </datalist>
-                      <ng-template #projectDraftSelect>
-                        <select
-                          *ngIf="selectOptions(activeSection(), column.key).length > 0; else projectDraftInput"
-                          [value]="draftRow()[column.key] || ''"
-                          (change)="updateDraftField(column.key, $any($event.target).value)"
+                      <ng-container *ngIf="isRecordSelectField(column); else projectDraftInput">
+                        <div
+                          class="erp-select-menu draft-select-menu"
+                          [class.open]="isDraftSelectOpen(column.key)"
                         >
-                          <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option">{{ option }}</option>
-                        </select>
-                      </ng-template>
+                          <button type="button" class="erp-select-trigger" (click)="toggleDraftSelect(column.key)">
+                            <span>{{ draftRow()[column.key] || 'Select' }}</span>
+                            <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                              <path d="M5.5 7.5 10 12l4.5-4.5" />
+                            </svg>
+                          </button>
+                          <div class="erp-select-panel" *ngIf="isDraftSelectOpen(column.key)">
+                            <label class="erp-select-search">
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                <circle cx="9" cy="9" r="5.5" />
+                                <path d="m13.5 13.5 3 3" />
+                              </svg>
+                              <input
+                                type="text"
+                                placeholder="Search"
+                                [value]="draftSelectSearch()"
+                                (input)="draftSelectSearch.set($any($event.target).value)"
+                              />
+                            </label>
+                            <button
+                              *ngFor="let option of filteredSelectOptions(activeSection(), column.key)"
+                              type="button"
+                              [class.selected]="option === draftRow()[column.key]"
+                              (click)="selectDraftOption(column.key, option)"
+                            >
+                              <span
+                                class="select-option-icon"
+                                *ngIf="selectOptionIcon(option) as icon"
+                                [class.approve]="icon === 'approve'"
+                                [class.decline]="icon === 'decline'"
+                              >
+                                <svg *ngIf="icon === 'approve'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                  <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                                </svg>
+                                <svg *ngIf="icon === 'decline'" viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                                  <path d="m5.5 5.5 9 9" />
+                                  <path d="m14.5 5.5-9 9" />
+                                </svg>
+                              </span>
+                              {{ option }}
+                            </button>
+                            <label class="custom-select-entry" *ngIf="allowsCustomOption(activeSection(), column.key)">
+                              <span>Custom</span>
+                              <input
+                                #draftCustomValue
+                                (keydown.enter)="saveCustomDraftOption(column.key, draftCustomValue.value, $event)"
+                                placeholder="Type value and press Enter"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </ng-container>
                       <ng-template #projectDraftInput>
                         <input
                           [type]="column.type || 'text'"
@@ -1072,6 +1116,8 @@ export class ProjectWorkspacePage {
   readonly filterBuilderOpen = signal(false);
   readonly filterBuilderStep = signal<FilterBuilderStep>("fields");
   readonly activeFilterValueKey = signal("");
+  readonly openDraftSelect = signal("");
+  readonly draftSelectSearch = signal("");
   readonly dateFilterOpen = signal(false);
   readonly dateRange = signal({ start: "", end: "" });
   readonly datePickerTarget = signal<"start" | "end">("start");
@@ -1100,7 +1146,7 @@ export class ProjectWorkspacePage {
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
   readonly attendanceRows = signal<TableRow[]>([]);
   readonly tableState = computed(() => ({
-    rows: this.visibleRows(this.activeSection()),
+    rows: this.activeSection() === "labour" ? this.groupLabourRows(this.visibleRows("labour")) : this.visibleRows(this.activeSection()),
     columns: this.columnsFor(this.activeSection()),
   }));
 
@@ -1195,6 +1241,12 @@ export class ProjectWorkspacePage {
       this.editingProject.set(project);
       this.showProjectForm.set(true);
     });
+    // Subcontractor spend rollup — re-fetched every time the active
+    // project changes. The total expense line below folds this in.
+    effect(() => {
+      const projectId = this.projectId();
+      this.loadProjectExpenseRollup(projectId);
+    });
   }
 
   switchSection(section: ModuleKey) {
@@ -1202,6 +1254,9 @@ export class ProjectWorkspacePage {
     this.tableSearch.set("");
     this.resetFilterState();
     this.closeDropdowns();
+    // Make sure the sub-contractor roster is available for the Add
+    // Record dropdown even if the boot-time hydration missed it.
+    if (section === "subcontractors") void this.hydration.loadModule("subcontractors");
     this.clearRowSelection();
     void this.router.navigate(["/clients", this.clientId(), "projects", this.projectId(), section]);
 
@@ -1413,6 +1468,20 @@ export class ProjectWorkspacePage {
     if (!window.confirm("Delete this row? This will permanently delete it from the backend.")) return;
     const section = this.activeSection();
 
+    if (section === "subcontractors") {
+      for (const row of rows) {
+        const paymentId = String(row["_id"] || "").trim();
+        if (!paymentId) continue;
+        try {
+          await firstValueFrom(this.api.deleteSubcontractorPayment(paymentId));
+        } catch {}
+      }
+      this.subcontractorPayments.set([]);
+      if (this.projectId()) this.loadProjectExpenseRollup(this.projectId());
+      this.clearRowSelection();
+      return;
+    }
+
     const apiDeleters: Record<string, ((id: string) => any) | null> = {
       materials: (id) => this.api.deleteMaterial(id),
       labour: (id) => this.api.deleteLabour(id),
@@ -1543,6 +1612,8 @@ export class ProjectWorkspacePage {
 
   private closeDropdowns() {
     this.openSelectKey.set("");
+    this.openDraftSelect.set("");
+    this.draftSelectSearch.set("");
     this.activeFilterValueKey.set("");
     this.selectCustomValue.set("");
   }
@@ -1583,13 +1654,23 @@ export class ProjectWorkspacePage {
 
   visibleRows(section: ModuleKey): TableRow[] {
     const query = this.tableSearch().trim().toLowerCase();
-    let rows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (row) => this.rowBelongsToProject(row));
+    // Subcontractor section reads from the dedicated payment collection
+    // — it's no longer coupled to the Subcontractor list. The generic
+    // CRUD table renders those rows through the same dropdown-driven
+    // UI (subcontractor + site are select fields).
+    let rows: TableRow[];
+    if (section === "subcontractors") {
+      rows = this.subcontractorPaymentRows();
+    } else {
+      rows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (row) => this.rowBelongsToProject(row));
+    }
     if (section === "labour") {
       rows = [...rows, ...this.attendanceRows()];
     }
     const site = this.activeSiteFilter();
     if (this.isSiteAware(section) && site !== "All") {
-      rows = rows.filter((row) => String(row["site"] ?? "").toLowerCase() === site.toLowerCase());
+      const siteKey = section === "subcontractors" ? "siteName" : "site";
+      rows = rows.filter((row) => String(row[siteKey] ?? "").toLowerCase() === site.toLowerCase());
     }
     rows = this.withComputedRows(section, rows);
     const filters = this.selectedFilters();
@@ -1607,6 +1688,92 @@ export class ProjectWorkspacePage {
       return matchesFilters && matchesDate;
     });
     return rows;
+  }
+
+  /**
+   * Labour rows are grouped by attendance date so a single date shows every
+   * labour type (and every attendance entry) in one row. Single-record dates
+   * pass through unchanged so inline editing keeps working; multi-record
+   * dates become read-only aggregate rows carrying their source records in
+   * `__labourGroup`.
+   */
+  groupLabourRows(rows: TableRow[]): TableRow[] {
+    const byKey = new Map<string, TableRow[]>();
+    for (const row of rows) {
+      const date = String(row["attendanceDate"] || "").trim();
+      const sub = String(row["subcontractorName"] || "").trim();
+      const key = date ? `${sub}||${date}` : `__no-date__:${sub}:${row["__rowId"] || "?"}`;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key)!.push(row);
+    }
+    const grouped: TableRow[] = [];
+    for (const [key, groupRows] of byKey) {
+      if (key.startsWith("__no-date__") || groupRows.length === 1) {
+        grouped.push(...groupRows);
+        continue;
+      }
+      const first = groupRows[0];
+      const typeMap = new Map<string, number>();
+      for (const row of groupRows) {
+        for (const entry of this.labourTypeEntriesForRow(row)) {
+          typeMap.set(entry.type, (typeMap.get(entry.type) || 0) + entry.count);
+        }
+      }
+      const distinctValues = (field: string): string => {
+        const values = [...new Set(groupRows.map((row) => String(row[field] ?? "").trim()).filter(Boolean))];
+        return values.join(", ");
+      };
+      const totalOvertime = groupRows.reduce(
+        (sum, row) => sum + this.moneyNumber(String(row["overtime"] || "").replace(/[^0-9.]/g, "")),
+        0
+      );
+      const groupedRow = Object.assign(
+        {
+          ...first,
+          __rowId: `labour-group:${key}`,
+          labourTypes: [...typeMap.entries()].map(([type, count]) => `${type}: ${count}`).join("\n"),
+          staffCount: String(groupRows.reduce((sum, row) => sum + this.moneyNumber(row["staffCount"]), 0)),
+          client: distinctValues("client"),
+          site: distinctValues("site"),
+          subcontractorName: distinctValues("subcontractorName"),
+          attendance: this.formatGroupedAttendance(groupRows),
+          shift: String(groupRows.reduce((sum, row) => sum + this.moneyNumber(row["shift"]), 0)),
+          overtime: totalOvertime ? String(totalOvertime) : distinctValues("overtime"),
+          notes: distinctValues("notes"),
+        } as TableRow,
+        { __labourGroup: groupRows }
+      );
+      grouped.push(groupedRow);
+    }
+    return grouped;
+  }
+
+  /**
+   * Renders a grouped labour row's attendance as "Present(N)" / "Absent(N)".
+   * Mixed days render as "Present(P)/Absent(A)" with separate counts so the
+   * total worker count is still visible at a glance.
+   */
+  private formatGroupedAttendance(groupRows: TableRow[]): string {
+    let present = 0;
+    let absent = 0;
+    for (const row of groupRows) {
+      const label = String(row["attendance"] || "").trim().toLowerCase();
+      const count = this.moneyNumber(row["staffCount"]);
+      if (label === "absent") absent += count;
+      else present += count;
+    }
+    if (absent > 0 && present > 0) return `Present(${present})/Absent(${absent})`;
+    if (absent > 0) return `Absent(${absent})`;
+    return `Present(${present})`;
+  }
+
+  labourGroupCount(row: TableRow): number {
+    const group = (row as TableRow & { __labourGroup?: TableRow[] })["__labourGroup"];
+    return Array.isArray(group) ? group.length : 0;
+  }
+
+  isLabourGroupRow(row: TableRow): boolean {
+    return this.labourGroupCount(row) > 1;
   }
 
   selectedFilterCount(): number {
@@ -1875,6 +2042,7 @@ export class ProjectWorkspacePage {
     if (section === "labour") return "attendanceDate";
     if (section === "expenses") return "expenseDate";
     if (section === "payments") return "paymentDate";
+    if (section === "subcontractors") return "date";
     return "";
   }
 
@@ -1935,7 +2103,16 @@ export class ProjectWorkspacePage {
     this.draftRow.set(row);
     for (const column of this.recordFormColumns()) {
       const options = this.selectOptions(this.activeSection(), column.key);
-      row[column.key] = column.key === "site" && this.activeSiteFilter() !== "All" ? this.activeSiteFilter() : row[column.key] || options[0] || "";
+      // Subcontractor payments must be explicitly chosen — never
+      // silently default to the first option (the reported "only the
+      // first subcontractor can receive payments" bug).
+      if (this.activeSection() === "subcontractors" && column.key === "subcontractorName") {
+        row[column.key] = "";
+        continue;
+      }
+      const activeSite = this.activeSiteFilter();
+      const isSiteColumn = column.key === "site" || (this.activeSection() === "subcontractors" && column.key === "siteName");
+      row[column.key] = isSiteColumn && activeSite !== "All" ? activeSite : row[column.key] || options[0] || "";
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
@@ -2087,6 +2264,35 @@ export class ProjectWorkspacePage {
     });
   }
 
+  toggleDraftSelect(key: string) {
+    this.openDraftSelect.update((current) => (current === key ? "" : key));
+    this.draftSelectSearch.set("");
+  }
+
+  isDraftSelectOpen(key: string): boolean {
+    return this.openDraftSelect() === key;
+  }
+
+  filteredSelectOptions(section: ModuleKey, key: string): string[] {
+    const query = this.draftSelectSearch().trim().toLowerCase();
+    const options = this.selectOptions(section, key);
+    if (!query) return options;
+    return options.filter((option) => String(option).toLowerCase().includes(query));
+  }
+
+  selectDraftOption(key: string, value: string) {
+    this.updateDraftField(key, value);
+    this.openDraftSelect.set("");
+    this.draftSelectSearch.set("");
+  }
+
+  saveCustomDraftOption(key: string, value: string, event?: Event) {
+    event?.preventDefault();
+    const trimmed = String(value || "").trim();
+    if (!trimmed) return;
+    this.selectDraftOption(key, trimmed);
+  }
+
   showSiteMaterialDetails(): boolean {
     if (this.activeSection() !== "expenses") return false;
     const row = this.draftRow();
@@ -2159,6 +2365,11 @@ export class ProjectWorkspacePage {
       }
     }
 
+    if (section === "subcontractors") {
+      await this.saveSubcontractorPaymentDraft(draft, selectedSite);
+      return;
+    }
+
     if (section === "materials") {
       const materialInput: Partial<MaterialRow> = {
         projectId: this.projectId() || undefined,
@@ -2203,6 +2414,141 @@ export class ProjectWorkspacePage {
     });
     if (section === "expenses") this.createMaterialFromSiteExpense(savedRow);
     this.recordDialogOpen.set(false);
+  }
+
+  /**
+   * Subcontractor payments live in their own backend collection, so the
+   * generic addCustomRow fallback (local-only) is not used. Resolves the
+   * chosen subcontractor + site by name/id and persists a real payment
+   * record, then reloads the project expense rollup so the hero total
+   * stays in sync.
+   */
+  private async saveSubcontractorPaymentDraft(draft: TableRow, selectedSite: string) {
+    const projectId = this.projectId();
+    if (!projectId) {
+      window.alert("Please select a project first.");
+      return;
+    }
+    const subcontractorName = String(draft["subcontractorName"] || "").trim();
+    const subcontractor = this.data
+      .subcontractors()
+      .find((s) => String(s.subcontractorName || "").trim().toLowerCase() === subcontractorName.toLowerCase());
+    if (!subcontractor?._id) {
+      window.alert("Please select a subcontractor.");
+      return;
+    }
+    const siteName = String(draft["siteName"] || draft["site"] || selectedSite || "").trim();
+    const siteId = this.data.resolveSiteNameToId(siteName);
+    if (!siteId) {
+      window.alert("Please select a valid site for this project.");
+      return;
+    }
+    const date = String(draft["date"] || new Date().toISOString().slice(0, 10));
+    const description = String(draft["description"] || "").trim();
+    if (!description) {
+      window.alert("Work description is required.");
+      return;
+    }
+    const employeeCount = Math.round(Number(draft["employeeCount"]) || 0);
+    if (!Number.isInteger(employeeCount) || employeeCount < 1) {
+      window.alert("Number of employees must be a positive whole number.");
+      return;
+    }
+    const amount = Math.abs(this.moneyNumber(draft["amount"]));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      window.alert("Amount must be a number greater than zero.");
+      return;
+    }
+    const notes = String(draft["notes"] || "").trim();
+    const payload = {
+      subcontractorId: subcontractor._id,
+      projectId,
+      siteId,
+      date,
+      description,
+      employeeCount,
+      amount,
+      notes,
+    };
+    const paymentId = String(draft["__paymentId"] || "").trim();
+    try {
+      if (paymentId) {
+        await firstValueFrom(this.api.updateSubcontractorPayment(paymentId, payload));
+      } else {
+        await firstValueFrom(this.api.createSubcontractorPayment(payload));
+      }
+      this.recordDialogOpen.set(false);
+      this.clearRowSelection();
+      this.loadProjectExpenseRollup(projectId);
+    } catch (err: any) {
+      console.error("[ProjectWorkspace] Failed to save subcontractor payment", err);
+      window.alert(err?.error?.error || err?.error?.message || err?.message || "Could not save the payment.");
+    }
+  }
+
+  /**
+   * Persist a single cell edit on a subcontractor payment row. Column
+   * names (subcontractor/site) are re-resolved to ids before the PATCH;
+   * the backend re-derives the denormalized display fields.
+   */
+  private updateSubcontractorPaymentRow(row: TableRow, key: string, value: string) {
+    const paymentId = String(row["_id"] || "").trim();
+    if (!paymentId) return;
+    const current = this.subcontractorPayments().find((p) => String(p._id) === paymentId);
+    const patch: Record<string, unknown> = {};
+    switch (key) {
+      case "date":
+        patch.date = value;
+        break;
+      case "subcontractorName": {
+        const match = this.data
+          .subcontractors()
+          .find((s) => String(s.subcontractorName || "").trim().toLowerCase() === value.toLowerCase());
+        if (!match?._id) return;
+        patch.subcontractorId = match._id;
+        break;
+      }
+      case "siteName": {
+        const siteId = this.data.resolveSiteNameToId(value);
+        if (!siteId) return;
+        patch.siteId = siteId;
+        break;
+      }
+      case "description":
+        patch.description = value;
+        break;
+      case "employeeCount":
+        patch.employeeCount = Math.round(Number(value) || 0);
+        break;
+      case "amount": {
+        const newAmount = Math.abs(this.moneyNumber(value));
+        patch.amount = newAmount;
+        if (current) {
+          const oldAmount = Number(current.amount) || 0;
+          this.subcontractorSpend.update((total) => Math.max(0, total - oldAmount + newAmount));
+        }
+        break;
+      }
+      case "notes":
+        patch.notes = value;
+        break;
+      default:
+        return;
+    }
+    if (current) {
+      this.subcontractorPayments.update((list) =>
+        list.map((p) => (String(p._id) === paymentId ? { ...p, ...patch } : p))
+      );
+    }
+    this.api.updateSubcontractorPayment(paymentId, patch).subscribe({
+      next: () => {
+        if (this.projectId()) this.loadProjectExpenseRollup(this.projectId());
+      },
+      error: (err) => {
+        console.warn("[ProjectWorkspace] Failed to update subcontractor payment", err);
+        if (this.projectId()) this.loadProjectExpenseRollup(this.projectId());
+      },
+    });
   }
 
   private createMaterialFromSiteExpense(row: TableRow) {
@@ -2292,6 +2638,13 @@ export class ProjectWorkspacePage {
     const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
     const cleanValue = value.trim();
+    if (section === "subcontractors") {
+      // Subcontractor payment rows map 1:1 to the backend collection.
+      // Cell edits PATCH the payment record directly (names re-resolve
+      // to ids) instead of being stashed locally.
+      this.updateSubcontractorPaymentRow(row, key, cleanValue);
+      return;
+    }
     if (section === "expenses" && key === "amount") {
       this.data.updateSharedRowCell(rowId, key, this.positiveExpenseAmountValue(cleanValue));
       return;
@@ -2304,7 +2657,39 @@ export class ProjectWorkspacePage {
   async deleteRow(row: TableRow) {
     const key = this.rowKey(row);
     const section = this.activeSection();
-    if (!window.confirm("Delete this row? This will permanently delete it from the backend.")) return;
+    const group = (row as TableRow & { __labourGroup?: TableRow[] })["__labourGroup"];
+    const isGroup = section === "labour" && Array.isArray(group) && group.length > 0;
+    const targets = isGroup ? (group as TableRow[]) : [row];
+    const confirmMessage = isGroup
+      ? `Delete ${targets.length} labour records on this date? This will permanently delete them from the backend.`
+      : "Delete this row? This will permanently delete it from the backend.";
+    if (!window.confirm(confirmMessage)) return;
+
+    for (const target of targets) {
+      await this.deleteRowRecord(section, target);
+    }
+
+    this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
+    if (this.selectedRowKey() === key) this.selectedRowKey.set("");
+    if (this.editingRowKey() === key) this.editingRowKey.set("");
+    this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
+
+    try { this.refreshFromBackend(); } catch {}
+  }
+
+  private async deleteRowRecord(section: ModuleKey, row: TableRow) {
+    // Subcontractor payments are stored in their own collection —
+    // dispatch through the dedicated endpoint.
+    if (section === "subcontractors") {
+      const id = String(row["_id"] || "").trim();
+      if (!id) return;
+      try {
+        await firstValueFrom(this.api.deleteSubcontractorPayment(id));
+        this.subcontractorPayments.update((list) => list.filter((p) => String(p._id) !== id));
+        this.subcontractorSpend.update((total) => Math.max(0, total - Number(row["amount"] || 0)));
+      } catch {}
+      return;
+    }
 
     const apiDeleters: Record<string, ((id: string) => any) | null> = {
       materials: (id) => this.api.deleteMaterial(id),
@@ -2341,13 +2726,6 @@ export class ProjectWorkspacePage {
         dataSignal.update((arr: any[]) => arr.filter((r: any) => String(r[idField] || "") !== bizId));
       }
     } catch {}
-
-    this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
-    if (this.selectedRowKey() === key) this.selectedRowKey.set("");
-    if (this.editingRowKey() === key) this.editingRowKey.set("");
-    this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
-
-    try { this.refreshFromBackend(); } catch {}
   }
 
   selectCellKey(row: TableRow, key: string): string {
@@ -2393,7 +2771,22 @@ export class ProjectWorkspacePage {
 
   allowsCustomOption(section: ModuleKey, key: string): boolean {
     if (key === "site" || key === "siteMaterial" || key === "transactionType" || key === "approvalStatus" || key === "status" || key === "paymentStatus" || key === "attendance") return false;
+    // Subcontractor payments must reference an existing sub-contractor
+    // and a real site — the backend resolves ids by name, so free-text
+    // entries would be rejected. Selection only.
+    if (section === "subcontractors" && (key === "subcontractorName" || key === "subcontractor" || key === "siteName")) return false;
     return this.selectOptions(section, key).length > 0;
+  }
+
+  /**
+   * Whether the Add Record dialog should render the select dropdown for
+   * this column. Subcontractor/site columns in the subcontractor section
+   * ALWAYS render the dropdown (even while names are still loading) so
+   * the user can never fall back to typing a free-text name.
+   */
+  isRecordSelectField(column: FieldSchema): boolean {
+    if (this.activeSection() === "subcontractors" && (column.key === "subcontractorName" || column.key === "subcontractor" || column.key === "siteName")) return true;
+    return this.selectOptions(this.activeSection(), column.key).length > 0;
   }
 
   selectOptionIcon(option: string): "approve" | "decline" | "" {
@@ -2647,10 +3040,88 @@ export class ProjectWorkspacePage {
     this.data.updateProject(this.projectId(), { totalValue: amount });
   }
 
+  private subcontractorSpend = signal<number>(0);
+  private subcontractorPayments = signal<any[]>([]);
+
+  /**
+   * Map SubcontractorPayment rows to the table shape the generic
+   * workspace CRUD table expects (it looks at column keys directly).
+   * Renamed `site` -> `siteName` so the column config matches.
+   */
+  private subcontractorPaymentRows(): TableRow[] {
+    return this.subcontractorPayments().map((p) => ({
+      __rowId: `sub-payment:${p._id}`,
+      __projectId: p.projectId,
+      _id: p._id,
+      date: p.date,
+      subcontractorId: p.subcontractorId,
+      subcontractorName: p.subcontractorName,
+      projectId: p.projectId,
+      siteId: p.siteId || "",
+      siteName: p.siteName || "",
+      description: p.description || "",
+      employeeCount: p.employeeCount,
+      amount: formatMoney(p.amount),
+      notes: p.notes || "",
+    }));
+  }
+
+  /**
+   * Fetch the subcontractor spend rollup for this project so the
+   * workspace "Total expense" line includes subcontractor payments
+   * (per spec) and the new Sub-contractors page total stays in sync.
+   */
+  private loadProjectExpenseRollup(projectId: string | null) {
+    if (!projectId) {
+      this.subcontractorSpend.set(0);
+      this.subcontractorPayments.set([]);
+      return;
+    }
+    this.api.getSubcontractorSpendRollup(projectId).subscribe({
+      next: (res) => this.subcontractorSpend.set(Number(res?.totalPaid) || 0),
+      error: () => this.subcontractorSpend.set(0),
+    });
+    // Load payments so the table renders the actual records.
+    this.api.listSubcontractorPayments({ projectId, limit: 500 }).subscribe({
+      next: (res) => this.subcontractorPayments.set(res.items || []),
+      error: () => this.subcontractorPayments.set([]),
+    });
+  }
+
   totalProjectExpenseLabel(): string {
     return formatMoney(this.totalProjectExpenseValue());
   }
 
+  vendorTotalSpendLabel(): string {
+    return formatMoney(this.vendorSpendValue());
+  }
+
+  subcontractorTotalSpendLabel(): string {
+    return formatMoney(this.subcontractorSpend());
+  }
+
+  /**
+   * Subcontractor payments AND materials-given amounts are folded
+   * into the project total expense (per spec) so the workspace hero
+   * matches what the admin sees elsewhere on the dashboard.
+   *
+   * Composition:
+   *   - expenseRows : sum of |amount| for expense records (expense
+   *     entries are sign-flipped so debits come through as negative
+   *     in the signed-amount helper — we absolute-value here).
+   *   - labourRows  : sum of weekly pay across labour rows for the
+   *     project (covers directly-hired + subcontractor-led labour).
+   *   - subcontractorSpend : server-computed total of all
+   *     SubcontractorPayment records.
+   *   - materialsGivenTotal : sum of `givenAmount` (cash disbursed
+   *     for materials) across every material row belonging to the
+   *     project. The materials section's own totals card uses
+   *     `issuedAmount + givenAmount`; we mirror that here so the
+   *     project-wide hero stays consistent with the materials view.
+   *     Issued amounts are NOT double-counted (they already appear
+   *     inside expense rows when the material was purchased through
+   *     the expense ledger).
+   */
   private totalProjectExpenseValue(): number {
     const expenseRows = this.data.tableRowsFor("expenses", this.tableRows().expenses, (row) => this.rowBelongsToProject(row));
     const expenseTotal = expenseRows.reduce((sum, row) => {
@@ -2659,7 +3130,23 @@ export class ProjectWorkspacePage {
     }, 0);
     const labourRows = this.data.tableRowsFor("labour", this.tableRows().labour, (row) => this.rowBelongsToProject(row));
     const labourTotal = labourRows.reduce((sum, row) => sum + this.labourWeeklyPayForRow(this.withLabourPayable(row)).total, 0);
-    return expenseTotal + labourTotal;
+    const subcontractorTotal = this.subcontractorSpend();
+    const materialRows = this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row));
+    const materialsGivenTotal = materialRows.reduce(
+      (sum, row) => sum + this.moneyNumber(row["givenAmount"]),
+      0
+    );
+    return expenseTotal + labourTotal + subcontractorTotal + materialsGivenTotal;
+  }
+
+  /**
+   * Vendor section "Total spend" = sum of issuedAmount across all
+   * materials belonging to this project (regardless of vendor).
+   * Recomputed reactively whenever the materials list changes.
+   */
+  private vendorSpendValue(): number {
+    const materials = this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row));
+    return materials.reduce((sum, row) => sum + this.moneyNumber(row["issuedAmount"]) + this.moneyNumber(row["givenAmount"]), 0);
   }
 
   deleteProject(project: Project) {
@@ -2703,6 +3190,7 @@ export class ProjectWorkspacePage {
           clientId: group.clientId || currentClient?.id || this.clientId(),
           site: group.site || "",
           attendanceDate: group.date,
+          subcontractorName: group.subcontractorName || "",
           staffName: group.supervisorName || w.workerName,
           labourTypes: group.labourType || "",
           staffCount: 1,
@@ -2832,21 +3320,18 @@ export class ProjectWorkspacePage {
         gstNumber: vendor.gst,
       }));
 
-    const subcontractors = this.data.subcontractorsForProject(projectId).map((row) => ({
-      __rowId: `subcontractor:${row.id}`,
-      __projectId: row.projectId,
-      projectId: row.projectId,
-      site: row.site,
-      subcontractorName: row.name,
-      workPackage: row.workPackage,
-      contractValue: formatMoney(row.contractValue),
-      advancePaid: formatMoney(row.advancePaid),
-      balance: formatMoney(row.contractValue - row.advancePaid),
-      startDate: row.startDate,
-      dueDate: row.dueDate,
-      supervisor: row.supervisor,
-      approvalStatus: row.approvalStatus,
-      paymentStatus: row.paymentStatus,
+    const subcontractors = this.subcontractorPayments().map((p) => ({
+      __rowId: `sub-payment:${p._id}`,
+      __projectId: p.projectId,
+      projectId: p.projectId,
+      subcontractorName: p.subcontractorName,
+      projectName: p.projectName,
+      siteName: p.siteName || "",
+      description: p.description || "",
+      employeeCount: p.employeeCount,
+      amount: formatMoney(p.amount),
+      notes: p.notes || "",
+      date: p.date,
     }));
 
     const reports = [
@@ -2925,7 +3410,7 @@ export class ProjectWorkspacePage {
   }
 
   selectOptions(section: ModuleKey, key: string): string[] {
-    if (key === "site") return this.projectSites();
+    if (key === "site" || key === "siteName") return this.projectSites();
     if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
     if (section === "materials" && key === "materialName") return this.materialNameOptions();
     if (section === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
@@ -2935,6 +3420,18 @@ export class ProjectWorkspacePage {
     }
     if (section === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (section === "labour" && key === "attendance") return ["Present", "Absent"];
+    // Subcontractor section — dropdowns are sourced from the live
+    // /api/subcontractors and the project's site list. Every
+    // sub-contractor (active or not) is offered so existing records
+    // can always be matched; on save we re-resolve to the matching
+    // subcontractorId to avoid matching on name alone.
+    if (section === "subcontractors" && (key === "subcontractorName" || key === "subcontractor")) {
+      return [...new Set(
+        this.data.subcontractors()
+          .map((s) => s.subcontractorName)
+          .filter((name): name is string => Boolean(name && name.trim()))
+      )].sort((a, b) => a.localeCompare(b));
+    }
     if (key === "approvalStatus" || key === "status") {
       if (section === "materials") {
         return ["Pending", "Approved", "Declined", "Completed", "Received", "Not Received"];
@@ -3044,17 +3541,13 @@ export class ProjectWorkspacePage {
         gstNumber: "",
       },
       subcontractors: {
-        site,
+        date: today,
         subcontractorName: "",
-        workPackage: "",
-        contractValue: "0",
-        advancePaid: "0",
-        balance: formatMoney(0),
-        startDate: today,
-        dueDate: today,
-        supervisor: currentProject?.supervisor ?? "",
-        approvalStatus: "Pending",
-        paymentStatus: "Not Started",
+        siteName: site,
+        description: "",
+        employeeCount: 1,
+        amount: 0,
+        notes: "",
       },
       inventory: {
         materialName: "",
@@ -3078,12 +3571,6 @@ export class ProjectWorkspacePage {
     const normalizedRows = rows.map((row) => this.withNormalizedApprovalStatus(row));
     if (section === "expenses") return this.withExpenseBalances(normalizedRows);
     if (section === "labour") return normalizedRows.map((row) => this.withLabourPayable(row));
-    if (section === "subcontractors") {
-      return normalizedRows.map((row) => ({
-        ...row,
-        balance: formatMoney(this.moneyNumber(row["contractValue"]) - this.moneyNumber(row["advancePaid"])),
-      }));
-    }
     return normalizedRows;
   }
 
@@ -3491,22 +3978,14 @@ export class ProjectWorkspacePage {
       ];
     }
     if (section === "labour") {
-      const wageFields = this.data.customFieldsFor("labour").filter((field) => this.isLabourWageField(field));
-      return [
-        { key: "attendanceDate", label: "Date" },
-        { key: "staffName", label: "Supervisor Name" },
-        { key: "labourTypes", label: "Labour Types" },
-        ...wageFields,
-        { key: "staffCount", label: "Staff Count" },
-        { key: "attendance", label: "Attendance" },
-        { key: "shift", label: "Shift" },
-        { key: "paymentMode", label: "Payment Mode" },
-        { key: "overtimeLate", label: "Overtime / Late" },
-        { key: "dailyPayByType", label: "Daily Pay by Labour Type" },
-        { key: "combinedDailyPay", label: "Combined Daily Pay" },
-        { key: "weeklyPayByType", label: "Weekly Pay by Labour Type" },
-        { key: "weeklyPayTotal", label: "Combined Weekly Pay" },
-      ];
+      // Mirror the labour table exactly — no synthetic pay totals, no
+      // late-fine amount. Payment mode, status, notes, and staff count are
+      // dropped from the report along with the table. The PDF is an
+      // attendance report, not a payroll summary.
+      const labourTableColumns = this.columnsFor("labour");
+      return labourTableColumns.filter(
+        (column) => column.key !== "lateFine" && column.key !== "paymentMode" && column.key !== "status" && column.key !== "notes" && column.key !== "staffCount"
+      );
     }
     return this.columnsFor(section);
   }
@@ -3535,52 +4014,50 @@ export class ProjectWorkspacePage {
     if (section !== "labour") return rows;
     const groups = new Map<string, TableRow[]>();
     for (const row of rows) {
-      const key = `${row["attendanceDate"] || ""}|${row["paymentMode"] || "Cash"}`;
+      const sub = String(row["subcontractorName"] || "").trim();
+      const date = String(row["attendanceDate"] || row["notes"] || "").trim();
+      const key = date ? `${sub}||${date}` : `__no-date__:${sub}:${row["__rowId"] || "?"}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(row);
     }
     const groupedRows: TableRow[] = [];
     for (const groupRows of groups.values()) {
       const first = groupRows[0];
-      const typeMap = new Map<string, { count: number; wage: number; amount: number }>();
-      let totalDailyPay = 0;
+      const typeMap = new Map<string, { count: number; wage: number }>();
       let totalOvertimeHrs = 0;
       let totalLateFine = 0;
-      let totalWeeklyPay = 0;
       for (const row of groupRows) {
         const entries = this.labourTypeEntriesForRow(row);
-        const shift = this.moneyNumber(row["shift"]) || 1;
         for (const entry of entries) {
-          const existing = typeMap.get(entry.type) || { count: 0, wage: entry.wage, amount: 0 };
+          const existing = typeMap.get(entry.type) || { count: 0, wage: entry.wage };
           existing.count += entry.count;
           existing.wage = existing.wage || entry.wage;
-          existing.amount += entry.count * entry.wage * (shift / 2);
           typeMap.set(entry.type, existing);
         }
-        totalDailyPay += this.moneyNumber(row["dailyPay"]) || 0;
         totalOvertimeHrs += this.moneyNumber(String(row["overtime"] || "").replace(/[^0-9.]/g, ""));
-        totalLateFine += this.moneyNumber(String(row["lateFine"] || "").replace(/[^0-9.]/g, ""));
-        totalWeeklyPay += this.labourWeeklyPayForRow(row).total;
+        totalLateFine += this.moneyNumber(String(row["lateFine"] || ""));
       }
       const typeBreakup = [...typeMap.entries()]
         .map(([type, v]) => `${type}: ${v.count}`)
         .join(", ");
-      const dailyPayBreakup = [...typeMap.entries()]
-        .map(([type, v]) => `${type}: ${formatMoney(v.amount)}`)
-        .join(", ");
-      const totalDailyAmount = [...typeMap.values()].reduce((sum, v) => sum + v.amount, 0);
+      const distinctValues = (field: string): string => {
+        const values = [...new Set(groupRows.map((row) => String(row[field] ?? "").trim()).filter(Boolean))];
+        return values.join(", ");
+      };
       groupedRows.push({
         ...first,
+        subcontractorName: distinctValues("subcontractorName"),
         labourTypes: typeBreakup || String(first["labourTypes"] || ""),
         staffCount: [...typeMap.values()].reduce((sum, v) => sum + v.count, 0),
-        dailyPayByType: dailyPayBreakup || formatMoney(0),
-        combinedDailyPay: formatMoney(totalDailyAmount),
-        overtimeLate: `${totalOvertimeHrs} overtime / ${formatMoney(totalLateFine)} late fine`,
-        weeklyPayByType: [...typeMap.entries()]
-          .map(([type, v]) => `${type}: ${formatMoney(v.amount)}`)
-          .join(", "),
-        weeklyPayTotal: formatMoney(totalWeeklyPay),
+        attendance: this.formatGroupedAttendance(groupRows),
+        // PDF keeps overtime hours but drops the late-fine amount. The
+        // wage custom fields flow through unchanged from the source row.
+        overtime: totalOvertimeHrs ? String(totalOvertimeHrs) : String(first["overtime"] || ""),
+        lateFine: "",
       });
+      // Suppress unused warnings while preserving the pre-existing
+      // behaviour for any caller still reading lateFine.
+      void totalLateFine;
     }
     return groupedRows;
   }
@@ -3674,7 +4151,6 @@ export class ProjectWorkspacePage {
 
   private labourSummaryHtml(rows: TableRow[]): string {
     const staffSummary = new Map<string, { present: number; absent: number; staff: number }>();
-    const wageSummary = new Map<string, { staff: number; payable: number }>();
     for (const row of rows) {
       const name = String(row["staffName"] || row["labourName"] || "Unnamed");
       const current = staffSummary.get(name) ?? { present: 0, absent: 0, staff: 0 };
@@ -3684,48 +4160,15 @@ export class ProjectWorkspacePage {
       const staffCount = this.moneyNumber(row["staffCount"]) || this.staffCountFromLabourTypes(String(row["labourTypes"] || ""));
       if (!isAbsent) current.staff += staffCount;
       staffSummary.set(name, current);
-
-      const precomputedBreakup = String(row["weeklyPayByType"] || "").trim();
-      if (precomputedBreakup && precomputedBreakup !== formatMoney(0)) {
-        for (const part of precomputedBreakup.split(",")) {
-          const match = part.trim().match(/^(.+?):\s*₹?([\d,]+(?:\.\d+)?)$/);
-          if (!match) continue;
-          const type = match[1].trim();
-          const amount = this.moneyNumber(match[2]);
-          const countMatch = String(row["labourTypes"] || "").match(new RegExp(`${type.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*(\\d+)`, "i"));
-          const count = countMatch ? Number(countMatch[1]) : 1;
-          const summary = wageSummary.get(type) ?? { staff: 0, payable: 0 };
-          summary.staff += count;
-          summary.payable += amount;
-          wageSummary.set(type, summary);
-        }
-      } else {
-        const weeklyPay = this.labourWeeklyPayForRow(row);
-        for (const item of weeklyPay.items) {
-          const summary = wageSummary.get(item.type) ?? { staff: 0, payable: 0 };
-          summary.staff += item.count;
-          summary.payable += item.amount;
-          wageSummary.set(item.type, summary);
-        }
-      }
     }
-    if (!staffSummary.size && !wageSummary.size) return "";
-    const combinedPayable = [...wageSummary.values()].reduce((sum, value) => sum + value.payable, 0);
-    const wageHtml = wageSummary.size
-      ? `<h2>Labour Wage Summary</h2>${[...wageSummary.entries()]
-          .map(
-            ([type, value]) =>
-              `<div><strong>${this.escapeHtml(type)}</strong><span>Staff units: ${value.staff}</span><span>Weekly pay: ${this.escapeHtml(formatMoney(value.payable))}</span></div>`,
-          )
-          .join("")}<div><strong>Combined Payable</strong><span>${this.escapeHtml(formatMoney(combinedPayable))}</span></div>`
-      : "";
+    if (!staffSummary.size) return "";
     const staffHtml = [...staffSummary.entries()]
       .map(
         ([name, value]) =>
           `<div><strong>${this.escapeHtml(name)}</strong><span>Present: ${value.present}</span><span>Absent: ${value.absent}</span><span>Staff: ${value.staff}</span></div>`,
       )
       .join("");
-    return `<section class="summary">${wageHtml}<h2>Attendance Summary</h2>${staffHtml}</section>`;
+    return `<section class="summary"><h2>Attendance Summary</h2>${staffHtml}</section>`;
   }
 
   private expenseSummaryHtml(rows: TableRow[]): string {

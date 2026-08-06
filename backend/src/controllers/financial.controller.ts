@@ -6,8 +6,10 @@ import * as expenseService from "../services/expense.service.js";
 import * as paymentService from "../services/payment.service.js";
 import * as vendorService from "../services/vendor.service.js";
 import * as subcontractorService from "../services/subcontractor.service.js";
+import * as subcontractorPaymentService from "../services/subcontractor-payment.service.js";
 import * as approvalService from "../services/approval.service.js";
 import * as inventoryService from "../services/inventory.service.js";
+import { recomputeProjectTotals } from "../services/financial.service.js";
 import { getScopedProjectIds } from "../middleware/rbac.js";
 import { User } from "../models/User.js";
 import { ActivityLog } from "../models/ActivityLog.js";
@@ -693,10 +695,7 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
     const scopeProjectIds = await getScopedProjectIds(req);
     const result = await subcontractorService.listSubcontractors({
       projectId: req.query.projectId as string | undefined,
-      siteId: req.query.siteId as string | undefined,
-      site: req.query.site as string | undefined,
-      approvalStatus: req.query.approvalStatus as string | undefined,
-      paymentStatus: req.query.paymentStatus as string | undefined,
+      status: req.query.status as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
       cursor: req.query.cursor as string | undefined,
@@ -731,11 +730,121 @@ export async function deleteSubcontractor(req: Request, res: Response, next: Nex
   } catch (e) { next(e); }
 }
 
-export async function getPendingSubcontractors(req: Request, res: Response, next: NextFunction) {
+// =================== SUBCONTRACTOR PAYMENTS ===================
+// The legacy embedded-payment endpoints (`POST /subcontractors/:id/payments`
+// and `DELETE /subcontractors/:id/payments/:paymentIndex`) were replaced
+// by the proper /subcontractor-payments CRUD endpoints below, which
+// store each payment as its own row in the SubcontractorPayment
+// collection.
+
+/**
+ * Lightweight subcontractor list for the mobile worker create page.
+ * Returns every active sub-contractor the supervisor has access to
+ * (universal — not filtered by site or project), so the worker create
+ * form can pick any one.
+ */
+export async function listSubcontractorsForWorker(req: Request, res: Response, next: NextFunction) {
   try {
     const scopeProjectIds = await getScopedProjectIds(req);
-    const subs = await subcontractorService.getPendingSubcontractors(scopeProjectIds);
-    res.json({ subcontractors: subs });
+    const items = await subcontractorService.listSubcontractorsForWorker({
+      scopeProjectIds,
+    });
+    res.json({ subcontractors: items });
+  } catch (e) { next(e); }
+}
+
+/**
+ * Spend rollup for the project workspace "total expense" line. Returns
+ * the sum of every SubcontractorPayment row for the given project (or
+ * the user's scoped projects, when no projectId is given).
+ */
+export async function getSubcontractorSpendRollup(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const rollup = await subcontractorPaymentService.subcontractorSpendRollup({
+      projectId: req.query.projectId as string | undefined,
+      scopeProjectIds,
+    });
+    res.json(rollup);
+  } catch (e) { next(e); }
+}
+
+// =================== SUBCONTRACTOR PAYMENTS ===================
+/**
+ * List sub-contractor payments. Always RBAC-scoped to the user's
+ * projects. Optional filters: subcontractorId, projectId, siteId,
+ * from, to.
+ */
+export async function listSubcontractorPayments(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const result = await subcontractorPaymentService.listSubcontractorPayments({
+      subcontractorId: req.query.subcontractorId as string | undefined,
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      from: req.query.from as string | undefined,
+      to: req.query.to as string | undefined,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 200,
+      cursor: req.query.cursor as string | undefined,
+      scopeProjectIds,
+    });
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function createSubcontractorPayment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const sub = await subcontractorPaymentService.createSubcontractorPayment(
+      req.body,
+      req.user?.sub,
+      scopeProjectIds
+    );
+    invalidateCachePrefix("/api/subcontractor-payments");
+    invalidateCachePrefix("/api/subcontractors");
+    invalidateCachePrefix("/api/dashboard/batch");
+    if (sub.projectId) await recomputeProjectTotals(new Types.ObjectId(sub.projectId));
+    res.status(201).json({ payment: sub });
+  } catch (e) { next(e); }
+}
+
+export async function updateSubcontractorPayment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const sub = await subcontractorPaymentService.updateSubcontractorPayment(
+      req.params.id,
+      req.body,
+      scopeProjectIds
+    );
+    invalidateCachePrefix("/api/subcontractor-payments");
+    invalidateCachePrefix("/api/subcontractors");
+    invalidateCachePrefix("/api/dashboard/batch");
+    if (sub.projectId) await recomputeProjectTotals(new Types.ObjectId(sub.projectId));
+    res.json({ payment: sub });
+  } catch (e) { next(e); }
+}
+
+export async function deleteSubcontractorPayment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const deleted = await subcontractorPaymentService.deleteSubcontractorPayment(req.params.id, scopeProjectIds);
+    invalidateCachePrefix("/api/subcontractor-payments");
+    invalidateCachePrefix("/api/subcontractors");
+    invalidateCachePrefix("/api/dashboard/batch");
+    if (deleted.projectId) await recomputeProjectTotals(new Types.ObjectId(deleted.projectId));
+    res.json({ success: true });
+  } catch (e) { next(e); }
+}
+
+export async function getSubcontractorPaymentSummary(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const summary = await subcontractorPaymentService.subcontractorPaymentSummary(
+      req.params.id,
+      scopeProjectIds
+    );
+    res.json(summary);
   } catch (e) { next(e); }
 }
 

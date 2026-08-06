@@ -31,6 +31,9 @@ export interface CursorPaginationOptions {
   page?: number;
   limit?: number;
   cursor?: string;
+  /** Override the default page-size cap (25). The subcontractor roster
+   *  requests up to 500 rows in one page. */
+  maxLimit?: number;
 }
 
 export interface CursorPaginationResult<T> {
@@ -82,7 +85,7 @@ export async function paginateByCursor<T>(
   maxTimeMS = 60_000
 ): Promise<CursorPaginationResult<T>> {
   const page = Math.max(Number(opts.page) || 1, 1);
-  const limit = Math.min(Math.max(Number(opts.limit) || 25, 1), 25);
+  const limit = Math.min(Math.max(Number(opts.limit) || 25, 1), opts.maxLimit ?? 25);
   const skip = opts.cursor ? 0 : (page - 1) * limit;
 
   applyCursor(query, opts.cursor);

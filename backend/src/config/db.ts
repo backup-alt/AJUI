@@ -6,16 +6,27 @@ export async function connectDatabase(): Promise<void> {
     mongoose.set("strictQuery", true);
 
     await mongoose.connect(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 15000,
+      // Atlas M0 free tier routinely drops idle TCP connections and
+      // takes 5–10s to re-handshake the TLS tunnel on the next request.
+      // The previous 15s window was too tight — requests fired right
+      // after an idle drop would fail with ETIMEDOUT before the driver
+      // could rediscover the cluster. Bump the timeout + keep a warm
+      // pool of two connections so we never start from zero.
+      serverSelectionTimeoutMS: 30_000,
+      connectTimeoutMS: 20_000,
+      socketTimeoutMS: 60_000,
       maxPoolSize: 10,
-      minPoolSize: 1,
+      minPoolSize: 2,
       maxConnecting: 3,
-      socketTimeoutMS: 45000,
-      heartbeatFrequencyMS: 10000,
-      waitQueueTimeoutMS: 30000,
-      maxIdleTimeMS: 45000,
+      heartbeatFrequencyMS: 10_000,
+      waitQueueTimeoutMS: 30_000,
+      maxIdleTimeMS: 30_000,
       retryWrites: true,
       retryReads: true,
+      // Force the driver to consider both primary and secondary shards
+      // (M0 has a 3-node replica set; we want quick failover rather than
+      // pinning to whichever shard was selected at boot).
+      readPreference: "primaryPreferred",
     });
 
     console.log(

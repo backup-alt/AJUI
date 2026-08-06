@@ -28,6 +28,7 @@ export interface DashboardKPIs {
     totalMaterialSpend: number;
     totalLabourPayable: number;
     totalExpenseReceived: number;
+    totalSubcontractorSpend: number;
     outstandingSubcontractValue: number;
   };
   recentActivity: {
@@ -106,6 +107,7 @@ export async function getDashboardKPIs(scopeProjectIds: ProjectScopeIds = null):
           materialSpend: { $sum: "$materialSpend" },
           labourPayable: { $sum: "$labourPayable" },
           expenseReceived: { $sum: "$totalExpenseReceived" },
+          subcontractorSpend: { $sum: "$subcontractorSpend" },
         },
       },
     ]),
@@ -130,6 +132,7 @@ export async function getDashboardKPIs(scopeProjectIds: ProjectScopeIds = null):
     materialSpend: 0,
     labourPayable: 0,
     expenseReceived: 0,
+    subcontractorSpend: 0,
   };
 
   const sub = subAgg[0] || { outstanding: 0 };
@@ -150,6 +153,7 @@ export async function getDashboardKPIs(scopeProjectIds: ProjectScopeIds = null):
       totalMaterialSpend: fin.materialSpend,
       totalLabourPayable: fin.labourPayable,
       totalExpenseReceived: fin.expenseReceived,
+      totalSubcontractorSpend: fin.subcontractorSpend,
       outstandingSubcontractValue: sub.outstanding,
     },
     recentActivity: {

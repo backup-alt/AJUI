@@ -21,6 +21,7 @@ export interface IProject extends Document {
   advanceAmount: number;
   receivedAmount: number;
   totalExpenseReceived: number;
+  subcontractorSpend: number;
   pendingBalance: number;
   materialSpend: number;
   labourPayable: number;
@@ -55,6 +56,7 @@ const projectSchema = new Schema<IProject>(
     advanceAmount: { type: Number, default: 0 },
     receivedAmount: { type: Number, default: 0 },
     totalExpenseReceived: { type: Number, default: 0 },
+    subcontractorSpend: { type: Number, default: 0 },
     pendingBalance: { type: Number, default: 0 },
     materialSpend: { type: Number, default: 0 },
     labourPayable: { type: Number, default: 0 },

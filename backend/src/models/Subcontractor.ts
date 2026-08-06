@@ -1,29 +1,25 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-export type ApprovalStatus = "Pending" | "Approved" | "Rejected";
-export type PaymentSubStatus = "Not Started" | "Part Paid" | "Paid";
-
+/**
+ * A sub-contractor. Stores the sub-contractor's profile only — every
+ * payment made to them lives in the SubcontractorPayment collection
+ * (shared with the project workspace). The "Total Paid" displayed in
+ * the UI is computed by summing that collection.
+ */
 export interface ISubcontractor extends Document {
   _id: Types.ObjectId;
-  subcontractId: string;
   projectId: Types.ObjectId;
   projectName: string;
   clientId: Types.ObjectId;
-  siteId?: Types.ObjectId;
-  site: string;
   subcontractorName: string;
-  workPackage: string;
-  contractValue: number;
-  advancePaid: number;
-  balance: number;
-  startDate: string;
-  dueDate: string;
-  supervisor: string;
-  supervisorId?: Types.ObjectId;
-  approvalStatus: ApprovalStatus;
-  paymentStatus: PaymentSubStatus;
-  approvedBy?: string;
-  approvedAt?: Date;
+  description: string;
+  employeeCount?: number;
+  note?: string;
+  // The four fields the admin types into the create form:
+  address?: string;
+  phone?: string;
+  status: "active" | "inactive";
+  createdBy?: Types.ObjectId;
   customFields?: Record<string, string | number | boolean | null>;
   createdAt: Date;
   updatedAt: Date;
@@ -31,42 +27,25 @@ export interface ISubcontractor extends Document {
 
 const subcontractorSchema = new Schema<ISubcontractor>(
   {
-    subcontractId: { type: String, required: true, unique: true, index: true },
-    projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
-    projectName: { type: String, required: true },
-    clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true },
-    siteId: { type: Schema.Types.ObjectId, ref: "Site" },
-    site: { type: String, required: true },
+    projectId: { type: Schema.Types.ObjectId, ref: "Project", index: true },
+    projectName: { type: String },
+    clientId: { type: Schema.Types.ObjectId, ref: "Project" },
     subcontractorName: { type: String, required: true, trim: true, index: true },
-    workPackage: { type: String, required: true, trim: true },
-    contractValue: { type: Number, required: true },
-    advancePaid: { type: Number, default: 0 },
-    balance: { type: Number, default: 0 },
-    startDate: { type: String, required: true },
-    dueDate: { type: String, required: true },
-    supervisor: { type: String, required: true },
-    supervisorId: { type: Schema.Types.ObjectId, ref: "Supervisor" },
-    approvalStatus: {
+    description: { type: String, default: "", trim: true },
+    employeeCount: { type: Number },
+    note: { type: String, default: "" },
+    address: { type: String, default: "" },
+    phone: { type: String, default: "" },
+    status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected"],
-      default: "Pending",
+      enum: ["active", "inactive"],
+      default: "active",
       index: true,
     },
-    paymentStatus: {
-      type: String,
-      enum: ["Not Started", "Part Paid", "Paid"],
-      default: "Not Started",
-    },
-    approvedBy: { type: String },
-    approvedAt: { type: Date },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
     customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );
-
-subcontractorSchema.pre("save", function (next) {
-  this.balance = Math.max(0, this.contractValue - this.advancePaid);
-  next();
-});
 
 export const Subcontractor = model<ISubcontractor>("Subcontractor", subcontractorSchema);

@@ -24,6 +24,8 @@ export interface IInventory extends Document {
   poNumber?: string;
   lastMaterialId?: Types.ObjectId;
   lastUpdatedBy?: string;
+  /** Free-text note attached to the most recent addition of this material at this site. */
+  notes?: string;
   billUrl?: string;
   pcloudFileId?: string;
   pcloudPublicCode?: string;
@@ -39,6 +41,8 @@ export interface IInventory extends Document {
     date: Date;
     poNumber?: string;
     materialId?: Types.ObjectId;
+    /** Free-text note attached when this purchase entry was recorded (e.g. supervisor's "Add existing material" note). */
+    notes?: string;
   }>;
   consumptionHistory?: Array<{
     quantity: number;
@@ -74,6 +78,7 @@ const inventorySchema = new Schema<IInventory>(
     poNumber: { type: String, trim: true },
     lastMaterialId: { type: Schema.Types.ObjectId, ref: "Material" },
     lastUpdatedBy: { type: String },
+    notes: { type: String, trim: true, maxlength: 2000 },
     billUrl: { type: String },
     pcloudFileId: { type: String, trim: true, index: true },
     pcloudPublicCode: { type: String, trim: true },
@@ -90,6 +95,7 @@ const inventorySchema = new Schema<IInventory>(
         date: { type: Date, default: Date.now },
         poNumber: { type: String, trim: true },
         materialId: { type: Schema.Types.ObjectId, ref: "Material" },
+        notes: { type: String, trim: true, maxlength: 2000 },
       }],
       default: undefined,
     },

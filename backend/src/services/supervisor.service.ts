@@ -153,6 +153,37 @@ export async function getSupervisorById(id: string, scopeProjectIds?: ProjectSco
   return supervisor;
 }
 
+/**
+ * Lightweight supervisor list — `{ _id, name, phone, email, supervisorId }`
+ * per row. Used by the mobile worker create page so a supervisor can
+ * be picked for directly-hired (non-subcontract) workers. Scoped to
+ * the calling supervisor's accessible projects so a site-A supervisor
+ * cannot pick a site-B supervisor.
+ *
+ * Note: Supervisor.status is the capitalized enum
+ *   ["Active", "On Leave", "Inactive"] — distinct from Subcontractor's
+ * lowercase "active"/"inactive" enum. Match the exact case.
+ */
+export async function listSupervisorsForWorker(filter: {
+  scopeProjectIds?: ProjectScopeIds;
+} = {}) {
+  const query: Record<string, unknown> = { status: "Active" };
+  applyProjectScope(query, "assignedProjects", filter.scopeProjectIds);
+
+  const items = await Supervisor.find(query)
+    .select("_id name phone email supervisorId assignedProjects")
+    .sort({ name: 1 })
+    .lean();
+  return items.map((s) => ({
+    _id: String(s._id),
+    name: s.name,
+    phone: s.phone || "",
+    email: s.email || "",
+    supervisorId: s.supervisorId || "",
+    projectId: s.assignedProjects?.length ? String(s.assignedProjects[0]) : "",
+  }));
+}
+
 export async function updateSupervisor(id: string, patch: UpdateSupervisorInput, scopeProjectIds?: ProjectScopeIds) {
   await getSupervisorById(id, scopeProjectIds);
   const updateData: Record<string, unknown> = { ...patch };

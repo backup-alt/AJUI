@@ -148,6 +148,12 @@ export class MaterialsService {
     quantity: row.approved ?? row.quantity ?? row.remainingStock ?? Math.max(0, (row.purchasedQuantity ?? row.purchased ?? 0) - (row.consumedQuantity ?? row.consumed ?? 0)),
     vendor: row.vendor,
     poNumber: row.poNumber,
+    // notes may be empty on legacy rows; the supervisor's "Add existing
+    // material" note (when the row was synced from the inventory) lands
+    // here as well as in the latest purchaseHistory entry.
+    notes: row.notes || (Array.isArray(row.purchaseHistory) && row.purchaseHistory.length
+      ? (row.purchaseHistory[row.purchaseHistory.length - 1]?.notes || "")
+      : "") || "",
     status: row.status,
     requestDate: row.requestDate,
     purchasedDate: row.purchasedDate,

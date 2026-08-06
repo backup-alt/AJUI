@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Types } from "mongoose";
 import * as authService from "../services/auth.service.js";
 import { requireAuth } from "../middleware/auth.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireRole, invalidateAccessCache } from "../middleware/rbac.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { AccessTemplate } from "../models/AccessTemplate.js";
 import { AccessSchedule } from "../models/AccessSchedule.js";
@@ -264,6 +264,50 @@ export async function getUserRequestPermissions(req: Request, res: Response, nex
       canApprovePayment: user.requestPermissions?.canApprovePayment ?? false,
       canManageWorkers: user.requestPermissions?.canManageWorkers ?? false,
       canViewReports: user.requestPermissions?.canViewReports ?? false,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Update a non-admin user's `managedProjectIds` (project managers and
+ * accountants). Admins always have empty `managedProjectIds` — assigning
+ * projects to them is a no-op.
+ *
+ * Also invalidates the in-process `userScopeCache` so the new scope
+ * takes effect on the user's very next request (no 60s wait).
+ */
+export async function saveUserManagedProjects(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.params.id;
+    if (!Types.ObjectId.isValid(userId)) throw new AppError(400, "Invalid user id");
+
+    const body = z
+      .object({
+        managedProjectIds: z.array(z.string().refine((id) => Types.ObjectId.isValid(id), "Invalid project id")),
+      })
+      .parse(req.body);
+
+    const user = await User.findById(userId);
+    if (!user) throw new AppError(404, "User not found");
+    if (user.role === "admin") {
+      throw new AppError(400, "Admins have access to every project and cannot be scoped.");
+    }
+
+    const newIds = body.managedProjectIds.map((id) => new Types.ObjectId(id));
+    user.managedProjectIds = newIds as Types.ObjectId[];
+    await user.save();
+
+    // Bust the rbac cache so the next request from this user sees the
+    // new scope immediately rather than waiting for the 60s TTL.
+    invalidateAccessCache(userId);
+
+    res.json({
+      employee: {
+        _id: user._id.toString(),
+        managedProjectIds: (user.managedProjectIds || []).map((id: Types.ObjectId) => id.toString()),
+      },
     });
   } catch (err) {
     next(err);

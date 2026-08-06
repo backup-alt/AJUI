@@ -25,6 +25,10 @@ import {
   createSubcontractorSchema,
   updateSubcontractorSchema,
   listSubcontractorsSchema,
+  addSubcontractorPaymentSchema,
+  createSubcontractorPaymentSchema,
+  updateSubcontractorPaymentSchema,
+  listSubcontractorPaymentsSchema,
   listApprovalsSchema,
   listInventorySchema,
   missingMaterialsForSiteSchema,
@@ -142,10 +146,41 @@ router.post(
   ctrl.createSubcontractor
 );
 router.get("/subcontractors", validate(listSubcontractorsSchema, "query"), cache(20), ctrl.listSubcontractors);
-router.get("/subcontractors/pending", requireRole("admin", "project_manager"), cache(10), ctrl.getPendingSubcontractors);
+router.get("/subcontractors/for-worker", cache(20), ctrl.listSubcontractorsForWorker);
+router.get("/subcontractors/spend-rollup", cache(10), ctrl.getSubcontractorSpendRollup);
 router.get("/subcontractors/:id", cache(30), ctrl.getSubcontractor);
 router.patch("/subcontractors/:id", validate(updateSubcontractorSchema), ctrl.updateSubcontractor);
 router.delete("/subcontractors/:id", requireRole("admin", "project_manager"), ctrl.deleteSubcontractor);
+
+// =================== SUBCONTRACTOR PAYMENTS ===================
+router.get(
+  "/subcontractor-payments",
+  validate(listSubcontractorPaymentsSchema, "query"),
+  cache(10),
+  ctrl.listSubcontractorPayments
+);
+router.get(
+  "/subcontractor-payments/summary/:id",
+  cache(10),
+  ctrl.getSubcontractorPaymentSummary
+);
+router.post(
+  "/subcontractor-payments",
+  validate(createSubcontractorPaymentSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.createSubcontractorPayment
+);
+router.patch(
+  "/subcontractor-payments/:id",
+  validate(updateSubcontractorPaymentSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.updateSubcontractorPayment
+);
+router.delete(
+  "/subcontractor-payments/:id",
+  requireRole("admin", "project_manager"),
+  ctrl.deleteSubcontractorPayment
+);
 
 // =================== APPROVALS ===================
 router.get("/approvals", validate(listApprovalsSchema, "query"), cache(10), ctrl.listApprovals);

@@ -107,15 +107,20 @@ export interface CreateWorkerRequest {
   name: string;
   address?: string;
   labourType: string;
-  weeklyPay: number;
+  // Wage field is no longer set from the mobile create form — the web
+  // admin tracks per-project wage via custom fields. Keep the property
+  // optional for backwards compatibility.
+  weeklyPay?: number;
   isSubcontract?: boolean;
   subcontractorId?: string;
   subcontractorName?: string;
 }
 
 export interface Subcontractor {
-  subcontractorId: string;
+  _id: string;
   subcontractorName: string;
+  site?: string;
+  projectId?: string;
 }
 
 // =================== ATTENDANCE ===================
@@ -149,9 +154,15 @@ export interface MarkAttendanceRequest {
   attendanceDate: string;
   shiftCount: number;
   overtimeHours: number;
-  overtimeAmount: number;
-  lateFine: number;
-  paymentMode: PaymentMode;
+  // Overtime amount and late fine are no longer collected from the
+  // supervisor's mobile form (per the latest spec). They're still on
+  // the Attendance type for legacy reads from the backend.
+  overtimeAmount?: number;
+  lateFine?: number;
+  // Payment mode was also dropped from the supervisor form — it now
+  // lives only in the admin-side Payment / Vendor flow. Marked
+  // optional so legacy clients don't break.
+  paymentMode?: PaymentMode;
   notes?: string;
 }
 

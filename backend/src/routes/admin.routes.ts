@@ -11,6 +11,7 @@ router.use(requireRole("admin"));
 
 router.get("/users", adminCtrl.listAllUsers);
 router.get("/users/:id", adminCtrl.getUserById);
+router.put("/users/:id/managed-projects", adminCtrl.saveUserManagedProjects);
 router.get("/users/:id/request-permissions", adminCtrl.getUserRequestPermissions);
 router.put("/users/:id/request-permissions", adminCtrl.saveUserRequestPermissions);
 router.get("/users/:id/activity", adminCtrl.getEmployeeActivity);

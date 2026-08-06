@@ -954,7 +954,17 @@ export class InventoryPage implements OnInit, OnDestroy {
       component: InventoryRequestModalComponent,
       componentProps: {
         mode: 'existing',
-        materialCatalog: this.items().map((item) => ({ name: item.name, unit: item.unit })),
+        // Build the autofill catalog from the current inventory items:
+        // unit / vendor / poNumber / minimumQuantity / remainingStock
+        // are derived from the most-recent stock entry per material name.
+        materialCatalog: this.items().map((item) => ({
+          name: item.name,
+          unit: item.unit,
+          vendor: item.vendor || undefined,
+          poNumber: item.poNumber || undefined,
+          minimumQuantity: item.minimumQuantity ?? null,
+          remainingStock: item.currentQuantity ?? null,
+        })),
       },
     });
     await modal.present();

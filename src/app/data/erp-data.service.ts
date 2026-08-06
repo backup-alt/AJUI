@@ -68,16 +68,14 @@ export type Supervisor = {
 export type Subcontractor = {
   id: string;
   projectId: string;
-  site: string;
-  name: string;
-  workPackage: string;
-  contractValue: number;
-  advancePaid: number;
-  startDate: string;
-  dueDate: string;
-  supervisor: string;
-  approvalStatus: "Pending" | "Approved" | "Rejected";
-  paymentStatus: "Not Started" | "Part Paid" | "Paid";
+  projectName: string;
+  subcontractorName: string;
+  description: string;
+  employeeCount?: number;
+  note: string;
+  address: string;
+  phone: string;
+  status: "active" | "inactive";
   _id?: string;
   customFields?: Record<string, string | number | boolean | null>;
 };
@@ -1160,6 +1158,10 @@ export class ErpDataService {
 
   resetCustomFieldsLoaded(): void {
     this.customFieldsLoaded = false;
+    // The frontend CustomFieldsService caches per-(entityType, entityId)
+    // Observables; clear it on full cache invalidation so the next page
+    // load pulls fresh data instead of replaying stale responses.
+    (this.customFieldsService as unknown as { clearCache?: () => void }).clearCache?.();
   }
 
   async loadCustomFieldsFromBackend(): Promise<void> {
@@ -1191,28 +1193,35 @@ export class ErpDataService {
     const merged: Record<SharedModuleKey, SharedTableField[]> = { ...this.customTableFields() };
     const backendLoaded: Record<SharedModuleKey, boolean> = {} as Record<SharedModuleKey, boolean>;
 
+    // Collect every (entityType, siteId) pair up front so we can collapse
+    // the (entityType × N_sites) call storm into one HTTP roundtrip per
+    // entityType via the bulk /custom-fields/list endpoint.
+    const siteIds = siteEntities
+      .map((site) => String(site._id || site.id || site.siteId || "").trim())
+      .filter((id) => id);
+
+    if (!siteIds.length) return;
+
     const promises = modules.map(async (module) => {
       const entityType = this.entityTypeForModule(module) as CustomFieldEntityType;
       const allFields = new Map<string, SharedTableField>();
 
-      for (const site of siteEntities) {
-        const entityId = site._id;
-        if (!entityId) continue;
-        try {
-          const result = await new Promise<{ fields: ApiCustomField[] }>((resolve, reject) => {
-            this.customFieldsService
-              .list(entityType, entityId)
-              .subscribe({ next: resolve, error: reject });
-          });
-          for (const f of result.fields) {
+      try {
+        const result = await new Promise<{ grouped: Record<string, ApiCustomField[]> }>((resolve, reject) => {
+          this.customFieldsService
+            .listBulk(entityType, siteIds)
+            .subscribe({ next: resolve, error: reject });
+        });
+        for (const fields of Object.values(result.grouped || {})) {
+          for (const f of fields) {
             if (!allFields.has(f.key)) {
               allFields.set(f.key, { key: f.key, label: f.label });
             }
           }
-          backendLoaded[module] = true;
-        } catch {
-          // silently skip — site may not have fields for this entityType
         }
+        backendLoaded[module] = true;
+      } catch {
+        // silently skip — site may not have fields for this entityType
       }
 
       if (backendLoaded[module]) {

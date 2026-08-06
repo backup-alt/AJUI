@@ -76,6 +76,9 @@ router.get("/supervisor/labour-types", cache(30), ctrl.getLabourTypeCounts);
 // Subcontractors
 router.get("/supervisor/subcontractors", cache(30), ctrl.listSubcontractors);
 
+// Supervisors (mobile)
+router.get("/supervisor/supervisors", cache(30), ctrl.listSupervisorsForWorker);
+
 // Expenses
 router.get("/supervisor/expenses", cache(15), ctrl.listExpenses);
 router.get("/supervisor/expenses/:id", cache(30), ctrl.getExpense);

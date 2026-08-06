@@ -51,6 +51,16 @@ export function requireRole(...allowedRoles: UserRole[]) {
   };
 }
 
+/**
+ * Drop a single user's entry from the process-level scope cache. Call
+ * this whenever `User.managedProjectIds` changes (admin re-assigning
+ * projects to a PM, etc.) so the user sees their new scope on the very
+ * next request instead of waiting for the 60s TTL to expire.
+ */
+export function invalidateAccessCache(userId: string): void {
+  userScopeCache.delete(String(userId));
+}
+
 export function requireAdmin(req: Request, _res: Response, next: NextFunction): void {
   if (!req.user?.sub) {
     next(new AppError(401, "Not authenticated"));

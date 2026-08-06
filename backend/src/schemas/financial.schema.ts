@@ -240,37 +240,81 @@ export const listVendorsSchema = z.object({
 export const createSubcontractorSchema = z.object({
   body: z.object({
     projectId: objectIdSchema,
-    siteId: objectIdSchema.optional(),
-    site: z.string().trim().min(1).max(200),
     subcontractorName: z.string().trim().min(1).max(200),
-    workPackage: z.string().trim().min(1).max(200),
-    contractValue: z.coerce.number().nonnegative(),
-    advancePaid: z.coerce.number().nonnegative().default(0),
-    startDate: z.string().min(1),
-    dueDate: z.string().min(1),
-    supervisor: z.string().trim().min(1),
-    supervisorId: objectIdSchema.optional(),
+    description: z.string().trim().max(500).optional().default(""),
+    employeeCount: z.coerce.number().int().nonnegative().optional(),
+    note: z.string().trim().max(1000).optional().default(""),
+    address: z.string().trim().max(500).optional().default(""),
+    phone: z.string().trim().max(40).optional().default(""),
+    status: z.enum(["active", "inactive"]).optional().default("active"),
+    payments: z
+      .array(
+        z.object({
+          amount: z.coerce.number().nonnegative(),
+          date: z.string().min(1),
+          note: z.string().trim().max(500).optional(),
+        })
+      )
+      .optional(),
   }),
 });
 
 export const updateSubcontractorSchema = z.object({
   body: createSubcontractorSchema.shape.body.partial().extend({
-    approvalStatus: z.enum(["Pending", "Approved", "Rejected"]).optional(),
-    paymentStatus: z.enum(["Not Started", "Part Paid", "Paid"]).optional(),
     customFields: z.record(z.unknown()).optional(),
   }),
   params: z.object({ id: objectIdSchema }),
 });
 
+export const addSubcontractorPaymentSchema = z.object({
+  body: z.object({
+    amount: z.coerce.number().positive(),
+    date: z.string().min(1),
+    note: z.string().trim().max(500).optional(),
+  }),
+  params: z.object({ id: objectIdSchema }),
+});
+
+export const createSubcontractorPaymentSchema = z.object({
+  body: z.object({
+    subcontractorId: objectIdSchema,
+    projectId: objectIdSchema,
+    siteId: objectIdSchema,
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
+    description: z.string().trim().min(1).max(500),
+    employeeCount: z.coerce.number().int().min(1),
+    amount: z.coerce.number().positive(),
+    notes: z.string().trim().max(1000).optional(),
+  }),
+});
+
+export const updateSubcontractorPaymentSchema = z.object({
+  body: createSubcontractorPaymentSchema.shape.body.partial().extend({
+    // Allow clearing the site by sending an empty string.
+    siteId: z.union([objectIdSchema, z.literal("")]).optional(),
+  }),
+  params: z.object({ id: objectIdSchema }),
+});
+
+export const listSubcontractorPaymentsSchema = z.object({
+  query: z.object({
+    subcontractorId: objectIdSchema.optional(),
+    projectId: objectIdSchema.optional(),
+    siteId: objectIdSchema.optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(500).default(200),
+    cursor: z.string().optional(),
+  }),
+});
+
 export const listSubcontractorsSchema = z.object({
   query: z.object({
     projectId: objectIdSchema.optional(),
-    siteId: objectIdSchema.optional(),
-    site: z.string().trim().optional(),
-    approvalStatus: z.enum(["Pending", "Approved", "Rejected"]).optional(),
-    paymentStatus: z.enum(["Not Started", "Part Paid", "Paid"]).optional(),
+    status: z.enum(["active", "inactive"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(200).default(200),
+    limit: z.coerce.number().int().min(1).max(500).default(200),
     cursor: z.string().optional(),
   }),
 });

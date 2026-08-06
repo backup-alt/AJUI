@@ -48,6 +48,16 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: "subcontractors",
+    loadComponent: () => import("./pages/subcontractor-dashboard.page").then((m) => m.SubcontractorDashboardPage),
+    canActivate: [authGuard],
+  },
+  {
+    path: "subcontractors/:id",
+    loadComponent: () => import("./pages/subcontractor-details.page").then((m) => m.SubcontractorDetailsPage),
+    canActivate: [authGuard],
+  },
+  {
     path: "quotations",
     loadComponent: () => import("./pages/quotation.page").then((m) => m.QuotationPage),
     canActivate: [authGuard],

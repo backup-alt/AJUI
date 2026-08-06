@@ -20,10 +20,12 @@ export async function createWorker(input: {
   name: string;
   address?: string;
   labourType: string;
-  weeklyPay: number;
+  weeklyPay?: number;
   isSubcontract: boolean;
   subcontractorId?: string;
   subcontractorName?: string;
+  supervisorId?: string;
+  supervisorName?: string;
   createdBy: string;
 }) {
   const { Project } = await import("../models/Project.js");
@@ -32,14 +34,41 @@ export async function createWorker(input: {
 
   let subcontractorObjectId: Types.ObjectId | undefined;
   if (input.isSubcontract && input.subcontractorId) {
+    // The mobile worker-create form sends the subcontractor's Mongo `_id`
+    // (24-char ObjectId). The legacy `subcontractId` field was removed
+    // from the Subcontractor model, so we look up by `_id` and verify
+    // the subcontractor actually lives under the selected project.
+    if (!Types.ObjectId.isValid(input.subcontractorId)) {
+      throw new AppError(400, "Invalid subcontractor id");
+    }
     const sub = await Subcontractor.findOne({
-      subcontractId: input.subcontractorId,
+      _id: new Types.ObjectId(input.subcontractorId),
       projectId: project._id,
     })
       .select("_id")
       .lean();
     if (!sub) throw new AppError(404, "Subcontractor not found for this project");
     subcontractorObjectId = sub._id;
+  }
+
+  let supervisorObjectId: Types.ObjectId | undefined;
+  if (!input.isSubcontract && input.supervisorId) {
+    // Directly-hired workers: look up the supervisor by `_id` and
+    // verify they are active and assigned to this project (so a
+    // supervisor at site A can't be assigned to a worker at site B).
+    if (!Types.ObjectId.isValid(input.supervisorId)) {
+      throw new AppError(400, "Invalid supervisor id");
+    }
+    const { Supervisor } = await import("../models/Supervisor.js");
+    const sup = await Supervisor.findOne({
+      _id: new Types.ObjectId(input.supervisorId),
+      status: "Active",
+      assignedProjects: project._id,
+    })
+      .select("_id")
+      .lean();
+    if (!sup) throw new AppError(404, "Supervisor not found for this project");
+    supervisorObjectId = sup._id;
   }
 
   const workerId = await generateId("WRK");
@@ -53,10 +82,14 @@ export async function createWorker(input: {
     name: input.name,
     address: input.address,
     labourType: input.labourType,
-    weeklyPay: input.weeklyPay,
+    // weeklyPay is optional on the supervisor mobile create form —
+    // admin-side custom fields drive the per-project wage.
+    ...(input.weeklyPay !== undefined ? { weeklyPay: input.weeklyPay } : {}),
     isSubcontract: input.isSubcontract,
     subcontractorId: subcontractorObjectId,
     subcontractorName: input.subcontractorName,
+    supervisorId: supervisorObjectId,
+    supervisorName: input.supervisorName,
     createdBy: input.createdBy,
   });
 
@@ -260,32 +293,6 @@ export async function deleteAttendance(id: string) {
   }
   const result = await Attendance.deleteOne({ _id: id });
   if (result.deletedCount === 0) throw new AppError(404, "Attendance record not found");
-}
-
-export async function listSubcontractors(projectId: string, siteId?: string) {
-  if (!Types.ObjectId.isValid(projectId)) {
-    throw new AppError(400, "Invalid project id");
-  }
-  const query: Record<string, unknown> = {
-    projectId: new Types.ObjectId(projectId),
-  };
-  if (siteId && Types.ObjectId.isValid(siteId)) {
-    query.$or = [
-      { siteId: new Types.ObjectId(siteId) },
-      { siteId: { $exists: false } },
-      { siteId: null },
-    ];
-  }
-
-  const subs = await Subcontractor.find(query)
-    .select("subcontractId subcontractorName")
-    .sort({ subcontractorName: 1 })
-    .lean();
-
-  return subs.map((s) => ({
-    subcontractorId: s.subcontractId,
-    subcontractorName: s.subcontractorName,
-  }));
 }
 
 export async function getLabourTypeCounts(siteId: string | undefined, date: string) {

@@ -28,8 +28,7 @@ import { addIcons } from 'ionicons';
 import { locationOutline, peopleOutline, checkmarkCircleOutline, timeOutline, alertCircleOutline } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { Worker, LabourPaymentMode } from '../../../shared/models';
-import { CurrencyPipe } from '@angular/common';
+import { Worker } from '../../../shared/models';
 
 @Component({
   selector: 'app-labour-mark-attendance',
@@ -56,7 +55,6 @@ import { CurrencyPipe } from '@angular/common';
     IonRefresher,
     IonRefresherContent,
     FormsModule,
-    CurrencyPipe,
   ],
   template: `
     <ion-header>
@@ -88,10 +86,6 @@ import { CurrencyPipe } from '@angular/common';
             <div class="worker-info">
               <span class="worker-name">{{ worker()!.name }}</span>
               <span class="worker-type">{{ worker()!.labourType }}</span>
-            </div>
-            <div class="worker-pay">
-              <span class="pay-label">Daily Pay</span>
-              <span class="pay-value">{{ worker()!.weeklyPay | currency:'INR':'symbol':'1.0-0' }}<span class="pay-suffix">/day</span></span>
             </div>
           </div>
         }
@@ -129,50 +123,14 @@ import { CurrencyPipe } from '@angular/common';
             </ion-segment>
           </ion-item>
 
-          <div class="form-row">
-            <ion-item class="form-item form-item-half">
-              <ion-label position="stacked">Overtime Hours</ion-label>
-              <ion-input
-                type="number"
-                placeholder="0"
-                [(ngModel)]="overtimeHours"
-                [clearInput]="true"
-              ></ion-input>
-            </ion-item>
-
-            <ion-item class="form-item form-item-half">
-              <ion-label position="stacked">Overtime Amount (INR)</ion-label>
-              <ion-input
-                type="number"
-                placeholder="0"
-                [(ngModel)]="overtimeAmount"
-                [clearInput]="true"
-              ></ion-input>
-            </ion-item>
-          </div>
-
           <ion-item class="form-item">
-            <ion-label position="stacked">Late Fine (INR)</ion-label>
+            <ion-label position="stacked">Overtime Hours</ion-label>
             <ion-input
               type="number"
               placeholder="0"
-              [(ngModel)]="lateFine"
+              [(ngModel)]="overtimeHours"
               [clearInput]="true"
             ></ion-input>
-          </ion-item>
-
-          <ion-item class="form-item">
-            <ion-label position="stacked">Payment Mode</ion-label>
-            <ion-select
-              placeholder="Select"
-              [(ngModel)]="paymentMode"
-              interface="popover"
-            >
-              <ion-select-option value="Cash">Cash</ion-select-option>
-              <ion-select-option value="NEFT">NEFT</ion-select-option>
-              <ion-select-option value="UPI">UPI</ion-select-option>
-              <ion-select-option value="Cheque">Cheque</ion-select-option>
-            </ion-select>
           </ion-item>
 
           <ion-item class="form-item form-item-last">
@@ -297,9 +255,6 @@ export class LabourMarkAttendancePage implements OnInit {
   todayDate = new Date().toISOString().slice(0, 10);
   shiftCount = 1;
   overtimeHours = 0;
-  overtimeAmount = 0;
-  lateFine = 0;
-  paymentMode: LabourPaymentMode = 'Cash';
   notes = '';
 
   isSubmitting = signal(false);
@@ -410,9 +365,6 @@ export class LabourMarkAttendancePage implements OnInit {
       attendanceDate: this.attendanceDate,
       shiftCount: Number(this.shiftCount),
       overtimeHours: Number(this.overtimeHours),
-      overtimeAmount: Number(this.overtimeAmount),
-      lateFine: Number(this.lateFine),
-      paymentMode: this.paymentMode,
       notes: this.notes || undefined,
     };
 

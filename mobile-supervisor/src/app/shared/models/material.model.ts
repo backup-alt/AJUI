@@ -40,6 +40,7 @@ export interface PurchaseHistoryEntry {
   vendor: string;
   quantity: number;
   date: string;
+  notes?: string;
 }
 
 export interface CustomField {

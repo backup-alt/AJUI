@@ -5,3 +5,5 @@ export type { StatusTone } from './status-pill.component';
 export { SiteBannerComponent } from './site-banner.component';
 export { StatCardComponent } from './stat-card.component';
 export { OtpInputComponent } from './otp-input.component';
+export { MaterialAutocompleteComponent } from './material-autocomplete.component';
+export type { MaterialAutocompleteMatch } from './material-autocomplete.component';

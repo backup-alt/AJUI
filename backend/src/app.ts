@@ -283,6 +283,24 @@ export async function bootstrap(): Promise<void> {
   } catch (err) {
     console.warn("[Bootstrap] ensureWorkersCollection failed (non-fatal):", (err as Error).message);
   }
+
+  // Migrate the legacy `subcontractId_1` (unique) index off the
+  // Subcontractor collection. Older builds declared a `subcontractId`
+  // string field with `unique: true`, but the new model no longer
+  // emits that field — the index now collides on every insert because
+  // it sees `null`. Drop it once on startup so inserts work.
+  try {
+    const { Subcontractor } = await import("./models/Subcontractor.js");
+    const indexes = await Subcontractor.collection.indexes();
+    for (const idx of indexes) {
+      if (idx.name === "subcontractId_1") {
+        await Subcontractor.collection.dropIndex("subcontractId_1");
+        console.log("[Startup] dropped legacy subcontractor subcontractId_1 index");
+      }
+    }
+  } catch (err) {
+    console.warn("[Bootstrap] legacy subcontractor index drop failed (non-fatal):", (err as Error).message);
+  }
   try {
     const { migrateCompanyName } = await import("./services/company-profile.service.js");
     await migrateCompanyName();

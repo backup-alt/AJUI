@@ -15,6 +15,11 @@ export interface IWorker extends Document {
   isSubcontract: boolean;
   subcontractorId?: Types.ObjectId;
   subcontractorName?: string;
+  // For directly-hired (non-subcontract) workers, the supervisor
+  // accountable for their attendance. Mutually exclusive with
+  // subcontractorId — exactly one of the two is set on a given worker.
+  supervisorId?: Types.ObjectId;
+  supervisorName?: string;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -31,10 +36,12 @@ const workerSchema = new Schema<IWorker>(
     name: { type: String, required: true, trim: true },
     address: { type: String, trim: true },
     labourType: { type: String, required: true, trim: true, index: true },
-    weeklyPay: { type: Number, required: true, min: 0 },
+    weeklyPay: { type: Number, min: 0 },
     isSubcontract: { type: Boolean, default: false },
     subcontractorId: { type: Schema.Types.ObjectId, ref: "Subcontractor" },
     subcontractorName: { type: String, trim: true },
+    supervisorId: { type: Schema.Types.ObjectId, ref: "Supervisor" },
+    supervisorName: { type: String, trim: true },
     createdBy: { type: String, required: true, index: true },
   },
   { timestamps: true, collection: "workers" }

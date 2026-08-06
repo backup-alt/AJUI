@@ -106,7 +106,7 @@ export function invalidateAccessCache(userId?: string): void {
   }
 }
 
-async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
+export async function getSupervisorAccess(userId: string): Promise<SupervisorAccess> {
   const cached = getCachedSupervisorAccess(userId);
   if (cached) return cached;
 
@@ -1428,6 +1428,13 @@ export async function addExistingMaterialForSupervisor(
     normalizedUnit,
   });
 
+  const trimmedNotes = String(input.notes || "").trim() || undefined;
+  // Persist the supervisor's note at the Inventory level (top-level + on the
+  // matching purchaseHistory entry) so it round-trips through the API.
+  // The note is also written to the Material record below so the web app's
+  // Materials table can show it without needing a join to the inventory
+  // collection.
+
   if (existing) {
     // Add quantities to the existing record
     existing.purchasedQuantity = (existing.purchasedQuantity || 0) + qty;
@@ -1440,6 +1447,7 @@ export async function addExistingMaterialForSupervisor(
     }
     if (input.poNumber) existing.poNumber = input.poNumber;
     if (input.minimumQuantity !== undefined) existing.minimumQuantity = input.minimumQuantity;
+    if (trimmedNotes) existing.notes = trimmedNotes;
     existing.lastUpdatedBy = userId;
     existing.purchaseHistory = existing.purchaseHistory || [];
     existing.purchaseHistory.push({
@@ -1448,8 +1456,16 @@ export async function addExistingMaterialForSupervisor(
       quantity: qty,
       date: new Date(),
       poNumber: input.poNumber || existing.poNumber,
+      ...(trimmedNotes ? { notes: trimmedNotes } : {}),
     });
     await existing.save();
+    await syncExistingMaterialWithNotes({
+      material: existing,
+      project,
+      siteObjectId: siteObjectId ?? undefined,
+      userId,
+      notes: trimmedNotes,
+    });
     return {
       inventory: existing.toObject(),
       created: false,
@@ -1478,6 +1494,7 @@ export async function addExistingMaterialForSupervisor(
     vendor: input.vendor,
     vendorId: input.vendorId ? toObjectId(input.vendorId) || undefined : undefined,
     poNumber: input.poNumber,
+    notes: trimmedNotes,
     lastUpdatedBy: userId,
     received: true,
     purchaseHistory: qty > 0 ? [{
@@ -1486,14 +1503,121 @@ export async function addExistingMaterialForSupervisor(
       quantity: qty,
       date: new Date(),
       poNumber: input.poNumber,
+      ...(trimmedNotes ? { notes: trimmedNotes } : {}),
     }] : undefined,
   });
   await inv.save();
+  await syncExistingMaterialWithNotes({
+    material: inv,
+    project,
+    siteObjectId: siteObjectId ?? undefined,
+    userId,
+    notes: trimmedNotes,
+  });
   return {
     inventory: inv.toObject(),
     created: true,
     message: `Recorded ${qty} ${input.unit} of ${input.name} at ${input.site}.`,
   };
+}
+
+/**
+ * Make sure the supervisor's "Add existing material" note also lands on the
+ * corresponding Material record so the web app's Materials table shows it
+ * without a separate query. We upsert by (projectId, siteId|site, name, unit)
+ * — the same compound key the inventory and approvals services use — and
+ * preserve the existing materialId if a row already exists.
+ */
+async function syncExistingMaterialWithNotes(params: {
+  material: { _id: Types.ObjectId; name: string; unit: string; projectId: Types.ObjectId; projectName?: string; clientId?: Types.ObjectId; clientName?: string; siteId?: Types.ObjectId; site: string; vendor?: string; vendorId?: Types.ObjectId; poNumber?: string; purchasedQuantity?: number; approvedQuantity?: number; remainingStock?: number; notes?: string };
+  project: { _id: Types.ObjectId; name: string; clientId?: Types.ObjectId; clientName?: string };
+  siteObjectId?: Types.ObjectId;
+  userId: string;
+  notes?: string;
+}): Promise<void> {
+  try {
+    const { Material } = await import("../models/Material.js");
+    const m = params.material;
+    const query: Record<string, unknown> = {
+      projectId: m.projectId,
+      name: m.name,
+      unit: m.unit,
+    };
+    if (m.siteId) query.siteId = m.siteId; else query.site = m.site;
+
+    const existingMaterial = await Material.findOne(query);
+    if (existingMaterial) {
+      let changed = false;
+      // Only refresh the note if the supervisor actually provided one — we
+      // never clobber a non-empty note with empty.
+      if (params.notes) {
+        existingMaterial.notes = params.notes;
+        changed = true;
+      }
+      if (m.purchasedQuantity !== undefined) {
+        existingMaterial.purchasedQuantity =
+          (existingMaterial.purchasedQuantity || 0) + Number(m.purchasedQuantity) || 0;
+        existingMaterial.approvedQuantity = Math.max(
+          existingMaterial.approvedQuantity || 0,
+          existingMaterial.purchasedQuantity || 0
+        );
+        existingMaterial.remainingStock = Math.max(
+          0,
+          (existingMaterial.purchasedQuantity || 0) - (existingMaterial.consumedQuantity || 0)
+        );
+        changed = true;
+      }
+      if (m.vendor && !existingMaterial.vendor) {
+        existingMaterial.vendor = m.vendor;
+        changed = true;
+      }
+      if (m.vendorId && !existingMaterial.vendorId) {
+        existingMaterial.vendorId = m.vendorId;
+        changed = true;
+      }
+      if (m.poNumber && !existingMaterial.poNumber) {
+        existingMaterial.poNumber = m.poNumber;
+        changed = true;
+      }
+      if (changed) await existingMaterial.save();
+      return;
+    }
+
+    // No existing material row — create one so the supervisor's record and
+    // note show up in the web Materials table immediately.
+    const { generateId } = await import("./id-generator.service.js");
+    const materialId = await generateId("MAT");
+    const today = new Date().toISOString().slice(0, 10);
+    await Material.create({
+      materialId,
+      projectId: m.projectId,
+      projectName: m.projectName || params.project.name,
+      clientId: m.clientId || params.project.clientId,
+      clientName: m.clientName || params.project.clientName,
+      siteId: m.siteId,
+      site: m.site,
+      name: m.name,
+      unit: m.unit,
+      requestedQuantity: Number(m.purchasedQuantity) || 0,
+      approvedQuantity: Number(m.purchasedQuantity) || 0,
+      purchasedQuantity: Number(m.purchasedQuantity) || 0,
+      consumedQuantity: 0,
+      remainingStock: Number(m.remainingStock ?? m.purchasedQuantity) || 0,
+      vendor: m.vendor,
+      vendorId: m.vendorId,
+      poNumber: m.poNumber,
+      requestDate: today,
+      status: "Received",
+      createdBy: params.userId,
+      supervisorName: params.userId,
+      notes: params.notes,
+    });
+  } catch (err) {
+    // Best-effort: never let the material sync fail the inventory write.
+    // The note is already persisted on the Inventory record so the audit
+    // trail survives even if the material write fails.
+    console.warn("[addExistingMaterial] failed to sync material record:", (err as Error)?.message || err);
+  }
 }
 
 export async function getRecentNotificationsForSupervisor(userId: string, limit: number) {

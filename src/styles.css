@@ -8455,6 +8455,14 @@ body {
   background: #ffffff !important;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05) !important;
   overflow: auto !important;
+  /* Cap the table's vertical size so a long labour section (or any other
+     section with many rows / wrapping chips) scrolls inside the panel
+     instead of stretching the page. The sticky <th> above now actually
+     sticks because the container has a finite height to scroll within.
+     The printable PDF report is generated into a separate window with
+     its own inline styles and is unaffected by this cap. */
+  max-height: calc(100vh - 320px);
+  min-height: 480px;
 }
 
 .operations-table table {
@@ -9664,6 +9672,52 @@ body {
   border-top: 1px solid #e2e8f0;
 }
 
+.erp-select-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 3px;
+  padding: 0 8px;
+  border: 1px solid #cbd7e8;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.erp-select-search .svg-icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  stroke: #64748b;
+}
+
+.erp-select-search input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  outline: 0;
+  font-size: 13px;
+}
+
+.erp-select-search input::placeholder {
+  color: #94a3b8;
+}
+
+.dark-mode .erp-select-search {
+  border-color: #385175;
+  background: #101c30;
+}
+
+.dark-mode .erp-select-search input {
+  color: #edf4ff;
+}
+
+.dark-mode .erp-select-search .svg-icon {
+  stroke: #7f94b8;
+}
+
 .custom-select-entry span {
   color: #64748b;
   font-size: 11px;
@@ -9689,6 +9743,27 @@ body {
   display: grid;
   gap: 7px;
   min-width: 240px;
+}
+
+.labour-group-badge {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef4ff;
+  border: 1px solid #cbd7e8;
+  color: #002263;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
+.dark-mode .labour-group-badge {
+  background: #16233c;
+  border-color: #385175;
+  color: #dbe8ff;
 }
 
 .labour-types-cell button {

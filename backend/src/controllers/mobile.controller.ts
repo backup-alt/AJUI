@@ -5,6 +5,8 @@ import { invalidateCachePrefix } from "../middleware/cache.js";
 import * as mobileService from "../services/supervisor-mobile.service.js";
 import * as workerService from "../services/worker.service.js";
 import * as vendorService from "../services/vendor.service.js";
+import * as subcontractorService from "../services/subcontractor.service.js";
+import * as supervisorService from "../services/supervisor.service.js";
 import * as deviceService from "../services/device-token.service.js";
 
 const MOBILE_PAGE_SIZE = 25;
@@ -190,7 +192,10 @@ export async function getMaterial(req: Request, res: Response, next: NextFunctio
 /**
  * "Add Existing Material" endpoint — supervisors record materials that
  * already exist at the site. No approval workflow; saves directly to
- * the Inventory collection (upsert by projectId+site+name+unit).
+ * the Inventory collection (upsert by projectId+site+name+unit) and
+ * mirrors the entry onto the Material collection so the supervisor's
+ * record (and any typed notes) shows up immediately in the web app's
+ * Materials table.
  */
 export async function addExistingMaterial(req: Request, res: Response, next: NextFunction) {
   try {
@@ -762,11 +767,29 @@ export async function getLabourTypeCounts(req: Request, res: Response, next: Nex
 // =================== SUBCONTRACTORS (mobile) ===================
 export async function listSubcontractors(req: Request, res: Response, next: NextFunction) {
   try {
-    const subs = await workerService.listSubcontractors(
-      req.query.projectId as string,
-      req.query.siteId as string | undefined
-    );
-    res.json({ subcontractors: subs });
+    // Scoped list — every active sub-contractor under the projects this
+    // supervisor is assigned to. The worker create page picks from this
+    // directly, so we MUST respect project access or a supervisor at
+    // site A could create a worker for a subcontractor at site B.
+    const userId = requireSupervisor(req);
+    const items = await subcontractorService.listSubcontractorsForSupervisor(userId);
+    res.json({ subcontractors: items });
+  } catch (e) { next(e); }
+}
+
+// =================== SUPERVISORS (mobile) ===================
+export async function listSupervisorsForWorker(req: Request, res: Response, next: NextFunction) {
+  try {
+    // Lightweight supervisor list for the worker-create page's
+    // "directly hired" mode. Scoped to the calling supervisor's
+    // accessible projects so cross-tenant assignments aren't possible.
+    const userId = requireSupervisor(req);
+    const { getSupervisorAccess } = await import("../services/supervisor-mobile.service.js");
+    const access = await getSupervisorAccess(userId);
+    const items = await supervisorService.listSupervisorsForWorker({
+      scopeProjectIds: access.projectIds,
+    });
+    res.json({ supervisors: items });
   } catch (e) { next(e); }
 }
 
