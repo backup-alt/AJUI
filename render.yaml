@@ -6,7 +6,11 @@ services:
     region: oregon
     branch: main
     rootDir: backend
-    buildCommand: npm ci && npm run build
+    # Faster install: omit dev deps, skip audit + funding noise, prefer
+    # the npm cache (Render caches node_modules between builds when
+    # package-lock.json hasn't changed). Combined this typically brings
+    # the install step from ~3-5 min to ~30-60 s on the starter plan.
+    buildCommand: npm ci --omit=dev --no-audit --no-fund --prefer-offline && npm run build
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
