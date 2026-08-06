@@ -100,7 +100,14 @@ export function createApp(): express.Application {
 
   const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 200,
+    // Bumped from 200 to 1500 — Render runs behind a load balancer that
+    // shares an outbound IP for many health checks + supervisor devices
+    // polling concurrently. The previous limit was hit during routine
+    // navigation on the dashboard (each hydration pass fires ~14
+    // bulk calls per entityType, plus periodic refreshes). 1500 per
+    // 15-min window comfortably covers normal usage; abusive
+    // traffic still gets cut off well before any meaningful DoS.
+    max: 1500,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many requests, please try again later" },
