@@ -14,6 +14,8 @@ export interface IAttendance extends Document {
   site: string;
   labourType: string;
   weeklyPay: number;
+  subcontractorId?: Types.ObjectId;
+  subcontractorName?: string;
   attendanceDate: string;
   shiftCount: number;
   overtimeHours: number;
@@ -38,6 +40,8 @@ const attendanceSchema = new Schema<IAttendance>(
     site: { type: String, required: true },
     labourType: { type: String, required: true },
     weeklyPay: { type: Number, required: true },
+    subcontractorId: { type: Schema.Types.ObjectId, ref: "Subcontractor" },
+    subcontractorName: { type: String, trim: true, index: true },
     attendanceDate: { type: String, required: true, index: true },
     shiftCount: { type: Number, default: 1, min: 1, max: 2 },
     overtimeHours: { type: Number, default: 0, min: 0 },
@@ -56,5 +60,6 @@ const attendanceSchema = new Schema<IAttendance>(
 
 attendanceSchema.index({ siteId: 1, attendanceDate: 1 });
 attendanceSchema.index({ workerId: 1, attendanceDate: 1 });
+attendanceSchema.index({ subcontractorId: 1, attendanceDate: 1 });
 
 export const Attendance = model<IAttendance>("Attendance", attendanceSchema);

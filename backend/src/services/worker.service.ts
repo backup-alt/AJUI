@@ -190,6 +190,12 @@ export async function markAttendance(input: {
   paymentMode: "Cash" | "NEFT" | "UPI" | "Cheque";
   notes?: string;
   createdBy: string;
+  // Sub-contractor fields are denormalized onto the Attendance record so
+  // the web labour table can group by subcontractor without re-querying
+  // the Worker collection. Caller may pass them explicitly; otherwise we
+  // fall back to the Worker's stored values.
+  subcontractorId?: string;
+  subcontractorName?: string;
 }) {
   if (!Types.ObjectId.isValid(input.workerId)) {
     throw new AppError(400, "Invalid worker id");
@@ -215,6 +221,19 @@ export async function markAttendance(input: {
     );
   }
 
+  // Prefer the values the caller sent, otherwise copy them from the
+  // Worker record. Every worker in this app belongs to a sub-contractor,
+  // so this guarantees the Subcontractor column in the web labour table
+  // is never blank for attendance created by the mobile app.
+  const subcontractorId =
+    (input.subcontractorId && Types.ObjectId.isValid(input.subcontractorId)
+      ? new Types.ObjectId(input.subcontractorId)
+      : (worker as any).subcontractorId) || undefined;
+  const subcontractorName =
+    (input.subcontractorName && String(input.subcontractorName).trim()) ||
+    String((worker as any).subcontractorName || "").trim() ||
+    undefined;
+
   const attendanceId = await generateId("ATT");
   const attendance = await Attendance.create({
     attendanceId,
@@ -227,6 +246,8 @@ export async function markAttendance(input: {
     site: input.site,
     labourType: worker.labourType || "General",
     weeklyPay: worker.weeklyPay ?? 0,
+    subcontractorId: subcontractorId as any,
+    subcontractorName,
     attendanceDate: input.attendanceDate,
     shiftCount: input.shiftCount,
     overtimeHours: input.overtimeHours,

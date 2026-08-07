@@ -366,6 +366,11 @@ export class LabourMarkAttendancePage implements OnInit {
       shiftCount: Number(this.shiftCount),
       overtimeHours: Number(this.overtimeHours),
       notes: this.notes || undefined,
+      // Pass the worker's sub-contractor info so the web labour table can
+      // group attendance by sub-contractor without re-querying. The backend
+      // falls back to the worker record if these are missing.
+      subcontractorId: this.worker()?.subcontractorId,
+      subcontractorName: this.worker()?.subcontractorName,
     };
 
     this.supervisor.markAttendance(payload).subscribe({

@@ -157,21 +157,14 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
               <div class="worker-body">
                 <div class="worker-name-row">
                   <h3 class="worker-name">{{ worker.name }}</h3>
-                  @if (worker.isSubcontract) {
-                    <span class="subcontract-badge">Subcontract</span>
-                  }
                   @if (isMarkedToday(worker)) {
                     <span class="marked-badge" title="Attendance already marked for today">
-                      <ion-icon name="checkmark-circle-outline"></ion-icon> Marked
+                      <ion-icon name="checkmark-circle-outline"></ion-icon> Attendance Marked
                     </span>
                   }
                 </div>
                 <p class="worker-meta">
-                  @if (worker.isSubcontract && worker.subcontractorName) {
-                    <span><ion-icon name="business-outline"></ion-icon> {{ worker.subcontractorName }}</span>
-                  } @else {
-                    <span><ion-icon name="person-outline"></ion-icon> Direct Employee</span>
-                  }
+                  <span><ion-icon name="business-outline"></ion-icon> {{ worker.subcontractorName || 'Direct Hire' }}</span>
                 </p>
               </div>
               <div class="worker-actions" (click)="$event.stopPropagation()">
@@ -347,17 +340,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-    .subcontract-badge {
-      display: inline-block;
-      font-size: 9px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      padding: 2px 6px;
-      background: rgba(245, 158, 11, 0.12);
-      color: #a16207;
-      border-radius: 999px;
     }
     .marked-badge {
       display: inline-flex;

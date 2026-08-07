@@ -162,15 +162,21 @@ export interface MarkAttendanceRequest {
   shiftCount: number;
   overtimeHours: number;
   // Overtime amount and late fine are no longer collected from the
-  // supervisor's mobile form (per the latest spec). They're still on
-  // the Attendance type for legacy reads from the backend.
+  // supervisor's mobile form (per the latest spec). They're still on the
+  // Attendance type for legacy reads from the backend.
   overtimeAmount?: number;
   lateFine?: number;
-  // Payment mode was also dropped from the supervisor form — it now
-  // lives only in the admin-side Payment / Vendor flow. Marked
-  // optional so legacy clients don't break.
+  // Payment mode was also dropped from the supervisor form — it now lives
+  // only in the admin-side Payment / Vendor flow. Marked optional so
+  // legacy clients don't break.
   paymentMode?: PaymentMode;
   notes?: string;
+  // Sub-contractor fields are denormalized onto the attendance record so
+  // the web labour table can group attendance by sub-contractor without
+  // re-querying. Optional — the backend falls back to the worker's own
+  // stored sub-contractor when missing.
+  subcontractorId?: string;
+  subcontractorName?: string;
 }
 
 export interface AttendanceListResponse {
