@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
-import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
+import { IonBadge, IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { Vendor, VendorStatus, ErpDataService, Site } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
@@ -8,7 +8,7 @@ import { MaterialsService } from "../core/materials.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { formatMoney } from "../shared/format";
+import { formatMoney, statusClass } from "../shared/format";
 
 type VendorSite = Site & {
   materialEntryCount: number;
@@ -22,7 +22,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
+  imports: [CommonModule, IonBadge, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="vendors"></agb-enterprise-sidebar>
@@ -68,10 +68,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                           </div>
                         </div>
                         <div class="head-meta">
-                          <span class="status-pill" [class.is-active]="vendor.status !== 'Not Active'" [class.is-inactive]="vendor.status === 'Not Active'">
-                            <ion-icon [name]="vendor.status === 'Not Active' ? 'pause-circle-outline' : 'checkmark-circle-outline'"></ion-icon>
-                            {{ vendor.status || 'Active' }}
-                          </span>
+                          <ion-badge class="status" [ngClass]="statusClass(vendor.status || 'Active')">{{ vendor.status || 'Active' }}</ion-badge>
                         </div>
                       </div>
 
@@ -111,10 +108,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
               <section class="vendor-breadcrumb">
                 <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
                 <h2>{{ selectedVendor()!.name }} – Sites</h2>
-                <span class="vendor-status-pill" [class.is-active]="selectedVendor()!.status !== 'Not Active'" [class.is-inactive]="selectedVendor()!.status === 'Not Active'">
-                  <ion-icon [name]="selectedVendor()!.status === 'Not Active' ? 'pause-circle-outline' : 'checkmark-circle-outline'"></ion-icon>
-                  {{ selectedVendor()!.status || 'Active' }}
-                </span>
+                <ion-badge class="status" [ngClass]="statusClass(selectedVendor()!.status || 'Active')">{{ selectedVendor()!.status || 'Active' }}</ion-badge>
               </section>
 
               @if (loadingSites()) {
@@ -164,10 +158,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         <span class="site-status" [class.active]="site.status === 'Active'" [class.on-hold]="site.status === 'On Hold'" [class.completed]="site.status === 'Completed'">
                           {{ site.status || 'Active' }}
                         </span>
-                        <span class="vendor-status-pill" [class.is-active]="selectedVendor()!.status !== 'Not Active'" [class.is-inactive]="selectedVendor()!.status === 'Not Active'">
-                          <ion-icon [name]="selectedVendor()!.status === 'Not Active' ? 'pause-circle-outline' : 'checkmark-circle-outline'"></ion-icon>
-                          {{ selectedVendor()!.status || 'Active' }}
-                        </span>
+                        <ion-badge class="status" [ngClass]="statusClass(selectedVendor()!.status || 'Active')">{{ selectedVendor()!.status || 'Active' }}</ion-badge>
                       </div>
                     </div>
                   </article>
@@ -431,65 +422,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       gap: 12px;
       min-width: 0;
       flex: 1 1 auto;
-    }
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      line-height: 1;
-      border: 1px solid transparent;
-      transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
-    }
-    .status-pill ion-icon {
-      display: inline-flex;
-      font-size: 13px;
-      line-height: 1;
-      vertical-align: middle;
-    }
-    .status-pill.is-active {
-      background: rgba(16, 185, 129, 0.12);
-      color: #047857;
-      border-color: rgba(16, 185, 129, 0.32);
-    }
-    .status-pill.is-inactive {
-      background: rgba(239, 68, 68, 0.12);
-      color: #b91c1c;
-      border-color: rgba(239, 68, 68, 0.3);
-    }
-    .vendor-status-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1;
-      letter-spacing: 0.02em;
-      border: 1px solid transparent;
-    }
-    .vendor-status-pill ion-icon {
-      display: inline-flex;
-      font-size: 13px;
-      line-height: 1;
-      vertical-align: middle;
-    }
-    .vendor-status-pill.is-active {
-      background: rgba(16, 185, 129, 0.12);
-      color: #047857;
-      border-color: rgba(16, 185, 129, 0.32);
-    }
-    .vendor-status-pill.is-inactive {
-      background: rgba(239, 68, 68, 0.12);
-      color: #b91c1c;
-      border-color: rgba(239, 68, 68, 0.3);
     }
     .gst-number {
       font-family: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
@@ -1000,6 +932,7 @@ export class VendorDashboardPage {
   readonly toastController = inject(ToastController);
 
   readonly showVendorForm = signal(false);
+  readonly statusClass = statusClass;
   readonly editingVendor = signal<Vendor | null>(null);
   readonly vendors = computed<Vendor[]>(() => this.data.vendors());
   readonly refreshing = signal(false);
