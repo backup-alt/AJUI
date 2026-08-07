@@ -154,6 +154,15 @@ interface SubcontractorRow {
               />
             </label>
             <label>
+              <span>Notes</span>
+              <textarea
+                rows="3"
+                [value]="draft().note"
+                (input)="patchDraft('note', $any($event.target).value)"
+                placeholder="Any extra detail about this sub-contractor (work scope, terms, contacts, etc.)"
+              ></textarea>
+            </label>
+            <label>
               <span>Status</span>
               <select
                 [value]="draft().status"
