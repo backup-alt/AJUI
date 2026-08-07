@@ -435,22 +435,58 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     .status-pill {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 4px;
       padding: 4px 10px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.02em;
+      line-height: 1;
       border: 1px solid transparent;
       transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
     }
-    .status-pill ion-icon { font-size: 13px; }
+    .status-pill ion-icon {
+      display: inline-flex;
+      font-size: 13px;
+      line-height: 1;
+      vertical-align: middle;
+    }
     .status-pill.is-active {
       background: rgba(16, 185, 129, 0.12);
       color: #047857;
       border-color: rgba(16, 185, 129, 0.32);
     }
     .status-pill.is-inactive {
+      background: rgba(239, 68, 68, 0.12);
+      color: #b91c1c;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    .vendor-status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+    }
+    .vendor-status-pill ion-icon {
+      display: inline-flex;
+      font-size: 13px;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .vendor-status-pill.is-active {
+      background: rgba(16, 185, 129, 0.12);
+      color: #047857;
+      border-color: rgba(16, 185, 129, 0.32);
+    }
+    .vendor-status-pill.is-inactive {
       background: rgba(239, 68, 68, 0.12);
       color: #b91c1c;
       border-color: rgba(239, 68, 68, 0.3);
