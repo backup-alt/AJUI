@@ -195,15 +195,20 @@ interface WageCalculation {
             <section class="info-section">
               <h2 class="section-title">Employment Information</h2>
               <div class="info-card">
-                @if (worker()!.isSubcontract && worker()!.subcontractorName) {
-                  <div class="info-row highlight-row">
-                    <span class="info-icon"><ion-icon name="business-outline"></ion-icon></span>
-                    <div class="info-data">
-                      <span class="info-label">Subcontractor</span>
-                      <span class="info-value">{{ worker()!.subcontractorName }}</span>
-                    </div>
+                <!--
+                  Subcontractor is always shown in Employment Information so
+                  supervisors can always tell at a glance which party a worker
+                  is associated with. Falls back to "Direct Hire" for workers
+                  who aren't attached to a sub-contractor. Highlighted when
+                  a sub-contractor name is actually present.
+                -->
+                <div class="info-row" [class.highlight-row]="!!worker()!.subcontractorName">
+                  <span class="info-icon"><ion-icon name="business-outline"></ion-icon></span>
+                  <div class="info-data">
+                    <span class="info-label">Subcontractor</span>
+                    <span class="info-value">{{ worker()!.subcontractorName || 'Direct Hire' }}</span>
                   </div>
-                }
+                </div>
               </div>
             </section>
           </div>
