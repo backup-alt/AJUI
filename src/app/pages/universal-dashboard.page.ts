@@ -951,6 +951,17 @@ const siteMaterialDetailFields: FieldSchema[] = [
       border-color: var(--ui-accent, #3b82f6);
       box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
     }
+    /* Compact the labour types cell to match the project workspace look:
+       hide the always-visible "Add labor type" button until the row is
+       hovered. The project workspace only shows this button while the
+       row is being edited, so by default its labour rows are shorter.
+       Mirror that default state in the dashboard. */
+    .universal-workbench .labour-type-add {
+      display: none !important;
+    }
+    .universal-workbench .universal-table tbody tr:hover .labour-type-add {
+      display: inline-flex !important;
+    }
     .checkbox-label {
       display: flex;
       align-items: center;

@@ -5585,14 +5585,14 @@ body {
 }
 
 .universal-table th {
-  height: 38px;
+  height: auto;
   padding: 9px 12px;
   background: #f3f6fa;
   letter-spacing: 0;
 }
 
 .universal-table td {
-  height: 42px;
+  height: auto;
   padding: 9px 12px;
 }
 
