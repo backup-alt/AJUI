@@ -26,7 +26,6 @@ export type ProjectFormValue = {
   supervisorId?: string;
   status: ProjectStatus;
   totalValue: number;
-  advanceAmount: number;
   openingBalance: number;
 };
 
@@ -114,10 +113,6 @@ type SupervisorOption = { id: string; name: string };
           <label>
             <span>Estimated Project Value</span>
             <input name="totalValue" required type="number" min="0" step="1" [value]="initialValue?.totalValue || ''" placeholder="8200000" />
-          </label>
-          <label>
-            <span>Advance Amount</span>
-            <input name="advanceAmount" required type="number" min="0" step="1" [value]="initialValue?.advanceAmount || ''" placeholder="1000000" />
           </label>
           <label>
             <span>Opening Expense Balance</span>
@@ -319,7 +314,6 @@ export class ProjectFormDialogComponent implements OnInit {
       status: this.projectStatusFor(String(formData.get("status") ?? "Active")),
       sites,
       totalValue: Number(formData.get("totalValue") ?? 0),
-      advanceAmount: Number(formData.get("advanceAmount") ?? 0),
       openingBalance: Number(formData.get("openingBalance") ?? 0),
     });
   }

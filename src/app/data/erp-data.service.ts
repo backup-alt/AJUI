@@ -601,7 +601,6 @@ export class ErpDataService {
         supervisor: client.supervisor || "",
         status: "Active",
         totalValue: 0,
-        advanceAmount: 0,
       });
     } finally {
       this.defaultProjectInFlight.delete(client.id);
@@ -622,7 +621,6 @@ export class ErpDataService {
       supervisorId?: string;
       status?: ProjectStatus;
       totalValue: number;
-      advanceAmount: number;
       receivedAmount?: number;
       openingBalance?: number;
     },
@@ -643,8 +641,8 @@ export class ErpDataService {
         status: input.status ?? "Active",
         startDate: input.startDate,
         totalValue: input.totalValue,
-        advanceAmount: input.advanceAmount,
-        receivedAmount: input.receivedAmount ?? input.advanceAmount,
+        advanceAmount: 0,
+        receivedAmount: input.receivedAmount ?? 0,
         materialSpend: 0,
         labourPayable: 0,
         expenseBalance: input.openingBalance ?? 0,
@@ -683,8 +681,8 @@ export class ErpDataService {
           status: input.status ?? "Active",
           startDate: input.startDate,
           totalValue: input.totalValue ?? 0,
-          advanceAmount: input.advanceAmount ?? 0,
-          receivedAmount: input.receivedAmount ?? input.advanceAmount ?? 0,
+          advanceAmount: 0,
+          receivedAmount: input.receivedAmount ?? 0,
           expenseBalance: input.openingBalance ?? 0,
         }),
       );
@@ -922,22 +920,18 @@ export class ErpDataService {
 
   updateProject(
     projectId: string,
-    patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "status" | "totalValue" | "advanceAmount" | "receivedAmount" | "expenseBalance">>,
+    patch: Partial<Pick<Project, "name" | "sites" | "startDate" | "supervisor" | "status" | "totalValue" | "receivedAmount" | "expenseBalance">>,
   ): Project | undefined {
     let updatedProject: Project | undefined;
 
     this.projects.update((projectRows) =>
       projectRows.map((project) => {
         if (project.id !== projectId) return project;
-        const receivedDelta =
-          patch.advanceAmount !== undefined && project.receivedAmount === project.advanceAmount
-            ? patch.advanceAmount - project.advanceAmount
-            : 0;
         updatedProject = {
           ...project,
           ...patch,
           sites: patch.sites?.length ? patch.sites : project.sites,
-          receivedAmount: patch.receivedAmount !== undefined ? Math.max(0, patch.receivedAmount) : project.receivedAmount + receivedDelta,
+          receivedAmount: patch.receivedAmount !== undefined ? Math.max(0, patch.receivedAmount) : project.receivedAmount,
         };
         return updatedProject;
       }),
@@ -962,7 +956,6 @@ export class ErpDataService {
       supervisorId?: string;
       status?: ProjectStatus;
       totalValue?: number;
-      advanceAmount?: number;
       expenseBalance?: number;
     },
   ): Promise<void> {

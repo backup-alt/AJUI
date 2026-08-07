@@ -3006,7 +3006,6 @@ export class ProjectWorkspacePage {
       startDate: project.startDate,
       supervisor: project.supervisor,
       totalValue: project.totalValue,
-      advanceAmount: project.advanceAmount,
       openingBalance: project.expenseBalance,
       status: project.status,
     };
@@ -3034,7 +3033,6 @@ export class ProjectWorkspacePage {
         supervisorId: value.supervisorId,
         status: value.status,
         totalValue: value.totalValue,
-        advanceAmount: value.advanceAmount,
         expenseBalance: openingBalance,
       });
       this.editingProject.set(null);
