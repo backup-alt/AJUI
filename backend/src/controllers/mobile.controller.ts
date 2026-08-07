@@ -767,18 +767,61 @@ export async function getLabourTypeCounts(req: Request, res: Response, next: Nex
 // =================== SUBCONTRACTORS (mobile) ===================
 export async function listSubcontractors(req: Request, res: Response, next: NextFunction) {
   try {
-    // Universal list — every active sub-contractor across ALL projects
-    // (not scoped to the calling supervisor's assigned projects).
-    //
-    // A sub-contractor is a shared resource: the same party (e.g. "Sri
-    // Balaji Electricals") may be working under multiple projects and
-    // multiple sites simultaneously, so the worker-create page must
-    // show every active sub-contractor — not just the ones tied to
-    // the currently selected site. The supervisor's role check still
-    // applies (only `supervisor` role tokens reach this endpoint).
-    const userId = requireSupervisor(req);
-    const items = await subcontractorService.listAllActiveSubcontractors();
-    res.json({ subcontractors: items });
+    // Fetch every sub-contractor in the database (the same set the web
+    // /subcontractors page uses, paginated by 500 rows). The web admin
+    // list shows duplicates when the same party (e.g. "Sri Balaji
+    // Electricals") is registered under several projects — that's the
+    // truth in this data model. The mobile dropdown, however, picks
+    // ONE row per name (lowest _id wins) so supervisors don't see the
+    // same name listed three times when assigning a worker.
+    requireSupervisor(req);
+    const page = Math.max(parseInt(String(req.query.page ?? "1"), 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "500"), 10) || 500, 1), 500);
+    const result = await subcontractorService.listSubcontractors({ page, limit });
+    const raw = (result.items || []) as any[];
+
+    // Sort: active first, then alphabetical. Active = status === "active"
+    // OR status is missing/empty (treat the schema default as active so
+    // pre-existing rows without an explicit status still appear).
+    const isActive = (s: any) => {
+      const st = String(s?.status || "active").toLowerCase();
+      return st === "active" || st === "" || st === "undefined" || st === "null";
+    };
+    raw.sort((a, b) => {
+      const aActive = isActive(a) ? 0 : 1;
+      const bActive = isActive(b) ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      return String(a.subcontractorName || "").localeCompare(String(b.subcontractorName || ""));
+    });
+
+    // Deduplicate by trimmed lowercase name — keep the first occurrence
+    // (active rows win because of the sort above).
+    const seen = new Set<string>();
+    const items: any[] = [];
+    for (const s of raw) {
+      const name = String(s.subcontractorName || "").trim();
+      if (!name) continue; // skip rows with no name — they would render as blank rows
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({
+        _id: String(s._id),
+        subcontractorName: name,
+        projectId: s.projectId ? String(s.projectId) : "",
+        address: s.address || "",
+        phone: s.phone || "",
+        note: s.note || "",
+        status: isActive(s) ? "active" : "inactive",
+      });
+    }
+
+    res.json({
+      subcontractors: items,
+      total: items.length,
+      page,
+      limit,
+      pages: 1,
+    });
   } catch (e) { next(e); }
 }
 

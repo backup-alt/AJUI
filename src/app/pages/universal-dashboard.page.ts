@@ -601,7 +601,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
               </ng-container>
               </ng-container>
             </section>
-
             <section class="form-overlay" *ngIf="filterBuilderOpen()">
               <form class="erp-dialog operations-dialog filter-dialog" (submit)="submitFilterBuilder($event)">
                 <div class="dialog-head">
@@ -675,7 +674,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
               </form>
             </section>
-
             <section class="form-overlay" *ngIf="recordDialogOpen()">
               <form class="erp-dialog operations-dialog" (submit)="saveRecord($event)">
                 <div class="dialog-head">
@@ -787,7 +785,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
               </form>
             </section>
-
             <section class="form-overlay" *ngIf="labourTypeDialogOpen()">
               <form class="erp-dialog labour-type-dialog" (submit)="saveLabourType($event)">
                 <div class="dialog-head">
@@ -845,7 +842,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
               </form>
             </section>
-
             <agb-vendor-form-dialog
               *ngIf="showVendorDialog()"
               [eyebrow]="editingInlineVendor() ? 'Vendor Edit' : 'Vendor Setup'"
@@ -858,7 +854,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
             ></agb-vendor-form-dialog>
           </main>
         </ion-content>
-
         @if (showInventoryBreakdown() && selectedInventoryCard()) {
           <section class="form-overlay" role="presentation">
             <section class="erp-dialog inventory-breakdown-dialog" role="dialog" aria-modal="true" aria-labelledby="inv-breakdown-title">
@@ -908,7 +903,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
             </section>
           </section>
         }
-
         @if (showInventoryInitDialog()) {
           <agb-inventory-init-dialog
             [sites]="addMaterialSiteOptions()"
@@ -961,6 +955,77 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .universal-workbench .universal-table tbody tr:hover .labour-type-add {
       display: inline-flex !important;
+    }
+    /* Dense data-grid rows: the global styles.css .universal-table rules
+       force a fixed 40px/44px cell height (the earlier height:auto fix is
+       overridden by a later rule with the same specificity), which makes the
+       dashboard labour table render tall and airy. Override within the
+       dashboard so cells size to their content, keep the vertical padding
+       slim, and top-align cell content. Chips/badges are also compacted so
+       no single column (Labour Types, Notes, Staff Count, etc.) inflates the
+       row height. Long text and badges wrap within their cell (not the row
+       height), so the row only grows as much as its tallest cell requires. */
+    .universal-workbench .universal-table th,
+    .universal-workbench .universal-table td {
+      height: auto !important;
+      padding-top: 8px !important;
+      padding-bottom: 8px !important;
+      vertical-align: top !important;
+    }
+    .universal-workbench .universal-table th {
+      padding-top: 9px !important;
+      padding-bottom: 9px !important;
+    }
+    .universal-workbench .universal-table .editable-cell {
+      min-height: 20px;
+      line-height: 1.3;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .universal-workbench .universal-table td {
+      line-height: 1.3 !important;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .universal-workbench .universal-table .labour-types-cell {
+      gap: 4px;
+      min-width: 210px;
+      align-items: flex-start;
+    }
+    .universal-workbench .universal-table .labour-type-chip-row {
+      gap: 4px;
+    }
+    .universal-workbench .universal-table .labour-type-chip {
+      min-height: 22px;
+      padding: 3px 26px 3px 8px;
+      gap: 5px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .universal-workbench .universal-table .labour-type-chip > span {
+      min-width: 0;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .universal-workbench .universal-table .labour-type-chip strong {
+      width: 19px;
+      height: 17px;
+      font-size: 10.5px;
+      align-self: center;
+    }
+    .universal-workbench .universal-table .labour-group-badge {
+      padding: 1px 8px;
+      font-size: 10.5px;
+    }
+    .universal-workbench .universal-table .labour-type-add {
+      min-height: 22px;
+      padding: 0 9px;
+      font-size: 11.5px;
     }
     .checkbox-label {
       display: flex;
@@ -1669,6 +1734,11 @@ export class UniversalDashboardPage implements OnInit {
   readonly openSelectKey = signal("");
   readonly openDraftSelect = signal("");
   readonly draftSelectSearch = signal("");
+  /** Full list of subcontractor names for the record-form dropdown.
+   *  Populated on demand from /api/subcontractors so it always matches the
+   *  /subcontractors page, not just the hydration's first page. */
+  readonly allSubcontractorNames = signal<string[]>([]);
+  readonly loadingAllSubcontractors = signal(false);
   readonly openFilterKey = signal("");
   readonly selectCustomValue = signal("");
   readonly labourTypeDialogOpen = signal(false);
@@ -1677,7 +1747,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly labourTypeCount = signal("1");
   readonly labourTypeDailyWage = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
-readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inventory(), this.activeSiteFilter(), this.selectedFilters(), this.searchText()));
+  readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inventory(), this.activeSiteFilter(), this.selectedFilters(), this.searchText()));
   readonly selectedInventoryCard = signal<{ siteKey: string; siteName: string; materialName: string; totalQty: number; unit: string; siteCount: number; lastUpdated: string } | null>(null);
   readonly inventoryBreakdownRows = computed(() => {
     const card = this.selectedInventoryCard();
@@ -2029,23 +2099,23 @@ readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inven
     }
   }
 
-/**
-   * Dedicated Material table refresh — bypasses refreshFromBackend's
-   * debounce and unconditionally hits GET /materials to update the
-   * materials signal + localStorage. Mirrors the pattern from commit
-   * b754d2f where a dedicated sites refresh was added so the inventory
-   * modal always had fresh data.
-   *
-   * Empty-array guard: the backend falls back to { items: [] } on M0
-   * timeout. We never overwrite the signal with an empty array or the
-   * table silently empties out on every tab switch.
-   *
-   * NOTE: we deliberately do NOT guard against "backend returned fewer
-   * items than existing signal" because that case is exactly the bug
-   * the user is hitting — localStorage has 4 stale entries and we want
-   * the fresh backend response (even if it equals 4, but usually 59)
-   * to overwrite. The only thing we skip on is empty.
-   */
+  /**
+     * Dedicated Material table refresh — bypasses refreshFromBackend's
+     * debounce and unconditionally hits GET /materials to update the
+     * materials signal + localStorage. Mirrors the pattern from commit
+     * b754d2f where a dedicated sites refresh was added so the inventory
+     * modal always had fresh data.
+     *
+     * Empty-array guard: the backend falls back to { items: [] } on M0
+     * timeout. We never overwrite the signal with an empty array or the
+     * table silently empties out on every tab switch.
+     *
+     * NOTE: we deliberately do NOT guard against "backend returned fewer
+     * items than existing signal" because that case is exactly the bug
+     * the user is hitting — localStorage has 4 stale entries and we want
+     * the fresh backend response (even if it equals 4, but usually 59)
+     * to overwrite. The only thing we skip on is empty.
+     */
   private refreshMaterialsForTable() {
     // Single-shot refresh via the new /materials/all endpoint — returns
     // every row in one HTTP call, no cursor pagination.
@@ -2097,7 +2167,7 @@ readonly inventoryCards = computed(() => this.aggregateInventory(this.data.inven
       if (updatedAt && updatedAt > existing.lastUpdated) existing.lastUpdated = updatedAt;
       map.set(key, existing);
     }
-let cards = [...map.values()].map((v) => {
+    let cards = [...map.values()].map((v) => {
       return {
         siteKey: v.siteName.toLowerCase(),
         siteName: v.siteName,
@@ -2169,8 +2239,8 @@ let cards = [...map.values()].map((v) => {
           if (items.length === 0) {
             console.warn(
               "[addInventoryMaterial] /api/sites returned 0 items. " +
-                "The Site dropdown will appear empty. Check that (1) the MongoDB Sites collection has records, " +
-                "(2) your role's RBAC scope includes those sites' projectIds."
+              "The Site dropdown will appear empty. Check that (1) the MongoDB Sites collection has records, " +
+              "(2) your role's RBAC scope includes those sites' projectIds."
             );
           } else {
             console.info(`[addInventoryMaterial] /api/sites returned ${items.length} sites`);
@@ -2499,7 +2569,7 @@ let cards = [...map.values()].map((v) => {
     return field.label.toLowerCase().includes("daily wage");
   }
 
-visibleRows(): TableRow[] {
+  visibleRows(): TableRow[] {
     const query = this.searchText().trim().toLowerCase();
     const filters = this.selectedFilters();
     const module = this.activeModule();
@@ -3061,6 +3131,11 @@ visibleRows(): TableRow[] {
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
+    // Ensure the sub-contractor dropdown lists every record from the
+    // /subcontractors page (not just the hydration's first page).
+    if (this.activeModule() === "subcontractors") {
+      void this.loadAllSubcontractorNames();
+    }
   }
 
   /** Title for the record dialog ("Edit Record" when editing a payment). */
@@ -3264,6 +3339,12 @@ visibleRows(): TableRow[] {
   toggleDraftSelect(key: string) {
     this.openDraftSelect.update((current) => (current === key ? "" : key));
     this.draftSelectSearch.set("");
+    // When the user opens the sub-contractor dropdown, make sure the
+    // full list from /api/subcontractors is loaded so it matches the
+    // /subcontractors page exactly.
+    if (this.openDraftSelect() === key && this.activeModule() === "subcontractors" && (key === "subcontractorName" || key === "subcontractor")) {
+      void this.loadAllSubcontractorNames();
+    }
   }
 
   closeDraftSelect() {
@@ -3555,25 +3636,25 @@ visibleRows(): TableRow[] {
             : r
         )
       );
-    } catch {}
+    } catch { }
 
     // Background backend PATCH — must use MongoDB _id, not business id
     const apiCall = (() => {
       if (!mongoId) return null;
       switch (module) {
         case "materials": return this.api["patchMaterial"]?.(mongoId, backendPayload) || null;
-        case "labour":    return this.api["patchLabour"]?.(mongoId, backendPayload) || null;
-        case "expenses":  return this.api["patchExpense"]?.(mongoId, backendPayload) || null;
+        case "labour": return this.api["patchLabour"]?.(mongoId, backendPayload) || null;
+        case "expenses": return this.api["patchExpense"]?.(mongoId, backendPayload) || null;
         case "generalExpenses": return this.api["patchExpense"]?.(mongoId, backendPayload) || null;
-        case "payments":  return this.api["patchPayment"]?.(mongoId, backendPayload) || null;
-        case "vendors":   return this.api["patchVendor"]?.(mongoId, backendPayload) || null;
+        case "payments": return this.api["patchPayment"]?.(mongoId, backendPayload) || null;
+        case "vendors": return this.api["patchVendor"]?.(mongoId, backendPayload) || null;
         case "subcontractors": return this.api["patchSubcontractor"]?.(mongoId, backendPayload) || null;
         default: return null;
       }
     })();
     if (apiCall && typeof apiCall.subscribe === "function") {
       apiCall.subscribe({
-        next: () => {},
+        next: () => { },
         error: (err: any) => console.warn(`[Patch] ${module}/${bizId} (${mongoId}) ${columnKey}=${value}:`, err?.error?.message || err?.message || err),
       });
     }
@@ -3589,7 +3670,7 @@ visibleRows(): TableRow[] {
       list.map((p) => (String(p._id) === paymentId ? { ...p, ...patch } : p))
     );
     this.api.updateSubcontractorPayment(paymentId, patch).subscribe({
-      next: () => {},
+      next: () => { },
       error: (err: any) => {
         console.warn("[Patch] subcontractor payment", err?.error?.message || err?.message || err);
         this.loadSubcontractorPayments();
@@ -3654,12 +3735,12 @@ visibleRows(): TableRow[] {
           String(c["id"] || c["clientId"] || "") === bizId ? { ...c, [columnKey]: value, [backendKey]: value } : c
         )
       );
-    } catch {}
+    } catch { }
 
     // Backend PATCH — use MongoDB _id
     if (mongoId && this.api["patchClient"]) {
       this.api["patchClient"](mongoId, payload).subscribe({
-        next: () => {},
+        next: () => { },
         error: (err: any) => console.warn(`[PatchClient] ${bizId} (${mongoId}) ${columnKey}=${value}:`, err?.error?.message || err?.message || err),
       });
     }
@@ -4001,7 +4082,7 @@ visibleRows(): TableRow[] {
       exportFormat,
     }));
 
-const inventory = this.data.inventory().map((row) => ({
+    const inventory = this.data.inventory().map((row) => ({
       __rowId: `inventory:${row.id}`,
       __projectId: row.projectId,
       projectId: row.projectId,
@@ -4090,6 +4171,45 @@ const inventory = this.data.inventory().map((row) => ({
     return output;
   }
 
+  /**
+   * Fetch every sub-contractor from the backend (paginating up to the
+   * page size the /subcontractors page uses) so the record-form dropdown
+   * matches the /subcontractors list exactly. Triggered when the user
+   * opens the Add Record dialog or the sub-contractor dropdown.
+   */
+  private async loadAllSubcontractorNames(): Promise<void> {
+    if (this.loadingAllSubcontractors()) return;
+    this.loadingAllSubcontractors.set(true);
+    const pageSize = 500;
+    const collected: string[] = [];
+    const seen = new Set<string>();
+    try {
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const res = await firstValueFrom(this.api.listSubcontractors({ limit: pageSize, page }));
+        const items: any[] = (res as any)?.items || [];
+        for (const row of items) {
+          const name = String(row?.subcontractorName || row?.name || "").trim();
+          if (name && !seen.has(name.toLowerCase())) {
+            seen.add(name.toLowerCase());
+            collected.push(name);
+          }
+        }
+        const total = Number((res as any)?.total ?? 0);
+        const pages = Number((res as any)?.pages ?? Math.ceil(total / pageSize));
+        totalPages = pages > 0 ? pages : 1;
+        page += 1;
+        if (items.length === 0) break;
+      } while (page <= totalPages);
+      this.allSubcontractorNames.set(collected.sort((a, b) => a.localeCompare(b)));
+    } catch {
+      // Fall back to whatever the hydration already has.
+    } finally {
+      this.loadingAllSubcontractors.set(false);
+    }
+  }
+
   selectOptions(module: DashboardModule, key: string): string[] {
     if (key === "site" || key === "assignedSite") return this.siteOptionsForModule(module);
     if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
@@ -4097,6 +4217,8 @@ const inventory = this.data.inventory().map((row) => ({
     if (key === "projectId") return this.projectIdOptions();
     if (module === "subcontractors" && (key === "projectName" || key === "project")) return this.projectNameOptions();
     if (module === "subcontractors" && (key === "subcontractorName" || key === "subcontractor")) {
+      const full = this.allSubcontractorNames();
+      if (full.length > 0) return full;
       return this.sortedUnique(
         this.data
           .subcontractors()

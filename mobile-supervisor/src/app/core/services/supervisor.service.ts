@@ -303,14 +303,19 @@ export class SupervisorService {
 
   // ---------------- Subcontractors ----------------
   getSubcontractors(projectId?: string, siteId?: string) {
-    // Universal list by default — the worker create page needs every
-    // active sub-contractor the supervisor has access to, regardless of
-    // which site they happen to be working on. Pass `projectId` only
-    // when you actually need it scoped.
-    const params: Record<string, string> = {};
+    // Mirror the web /subcontractors page: fetch every subcontractor
+    // (not just active ones) using the same 500-row window so the
+    // worker-create dropdown matches what the office sees.
+    const params: Record<string, string | number> = { limit: 500, page: 1 };
     if (projectId) params['projectId'] = projectId;
     if (siteId) params['siteId'] = siteId;
-    return this.api.get<{ subcontractors: Subcontractor[] }>('/supervisor/subcontractors', params);
+    return this.api.get<{
+      subcontractors: Subcontractor[];
+      total?: number;
+      page?: number;
+      limit?: number;
+      pages?: number;
+    }>('/supervisor/subcontractors', params);
   }
 
   // ---------------- Supervisors (mobile) ----------------

@@ -3,6 +3,6 @@
   "appName": "AGB(Annai Golden Builders)",
   "webDir": "www/browser",
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": true
   }
 }

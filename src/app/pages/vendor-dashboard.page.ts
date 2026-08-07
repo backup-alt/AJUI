@@ -408,12 +408,29 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
   `,
   styles: [`
     .vendor-card .card-head {
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      padding-top: 12px;
       padding-bottom: 12px;
       border-bottom: 1px solid #e5eaf1;
       margin-bottom: 12px;
     }
     .vendor-card .head-meta {
       flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      align-self: center !important;
+      margin: 0;
+      padding: 0;
+    }
+    .vendor-card .identity {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex: 1 1 auto;
     }
     .status-pill {
       display: inline-flex;

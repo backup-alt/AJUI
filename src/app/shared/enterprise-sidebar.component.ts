@@ -20,7 +20,7 @@ type SidebarItem = {
   standalone: true,
   imports: [CommonModule, RouterLink, IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenu],
   template: `
-    <ion-menu contentId="main-content" type="overlay" class="enterprise-sidebar">
+    <ion-menu contentId="main-content" type="overlay" menuId="enterprise-sidebar" class="enterprise-sidebar">
       <ion-content>
         <div class="sidebar-shell">
           <div class="sidebar-logo-wrap">
@@ -57,7 +57,7 @@ type SidebarItem = {
             </div>
             <div class="sidebar-project-scroll">
               <div *ngFor="let project of filteredSidebarProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
-                <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']">
+                <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']" (click)="closeMenu()">
                   <span>{{ project.name }}</span>
                   <small>
                     <em>
@@ -79,7 +79,7 @@ type SidebarItem = {
                 </div>
               </div>
             </div>
-            <a class="sidebar-view-all-projects" [routerLink]="['/projects']">
+            <a class="sidebar-view-all-projects" [routerLink]="['/projects']" (click)="closeMenu()">
               <span>View all projects</span>
               <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                 <path d="M5 12h14" />
@@ -100,7 +100,7 @@ export class EnterpriseSidebarComponent {
   private readonly menuController = inject(MenuController);
 
   closeMenu() {
-    void this.menuController.close();
+    void this.menuController.close("enterprise-sidebar");
   }
 
   @Input() active = "dashboard";

@@ -1132,6 +1132,11 @@ export class ProjectWorkspacePage {
   readonly activeFilterValueKey = signal("");
   readonly openDraftSelect = signal("");
   readonly draftSelectSearch = signal("");
+  /** Full list of subcontractor names for the record-form dropdown.
+   *  Populated on demand from /api/subcontractors so it always matches the
+   *  /subcontractors page, not just the hydration's first page. */
+  readonly allSubcontractorNames = signal<string[]>([]);
+  readonly loadingAllSubcontractors = signal(false);
   readonly dateFilterOpen = signal(false);
   readonly dateRange = signal({ start: "", end: "" });
   readonly datePickerTarget = signal<"start" | "end">("start");
@@ -2133,6 +2138,11 @@ export class ProjectWorkspacePage {
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
+    // Ensure the sub-contractor dropdown lists every record from the
+    // /subcontractors page (not just the hydration's first page).
+    if (this.activeSection() === "subcontractors") {
+      void this.loadAllSubcontractorNames();
+    }
   }
 
   closeInventoryInitDialog() {
@@ -2284,6 +2294,12 @@ export class ProjectWorkspacePage {
   toggleDraftSelect(key: string) {
     this.openDraftSelect.update((current) => (current === key ? "" : key));
     this.draftSelectSearch.set("");
+    // When the user opens the sub-contractor dropdown, make sure the
+    // full list from /api/subcontractors is loaded so it matches the
+    // /subcontractors page exactly.
+    if (this.openDraftSelect() === key && this.activeSection() === "subcontractors" && (key === "subcontractorName" || key === "subcontractor")) {
+      void this.loadAllSubcontractorNames();
+    }
   }
 
   closeDraftSelect() {
@@ -3431,6 +3447,45 @@ export class ProjectWorkspacePage {
     return raw == null ? "" : String(raw);
   }
 
+  /**
+   * Fetch every sub-contractor from the backend (paginating up to the
+   * page size the /subcontractors page uses) so the record-form dropdown
+   * matches the /subcontractors list exactly. Triggered when the user
+   * opens the Add Record dialog or the sub-contractor dropdown.
+   */
+  private async loadAllSubcontractorNames(): Promise<void> {
+    if (this.loadingAllSubcontractors()) return;
+    this.loadingAllSubcontractors.set(true);
+    const pageSize = 500;
+    const collected: string[] = [];
+    const seen = new Set<string>();
+    try {
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const res = await firstValueFrom(this.api.listSubcontractors({ limit: pageSize, page }));
+        const items: any[] = (res as any)?.items || [];
+        for (const row of items) {
+          const name = String(row?.subcontractorName || row?.name || "").trim();
+          if (name && !seen.has(name.toLowerCase())) {
+            seen.add(name.toLowerCase());
+            collected.push(name);
+          }
+        }
+        const total = Number((res as any)?.total ?? 0);
+        const pages = Number((res as any)?.pages ?? Math.ceil(total / pageSize));
+        totalPages = pages > 0 ? pages : 1;
+        page += 1;
+        if (items.length === 0) break;
+      } while (page <= totalPages);
+      this.allSubcontractorNames.set(collected.sort((a, b) => a.localeCompare(b)));
+    } catch {
+      // Fall back to whatever the hydration already has.
+    } finally {
+      this.loadingAllSubcontractors.set(false);
+    }
+  }
+
   selectOptions(section: ModuleKey, key: string): string[] {
     if (key === "site" || key === "siteName") return this.projectSites();
     if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
@@ -3448,6 +3503,11 @@ export class ProjectWorkspacePage {
     // can always be matched; on save we re-resolve to the matching
     // subcontractorId to avoid matching on name alone.
     if (section === "subcontractors" && (key === "subcontractorName" || key === "subcontractor")) {
+      const full = this.allSubcontractorNames();
+      if (full.length > 0) return full;
+      // Fallback while the full list is still loading: merge the
+      // hydration's first page with anything already in memory so the
+      // dropdown is never empty.
       return [...new Set(
         this.data.subcontractors()
           .map((s) => s.subcontractorName)

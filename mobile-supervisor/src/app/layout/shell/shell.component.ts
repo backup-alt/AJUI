@@ -49,6 +49,7 @@ import {
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { MenuController } from '@ionic/angular/standalone';
 import { Site } from '../../shared/models';
 
 @Component({
@@ -77,7 +78,7 @@ import { Site } from '../../shared/models';
     RouterLinkActive,
   ],
   template: `
-    <ion-menu content-id="main-content" type="overlay" class="agb-menu">
+    <ion-menu menuId="agb-menu" content-id="main-content" type="overlay" class="agb-menu">
       <ion-header class="agb-menu-header">
         <div class="menu-brand">
           <div class="menu-brand-logo">
@@ -106,34 +107,34 @@ import { Site } from '../../shared/models';
 
         <div class="menu-section-label">Main Menu</div>
         <ion-list lines="none" class="menu-list">
-          <ion-item routerLink="/tabs/dashboard" routerLinkActive="selected" button detail="false">
+          <ion-item routerLink="/tabs/dashboard" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="home-outline" slot="start"></ion-icon>
             <ion-label>Dashboard</ion-label>
           </ion-item>
-          <ion-item routerLink="/tabs/sites" routerLinkActive="selected" button detail="false">
+          <ion-item routerLink="/tabs/sites" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="location-outline" slot="start"></ion-icon>
             <ion-label>My Sites</ion-label>
           </ion-item>
-          <ion-item routerLink="/tabs/inventory" routerLinkActive="selected" button detail="false">
+          <ion-item routerLink="/tabs/inventory" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="grid-outline" slot="start"></ion-icon>
             <ion-label>Inventory</ion-label>
           </ion-item>
-          <ion-item routerLink="/tabs/materials" routerLinkActive="selected" button detail="false">
+          <ion-item routerLink="/tabs/materials" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="cube-outline" slot="start"></ion-icon>
             <ion-label>Materials</ion-label>
           </ion-item>
-          <ion-item routerLink="/tabs/labour" routerLinkActive="selected" button detail="false">
+          <ion-item routerLink="/tabs/labour" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="people-outline" slot="start"></ion-icon>
             <ion-label>Labour</ion-label>
           </ion-item>
-          <ion-item routerLink="/tabs/expenses" routerLinkActive="selected" button detail="false">
+          <ion-item routerLink="/tabs/expenses" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="wallet-outline" slot="start"></ion-icon>
             <ion-label>Expenses</ion-label>
             @if (pendingExpenses() > 0) {
               <span class="menu-badge" slot="end">{{ pendingExpenses() }}</span>
             }
           </ion-item>
-          <ion-item routerLink="/tabs/requests" routerLinkActive="selected" button detail="false">
+          <ion-item routerLink="/tabs/requests" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="clipboard-outline" slot="start"></ion-icon>
             <ion-label>Requests</ion-label>
             @if (pendingApprovals() > 0) {
@@ -144,7 +145,7 @@ import { Site } from '../../shared/models';
 
         <div class="menu-section-label">Account</div>
         <ion-list lines="none" class="menu-list">
-          <ion-item routerLink="/tabs/profile" routerLinkActive="selected" button detail="false">
+          <ion-item routerLink="/tabs/profile" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="person-circle-outline" slot="start"></ion-icon>
             <ion-label>Profile</ion-label>
           </ion-item>
@@ -594,6 +595,20 @@ export class ShellComponent implements OnInit {
   private notifications = inject(NotificationService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
+  private menuController = inject(MenuController);
+
+  /**
+   * Close the side menu after a navigation tap. Without this, the
+   * overlay stays open over the destination page until the user
+   * taps the backdrop or a menu button.
+   */
+  async closeMenu(): Promise<void> {
+    try {
+      await this.menuController.close('agb-menu');
+    } catch {
+      // Menu may already be closed or unmounted — safe to ignore.
+    }
+  }
 
   currentUser = signal<{ name: string; email: string } | null>(null);
   sites = signal<Site[]>([]);

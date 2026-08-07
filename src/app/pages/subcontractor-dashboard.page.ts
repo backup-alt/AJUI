@@ -100,15 +100,6 @@ interface SubcontractorRow {
                             <path d="m14.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
                           </svg>
                         </button>
-                        <button type="button" class="icon-btn danger" aria-label="Delete" title="Delete sub-contractor" (click)="deleteRow(row, $event)">
-                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                            <path d="M5 7h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                            <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-                            <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-                            <path d="M10 11v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                            <path d="M14 11v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                          </svg>
-                        </button>
                       </td>
                     </tr>
                   }
@@ -221,7 +212,7 @@ interface SubcontractorRow {
     .status-pill { display: inline-flex; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
     .status-pill.active { background: rgba(16, 185, 129, 0.14); color: #047857; }
     .status-pill.inactive { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
-    .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .row-actions { display: flex; gap: 6px; justify-content: center; }
     .name-link { color: #002263; font-weight: 700; text-decoration: none; }
     .name-link:hover { text-decoration: underline; }
     .icon-btn {
@@ -403,20 +394,6 @@ export class SubcontractorDashboardPage {
       error: (err) => {
         this.saving.set(false);
         this.drawerError.set(err?.error?.error || err?.error?.message || err?.message || "Could not save.");
-      },
-    });
-  }
-
-  deleteRow(row: SubcontractorRow, event?: Event) {
-    event?.stopPropagation();
-    if (!window.confirm(`Delete ${row.subcontractorName}? This also removes every payment recorded against them.`)) return;
-    this.api.deleteSubcontractor(row.id).subscribe({
-      next: () => {
-        this.rows.update((list) => list.filter((r) => r.id !== row.id));
-        this.presentToast("Sub-contractor deleted.");
-      },
-      error: (err) => {
-        this.presentToast(err?.error?.error || err?.message || "Delete failed.");
       },
     });
   }

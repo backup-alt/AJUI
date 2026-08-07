@@ -26,6 +26,7 @@ import { addIcons } from 'ionicons';
 import { locationOutline, peopleOutline, businessOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
 import { SupervisorService } from '../../../core/services/supervisor.service';
+import { ApiService } from '../../../core/services/api.service';
 import type { Subcontractor } from '../../../shared/models/labour.model';
 
 const LABOUR_TYPES = [
@@ -266,6 +267,7 @@ const LABOUR_TYPES = [
 })
 export class LabourCreateWorkerPage implements OnInit {
   private supervisor = inject(SupervisorService);
+  private api = inject(ApiService);
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
 
@@ -294,6 +296,10 @@ export class LabourCreateWorkerPage implements OnInit {
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
+    // Always fetch the freshest list of subcontractors when the form opens —
+    // the GET cache may hold a stale snapshot if a sub-contractor was created
+    // or modified from another device since the last visit.
+    this.api.invalidateGetCache('/supervisor/subcontractors');
     await this.loadSubcontractors();
   }
 

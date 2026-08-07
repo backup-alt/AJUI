@@ -564,6 +564,13 @@ export class PendingApprovalsPage implements OnInit {
     // Optimistically drop the row from local lists so the UI updates instantly.
     this.removeRowFromLists(row.rowId);
 
+    // Fire the toast immediately so the user gets instant feedback on their
+    // click, rather than waiting for the full backend round-trip (which can
+    // include DB writes, inventory updates, ledger recomputes, and push
+    // notifications). On failure we restore the row and surface a separate
+    // error toast below.
+    this.showToast(status === "Approved" ? "Request approved successfully" : "Request rejected successfully", "success");
+
     try {
       if (status === "Approved") {
         let payload: any = {};
@@ -591,8 +598,6 @@ export class PendingApprovalsPage implements OnInit {
       } else {
         await firstValueFrom(this.approvalsService.reject(row.rowId));
       }
-
-      this.showToast(status === "Approved" ? "Request approved successfully" : "Request rejected successfully", "success");
     } catch (e: any) {
       // Restore the row so the user can retry.
       this.restoreRow(row.rowId, snapshot);
