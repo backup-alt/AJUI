@@ -195,13 +195,6 @@ interface WageCalculation {
             <section class="info-section">
               <h2 class="section-title">Employment Information</h2>
               <div class="info-card">
-                <div class="info-row">
-                  <span class="info-icon"><ion-icon name="briefcase-outline"></ion-icon></span>
-                  <div class="info-data">
-                    <span class="info-label">Shift Type</span>
-                    <span class="info-value">Day Shift</span>
-                  </div>
-                </div>
                 @if (worker()!.isSubcontract && worker()!.subcontractorName) {
                   <div class="info-row highlight-row">
                     <span class="info-icon"><ion-icon name="business-outline"></ion-icon></span>

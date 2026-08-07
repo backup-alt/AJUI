@@ -131,21 +131,6 @@ import { AuthService } from '../../../core/services/auth.service';
             </ion-item>
           </div>
 
-          <ion-item class="form-item shift-item">
-            <ion-label position="stacked">Shift</ion-label>
-            <ion-segment [(ngModel)]="labour.shift" mode="ios">
-              <ion-segment-button value="Day">
-                <ion-label>Day</ion-label>
-              </ion-segment-button>
-              <ion-segment-button value="Evening">
-                <ion-label>Evening</ion-label>
-              </ion-segment-button>
-              <ion-segment-button value="Night">
-                <ion-label>Night</ion-label>
-              </ion-segment-button>
-            </ion-segment>
-          </ion-item>
-
           <ion-item class="form-item">
             <ion-label position="stacked">Payment Mode</ion-label>
             <ion-select
@@ -259,7 +244,6 @@ import { AuthService } from '../../../core/services/auth.service';
     }
     .form-row .form-item { border-right: 1px solid #e5e7eb; }
     .form-row .form-item:last-of-type { border-right: none; }
-    .shift-item { min-height: 80px; }
     .form-actions { padding: 20px 0; }
     .readonly-input { --color: #111827; font-weight: 600; opacity: 1; }
   `],

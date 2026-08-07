@@ -164,6 +164,8 @@ export function mapLabour(l: any): any {
     partyName: l.partyName,
     category: l.category,
     attendanceDate: l.attendanceDate,
+    subcontractorName: l.subcontractorName || "",
+    subcontractorId: l.subcontractorId || "",
     presentCount: l.presentCount,
     presentDays: l.presentDays,
     absentDays: l.absentDays,

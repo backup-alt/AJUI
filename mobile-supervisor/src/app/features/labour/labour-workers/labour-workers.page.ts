@@ -173,14 +173,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
                     <span><ion-icon name="person-outline"></ion-icon> Direct Employee</span>
                   }
                 </p>
-                <div class="worker-pay">
-                  <span class="pay-primary">
-                    <ion-icon name="wallet-outline"></ion-icon>
-                    <span class="pay-amount">{{ getDailyWage(worker) | currency:'INR':'symbol':'1.0-0' }}</span>
-                    <span class="pay-suffix">/day</span>
-                  </span>
-                  <span class="pay-secondary">{{ worker.weeklyPay | currency:'INR':'symbol':'1.0-0' }}/wk</span>
-                </div>
               </div>
               <div class="worker-actions" (click)="$event.stopPropagation()">
                 @if (!isMarkedToday(worker)) {
@@ -387,31 +379,6 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       margin: 0 0 6px;
     }
     .worker-meta ion-icon { font-size: 11px; vertical-align: -1px; margin-right: 2px; }
-    .worker-pay {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-    }
-    .pay-primary {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 2px;
-      font-size: 12px;
-      color: var(--m3-on-surface-muted);
-    }
-    .pay-primary ion-icon { font-size: 13px; }
-    .pay-amount {
-      color: var(--m3-primary);
-      font-weight: 800;
-      font-size: 13px;
-    }
-    .pay-suffix { font-size: 10px; }
-    .pay-secondary {
-      font-size: 11px;
-      color: var(--m3-on-surface-muted);
-      opacity: 0.7;
-    }
-
     .worker-actions {
       display: flex;
       gap: 6px;

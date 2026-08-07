@@ -2615,16 +2615,23 @@ export class UniversalDashboardPage implements OnInit {
   }
 
   /**
-   * Labour rows are grouped by attendance date so a single date shows every
-   * labour type (and every attendance entry) in one row. Single-record dates
-   * pass through unchanged; multi-record dates become read-only aggregate
-   * rows carrying their source records in `__labourGroup`.
+   * Labour rows are grouped by sub-contractor + attendance date so a single
+   * day shows every labour entry (and every attendance row) for that
+   * sub-contractor in one row. Single-record groups pass through unchanged;
+   * multi-record groups become read-only aggregate rows carrying their
+   * source records in `__labourGroup`.
+   *
+   * Rows without a sub-contractor name get bucketed under a stable
+   * "(No sub-contractor)" label so the Subcontractor column never
+   * appears blank and the grouping stays consistent across every page.
    */
   groupLabourRows(rows: TableRow[]): TableRow[] {
+    const NO_SUB = "(No sub-contractor)";
     const byKey = new Map<string, TableRow[]>();
     for (const row of rows) {
       const date = String(row["attendanceDate"] || "").trim();
-      const sub = String(row["subcontractorName"] || "").trim();
+      const rawSub = String(row["subcontractorName"] || "").trim();
+      const sub = rawSub || NO_SUB;
       const key = date ? `${sub}||${date}` : `__no-date__:${sub}:${row["__rowId"] || "?"}`;
       if (!byKey.has(key)) byKey.set(key, []);
       byKey.get(key)!.push(row);
@@ -2659,7 +2666,7 @@ export class UniversalDashboardPage implements OnInit {
           client: distinctValues("client"),
           project: distinctValues("project"),
           site: distinctValues("site"),
-          subcontractorName: distinctValues("subcontractorName"),
+          subcontractorName: distinctValues("subcontractorName") || NO_SUB,
           attendance: this.formatGroupedAttendance(groupRows),
           shift: String(groupRows.reduce((sum, row) => sum + this.moneyNumber(row["shift"]), 0)),
           overtime: totalOvertime ? String(totalOvertime) : distinctValues("overtime"),
@@ -3955,6 +3962,7 @@ export class UniversalDashboardPage implements OnInit {
       project: projectName(row.projectId),
       site: row.site,
       attendanceDate: (row as any)["attendanceDate"] || "",
+      subcontractorName: (row as any).subcontractorName || "",
       staffName: row["supervisorName"] || row.party,
       supervisorName: row["supervisorName"] || "",
       dailyWage: row.dailyWage,

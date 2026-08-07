@@ -1713,17 +1713,24 @@ export class ProjectWorkspacePage {
   }
 
   /**
-   * Labour rows are grouped by attendance date so a single date shows every
-   * labour type (and every attendance entry) in one row. Single-record dates
-   * pass through unchanged so inline editing keeps working; multi-record
-   * dates become read-only aggregate rows carrying their source records in
-   * `__labourGroup`.
+   * Labour rows are grouped by subcontractor + attendance date so a single
+   * day shows every labour entry (and every attendance row) for that
+   * sub-contractor in one row. Single-record groups pass through unchanged
+   * so inline editing keeps working; multi-record groups become read-only
+   * aggregate rows carrying their source records in `__labourGroup`.
+   *
+   * Rows with no sub-contractor name are kept as their own group so the
+   * "Subcontractor" column displays a clear "(No sub-contractor)" label
+   * instead of an empty cell — that way the column is never blank and the
+   * grouping remains consistent across every page that shows labour.
    */
   groupLabourRows(rows: TableRow[]): TableRow[] {
+    const NO_SUB = "(No sub-contractor)";
     const byKey = new Map<string, TableRow[]>();
     for (const row of rows) {
       const date = String(row["attendanceDate"] || "").trim();
-      const sub = String(row["subcontractorName"] || "").trim();
+      const rawSub = String(row["subcontractorName"] || "").trim();
+      const sub = rawSub || NO_SUB;
       const key = date ? `${sub}||${date}` : `__no-date__:${sub}:${row["__rowId"] || "?"}`;
       if (!byKey.has(key)) byKey.set(key, []);
       byKey.get(key)!.push(row);
@@ -1757,7 +1764,7 @@ export class ProjectWorkspacePage {
           staffCount: String(groupRows.reduce((sum, row) => sum + this.moneyNumber(row["staffCount"]), 0)),
           client: distinctValues("client"),
           site: distinctValues("site"),
-          subcontractorName: distinctValues("subcontractorName"),
+          subcontractorName: distinctValues("subcontractorName") || NO_SUB,
           attendance: this.formatGroupedAttendance(groupRows),
           shift: String(groupRows.reduce((sum, row) => sum + this.moneyNumber(row["shift"]), 0)),
           overtime: totalOvertime ? String(totalOvertime) : distinctValues("overtime"),
@@ -3280,7 +3287,8 @@ export class ProjectWorkspacePage {
       projectId: row.projectId,
       client: currentProject?.client ?? "",
       clientId: currentClient?.id ?? this.clientId(),
-      attendanceDate: "2026-06-05",
+      attendanceDate: row.attendanceDate || "2026-06-05",
+      subcontractorName: (row as any).subcontractorName || "",
       staffName: row["supervisorName"] || (row as any)["partyName"] || row.party,
       site: row.site,
       dailyWage: row.dailyWage,
