@@ -622,7 +622,6 @@ export class ErpDataService {
       status?: ProjectStatus;
       totalValue: number;
       receivedAmount?: number;
-      openingBalance?: number;
     },
   ): Promise<Project> {
     const createLocalProject = (): Project => {
@@ -645,7 +644,7 @@ export class ErpDataService {
         receivedAmount: input.receivedAmount ?? 0,
         materialSpend: 0,
         labourPayable: 0,
-        expenseBalance: input.openingBalance ?? 0,
+        expenseBalance: 0,
         completion: 0,
       };
       this.projects.update((projects) => [localProject, ...projects]);
@@ -683,7 +682,7 @@ export class ErpDataService {
           totalValue: input.totalValue ?? 0,
           advanceAmount: 0,
           receivedAmount: input.receivedAmount ?? 0,
-          expenseBalance: input.openingBalance ?? 0,
+          expenseBalance: 0,
         }),
       );
     } catch (err) {
@@ -707,7 +706,7 @@ export class ErpDataService {
       receivedAmount: created.receivedAmount !== undefined ? Number(created.receivedAmount) : Number(created.advanceAmount) || 0,
       materialSpend: Number(created.materialSpend) || 0,
       labourPayable: Number(created.labourPayable) || 0,
-      expenseBalance: created.expenseBalance !== undefined ? Number(created.expenseBalance) : input.openingBalance ?? 0,
+      expenseBalance: created.expenseBalance !== undefined ? Number(created.expenseBalance) : 0,
       completion: Number(created.completion) || 0,
     };
 

@@ -3006,7 +3006,6 @@ export class ProjectWorkspacePage {
       startDate: project.startDate,
       supervisor: project.supervisor,
       totalValue: project.totalValue,
-      openingBalance: project.expenseBalance,
       status: project.status,
     };
   }
@@ -3015,14 +3014,8 @@ export class ProjectWorkspacePage {
     const currentClient = this.client();
     if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
     const editing = this.editingProject();
-    const { openingBalance, ...projectValue } = value;
     if (editing) {
-      const updated = this.data.updateProject(editing.id, { ...projectValue, expenseBalance: openingBalance });
-      if (editing.sites[0]) {
-        this.data.persistSiteOpeningBalance(editing.id, editing.sites[0], openingBalance);
-      } else {
-        this.data.setExpenseOpeningBalance(editing.id, "Main Site", openingBalance);
-      }
+      const updated = this.data.updateProject(editing.id, { ...value });
       // Persist supervisor/site changes to the backend so the supervisor mobile
       // app receives the updated site assignments.
       void this.data.persistProjectEdit(editing.id, {
@@ -3033,7 +3026,6 @@ export class ProjectWorkspacePage {
         supervisorId: value.supervisorId,
         status: value.status,
         totalValue: value.totalValue,
-        expenseBalance: openingBalance,
       });
       this.editingProject.set(null);
       this.showProjectForm.set(false);
@@ -3043,7 +3035,7 @@ export class ProjectWorkspacePage {
       return;
     }
     try {
-      const project = await this.data.addProject(currentClient, { ...projectValue, openingBalance });
+      const project = await this.data.addProject(currentClient, { ...value });
       this.showProjectForm.set(false);
       setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]));
     } catch (err) {
