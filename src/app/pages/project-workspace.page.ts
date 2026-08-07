@@ -207,6 +207,22 @@ const siteMaterialDetailFields: FieldSchema[] = [
       max-height: 240px;
       overflow-y: auto;
     }
+    .erp-select-filter {
+      width: 100%;
+      padding: 8px 10px;
+      margin: 0 0 6px;
+      border: 1px solid var(--ui-line);
+      border-radius: 6px;
+      background: var(--ui-panel, #fff);
+      color: var(--ui-text);
+      font-size: 13px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .erp-select-filter:focus {
+      border-color: var(--ui-accent, #3b82f6);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+    }
     .image-preview-overlay {
       position: fixed;
       top: 0;
@@ -883,18 +899,16 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </svg>
                           </button>
                           <div class="erp-select-panel" *ngIf="isDraftSelectOpen(column.key)">
-                            <label class="erp-select-search">
-                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                                <circle cx="9" cy="9" r="5.5" />
-                                <path d="m13.5 13.5 3 3" />
-                              </svg>
-                              <input
-                                type="text"
-                                placeholder="Search"
-                                [value]="draftSelectSearch()"
-                                (input)="draftSelectSearch.set($any($event.target).value)"
-                              />
-                            </label>
+                            <input
+                              #draftSelectSearchInput
+                              type="text"
+                              class="erp-select-filter"
+                              placeholder="Type to filter"
+                              autofocus
+                              [value]="draftSelectSearch()"
+                              (input)="draftSelectSearch.set($any($event.target).value)"
+                              (keydown.escape)="closeDraftSelect()"
+                            />
                             <button
                               *ngFor="let option of filteredSelectOptions(activeSection(), column.key)"
                               type="button"
@@ -1280,7 +1294,10 @@ export class ProjectWorkspacePage {
       expenses: () => this.api.listExpenses({ limit: 200, projectId: this.projectId() }),
       payments: () => this.api.listPayments({ limit: 200, projectId: this.projectId() }),
       vendors: () => this.api.listVendors({ limit: 200 }),
-      subcontractors: () => this.api.listSubcontractors({ limit: 200, projectId: this.projectId() }),
+      // Subcontractors are universal across projects on the backend — never
+      // filter by projectId here, or the dropdown will be empty when the
+      // current project doesn't own the subs the user wants to pick.
+      subcontractors: () => this.api.listSubcontractors({ limit: 200 }),
       inventory: () => this.api.listInventory({ limit: 200, projectId: this.projectId() }),
     };
     const mapperMap: Record<string, (x: any) => any> = {
@@ -2266,6 +2283,11 @@ export class ProjectWorkspacePage {
 
   toggleDraftSelect(key: string) {
     this.openDraftSelect.update((current) => (current === key ? "" : key));
+    this.draftSelectSearch.set("");
+  }
+
+  closeDraftSelect() {
+    this.openDraftSelect.set("");
     this.draftSelectSearch.set("");
   }
 

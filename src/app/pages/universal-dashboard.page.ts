@@ -691,35 +691,33 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <label *ngFor="let column of recordFormColumns()">
                     <span>{{ formColumnLabel(column) }}</span>
                     <ng-container *ngIf="isRecordSelectField(column); else dashboardDraftInput">
-                      <div
-                        class="erp-select-menu draft-select-menu"
-                        [class.open]="isDraftSelectOpen(column.key)"
-                      >
-                        <button type="button" class="erp-select-trigger" (click)="toggleDraftSelect(column.key)">
-                          <span>{{ draftRow()[column.key] || 'Select' }}</span>
-                          <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                            <path d="M5.5 7.5 10 12l4.5-4.5" />
-                          </svg>
-                        </button>
-                        <div class="erp-select-panel" *ngIf="isDraftSelectOpen(column.key)">
-                          <label class="erp-select-search">
+                        <div
+                          class="erp-select-menu draft-select-menu"
+                          [class.open]="isDraftSelectOpen(column.key)"
+                        >
+                          <button type="button" class="erp-select-trigger" (click)="toggleDraftSelect(column.key)">
+                            <span>{{ draftRow()[column.key] || 'Select' }}</span>
                             <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                              <circle cx="9" cy="9" r="5.5" />
-                              <path d="m13.5 13.5 3 3" />
+                              <path d="M5.5 7.5 10 12l4.5-4.5" />
                             </svg>
+                          </button>
+                          <div class="erp-select-panel" *ngIf="isDraftSelectOpen(column.key)">
                             <input
+                              #draftSelectSearchInput
                               type="text"
-                              placeholder="Search"
+                              class="erp-select-filter"
+                              placeholder="Type to filter"
+                              autofocus
                               [value]="draftSelectSearch()"
                               (input)="draftSelectSearch.set($any($event.target).value)"
+                              (keydown.escape)="closeDraftSelect()"
                             />
-                          </label>
-                          <button
-                            *ngFor="let option of filteredSelectOptions(activeModule(), column.key)"
-                            type="button"
-                            [class.selected]="option === draftRow()[column.key]"
-                            (click)="selectDraftOption(column.key, option)"
-                          >
+                            <button
+                              *ngFor="let option of filteredSelectOptions(activeModule(), column.key)"
+                              type="button"
+                              [class.selected]="option === draftRow()[column.key]"
+                              (click)="selectDraftOption(column.key, option)"
+                            >
                             <span
                               class="select-option-icon"
                               *ngIf="selectOptionIcon(option) as icon"
@@ -936,6 +934,22 @@ const siteMaterialDetailFields: FieldSchema[] = [
       min-width: 220px;
       max-height: 240px;
       overflow-y: auto;
+    }
+    .erp-select-filter {
+      width: 100%;
+      padding: 8px 10px;
+      margin: 0 0 6px;
+      border: 1px solid var(--ui-line);
+      border-radius: 6px;
+      background: var(--ui-panel, #fff);
+      color: var(--ui-text);
+      font-size: 13px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .erp-select-filter:focus {
+      border-color: var(--ui-accent, #3b82f6);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
     }
     .checkbox-label {
       display: flex;
@@ -3238,6 +3252,11 @@ visibleRows(): TableRow[] {
 
   toggleDraftSelect(key: string) {
     this.openDraftSelect.update((current) => (current === key ? "" : key));
+    this.draftSelectSearch.set("");
+  }
+
+  closeDraftSelect() {
+    this.openDraftSelect.set("");
     this.draftSelectSearch.set("");
   }
 
