@@ -3879,9 +3879,11 @@ export class UniversalDashboardPage implements OnInit {
     const sourceRows = this.visibleRows();
     const rows = this.reportRows(module, sourceRows);
     const summary = module === "labour" ? this.labourSummaryHtml(rows) : module === "expenses" ? this.expenseSummaryHtml(sourceRows) : "";
+    // Subtitle is the module name only — the company brand is already
+    // shown in the report header so it isn't repeated here.
     this.openPrintableReport({
       title: module === "labour" ? "Labour Attendance Report" : module === "expenses" ? "Expense Ledger Report" : this.activeConfig().title,
-      subtitle: "Annai Golden Builders - Universal Dashboard",
+      subtitle: this.activeConfig().title,
       columns,
       rows,
       summary,
@@ -3890,9 +3892,12 @@ export class UniversalDashboardPage implements OnInit {
 
   downloadReportRow(row: TableRow) {
     const columns = this.columnsForModule("reports");
+    // Brand is already in the header; the subtitle just describes scope
+    // so the report doesn't carry the redundant "Annai Golden Builders -"
+    // prefix on the dashboard download either.
     this.openPrintableReport({
       title: String(row["reportName"] || "Dashboard Report"),
-      subtitle: `Annai Golden Builders - ${String(row["scope"] || "Universal Dashboard")}`,
+      subtitle: `${String(row["scope"] || "Universal Dashboard")} — ${String(row["owner"] || "")}`.trim(),
       columns,
       rows: [row],
       summary: `<section class="summary"><h2>Report Details</h2><div><strong>Owner</strong><span>${this.escapeHtml(String(row["owner"] || "-"))}</span></div><div><strong>Format</strong><span>${this.escapeHtml(String(row["exportFormat"] || "PDF / Excel"))}</span></div></section>`,
@@ -5032,7 +5037,7 @@ export class UniversalDashboardPage implements OnInit {
 <body>
   <main class="sheet">
     <header>
-      <div><div class="brand">Annai Golden Builders</div><h1>${this.escapeHtml(config.title)}</h1><p>${this.escapeHtml(config.subtitle)}</p></div>
+      <div><div class="brand">Annai Golden Builders PVT LTD</div><h1>${this.escapeHtml(config.title)}</h1><p>${this.escapeHtml(config.subtitle)}</p></div>
       <div class="meta"><strong>Generated</strong><span>${this.escapeHtml(generatedAt)}</span><span>Prepared for review and approval</span></div>
     </header>
     <table>

@@ -62,7 +62,7 @@ export interface BuildExportArgs {
  */
 export async function buildBusinessDocumentXlsx(args: BuildExportArgs): Promise<void> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Annai Golden Builders";
+  wb.creator = "Annai Golden Builders PVT LTD";
   wb.created = new Date();
 
   const sheet = wb.addWorksheet(args.documentTitle, {
@@ -384,7 +384,7 @@ export async function buildBusinessDocumentXlsx(args: BuildExportArgs): Promise<
   const footerRowNumber = sheet.lastRow!.number + 1;
   sheet.mergeCells(`A${footerRowNumber}:${amountColLetter}${footerRowNumber}`);
   const footerCell = sheet.getCell(`A${footerRowNumber}`);
-  footerCell.value = `This is a computer-generated ${args.documentTitle.toLowerCase()} from Annai Golden Builders.`;
+  footerCell.value = `This is a computer-generated ${args.documentTitle.toLowerCase()} from Annai Golden Builders PVT LTD.`;
   footerCell.font = { ...baseFont, italic: true, size: 9, color: { argb: "FF94A3B8" } };
   footerCell.alignment = { vertical: "middle", horizontal: "center" };
 

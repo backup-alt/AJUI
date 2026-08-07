@@ -157,12 +157,14 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
               <div class="worker-body">
                 <div class="worker-name-row">
                   <h3 class="worker-name">{{ worker.name }}</h3>
-                  @if (isMarkedToday(worker)) {
+                </div>
+                @if (isMarkedToday(worker)) {
+                  <div class="worker-marked-row">
                     <span class="marked-badge" title="Attendance already marked for today">
                       <ion-icon name="checkmark-circle-outline"></ion-icon> Attendance Marked
                     </span>
-                  }
-                </div>
+                  </div>
+                }
                 <p class="worker-meta">
                   <span><ion-icon name="business-outline"></ion-icon> {{ worker.subcontractorName || 'Direct Hire' }}</span>
                 </p>
@@ -340,6 +342,14 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .worker-marked-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 4px;
     }
     .marked-badge {
       display: inline-flex;
@@ -353,6 +363,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
       background: rgba(34, 197, 94, 0.12);
       color: #15803d;
       border-radius: 999px;
+      flex-shrink: 0;
     }
     .marked-badge ion-icon { font-size: 11px; }
     .worker-meta {

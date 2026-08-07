@@ -4318,7 +4318,7 @@ export class ProjectWorkspacePage {
 <body>
   <main class="sheet">
     <header>
-      <div><div class="brand">Annai Golden Builders</div><h1>${this.escapeHtml(config.title)}</h1><p>${this.escapeHtml(config.subtitle)}</p></div>
+      <div><div class="brand">Annai Golden Builders PVT LTD</div><h1>${this.escapeHtml(config.title)}</h1><p>${this.escapeHtml(config.subtitle)}</p></div>
       <div class="meta"><strong>Generated</strong><span>${this.escapeHtml(generatedAt)}</span><span>Prepared for review and approval</span></div>
     </header>
     <table>
