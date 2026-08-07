@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from "@angular/core";
-import { IonContent, IonIcon } from "@ionic/angular/standalone";
+import { IonIcon } from "@ionic/angular/standalone";
 import { ApiService } from "../core/api.service";
 
 export type InventoryInitSite = { id: string; name: string };
@@ -15,7 +15,7 @@ export type InventoryInitMaterialRow = {
 @Component({
   selector: "agb-inventory-init-dialog",
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon],
+  imports: [CommonModule, IonIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="form-overlay" role="presentation">

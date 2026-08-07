@@ -3287,7 +3287,7 @@ export class ProjectWorkspacePage {
       projectId: row.projectId,
       client: currentProject?.client ?? "",
       clientId: currentClient?.id ?? this.clientId(),
-      attendanceDate: row.attendanceDate || "2026-06-05",
+      attendanceDate: (row as any).attendanceDate || "2026-06-05",
       subcontractorName: (row as any).subcontractorName || "",
       staffName: row["supervisorName"] || (row as any)["partyName"] || row.party,
       site: row.site,
