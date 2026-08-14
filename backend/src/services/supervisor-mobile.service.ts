@@ -269,7 +269,13 @@ async function buildScopedEntityQuery(
     query.projectId = { $in: access.projectIds };
   }
 
-  const siteScope = await getSiteScopeForFilter(access, filters.siteId);
+  // A project-scoped request is already authorized by project membership.
+  // Only apply site scoping when the caller explicitly chose a site, or when
+  // no project scope is available. This keeps project-level PO materials
+  // visible in the supervisor app without inventing a site assignment.
+  const siteScope = (filters.siteId || access.projectIds.length === 0)
+    ? await getSiteScopeForFilter(access, filters.siteId)
+    : undefined;
   if (siteScope) Object.assign(query, siteScope);
   if (
     !filters.projectId &&
@@ -926,6 +932,22 @@ export async function listMaterialsForSupervisor(
       });
     }
 
+    // Project-level PO materials intentionally have no manual site assignment.
+    // Include them in the Approved view by project scope so a PO-created
+    // material is visible in the supervisor app even when a site is selected.
+    const poMaterialQuery: Record<string, unknown> = {
+      poNumber: { $regex: /^PO-\d{4}-\d{4,}$/ },
+      notes: "Created from purchase order",
+    };
+    if (query.projectId) poMaterialQuery.projectId = query.projectId;
+    else poMaterialQuery._id = { $exists: false };
+    const poMaterials = await Material.find(poMaterialQuery)
+      .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
+      .sort({ _id: -1 })
+      .limit(limit)
+      .lean()
+      .maxTimeMS(20_000);
+
     // Batch-fetch billUrl for purchaseHistory entries across all items
     const allMatIds = items.flatMap((m) =>
       (m.purchaseHistory || []).filter((h: any) => h.materialId).map((h: any) => h.materialId)
@@ -942,7 +964,7 @@ export async function listMaterialsForSupervisor(
     }
 
     return {
-      materials: items.map((m) => ({
+      materials: [...items.map((m) => ({
         _id: m._id.toString(),
         materialId: m._id.toString(),
         projectId: m.projectId,
@@ -973,7 +995,29 @@ export async function listMaterialsForSupervisor(
         status: "Approved" as const,
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
-      })),
+      })), ...poMaterials.map((m) => ({
+        _id: m._id.toString(),
+        materialId: m.materialId,
+        projectId: m.projectId,
+        projectName: m.projectName,
+        siteId: m.siteId,
+        site: m.site,
+        name: m.name,
+        unit: m.unit,
+        requestedQuantity: m.requestedQuantity,
+        approvedQuantity: m.approvedQuantity,
+        purchasedQuantity: m.purchasedQuantity,
+        consumedQuantity: m.consumedQuantity,
+        remainingStock: m.remainingStock,
+        vendor: m.vendor,
+        poNumber: m.poNumber,
+        received: m.status === "Received",
+        requestDate: m.requestDate,
+        status: "Approved" as const,
+        notes: m.notes,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+      }))],
       pagination: {
         limit,
         total: estimatedMobileTotal(items.length, limit, !!filters.cursor),

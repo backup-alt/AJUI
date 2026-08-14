@@ -29,6 +29,12 @@ import {
   createSubcontractorPaymentSchema,
   updateSubcontractorPaymentSchema,
   listSubcontractorPaymentsSchema,
+  createSubcontractorLaborSchema,
+  updateSubcontractorLaborSchema,
+  createPurchaseOrderSchema,
+  updatePurchaseOrderSchema,
+  listPurchaseOrdersSchema,
+  createGstRateSchema,
   listApprovalsSchema,
   listInventorySchema,
   missingMaterialsForSiteSchema,
@@ -180,6 +186,44 @@ router.delete(
   "/subcontractor-payments/:id",
   requireRole("admin", "project_manager"),
   ctrl.deleteSubcontractorPayment
+);
+
+// =================== SUBCONTRACTOR LABOR ROSTER ===================
+router.get("/subcontractor-labor", ctrl.listSubcontractorLabor);
+router.post(
+  "/subcontractor-labor",
+  validate(createSubcontractorLaborSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.createSubcontractorLabor
+);
+router.patch(
+  "/subcontractor-labor/:id",
+  validate(updateSubcontractorLaborSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.updateSubcontractorLabor
+);
+
+// =================== PURCHASE ORDERS ===================
+router.get("/purchase-orders/gst-rates", ctrl.listPurchaseOrderGstRates);
+router.post(
+  "/purchase-orders/gst-rates",
+  validate(createGstRateSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.createPurchaseOrderGstRate
+);
+router.get("/purchase-orders", validate(listPurchaseOrdersSchema, "query"), cache(10), ctrl.listPurchaseOrders);
+router.get("/purchase-orders/:id", cache(20), ctrl.getPurchaseOrder);
+router.post(
+  "/purchase-orders",
+  validate(createPurchaseOrderSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.createPurchaseOrder
+);
+router.put(
+  "/purchase-orders/:id",
+  validate(updatePurchaseOrderSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.updatePurchaseOrder
 );
 
 // =================== APPROVALS ===================

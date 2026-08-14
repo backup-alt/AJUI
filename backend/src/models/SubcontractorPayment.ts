@@ -60,7 +60,7 @@ const subcontractorPaymentSchema = new Schema<ISubcontractorPayment>(
     projectName: { type: String, required: true, trim: true },
     siteName: { type: String, trim: true },
     date: { type: String, required: true, index: true },
-    description: { type: String, required: true, default: "", trim: true, maxlength: 500 },
+    description: { type: String, default: "", trim: true, maxlength: 500 },
     employeeCount: { type: Number, required: true, min: 1 },
     amount: { type: Number, required: true, min: 0.01 },
     notes: { type: String, default: "", maxlength: 1000 },

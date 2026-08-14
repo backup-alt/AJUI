@@ -197,8 +197,8 @@ export async function createProject(input: CreateProjectInput) {
     name: input.name,
     client: client.name,
     clientId: client._id,
-    mobile: input.mobile,
-    address: input.address,
+    mobile: input.mobile || client.mobile,
+    address: input.address || client.address,
     supervisor: input.supervisor,
     supervisorId: input.supervisorId ? new Types.ObjectId(input.supervisorId) : undefined,
     siteIds: [],
@@ -300,9 +300,15 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
   const existing = await getProjectById(id, scopeProjectIds);
 
   const updateData: Record<string, unknown> = { ...patch };
-  if (patch.clientId) updateData.clientId = new Types.ObjectId(patch.clientId);
+  if (patch.clientId) {
+    const nextClient = await Client.findById(patch.clientId).lean();
+    if (!nextClient) throw new AppError(404, "Client not found");
+    updateData.clientId = new Types.ObjectId(patch.clientId);
+    updateData.client = nextClient.name;
+    updateData.mobile = nextClient.mobile;
+    updateData.address = nextClient.address;
+  }
   if (patch.supervisorId) updateData.supervisorId = new Types.ObjectId(patch.supervisorId);
-  delete (updateData as Record<string, unknown>).client;
   // sites (names) is handled below, not as a direct set on Project.
   delete (updateData as Record<string, unknown>).sites;
 

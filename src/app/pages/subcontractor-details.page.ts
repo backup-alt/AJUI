@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@a
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane, IonSpinner, ToastController } from "@ionic/angular/standalone";
-import { ApiService, SubcontractorPayment } from "../core/api.service";
+import { ApiService, SubcontractorLabor, SubcontractorPayment } from "../core/api.service";
 import { ErpDataService } from "../data/erp-data.service";
 import { formatMoney } from "../shared/format";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -79,6 +79,14 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                 </article>
               </section>
 
+              <nav class="detail-tabs">
+                <button type="button" class="tab" [class.active]="activeTab() === 'payments'" (click)="activeTab.set('payments')">Payment Logs</button>
+                <button type="button" class="tab" [class.active]="activeTab() === 'labor'" (click)="activeTab.set('labor')">Labour Details</button>
+              </nav>
+
+              @if (activeTab() === 'payments') {
+              <section class="detail-pane">
+              <div class="pane-head"><div><h2>Payment Logs</h2></div></div>
               <section class="filters">
                 <label class="filter-field">
                   <span>Project</span>
@@ -116,7 +124,6 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                       <th>Description</th>
                       <th>Employees</th>
                       <th>Amount</th>
-                      <th>Notes</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -129,7 +136,6 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                         <td class="wrap">{{ p.description || '—' }}</td>
                         <td>{{ p.employeeCount }}</td>
                         <td>{{ formatMoney(p.amount) }}</td>
-                        <td class="wrap">{{ p.notes || '—' }}</td>
                         <td class="row-actions">
                           <button type="button" class="icon-btn" aria-label="Edit" title="Edit payment" (click)="openEditPayment(p)">
                             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -151,12 +157,57 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                     }
                     @if (filteredPayments().length === 0) {
                       <tr>
-                        <td colspan="8" class="empty-row">No payments recorded for this sub-contractor yet.</td>
+                        <td colspan="7" class="empty-row">No payments recorded for this sub-contractor yet.</td>
                       </tr>
                     }
                   </tbody>
                 </table>
               </section>
+              </section>
+              }
+
+              @if (activeTab() === 'labor') {
+              <section class="detail-pane">
+                <div class="pane-head">
+                  <div><h2>Labour Details</h2></div>
+                  <button type="button" class="btn-primary" (click)="openLaborDialog()">
+                    <ion-icon name="add-outline"></ion-icon>
+                    Add labour
+                  </button>
+                </div>
+                <section class="table-wrap labor-table-wrap">
+                  <table class="labor-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Role</th>
+                        <th>Address</th>
+                        <th>Notes</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (laborer of laborRoster(); track laborer._id) {
+                        <tr>
+                          <td><strong>{{ laborer.name }}</strong></td>
+                          <td>{{ laborer.phone }}</td>
+                          <td>{{ laborer.role }}</td>
+                          <td class="wrap">{{ laborer.address || 'No address' }}</td>
+                          <td class="wrap">{{ laborer.notes || 'No notes' }}</td>
+                          <td><button type="button" class="icon-btn" aria-label="Edit labor" title="Edit labor" (click)="editLaborer(laborer)"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="m14.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></td>
+                        </tr>
+                      }
+                      @if (laborRoster().length === 0) {
+                        <tr>
+                          <td colspan="6" class="empty-row">No laborers linked to this sub-contractor yet.</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </section>
+              </section>
+              }
             }
           </main>
         </ion-content>
@@ -215,10 +266,9 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
             </label>
 
             <label>
-              <span>Description *</span>
+              <span>Work Description (optional)</span>
               <input
                 type="text"
-                required
                 placeholder="e.g. Masonry work"
                 [ngModel]="paymentDraft().description"
                 (ngModelChange)="updatePaymentDraft('description', $event)"
@@ -253,17 +303,6 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
               </label>
             </div>
 
-            <label>
-              <span>Notes</span>
-              <textarea
-                rows="2"
-                placeholder="Optional"
-                [ngModel]="paymentDraft().notes"
-                (ngModelChange)="updatePaymentDraft('notes', $event)"
-                name="notes"
-              ></textarea>
-            </label>
-
             @if (paymentError()) {
               <p class="drawer-error">{{ paymentError() }}</p>
             }
@@ -272,6 +311,50 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
               <button type="button" class="btn-ghost" (click)="closePaymentDialog()">Cancel</button>
               <button type="submit" class="btn-primary" [disabled]="paymentSaving()">
                 {{ paymentSaving() ? 'Saving…' : (editingPayment() ? 'Save changes' : 'Record payment') }}
+              </button>
+            </footer>
+          </form>
+        </aside>
+      }
+
+      @if (laborDialogOpen()) {
+        <div class="drawer-backdrop" (click)="closeLaborDialog()" aria-hidden="true"></div>
+        <aside class="drawer" role="dialog" aria-label="Add or edit labour">
+          <header class="drawer-head">
+            <h2>{{ editingLabor() ? 'Edit labour' : 'Add labour' }} — {{ subcontractorName() }}</h2>
+            <button type="button" class="icon-btn" aria-label="Close" (click)="closeLaborDialog()">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </header>
+          <form class="drawer-body" (submit)="$event.preventDefault(); saveLaborer()">
+            <label>
+              <span>Name *</span>
+              <input required [ngModel]="laborDraft().name" (ngModelChange)="updateLaborDraft('name', $event)" name="laborName" placeholder="Worker name" />
+            </label>
+            <label>
+              <span>Address (optional)</span>
+              <input [ngModel]="laborDraft().address" (ngModelChange)="updateLaborDraft('address', $event)" name="laborAddress" placeholder="Optional address" />
+            </label>
+            <label>
+              <span>Number / Phone *</span>
+              <input required [ngModel]="laborDraft().phone" (ngModelChange)="updateLaborDraft('phone', $event)" name="laborPhone" />
+            </label>
+            <label>
+              <span>Role *</span>
+              <input required list="labor-role-suggestions" [ngModel]="laborDraft().role" (ngModelChange)="updateLaborDraft('role', $event)" name="laborRole" />
+              <datalist id="labor-role-suggestions"><option value="Carpenter"></option><option value="Civil Worker"></option><option value="Mason"></option><option value="Electrician"></option><option value="Plumber"></option><option value="General Labor"></option></datalist>
+            </label>
+            <label>
+              <span>Notes (optional)</span>
+              <textarea rows="3" [ngModel]="laborDraft().notes" (ngModelChange)="updateLaborDraft('notes', $event)" name="laborNotes"></textarea>
+            </label>
+            @if (laborError()) {
+              <p class="drawer-error">{{ laborError() }}</p>
+            }
+            <footer class="drawer-foot">
+              <button type="button" class="btn-ghost" (click)="closeLaborDialog()">Cancel</button>
+              <button type="submit" class="btn-primary" [disabled]="laborSaving()">
+                {{ laborSaving() ? 'Saving…' : (editingLabor() ? 'Save changes' : 'Add labour') }}
               </button>
             </footer>
           </form>
@@ -315,10 +398,21 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
     .stat-card span { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
     .stat-card strong { font-size: 20px; color: #0f172a; }
 
-    .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 720px; }
+    .detail-tabs { display: flex; gap: 4px; border-bottom: 2px solid #e2e8f0; }
+    .detail-tabs .tab {
+      padding: 10px 18px; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px;
+      background: transparent; color: #64748b; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .detail-tabs .tab:hover { color: #1e293b; }
+    .detail-tabs .tab.active { color: #002263; border-bottom-color: #002263; }
+    .detail-pane { min-width: 0; display: grid; gap: 12px; padding: 16px; border: 1px solid #dbe4f0; border-radius: 14px; background: #f8fafc; }
+    .pane-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #002263; padding-bottom: 10px; }
+    .pane-head span { color: #64748b; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+    .pane-head h2 { margin: 3px 0 0; color: #0f172a; font-size: 18px; }
+    .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .filter-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #1e293b; }
     .filter-field span { font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
-    .filter-field select {
+    .filter-field select, .filter-field input, .filter-field textarea {
       padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
       font-size: 14px; color: #0f172a; background: #fff;
     }
@@ -330,6 +424,16 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
     td.wrap { word-break: break-word; white-space: pre-wrap; }
     tr:last-child td { border-bottom: none; }
     .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .labor-table { min-width: 760px; table-layout: fixed; }
+    .labor-table th, .labor-table td { padding: 10px 8px; overflow-wrap: anywhere; max-width: none; }
+    .labor-table th:nth-child(1) { width: 18%; }
+    .labor-table th:nth-child(2) { width: 15%; }
+    .labor-table th:nth-child(3) { width: 17%; }
+    .labor-table th:nth-child(4) { width: 20%; }
+    .labor-table th:nth-child(5) { width: 22%; }
+    .labor-table th:nth-child(6) { width: 56px; }
+    .labor-table td:last-child { text-align: right; }
+    .labor-cell-detail { display: block; margin-top: 3px; color: #64748b; font-size: 11px; font-weight: 400; }
     .icon-btn {
       width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
       border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #475569;
@@ -370,6 +474,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
       .stats { grid-template-columns: 1fr 1fr; }
       .filters { grid-template-columns: 1fr; }
       .grid-2 { grid-template-columns: 1fr; }
+      .detail-tabs .tab { padding: 10px 12px; font-size: 13px; }
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -396,6 +501,13 @@ export class SubcontractorDetailsPage {
   readonly editingPayment = signal<SubcontractorPayment | null>(null);
   readonly paymentSaving = signal(false);
   readonly paymentError = signal<string | null>(null);
+  readonly laborRoster = signal<SubcontractorLabor[]>([]);
+  readonly editingLabor = signal<SubcontractorLabor | null>(null);
+  readonly laborSaving = signal(false);
+  readonly laborError = signal<string | null>(null);
+  readonly laborDraft = signal(emptyLaborDraft());
+  readonly laborDialogOpen = signal(false);
+  readonly activeTab = signal<"payments" | "labor">("payments");
   readonly paymentDraft = signal<{
     projectId: string;
     siteId: string;
@@ -482,6 +594,7 @@ export class SubcontractorDetailsPage {
         this.loading.set(false);
         this.loadError.set(null);
         this.refreshPayments();
+        this.refreshLabor();
       },
       error: (err) => {
         this.loadError.set(err?.error?.error || err?.message || "Failed to load sub-contractor.");
@@ -511,6 +624,71 @@ export class SubcontractorDetailsPage {
     this.filterSiteId.set("");
   }
 
+  updateLaborDraft<K extends keyof ReturnType<typeof emptyLaborDraft>>(key: K, value: string) {
+    this.laborDraft.set({ ...this.laborDraft(), [key]: value });
+  }
+
+  refreshLabor() {
+    const id = this.subcontractorId;
+    if (!id) return;
+    this.api.listSubcontractorLabor(id).subscribe({
+      next: (response) => this.laborRoster.set(response.items || []),
+      error: () => this.laborRoster.set([]),
+    });
+  }
+
+  editLaborer(laborer: SubcontractorLabor) {
+    this.editingLabor.set(laborer);
+    this.laborDraft.set({
+      name: laborer.name,
+      address: laborer.address || "",
+      phone: laborer.phone,
+      role: laborer.role,
+      notes: laborer.notes || "",
+    });
+    this.laborError.set(null);
+    this.laborDialogOpen.set(true);
+  }
+
+  openLaborDialog() {
+    this.editingLabor.set(null);
+    this.laborDraft.set(emptyLaborDraft());
+    this.laborError.set(null);
+    this.laborDialogOpen.set(true);
+  }
+
+  closeLaborDialog() {
+    this.laborDialogOpen.set(false);
+    this.resetLaborDraft();
+  }
+
+  resetLaborDraft() {
+    this.editingLabor.set(null);
+    this.laborDraft.set(emptyLaborDraft());
+    this.laborError.set(null);
+  }
+
+  saveLaborer() {
+    const draft = this.laborDraft();
+    if (!draft.name.trim() || !draft.phone.trim() || !draft.role.trim()) {
+      this.laborError.set("Name, phone number, and role are required.");
+      return;
+    }
+    this.laborSaving.set(true);
+    const payload = {
+      subcontractorId: this.subcontractorId,
+      name: draft.name.trim(), address: draft.address.trim(), phone: draft.phone.trim(), role: draft.role.trim(), notes: draft.notes.trim(),
+    };
+    const editing = this.editingLabor();
+    const request = editing
+      ? this.api.updateSubcontractorLabor(editing._id, payload)
+      : this.api.createSubcontractorLabor(payload);
+    request.subscribe({
+      next: () => { this.laborSaving.set(false); this.closeLaborDialog(); this.refreshLabor(); this.presentToast(editing ? "Labor updated." : "Labor added."); },
+      error: (error) => { this.laborSaving.set(false); this.laborError.set(error?.error?.error || error?.message || "Could not save labor."); },
+    });
+  }
+
   // ---------- PAYMENT DIALOG ----------
   openRecordPayment() {
     if (!this.canRecordPayment()) return;
@@ -529,7 +707,7 @@ export class SubcontractorDetailsPage {
       description: p.description,
       employeeCount: p.employeeCount,
       amount: p.amount,
-      notes: p.notes || "",
+      notes: "",
     });
     this.paymentError.set(null);
     this.paymentDialogOpen.set(true);
@@ -556,7 +734,6 @@ export class SubcontractorDetailsPage {
     if (!draft.projectId) errors.push("Project is required.");
     if (!draft.siteId) errors.push("Site is required.");
     if (!draft.date) errors.push("Date is required.");
-    if (!draft.description.trim()) errors.push("Description is required.");
     if (!Number.isInteger(draft.employeeCount) || draft.employeeCount < 1) errors.push("Number of employees must be a positive whole number.");
     if (!Number.isFinite(draft.amount) || draft.amount <= 0) errors.push("Amount must be greater than zero.");
     if (errors.length) {
@@ -572,6 +749,7 @@ export class SubcontractorDetailsPage {
     this.paymentSaving.set(true);
     this.paymentError.set(null);
 
+    const editing = this.editingPayment();
     const payload = {
       subcontractorId: id,
       projectId: draft.projectId,
@@ -580,10 +758,9 @@ export class SubcontractorDetailsPage {
       description: draft.description.trim(),
       employeeCount: draft.employeeCount,
       amount: draft.amount,
-      notes: draft.notes,
+      ...(editing ? {} : { notes: "" }),
     };
 
-    const editing = this.editingPayment();
     const req = editing
       ? this.api.updateSubcontractorPayment(editing._id, payload)
       : this.api.createSubcontractorPayment(payload);
@@ -629,6 +806,16 @@ function emptyPaymentDraft() {
     description: "",
     employeeCount: 1,
     amount: 0,
+    notes: "",
+  };
+}
+
+function emptyLaborDraft() {
+  return {
+    name: "",
+    address: "",
+    phone: "",
+    role: "",
     notes: "",
   };
 }

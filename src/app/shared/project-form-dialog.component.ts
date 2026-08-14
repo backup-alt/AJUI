@@ -19,6 +19,7 @@ import { ApiService } from "../core/api.service";
 import type { ProjectStatus } from "../../data/dashboardData";
 
 export type ProjectFormValue = {
+  clientId?: string;
   name: string;
   sites: string[];
   startDate: string;
@@ -49,6 +50,13 @@ type SupervisorOption = { id: string; name: string };
         </div>
 
         <form class="erp-form" (submit)="submit($event)">
+          <label class="span-2" *ngIf="clients.length">
+            <span>Client</span>
+            <select name="clientId" required [value]="initialValue?.clientId || currentClientId">
+              <option value="">Select client</option>
+              <option *ngFor="let client of clients" [value]="client._id || client.id">{{ client.name }}</option>
+            </select>
+          </label>
           <label class="span-2">
             <span>Project Name</span>
             <input name="name" required [value]="initialValue?.name || ''" placeholder="Example: Green Nest Villas Phase 2" />
@@ -104,10 +112,6 @@ type SupervisorOption = { id: string; name: string };
               <option value="On Hold">On Hold</option>
               <option value="Completed">Completed</option>
             </select>
-          </label>
-          <label class="span-2">
-            <span>Sites / Areas</span>
-            <input name="sites" required [value]="initialValue?.sites?.join(', ') || ''" placeholder="Area 1, Area 2, Terrace" />
           </label>
           <label>
             <span>Estimated Project Value</span>
@@ -177,6 +181,8 @@ export class ProjectFormDialogComponent implements OnInit {
   @Input() initialValue: ProjectFormValue | null = null;
   @Input() clientName = "Selected client";
   @Input() defaultSupervisor = "";
+  @Input() clients: Array<{ id?: string; _id?: string; name: string }> = [];
+  @Input() currentClientId = "";
   @Output() cancel = new EventEmitter<void>();
   @Output() create = new EventEmitter<ProjectFormValue>();
 
@@ -294,20 +300,16 @@ export class ProjectFormDialogComponent implements OnInit {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
-    const sites = String(formData.get("sites") ?? "")
-      .split(",")
-      .map((site) => site.trim())
-      .filter(Boolean);
-
     const supervisor = String(formData.get("supervisor") ?? "").trim();
 
     this.create.emit({
+      clientId: String(formData.get("clientId") ?? this.currentClientId).trim() || undefined,
       name: String(formData.get("name") ?? "").trim(),
       startDate: String(formData.get("startDate") ?? "").trim(),
       supervisor,
       supervisorId: this.selectedSupervisorId() || undefined,
       status: this.projectStatusFor(String(formData.get("status") ?? "Active")),
-      sites,
+      sites: [],
       totalValue: Number(formData.get("totalValue") ?? 0),
     });
   }

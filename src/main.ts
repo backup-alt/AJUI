@@ -11,9 +11,11 @@ import { addIcons } from "ionicons";
 import {
   addOutline,
   analyticsOutline,
+  arrowBackOutline,
   businessOutline,
   calendarOutline,
   callOutline,
+  cartOutline,
   cashOutline,
   checkmarkDoneOutline,
   closeOutline,
@@ -46,9 +48,11 @@ import { authInterceptor } from "./app/core/auth.interceptor";
 addIcons({
   "add-outline": addOutline,
   "analytics-outline": analyticsOutline,
+  "arrow-back-outline": arrowBackOutline,
   "business-outline": businessOutline,
   "calendar-outline": calendarOutline,
   "call-outline": callOutline,
+  "cart-outline": cartOutline,
   "cash-outline": cashOutline,
   "checkmark-done-outline": checkmarkDoneOutline,
   "close-outline": closeOutline,

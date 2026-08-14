@@ -99,6 +99,45 @@ export interface CreateSubcontractorPaymentPayload {
   notes?: string;
 }
 
+export interface SubcontractorLabor {
+  _id: string;
+  subcontractorId: string;
+  name: string;
+  address?: string;
+  phone: string;
+  role: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PurchaseOrderItem {
+  materialId: string;
+  source: "existing" | "manual";
+  description: string;
+  unit: string;
+  quantity: number;
+  rate: number;
+  itemAmount: number;
+  gstPercent: number;
+  gstAmount: number;
+}
+
+export interface PurchaseOrder {
+  _id: string;
+  poNumber: string;
+  projectId: string;
+  projectName: string;
+  vendorId: string;
+  vendorName: string;
+  date: string;
+  items: PurchaseOrderItem[];
+  subtotal: number;
+  totalGst: number;
+  roundOff: number;
+  grandTotal: number;
+}
+
 const STORAGE_KEYS = {
   ACCESS_TOKEN: "ajui_access_token",
   REFRESH_TOKEN: "ajui_refresh_token",
@@ -620,6 +659,104 @@ export class ApiService {
         }),
         catchError(this.handleError)
       );
+  }
+
+  listSubcontractorLabor(subcontractorId: string): Observable<{ items: SubcontractorLabor[]; total: number }> {
+    return this.http.get<{ items: SubcontractorLabor[]; total: number }>(
+      `${this.baseUrl}/subcontractor-labor?subcontractorId=${encodeURIComponent(subcontractorId)}`,
+      { headers: this.authHeaders() },
+    ).pipe(catchError(this.handleError));
+  }
+
+  createSubcontractorLabor(payload: Omit<SubcontractorLabor, "_id">): Observable<{ labor: SubcontractorLabor }> {
+    return this.http.post<{ labor: SubcontractorLabor }>(`${this.baseUrl}/subcontractor-labor`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  updateSubcontractorLabor(id: string, payload: Partial<Omit<SubcontractorLabor, "_id" | "subcontractorId">>): Observable<{ labor: SubcontractorLabor }> {
+    return this.http.patch<{ labor: SubcontractorLabor }>(`${this.baseUrl}/subcontractor-labor/${id}`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  listPurchaseOrders(params?: { projectId?: string; page?: number; limit?: number }): Observable<PaginatedResponse<PurchaseOrder>> {
+    const q = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => value !== undefined && q.set(key, String(value)));
+    const query = q.toString() ? `?${q.toString()}` : "";
+    return this.http.get<PaginatedResponse<PurchaseOrder>>(`${this.baseUrl}/purchase-orders${query}`, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  getPurchaseOrder(idOrNumber: string): Observable<{ purchaseOrder: PurchaseOrder }> {
+    return this.http.get<{ purchaseOrder: PurchaseOrder }>(
+      `${this.baseUrl}/purchase-orders/${encodeURIComponent(idOrNumber)}`,
+      { headers: this.authHeaders() },
+    ).pipe(catchError(this.handleError));
+  }
+
+  createPurchaseOrder(payload: {
+    projectId: string;
+    vendorId: string;
+    date: string;
+    roundOff: number;
+    items: Array<{
+      source: "existing" | "manual";
+      materialId?: string;
+      description?: string;
+      unit?: string;
+      quantity?: number;
+      rate: number;
+      gstPercent: number;
+    }>;
+  }): Observable<{ purchaseOrder: PurchaseOrder }> {
+    return this.http.post<{ purchaseOrder: PurchaseOrder }>(`${this.baseUrl}/purchase-orders`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(
+      tap(() => {
+        this.cache.invalidate("/purchase-orders");
+        this.cache.invalidate("/materials");
+      }),
+      catchError(this.handleError),
+    );
+  }
+
+  updatePurchaseOrder(id: string, payload: {
+    vendorId: string;
+    date: string;
+    roundOff: number;
+    items: Array<{
+      source: "existing" | "manual";
+      materialId?: string;
+      description?: string;
+      unit?: string;
+      quantity?: number;
+      rate: number;
+      gstPercent: number;
+    }>;
+  }): Observable<{ purchaseOrder: PurchaseOrder }> {
+    return this.http.put<{ purchaseOrder: PurchaseOrder }>(`${this.baseUrl}/purchase-orders/${encodeURIComponent(id)}`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(
+      tap(() => {
+        this.cache.invalidate("/purchase-orders");
+        this.cache.invalidate("/materials");
+      }),
+      catchError(this.handleError),
+    );
+  }
+
+  listPurchaseOrderGstRates(): Observable<{ rates: number[] }> {
+    return this.http.get<{ rates: number[] }>(`${this.baseUrl}/purchase-orders/gst-rates`, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
+  }
+
+  addPurchaseOrderGstRate(rate: number): Observable<{ rate: number }> {
+    return this.http.post<{ rate: number }>(`${this.baseUrl}/purchase-orders/gst-rates`, { rate }, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
   }
 
   deleteSubcontractor(id: string): Observable<any> {

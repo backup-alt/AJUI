@@ -17,7 +17,7 @@ import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/pro
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.component";
 
-type ModuleKey = Exclude<SharedModuleKey, "clients" | "generalExpenses" | "settings" | "supervisors">;
+type ModuleKey = Exclude<SharedModuleKey, "clients" | "generalExpenses" | "purchaseOrders" | "settings" | "supervisors">;
 type TableRow = SharedTableRow;
 type FieldSchema = SharedTableField;
 type FilterBuilderStep = "fields" | "values";
@@ -78,7 +78,7 @@ const sectionConfigs: SectionConfig[] = [
     key: "expenses",
     label: "Expenses",
     title: "Site Expense Ledger",
-    description: "Supervisor cash ledger and site expense fields with PO number, receipt, and approval status.",
+    description: "Supervisor cash ledger and site expense fields with receipt and approval status.",
     columns: [
       { key: "expenseDate", label: "Expense Date", type: "date" },
       { key: "transactionType", label: "Transaction Type" },
@@ -88,9 +88,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "runningBalance", label: "Balance" },
       { key: "site", label: "Site" },
       { key: "supervisor", label: "Supervisor" },
-      { key: "poNumber", label: "PO Number" },
       { key: "reference", label: "Bill / Reference" },
-      { key: "notes", label: "Notes" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
   },
@@ -134,7 +132,6 @@ const sectionConfigs: SectionConfig[] = [
       { key: "description", label: "Work Description" },
       { key: "employeeCount", label: "Number of Employees", type: "number" },
       { key: "amount", label: "Total Paid", type: "number" },
-      { key: "notes", label: "Notes" },
     ],
   },
   {
@@ -177,7 +174,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
   { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
   { key: "vendor", label: "Vendor Name" },
   { key: "requestDate", label: "Request Date", type: "date" },
-  { key: "poNumber", label: "PO Number" },
   { key: "remainingStock", label: "Remaining Stock" },
 ];
 
@@ -362,58 +358,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   (click)="switchSection(section.key)"
                 >
                   <span>{{ section.label }}</span>
-                  <small>{{ visibleRows(section.key).length }}</small>
+                  <small>{{ sectionCount(section.key) }}</small>
                 </button>
               </nav>
-
-              <div class="site-workbench" *ngIf="!tableViewExpanded() && isSiteAware(activeSection())">
-                <div class="site-switch-row">
-                  <span>Site</span>
-                  <div class="site-chip-strip">
-                    <button type="button" [class.active]="activeSiteFilter() === 'All'" (click)="selectSite('All')">All Sites</button>
-                    <span class="site-chip-unit" *ngFor="let site of displaySites()">
-                      <button
-                        type="button"
-                        [class.active]="activeSiteFilter() === site"
-                        (click)="selectSite(site)"
-                      >
-                        {{ site }}
-                      </button>
-                    </span>
-                    <button *ngIf="!siteDraftOpen()" type="button" class="site-add-chip" aria-label="Add site" (click)="openSiteDraft()">
-                      <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                        <path d="M12 5v14" />
-                        <path d="M5 12h14" />
-                      </svg>
-                    </button>
-                    <form *ngIf="siteDraftOpen()" class="site-add-form" (submit)="saveSite($event)">
-                      <input
-                        [value]="siteDraftName()"
-                        (input)="siteDraftName.set($any($event.target).value)"
-                        placeholder="New site"
-                      />
-                      <button type="submit" class="site-confirm" aria-label="Add site">
-                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                          <path d="m5 12 4 4L19 6" />
-                        </svg>
-                        <span>Add</span>
-                      </button>
-                      <button type="button" class="site-cancel" aria-label="Cancel site" (click)="siteDraftOpen.set(false)">
-                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                          <path d="M6 6l12 12" />
-                          <path d="M18 6 6 18" />
-                        </svg>
-                      </button>
-                    </form>
-                    @if (data.siteError()) {
-                      <div class="site-toast" (click)="data.siteError.set(null)">
-                        <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-2h2v2h-2zm0-4V7h2v6h-2z"/></svg>
-                        <span>{{ data.siteError() }}</span>
-                      </div>
-                    }
-                  </div>
-                </div>
-              </div>
 
               <div class="module-toolbar table-first-toolbar">
                 <div>
@@ -563,7 +510,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
               <ng-container *ngIf="tableState() as tableState">
               <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
-                <span>{{ tableState.rows.length }} rows</span>
+                    <span>{{ tableState.rows.length }} rows</span>
                 <span>{{ tableState.columns.length }} fields</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
                 <span>Rows edit after selection</span>
@@ -742,6 +689,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </div>
                           </div>
                           <ng-template #editableProjectCell>
+                            <ng-container *ngIf="activeSection() === 'materials' && column.key === 'poNumber' && isReadablePurchaseOrderNumber(row['poNumber']); else billOrEditableCell">
+                              <button type="button" class="bill-link" (click)="openPurchaseOrder(row['poNumber'], $event)">{{ row['poNumber'] }}</button>
+                            </ng-container>
+                            <ng-template #billOrEditableCell>
                             <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
                               @if (isDataUrl($any(row['billUrl']))) {
                                 <button type="button" class="bill-link" (click)="openImagePreview($any(row['billUrl']))">View Bill</button>
@@ -749,6 +700,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                 <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
                               }
                             </ng-container>
+                            </ng-template>
                             <ng-template #normalEditableCell>
                               <span
                                 class="editable-cell"
@@ -788,35 +740,16 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div class="dialog-head">
                   <div>
                     <span>{{ activeConfig().label }}</span>
-                    <h2>{{ filterBuilderStep() === 'fields' ? 'Filter By Fields' : 'Filter Values' }}</h2>
-                    <p>
-                      {{
-                        filterBuilderStep() === 'fields'
-                          ? 'Choose any project table fields to filter. Custom fields are included.'
-                          : 'Enter one or more values. Pick a suggestion or type your own.'
-                      }}
-                    </p>
+                    <h2>Filter By</h2>
+                    <p>Fill any field below to filter this table.</p>
                   </div>
                   <button type="button" class="icon-button" (click)="closeFilterBuilder()">
                     <ion-icon name="close-outline"></ion-icon>
                   </button>
                 </div>
-                <div class="filter-dialog-body" *ngIf="filterBuilderStep() === 'fields'">
-                  <div class="filter-field-grid filter-dialog-field-grid">
-                    <button
-                      type="button"
-                      *ngFor="let column of filterableColumns()"
-                      [class.selected]="isFilterFieldSelected(column.key)"
-                      (click)="toggleFilterField(column.key)"
-                    >
-                      <span>{{ column.label }}</span>
-                      <small>{{ column.key }}</small>
-                    </button>
-                  </div>
-                </div>
-                <div class="filter-dialog-body" *ngIf="filterBuilderStep() === 'values'">
+                <div class="filter-dialog-body">
                   <div class="filter-value-grid filter-dialog-value-grid">
-                    <label class="filter-combo-field" *ngFor="let column of selectedFilterColumns()" [class.menu-open]="activeFilterValueKey() === column.key">
+                    <label class="filter-combo-field" *ngFor="let column of filterableColumns()" [class.menu-open]="activeFilterValueKey() === column.key">
                       <span>{{ column.label }}</span>
                       <div class="filter-combo-control">
                         <input
@@ -849,10 +782,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
                 <div class="dialog-actions">
                   <button type="button" class="secondary-action" (click)="closeFilterBuilder()">Cancel</button>
-                  <button type="button" class="secondary-action" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderStep.set('fields')">Back</button>
-                  <button type="submit" class="primary-action" [disabled]="filterBuilderStep() === 'fields' && !selectedFilterFields().length">
-                    {{ filterBuilderStep() === 'fields' ? 'Next' : 'Apply Filter' }}
-                  </button>
+                  <button type="submit" class="primary-action">Apply Filter</button>
                 </div>
               </form>
             </section>
@@ -1061,6 +991,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
               *ngIf="showProjectForm() && client() as currentClient"
               [clientName]="currentClient.name"
               [defaultSupervisor]="currentClient.supervisor"
+              [clients]="data.clients()"
+              [currentClientId]="currentClient._id || currentClient.id"
               [initialValue]="editingProjectValue()"
               [eyebrow]="editingProject() ? 'Project Edit' : 'Project Setup'"
               [title]="editingProject() ? 'Edit Project' : 'Create New Project'"
@@ -1076,7 +1008,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
               [description]="editingInlineVendor() ? 'Update vendor contact, material type, GST, and address information.' : 'Create the vendor record to track material purchases and GST.'"
               [submitLabel]="editingInlineVendor() ? 'Save Changes' : 'Create Vendor'"
               [initialValue]="editingInlineVendor() ? inlineVendorEditValue() : null"
-              [showSiteAssignment]="false"
               (cancel)="closeVendorDialog()"
               (create)="editingInlineVendor() ? updateInlineVendor($event) : createInlineVendor($event)"
             ></agb-vendor-form-dialog>
@@ -1701,7 +1632,7 @@ export class ProjectWorkspacePage {
     if (query) rows = rows.filter((row) => Object.values(row).some((value) => String(value).toLowerCase().includes(query)));
     rows = rows.filter((row) => {
       const matchesFilters = Object.entries(filters).every(
-        ([key, value]) => !value || String(row[key] ?? "").toLowerCase().includes(value.trim().toLowerCase()),
+        ([key, value]) => !value || this.matchesFilterValue(row[key], value),
       );
       const matchesDate =
         !dateKey ||
@@ -1842,7 +1773,8 @@ export class ProjectWorkspacePage {
   toggleFilterBuilder() {
     this.filterBuilderOpen.update((open) => !open);
     this.dateFilterOpen.set(false);
-    if (!this.selectedFilterFields().length) this.filterBuilderStep.set("fields");
+    this.selectedFilterFields.set(this.filterableColumns().map((column) => column.key));
+    this.filterBuilderStep.set("values");
   }
 
   closeFilterBuilder() {
@@ -1861,6 +1793,14 @@ export class ProjectWorkspacePage {
 
   filterableColumns(): FieldSchema[] {
     return this.columnsFor(this.activeSection());
+  }
+
+  private matchesFilterValue(raw: unknown, query: string): boolean {
+    const haystack = String(raw ?? "").toLowerCase();
+    const needle = query.trim().toLowerCase();
+    if (haystack.includes(needle)) return true;
+    const numericNeedle = needle.replace(/[^0-9.+-]/g, "");
+    return Boolean(numericNeedle && /\d/.test(numericNeedle) && haystack.replace(/[^0-9.+-]/g, "").includes(numericNeedle));
   }
 
   isFilterFieldSelected(key: string): boolean {
@@ -2058,7 +1998,7 @@ export class ProjectWorkspacePage {
 
   activeFilterSummary(): string[] {
     const summary: string[] = [];
-    for (const column of this.selectedFilterColumns()) {
+    for (const column of this.filterableColumns()) {
       const value = this.selectedFilters()[column.key];
       if (value) summary.push(`${column.label}: ${value}`);
     }
@@ -2192,8 +2132,6 @@ export class ProjectWorkspacePage {
       phone: v.phoneNumber,
       address: v.address,
       gst: v.gstNumber,
-      status: "Active",
-      siteIds: [],
     };
   }
 
@@ -2206,7 +2144,7 @@ export class ProjectWorkspacePage {
       address: value.address,
       gstNumber: value.gst,
       status: "Active",
-      siteIds: value.siteIds || [],
+      siteIds: [],
     };
     this.api.createVendor(payload).subscribe({
       next: () => {
@@ -2219,7 +2157,7 @@ export class ProjectWorkspacePage {
           address: value.address,
           gst: value.gst,
           status: "Active",
-          siteIds: value.siteIds || [],
+          siteIds: [],
         });
       },
       error: (err) => {
@@ -2238,7 +2176,7 @@ export class ProjectWorkspacePage {
       address: value.address,
       gstNumber: value.gst,
       status: "Active",
-      siteIds: value.siteIds || [],
+      siteIds: [],
     };
     this.api.patchVendor(inline.id, payload).subscribe({
       next: () => {
@@ -2504,7 +2442,6 @@ export class ProjectWorkspacePage {
       window.alert("Amount must be a number greater than zero.");
       return;
     }
-    const notes = String(draft["notes"] || "").trim();
     const payload = {
       subcontractorId: subcontractor._id,
       projectId,
@@ -2513,7 +2450,7 @@ export class ProjectWorkspacePage {
       description,
       employeeCount,
       amount,
-      notes,
+      notes: "",
     };
     const paymentId = String(draft["__paymentId"] || "").trim();
     try {
@@ -2529,6 +2466,22 @@ export class ProjectWorkspacePage {
       console.error("[ProjectWorkspace] Failed to save subcontractor payment", err);
       window.alert(err?.error?.error || err?.error?.message || err?.message || "Could not save the payment.");
     }
+  }
+
+  isReadablePurchaseOrderNumber(value: unknown): boolean {
+    return /^PO-\d{4}-\d{4,}$/.test(String(value || "").trim());
+  }
+
+  openPurchaseOrder(value: unknown, event?: Event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const poNumber = String(value || "").trim();
+    if (!poNumber) return;
+    void this.router.navigate(["/purchase-orders"], { queryParams: { open: poNumber } });
+  }
+
+  sectionCount(section: ModuleKey): number {
+    return this.visibleRows(section).length;
   }
 
   /**
@@ -3007,6 +2960,7 @@ export class ProjectWorkspacePage {
       supervisor: project.supervisor,
       totalValue: project.totalValue,
       status: project.status,
+      clientId: this.client()?._id || this.client()?.id,
     };
   }
 
@@ -3018,7 +2972,8 @@ export class ProjectWorkspacePage {
       const updated = this.data.updateProject(editing.id, { ...value });
       // Persist supervisor/site changes to the backend so the supervisor mobile
       // app receives the updated site assignments.
-      void this.data.persistProjectEdit(editing.id, {
+      await this.data.persistProjectEdit(editing.id, {
+        clientId: value.clientId,
         name: value.name,
         sites: value.sites,
         startDate: value.startDate,
@@ -3029,6 +2984,13 @@ export class ProjectWorkspacePage {
       });
       this.editingProject.set(null);
       this.showProjectForm.set(false);
+      const targetClient = value.clientId
+        ? this.data.clients().find((client) => client._id === value.clientId || client.id === value.clientId)
+        : undefined;
+      if (targetClient && targetClient.id !== currentClient.id) {
+        void this.router.navigate(["/clients", targetClient.id, "projects", editing.id, this.activeSection()]);
+        return;
+      }
       if (updated && editing.id === this.projectId()) {
         void this.router.navigate(["/clients", currentClient.id, "projects", updated.id, this.activeSection()]);
       }
@@ -3097,7 +3059,6 @@ export class ProjectWorkspacePage {
       description: p.description || "",
       employeeCount: p.employeeCount,
       amount: formatMoney(p.amount),
-      notes: p.notes || "",
     }));
   }
 
@@ -3366,7 +3327,6 @@ export class ProjectWorkspacePage {
       description: p.description || "",
       employeeCount: p.employeeCount,
       amount: formatMoney(p.amount),
-      notes: p.notes || "",
       date: p.date,
     }));
 
@@ -3431,7 +3391,7 @@ export class ProjectWorkspacePage {
   }
 
   isReadonlyColumn(key: string): boolean {
-    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance";
+    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId";
   }
 
   /**
@@ -3441,6 +3401,7 @@ export class ProjectWorkspacePage {
    */
   displayCell(row: TableRow, key: string): string {
     const raw = row[key];
+    if (this.activeSection() === "materials" && key === "poNumber" && raw && !this.isReadablePurchaseOrderNumber(raw)) return "";
     if (key === "transactionType" && raw === "Cash Added") return "Add Cash";
     return raw == null ? "" : String(raw);
   }
@@ -3627,7 +3588,6 @@ export class ProjectWorkspacePage {
         description: "",
         employeeCount: 1,
         amount: 0,
-        notes: "",
       },
       inventory: {
         materialName: "",

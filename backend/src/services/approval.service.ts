@@ -9,7 +9,6 @@ import { generateId } from "./id-generator.service.js";
 import { recomputeProjectTotals } from "./financial.service.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
-import { generatePoNumberForSite } from "./po-number.service.js";
 import { recomputeSiteLedger } from "./expense.service.js";
 import { addApprovedMaterialToInventory } from "./inventory.service.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
@@ -85,17 +84,11 @@ export async function approveRequest(
     case "materials":
     case "Material": {
       const mat = await Material.findById(approval.sourceId).lean();
-      const generatedPo = options.poNumber || await generatePoNumberForSite(
-        mat?.siteId ? String(mat.siteId) : undefined,
-        mat?.site,
-        mat?.projectId ? String(mat.projectId) : undefined
-      );
-      generatedPoNumber = generatedPo;
-      await Material.updateOne(
-        { _id: approval.sourceId },
-        {
-          ...sourceUpdate,
-          poNumber: generatedPo,
+        await Material.updateOne(
+          { _id: approval.sourceId },
+          {
+            ...sourceUpdate,
+            poNumber: "",
           ...(options.approvedQuantity !== undefined ? { approvedQuantity: options.approvedQuantity } : {}),
           ...(options.vendor !== undefined ? { vendor: options.vendor } : {}),
         }
@@ -118,8 +111,8 @@ export async function approveRequest(
     case "expenses":
     case "Expense": {
       const exp = await Expense.findById(approval.sourceId).lean();
-      // Purchase approvals generate a PO and then move into the supervisor bill upload flow.
-      // Cash Added approvals become approved here with the admin's approvedAmount
+        // Purchase orders are now created only by the dedicated PO module.
+        // Cash Added approvals become approved here with the admin's approvedAmount
       // and then update the site ledger.
       if (exp?.transactionType === "Cash Added") {
         // For Cash Added: only the admin-entered approvedAmount matters.
@@ -142,21 +135,13 @@ export async function approveRequest(
           await recomputeSiteLedger(exp.projectId, exp.site);
         }
       } else if (exp?.transactionType === "Purchase") {
-        const generatedPo = options.poNumber || await generatePoNumberForSite(
-          exp.siteId ? String(exp.siteId) : undefined,
-          exp.site,
-          exp.projectId ? String(exp.projectId) : undefined
-        );
-        generatedPoNumber = generatedPo;
-        // Keep status Pending so the supervisor still has to upload a
-        // receipt. The approval record itself becomes "Approved" below.
-        await Expense.updateOne(
+          await Expense.updateOne(
           { _id: approval.sourceId },
           {
             status: "Approved",
             approvedBy: reviewer,
             approvedAt: new Date(),
-            poNumber: generatedPo,
+              poNumber: "",
             ...(options.issuedAmount !== undefined ? { issuedAmount: options.issuedAmount } : {}),
             ...(options.givenAmount !== undefined ? { givenAmount: options.givenAmount } : {}),
           }
@@ -187,7 +172,6 @@ export async function approveRequest(
           remainingStock: exp.materialQuantity || 1,
           vendor: exp.materialVendor,
           vendorId: exp.materialVendorId,
-          poNumber: generatedPoNumber,
           status: "Approved",
           approvedBy: reviewer,
           approvedAt: new Date(),

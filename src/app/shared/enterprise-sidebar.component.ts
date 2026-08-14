@@ -186,11 +186,12 @@ export class EnterpriseSidebarComponent {
     return [
       { key: "dashboard", label: "Dashboard", icon: "grid-outline", route: ["/dashboard"] },
       { key: "clients", label: "Clients", icon: "people-outline", route: ["/clients"] },
+      { key: "projects", label: "Project list", icon: "folder-open-outline", route: ["/projects"] },
       { key: "vendors", label: "Vendors", icon: "storefront-outline", route: ["/vendors"] },
       { key: "subcontractors", label: "Sub contractors", icon: "construct-outline", route: ["/subcontractors"] },
       { key: "quotations", label: "Quotations", icon: "document-text-outline", route: ["/quotations"] },
       { key: "tax-invoices", label: "Invoice", icon: "receipt-outline", route: ["/tax-invoices"] },
-      { key: "projects", label: "Project list", icon: "folder-open-outline", route: ["/projects"] },
+      { key: "purchase-orders", label: "Purchase Orders", icon: "cart-outline", route: ["/purchase-orders"] },
       { key: "approvals", label: "Pending Approvals", icon: "checkmark-done-outline", route: ["/approvals"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
     ];

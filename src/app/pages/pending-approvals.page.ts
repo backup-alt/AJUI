@@ -204,7 +204,6 @@ type ToastManager = {
                         <th>Date</th>
                         <th>Issued Amt</th>
                         <th>Given Amt</th>
-                        <th>PO Number</th>
                         <th>Notes</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -254,15 +253,6 @@ type ToastManager = {
                             min="0"
                           />
                         </td>
-                        <td>
-                          <input
-                            class="approval-table-input readonly-field"
-                            type="text"
-                            [value]="row.poNumber || 'AUTO GENERATED'"
-                            readonly
-                            aria-label="PO Number"
-                          />
-                        </td>
                         <td>{{ row.notes || "-" }}</td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
                         <td class="approval-actions">
@@ -284,7 +274,7 @@ type ToastManager = {
                           </button>
                         </td>
                       </tr>
-                      <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" colspan="15"><span>No pending material approvals.</span></td></tr>
+                      <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" colspan="14"><span>No pending material approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -312,7 +302,6 @@ type ToastManager = {
                         <th>Description</th>
                         <th>Amount</th>
                         <th>Given Amt</th>
-                        <th>PO Number</th>
                         <th>Supervisor</th>
                         <th>Notes</th>
                         <th>Bill / Reference</th>
@@ -340,7 +329,6 @@ type ToastManager = {
                               min="0"
                             />
                           </td>
-                          <td>-</td>
                         } @else {
                           <td>
                             <input
@@ -349,15 +337,6 @@ type ToastManager = {
                               [value]="row.givenAmount ?? ''"
                               aria-label="Given amount (from supervisor)"
                               readonly
-                            />
-                          </td>
-                          <td>
-                            <input
-                              class="approval-table-input readonly-field"
-                              type="text"
-                              [value]="row.poNumber || 'AUTO GENERATED'"
-                              readonly
-                              aria-label="PO Number"
                             />
                           </td>
                         }
@@ -394,7 +373,7 @@ type ToastManager = {
                           </button>
                         </td>
                       </tr>
-                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="15"><span>No pending site expense approvals.</span></td></tr>
+                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="13"><span>No pending site expense approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>

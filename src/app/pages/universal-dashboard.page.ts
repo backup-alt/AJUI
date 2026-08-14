@@ -50,6 +50,8 @@ const dashboardModules: ModuleConfig[] = [
       { key: "site", label: "Site" },
       { key: "materialName", label: "Material Name" },
       { key: "unit", label: "Unit" },
+      { key: "issuedAmount", label: "Issued Amount" },
+      { key: "givenAmount", label: "Given Amount" },
       { key: "requestedQuantity", label: "Requested Quantity" },
       { key: "approvedQuantity", label: "Approved Quantity" },
       { key: "vendor", label: "Vendor" },
@@ -80,10 +82,8 @@ const dashboardModules: ModuleConfig[] = [
       { key: "totalProjectValue", label: "Total Project Value" },
       { key: "amountReceived", label: "Amount Received" },
       { key: "pendingBalance", label: "Pending Balance" },
-      { key: "status", label: "Status" },
     ],
     filters: [
-      { key: "status", label: "Status" },
       { key: "projectCount", label: "Project Count" },
     ],
   },
@@ -126,8 +126,6 @@ const dashboardModules: ModuleConfig[] = [
       { key: "amount", label: "Amount" },
       { key: "siteMaterial", label: "Site Material" },
       { key: "runningBalance", label: "Balance" },
-      { key: "poNumber", label: "PO Number" },
-      { key: "notes", label: "Notes" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
     filters: [
@@ -206,7 +204,6 @@ const dashboardModules: ModuleConfig[] = [
       { key: "description", label: "Description" },
       { key: "employeeCount", label: "Number of Employees" },
       { key: "amount", label: "Amount", type: "number" },
-      { key: "notes", label: "Notes" },
     ],
     filters: [],
   },
@@ -253,7 +250,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
   { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
   { key: "vendor", label: "Vendor Name" },
   { key: "requestDate", label: "Request Date", type: "date" },
-  { key: "poNumber", label: "PO Number" },
   { key: "remainingStock", label: "Remaining Stock" },
 ];
 
@@ -301,23 +297,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <small>{{ rowCountFor(module.key) }}</small>
                 </button>
               </nav>
-
-              <div class="site-workbench universal-site-workbench" *ngIf="!tableViewExpanded() && isUniversalSiteAware(activeModule())">
-                <div class="site-switch-row">
-                  <span>Site</span>
-                  <div class="site-chip-strip">
-                    <button type="button" [class.active]="activeSiteFilter() === 'All'" (click)="selectUniversalSite('All')">All Sites</button>
-                    <button
-                      *ngFor="let site of universalSiteOptions()"
-                      type="button"
-                      [class.active]="activeSiteFilter() === site.id"
-                      (click)="selectUniversalSite(site.id)"
-                    >
-                      {{ site.name }}
-                    </button>
-                  </div>
-                </div>
-              </div>
 
               <div class="module-toolbar table-first-toolbar">
                 <div>
@@ -555,12 +534,20 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           </div>
                         </ng-container>
                         <ng-template #standardDashboardCell>
+                          <button
+                            *ngIf="activeModule() === 'materials' && column.key === 'poNumber' && isReadablePurchaseOrderNumber(row[column.key]); else standardReadonlyCell"
+                            type="button"
+                            class="bill-link"
+                            (click)="openMaterialPurchaseOrder(row, $event)"
+                          >{{ row[column.key] }}</button>
+                          <ng-template #standardReadonlyCell>
                           <span
                             class="editable-cell cell-readonly"
                             spellcheck="false"
                           >
                             {{ displayCell(row, column.key) }}
                           </span>
+                          </ng-template>
                         </ng-template>
                       </td>
                       <td class="row-actions-cell" *ngIf="activeModule() === 'subcontractors'">
@@ -606,35 +593,16 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div class="dialog-head">
                   <div>
                     <span>{{ activeConfig().label }}</span>
-                    <h2>{{ filterBuilderStep() === 'fields' ? 'Filter By Fields' : 'Filter Values' }}</h2>
-                    <p>
-                      {{
-                        filterBuilderStep() === 'fields'
-                          ? 'Choose any table fields to filter. Custom fields are included.'
-                          : 'Enter one or more values. Pick a suggestion or type your own.'
-                      }}
-                    </p>
+                    <h2>Filter By</h2>
+                    <p>Fill any relevant table field below, then apply the filter.</p>
                   </div>
                   <button type="button" class="icon-button" (click)="closeFilterBuilder()">
                     <ion-icon name="close-outline"></ion-icon>
                   </button>
                 </div>
-                <div class="filter-dialog-body" *ngIf="filterBuilderStep() === 'fields'">
-                  <div class="filter-field-grid filter-dialog-field-grid">
-                    <button
-                      type="button"
-                      *ngFor="let column of filterableColumns()"
-                      [class.selected]="isFilterFieldSelected(column.key)"
-                      (click)="toggleFilterField(column.key)"
-                    >
-                      <span>{{ column.label }}</span>
-                      <small>{{ column.key }}</small>
-                    </button>
-                  </div>
-                </div>
-                <div class="filter-dialog-body" *ngIf="filterBuilderStep() === 'values'">
+                <div class="filter-dialog-body">
                   <div class="filter-value-grid filter-dialog-value-grid">
-                    <label class="filter-combo-field" *ngFor="let column of selectedFilterColumns()" [class.menu-open]="activeFilterValueKey() === column.key">
+                    <label class="filter-combo-field" *ngFor="let column of filterableColumns()" [class.menu-open]="activeFilterValueKey() === column.key">
                       <span>{{ column.label }}</span>
                       <div class="filter-combo-control">
                         <input
@@ -667,10 +635,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 </div>
                 <div class="dialog-actions">
                   <button type="button" class="secondary-action" (click)="closeFilterBuilder()">Cancel</button>
-                  <button type="button" class="secondary-action" *ngIf="filterBuilderStep() === 'values'" (click)="filterBuilderStep.set('fields')">Back</button>
-                  <button type="submit" class="primary-action" [disabled]="filterBuilderStep() === 'fields' && !selectedFilterFields().length">
-                    {{ filterBuilderStep() === 'fields' ? 'Next' : 'Apply Filter' }}
-                  </button>
+                  <button type="submit" class="primary-action">Apply Filter</button>
                 </div>
               </form>
             </section>
@@ -2603,7 +2568,7 @@ export class UniversalDashboardPage implements OnInit {
           return query.split(/\s+/).filter(Boolean).every((tok) => haystack.includes(tok));
         })();
       const matchesFilters = Object.entries(filters).every(
-        ([key, value]) => !value || String(row[key] ?? "").toLowerCase().includes(value.trim().toLowerCase()),
+        ([key, value]) => !value || this.matchesFilterValue(row[key], value),
       );
       const matchesDate =
         !dateKey ||
@@ -2840,8 +2805,20 @@ export class UniversalDashboardPage implements OnInit {
    */
   displayCell(row: TableRow, key: string): string {
     const raw = row[key];
+    if (this.activeModule() === "materials" && key === "poNumber" && raw && !this.isReadablePurchaseOrderNumber(raw)) return "";
     if (key === "transactionType" && raw === "Cash Added") return "Add Cash";
     return raw == null ? "" : String(raw);
+  }
+
+  isReadablePurchaseOrderNumber(value: unknown): boolean {
+    return /^PO-\d{4}-\d{4,}$/.test(String(value || "").trim());
+  }
+
+  openMaterialPurchaseOrder(row: TableRow, event?: Event) {
+    event?.stopPropagation();
+    const poNumber = String(row["poNumber"] || "").trim();
+    if (!poNumber) return;
+    void this.router.navigate(["/purchase-orders"], { queryParams: { open: poNumber } });
   }
 
   setFilter(key: string, value: string) {
@@ -2873,7 +2850,8 @@ export class UniversalDashboardPage implements OnInit {
   toggleFilterBuilder() {
     this.filterBuilderOpen.update((open) => !open);
     this.dateFilterOpen.set(false);
-    if (!this.selectedFilterFields().length) this.filterBuilderStep.set("fields");
+    this.selectedFilterFields.set(this.filterableColumns().map((column) => column.key));
+    this.filterBuilderStep.set("values");
   }
 
   closeFilterBuilder() {
@@ -2883,15 +2861,19 @@ export class UniversalDashboardPage implements OnInit {
 
   submitFilterBuilder(event: Event) {
     event.preventDefault();
-    if (this.filterBuilderStep() === "fields") {
-      this.goToFilterValues();
-      return;
-    }
     this.closeFilterBuilder();
   }
 
   filterableColumns(): FieldSchema[] {
     return this.columnsForActive();
+  }
+
+  private matchesFilterValue(raw: unknown, query: string): boolean {
+    const haystack = String(raw ?? "").toLowerCase();
+    const needle = query.trim().toLowerCase();
+    if (haystack.includes(needle)) return true;
+    const numericNeedle = needle.replace(/[^0-9.+-]/g, "");
+    return Boolean(numericNeedle && /\d/.test(numericNeedle) && haystack.replace(/[^0-9.+-]/g, "").includes(numericNeedle));
   }
 
   isFilterFieldSelected(key: string): boolean {
@@ -3919,11 +3901,15 @@ export class UniversalDashboardPage implements OnInit {
       id: row.id,
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
+      projectId: row.projectId,
+      clientId: clientId(row.projectId),
       client: clientName(row.projectId),
       project: projectName(row.projectId),
       site: row.site,
       materialName: row.name,
       unit: row.unit,
+      issuedAmount: formatMoney(Number((row as any).issuedAmount || 0)),
+      givenAmount: formatMoney(Number((row as any).givenAmount || 0)),
       requestedQuantity: formatNumber(row.requested),
       approvedQuantity: formatNumber(row.approved),
       vendor: row.vendor,

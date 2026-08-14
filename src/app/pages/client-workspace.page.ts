@@ -149,6 +149,8 @@ import { formatMoney, statusClass } from "../shared/format";
               *ngIf="showProjectForm()"
               [clientName]="currentClient.name"
               [defaultSupervisor]="currentClient.supervisor"
+              [clients]="data.clients()"
+              [currentClientId]="currentClient._id || currentClient.id"
               [initialValue]="editingProjectValue()"
               [eyebrow]="editingProject() ? 'Project Edit' : 'Project Setup'"
               [title]="editingProject() ? 'Edit Project' : 'Create New Project'"
@@ -161,7 +163,7 @@ import { formatMoney, statusClass } from "../shared/format";
               *ngIf="editingClient()"
               eyebrow="Client Edit"
               title="Edit Client"
-              description="Update client contact, address, and assigned supervisor information."
+              description="Update client contact and address information."
               submitLabel="Save Client"
               [initialValue]="clientEditValue()"
               (cancel)="editingClient.set(false)"
@@ -254,6 +256,7 @@ export class ClientWorkspacePage {
       supervisor: project.supervisor,
       totalValue: project.totalValue,
       status: project.status,
+      clientId: this.client()?._id || this.client()?.id,
     };
   }
 
@@ -273,7 +276,8 @@ export class ClientWorkspacePage {
       const updated = this.data.updateProject(editing.id, { ...value });
       // Persist supervisor/site changes to the backend so the supervisor mobile
       // app receives the updated site assignments.
-      void this.data.persistProjectEdit(editing.id, {
+      await this.data.persistProjectEdit(editing.id, {
+        clientId: value.clientId,
         name: value.name,
         sites: value.sites,
         startDate: value.startDate,
@@ -284,6 +288,13 @@ export class ClientWorkspacePage {
       });
       this.editingProject.set(null);
       this.showProjectForm.set(false);
+      const targetClient = value.clientId
+        ? this.data.clients().find((client) => client._id === value.clientId || client.id === value.clientId)
+        : undefined;
+      if (targetClient && targetClient.id !== currentClient.id) {
+        void this.router.navigate(["/clients", targetClient.id, "projects", editing.id]);
+        return;
+      }
       if (updated && editing.id === currentClient.id) {
         // Refresh current project context if needed
       }

@@ -1,17 +1,17 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
-import { IonBadge, IonContent, IonIcon, IonProgressBar, IonSplitPane } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonProgressBar, IonSplitPane } from "@ionic/angular/standalone";
 import { Client, ErpDataService } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { formatMoney, statusClass } from "../shared/format";
+import { formatMoney } from "../shared/format";
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonBadge, IonContent, IonIcon, IonProgressBar, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, ClientFormDialogComponent],
+  imports: [CommonModule, IonContent, IonIcon, IonProgressBar, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, ClientFormDialogComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="clients"></agb-enterprise-sidebar>
@@ -54,7 +54,6 @@ import { formatMoney, statusClass } from "../shared/format";
                         <p><ion-icon name="call-outline"></ion-icon>{{ client.mobile }}</p>
                       </div>
                     </div>
-                    <ion-badge class="status" [ngClass]="statusClass(client.status)">{{ client.status }}</ion-badge>
                   </div>
 
                   <p class="address"><ion-icon name="location-outline"></ion-icon>{{ client.address }}</p>
@@ -89,7 +88,7 @@ import { formatMoney, statusClass } from "../shared/format";
           *ngIf="showClientForm() || editingClient()"
           eyebrow="{{ editingClient() ? 'Client Edit' : 'Client Setup' }}"
           title="{{ editingClient() ? 'Edit Client' : 'Add New Client' }}"
-          description="{{ editingClient() ? 'Update client contact, address, supervisor, and status information.' : 'Create the client record first. Projects, ledgers, and site records stay separated under this client.' }}"
+          description="{{ editingClient() ? 'Update client contact and address information.' : 'Create the client record first. Projects, ledgers, and site records stay separated under this client.' }}"
           submitLabel="{{ editingClient() ? 'Save Changes' : 'Create Client' }}"
           [initialValue]="editingClient() ? clientEditValue(editingClient()!) : null"
           (cancel)="closeClientForm()"
@@ -145,8 +144,6 @@ export class ClientDashboardPage {
       },
     });
   }
-  readonly statusClass = statusClass;
-
   async openClient(client: Client) {
     let project = this.data.firstProjectForClient(client);
     if (!project) {
@@ -171,8 +168,8 @@ export class ClientDashboardPage {
       address: value.address,
       gstNumber: value.gstNumber || "",
       state: value.state || "",
-      supervisor: value.supervisor || "",
-      status: value.status || 'Active',
+      supervisor: "",
+      status: "Active",
     };
 
     this.api.createClient(payload).subscribe({
@@ -183,7 +180,7 @@ export class ClientDashboardPage {
           ...value,
           id: clientId,
           _id: created?._id,
-          supervisor: value.supervisor || "",
+          supervisor: "",
         } as Client);
         try {
           const project = await this.data.createDefaultProject(client);
@@ -218,8 +215,6 @@ export class ClientDashboardPage {
       address: client.address,
       gstNumber: client.gstNumber || "",
       state: client.state || "",
-      supervisor: client.supervisor || "",
-      status: client.status,
     };
   }
 

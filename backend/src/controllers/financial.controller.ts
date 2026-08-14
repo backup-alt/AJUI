@@ -7,6 +7,8 @@ import * as paymentService from "../services/payment.service.js";
 import * as vendorService from "../services/vendor.service.js";
 import * as subcontractorService from "../services/subcontractor.service.js";
 import * as subcontractorPaymentService from "../services/subcontractor-payment.service.js";
+import * as subcontractorLaborService from "../services/subcontractor-labor.service.js";
+import * as purchaseOrderService from "../services/purchase-order.service.js";
 import * as approvalService from "../services/approval.service.js";
 import * as inventoryService from "../services/inventory.service.js";
 import { recomputeProjectTotals } from "../services/financial.service.js";
@@ -845,6 +847,88 @@ export async function getSubcontractorPaymentSummary(req: Request, res: Response
       scopeProjectIds
     );
     res.json(summary);
+  } catch (e) { next(e); }
+}
+
+// =================== SUBCONTRACTOR LABOR ROSTER ===================
+export async function listSubcontractorLabor(req: Request, res: Response, next: NextFunction) {
+  try {
+    const subcontractorId = String(req.query.subcontractorId || "");
+    if (!Types.ObjectId.isValid(subcontractorId)) throw new AppError(400, "Valid subcontractorId is required");
+    const items = await subcontractorLaborService.listSubcontractorLabor(subcontractorId);
+    res.json({ items, total: items.length });
+  } catch (e) { next(e); }
+}
+
+export async function createSubcontractorLabor(req: Request, res: Response, next: NextFunction) {
+  try {
+    const labor = await subcontractorLaborService.createSubcontractorLabor({ ...req.body, createdBy: req.user?.sub });
+    invalidateCachePrefix("/api/subcontractor-labor");
+    res.status(201).json({ labor });
+  } catch (e) { next(e); }
+}
+
+export async function updateSubcontractorLabor(req: Request, res: Response, next: NextFunction) {
+  try {
+    const labor = await subcontractorLaborService.updateSubcontractorLabor(req.params.id, req.body);
+    invalidateCachePrefix("/api/subcontractor-labor");
+    res.json({ labor });
+  } catch (e) { next(e); }
+}
+
+// =================== PURCHASE ORDERS ===================
+export async function createPurchaseOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const purchaseOrder = await purchaseOrderService.createPurchaseOrder({ ...req.body, createdBy: req.user?.sub });
+    invalidateCachePrefix("/api/purchase-orders");
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.status(201).json({ purchaseOrder });
+  } catch (e) { next(e); }
+}
+
+export async function listPurchaseOrders(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await purchaseOrderService.listPurchaseOrders({
+      projectId: req.query.projectId as string | undefined,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 50,
+      cursor: req.query.cursor as string | undefined,
+    });
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getPurchaseOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const purchaseOrder = await purchaseOrderService.getPurchaseOrder(req.params.id);
+    res.json({ purchaseOrder });
+  } catch (e) { next(e); }
+}
+
+export async function updatePurchaseOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const purchaseOrder = await purchaseOrderService.updatePurchaseOrder(req.params.id, { ...req.body, createdBy: req.user?.sub });
+    invalidateCachePrefix("/api/purchase-orders");
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.json({ purchaseOrder });
+  } catch (e) { next(e); }
+}
+
+export async function listPurchaseOrderGstRates(_req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json({ rates: await purchaseOrderService.listGstRates() });
+  } catch (e) { next(e); }
+}
+
+export async function createPurchaseOrderGstRate(req: Request, res: Response, next: NextFunction) {
+  try {
+    const item = await purchaseOrderService.addGstRate(req.body.rate, req.user?.sub);
+    invalidateCachePrefix("/api/purchase-orders/gst-rates");
+    res.status(201).json({ rate: item.rate });
   } catch (e) { next(e); }
 }
 

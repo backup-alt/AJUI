@@ -39,8 +39,6 @@ const permissionGroups: PermissionGroup[] = [
       { key: "totalProjectValue", label: "Total Project Value" },
       { key: "amountReceived", label: "Amount Received" },
       { key: "pendingBalance", label: "Pending Balance" },
-      { key: "supervisor", label: "Supervisor" },
-      { key: "status", label: "Status" },
     ],
   },
   {

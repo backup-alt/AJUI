@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
+import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
 import { IonBadge, IonContent, IonIcon, IonSpinner, IonSplitPane } from "@ionic/angular/standalone";
 import { ApiService } from "../core/api.service";
@@ -25,7 +26,7 @@ interface ApiProject {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon, IonBadge, IonSpinner, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonBadge, IonSpinner, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="projects"></agb-enterprise-sidebar>
@@ -64,6 +65,14 @@ interface ApiProject {
             </section>
 
             <section class="projects-directory-list">
+              <article class="projects-directory-card add-client-card" role="button" tabindex="0" (click)="openProjectForm()" (keydown.enter)="openProjectForm()">
+                <div class="add-client-icon">
+                  <ion-icon name="add-outline"></ion-icon>
+                </div>
+                <h3>Add Project</h3>
+                <p>Create a project independently and link it to a client.</p>
+              </article>
+
               <article *ngFor="let project of filteredProjects(); trackBy: trackProject" class="projects-directory-card" role="button" tabindex="0" (click)="openProject(project)" (keydown.enter)="openProject(project)">
                 <div class="projects-directory-title">
                   <div class="title-stack">
@@ -97,9 +106,94 @@ interface ApiProject {
             </section>
           </main>
         </ion-content>
+
+        <section class="form-overlay" *ngIf="showProjectForm()">
+          <form class="erp-dialog" (submit)="$event.preventDefault(); createProject()">
+            <div class="dialog-head">
+              <div>
+                <span>Project Setup</span>
+                <h2>Add Project</h2>
+                <p>Create a project independently from the project list.</p>
+              </div>
+              <button type="button" class="icon-button" aria-label="Close project form" (click)="closeProjectForm()">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+            </div>
+            <div class="erp-form">
+              <label>
+                <span>Client</span>
+                <select required [(ngModel)]="projectDraft.clientId" name="clientId">
+                  <option value="">Select client</option>
+                  <option *ngFor="let client of clients()" [value]="client._id || client.clientId">{{ client.name }}</option>
+                </select>
+              </label>
+              <label>
+                <span>Project Name</span>
+                <input required [(ngModel)]="projectDraft.name" name="name" placeholder="Project name" />
+              </label>
+              <label>
+                <span>Start Date</span>
+                <input required type="date" [(ngModel)]="projectDraft.startDate" name="startDate" />
+              </label>
+              <label>
+                <span>Supervisor</span>
+                <select required [(ngModel)]="projectDraft.supervisorId" name="supervisorId" (ngModelChange)="selectSupervisor($event)">
+                  <option value="">Select supervisor</option>
+                  <option *ngFor="let supervisor of supervisors()" [value]="supervisor._id || supervisor.id">{{ supervisor.name }}</option>
+                </select>
+              </label>
+              <label>
+                <span>Status</span>
+                <select [(ngModel)]="projectDraft.status" name="status">
+                  <option value="Active">Active</option>
+                  <option value="On Hold">On Hold</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </label>
+              <label>
+                <span>Estimated Project Value</span>
+                <input required type="number" min="0" step="1" [(ngModel)]="projectDraft.totalValue" name="totalValue" />
+              </label>
+            </div>
+            <div class="dialog-actions">
+              <button type="button" class="secondary-action" (click)="closeProjectForm()">Cancel</button>
+              <button type="submit" class="primary-action">Create Project</button>
+            </div>
+          </form>
+        </section>
       </div>
     </ion-split-pane>
   `,
+  styles: [`
+    .projects-directory-card.add-client-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 312px;
+      padding: 28px;
+      border: 1px dashed #c9b46d;
+      background: #fffdf6;
+      text-align: center;
+    }
+    .projects-directory-card.add-client-card:hover {
+      border-color: var(--gold-dark);
+      background: #fff9e6;
+    }
+    .projects-directory-card.add-client-card h3 {
+      margin: 0;
+      color: #0f172a;
+      font-size: 22px;
+      line-height: 1.25;
+    }
+    .projects-directory-card.add-client-card p {
+      max-width: 260px;
+      margin: 10px 0 0;
+      color: #64748b;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectsDirectoryPage implements OnInit {
@@ -110,7 +204,11 @@ export class ProjectsDirectoryPage implements OnInit {
 
   readonly searchQuery = signal("");
   readonly projects = signal<ApiProject[]>([]);
+  readonly clients = signal<any[]>([]);
+  readonly supervisors = signal<any[]>([]);
   readonly loading = signal(true);
+  readonly showProjectForm = signal(false);
+  projectDraft = this.emptyProjectDraft();
 
   private readonly allProjects = computed(() => this.projects());
 
@@ -126,6 +224,8 @@ export class ProjectsDirectoryPage implements OnInit {
 
   ngOnInit() {
     this.loadProjects();
+    this.loadClients();
+    this.loadSupervisors();
   }
 
   private loadProjects() {
@@ -139,6 +239,67 @@ export class ProjectsDirectoryPage implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  private loadClients() {
+    this.api.listClients({ limit: 200, page: 1 }).subscribe({
+      next: (res) => this.clients.set(res.items || []),
+      error: () => this.clients.set([]),
+    });
+  }
+
+  private loadSupervisors() {
+    this.api.listEmployees({ limit: 100, role: "supervisor" }).subscribe({
+      next: (response) => this.supervisors.set((response.items || []).filter((item: any) => String(item.role || "").toLowerCase() === "supervisor")),
+      error: () => this.supervisors.set([]),
+    });
+  }
+
+  selectSupervisor(supervisorId: string) {
+    const supervisor = this.supervisors().find((item) => String(item._id || item.id) === supervisorId);
+    this.projectDraft.supervisor = supervisor?.name || "";
+  }
+
+  openProjectForm() {
+    this.projectDraft = this.emptyProjectDraft();
+    this.showProjectForm.set(true);
+  }
+
+  closeProjectForm() {
+    this.showProjectForm.set(false);
+  }
+
+  createProject() {
+    if (!this.projectDraft.clientId || !this.projectDraft.name || !this.projectDraft.startDate || !this.projectDraft.supervisor) return;
+    this.api.createProject({
+      clientId: this.projectDraft.clientId,
+      name: this.projectDraft.name,
+      startDate: this.projectDraft.startDate,
+      supervisor: this.projectDraft.supervisor,
+      supervisorId: this.projectDraft.supervisorId,
+      status: this.projectDraft.status,
+      totalValue: Number(this.projectDraft.totalValue) || 0,
+      siteIds: [],
+      sites: [],
+    }).subscribe({
+      next: () => {
+        this.closeProjectForm();
+        this.loadProjects();
+      },
+      error: () => {},
+    });
+  }
+
+  private emptyProjectDraft() {
+    return {
+      clientId: "",
+      name: "",
+      startDate: new Date().toISOString().slice(0, 10),
+      supervisor: "",
+      supervisorId: "",
+      status: "Active" as ApiProject["status"],
+      totalValue: 0,
+    };
   }
 
   trackProject(_: number, project: ApiProject): string {

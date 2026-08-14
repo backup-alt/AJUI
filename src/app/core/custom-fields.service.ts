@@ -7,6 +7,7 @@ export type CustomFieldEntityType =
   | "clients"
   | "projects"
   | "materials"
+  | "purchaseOrders"
   | "labour"
   | "expenses"
   | "payments"

@@ -4,6 +4,7 @@ export type CustomFieldEntityType =
   | "clients"
   | "projects"
   | "materials"
+  | "purchaseOrders"
   | "labour"
   | "expenses"
   | "payments"
@@ -35,6 +36,7 @@ const customFieldSchema = new Schema<ICustomField>(
         "clients",
         "projects",
         "materials",
+        "purchaseOrders",
         "labour",
         "expenses",
         "payments",

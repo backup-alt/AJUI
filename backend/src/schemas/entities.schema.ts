@@ -7,8 +7,8 @@ export const idSchema = z.object({
 export const createClientSchema = z.object({
   body: z.object({
     name: z.string().trim().min(1).max(200),
-    mobile: z.string().trim().min(8).max(20),
-    address: z.string().trim().min(1).max(500),
+    mobile: z.string().trim().min(8).max(20).optional(),
+    address: z.string().trim().min(1).max(500).optional(),
     gstNumber: z.string().trim().optional(),
     state: z.string().trim().optional(),
     status: z.enum(["Active", "On Hold", "Completed"]).default("Active"),
@@ -143,6 +143,7 @@ export const createCustomFieldSchema = z.object({
       "clients",
       "projects",
       "materials",
+      "purchaseOrders",
       "labour",
       "expenses",
       "payments",
@@ -175,6 +176,7 @@ export const getCustomFieldsSchema = z.object({
       "clients",
       "projects",
       "materials",
+      "purchaseOrders",
       "labour",
       "expenses",
       "payments",

@@ -51,7 +51,7 @@ const materialSchema = new Schema<IMaterial>(
     clientId: { type: Schema.Types.ObjectId, ref: "Client" },
     clientName: { type: String },
     siteId: { type: Schema.Types.ObjectId, ref: "Site", index: true },
-    site: { type: String, required: true },
+    site: { type: String, default: "" },
     name: { type: String, required: true, trim: true },
     unit: { type: String, required: true },
     requestedQuantity: { type: Number, default: 0 },

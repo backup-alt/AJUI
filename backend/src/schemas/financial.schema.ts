@@ -281,11 +281,78 @@ export const createSubcontractorPaymentSchema = z.object({
     projectId: objectIdSchema,
     siteId: objectIdSchema,
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
-    description: z.string().trim().min(1).max(500),
+    description: z.string().trim().max(500).optional().default(""),
     employeeCount: z.coerce.number().int().min(1),
     amount: z.coerce.number().positive(),
     notes: z.string().trim().max(1000).optional(),
   }),
+});
+
+export const createSubcontractorLaborSchema = z.object({
+  body: z.object({
+    subcontractorId: objectIdSchema,
+    name: z.string().trim().min(1).max(200),
+    address: z.string().trim().max(500).optional().default(""),
+    phone: z.string().trim().min(5).max(40),
+    role: z.string().trim().min(1).max(100),
+    notes: z.string().trim().max(1000).optional().default(""),
+  }),
+});
+
+export const updateSubcontractorLaborSchema = z.object({
+  body: createSubcontractorLaborSchema.shape.body.omit({ subcontractorId: true }).partial(),
+  params: z.object({ id: objectIdSchema }),
+});
+
+const purchaseOrderItemSchema = z.discriminatedUnion("source", [
+  z.object({
+    source: z.literal("existing"),
+    materialId: objectIdSchema,
+    rate: z.coerce.number().nonnegative(),
+    gstPercent: z.coerce.number().min(0).max(100),
+  }),
+  z.object({
+    source: z.literal("manual"),
+    materialId: objectIdSchema.optional(),
+    description: z.string().trim().min(1).max(200),
+    unit: z.string().trim().min(1).max(50),
+    quantity: z.coerce.number().positive(),
+    rate: z.coerce.number().nonnegative(),
+    gstPercent: z.coerce.number().min(0).max(100),
+  }),
+]);
+
+export const createPurchaseOrderSchema = z.object({
+  body: z.object({
+    projectId: objectIdSchema,
+    vendorId: objectIdSchema,
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
+    items: z.array(purchaseOrderItemSchema).min(1),
+    roundOff: z.coerce.number().min(-1000).max(1000).optional().default(0),
+  }),
+});
+
+export const updatePurchaseOrderSchema = z.object({
+  body: z.object({
+    vendorId: objectIdSchema,
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
+    items: z.array(purchaseOrderItemSchema).min(1),
+    roundOff: z.coerce.number().min(-1000).max(1000).optional().default(0),
+  }),
+  params: z.object({ id: objectIdSchema }),
+});
+
+export const listPurchaseOrdersSchema = z.object({
+  query: z.object({
+    projectId: objectIdSchema.optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    cursor: z.string().optional(),
+  }),
+});
+
+export const createGstRateSchema = z.object({
+  body: z.object({ rate: z.coerce.number().min(0).max(100) }),
 });
 
 export const updateSubcontractorPaymentSchema = z.object({

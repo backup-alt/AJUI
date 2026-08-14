@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
-import { IonBadge, IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { Vendor, VendorStatus, ErpDataService, Site } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
@@ -8,7 +8,7 @@ import { MaterialsService } from "../core/materials.service";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { formatMoney, statusClass } from "../shared/format";
+import { formatMoney } from "../shared/format";
 
 type VendorSite = Site & {
   materialEntryCount: number;
@@ -22,7 +22,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonBadge, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
+  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="vendors"></agb-enterprise-sidebar>
@@ -52,7 +52,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                 @for (vendor of vendors(); track vendor.id) {
                   <article
                     class="client-card vendor-card"
-                    [class.is-inactive]="vendor.status === 'Not Active'"
                     role="button"
                     tabindex="0"
                     (click)="openVendor(vendor)"
@@ -66,9 +65,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                             <h3>{{ vendor.name }}</h3>
                             <p><ion-icon name="call-outline"></ion-icon>{{ vendor.phone }}</p>
                           </div>
-                        </div>
-                        <div class="head-meta">
-                          <ion-badge class="status" [ngClass]="statusClass(vendor.status || 'Active')">{{ vendor.status || 'Active' }}</ion-badge>
                         </div>
                       </div>
 
@@ -108,7 +104,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
               <section class="vendor-breadcrumb">
                 <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
                 <h2>{{ selectedVendor()!.name }} – Sites</h2>
-                <ion-badge class="status" [ngClass]="statusClass(selectedVendor()!.status || 'Active')">{{ selectedVendor()!.status || 'Active' }}</ion-badge>
               </section>
 
               @if (loadingSites()) {
@@ -122,7 +117,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                 @for (site of vendorSites(); track site.id) {
                   <article
                     class="client-card site-card"
-                    [class.is-inactive]="selectedVendor()!.status === 'Not Active'"
                     role="button"
                     tabindex="0"
                     (click)="openSite(site)"
@@ -158,7 +152,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         <span class="site-status" [class.active]="site.status === 'Active'" [class.on-hold]="site.status === 'On Hold'" [class.completed]="site.status === 'Completed'">
                           {{ site.status || 'Active' }}
                         </span>
-                        <ion-badge class="status" [ngClass]="statusClass(selectedVendor()!.status || 'Active')">{{ selectedVendor()!.status || 'Active' }}</ion-badge>
                       </div>
                     </div>
                   </article>
@@ -932,7 +925,6 @@ export class VendorDashboardPage {
   readonly toastController = inject(ToastController);
 
   readonly showVendorForm = signal(false);
-  readonly statusClass = statusClass;
   readonly editingVendor = signal<Vendor | null>(null);
   readonly vendors = computed<Vendor[]>(() => this.data.vendors());
   readonly refreshing = signal(false);
@@ -1372,7 +1364,7 @@ export class VendorDashboardPage {
       return;
     }
 
-    const statusValue: VendorStatus = value.status === "Not Active" ? "Not Active" : "Active";
+    const statusValue: VendorStatus = "Active";
 
     const payload = {
       name: value.name,
@@ -1381,7 +1373,7 @@ export class VendorDashboardPage {
       address: value.address,
       gstNumber: value.gst,
       status: statusValue,
-      siteIds: value.siteIds || [],
+      siteIds: [],
     };
 
     try {
@@ -1390,7 +1382,7 @@ export class VendorDashboardPage {
       const vendorId = v?.vendorId || v?._id || v?.id || `VEN-${Date.now()}`;
       const serverSiteIds = Array.isArray(v?.siteIds)
         ? v.siteIds.map((id: any) => String(id))
-        : (value.siteIds || []).map((id) => String(id));
+        : [];
 
       this.data.addVendor({
         id: vendorId,
@@ -1471,8 +1463,6 @@ export class VendorDashboardPage {
       phone: vendor.phone,
       address: vendor.address,
       gst: vendor.gst,
-      status: vendor.status === "Not Active" ? "Not Active" : "Active",
-      siteIds: (vendor as any).siteIds || [],
     };
   }
 
@@ -1490,7 +1480,7 @@ export class VendorDashboardPage {
       return;
     }
 
-    const statusValue: VendorStatus = value.status === "Not Active" ? "Not Active" : "Active";
+    const statusValue: VendorStatus = "Active";
 
     const payload = {
       name: value.name,
@@ -1499,7 +1489,7 @@ export class VendorDashboardPage {
       address: value.address,
       gstNumber: value.gst,
       status: statusValue,
-      siteIds: value.siteIds || [],
+      siteIds: [],
     };
 
     try {
@@ -1508,7 +1498,7 @@ export class VendorDashboardPage {
       const v = res?.vendor || res;
       const serverSiteIds = Array.isArray(v?.siteIds)
         ? v.siteIds.map((id: any) => String(id))
-        : (value.siteIds || []).map((id) => String(id));
+        : [];
 
       this.data.updateVendor(vendor.id, {
         ...value,

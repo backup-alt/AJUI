@@ -107,6 +107,7 @@ export type AppUser = {
 
 export type SharedModuleKey =
   | "materials"
+  | "purchaseOrders"
   | "clients"
   | "labour"
   | "expenses"
@@ -949,6 +950,7 @@ export class ErpDataService {
     projectId: string,
     patch: {
       name?: string;
+      clientId?: string;
       sites?: string[];
       startDate?: string;
       supervisor?: string;
@@ -1645,6 +1647,7 @@ export class ErpDataService {
   private emptySharedFieldMap(): Record<SharedModuleKey, SharedTableField[]> {
     return {
       materials: [],
+      purchaseOrders: [],
       clients: [],
       labour: [],
       expenses: [],
@@ -1662,6 +1665,7 @@ export class ErpDataService {
   private emptySharedRowMap(): Record<SharedModuleKey, SharedTableRow[]> {
     return {
       materials: [],
+      purchaseOrders: [],
       clients: [],
       labour: [],
       expenses: [],
@@ -1679,6 +1683,7 @@ export class ErpDataService {
   private emptyHiddenFieldMap(): Record<SharedModuleKey, string[]> {
     return {
       materials: [],
+      purchaseOrders: [],
       clients: [],
       labour: [],
       expenses: [],
