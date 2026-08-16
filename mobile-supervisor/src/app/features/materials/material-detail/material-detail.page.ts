@@ -28,7 +28,7 @@ import { StatusPillComponent } from '../../../shared/components';
         <ion-buttons slot="start">
           <ion-back-button default-href="/tabs/materials" color="primary"></ion-back-button>
         </ion-buttons>
-        <ion-title>Material</ion-title>
+        <ion-title>Inventory Item</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="detail-content">
@@ -140,7 +140,7 @@ import { StatusPillComponent } from '../../../shared/components';
 
           <div class="card">
             <h3 class="card-title">Live stock</h3>
-            <p class="card-sub">Track purchased and consumed quantities. Update directly from the Inventory page.</p>
+            <p class="card-sub">Track purchased and consumed quantities. Update directly from the Materials page.</p>
             <div class="stock-grid">
               <div class="stock-stat">
                 <div class="stat-label">Purchased</div>
@@ -158,7 +158,7 @@ import { StatusPillComponent } from '../../../shared/components';
 
             <a routerLink="/tabs/inventory" class="stock-link-btn">
               <ion-icon name="grid-outline"></ion-icon>
-              Open Inventory to Update
+              Open Materials to Update
             </a>
           </div>
         </div>

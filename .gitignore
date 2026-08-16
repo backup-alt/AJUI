@@ -51,3 +51,5 @@ AJUI-temp/
 # Coverage / test output
 coverage/
 *.lcov
+
+.claude/

@@ -11,7 +11,7 @@ import { cubeOutline, documentTextOutline, closeOutline } from 'ionicons/icons';
   template: `
     <div class="action-sheet-container">
       <div class="action-sheet-header">
-        <h2>Add to Inventory</h2>
+        <h2>Add to Materials</h2>
         <p>Choose how you'd like to add materials</p>
         <button class="close-btn" (click)="dismiss()" aria-label="Close">
           <ion-icon name="close-outline"></ion-icon>

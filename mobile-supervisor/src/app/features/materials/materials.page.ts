@@ -4,30 +4,18 @@ import { firstValueFrom } from 'rxjs';
 import {
   IonContent,
   IonSearchbar,
-  IonSegment,
-  IonSegmentButton,
-  IonLabel,
-  IonFab,
-  IonFabButton,
   IonIcon,
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
-  IonSelect,
-  IonSelectOption,
 } from '@ionic/angular/standalone';
-import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
 import {
-  addOutline,
   cubeOutline,
-  filterOutline,
   timeOutline,
-  checkmarkCircleOutline,
-  closeCircleOutline,
   chevronForwardOutline,
   chevronDownOutline,
   businessOutline,
@@ -35,28 +23,22 @@ import {
   refreshOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
-import { Material, MaterialStatus } from '../../shared/models';
+import { Material } from '../../shared/models';
 import { DatePipe } from '@angular/common';
 import {
   PageHeaderComponent,
   EmptyStateComponent,
-  StatusPillComponent,
 } from '../../shared/components';
 
 interface ConsolidatedMaterial {
+  key: string;
   name: string;
   unit: string;
-  totalRequested: number;
-  totalApproved: number;
-  totalRemaining: number;
+  totalConsumed: number;
   siteCount: number;
   projectNames: string[];
-  status: MaterialStatus;
   items: Material[];
-  lowStock: boolean;
 }
-
-type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
 
 @Component({
   selector: 'app-materials',
@@ -65,23 +47,15 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
     FormsModule,
     IonContent,
     IonSearchbar,
-    IonSegment,
-    IonSegmentButton,
-    IonLabel,
-    IonFab,
-    IonFabButton,
     IonIcon,
     IonSkeletonText,
     IonRefresher,
     IonRefresherContent,
     IonInfiniteScroll,
     IonInfiniteScrollContent,
-    IonSelect,
-    IonSelectOption,
     DatePipe,
     PageHeaderComponent,
     EmptyStateComponent,
-    StatusPillComponent,
   ],
   template: `
     <ion-content class="materials-content">
@@ -90,10 +64,10 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
       </ion-refresher>
 
       <app-page-header
-        title="Materials"
-        subtitle="Live inventory across your assigned sites."
+        title="Inventory"
+        subtitle="Consumed quantities and consumption logs."
       >
-        <span actions class="count-chip">{{ consolidatedMaterials().length }} material{{ consolidatedMaterials().length === 1 ? '' : 's' }}</span>
+        <span actions class="count-chip">{{ consolidatedMaterials().length }} item{{ consolidatedMaterials().length === 1 ? '' : 's' }}</span>
       </app-page-header>
 
       <div class="filter-stack">
@@ -103,33 +77,6 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
           (ngModelChange)="onSearchChange($event)"
           class="search"
         ></ion-searchbar>
-        <div class="seg-wrap">
-          <ion-segment [(ngModel)]="statusFilter" (ionChange)="onStatusChange($event.detail.value)" [value]="'Approved'">
-            <ion-segment-button [value]="''">
-              <ion-label>All</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="Pending">
-              <ion-label>Pending</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="Approved">
-              <ion-label>Approved</ion-label>
-            </ion-segment-button>
-          </ion-segment>
-        </div>
-        <div class="filter-row">
-          <ion-select
-            class="stock-filter"
-            aria-label="Stock filter"
-            interface="popover"
-            [ngModel]="stockFilter"
-            (ionChange)="onStockFilterChange($event.detail.value)"
-          >
-            <ion-select-option value="all">All stock</ion-select-option>
-            <ion-select-option value="available">Available</ion-select-option>
-            <ion-select-option value="low">Low stock</ion-select-option>
-            <ion-select-option value="out">Out of stock</ion-select-option>
-          </ion-select>
-        </div>
       </div>
 
       <div class="cards">
@@ -154,15 +101,15 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
         } @else if (consolidatedMaterials().length === 0) {
           <app-empty-state
             icon="cube-outline"
-            [title]="searchQuery || stockFilter !== 'all' ? 'No matches' : 'No materials yet'"
-            [message]="searchQuery || stockFilter !== 'all'
-              ? 'No materials match your filters. Try clearing them.'
-              : 'Create a material request to get started.'"
+            [title]="searchQuery ? 'No matches' : 'No consumption logs yet'"
+            [message]="searchQuery
+              ? 'No consumption logs match your search.'
+              : 'Consumed material entries will appear here.'"
           ></app-empty-state>
         } @else {
-          @for (group of consolidatedMaterials(); track group.name) {
-            <div class="material-group" [class.expanded]="expandedKey() === group.name">
-              <button class="material-card" (click)="toggleGroup(group.name)">
+          @for (group of consolidatedMaterials(); track group.key) {
+            <div class="material-group" [class.expanded]="expandedKey() === group.key">
+              <button class="material-card" (click)="toggleGroup(group)">
                 <header class="material-head">
                   <span class="material-tile">
                     <ion-icon name="cube-outline"></ion-icon>
@@ -177,33 +124,11 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
                   <ion-icon class="expand-chevron" name="chevron-down-outline"></ion-icon>
                 </header>
 
-                <div class="material-badges">
-                  <app-status-pill [tone]="getStatusTone(group.status)">{{ group.status }}</app-status-pill>
-                  @if (group.lowStock) {
-                    <span class="low-stock-flag">
-                      <ion-icon name="alert-circle-outline"></ion-icon>
-                      Low
-                    </span>
-                  }
-                </div>
-
                 <div class="material-stats">
-                  <div class="stat">
-                    <div class="stat-label">Requested</div>
-                    <div class="stat-value">{{ group.totalRequested }} {{ group.unit }}</div>
+                  <div class="stat consumed">
+                    <div class="stat-label">Consumed</div>
+                    <div class="stat-value">{{ group.totalConsumed }} {{ group.unit }}</div>
                   </div>
-                  @if (group.totalApproved > 0) {
-                    <div class="stat highlight">
-                      <div class="stat-label">Approved</div>
-                      <div class="stat-value">{{ group.totalApproved }} {{ group.unit }}</div>
-                    </div>
-                  }
-                  @if (group.totalRemaining > 0) {
-                    <div class="stat">
-                      <div class="stat-label">On site</div>
-                      <div class="stat-value">{{ group.totalRemaining }} {{ group.unit }}</div>
-                    </div>
-                  }
                 </div>
 
                 <footer class="material-footer">
@@ -212,26 +137,39 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
                     {{ group.items[0].requestDate | date:'MMM d, yyyy' }}
                   </div>
                   <span class="view-link">
-                    {{ expandedKey() === group.name ? 'Collapse' : 'View ' + group.items.length + ' entries' }}
-                    <ion-icon [name]="expandedKey() === group.name ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon>
+                    {{ expandedKey() === group.key ? 'Collapse' : 'View ' + group.items.length + ' entries' }}
+                    <ion-icon [name]="expandedKey() === group.key ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon>
                   </span>
                 </footer>
               </button>
 
-              @if (expandedKey() === group.name) {
+              @if (expandedKey() === group.key) {
                 <div class="group-breakdown">
                   @for (item of group.items; track item._id) {
-                    <button class="breakdown-item" (click)="viewMaterial(item)">
+                    <div class="breakdown-item">
                       <div class="breakdown-info">
                         <span class="breakdown-site">{{ item.site }}</span>
                         <span class="breakdown-project">{{ item.projectName }}</span>
                       </div>
                       <div class="breakdown-stats">
-                        <span class="breakdown-qty">{{ item.approvedQuantity || item.requestedQuantity }} {{ item.unit }}</span>
-                        <app-status-pill [tone]="getStatusTone(item.status)">{{ item.status }}</app-status-pill>
+                        <span class="breakdown-qty">{{ item.consumedQuantity || 0 }} {{ item.unit }} consumed</span>
                       </div>
-                      <ion-icon name="chevron-forward-outline" class="breakdown-chevron"></ion-icon>
-                    </button>
+                      <div class="consumption-log">
+                        <div class="consumption-log-title">Consumption logs</div>
+                        @if (loadingConsumptionKeys().has(item._id)) {
+                          <div class="consumption-empty">Loading logs...</div>
+                        } @else if (item.consumptionHistory?.length) {
+                          @for (log of item.consumptionHistory; track $index) {
+                            <div class="consumption-entry">
+                              <span>{{ log.quantity }} {{ item.unit }}</span>
+                              <time>{{ log.date | date:'MMM d, yyyy, h:mm a' }}</time>
+                            </div>
+                          }
+                        } @else {
+                          <div class="consumption-empty">No consumption recorded.</div>
+                        }
+                      </div>
+                    </div>
                   }
                 </div>
               }
@@ -239,12 +177,6 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
           }
         }
       </div>
-
-      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button (click)="createMaterial()">
-          <ion-icon name="add-outline"></ion-icon>
-        </ion-fab-button>
-      </ion-fab>
 
       <ion-infinite-scroll
         threshold="160px"
@@ -361,7 +293,7 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
     .low-stock-flag ion-icon { font-size: 12px; }
 
     .material-stats {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
       background: var(--m3-surface-container);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--md-radius-lg);
@@ -372,6 +304,7 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
     .stat-label { font-size: 11px; color: var(--m3-on-surface-muted); text-transform: uppercase; letter-spacing: 0.3px; }
     .stat-value { font-size: 15px; font-weight: 700; color: var(--m3-on-surface); margin-top: 3px; }
     .stat.highlight .stat-value { color: var(--m3-success); }
+    .stat.consumed .stat-value { color: var(--m3-error); }
 
     .material-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 2px; }
     .material-date { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--m3-on-surface-muted); }
@@ -396,6 +329,7 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
       cursor: pointer;
       font-family: inherit;
       transition: background 120ms ease;
+      flex-wrap: wrap;
     }
     .breakdown-item:last-child { border-bottom: none; }
     .breakdown-item:active { background: var(--m3-surface-container); }
@@ -405,6 +339,33 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
     .breakdown-stats { display: flex; align-items: center; gap: 10px; }
     .breakdown-qty { font-size: 14px; font-weight: 600; color: var(--m3-on-surface); }
     .breakdown-chevron { font-size: 16px; color: var(--m3-on-surface-muted); }
+    .consumption-log {
+      width: 100%;
+      margin-top: 4px;
+      padding: 10px 12px;
+      border-radius: var(--md-radius-md);
+      background: var(--m3-surface-container);
+      text-align: left;
+    }
+    .consumption-log-title {
+      margin-bottom: 6px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--m3-on-surface-muted);
+    }
+    .consumption-entry {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 4px 0;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+    }
+    .consumption-entry time { font-weight: 500; color: var(--m3-on-surface-muted); }
+    .consumption-empty { font-size: 12px; color: var(--m3-on-surface-muted); }
 
     .skeleton-card {
       background: var(--m3-surface-bright);
@@ -438,7 +399,6 @@ type MaterialsStockFilter = 'all' | 'available' | 'low' | 'out';
 export class MaterialsPage implements OnInit {
   private destroyRef = inject(DestroyRef);
   private supervisor = inject(SupervisorService);
-  private router = inject(Router);
 
   materials = signal<Material[]>([]);
   consolidatedMaterials = signal<ConsolidatedMaterial[]>([]);
@@ -446,17 +406,15 @@ export class MaterialsPage implements OnInit {
   isLoadingMore = signal(false);
   errorMessage = signal<string>('');
   expandedKey = signal<string>('');
+  loadingConsumptionKeys = signal<Set<string>>(new Set());
   nextCursor = signal<string | null>(null);
   searchQuery = '';
-  statusFilter: MaterialStatus | '' = 'Approved';
-  stockFilter: MaterialsStockFilter = 'all';
   private loadGeneration = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      addOutline, cubeOutline, filterOutline, timeOutline, checkmarkCircleOutline,
-      closeCircleOutline, chevronForwardOutline, chevronDownOutline, businessOutline,
+      cubeOutline, timeOutline, chevronForwardOutline, chevronDownOutline, businessOutline,
       cloudOfflineOutline, refreshOutline,
     });
     await this.supervisor.init().catch(() => {});
@@ -482,10 +440,9 @@ export class MaterialsPage implements OnInit {
         this.supervisor.getMaterials({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
-          status: this.statusFilter || undefined,
+          status: 'Approved',
           limit: 25,
           search: this.searchQuery.trim() || undefined,
-          stockStatus: this.stockFilter,
         }, force)
       );
       if (gen !== this.loadGeneration) return;
@@ -515,11 +472,10 @@ export class MaterialsPage implements OnInit {
         this.supervisor.getMaterials({
           siteId: this.supervisor.selectedSiteId() || undefined,
           projectId: this.supervisor.selectedProjectId() || undefined,
-          status: this.statusFilter || undefined,
+          status: 'Approved',
           limit: 25,
           cursor,
           search: this.searchQuery.trim() || undefined,
-          stockStatus: this.stockFilter,
         })
       );
       const existing = this.materials();
@@ -547,50 +503,40 @@ export class MaterialsPage implements OnInit {
     this.searchTimer = setTimeout(() => void this.loadMaterials(true), 350);
   }
 
-  onStatusChange(value: string | number | undefined): void {
-    this.statusFilter = (String(value ?? '') as MaterialStatus | '');
-    void this.loadMaterials(true);
-  }
-
-  onStockFilterChange(value: MaterialsStockFilter): void {
-    this.stockFilter = value || 'all';
-    void this.loadMaterials(true);
-  }
-
   filterMaterials(): void {
     this.consolidatedMaterials.set(this.consolidateByName(this.materials()));
   }
 
   private consolidateByName(materials: Material[]): ConsolidatedMaterial[] {
     const map = new Map<string, ConsolidatedMaterial>();
+    const inventoryKeys = new Set(
+      materials
+        .filter((material) => material._id === material.materialId)
+        .map((material) => this.normalizedMaterialName(material.name))
+    );
 
     for (const m of materials) {
       if (!m.name) continue;
-      const existing = map.get(m.name);
+      const key = this.normalizedMaterialName(m.name);
+      if (!key) continue;
+      if (inventoryKeys.has(key) && m._id !== m.materialId) continue;
+      const existing = map.get(key);
       if (existing) {
-        existing.totalRequested += m.requestedQuantity ?? 0;
-        existing.totalApproved += m.approvedQuantity ?? 0;
-        existing.totalRemaining += m.remainingStock ?? 0;
+        existing.totalConsumed += m.consumedQuantity ?? 0;
         if (!existing.projectNames.includes(m.projectName)) {
           existing.projectNames.push(m.projectName);
         }
-        existing.siteCount += 1;
-        existing.status = this.worstStatus(existing.status, m.status);
         existing.items.push(m);
-        existing.lowStock = existing.totalApproved > 0 && existing.totalRemaining < existing.totalApproved * 0.7;
+        existing.siteCount = new Set(existing.items.map((item) => item.siteId || item.site)).size;
       } else {
-        const lowStock = (m.approvedQuantity ?? 0) > 0 && (m.remainingStock ?? 0) < (m.approvedQuantity ?? 0) * 0.7;
-        map.set(m.name, {
-          name: m.name,
+        map.set(key, {
+          key,
+          name: m.name.trim(),
           unit: m.unit,
-          totalRequested: m.requestedQuantity ?? 0,
-          totalApproved: m.approvedQuantity ?? 0,
-          totalRemaining: m.remainingStock ?? 0,
+          totalConsumed: m.consumedQuantity ?? 0,
           siteCount: 1,
           projectNames: [m.projectName],
-          status: m.status,
           items: [m],
-          lowStock,
         });
       }
     }
@@ -600,40 +546,53 @@ export class MaterialsPage implements OnInit {
     );
   }
 
-  private worstStatus(current: MaterialStatus, next: MaterialStatus): MaterialStatus {
-    const priority: Record<MaterialStatus, number> = {
-      'Rejected': 0,
-      'Pending': 1,
-      'Not Received': 2,
-      'Received': 3,
-      'Completed': 4,
-      'Approved': 5,
-    };
-    return (priority[next] ?? 9) < (priority[current] ?? 9) ? next : current;
+  private normalizedMaterialName(name: string): string {
+    return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
   }
 
-  toggleGroup(name: string): void {
-    if (this.expandedKey() === name) {
+  toggleGroup(group: ConsolidatedMaterial): void {
+    if (this.expandedKey() === group.key) {
       this.expandedKey.set('');
     } else {
-      this.expandedKey.set(name);
+      this.expandedKey.set(group.key);
+      void this.loadConsumptionLogs(group.items);
     }
   }
 
-  viewMaterial(material: Material): void {
-    this.router.navigate(['/tabs/materials', material._id]);
+  private async loadConsumptionLogs(items: Material[]): Promise<void> {
+    const pending = items.filter(
+      (item) => (item.consumedQuantity || 0) > 0
+        && item.consumptionHistory === undefined
+        && !this.loadingConsumptionKeys().has(item._id)
+    );
+    if (pending.length === 0) return;
+
+    this.loadingConsumptionKeys.update((current) => new Set([
+      ...current,
+      ...pending.map((item) => item._id),
+    ]));
+
+    const detailResults = await Promise.all(pending.map(async (item) => {
+      try {
+        const response = await firstValueFrom(this.supervisor.getMaterialDetail(item._id));
+        return [item._id, response.material.consumptionHistory || []] as const;
+      } catch {
+        return [item._id, [] as NonNullable<Material['consumptionHistory']>] as const;
+      }
+    }));
+    const histories = new Map(detailResults);
+
+    this.materials.update((current) => current.map((item) =>
+      histories.has(item._id)
+        ? { ...item, consumptionHistory: histories.get(item._id) }
+        : item
+    ));
+    this.filterMaterials();
+    this.loadingConsumptionKeys.update((current) => {
+      const next = new Set(current);
+      for (const item of pending) next.delete(item._id);
+      return next;
+    });
   }
 
-  createMaterial(): void {
-    this.router.navigate(['/tabs/materials/create']);
-  }
-
-  getStatusTone(status: MaterialStatus): 'success' | 'warning' | 'danger' | 'neutral' {
-    switch (status) {
-      case 'Pending': return 'warning';
-      case 'Approved': return 'success';
-      case 'Rejected': return 'danger';
-      default: return 'neutral';
-    }
-}
 }

@@ -94,7 +94,7 @@ import { firstValueFrom } from 'rxjs';
             <span class="stat-val">{{ dashboard()?.counts?.sites || 0 }}</span>
             <span class="stat-label">Sites</span>
           </button>
-          <button class="stat-card" (click)="navigateTo('/tabs/inventory')">
+          <button class="stat-card" (click)="navigateTo('/tabs/materials')">
             <div class="stat-icon si-gold">
               <ion-icon name="cube-outline"></ion-icon>
             </div>

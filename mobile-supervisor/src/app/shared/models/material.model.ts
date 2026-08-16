@@ -32,6 +32,7 @@ export interface Material {
   approvedBy?: string;
   approvedAt?: string;
   purchaseHistory?: PurchaseHistoryEntry[];
+  consumptionHistory?: ConsumptionHistoryEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -41,6 +42,12 @@ export interface PurchaseHistoryEntry {
   quantity: number;
   date: string;
   notes?: string;
+}
+
+export interface ConsumptionHistoryEntry {
+  quantity: number;
+  date: string;
+  updatedBy?: string;
 }
 
 export interface CustomField {

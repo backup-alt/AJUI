@@ -19,7 +19,7 @@ import { DatePipe } from '@angular/common';
         <ion-buttons slot="start">
           <ion-back-button default-href="/tabs/inventory" color="primary"></ion-back-button>
         </ion-buttons>
-        <ion-title>Inventory Detail</ion-title>
+        <ion-title>Material Detail</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="detail-content">

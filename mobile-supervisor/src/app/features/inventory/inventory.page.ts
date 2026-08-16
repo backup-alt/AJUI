@@ -103,8 +103,8 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
       </ion-refresher>
 
       <app-page-header
-        title="Inventory"
-        subtitle="Current stock at your site"
+        title="Materials"
+        subtitle="Current material stock at your site"
       >
         <span actions class="count-chip">{{ filteredItems().length }} item{{ filteredItems().length === 1 ? '' : 's' }}</span>
       </app-page-header>
@@ -159,10 +159,10 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
         } @else if (filteredItems().length === 0) {
           <app-empty-state
             icon="grid-outline"
-            [title]="searchQuery() ? 'No matches found' : 'No inventory yet'"
+            [title]="searchQuery() ? 'No matches found' : 'No materials yet'"
             [message]="searchQuery()
               ? 'Try adjusting your search.'
-              : 'Approved materials will appear here as inventory.'"
+              : 'Approved stock will appear here as materials.'"
           ></app-empty-state>
         } @else {
           @for (item of filteredItems(); track item.materialId) {
@@ -698,7 +698,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   private isDragging = false;
 
   filteredItems = computed(() => {
-    let result = [...this.items()];
+    let result = this.consolidateByName(this.items());
 
     const q = this.searchQuery().toLowerCase().trim();
     if (q) {
@@ -733,6 +733,53 @@ export class InventoryPage implements OnInit, OnDestroy {
 
     return result;
   });
+
+  private consolidateByName(items: InventoryItem[]): InventoryItem[] {
+    const grouped = new Map<string, InventoryItem>();
+    const inventoryKeys = new Set(
+      items
+        .filter((item) => item._id === item.materialId)
+        .map((item) => this.normalizedMaterialName(item.name))
+    );
+
+    for (const item of items) {
+      const key = this.normalizedMaterialName(item.name);
+      if (!key) continue;
+      if (inventoryKeys.has(key) && item._id !== item.materialId) continue;
+
+      const existing = grouped.get(key);
+      if (!existing) {
+        grouped.set(key, {
+          ...item,
+          name: item.name.trim(),
+          purchaseHistory: [...(item.purchaseHistory || [])],
+        });
+        continue;
+      }
+
+      existing.currentQuantity += item.currentQuantity;
+      existing.minimumQuantity += item.minimumQuantity;
+      existing.purchaseHistory = [
+        ...(existing.purchaseHistory || []),
+        ...(item.purchaseHistory || []),
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      if (new Date(item.lastUpdated).getTime() > new Date(existing.lastUpdated).getTime()) {
+        existing.lastUpdated = item.lastUpdated;
+        existing._id = item._id;
+        existing.materialId = item.materialId;
+        existing.vendor = item.vendor;
+        existing.poNumber = item.poNumber;
+        existing.billUrl = item.billUrl;
+      }
+    }
+
+    return Array.from(grouped.values());
+  }
+
+  private normalizedMaterialName(name: string): string {
+    return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+  }
 
   sortLabel = computed(() => {
     const map: Record<SortField, string> = {
