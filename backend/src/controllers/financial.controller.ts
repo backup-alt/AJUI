@@ -13,7 +13,7 @@ import * as purchaseOrderService from "../services/purchase-order.service.js";
 import * as approvalService from "../services/approval.service.js";
 import * as inventoryService from "../services/inventory.service.js";
 import * as workerService from "../services/worker.service.js";
-import { recomputeProjectTotals } from "../services/financial.service.js";
+import { recomputeClientTotals, recomputeProjectTotals } from "../services/financial.service.js";
 import { getScopedProjectIds } from "../middleware/rbac.js";
 import { User } from "../models/User.js";
 import { ActivityLog } from "../models/ActivityLog.js";
@@ -680,11 +680,30 @@ export async function deleteGeneralExpense(req: Request, res: Response, next: Ne
 }
 
 // =================== PAYMENTS ===================
+async function recomputePaymentRollups(...payments: any[]): Promise<void> {
+  const projectIds = new Set<string>();
+  const clientIds = new Set<string>();
+  for (const payment of payments) {
+    if (payment?.projectId) projectIds.add(String(payment.projectId));
+    if (payment?.clientId) clientIds.add(String(payment.clientId));
+  }
+  await Promise.all([...projectIds].map((id) => recomputeProjectTotals(new Types.ObjectId(id))));
+  await Promise.all([...clientIds].map((id) => recomputeClientTotals(new Types.ObjectId(id))));
+}
+
+function invalidatePaymentCaches(): void {
+  invalidateCachePrefix("/api/payments");
+  invalidateCachePrefix("/api/projects");
+  invalidateCachePrefix("/api/clients");
+  invalidateCachePrefix("/api/dashboard/kpis");
+  invalidateCachePrefix("/api/dashboard/batch");
+}
+
 export async function createPayment(req: Request, res: Response, next: NextFunction) {
   try {
     const payment = await paymentService.createPayment(req.body);
-    invalidateCachePrefix("/api/payments");
-    invalidateCachePrefix("/api/dashboard/batch");
+    await recomputePaymentRollups(payment);
+    invalidatePaymentCaches();
     res.status(201).json({ payment });
   } catch (e) { next(e); }
 }
@@ -717,18 +736,19 @@ export async function getPayment(req: Request, res: Response, next: NextFunction
 
 export async function updatePayment(req: Request, res: Response, next: NextFunction) {
   try {
+    const previousPayment = await paymentService.getPaymentById(req.params.id);
     const payment = await paymentService.updatePayment(req.params.id, req.body);
-    invalidateCachePrefix("/api/payments");
-    invalidateCachePrefix("/api/dashboard/batch");
+    await recomputePaymentRollups(previousPayment, payment);
+    invalidatePaymentCaches();
     res.json({ payment });
   } catch (e) { next(e); }
 }
 
 export async function deletePayment(req: Request, res: Response, next: NextFunction) {
   try {
-    await paymentService.deletePayment(req.params.id);
-    invalidateCachePrefix("/api/payments");
-    invalidateCachePrefix("/api/dashboard/batch");
+    const payment = await paymentService.deletePayment(req.params.id);
+    await recomputePaymentRollups(payment);
+    invalidatePaymentCaches();
     res.json({ success: true });
   } catch (e) { next(e); }
 }
@@ -1136,6 +1156,7 @@ export async function approveApproval(req: Request, res: Response, next: NextFun
       approvedQuantity,
       vendor,
     });
+    if (approval.type === "payment") invalidatePaymentCaches();
 
     if (req.user?.sub) {
       await ActivityLog.create({
@@ -1176,6 +1197,7 @@ export async function rejectApproval(req: Request, res: Response, next: NextFunc
     }
 
     const updated = await approvalService.rejectRequest(req.params.id, reviewer);
+    if (approval.type === "payment") invalidatePaymentCaches();
 
     if (req.user?.sub) {
       await ActivityLog.create({

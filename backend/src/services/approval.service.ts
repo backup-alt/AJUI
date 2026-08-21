@@ -6,7 +6,7 @@ import { Expense } from "../models/Expense.js";
 import { Payment } from "../models/Payment.js";
 import { Subcontractor } from "../models/Subcontractor.js";
 import { generateId } from "./id-generator.service.js";
-import { recomputeProjectTotals } from "./financial.service.js";
+import { recomputeClientTotals, recomputeProjectTotals } from "./financial.service.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { recomputeSiteLedger } from "./expense.service.js";
@@ -273,6 +273,8 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
     approvedBy: reviewer,
     approvedAt: new Date(),
   };
+  let paymentProjectId: Types.ObjectId | undefined;
+  let paymentClientId: Types.ObjectId | undefined;
 
   switch (approval.sourceCollection) {
     case "materials":
@@ -293,6 +295,9 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
     case "payments":
     case "Payment": {
       await Payment.updateOne({ _id: approval.sourceId }, sourceUpdate);
+      const payment = await Payment.findById(approval.sourceId).select("projectId clientId").lean();
+      paymentProjectId = payment?.projectId;
+      paymentClientId = payment?.clientId;
       break;
     }
     case "subcontractors":
@@ -306,6 +311,9 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
   approval.reviewedBy = reviewer;
   approval.reviewedAt = new Date();
   await approval.save();
+
+  if (paymentProjectId) await recomputeProjectTotals(paymentProjectId);
+  if (paymentClientId) await recomputeClientTotals(paymentClientId);
 
   // Send push notification to project supervisors and owner
   try {

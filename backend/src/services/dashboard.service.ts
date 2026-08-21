@@ -75,6 +75,7 @@ export async function getDashboardKPIs(scopeProjectIds: ProjectScopeIds = null):
     approvalsApproved,
     approvalsRejected,
     financialAgg,
+    paymentAgg,
     subAgg,
     pendingMaterials,
     pendingExpenses,
@@ -111,6 +112,10 @@ export async function getDashboardKPIs(scopeProjectIds: ProjectScopeIds = null):
         },
       },
     ]),
+    Payment.aggregate([
+      { $match: { ...projectDataQuery, status: { $ne: "Rejected" } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
     Subcontractor.aggregate([
       { $match: projectDataQuery },
       {
@@ -136,6 +141,7 @@ export async function getDashboardKPIs(scopeProjectIds: ProjectScopeIds = null):
   };
 
   const sub = subAgg[0] || { outstanding: 0 };
+  const totalReceived = paymentAgg[0]?.total ?? 0;
 
   return {
     counts: {
@@ -148,8 +154,8 @@ export async function getDashboardKPIs(scopeProjectIds: ProjectScopeIds = null):
     },
     financials: {
       totalProjectValue: fin.totalValue,
-      totalReceived: fin.received,
-      totalPending: Math.max(0, fin.totalValue - fin.received),
+      totalReceived,
+      totalPending: Math.max(0, fin.totalValue - totalReceived),
       totalMaterialSpend: fin.materialSpend,
       totalLabourPayable: fin.labourPayable,
       totalExpenseReceived: fin.expenseReceived,

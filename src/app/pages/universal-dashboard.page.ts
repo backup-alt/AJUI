@@ -1,36 +1,26 @@
 import { CommonModule } from "@angular/common";
-import {
-  ChangeDetectionStrategy,
-  Component,
-  OnInit,
-  computed,
-  inject,
-  signal,
-} from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, inject, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import { IonContent, IonSplitPane } from "@ionic/angular/standalone";
 import { firstValueFrom } from "rxjs";
 import { ApiService } from "../core/api.service";
 import { ApprovalsService } from "../core/approvals.service";
+import { mapProject } from "../core/mappers";
 import { ErpDataService } from "../data/erp-data.service";
 import { ClientFormDialogComponent } from "../shared/client-form-dialog.component";
 import { DashboardBarChartComponent, type BarChartSeries } from "../shared/dashboard-bar-chart.component";
 import { DashboardDonutChartComponent, type DonutSegment } from "../shared/dashboard-donut-chart.component";
-import { DashboardKpiCardComponent } from "../shared/dashboard-kpi-card.component";
-import { DashboardSectionCardComponent } from "../shared/dashboard-section-card.component";
-import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.component";
-import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ProjectFormDialogComponent } from "../shared/project-form-dialog.component";
 import { VendorFormDialogComponent } from "../shared/vendor-form-dialog.component";
-import { formatMoney, formatNumber } from "../shared/format";
+import { formatMoney } from "../shared/format";
 
 type PeriodKey = "today" | "week" | "month" | "3m" | "6m" | "year" | "custom";
 
 interface DashboardKpis {
   counts?: {
     clients?: { total?: number; active?: number };
-    projects?: { total?: number; active?: number; onHold?: number; completed?: number };
+    projects?: { total?: number; active?: number };
     vendors?: { total?: number; active?: number };
     approvals?: { pending?: number };
   };
@@ -43,27 +33,6 @@ interface DashboardKpis {
     totalExpenseReceived?: number;
     totalSubcontractorSpend?: number;
   };
-  recentActivity?: {
-    pendingMaterials?: number;
-    pendingPayments?: number;
-    pendingExpenses?: number;
-    pendingSubcontracts?: number;
-  };
-}
-
-interface ActionItem {
-  id: string;
-  label: string;
-  detail: string;
-  count: number;
-  tone: "critical" | "warning" | "info";
-  route: string;
-  action: string;
-}
-
-interface TrendPoint {
-  label: string;
-  value: number;
 }
 
 @Component({
@@ -74,16 +43,12 @@ interface TrendPoint {
     RouterLink,
     IonContent,
     IonSplitPane,
-    EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
     ClientFormDialogComponent,
     ProjectFormDialogComponent,
     VendorFormDialogComponent,
     DashboardBarChartComponent,
     DashboardDonutChartComponent,
-    DashboardKpiCardComponent,
-    DashboardSectionCardComponent,
-    DashboardSkeletonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -91,2188 +56,728 @@ interface TrendPoint {
       <agb-enterprise-sidebar active="dashboard"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
-        <agb-enterprise-header title="Dashboard"></agb-enterprise-header>
-
         <ion-content class="dashboard-page">
           <main class="dashboard-shell">
-            <!-- ───────────────────── HERO ───────────────────── -->
-            <header class="hero">
-              <div class="hero-meta">
-                <span class="hero-eyebrow">{{ currentDateLabel() }}</span>
-                <h1 class="hero-title">
-                  {{ greeting() }}, <span class="hero-name">{{ userName() }}</span>
-                </h1>
-                <p class="hero-sub">
-                  A real-time view of
-                  <strong>{{ selectedScopeLabel().toLowerCase() }}</strong>
-                  for <strong>{{ periodLabel().toLowerCase() }}</strong>.
-                  {{ heroSubline() }}
-                </p>
-
-                <div class="hero-pills">
-                  <span class="hero-pill">
-                    <i class="hero-dot" [class.loading]="refreshing()"></i>
-                    <strong>{{ refreshing() ? 'Syncing live data' : 'Live data connected' }}</strong>
-                    <small>{{ lastUpdatedAt() ? 'Updated ' + relativeTime(lastUpdatedAt()) : 'Loading' }}</small>
-                  </span>
-                  <span class="hero-pill subtle">
-                    <strong>{{ activeProjectCount() }}</strong>
-                    <small>active project{{ activeProjectCount() === 1 ? '' : 's' }}</small>
-                  </span>
-                  <span class="hero-pill subtle">
-                    <strong>{{ actionQueue().length }}</strong>
-                    <small>needs your attention</small>
-                  </span>
-                </div>
+            <header class="dashboard-header">
+              <div>
+                <h1>{{ greeting() }}, {{ userDisplayName() }}</h1>
+                <p>Here's what's happening with your business today.</p>
               </div>
-
-              <div class="hero-actions">
-                <button
-                  type="button"
-                  class="hero-button ghost"
-                  [disabled]="refreshing()"
-                  (click)="refreshAll()"
-                  aria-label="Refresh dashboard"
-                >
-                  <svg viewBox="0 0 24 24" [class.spinning]="refreshing()">
-                    <path d="M20 11a8 8 0 1 0 2 5M20 4v7h-7" />
-                  </svg>
-                  <span>{{ refreshing() ? 'Refreshing' : 'Refresh' }}</span>
-                </button>
-                <button type="button" class="hero-button ghost" (click)="openClientDialog()">
-                  <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-                  <span>New client</span>
-                </button>
-                <button type="button" class="hero-button primary" (click)="openProjectDialog()">
-                  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
-                  <span>New project</span>
+              <div class="header-controls">
+                <div class="date-picker" (click)="$event.stopPropagation()">
+                  <button type="button" class="date-control" aria-haspopup="dialog" [attr.aria-expanded]="dateMenuOpen()" (click)="toggleDateMenu()">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                    <strong>{{ selectedDateLabel() }}</strong>
+                    <svg class="chevron" [class.open]="dateMenuOpen()" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+                  </button>
+                  @if (dateMenuOpen()) {
+                    <section class="date-menu" role="dialog" aria-label="Choose dashboard dates">
+                      <div class="date-menu-heading">
+                        <span><strong>Filter by date</strong><small>Choose one day or a custom range.</small></span>
+                        <button type="button" aria-label="Close date filter" (click)="cancelDateFilter()"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                      </div>
+                      <div class="date-mode-tabs" role="tablist" aria-label="Date selection mode">
+                        <button type="button" role="tab" [class.active]="datePickerMode() === 'single'" [attr.aria-selected]="datePickerMode() === 'single'" (click)="setDatePickerMode('single')">Single date</button>
+                        <button type="button" role="tab" [class.active]="datePickerMode() === 'range'" [attr.aria-selected]="datePickerMode() === 'range'" (click)="setDatePickerMode('range')">Date range</button>
+                      </div>
+                      @if (datePickerMode() === 'single') {
+                        <label class="date-field">
+                          <span>Select date</span>
+                          <input type="date" [value]="draftSingleDate()" (input)="draftSingleDate.set($any($event.target).value)" />
+                        </label>
+                      } @else {
+                        <div class="date-range-fields">
+                          <label class="date-field"><span>From</span><input type="date" [value]="draftRangeFrom()" [max]="draftRangeTo() || undefined" (input)="draftRangeFrom.set($any($event.target).value)" /></label>
+                          <label class="date-field"><span>To</span><input type="date" [value]="draftRangeTo()" [min]="draftRangeFrom() || undefined" (input)="draftRangeTo.set($any($event.target).value)" /></label>
+                        </div>
+                        @if (dateRangeInvalid()) { <small class="date-error">The end date must be on or after the start date.</small> }
+                      }
+                      <div class="date-menu-actions">
+                        <button type="button" class="date-cancel" (click)="cancelDateFilter()">Cancel</button>
+                        <button type="button" class="date-apply" [disabled]="!canApplyDateFilter()" (click)="applyDateFilter()">Apply filter</button>
+                      </div>
+                    </section>
+                  }
+                </div>
+                <div class="period-picker" (click)="$event.stopPropagation()">
+                  <button type="button" class="period-control" aria-haspopup="listbox" [attr.aria-expanded]="openPeriodMenu() === 'header'" (click)="togglePeriodMenu('header')">
+                    <svg viewBox="0 0 24 24"><path d="M4 4h16l-6 7v6l-4 3v-9L4 4Z"/></svg>
+                    <strong>{{ periodLabel() }}</strong>
+                    <svg class="chevron" [class.open]="openPeriodMenu() === 'header'" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+                  </button>
+                  @if (openPeriodMenu() === 'header') {
+                    <div class="period-menu" role="listbox" aria-label="Dashboard period">
+                      @for (option of periodOptions; track option.value) {
+                        <button type="button" class="period-option" [class.active]="periodKey() === option.value" [attr.aria-selected]="periodKey() === option.value" (click)="selectPeriod(option.value)">
+                          <span>{{ option.label }}</span>
+                          @if (periodKey() === option.value) { <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg> }
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+                <button type="button" class="new-project-button" (click)="openProjectDialog()">
+                  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                  New Project
                 </button>
               </div>
             </header>
 
-            <!-- ───────────────────── SCOPE BAR ───────────────────── -->
-            <section class="scope-bar" aria-label="Dashboard scope">
-              <div class="scope-summary">
-                <span class="scope-summary-icon">
-                  <svg viewBox="0 0 24 24"><path d="M3 4h18l-2 14H5L3 4Z" /><path d="M3 4 2 2M21 4l1-2" /></svg>
-                </span>
-                <div>
-                  <span class="scope-summary-label">Viewing</span>
-                  <strong>{{ selectedScopeLabel() }} · {{ periodLabel() }}</strong>
-                </div>
-              </div>
-
-              <label class="scope-field">
-                <span>Project</span>
-                <select [value]="selectedProjectId()" (change)="onProjectChange($any($event.target).value)">
-                  <option value="">All projects</option>
-                  @for (project of projects(); track project.id || project._id) {
-                    <option [value]="project.id || project._id">{{ project.name }}</option>
-                  }
-                </select>
-              </label>
-
-              <label class="scope-field">
-                <span>Site</span>
-                <select
-                  [disabled]="!selectedProjectId()"
-                  [value]="selectedSiteId()"
-                  (change)="onSiteChange($any($event.target).value)"
-                >
-                  <option value="">All sites</option>
-                  @for (site of availableSites(); track site.id) {
-                    <option [value]="site.id">{{ site.name }}</option>
-                  }
-                </select>
-              </label>
-
-              <label class="scope-field">
-                <span>Period</span>
-                <select [value]="periodKey()" (change)="onPeriodChange($any($event.target).value)">
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">This month</option>
-                  <option value="3m">Last 3 months</option>
-                  <option value="6m">Last 6 months</option>
-                  <option value="year">This year</option>
-                  <option value="custom">Custom dates</option>
-                </select>
-              </label>
-
-              @if (periodKey() === 'custom') {
-                <label class="scope-field scope-field-date">
-                  <span>From</span>
-                  <input type="date" [value]="customFrom()" (change)="onCustomFromChange($any($event.target).value)" />
-                </label>
-                <label class="scope-field scope-field-date">
-                  <span>To</span>
-                  <input type="date" [value]="customTo()" (change)="onCustomToChange($any($event.target).value)" />
-                </label>
-              }
-
-              @if (hasActiveFilters()) {
-                <button type="button" class="scope-reset" (click)="clearFilters()">
-                  <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
-                  Reset filters
-                </button>
-              }
+            <section class="kpi-grid" aria-label="Key financial metrics">
+              <article class="kpi-card green">
+                <span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M4 7h14a2 2 0 0 1 2 2v10H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11"/><path d="M16 12h6v4h-6a2 2 0 0 1 0-4Z"/></svg></span>
+                <div class="kpi-content"><span>Amount Received</span><strong>{{ money(totalReceived()) }}</strong><small>Across all recorded payments</small></div>
+                <span class="kpi-fact"><small>Payment activity</small><strong>{{ payments().length }} {{ payments().length === 1 ? 'payment' : 'payments' }}</strong></span>
+              </article>
+              <article class="kpi-card orange">
+                <span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M5 3h11l4 4v14H5V3Z"/><path d="M15 3v5h5M9 12h7M9 16h5"/><circle cx="18" cy="18" r="3"/></svg></span>
+                <div class="kpi-content"><span>Total Expenditure</span><strong>{{ money(financials().spent) }}</strong><small>{{ periodLabel() }} total</small></div>
+                <span class="kpi-fact"><small>Recorded entries</small><strong>{{ scopedExpenses().length }}</strong><em>{{ topExpense() ? topExpense()!.label : 'No expenses' }}</em></span>
+              </article>
+              <article class="kpi-card purple">
+                <span class="kpi-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/></svg></span>
+                <div class="kpi-content"><span>Active Portfolio Value</span><strong>{{ money(financials().portfolio) }}</strong><small>{{ activeProjectCount() }} active {{ activeProjectCount() === 1 ? 'project' : 'projects' }}</small></div>
+                <span class="kpi-fact"><small>Average active value</small><strong>{{ money(averageActiveProjectValue()) }}</strong><em>Estimated value</em></span>
+              </article>
             </section>
 
-            <!-- ───────────────────── KPI STRIP ───────────────────── -->
-            <section class="kpi-strip" aria-label="Key performance indicators">
-              @if (loadingKpis()) {
-                <agb-dashboard-skeleton variant="kpi" [kpiCount]="4"></agb-dashboard-skeleton>
-              } @else {
-                <agb-kpi-card
-                  label="Amount received"
-                  [value]="money(financials().totalReceived)"
-                  subtitle="Collections this period"
-                  [delta]="kpiReceivedDelta()"
-                  deltaContext="vs previous period"
-                  accent="success"
-                  [iconPath]="'M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'"
-                ></agb-kpi-card>
-
-                <agb-kpi-card
-                  label="Total expenditure"
-                  [value]="money(totalExpenses())"
-                  subtitle="Materials · labour · subcontractors · expenses"
-                  [delta]="kpiSpentDelta()"
-                  deltaContext="vs previous period"
-                  accent="warning"
-                  [iconPath]="'M3 7h18M5 7v13h14V7M9 11h6'"
-                ></agb-kpi-card>
-
-                <agb-kpi-card
-                  label="Net cash position"
-                  [value]="money(netCashPosition())"
-                  [subtitle]="netSubtitle()"
-                  [delta]="kpiNetDelta()"
-                  deltaContext="vs previous period"
-                  [accent]="netCashPosition() >= 0 ? 'info' : 'danger'"
-                  [iconPath]="'M4 17 10 11l4 4 6-8M16 7h4v4'"
-                ></agb-kpi-card>
-
-                <agb-kpi-card
-                  label="Portfolio value"
-                  [value]="money(financials().totalProjectValue)"
-                  [subtitle]="collectionRate() + '% collected · ' + money(financials().totalPending) + ' pending'"
-                  accent="primary"
-                  [iconPath]="'M4 19V9m6 10V5m6 14v-7m4 7H2'"
-                ></agb-kpi-card>
-              }
-            </section>
-
-            <!-- ───────────────────── MAIN GRID ───────────────────── -->
-            <div class="main-grid">
-              <agb-section-card
-                class="project-section"
-                eyebrow="Delivery"
-                title="Project health"
-                description="Live status, progress and collections for every project in scope."
-                actionLabel="View all"
-                actionRoute="/projects"
-                [loading]="loadingKpis()"
-                [isEmpty]="!loadingKpis() && projectHealth().length === 0"
-                emptyTitle="No projects in this scope"
-                emptyMessage="Adjust your filters or create a new project to see it here."
-                emptyActionLabel="Create project"
-                emptyActionRoute="/projects"
-              >
-                <ng-content>
-                  <div class="project-progress-strip" aria-label="Portfolio progress">
-                    <div class="project-progress-stat">
-                      <span>Active</span>
-                      <strong>{{ activeProjectCount() }}</strong>
-                    </div>
-                    <div class="project-progress-stat">
-                      <span>On hold</span>
-                      <strong>{{ onHoldCount() }}</strong>
-                    </div>
-                    <div class="project-progress-stat">
-                      <span>Completed</span>
-                      <strong>{{ completedCount() }}</strong>
-                    </div>
-                    <div class="project-progress-stat">
-                      <span>Avg progress</span>
-                      <strong>{{ avgProgress() }}%</strong>
-                    </div>
-                  </div>
-
-                  <div class="project-table">
-                    <div class="project-table-head">
-                      <span>Project</span>
-                      <span>Progress</span>
-                      <span>Value</span>
-                      <span>Received</span>
-                      <span>Spent</span>
-                    </div>
-                    @for (project of projectHealth(); track project.id) {
-                      <a class="project-row" [routerLink]="projectRoute(project)">
-                        <span class="project-cell project-cell-main">
-                          <span class="project-avatar" [style.background]="project.color">
-                            {{ project.initials }}
-                          </span>
-                          <span class="project-main">
-                            <strong>{{ project.name }}</strong>
-                            <small>
-                              {{ project.client || 'No client' }}
-                              <i class="status-badge" [class]="statusClass(project.status)">
-                                {{ project.status }}
-                              </i>
-                            </small>
-                          </span>
-                        </span>
-                        <span class="project-cell project-cell-progress">
-                          <span class="project-progress-bar">
-                            <i [style.width.%]="project.progress" [style.background]="project.color"></i>
-                          </span>
-                          <strong>{{ project.progress }}%</strong>
-                        </span>
-                        <span class="project-cell project-cell-value">
-                          <strong>{{ money(project.value) }}</strong>
-                        </span>
-                        <span class="project-cell project-cell-value">
-                          <strong class="received">{{ money(project.received) }}</strong>
-                        </span>
-                        <span class="project-cell project-cell-value">
-                          <strong class="spent">{{ money(project.spent) }}</strong>
-                        </span>
-                      </a>
-                    }
-                  </div>
-                </ng-content>
-              </agb-section-card>
-
-              <aside class="side-column">
-                <agb-section-card
-                  eyebrow="Action inbox"
-                  title="Needs your attention"
-                  description="Decisions that unblock your team."
-                  [actionLabel]="actionQueue().length + ' open'"
-                  [loading]="loadingKpis()"
-                  [isEmpty]="!loadingKpis() && actionQueue().length === 0"
-                  emptyTitle="All caught up"
-                  emptyMessage="No urgent approvals, low stock or delayed activity right now."
-                >
-                  <ng-content>
-                    <div class="action-list">
-                      @for (item of actionQueue(); track item.id) {
-                        <a class="action-item" [attr.data-tone]="item.tone" [routerLink]="item.route">
-                          <span class="action-count">{{ item.count }}</span>
-                          <span class="action-copy">
-                            <strong>{{ item.label }}</strong>
-                            <small>{{ item.detail }}</small>
-                          </span>
-                          <span class="action-link">
-                            {{ item.action }}
-                            <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-                          </span>
-                        </a>
-                      }
-                    </div>
-                    <div class="quick-create">
-                      <span class="quick-create-label">Quick create</span>
-                      <div class="quick-create-row">
-                        <button type="button" (click)="openClientDialog()">
-                          <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-                          Client
-                        </button>
-                        <button type="button" (click)="openVendorDialog()">
-                          <svg viewBox="0 0 24 24"><path d="M3 9h18l-2-5H5L3 9Z" /><path d="M9 20v-6h6v6" /></svg>
-                          Vendor
-                        </button>
-                        <a routerLink="/general-expenses">
-                          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
-                          Expense
-                        </a>
-                        <a routerLink="/approvals">
-                          <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
-                          Approval
-                        </a>
-                      </div>
-                    </div>
-                  </ng-content>
-                </agb-section-card>
-
-                <agb-section-card
-                  eyebrow="Inventory"
-                  title="Stock at a glance"
-                  description="Materials on hand across selected projects."
-                  [isEmpty]="!loadingKpis() && inventoryItemCount() === 0"
-                  emptyTitle="No inventory yet"
-                  emptyMessage="Add materials to a project to start tracking stock."
-                >
-                  <ng-content>
-                    <div class="stock-summary" [class.has-alerts]="lowStockCount() > 0">
-                      <span class="stock-icon">
-                        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="M3.27 6.96 12 12l8.73-5.04" /><path d="M12 22V12" /></svg>
-                      </span>
-                      <div>
-                        <strong>
-                          @if (lowStockCount() > 0) {
-                            {{ lowStockCount() }} {{ lowStockCount() === 1 ? 'material' : 'materials' }} below minimum
-                          } @else {
-                            Inventory levels are healthy
-                          }
-                        </strong>
-                        <small>
-                          {{ inventoryItemCount() }} tracked
-                          @if (lowStockCount() > 0) { · replenishment recommended }
-                          @else { · no action required }
-                        </small>
-                      </div>
-                      <a routerLink="/projects">View</a>
-                    </div>
-
-                    @if (lowStockRows().length > 0) {
-                      <div class="stock-list">
-                        @for (item of lowStockRows(); track item.id) {
-                          <div class="stock-row">
-                            <span class="stock-name">{{ item.name }}</span>
-                            <span class="stock-progress">
-                              <i [style.width.%]="item.percent" [class.danger]="item.percent <= 25"></i>
-                            </span>
-                            <span class="stock-meta">
-                              <strong>{{ item.remaining }}</strong>
-                              <small>/ {{ item.minimum }} min</small>
-                            </span>
-                          </div>
+            <section class="main-panels">
+              <article class="panel cash-panel">
+                <div class="panel-heading">
+                  <h2>Cash Flow Overview</h2>
+                  <div class="period-picker mini" (click)="$event.stopPropagation()">
+                    <button type="button" class="mini-period" aria-haspopup="listbox" [attr.aria-expanded]="openPeriodMenu() === 'chart'" (click)="togglePeriodMenu('chart')">
+                      <strong>{{ periodLabel() }}</strong>
+                      <svg [class.open]="openPeriodMenu() === 'chart'" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+                    </button>
+                    @if (openPeriodMenu() === 'chart') {
+                      <div class="period-menu mini-menu" role="listbox" aria-label="Cash flow period">
+                        @for (option of chartPeriodOptions; track option.value) {
+                          <button type="button" class="period-option" [class.active]="periodKey() === option.value" [attr.aria-selected]="periodKey() === option.value" (click)="selectPeriod(option.value)">
+                            <span>{{ option.label }}</span>
+                            @if (periodKey() === option.value) { <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg> }
+                          </button>
                         }
                       </div>
-                    } @else {
-                      <div class="stock-empty">All tracked materials are above their minimum threshold.</div>
-                    }
-                  </ng-content>
-                </agb-section-card>
-
-                <agb-section-card
-                  eyebrow="Pipeline"
-                  title="Pending approvals"
-                  description="Workflow requests needing a decision."
-                  actionLabel="Open queue"
-                  actionRoute="/approvals"
-                  [loading]="loadingKpis()"
-                  [isEmpty]="!loadingKpis() && topApprovals().length === 0"
-                  emptyTitle="No approvals waiting"
-                  emptyMessage="Everything in the queue has been actioned."
-                >
-                  <ng-content>
-                    <div class="approval-list">
-                      @for (approval of topApprovals(); track approval.id) {
-                        <a routerLink="/approvals" class="approval-row">
-                          <span class="approval-type" [style.background]="approval.color">{{ approval.initials }}</span>
-                          <span class="approval-copy">
-                            <strong>{{ approval.module }}</strong>
-                            <small>{{ approval.projectName }} · {{ approval.requestedBy }}</small>
-                          </span>
-                          <time>{{ relativeTime(approval.createdAt) }}</time>
-                        </a>
-                      }
-                    </div>
-                  </ng-content>
-                </agb-section-card>
-              </aside>
-            </div>
-
-            <!-- ───────────────────── CASH TREND ───────────────────── -->
-            <div class="cash-grid">
-              <agb-section-card
-                class="cash-section"
-                eyebrow="Cash movement"
-                title="Collections vs expenditure"
-                [description]="periodLabel() + ' · ' + selectedScopeLabel()"
-                actionLabel="Manage expenses"
-                actionRoute="/general-expenses"
-                [isEmpty]="!loadingKpis() && !hasFinancialTrend()"
-                emptyTitle="No financial movement for this period"
-                emptyMessage="Change the period or record a payment or expense to see trends."
-              >
-                <ng-content>
-                  <agb-bar-chart
-                    orientation="vertical"
-                    [series]="financialSeries()"
-                    [labels]="financialLabels()"
-                    [legend]="financialLegend"
-                  ></agb-bar-chart>
-                  <div class="cash-totals">
-                    <div class="cash-total">
-                      <span class="cash-total-label">Total received</span>
-                      <strong class="cash-total-value received">{{ money(periodTotals().received) }}</strong>
-                    </div>
-                    <div class="cash-total">
-                      <span class="cash-total-label">Total spent</span>
-                      <strong class="cash-total-value spent">{{ money(periodTotals().spent) }}</strong>
-                    </div>
-                    <div class="cash-total">
-                      <span class="cash-total-label">Net movement</span>
-                      <strong
-                        class="cash-total-value"
-                        [class.received]="periodTotals().net >= 0"
-                        [class.spent]="periodTotals().net < 0"
-                      >
-                        {{ money(periodTotals().net) }}
-                      </strong>
-                    </div>
-                  </div>
-                </ng-content>
-              </agb-section-card>
-
-              <agb-section-card
-                eyebrow="Spend breakdown"
-                title="Where the money went"
-                description="Composition of total expenditure for this period."
-                [isEmpty]="!loadingKpis() && expenseDonut().length === 0"
-                emptyTitle="No expenses logged"
-                emptyMessage="Record materials, labour or expenses to see the split."
-              >
-                <ng-content>
-                  <agb-donut-chart
-                    [segments]="expenseDonut()"
-                    caption="Total spent"
-                    ariaLabel="Expense distribution"
-                    [valueFormatter]="formatNumberValue"
-                  ></agb-donut-chart>
-                </ng-content>
-              </agb-section-card>
-            </div>
-
-            <!-- ───────────────────── COLLECTIONS ───────────────────── -->
-            <div class="bottom-grid">
-              <agb-section-card
-                eyebrow="Collections"
-                title="Recent client payments"
-                description="Latest money received in the selected period."
-                actionLabel="View clients"
-                actionRoute="/clients"
-                [isEmpty]="!loadingKpis() && recentPayments().length === 0"
-                emptyTitle="No payments recorded"
-                emptyMessage="Payments recorded in this period will appear here."
-              >
-                <ng-content>
-                  <div class="payment-list">
-                    @for (payment of recentPayments(); track payment.id) {
-                      <a
-                        class="payment-row"
-                        [routerLink]="payment.clientId ? ['/clients', payment.clientId] : ['/clients']"
-                      >
-                        <span class="payment-icon">
-                          <svg viewBox="0 0 24 24"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
-                        </span>
-                        <span class="payment-copy">
-                          <strong>{{ payment.clientName }}</strong>
-                          <small>{{ payment.projectName }} · {{ formatDate(payment.date) }}</small>
-                        </span>
-                        <strong class="payment-amount">{{ money(payment.amount) }}</strong>
-                      </a>
                     }
                   </div>
-                </ng-content>
-              </agb-section-card>
+                </div>
+                <div class="chart-wrap">
+                  @if (hasFinancialTrend()) {
+                    <agb-bar-chart orientation="vertical" [series]="financialSeries()" [labels]="financialLabels()" [legend]="financialLegend" [axisValueFormatter]="formatChartAxis" [tooltipValueFormatter]="formatCurrency"></agb-bar-chart>
+                  } @else {
+                    <div class="chart-empty"><span>No cash movement in this period</span></div>
+                  }
+                </div>
+                <div class="cash-totals"><div><span>Total Received</span><strong>{{ money(financials().received) }}</strong></div><div><span>Total Spent</span><strong>{{ money(financials().spent) }}</strong></div></div>
+              </article>
 
-              <agb-section-card
-                eyebrow="Operations"
-                title="Live operations"
-                description="Headline counts across the business."
-              >
-                <ng-content>
-                  <div class="ops-grid">
-                    <a routerLink="/projects" class="op-tile primary">
-                      <span class="op-icon">
-                        <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5" /></svg>
-                      </span>
-                      <strong>{{ activeProjectCount() }}</strong>
-                      <small>Active projects</small>
-                    </a>
-                    <a routerLink="/clients" class="op-tile violet">
-                      <span class="op-icon">
-                        <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4" /><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75M22 21v-2a4 4 0 0 0-3-3.87" /></svg>
-                      </span>
-                      <strong>{{ activeClientCount() }}</strong>
-                      <small>Active clients</small>
-                    </a>
-                    <a routerLink="/vendors" class="op-tile success">
-                      <span class="op-icon">
-                        <svg viewBox="0 0 24 24"><path d="M3 9h18l-2-5H5L3 9Z" /><path d="M5 9v11h14V9" /><path d="M9 20v-6h6v6" /></svg>
-                      </span>
-                      <strong>{{ activeVendorCount() }}</strong>
-                      <small>Active vendors</small>
-                    </a>
-                    <a routerLink="/projects" class="op-tile warning">
-                      <span class="op-icon">
-                        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="M3.27 6.96 12 12l8.73-5.04" /><path d="M12 22V12" /></svg>
-                      </span>
-                      <strong>{{ inventoryItemCount() }}</strong>
-                      <small>Materials in stock</small>
-                    </a>
-                    <a routerLink="/approvals" class="op-tile danger">
-                      <span class="op-icon">
-                        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
-                      </span>
-                      <strong>{{ actionQueue()[0]?.count ?? 0 }}</strong>
-                      <small>Approvals waiting</small>
-                    </a>
-                    <a routerLink="/subcontractors" class="op-tile neutral">
-                      <span class="op-icon">
-                        <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-                      </span>
-                      <strong>{{ data.subcontractors().length }}</strong>
-                      <small>Subcontractors</small>
-                    </a>
-                  </div>
-                </ng-content>
-              </agb-section-card>
+              <article class="panel spend-panel">
+                <div class="panel-heading"><h2>Spending Breakdown</h2></div>
+                <div class="donut-wrap">
+                  @if (expenseDonut().length) {
+                    <agb-donut-chart [segments]="expenseDonut()" caption="Total Spent" [valueFormatter]="formatCurrency"></agb-donut-chart>
+                  } @else {
+                    <div class="chart-empty"><span>No expenditure in this period</span></div>
+                  }
+                </div>
+              </article>
 
-              <agb-section-card
-                eyebrow="Activity"
-                title="Top performers"
-                description="Best and worst performing projects in scope."
-                [isEmpty]="!loadingKpis() && topPerformers().length === 0"
-                emptyTitle="No activity yet"
-                emptyMessage="Projects need payments or expenses to rank."
-              >
-                <ng-content>
-                  <div class="performer-list">
-                    @for (item of topPerformers(); track item.id) {
-                      <div class="performer-row" [attr.data-tone]="item.tone">
-                        <span class="performer-rank">{{ $index + 1 }}</span>
-                        <span class="performer-copy">
-                          <strong>{{ item.name }}</strong>
-                          <small>{{ item.client }}</small>
-                        </span>
-                        <span class="performer-bar">
-                          <i [style.width.%]="item.score" [class]="item.tone"></i>
-                        </span>
-                        <span class="performer-score">{{ item.score }}%</span>
-                      </div>
-                    }
-                  </div>
-                </ng-content>
-              </agb-section-card>
-            </div>
+              <article class="panel projects-panel">
+                <div class="panel-heading"><h2>Recent Projects</h2><a routerLink="/projects">View All</a></div>
+                <div class="recent-project-list">
+                  @for (project of recentProjects(); track project.id) {
+                    <a [routerLink]="projectRoute(project)" class="recent-project-row">
+                      <span class="dashboard-project-avatar" [style.background]="project.color">{{ project.initials }}</span>
+                      <span class="dashboard-project-copy"><strong>{{ project.name }}</strong><small>{{ project.status }}</small></span>
+                      <span class="dashboard-project-progress"><i [style.width.%]="project.progress"></i></span>
+                      <b>{{ project.progress }}%</b>
+                    </a>
+                  } @empty {
+                    <div class="simple-empty">No projects available.</div>
+                  }
+                </div>
+              </article>
+            </section>
 
-            <!-- ───────────────────── FOOTER ───────────────────── -->
-            <footer class="dashboard-footer">
-              <span>
-                Showing <strong>{{ selectedScopeLabel() }}</strong>
-                for <strong>{{ periodLabel().toLowerCase() }}</strong>
-                · {{ lastUpdatedAt() ? 'Updated ' + relativeTime(lastUpdatedAt()) : 'Loading' }}
-              </span>
-              <nav>
-                <a routerLink="/projects">Projects</a>
-                <a routerLink="/approvals">Approvals</a>
-                <a routerLink="/general-expenses">Expenses</a>
-                <a routerLink="/clients">Clients</a>
-              </nav>
-            </footer>
+            <section class="lower-panels">
+              <article class="panel approvals-panel">
+                <div class="panel-heading"><h2>Pending Approvals</h2><a routerLink="/approvals">View All</a></div>
+                <div class="approval-summary-list">
+                  @for (item of pendingExpenseRows(); track item.rowId || item.id || item._id) {
+                    <a routerLink="/approvals" class="approval-summary-row">
+                      <span class="approval-icon expense"><svg viewBox="0 0 24 24"><path d="M7 3h10v4h3v14H4V7h3V3Z"/><path d="M9 13h6M9 17h4"/></svg></span>
+                      <span><strong>{{ expenseApprovalDescription(item) }}</strong><small>{{ expenseApprovalContext(item) }}</small></span>
+                      <span class="approval-amount"><strong>{{ money(item.amount) }}</strong><small>Pending expense</small></span>
+                    </a>
+                  } @empty {
+                    <div class="simple-empty">No expense approvals waiting.</div>
+                  }
+                </div>
+              </article>
+
+              <article class="panel summary-panel">
+                <div class="panel-heading"><h2>Project Summary</h2></div>
+                <div class="summary-grid">
+                  <a routerLink="/projects"><span class="summary-icon blue"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4V7ZM8 7V4h8v3"/></svg></span><span><small>Total Projects</small><strong>{{ totalProjectCount() }}</strong></span></a>
+                  <a routerLink="/projects"><span class="summary-icon green"><svg viewBox="0 0 24 24"><path d="M4 20V8l8-5 8 5v12H4Z"/><path d="m9 14 2 2 4-5"/></svg></span><span><small>Active Projects</small><strong>{{ activeProjectCount() }}</strong><b>{{ activeProjectRate() }}%</b></span></a>
+                  <a routerLink="/subcontractors"><span class="summary-icon orange"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2M17 11a4 4 0 0 1 4 4v2"/></svg></span><span><small>Team Members</small><strong>{{ teamMemberCount() }}</strong></span></a>
+                  <a routerLink="/projects"><span class="summary-icon purple"><svg viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/></svg></span><span><small>Materials in Stock</small><strong>{{ inventoryItemCount() }}</strong><em>Items</em></span></a>
+                </div>
+              </article>
+
+              <article class="panel expenditure-panel">
+                <div class="panel-heading"><h2>Top Expenditures</h2></div>
+                <div class="expenditure-table">
+                  <div class="expenditure-head"><span>Category</span><span>Amount</span><span>% of Total</span></div>
+                  @for (item of expenditureRows(); track item.label) {
+                    <div class="expenditure-row"><span><i [style.background]="item.color"></i>{{ item.label }}</span><strong>{{ money(item.value) }}</strong><span><span class="expenditure-bar"><i [style.width.%]="item.percent" [style.background]="item.color"></i></span><b>{{ item.percent }}%</b></span></div>
+                  }
+                  <div class="expenditure-total"><strong>Total</strong><strong>{{ money(financials().spent) }}</strong><strong>100%</strong></div>
+                </div>
+              </article>
+            </section>
+
+            <section class="insights-panel">
+              <h2>Business Insights</h2>
+              <div class="insight-grid">
+                <article><span class="insight-icon green"><svg viewBox="0 0 24 24"><path d="M4 17 10 11l4 4 6-8M16 7h4v4"/></svg></span><span><small>{{ periodLabel() }} expenditure</small><strong>{{ money(financials().spent) }}</strong><em>{{ scopedExpenses().length }} recorded {{ scopedExpenses().length === 1 ? 'expense' : 'expenses' }}</em></span></article>
+                <article><span class="insight-icon orange"><svg viewBox="0 0 24 24"><path d="M3 5h2l2 11h11l2-7H7M10 21h.01M18 21h.01"/></svg></span><span><small>Largest expense category</small><strong>{{ topExpense() ? topExpense()!.label : 'No expenses' }}</strong><em>{{ topExpense() ? money(topExpense()!.value) : money(0) }}</em></span></article>
+                <article><span class="insight-icon blue"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2M17 11a4 4 0 0 1 4 4v2"/></svg></span><span><small>Active projects</small><strong>{{ activeProjectCount() }}</strong><em>{{ money(financials().portfolio) }} estimated value</em></span></article>
+                <article><span class="insight-icon purple"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6V3ZM9 8h6M9 12h6"/><circle cx="17" cy="18" r="3"/></svg></span><span><small>Pending expense approvals</small><strong>{{ money(pendingApprovalTotal()) }}</strong><em>{{ pendingApprovalCount() }} {{ pendingApprovalCount() === 1 ? 'request' : 'requests' }}</em></span></article>
+                <article><span class="insight-icon blue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 17h.01"/></svg></span><span><small>{{ periodLabel() }} cash inflow</small><strong>{{ money(financials().received) }}</strong><em>{{ scopedPayments().length }} recorded {{ scopedPayments().length === 1 ? 'payment' : 'payments' }}</em></span></article>
+              </div>
+            </section>
           </main>
         </ion-content>
       </div>
 
-      @if (showClientDialog()) {
-        <agb-client-form-dialog
-          [initialValue]="null"
-          (cancel)="closeClientDialog()"
-          (create)="onClientCreated()"
-        ></agb-client-form-dialog>
-      }
-      @if (showProjectDialog()) {
-        <agb-project-form-dialog
-          [currentClientId]="''"
-          [initialValue]="null"
-          (cancel)="closeProjectDialog()"
-          (create)="onProjectCreated()"
-        ></agb-project-form-dialog>
-      }
-      @if (showVendorDialog()) {
-        <agb-vendor-form-dialog
-          [initialValue]="null"
-          (cancel)="closeVendorDialog()"
-          (create)="onVendorCreated()"
-        ></agb-vendor-form-dialog>
-      }
+      @if (showClientDialog()) { <agb-client-form-dialog [initialValue]="null" (cancel)="closeClientDialog()" (create)="onClientCreated()"></agb-client-form-dialog> }
+      @if (showProjectDialog()) { <agb-project-form-dialog [currentClientId]="''" [initialValue]="null" (cancel)="closeProjectDialog()" (create)="onProjectCreated()"></agb-project-form-dialog> }
+      @if (showVendorDialog()) { <agb-vendor-form-dialog [initialValue]="null" (cancel)="closeVendorDialog()" (create)="onVendorCreated()"></agb-vendor-form-dialog> }
     </ion-split-pane>
   `,
   styles: [`
     :host { display: block; }
     * { box-sizing: border-box; }
+    .dashboard-page { --background: #f8fafc; }
+    .dashboard-shell { width: 100%; max-width: none; min-height: 100%; margin: 0; padding: 24px clamp(18px, 2vw, 32px) 44px; color: #101828; font-family: var(--ion-font-family, Inter, ui-sans-serif, system-ui, sans-serif); font-size: 14px; line-height: 1.5; }
     svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    button, select, input { font: inherit; }
-    a { color: inherit; text-decoration: none; }
-
-    .dashboard-page { --background: linear-gradient(180deg, #f6f8fc 0%, #eef2f8 100%); }
-    .dashboard-shell {
-      width: min(100%, 1640px);
-      margin: 0 auto;
-      padding: 28px 32px 64px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      color: #0f172a;
-    }
-
-    /* ────────── HERO ────────── */
-    .hero {
-      position: relative;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 28px;
-      padding: 30px 34px;
-      border-radius: 22px;
-      background:
-        radial-gradient(120% 120% at 100% 0%, rgba(99, 102, 241, 0.18) 0%, transparent 55%),
-      radial-gradient(80% 80% at 0% 100%, rgba(14, 165, 233, 0.16) 0%, transparent 60%),
-      linear-gradient(135deg, #0b1f4d 0%, #122b6e 60%, #1d3aa3 100%);
-      color: #f8fafc;
-      overflow: hidden;
-      box-shadow: 0 30px 60px -32px rgba(15, 23, 42, 0.45);
-    }
-    .hero::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.07) 0, transparent 40%),
-        radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.06) 0, transparent 45%);
-      pointer-events: none;
-    }
-    .hero-meta { display: grid; gap: 10px; max-width: 760px; }
-    .hero-eyebrow {
-      display: inline-block;
-      width: fit-content;
-      padding: 4px 12px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      color: #cbd5f5;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .hero-title {
-      margin: 0;
-      font-size: clamp(26px, 2.6vw, 38px);
-      line-height: 1.1;
-      letter-spacing: -0.035em;
-      font-weight: 800;
-      color: #fff;
-    }
-    .hero-name {
-      background: linear-gradient(120deg, #93c5fd 0%, #c4b5fd 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-    .hero-sub {
-      margin: 0;
-      max-width: 64ch;
-      color: rgba(226, 232, 240, 0.85);
-      font-size: 14px;
-      line-height: 1.55;
-    }
-    .hero-sub strong { color: #fff; font-weight: 700; }
-
-    .hero-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 6px;
-    }
-    .hero-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 14px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      font-size: 12px;
-      backdrop-filter: blur(6px);
-    }
-    .hero-pill strong { font-weight: 700; }
-    .hero-pill small { color: rgba(203, 213, 225, 0.8); font-weight: 600; }
-    .hero-pill.subtle { background: rgba(255, 255, 255, 0.04); }
-    .hero-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #4ade80;
-      box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.18);
-    }
-    .hero-dot.loading {
-      background: #fbbf24;
-      box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.18);
-      animation: pulseDot 1.4s ease-in-out infinite;
-    }
-    @keyframes pulseDot { 50% { transform: scale(1.3); } }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-self: flex-start;
-      position: relative;
-      z-index: 1;
-    }
-    .hero-button {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      height: 42px;
-      padding: 0 16px;
-      border-radius: 11px;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-      border: 1px solid transparent;
-    }
-    .hero-button svg { width: 16px; height: 16px; }
-    .hero-button.ghost {
-      background: rgba(255, 255, 255, 0.08);
-      color: #f1f5f9;
-      border-color: rgba(255, 255, 255, 0.18);
-    }
-    .hero-button.ghost:hover { background: rgba(255, 255, 255, 0.14); }
-    .hero-button.primary {
-      background: #fff;
-      color: #0b1f4d;
-      box-shadow: 0 12px 24px -10px rgba(15, 23, 42, 0.6);
-    }
-    .hero-button.primary:hover { transform: translateY(-1px); }
-    .hero-button:disabled { cursor: wait; opacity: 0.65; }
-    .spinning { animation: spin 0.9s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ────────── SCOPE BAR ────────── */
-    .scope-bar {
-      position: sticky;
-      z-index: 6;
-      top: 8px;
-      display: flex;
-      align-items: flex-end;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 12px 28px -20px rgba(15, 23, 42, 0.25);
-      backdrop-filter: blur(14px);
-    }
-    .scope-summary {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 230px;
-      margin-right: auto;
-      padding: 0 6px;
-    }
-    .scope-summary-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #eef2ff, #dbeafe);
-      color: #1d4ed8;
-    }
-    .scope-summary-icon svg { width: 18px; }
-    .scope-summary-label {
-      display: block;
-      color: #64748b;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .scope-summary strong {
-      display: block;
-      max-width: 280px;
-      overflow: hidden;
-      color: #0f172a;
-      font-size: 13px;
-      font-weight: 700;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .scope-field {
-      display: grid;
-      gap: 5px;
-      min-width: 160px;
-    }
-    .scope-field > span {
-      color: #64748b;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-    .scope-field select,
-    .scope-field input {
-      height: 38px;
-      padding: 0 12px;
-      border: 1px solid #d1d9e6;
-      border-radius: 10px;
-      background: #fff;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 600;
-      outline: none;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .scope-field select:focus,
-    .scope-field input:focus {
-      border-color: #93c5fd;
-      box-shadow: 0 0 0 4px rgba(147, 197, 253, 0.25);
-    }
-    .scope-field select:disabled { background: #f1f5f9; color: #94a3b8; }
-    .scope-field-date { min-width: 130px; }
-    .scope-reset {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      height: 38px;
-      padding: 0 14px;
-      border-radius: 10px;
-      border: 1px solid #fecaca;
-      background: #fff1f2;
-      color: #b91c1c;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .scope-reset svg { width: 14px; }
-
-    /* ────────── KPI STRIP ────────── */
-    .kpi-strip {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    /* ────────── MAIN GRID ────────── */
-    .main-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.75fr) minmax(320px, 0.9fr);
-      gap: 18px;
-    }
-    .side-column { display: grid; gap: 18px; min-width: 0; }
-
-    /* ────────── PROJECT TABLE ────────── */
-    .project-progress-strip {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1px;
-      margin-bottom: 14px;
-      padding: 12px;
-      background: #f1f5f9;
-      border-radius: 12px;
-    }
-    .project-progress-stat {
-      display: grid;
-      gap: 4px;
-      padding: 4px 10px;
-      background: #fff;
-      border-radius: 8px;
-    }
-    .project-progress-stat span {
-      color: #64748b;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-    .project-progress-stat strong {
-      color: #0f172a;
-      font-size: 18px;
-      font-weight: 800;
-    }
-
-    .project-table {
-      display: grid;
-      gap: 2px;
-    }
-    .project-table-head {
-      display: grid;
-      grid-template-columns: 1.8fr 1.1fr 1fr 1fr 1fr;
-      gap: 12px;
-      padding: 8px 14px;
-      color: #64748b;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .project-row {
-      display: grid;
-      grid-template-columns: 1.8fr 1.1fr 1fr 1fr 1fr;
-      align-items: center;
-      gap: 12px;
-      padding: 14px;
-      border-radius: 12px;
-      transition: background 0.15s ease, transform 0.15s ease;
-    }
-    .project-row:hover { background: #f8fafc; transform: translateY(-1px); }
-    .project-cell-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
-    .project-avatar {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #eef2ff, #c7d2fe);
-      color: #1d4ed8;
-      font-size: 12px;
-      font-weight: 800;
-      flex: 0 0 auto;
-    }
-    .project-main { display: grid; gap: 4px; min-width: 0; }
-    .project-main strong {
-      overflow: hidden;
-      color: #0f172a;
-      font-size: 13px;
-      font-weight: 700;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .project-main small {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      overflow: hidden;
-      color: #64748b;
-      font-size: 11px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 7px;
-      border-radius: 999px;
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .status-badge.active { background: #dcfce7; color: #15803d; }
-    .status-badge.on-hold { background: #fef3c7; color: #b45309; }
-    .status-badge.completed { background: #e2e8f0; color: #475569; }
-
-    .project-cell-progress {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .project-progress-bar {
-      flex: 1;
-      height: 6px;
-      background: #e2e8f0;
-      border-radius: 999px;
-      overflow: hidden;
-    }
-    .project-progress-bar i {
-      display: block;
-      height: 100%;
-      border-radius: 999px;
-      background: #1d4ed8;
-      transition: width 0.4s ease;
-    }
-    .project-cell-progress strong {
-      width: 40px;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 800;
-      text-align: right;
-    }
-    .project-cell-value strong {
-      display: block;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .project-cell-value strong.received { color: #15803d; }
-    .project-cell-value strong.spent { color: #b45309; }
-
-    /* ────────── ACTION INBOX ────────── */
-    .action-list { display: grid; gap: 8px; }
-    .action-item {
-      display: grid;
-      grid-template-columns: 44px 1fr auto;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      background: #f8fafc;
-      transition: background 0.15s ease, transform 0.15s ease;
-    }
-    .action-item:hover { background: #f1f5f9; transform: translateY(-1px); }
-    .action-count {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: #fef3c7;
-      color: #b45309;
-      font-size: 16px;
-      font-weight: 800;
-    }
-    .action-item[data-tone="critical"] .action-count { background: #fee2e2; color: #b91c1c; }
-    .action-item[data-tone="warning"] .action-count { background: #fef3c7; color: #b45309; }
-    .action-item[data-tone="info"] .action-count { background: #dbeafe; color: #1d4ed8; }
-    .action-copy { display: grid; gap: 3px; min-width: 0; }
-    .action-copy strong { color: #0f172a; font-size: 13px; font-weight: 700; }
-    .action-copy small {
-      overflow: hidden;
-      color: #64748b;
-      font-size: 11px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .action-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      color: #1d4ed8;
-      font-size: 11px;
-      font-weight: 700;
-    }
-    .action-link svg { width: 13px; }
-
-    .quick-create {
-      margin-top: 14px;
-      padding: 14px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    }
-    .quick-create-label {
-      display: block;
-      margin-bottom: 8px;
-      color: #64748b;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .quick-create-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-    .quick-create-row button,
-    .quick-create-row a {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      height: 38px;
-      padding: 0 12px;
-      border-radius: 10px;
-      border: 1px solid #e2e8f0;
-      background: #fff;
-      color: #1e293b;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .quick-create-row button:hover,
-    .quick-create-row a:hover { border-color: #cbd5f5; color: #1d4ed8; }
-    .quick-create-row svg { width: 14px; }
-
-    /* ────────── STOCK ────────── */
-    .stock-summary {
-      display: grid;
-      grid-template-columns: 44px 1fr auto;
-      align-items: center;
-      gap: 12px;
-      padding: 14px;
-      border-radius: 12px;
-      border: 1px solid #bbf7d0;
-      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-    }
-    .stock-summary.has-alerts {
-      border-color: #fde68a;
-      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-    }
-    .stock-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.7);
-      color: #047857;
-    }
-    .stock-summary.has-alerts .stock-icon { color: #b45309; }
-    .stock-summary strong { color: #064e3b; font-size: 13px; font-weight: 800; }
-    .stock-summary.has-alerts strong { color: #78350f; }
-    .stock-summary small { color: #475569; font-size: 11px; }
-    .stock-summary.has-alerts small { color: #92400e; }
-    .stock-summary a {
-      padding: 6px 12px;
-      border-radius: 8px;
-      background: #fff;
-      color: #047857;
-      font-size: 11px;
-      font-weight: 700;
-      box-shadow: 0 4px 8px -4px rgba(0, 0, 0, 0.1);
-    }
-    .stock-summary.has-alerts a { color: #b45309; }
-
-    .stock-list {
-      display: grid;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .stock-row {
-      display: grid;
-      grid-template-columns: 1.3fr 1fr auto;
-      gap: 12px;
-      align-items: center;
-      padding: 10px 12px;
-      border-radius: 10px;
-      background: #f8fafc;
-    }
-    .stock-name {
-      overflow: hidden;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 700;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .stock-progress {
-      height: 6px;
-      background: #e2e8f0;
-      border-radius: 999px;
-      overflow: hidden;
-    }
-    .stock-progress i {
-      display: block;
-      height: 100%;
-      background: linear-gradient(90deg, #f97316, #fbbf24);
-    }
-    .stock-progress i.danger { background: linear-gradient(90deg, #ef4444, #f97316); }
-    .stock-meta { display: grid; gap: 1px; text-align: right; }
-    .stock-meta strong { color: #b45309; font-size: 12px; font-weight: 800; }
-    .stock-meta small { color: #64748b; font-size: 10px; }
-    .stock-empty {
-      margin-top: 12px;
-      padding: 12px;
-      text-align: center;
-      color: #64748b;
-      font-size: 11px;
-      border-radius: 10px;
-      background: #f8fafc;
-    }
-
-    /* ────────── APPROVALS ────────── */
-    .approval-list { display: grid; gap: 4px; }
-    .approval-row {
-      display: grid;
-      grid-template-columns: 36px 1fr auto;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 8px;
-      border-radius: 10px;
-      transition: background 0.15s ease;
-    }
-    .approval-row:hover { background: #f8fafc; }
-    .approval-type {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: #fef3c7;
-      color: #b45309;
-      font-size: 11px;
-      font-weight: 800;
-    }
-    .approval-copy { display: grid; gap: 2px; min-width: 0; }
-    .approval-copy strong {
-      overflow: hidden;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 700;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .approval-copy small {
-      overflow: hidden;
-      color: #64748b;
-      font-size: 11px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .approval-row time {
-      color: #94a3b8;
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    /* ────────── CASH TREND ────────── */
-    .cash-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
-      gap: 18px;
-    }
-    .cash-section agb-bar-chart { display: block; padding-bottom: 4px; }
-    .cash-totals {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      padding: 16px 22px 20px;
-      border-top: 1px solid #f1f5f9;
-    }
-    .cash-total {
-      display: grid;
-      gap: 4px;
-      padding: 12px;
-      border-radius: 12px;
-      background: #f8fafc;
-    }
-    .cash-total-label {
-      color: #64748b;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-    .cash-total-value {
-      color: #0f172a;
-      font-size: 16px;
-      font-weight: 800;
-    }
-    .cash-total-value.received { color: #047857; }
-    .cash-total-value.spent { color: #b45309; }
-
-    /* ────────── BOTTOM GRID ────────── */
-    .bottom-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-      gap: 18px;
-    }
-
-    .payment-list { display: grid; gap: 4px; }
-    .payment-row {
-      display: grid;
-      grid-template-columns: 36px 1fr auto;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 8px;
-      border-radius: 10px;
-      transition: background 0.15s ease;
-    }
-    .payment-row:hover { background: #f8fafc; }
-    .payment-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: #dcfce7;
-      color: #047857;
-    }
-    .payment-icon svg { width: 16px; }
-    .payment-copy { display: grid; gap: 2px; min-width: 0; }
-    .payment-copy strong {
-      overflow: hidden;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 700;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .payment-copy small {
-      overflow: hidden;
-      color: #64748b;
-      font-size: 11px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .payment-amount {
-      color: #047857;
-      font-size: 13px;
-      font-weight: 800;
-    }
-
-    /* ────────── OPERATIONS TILES ────────── */
-    .ops-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-    .op-tile {
-      display: grid;
-      grid-template-rows: auto auto auto;
-      gap: 8px;
-      padding: 16px;
-      border-radius: 14px;
-      background: #f8fafc;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      position: relative;
-      overflow: hidden;
-    }
-    .op-tile:hover { transform: translateY(-2px); box-shadow: 0 12px 22px -16px rgba(15, 23, 42, 0.35); }
-    .op-tile::after {
-      content: "→";
-      position: absolute;
-      top: 14px;
-      right: 14px;
-      color: #94a3b8;
-      font-size: 14px;
-    }
-    .op-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-    }
-    .op-icon svg { width: 18px; }
-    .op-tile.primary { background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); }
-    .op-tile.primary .op-icon { background: #c7d2fe; color: #1d4ed8; }
-    .op-tile.primary strong { color: #1d4ed8; }
-    .op-tile.violet { background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); }
-    .op-tile.violet .op-icon { background: #ddd6fe; color: #6d28d9; }
-    .op-tile.violet strong { color: #6d28d9; }
-    .op-tile.success { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); }
-    .op-tile.success .op-icon { background: #a7f3d0; color: #047857; }
-    .op-tile.success strong { color: #047857; }
-    .op-tile.warning { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); }
-    .op-tile.warning .op-icon { background: #fde68a; color: #b45309; }
-    .op-tile.warning strong { color: #b45309; }
-    .op-tile.danger { background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); }
-    .op-tile.danger .op-icon { background: #fecaca; color: #b91c1c; }
-    .op-tile.danger strong { color: #b91c1c; }
-    .op-tile.neutral { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }
-    .op-tile.neutral .op-icon { background: #cbd5f5; color: #475569; }
-    .op-tile.neutral strong { color: #475569; }
-    .op-tile strong {
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
-    .op-tile small {
-      color: #475569;
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    /* ────────── PERFORMERS ────────── */
-    .performer-list { display: grid; gap: 10px; }
-    .performer-row {
-      display: grid;
-      grid-template-columns: 28px 1fr 1.4fr auto;
-      gap: 12px;
-      align-items: center;
-      padding: 10px 12px;
-      border-radius: 12px;
-      background: #f8fafc;
-    }
-    .performer-rank {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      background: #fff;
-      color: #475569;
-      font-size: 11px;
-      font-weight: 800;
-      border: 1px solid #e2e8f0;
-    }
-    .performer-copy { display: grid; gap: 1px; min-width: 0; }
-    .performer-copy strong {
-      overflow: hidden;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 700;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .performer-copy small {
-      overflow: hidden;
-      color: #64748b;
-      font-size: 11px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .performer-bar {
-      height: 8px;
-      background: #e2e8f0;
-      border-radius: 999px;
-      overflow: hidden;
-    }
-    .performer-bar i {
-      display: block;
-      height: 100%;
-      background: linear-gradient(90deg, #1d4ed8, #3b82f6);
-    }
-    .performer-bar i.warning { background: linear-gradient(90deg, #f97316, #fbbf24); }
-    .performer-bar i.danger { background: linear-gradient(90deg, #ef4444, #f97316); }
-    .performer-score {
-      width: 48px;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 800;
-      text-align: right;
-    }
-
-    /* ────────── FOOTER ────────── */
-    .dashboard-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 8px 4px;
-      color: #64748b;
-      font-size: 11px;
-    }
-    .dashboard-footer strong { color: #0f172a; font-weight: 700; }
-    .dashboard-footer nav { display: flex; gap: 18px; }
-    .dashboard-footer a {
-      color: #475569;
-      font-weight: 700;
-      transition: color 0.15s ease;
-    }
-    .dashboard-footer a:hover { color: #1d4ed8; }
-
-    /* ────────── RESPONSIVE ────────── */
-    @media (max-width: 1280px) {
-      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
-      .main-grid, .cash-grid { grid-template-columns: 1fr; }
-      .bottom-grid { grid-template-columns: 1fr 1fr; }
-    }
-    @media (max-width: 920px) {
-      .dashboard-shell { padding: 20px 16px 48px; }
-      .hero { padding: 24px; flex-direction: column; }
-      .hero-actions { width: 100%; }
-      .hero-actions .hero-button { flex: 1; justify-content: center; }
-      .project-table-head { display: none; }
-      .project-row {
-        grid-template-columns: 1fr auto;
-        gap: 10px;
-        padding: 14px;
-      }
-      .project-cell-progress { grid-column: 1 / -1; }
-      .project-cell-value strong { font-size: 13px; }
-    }
-    @media (max-width: 640px) {
-      .kpi-strip { grid-template-columns: 1fr; }
-      .bottom-grid { grid-template-columns: 1fr; }
-      .ops-grid { grid-template-columns: 1fr 1fr; }
-      .cash-totals { grid-template-columns: 1fr; }
-      .project-progress-strip { grid-template-columns: 1fr 1fr; }
-      .scope-bar { flex-direction: column; align-items: stretch; }
-      .scope-summary { min-width: 0; margin-right: 0; }
-      .scope-field, .scope-field-date { min-width: 0; width: 100%; }
-    }
+    button, select, input { font: inherit; } a { color: inherit; text-decoration: none; }
+    .dashboard-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; margin-bottom: 26px; }
+    .dashboard-header h1 { margin: 0; color: #101828; font-size: clamp(25px, 2vw, 31px); font-weight: 750; line-height: 1.2; letter-spacing: -.03em; }
+    .dashboard-header p { margin: 8px 0 0; color: #667085; font-size: 14px; line-height: 1.5; }
+    .header-controls { display: flex; align-items: center; gap: 12px; }
+    .date-control, .period-control, .new-project-button { position: relative; display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 14px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; color: #1d2939; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+    .date-picker { position: relative; z-index: 32; }.date-control { min-width: 176px; cursor: pointer; }.date-control strong { flex: 1; font-size: 14px; text-align: left; white-space: nowrap; }.date-control:hover { border-color: #98a2b3; background: #f9fafb; }.date-control:focus-visible { outline: 3px solid rgba(47,107,255,.18); outline-offset: 1px; }
+    .date-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 50; display: grid; width: 360px; gap: 16px; padding: 16px; border: 1px solid #d0d5dd; border-radius: 13px; background: #fff; box-shadow: 0 18px 40px rgba(16,24,40,.17), 0 4px 10px rgba(16,24,40,.08); }.date-menu-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }.date-menu-heading > span { display: grid; gap: 3px; }.date-menu-heading strong { color: #101828; font-size: 15px; }.date-menu-heading small { color: #667085; font-size: 12px; }.date-menu-heading > button { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; padding: 0; border: 1px solid #e4e7ec; border-radius: 7px; background: #fff; color: #667085; cursor: pointer; }.date-menu-heading > button:hover { background: #f2f4f7; color: #101828; }.date-menu-heading > button svg { width: 15px; height: 15px; }
+    .date-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 9px; background: #f2f4f7; }.date-mode-tabs button { min-height: 36px; padding: 7px 10px; border: 0; border-radius: 7px; background: transparent; color: #667085; font-size: 13px; font-weight: 700; cursor: pointer; }.date-mode-tabs button:hover { color: #344054; }.date-mode-tabs button.active { background: #fff; color: #175cd3; box-shadow: 0 1px 3px rgba(16,24,40,.12); }
+    .date-range-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }.date-field { display: grid; gap: 6px; }.date-field > span { color: #344054; font-size: 12px; font-weight: 700; }.date-field input { width: 100%; height: 42px; padding: 0 10px; border: 1px solid #d0d5dd; border-radius: 8px; outline: 0; background: #fff; color: #101828; font-size: 13px; color-scheme: light; }.date-field input:hover { border-color: #98a2b3; }.date-field input:focus { border-color: #2f6bff; box-shadow: 0 0 0 3px rgba(47,107,255,.13); }.date-error { margin-top: -8px; color: #d92d20; font-size: 12px; }.date-menu-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }.date-menu-actions button { min-height: 38px; padding: 8px 13px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }.date-cancel { border: 1px solid #d0d5dd; background: #fff; color: #344054; }.date-cancel:hover { background: #f9fafb; }.date-apply { border: 1px solid #175cd3; background: #175cd3; color: #fff; box-shadow: 0 2px 5px rgba(23,92,211,.18); }.date-apply:hover:not(:disabled) { background: #1849a9; }.date-apply:disabled { border-color: #d0d5dd; background: #e4e7ec; color: #98a2b3; box-shadow: none; cursor: not-allowed; }
+    .period-picker { position: relative; z-index: 30; }.period-control { min-width: 160px; cursor: pointer; }.period-control strong { flex: 1; color: #1d2939; font-size: 14px; font-weight: 700; text-align: left; white-space: nowrap; }.period-control:hover, .mini-period:hover { border-color: #98a2b3; background: #f9fafb; }.period-control:focus-visible, .mini-period:focus-visible, .period-option:focus-visible { outline: 3px solid rgba(47, 107, 255, .18); outline-offset: 1px; }.period-control .chevron { pointer-events: none; transition: transform 160ms ease; }
+    .chevron { width: 14px; }.chevron.open, .mini-period svg.open { transform: rotate(180deg); }.new-project-button { border-color: #175cd3; background: #175cd3; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 3px 8px rgba(23,92,211,.18); }
+    .period-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; display: grid; width: 192px; gap: 3px; padding: 6px; border: 1px solid #d0d5dd; border-radius: 11px; background: #fff; box-shadow: 0 14px 32px rgba(16,24,40,.16), 0 3px 8px rgba(16,24,40,.08); }.period-option { display: flex; width: 100%; min-height: 38px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: #344054; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }.period-option:hover { background: #f2f4f7; color: #101828; }.period-option.active { background: #eef4ff; color: #175cd3; }.period-option svg { width: 15px; height: 15px; stroke-width: 2.3; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+    .kpi-card { position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(128px, auto); align-items: center; column-gap: 15px; min-width: 0; min-height: 132px; padding: 18px; overflow: hidden; border: 1px solid #e4e7ec; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.04); }
+    .kpi-icon { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 50%; }.kpi-icon svg { width: 24px; height: 24px; stroke-width: 1.8; }
+    .green .kpi-icon { background: #eaf8f0; color: #039855; }.orange .kpi-icon { background: #fff3e8; color: #e04f16; }.blue .kpi-icon { background: #edf4ff; color: #175cd3; }.purple .kpi-icon { background: #f4f0ff; color: #6938c6; }
+    .kpi-content { display: grid; min-width: 0; gap: 7px; }.kpi-content > span { color: #475467; font-size: 14px; font-weight: 650; }.kpi-content > strong { overflow: hidden; color: #101828; font-size: clamp(24px, 1.65vw, 30px); line-height: 1.08; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }.kpi-content small { color: #667085; font-size: 12px; }
+    .kpi-fact { display: grid; min-width: 0; gap: 4px; align-content: center; padding-left: 15px; border-left: 1px solid #eaecf0; }.kpi-fact small, .kpi-fact em { overflow: hidden; color: #667085; font-size: 11px; font-style: normal; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }.kpi-fact strong { overflow: hidden; color: #101828; font-size: 16px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }.green .kpi-fact strong { color: #027a48; }.orange .kpi-fact strong { color: #c4320a; }.purple .kpi-fact strong { color: #5925dc; }
+    .main-panels, .lower-panels { display: grid; gap: 16px; margin-bottom: 16px; }.main-panels { grid-template-columns: 1.28fr 1fr .96fr; }.lower-panels { grid-template-columns: .95fr .9fr 1.22fr; }
+    .panel, .insights-panel { overflow: hidden; border: 1px solid #e4e7ec; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.035); }.main-panels .panel { min-height: 430px; }.lower-panels .panel { min-height: 270px; }
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 66px; padding: 18px 20px; }.cash-panel .panel-heading { position: relative; z-index: 10; }.panel-heading h2, .insights-panel h2 { margin: 0; color: #101828; font-size: 17px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }.panel-heading > a { color: #175cd3; font-size: 13px; font-weight: 700; }
+    .period-picker.mini { z-index: 20; }.mini-period { display: flex; min-width: 126px; height: 38px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 11px; border: 1px solid #d0d5dd; border-radius: 8px; background: #fff; color: #344054; cursor: pointer; }.mini-period strong { font-size: 12px; font-weight: 700; white-space: nowrap; }.mini-period svg { width: 13px; pointer-events: none; transition: transform 160ms ease; }.period-menu.mini-menu { top: calc(100% + 7px); width: 180px; }
+    .chart-wrap { min-height: 270px; padding: 4px 20px 0; }.chart-wrap agb-bar-chart { display: block; }.cash-panel ::ng-deep .bar-chart-x-label, .cash-panel ::ng-deep .bar-chart-tick, .cash-panel ::ng-deep .bar-chart-legend li { font-size: 12px; }.chart-empty, .simple-empty { display: flex; align-items: center; justify-content: center; min-height: 170px; color: #98a2b3; font-size: 14px; }
+    .cash-totals { display: grid; grid-template-columns: 1fr 1fr; margin: 0 20px 18px; overflow: hidden; border: 1px solid #e4e7ec; border-radius: 9px; }.cash-totals div { display: grid; gap: 6px; padding: 13px 18px; }.cash-totals div:first-child { background: #f0faf5; }.cash-totals div:last-child { border-left: 1px solid #e4e7ec; background: #fff8f2; }.cash-totals span { color: #039855; font-size: 12px; font-weight: 700; }.cash-totals div:last-child span { color: #e04f16; }.cash-totals strong { color: #101828; font-size: 19px; }
+    .donut-wrap { display: flex; min-height: 340px; align-items: center; padding: 20px 24px; }.donut-wrap agb-donut-chart { width: 100%; }.spend-panel ::ng-deep .donut-chart { justify-content: center; gap: 24px; }.spend-panel ::ng-deep .donut-canvas { width: 170px; height: 170px; }.spend-panel ::ng-deep .donut-legend-label, .spend-panel ::ng-deep .donut-legend-meta strong { font-size: 14px; }.spend-panel ::ng-deep .donut-legend-meta small { font-size: 12px; }
+    .recent-project-list { display: grid; padding: 4px 20px 14px; }.recent-project-row { display: grid; grid-template-columns: 40px minmax(120px, .9fr) minmax(80px, 1.25fr) 40px; align-items: center; gap: 12px; min-height: 65px; }.dashboard-project-avatar { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 750; }.dashboard-project-copy { display: grid; min-width: 0; gap: 5px; }.dashboard-project-copy strong { overflow: hidden; color: #101828; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }.dashboard-project-copy small { width: fit-content; padding: 2px 6px; border-radius: 3px; background: #ecfdf3; color: #027a48; font-size: 11px; }.dashboard-project-progress { display: block; width: 100%; height: 6px; overflow: hidden; border-radius: 99px; background: #eaecf0; }.dashboard-project-progress i { display: block; height: 100%; border-radius: inherit; background: #175cd3; }.recent-project-row > b { color: #344054; font-size: 12px; text-align: right; }
+    .approval-summary-list { display: grid; gap: 8px; padding: 0 14px 14px; }.approval-summary-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 76px; padding: 10px 11px; border: 1px solid #eaecf0; border-radius: 9px; }.approval-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 9px; }.approval-icon.expense { background: #fff0e6; color: #e04f16; }.approval-summary-row > span:nth-child(2), .approval-amount { display: grid; min-width: 0; gap: 4px; }.approval-summary-row strong { overflow: hidden; color: #101828; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }.approval-summary-row small { overflow: hidden; color: #667085; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.approval-amount { text-align: right; }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 14px 14px; }.summary-grid a { display: grid; grid-template-columns: 47px 1fr; align-items: center; gap: 11px; min-height: 88px; padding: 11px; border: 1px solid #eaecf0; border-radius: 9px; }.summary-icon { display: inline-flex; align-items: center; justify-content: center; width: 45px; height: 45px; border-radius: 9px; }.summary-icon.blue { background: #edf4ff; color: #175cd3; }.summary-icon.green { background: #eaf8f0; color: #039855; }.summary-icon.orange { background: #fff3e8; color: #e04f16; }.summary-icon.purple { background: #f4f0ff; color: #6938c6; }.summary-grid a > span:last-child { display: grid; gap: 3px; }.summary-grid small, .summary-grid em { color: #667085; font-size: 12px; font-style: normal; }.summary-grid strong { color: #101828; font-size: 22px; }.summary-grid b { color: #039855; font-size: 12px; }
+    .expenditure-table { padding: 0 22px 14px; }.expenditure-head, .expenditure-row, .expenditure-total { display: grid; grid-template-columns: 1.2fr .72fr 1fr; align-items: center; min-height: 48px; border-bottom: 1px solid #eaecf0; }.expenditure-head { color: #667085; font-size: 12px; font-weight: 600; }.expenditure-row { color: #344054; font-size: 13px; }.expenditure-row > span:first-child { display: flex; align-items: center; gap: 10px; }.expenditure-row > span:first-child i { width: 8px; height: 8px; border-radius: 50%; }.expenditure-row > span:last-child { display: grid; grid-template-columns: 1fr 42px; align-items: center; gap: 9px; }.expenditure-row b { font-size: 12px; text-align: right; }.expenditure-bar { height: 6px; overflow: hidden; border-radius: 99px; background: #f2f4f7; }.expenditure-bar i { display: block; height: 100%; border-radius: inherit; }.expenditure-total { border: 0; color: #101828; font-size: 13px; }
+    .insights-panel { padding: 20px 22px 22px; }.insights-panel h2 { margin-bottom: 16px; font-size: 18px; }.insight-grid { display: grid; grid-template-columns: repeat(5, 1fr); }.insight-grid article { display: grid; grid-template-columns: 50px 1fr; align-items: center; gap: 14px; min-height: 90px; padding: 8px 18px; border-right: 1px solid #eaecf0; }.insight-grid article:first-child { padding-left: 0; }.insight-grid article:last-child { border-right: 0; }.insight-icon { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; }.insight-icon.green { background: #eaf8f0; color: #039855; }.insight-icon.orange { background: #fff3e8; color: #e04f16; }.insight-icon.blue { background: #edf4ff; color: #175cd3; }.insight-icon.purple { background: #f4f0ff; color: #6938c6; }.insight-grid article > span:last-child { display: grid; min-width: 0; gap: 5px; }.insight-grid small { color: #667085; font-size: 13px; line-height: 1.35; }.insight-grid strong { overflow: hidden; color: #101828; font-size: 19px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }.insight-grid em { overflow: hidden; color: #667085; font-size: 13px; font-style: normal; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 1250px) { .kpi-grid { grid-template-columns: 1fr 1fr; }.main-panels { grid-template-columns: 1fr 1fr; }.projects-panel { grid-column: 1 / -1; }.lower-panels { grid-template-columns: 1fr 1fr; }.expenditure-panel { grid-column: 1 / -1; }.insight-grid { grid-template-columns: 1fr 1fr 1fr; }.insight-grid article { border-bottom: 1px solid #e4e8f0; } }
+    @media (max-width: 1000px) { .kpi-grid { grid-template-columns: 1fr 1fr; } .kpi-card { grid-template-columns: 52px minmax(0, 1fr) minmax(120px, auto); } }
+    @media (max-width: 820px) { .dashboard-shell { padding: 20px 14px 36px; }.dashboard-header { flex-direction: column; }.header-controls { width: 100%; flex-wrap: wrap; }.date-picker, .period-picker { flex: 1; }.date-control, .period-control { width: 100%; }.main-panels, .lower-panels { grid-template-columns: 1fr; }.projects-panel, .expenditure-panel { grid-column: auto; }.insight-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .kpi-grid { grid-template-columns: 1fr; }.kpi-card { grid-template-columns: 46px minmax(0, 1fr); }.kpi-icon { width: 46px; height: 46px; }.kpi-fact { grid-column: 2; padding: 10px 0 0; border-top: 1px solid #eaecf0; border-left: 0; }.header-controls { align-items: stretch; flex-direction: column; }.date-picker, .date-control, .period-picker, .period-control, .new-project-button { width: 100%; }.date-menu { width: min(360px, calc(100vw - 28px)); }.date-range-fields { grid-template-columns: 1fr; }.period-menu { right: auto; left: 0; width: 100%; }.period-picker.mini { width: auto; }.period-menu.mini-menu { right: 0; left: auto; width: 180px; }.summary-grid, .insight-grid { grid-template-columns: 1fr; }.insight-grid article { border-right: 0; }.recent-project-row { grid-template-columns: 38px 1fr 32px; }.dashboard-project-progress { display: none; } }
   `],
 })
 export class UniversalDashboardPage implements OnInit {
   private readonly api = inject(ApiService);
-  protected readonly data = inject(ErpDataService);
+  private readonly data = inject(ErpDataService);
   private readonly approvals = inject(ApprovalsService);
 
   readonly kpis = signal<DashboardKpis | null>(null);
   readonly approvalRows = signal<any[]>([]);
-  readonly loadingKpis = signal(true);
+  readonly loadedProjects = signal<any[] | null>(null);
+  readonly loadedPayments = signal<any[] | null>(null);
+  readonly loadedExpenses = signal<any[] | null>(null);
+  readonly loadedGeneralExpenses = signal<any[] | null>(null);
+  readonly loadedMaterials = signal<any[] | null>(null);
+  readonly loadedSubcontractorPayments = signal<any[] | null>(null);
   readonly refreshing = signal(false);
-  readonly lastUpdatedAt = signal<Date | null>(null);
-
-  readonly selectedProjectId = signal("");
-  readonly selectedSiteId = signal("");
   readonly periodKey = signal<PeriodKey>("month");
-  readonly customFrom = signal("");
-  readonly customTo = signal("");
-
+  readonly openPeriodMenu = signal<"header" | "chart" | null>(null);
+  readonly selectedDate = signal(new Date().toISOString().slice(0, 10));
+  readonly dateMenuOpen = signal(false);
+  readonly datePickerMode = signal<"single" | "range">("single");
+  readonly customDateFrom = signal("");
+  readonly customDateTo = signal("");
+  readonly draftSingleDate = signal(this.selectedDate());
+  readonly draftRangeFrom = signal(this.selectedDate());
+  readonly draftRangeTo = signal(this.selectedDate());
   readonly showClientDialog = signal(false);
   readonly showProjectDialog = signal(false);
   readonly showVendorDialog = signal(false);
+  readonly periodOptions: ReadonlyArray<{ value: PeriodKey; label: string }> = [
+    { value: "today", label: "Today" },
+    { value: "week", label: "Last 7 Days" },
+    { value: "month", label: "This Month" },
+    { value: "3m", label: "Last 3 Months" },
+    { value: "6m", label: "Last 6 Months" },
+    { value: "year", label: "This Year" },
+  ];
+  readonly chartPeriodOptions = this.periodOptions.filter((option) => option.value !== "today");
 
-  readonly projects = computed(() => this.data.projects() as any[]);
-  readonly payments = computed(() => this.data.payments() as any[]);
-  readonly expenses = computed(() => [
-    ...(this.data.expenses() as any[]),
-    ...(this.data.generalExpenses() as any[]),
-  ]);
-
-  readonly userName = computed(() => {
-    const user = this.api.user() as any;
-    return user?.name?.split(" ")?.[0] || user?.fullName?.split(" ")?.[0] || "there";
+  readonly projects = computed(() => this.loadedProjects() ?? (this.data.projects() as any[]));
+  readonly activeProjects = computed(() => this.projects().filter((row) => String(row.status || "").trim().toLowerCase() === "active"));
+  readonly legacyPayments = computed<any[]>(() => this.data.tableRowsFor("payments", [])
+    .filter((row) => String(row["__rowId"] || "").startsWith("custom:payments:"))
+    .map((row) => ({
+      ...row,
+      id: String(row["__rowId"] || ""),
+      date: String(row["paymentDate"] || row["date"] || ""),
+      status: String(row["approvalStatus"] || row["status"] || "Pending"),
+    })));
+  readonly payments = computed(() => {
+    const backendRows = this.loadedPayments() ?? (this.data.payments() as any[]);
+    const rows = [...backendRows, ...this.legacyPayments()];
+    return this.dedupeRows(rows).filter((row) => this.isPostedPayment(row));
   });
-
-  readonly availableSites = computed(() => {
-    const projectId = this.selectedProjectId();
-    if (!projectId) return [];
-    return (this.data.siteEntities() as any[])
-      .filter(
-        (site) =>
-          String(site.projectId || "") === projectId ||
-          site.projectIds?.some((id: any) => String(id) === projectId),
-      )
-      .filter((site) => site.name && site.name.trim().toLowerCase() !== "main site")
-      .map((site) => ({ id: String(site.id || site._id), name: site.name }));
-  });
-
-  readonly selectedScopeLabel = computed(() => {
-    const projectId = this.selectedProjectId();
-    if (!projectId) return "All projects";
-    const project = this.projects().find((item) => String(item.id || item._id) === projectId);
-    const site = this.availableSites().find((item) => item.id === this.selectedSiteId());
-    return site ? `${project?.name || "Project"} · ${site.name}` : project?.name || "Selected project";
-  });
-
-  readonly periodLabel = computed(() => {
-    const period = this.periodKey();
-    if (period === "custom") {
-      return this.customFrom() && this.customTo()
-        ? `${this.formatDate(this.customFrom())} – ${this.formatDate(this.customTo())}`
-        : "Custom period";
-    }
-    return ({
-      today: "Today",
-      week: "Last 7 days",
-      month: "This month",
-      "3m": "Last 3 months",
-      "6m": "Last 6 months",
-      year: "This year",
-    } as const)[period];
-  });
-
-  readonly currentDateLabel = computed(() =>
-    new Date().toLocaleDateString("en-IN", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }),
-  );
-
-  readonly scopedProjects = computed(() => {
-    const projectId = this.selectedProjectId();
-    return projectId
-      ? this.projects().filter((project) => String(project.id || project._id) === projectId)
-      : this.projects();
-  });
-
-  readonly scopedPayments = computed(() => this.payments().filter((row) => this.matchesScope(row, true)));
-  readonly scopedExpenses = computed(() => this.expenses().filter((row) => this.matchesScope(row, true)));
-
-  readonly financials = computed(() => {
-    const raw = this.kpis()?.financials || {};
-    const hasScope = !!this.selectedProjectId() || !!this.selectedSiteId();
-    const periodReceived = this.scopedPayments().reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    const spent = this.scopedExpenses().reduce((sum, row) => sum + Math.abs(Number(row.amount || 0)), 0);
-    const projectValueFromRows = this.scopedProjects().reduce(
-      (sum, project) => sum + Number(project.totalValue || project.value || 0),
-      0,
-    );
-    const receivedFromRows = this.scopedProjects().reduce(
-      (sum, project) => sum + Number(project.receivedAmount || project.received || 0),
-      0,
-    );
-    const projectValue = projectValueFromRows || Number(raw.totalProjectValue || 0);
-    const lifetimeReceived = receivedFromRows || Number(raw.totalReceived || 0);
-    return {
-      totalProjectValue: projectValue,
-      totalReceived: periodReceived,
-      lifetimeReceived,
-      totalPending: hasScope ? Math.max(0, projectValue - lifetimeReceived) : Number(raw.totalPending || 0),
-      totalSpent: spent,
-    };
-  });
-
-  readonly totalExpenses = computed(() => this.financials().totalSpent);
-  readonly netCashPosition = computed(() => this.financials().totalReceived - this.totalExpenses());
-  readonly collectionRate = computed(() => {
-    const value = this.financials().totalProjectValue;
-    return value > 0
-      ? Math.round(Math.min(100, Math.max(0, (this.financials().lifetimeReceived / value) * 100)))
-      : 0;
-  });
-
-  readonly activeProjectCount = computed(
-    () => this.scopedProjects().filter((project) => String(project.status || "active").toLowerCase() === "active").length,
-  );
-  readonly onHoldCount = computed(
-    () => this.scopedProjects().filter((project) => String(project.status || "").toLowerCase().includes("hold")).length,
-  );
-  readonly completedCount = computed(
-    () => this.scopedProjects().filter((project) => String(project.status || "").toLowerCase().includes("complete")).length,
-  );
-  readonly avgProgress = computed(() => {
-    const list = this.scopedProjects();
-    if (!list.length) return 0;
-    const total = list.reduce(
-      (sum, project) =>
-        sum + Math.min(100, Math.max(0, Number(project.completion || project.progress || 0))),
-      0,
-    );
-    return Math.round(total / list.length);
-  });
-
-  readonly activeClientCount = computed(
-    () => this.kpis()?.counts?.clients?.active ?? this.data.clients().length,
-  );
-  readonly activeVendorCount = computed(
-    () => this.kpis()?.counts?.vendors?.active ?? this.data.vendors().length,
-  );
-
-  readonly inventoryItemCount = computed(
-    () =>
-      new Set(
-        (this.data.inventory() as any[])
-          .filter((row) => this.matchesScope(row, false))
-          .map((row) => String(row.normalizedName || row.name || "").toLowerCase()),
-      ).size,
-  );
-
-  readonly lowStockRows = computed(() => {
-    const rows = (this.data.inventory() as any[]).filter((row) => {
-      if (!this.matchesScope(row, false)) return false;
-      const remaining = Number(row.remainingStock || 0);
-      const minimum = Number(row.minimumQuantity || 0);
-      return minimum > 0 && remaining <= minimum;
-    });
-    return rows
-      .map((row) => {
-        const remaining = Number(row.remainingStock || 0);
-        const minimum = Number(row.minimumQuantity || 0);
-        const percent = minimum > 0 ? Math.min(100, Math.round((remaining / minimum) * 100)) : 0;
-        return {
-          id: String(row.id || row._id || row.normalizedName || row.name),
-          name: row.normalizedName || row.name || "Material",
-          remaining,
-          minimum,
-          percent,
-        };
-      })
-      .sort((a, b) => a.percent - b.percent)
-      .slice(0, 5);
-  });
-  readonly lowStockCount = computed(() =>
-    (this.data.inventory() as any[]).filter((row) => {
-      if (!this.matchesScope(row, false)) return false;
-      const remaining = Number(row.remainingStock || 0);
-      const minimum = Number(row.minimumQuantity || 0);
-      return minimum > 0 && remaining <= minimum;
-    }).length,
-  );
-
-  private readonly palette = ["#1d4ed8", "#7c3aed", "#0d9488", "#db2777", "#ea580c", "#0891b2", "#4f46e5", "#16a34a"];
-
-  readonly projectHealth = computed(() => {
-    const list = this.scopedProjects();
-    return list
-      .map((project, index) => {
-        const name = project.name || "Unnamed project";
-        const spent =
-          Number(project.materialSpend || 0) +
-          Number(project.labourPayable || 0) +
-          Number(project.subcontractorSpend || 0) +
-          Number(project.expenses || 0);
-        return {
-          id: String(project.id || project._id || ""),
-          clientId: String(project.clientId || project.client?._id || ""),
-          name,
-          initials: name.split(/\s+/).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase(),
-          client: project.clientName || project.client?.name || project.client || "",
-          status: project.status || "Active",
-          value: Number(project.totalValue || project.value || 0),
-          received: Number(project.receivedAmount || project.received || 0),
-          spent,
-          progress: Math.round(Math.min(100, Math.max(0, Number(project.completion || project.progress || 0)))),
-          color: this.palette[index % this.palette.length],
-        };
-      })
-      .sort(
-        (a, b) =>
-          (a.status === "Active" ? -1 : 1) - (b.status === "Active" ? -1 : 1) || b.value - a.value,
-      )
-      .slice(0, 8);
-  });
-
-  readonly actionQueue = computed<ActionItem[]>(() => {
-    const activity = this.kpis()?.recentActivity || {};
-    const items: ActionItem[] = [];
-    const pendingApprovals = this.approvalRows().filter(
-      (row) => !this.selectedProjectId() || String(row.projectId || "") === this.selectedProjectId(),
-    ).length;
-    const approvals = this.selectedProjectId()
-      ? pendingApprovals
-      : Math.max(pendingApprovals, Number(this.kpis()?.counts?.approvals?.pending || 0));
-    if (approvals > 0) {
-      items.push({
-        id: "approvals",
-        label: "Approvals waiting",
-        detail: "Requests need a decision before work can continue.",
-        count: approvals,
-        tone: "critical",
-        route: "/approvals",
-        action: "Review",
-      });
-    }
-    if (this.lowStockCount() > 0) {
-      items.push({
-        id: "stock",
-        label: "Low-stock materials",
-        detail: "Replenish inventory to prevent site delays.",
-        count: this.lowStockCount(),
-        tone: "warning",
-        route: "/projects",
-        action: "Inspect",
-      });
-    }
-    if (Number(activity.pendingMaterials || 0) > 0) {
-      items.push({
-        id: "materials",
-        label: "Material requests pending",
-        detail: "Sites are waiting for requested materials.",
-        count: Number(activity.pendingMaterials),
-        tone: "warning",
-        route: "/approvals",
-        action: "Review",
-      });
-    }
-    if (Number(activity.pendingPayments || 0) > 0) {
-      items.push({
-        id: "payments",
-        label: "Payments pending",
-        detail: "Payment records require confirmation.",
-        count: Number(activity.pendingPayments),
-        tone: "info",
-        route: "/approvals",
-        action: "Review",
-      });
-    }
-    if (Number(activity.pendingExpenses || 0) > 0) {
-      items.push({
-        id: "expenses",
-        label: "Expenses pending",
-        detail: "Expense entries are awaiting review.",
-        count: Number(activity.pendingExpenses),
-        tone: "info",
-        route: "/approvals",
-        action: "Review",
-      });
-    }
-    return items.slice(0, 5);
-  });
-
-  readonly topApprovals = computed(() => {
-    const palette = ["#1d4ed8", "#7c3aed", "#0d9488", "#ea580c", "#db2777"];
-    return this.approvalRows()
-      .filter((row) => !this.selectedProjectId() || String(row.projectId || "") === this.selectedProjectId())
-      .slice(0, 5)
-      .map((row, index) => {
-        const module = String(row.module || row.type || "Request").replace(/_/g, " ");
-        return {
-          id: String(row.rowId || row.id || row._id || `${module}-${row.createdAt || index}`),
-          module,
-          initials: module.slice(0, 2).toUpperCase(),
-          projectName: row.projectName || "General",
-          requestedBy: row.requestedBy || row.submittedBy || "Team member",
-          createdAt: row.createdAt || row.requestedDate || row.date,
-          color: palette[index % palette.length] + "1f",
-        };
-      });
-  });
-
-  readonly recentPayments = computed(() =>
-    [...this.scopedPayments()]
-      .sort(
-        (a, b) =>
-          this.dateValue(b.date || b.paymentDate || b.createdAt) -
-          this.dateValue(a.date || a.paymentDate || a.createdAt),
-      )
-      .slice(0, 5)
+  readonly expenses = computed(() => {
+    const legacyRows = this.loadedExpenses() ?? (this.data.expenses() as any[]);
+    const generalRows = this.loadedGeneralExpenses() ?? (this.data.generalExpenses() as any[]);
+    const materialRows = (this.loadedMaterials() ?? (this.data.materials() as any[]))
       .map((row) => ({
-        id: String(row.id || row._id || ""),
-        clientId: String(row.clientId || row.client?._id || ""),
-        clientName: row.clientName || row.client?.name || row.client || "Client",
-        projectName: row.projectName || row.project?.name || row.project || "General payment",
-        amount: Number(row.amount || 0),
-        date: row.date || row.paymentDate || row.createdAt,
-      })),
-  );
+        ...row,
+        amount: Math.max(0, Number(row.givenAmount || 0)),
+        date: row.requestDate || row.createdAt || "",
+        dashboardSource: "Material Expense",
+      }))
+      .filter((row) => row.amount > 0);
+    const subcontractorRows = (this.loadedSubcontractorPayments() ?? [])
+      .map((row) => ({
+        ...row,
+        date: row.date || row.createdAt || "",
+        dashboardSource: "Subcontractor Payment",
+      }));
+    return this.dedupeRows([
+      ...legacyRows.map((row) => ({ ...row, dashboardSource: this.legacyExpenseSource(row) })),
+      ...generalRows.map((row) => ({ ...row, dashboardSource: "Expense" })),
+      ...materialRows,
+      ...subcontractorRows,
+    ]).filter((row) => this.isPostedExpense(row));
+  });
+  readonly userDisplayName = computed(() => {
+    const user = this.api.user() as any;
+    return user?.name || user?.fullName || "AGB Admin";
+  });
+  readonly dateRangeInvalid = computed(() => Boolean(this.draftRangeFrom() && this.draftRangeTo() && this.draftRangeFrom() > this.draftRangeTo()));
+  readonly selectedDateLabel = computed(() => {
+    if (this.periodKey() === "custom" && this.customDateFrom() && this.customDateTo()) {
+      const from = new Date(`${this.customDateFrom()}T00:00:00`);
+      const to = new Date(`${this.customDateTo()}T00:00:00`);
+      if (this.customDateFrom() === this.customDateTo()) return this.displayDate(to);
+      const fromLabel = from.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+      return `${fromLabel} – ${this.displayDate(to)}`;
+    }
+    return this.displayDate(new Date(`${this.selectedDate()}T00:00:00`));
+  });
+  readonly periodLabel = computed(() => ({
+    today: "Today",
+    week: "Last 7 days",
+    month: "This month",
+    "3m": "Last 3 months",
+    "6m": "Last 6 months",
+    year: "This year",
+    custom: "Custom range",
+  })[this.periodKey()]);
+
+  readonly scopedPayments = computed(() => this.payments().filter((row) => this.inCurrentPeriod(row)));
+  readonly scopedExpenses = computed(() => this.expenses().filter((row) => this.inCurrentPeriod(row)));
+  readonly totalReceived = computed(() => this.payments().reduce((sum, row) => sum + this.amountOf(row), 0));
+  readonly financials = computed(() => {
+    const received = this.scopedPayments().reduce((sum, row) => sum + this.amountOf(row), 0);
+    const spent = this.scopedExpenses().reduce((sum, row) => sum + Math.abs(Number(row.amount || 0)), 0);
+    const portfolio = this.activeProjects().reduce((sum, row) => sum + Math.max(0, Number(row.totalValue || row.estimatedValue || 0)), 0);
+    return { received, spent, portfolio };
+  });
+
+  readonly totalProjectCount = computed(() => Number(this.kpis()?.counts?.projects?.total ?? this.projects().length));
+  readonly activeProjectCount = computed(() => this.activeProjects().length);
+  readonly activeProjectRate = computed(() => this.totalProjectCount() ? Math.round(this.activeProjectCount() / this.totalProjectCount() * 100) : 0);
+  readonly averageActiveProjectValue = computed(() => this.activeProjectCount() ? this.financials().portfolio / this.activeProjectCount() : 0);
+  readonly teamMemberCount = computed(() => {
+    const labour = this.data.labour() as any[];
+    if (labour.length) return new Set(labour.map((row) => row.employeeId || row.workerId || row.name || row.subcontractorName).filter(Boolean)).size || labour.reduce((sum, row) => sum + Number(row.presentCount || 0), 0);
+    return this.data.subcontractors().length;
+  });
+  readonly inventoryItemCount = computed(() => new Set((this.data.inventory() as any[]).map((row) => String(row.normalizedName || row.name || "").toLowerCase()).filter(Boolean)).size);
+
+  private readonly palette = ["#175cd3", "#039855", "#e04f16", "#0e9384", "#c11574", "#6938c6"];
+  readonly recentProjects = computed(() => this.projects().slice(0, 5).map((row, index) => {
+    const name = row.name || "Unnamed Project";
+    const id = String(row.id || row._id || "");
+    const collected = this.payments()
+      .filter((payment) => String(payment.projectId || "") === id)
+      .reduce((sum, payment) => sum + this.amountOf(payment), 0);
+    const estimated = Math.max(0, Number(row.totalValue || row.estimatedValue || 0));
+    const progress = estimated > 0
+      ? Math.round(Math.min(100, Math.max(0, (collected / estimated) * 100)))
+      : 0;
+    return { id, clientId: String(row.clientId || row.client?._id || ""), name, initials: name.split(/\s+/).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase(), status: row.status || "Active", progress, color: this.palette[index % this.palette.length] };
+  }));
 
   readonly financialLabels = computed(() => this.trendBuckets().map((bucket) => bucket.label));
   readonly financialSeries = computed<BarChartSeries[]>(() => {
     const buckets = this.trendBuckets();
     return [
-      { label: "Received", color: "#10b981", values: buckets.map((bucket) => this.sumBucket(this.scopedPayments(), bucket)) },
-      { label: "Expenses", color: "#f97316", values: buckets.map((bucket) => this.sumBucket(this.scopedExpenses(), bucket)) },
+      { label: "Received", color: "#12b76a", values: buckets.map((bucket) => this.sumBucket(this.scopedPayments(), bucket)) },
+      { label: "Spent", color: "#f97316", values: buckets.map((bucket) => this.sumBucket(this.scopedExpenses(), bucket)) },
     ];
   });
-  readonly financialLegend = [
-    { label: "Received", color: "#10b981" },
-    { label: "Expenses", color: "#f97316" },
-  ];
+  readonly financialLegend = [{ label: "Received", color: "#12b76a" }, { label: "Spent", color: "#f97316" }];
   readonly hasFinancialTrend = computed(() => this.financialSeries().some((series) => series.values.some((value) => value > 0)));
 
   readonly expenseDonut = computed<DonutSegment[]>(() => {
-    const totals = { materials: 0, labour: 0, subcontractors: 0, expenses: 0 };
-    for (const row of this.scopedExpenses() as any[]) {
-      const module = String(row.module || row.category || row.type || "").toLowerCase();
-      const amount = Math.abs(Number(row.amount || 0));
-      if (!amount) continue;
-      if (module.includes("material")) totals.materials += amount;
-      else if (module.includes("labour") || module.includes("labor")) totals.labour += amount;
-      else if (module.includes("sub")) totals.subcontractors += amount;
-      else totals.expenses += amount;
+    const categories = [
+      { label: "Expense", color: "#175cd3" },
+      { label: "Supervisor Expense", color: "#e5484d" },
+      { label: "Material Expense", color: "#f59e0b" },
+      { label: "Subcontractor Payment", color: "#6938c6" },
+    ];
+    const values = new Map(categories.map((category) => [category.label, 0]));
+    for (const row of this.scopedExpenses()) {
+      const label = this.expenseCategory(row);
+      values.set(label, (values.get(label) || 0) + Math.abs(Number(row.amount || 0)));
     }
-    const segments: DonutSegment[] = [
-      { label: "Materials", value: totals.materials, color: "#2563eb" },
-      { label: "Labour", value: totals.labour, color: "#16a34a" },
-      { label: "Subcontractors", value: totals.subcontractors, color: "#f59e0b" },
-      { label: "Other expenses", value: totals.expenses, color: "#a855f7" },
-    ].filter((seg) => seg.value > 0);
-    return segments;
+    return categories
+      .map((category) => ({ ...category, value: values.get(category.label) || 0 }))
+      .filter((category) => category.value > 0)
+      .sort((a, b) => b.value - a.value);
   });
-
-  readonly periodTotals = computed(() => {
-    const received = this.financials().totalReceived;
-    const spent = this.financials().totalSpent;
-    return { received, spent, net: received - spent };
+  readonly expenditureRows = computed(() => {
+    const total = this.expenseDonut().reduce((sum, row) => sum + row.value, 0);
+    return this.expenseDonut().map((row) => ({ ...row, percent: total ? Math.round(row.value / total * 1000) / 10 : 0 }));
   });
+  readonly topExpense = computed(() => this.expenditureRows()[0] || null);
 
-  // ────────── PERIOD-OVER-PERIOD DELTAS ──────────
-  private readonly previousPeriodRange = computed(() => {
-    const current = this.periodRange();
-    const span = current.to.getTime() - current.from.getTime();
-    const prevTo = new Date(current.from.getTime() - 1);
-    const prevFrom = new Date(prevTo.getTime() - span);
-    return { from: prevFrom, to: prevTo };
-  });
+  readonly pendingExpenseApprovals = computed(() => this.approvalRows().filter((row) => {
+    const module = String(row.module || "").replace(/[_\s-]/g, "").toLowerCase();
+    return module === "expenses" || module === "expense" || module === "generalexpenses";
+  }));
+  readonly pendingExpenseRows = computed(() => this.pendingExpenseApprovals().slice(0, 3));
+  readonly pendingApprovalCount = computed(() => this.pendingExpenseApprovals().length);
+  readonly pendingApprovalTotal = computed(() => this.pendingExpenseApprovals().reduce((sum, row) => sum + Math.abs(Number(row.amount || 0)), 0));
 
-  private readonly previousReceived = computed(() => {
-    const range = this.previousPeriodRange();
-    return this.payments()
-      .filter((row) => this.matchesProject(row) && this.inRange(row, range))
-      .reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  });
+  readonly formatCurrency = (value: number) => formatMoney(value);
+  readonly formatChartAxis = (value: number): string => {
+    const absoluteValue = Math.abs(value);
+    if (absoluteValue >= 10_000_000) return `₹${(value / 10_000_000).toFixed(1)}Cr`;
+    if (absoluteValue >= 100_000) return `₹${(value / 100_000).toFixed(1)}L`;
+    if (absoluteValue >= 1_000) return `₹${Math.round(value / 1_000)}K`;
+    return `₹${Math.round(value)}`;
+  };
 
-  private readonly previousSpent = computed(() => {
-    const range = this.previousPeriodRange();
-    return this.expenses()
-      .filter((row) => this.matchesProject(row) && this.inRange(row, range))
-      .reduce((sum, row) => sum + Math.abs(Number(row.amount || 0)), 0);
-  });
-
-  readonly kpiReceivedDelta = computed(() => this.delta(this.financials().totalReceived, this.previousReceived()));
-  readonly kpiSpentDelta = computed(() => this.delta(this.totalExpenses(), this.previousSpent()));
-  readonly kpiNetDelta = computed(() =>
-    this.delta(this.netCashPosition(), this.previousReceived() - this.previousSpent()),
-  );
-
-  readonly topPerformers = computed(() => {
-    return this.projectHealth()
-      .map((project) => {
-        const score = project.value > 0 ? Math.round((project.received / project.value) * 100) : 0;
-        const tone = score >= 75 ? "success" : score >= 40 ? "warning" : "danger";
-        return { id: project.id, name: project.name, client: project.client, score, tone };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6);
-  });
-
-  readonly heroSubline = computed(() => {
-    const projects = this.activeProjectCount();
-    const pending = this.financials().totalPending;
-    if (!projects && !pending) {
-      return "Set up a project to start tracking revenue and spend.";
-    }
-    return `${projects} active project${projects === 1 ? "" : "s"} · ${this.collectionRate()}% of ${this.money(
-      this.financials().totalProjectValue,
-    )} collected so far.`;
-  });
-
-  readonly netSubtitle = computed(() => {
-    const position = this.netCashPosition();
-    return position >= 0
-      ? "Positive operating cash flow this period"
-      : "Spending is outpacing collections this period";
-  });
-
-  readonly hasActiveFilters = computed(
-    () => !!this.selectedProjectId() || !!this.selectedSiteId() || this.periodKey() !== "month",
-  );
-
-  ngOnInit(): void {
-    void this.refreshAll();
-  }
-
+  ngOnInit(): void { void this.refreshAll(); }
   async refreshAll(): Promise<void> {
     if (this.refreshing()) return;
     this.refreshing.set(true);
-    this.loadingKpis.set(true);
     try {
-      const [kpisResult, approvalsResult] = await Promise.allSettled([
+      const [kpis, approvals, projects, payments, expenses, generalExpenses, materials, subcontractorPayments] = await Promise.allSettled([
         firstValueFrom(this.api.getKPIs()),
-        this.approvals.fetchApprovals({ status: "Pending", limit: 25 }),
+        this.approvals.fetchApprovals({ status: "Pending", limit: 100 }),
+        firstValueFrom(this.api.listProjects({ page: 1, limit: 200 })),
+        this.loadAllPayments(),
+        this.loadAllLegacyExpenses(),
+        this.loadAllGeneralExpenses(),
+        this.loadAllMaterials(),
+        this.loadAllSubcontractorPayments(),
       ]);
-      if (kpisResult.status === "fulfilled") this.kpis.set((kpisResult.value as any)?.kpis || null);
-      if (approvalsResult.status === "fulfilled") this.approvalRows.set((approvalsResult.value || []) as any[]);
-      this.lastUpdatedAt.set(new Date());
-    } finally {
-      this.loadingKpis.set(false);
-      this.refreshing.set(false);
+      if (kpis.status === "fulfilled") this.kpis.set((kpis.value as any)?.kpis || null);
+      if (approvals.status === "fulfilled") this.approvalRows.set((approvals.value || []) as any[]);
+      if (projects.status === "fulfilled") this.loadedProjects.set(((projects.value as any)?.items || []).map(mapProject));
+      if (payments.status === "fulfilled") this.loadedPayments.set(payments.value);
+      if (expenses.status === "fulfilled") this.loadedExpenses.set(expenses.value);
+      if (generalExpenses.status === "fulfilled") this.loadedGeneralExpenses.set(generalExpenses.value);
+      if (materials.status === "fulfilled") this.loadedMaterials.set(materials.value);
+      if (subcontractorPayments.status === "fulfilled") this.loadedSubcontractorPayments.set(subcontractorPayments.value);
+
+      const migratedCount = await this.migrateLegacyPayments(
+        payments.status === "fulfilled" ? payments.value : [],
+      );
+      if (migratedCount > 0) {
+        const [nextPayments, nextProjects, nextKpis] = await Promise.all([
+          this.loadAllPayments(),
+          firstValueFrom(this.api.listProjects({ page: 1, limit: 200 })),
+          firstValueFrom(this.api.getKPIs()),
+        ]);
+        this.loadedPayments.set(nextPayments);
+        this.loadedProjects.set(((nextProjects as any)?.items || []).map(mapProject));
+        this.kpis.set((nextKpis as any)?.kpis || null);
+      }
+    } finally { this.refreshing.set(false); }
+  }
+
+  toggleDateMenu(): void {
+    const shouldOpen = !this.dateMenuOpen();
+    this.openPeriodMenu.set(null);
+    if (!shouldOpen) {
+      this.dateMenuOpen.set(false);
+      return;
     }
+    this.draftSingleDate.set(this.selectedDate());
+    const range = this.currentRange();
+    this.draftRangeFrom.set(this.dateInputValue(range.from));
+    this.draftRangeTo.set(this.dateInputValue(range.to));
+    this.datePickerMode.set(this.periodKey() === "custom" ? "range" : "single");
+    this.dateMenuOpen.set(true);
   }
-
-  onProjectChange(value: string): void {
-    this.selectedProjectId.set(value || "");
-    this.selectedSiteId.set("");
+  setDatePickerMode(mode: "single" | "range"): void { this.datePickerMode.set(mode); }
+  canApplyDateFilter(): boolean {
+    if (this.datePickerMode() === "single") return Boolean(this.draftSingleDate());
+    return Boolean(this.draftRangeFrom() && this.draftRangeTo() && !this.dateRangeInvalid());
   }
-  onSiteChange(value: string): void {
-    this.selectedSiteId.set(value || "");
-  }
-  onPeriodChange(value: string): void {
-    this.periodKey.set((value || "month") as PeriodKey);
-    if (value !== "custom") {
-      this.customFrom.set("");
-      this.customTo.set("");
+  applyDateFilter(): void {
+    if (!this.canApplyDateFilter()) return;
+    if (this.datePickerMode() === "single") {
+      this.selectedDate.set(this.draftSingleDate());
+      this.periodKey.set("today");
+    } else {
+      this.customDateFrom.set(this.draftRangeFrom());
+      this.customDateTo.set(this.draftRangeTo());
+      this.selectedDate.set(this.draftRangeTo());
+      this.periodKey.set("custom");
     }
+    this.dateMenuOpen.set(false);
   }
-  onCustomFromChange(value: string): void {
-    this.customFrom.set(value || "");
+  cancelDateFilter(): void { this.dateMenuOpen.set(false); }
+  togglePeriodMenu(menu: "header" | "chart"): void {
+    this.dateMenuOpen.set(false);
+    this.openPeriodMenu.update((current) => current === menu ? null : menu);
   }
-  onCustomToChange(value: string): void {
-    this.customTo.set(value || "");
+  selectPeriod(value: PeriodKey): void {
+    this.periodKey.set(value);
+    this.dateMenuOpen.set(false);
+    this.openPeriodMenu.set(null);
   }
-  clearFilters(): void {
-    this.selectedProjectId.set("");
-    this.selectedSiteId.set("");
-    this.periodKey.set("month");
-    this.customFrom.set("");
-    this.customTo.set("");
+  @HostListener("document:click")
+  closePeriodMenu(): void {
+    this.openPeriodMenu.set(null);
+    this.dateMenuOpen.set(false);
   }
-
-  openClientDialog(): void {
-    this.showClientDialog.set(true);
+  @HostListener("document:keydown.escape")
+  closePeriodMenuOnEscape(): void {
+    this.openPeriodMenu.set(null);
+    this.dateMenuOpen.set(false);
   }
-  closeClientDialog(): void {
-    this.showClientDialog.set(false);
+  openClientDialog(): void { this.showClientDialog.set(true); }
+  closeClientDialog(): void { this.showClientDialog.set(false); }
+  onClientCreated(): void { this.closeClientDialog(); void this.refreshAll(); }
+  openProjectDialog(): void { this.showProjectDialog.set(true); }
+  closeProjectDialog(): void { this.showProjectDialog.set(false); }
+  onProjectCreated(): void { this.closeProjectDialog(); void this.refreshAll(); }
+  openVendorDialog(): void { this.showVendorDialog.set(true); }
+  closeVendorDialog(): void { this.showVendorDialog.set(false); }
+  onVendorCreated(): void { this.closeVendorDialog(); void this.refreshAll(); }
+  projectRoute(project: any): any[] { return project.clientId && project.id ? ["/clients", project.clientId, "projects", project.id] : ["/projects"]; }
+  greeting(): string { const hour = new Date().getHours(); return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"; }
+  money(value: number | null | undefined): string { return formatMoney(Number(value || 0)); }
+  expenseApprovalDescription(row: any): string {
+    return String(row.description || row.notes || row.transactionType || row.category || "Expense request").trim();
   }
-  onClientCreated(): void {
-    this.closeClientDialog();
-    void this.refreshAll();
-  }
-  openProjectDialog(): void {
-    this.showProjectDialog.set(true);
-  }
-  closeProjectDialog(): void {
-    this.showProjectDialog.set(false);
-  }
-  onProjectCreated(): void {
-    this.closeProjectDialog();
-    void this.refreshAll();
-  }
-  openVendorDialog(): void {
-    this.showVendorDialog.set(true);
-  }
-  closeVendorDialog(): void {
-    this.showVendorDialog.set(false);
-  }
-  onVendorCreated(): void {
-    this.closeVendorDialog();
-    void this.refreshAll();
-  }
-
-  projectRoute(project: any): any[] {
-    return project.clientId && project.id
-      ? ["/clients", project.clientId, "projects", project.id]
-      : ["/projects"];
-  }
-
-  statusClass(status: string): string {
-    const value = String(status || "").toLowerCase();
-    if (value.includes("hold")) return "on-hold";
-    if (value.includes("complete")) return "completed";
-    return "active";
-  }
-
-  greeting(): string {
-    const hour = new Date().getHours();
-    return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  }
-  money(value: number | null | undefined): string {
-    return formatMoney(Number(value || 0));
-  }
-  number(value: number | null | undefined): string {
-    return formatNumber(Number(value || 0));
-  }
-  formatNumberValue = (value: number): string => formatMoney(value);
-  formatDate(value: string | Date | null | undefined): string {
-    if (!value) return "—";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
-      ? "—"
-      : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  }
-  relativeTime(value: string | Date | null | undefined): string {
-    if (!value) return "";
-    const difference = Date.now() - new Date(value).getTime();
-    if (!Number.isFinite(difference) || difference < 60_000) return "just now";
-    if (difference < 3_600_000) return `${Math.floor(difference / 60_000)}m ago`;
-    if (difference < 86_400_000) return `${Math.floor(difference / 3_600_000)}h ago`;
-    return `${Math.floor(difference / 86_400_000)}d ago`;
-  }
-
-  // ────────── HELPERS ──────────
-  private matchesScope(row: any, includePeriod: boolean): boolean {
-    if (!this.matchesProject(row)) return false;
-    if (!this.matchesSite(row)) return false;
-    if (!includePeriod) return true;
-    const value = row.date || row.paymentDate || row.expenseDate || row.createdAt;
-    return this.isInPeriod(value);
-  }
-
-  private matchesProject(row: any): boolean {
-    const projectId = this.selectedProjectId();
-    if (!projectId) return true;
-    return String(row.projectId || row.project?._id || row.project || "") === projectId;
-  }
-
-  private matchesSite(row: any): boolean {
-    const siteId = this.selectedSiteId();
-    if (!siteId) return true;
-    const selectedSiteName = this.availableSites().find((site) => site.id === siteId)?.name?.toLowerCase();
-    const rowSiteId = String(row.siteId || row.site?._id || "");
-    const rowSiteName = String(row.siteName || row.site?.name || row.site || "").toLowerCase();
-    return rowSiteId === siteId || (!!selectedSiteName && rowSiteName === selectedSiteName);
-  }
-
-  private inRange(row: any, range: { from: Date; to: Date }): boolean {
-    const value = row.date || row.paymentDate || row.expenseDate || row.createdAt;
-    if (!value) return false;
-    const timestamp = new Date(value).getTime();
-    return Number.isFinite(timestamp) && timestamp >= range.from.getTime() && timestamp <= range.to.getTime();
-  }
-
-  private delta(current: number, previous: number): number {
-    if (!previous) return current > 0 ? 100 : 0;
-    return Math.round(((current - previous) / previous) * 100);
-  }
-
-  private isInPeriod(value: string | Date | null | undefined): boolean {
-    if (!value) return false;
-    const timestamp = new Date(value).getTime();
-    if (!Number.isFinite(timestamp)) return false;
-    const range = this.periodRange();
-    return timestamp >= range.from.getTime() && timestamp <= range.to.getTime();
-  }
-
-  private periodRange(): { from: Date; to: Date } {
-    const to = this.customTo() ? new Date(`${this.customTo()}T23:59:59`) : new Date();
-    let from = new Date(to);
-    if (this.periodKey() === "custom" && this.customFrom())
-      return { from: new Date(`${this.customFrom()}T00:00:00`), to };
-    switch (this.periodKey()) {
-      case "today":
-        from.setHours(0, 0, 0, 0);
-        break;
-      case "week":
-        from.setDate(from.getDate() - 6);
-        from.setHours(0, 0, 0, 0);
-        break;
-      case "3m":
-        from.setMonth(from.getMonth() - 2, 1);
-        from.setHours(0, 0, 0, 0);
-        break;
-      case "6m":
-        from.setMonth(from.getMonth() - 5, 1);
-        from.setHours(0, 0, 0, 0);
-        break;
-      case "year":
-        from = new Date(from.getFullYear(), 0, 1);
-        break;
-      default:
-        from = new Date(from.getFullYear(), from.getMonth(), 1);
+  expenseApprovalContext(row: any): string {
+    const parts: string[] = [];
+    const project = String(row.project || "").trim();
+    const site = String(row.site || "").trim();
+    const rawDate = String(row.expenseDate || row.date || "").trim();
+    parts.push(project || "General expense");
+    if (site) parts.push(site);
+    if (rawDate) {
+      const date = new Date(rawDate);
+      parts.push(Number.isNaN(date.getTime()) ? rawDate : date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }));
     }
+    return parts.join(" • ");
+  }
+
+  private async loadAllPayments(): Promise<any[]> {
+    return this.loadCursorPages((cursor, page) => firstValueFrom(this.api.listPayments({ cursor, page, limit: 200 })));
+  }
+
+  private async migrateLegacyPayments(existingPayments: any[]): Promise<number> {
+    const legacyRows = [...this.legacyPayments()];
+    if (!legacyRows.length) return 0;
+
+    const supportedModes = new Set([
+      "Cash", "UPI", "Bank Transfer", "NEFT", "RTGS", "IMPS", "Cheque",
+      "Credit Card", "Debit Card", "Net Banking", "Demand Draft", "Wallet", "Other",
+    ]);
+    const serverRows = [...existingPayments];
+    let migratedCount = 0;
+
+    for (const row of legacyRows) {
+      const rowId = String(row.__rowId || row.id || "").trim();
+      const migrationMarker = `Legacy workspace payment: ${rowId}`;
+      if (serverRows.some((payment) => String(payment.notes || "") === migrationMarker)) {
+        this.data.deleteSharedRow(rowId);
+        continue;
+      }
+
+      const rowProjectId = String(row.projectId || row.__projectId || "").trim();
+      const rowProjectName = String(row.project || row.projectName || "").trim().toLowerCase();
+      const project = this.projects().find((candidate) => {
+        const ids = [candidate.id, candidate._id, candidate.projectId].map((value) => String(value || ""));
+        return ids.includes(rowProjectId) || (rowProjectName && String(candidate.name || "").toLowerCase() === rowProjectName);
+      });
+      const projectObjectId = String(project?.id || project?._id || "");
+      const clientObjectId = String(project?.clientId || "");
+      const amount = this.amountOf(row);
+      if (!/^[a-f0-9]{24}$/i.test(projectObjectId) || !/^[a-f0-9]{24}$/i.test(clientObjectId) || amount <= 0) {
+        continue;
+      }
+
+      const rawDate = String(row.date || row.paymentDate || "");
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+        ? rawDate
+        : new Date().toISOString().slice(0, 10);
+      const rawMode = String(row.mode || "Other").trim();
+      const mode = supportedModes.has(rawMode) ? rawMode : "Other";
+
+      try {
+        const result = await firstValueFrom(this.api.createPayment({
+          projectId: projectObjectId,
+          clientId: clientObjectId,
+          date,
+          amount,
+          mode,
+          receiptNumber: String(row.receiptNumber || row.receipt || "").trim() || undefined,
+          transactionReference: String(row.transactionReference || row.reference || "").trim() || undefined,
+          collectedBy: String(row.collectedBy || this.userDisplayName()).trim() || "Admin",
+          notes: migrationMarker,
+        }));
+        serverRows.push(result.payment);
+        this.data.deleteSharedRow(rowId);
+        migratedCount += 1;
+      } catch (error) {
+        console.warn("[Dashboard] Could not migrate legacy payment row", rowId, error);
+      }
+    }
+
+    return migratedCount;
+  }
+
+  private async loadAllLegacyExpenses(): Promise<any[]> {
+    return this.loadCursorPages((cursor, page) => firstValueFrom(this.api.listExpenses({ cursor, page, limit: 200 })));
+  }
+
+  private async loadAllGeneralExpenses(): Promise<any[]> {
+    const response = await firstValueFrom(this.api.listAllGeneralExpenses());
+    return this.dedupeRows((response as any)?.items || []);
+  }
+
+  private async loadAllMaterials(): Promise<any[]> {
+    return this.loadCursorPages((cursor, page) => firstValueFrom(this.api.listMaterials({ cursor, page, limit: 200 })));
+  }
+
+  private async loadAllSubcontractorPayments(): Promise<any[]> {
+    return this.loadCursorPages((cursor, page) => firstValueFrom(this.api.listSubcontractorPayments({ cursor, page, limit: 200 })));
+  }
+
+  private async loadCursorPages(fetchPage: (cursor: string | undefined, page: number) => Promise<any>): Promise<any[]> {
+    const rows: any[] = [];
+    const seenCursors = new Set<string>();
+    let cursor: string | undefined;
+    let page = 1;
+    while (true) {
+      const response = await fetchPage(cursor, page);
+      rows.push(...((response as any)?.items || []));
+      const nextCursor = String((response as any)?.nextCursor || "");
+      if (!nextCursor || seenCursors.has(nextCursor)) break;
+      seenCursors.add(nextCursor);
+      cursor = nextCursor;
+      page += 1;
+    }
+    return this.dedupeRows(rows);
+  }
+
+  private dedupeRows(rows: any[]): any[] {
+    const unique = new Map<string, any>();
+    rows.forEach((row, index) => {
+      const id = String(row?.id || row?._id || row?.expenseId || row?.paymentId || "");
+      const fallback = `${row?.dashboardSource || row?.type || "row"}|${row?.date || row?.createdAt || ""}|${row?.amount || 0}|${row?.description || ""}|${index}`;
+      unique.set(id || fallback, row);
+    });
+    return [...unique.values()];
+  }
+
+  private isPostedPayment(row: any): boolean {
+    const status = String(row?.status || "").toLowerCase();
+    return status !== "rejected";
+  }
+
+  private amountOf(row: any): number {
+    const amount = Number(String(row?.amount ?? 0).replace(/[^\d.-]/g, ""));
+    return Number.isFinite(amount) ? Math.max(0, amount) : 0;
+  }
+
+  private isPostedExpense(row: any): boolean {
+    if (String(row?.transactionType || "").toLowerCase() === "cash added") return false;
+    const status = String(row?.status || "").toLowerCase();
+    if (["Expense", "Material Expense", "Subcontractor Payment"].includes(String(row?.dashboardSource || ""))) return status !== "rejected";
+    return !status || status === "approved" || status === "completed" || status === "paid";
+  }
+
+  private legacyExpenseSource(row: any): string {
+    if (row?.isSiteMaterial || row?.materialName || row?.siteMaterialName) return "Material Expense";
+    return String(row?.type || "").toLowerCase() === "site" || row?.supervisorId || row?.supervisor
+      ? "Supervisor Expense"
+      : "Expense";
+  }
+
+  private expenseCategory(row: any): string {
+    const source = String(row?.dashboardSource || "Expense");
+    return ["Expense", "Supervisor Expense", "Material Expense", "Subcontractor Payment"].includes(source)
+      ? source
+      : "Expense";
+  }
+
+  private displayDate(date: Date): string {
+    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  }
+
+  private dateInputValue(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  private dateOf(row: any): number { const raw = row.date || row.paymentDate || row.expenseDate || row.createdAt; const value = raw ? new Date(raw).getTime() : Number.NaN; return Number.isFinite(value) ? value : 0; }
+  private currentRange(): { from: Date; to: Date } {
+    if (this.periodKey() === "custom" && this.customDateFrom() && this.customDateTo()) {
+      return {
+        from: new Date(`${this.customDateFrom()}T00:00:00`),
+        to: new Date(`${this.customDateTo()}T23:59:59.999`),
+      };
+    }
+    const to = new Date(`${this.selectedDate()}T23:59:59`); let from = new Date(to);
+    switch (this.periodKey()) { case "today": from.setHours(0, 0, 0, 0); break; case "week": from.setDate(from.getDate() - 6); from.setHours(0, 0, 0, 0); break; case "3m": from.setMonth(from.getMonth() - 2, 1); break; case "6m": from.setMonth(from.getMonth() - 5, 1); break; case "year": from = new Date(from.getFullYear(), 0, 1); break; default: from = new Date(from.getFullYear(), from.getMonth(), 1); }
     return { from, to };
   }
-
+  private inCurrentPeriod(row: any): boolean { const value = this.dateOf(row); const range = this.currentRange(); return value >= range.from.getTime() && value <= range.to.getTime(); }
   private trendBuckets(): Array<{ label: string; from: Date; to: Date }> {
-    const range = this.periodRange();
-    const spanDays = Math.max(1, Math.ceil((range.to.getTime() - range.from.getTime()) / 86_400_000));
-    const buckets: Array<{ label: string; from: Date; to: Date }> = [];
-    if (spanDays <= 14) {
-      const cursor = new Date(range.from);
-      cursor.setHours(0, 0, 0, 0);
-      while (cursor <= range.to && buckets.length < 14) {
-        const from = new Date(cursor);
-        const to = new Date(cursor);
-        to.setHours(23, 59, 59, 999);
-        buckets.push({
-          label: from.toLocaleDateString("en-IN", { weekday: "short" }),
-          from,
-          to,
-        });
-        cursor.setDate(cursor.getDate() + 1);
-      }
-      return buckets;
-    }
-    if (spanDays <= 45) {
-      const cursor = new Date(range.from);
-      while (cursor <= range.to && buckets.length < 7) {
-        const from = new Date(cursor);
-        const to = new Date(cursor);
-        to.setDate(to.getDate() + 6);
-        to.setHours(23, 59, 59, 999);
-        if (to > range.to) to.setTime(range.to.getTime());
-        buckets.push({
-          label: from.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
-          from,
-          to,
-        });
-        cursor.setDate(cursor.getDate() + 7);
-      }
-      return buckets;
-    }
-    const cursor = new Date(range.from.getFullYear(), range.from.getMonth(), 1);
-    while (cursor <= range.to && buckets.length < 12) {
-      const from = new Date(cursor);
-      const to = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59, 999);
-      buckets.push({
-        label: cursor.toLocaleDateString("en-IN", { month: "short" }),
-        from,
-        to,
-      });
-      cursor.setMonth(cursor.getMonth() + 1);
-    }
-    return buckets;
+    const range = this.currentRange(); const days = Math.max(1, Math.ceil((range.to.getTime() - range.from.getTime()) / 86_400_000)); const buckets: Array<{ label: string; from: Date; to: Date }> = [];
+    if (days <= 14) { const cursor = new Date(range.from); while (cursor <= range.to && buckets.length < 14) { const from = new Date(cursor); const to = new Date(cursor); to.setHours(23, 59, 59, 999); buckets.push({ label: from.toLocaleDateString("en-IN", { day: "numeric", month: "short" }), from, to }); cursor.setDate(cursor.getDate() + 1); } return buckets; }
+    if (days <= 45) { const cursor = new Date(range.from); while (cursor <= range.to && buckets.length < 6) { const from = new Date(cursor); const to = new Date(cursor); to.setDate(to.getDate() + 6); to.setHours(23, 59, 59, 999); buckets.push({ label: from.toLocaleDateString("en-IN", { day: "numeric", month: "short" }), from, to }); cursor.setDate(cursor.getDate() + 7); } return buckets; }
+    const cursor = new Date(range.from.getFullYear(), range.from.getMonth(), 1); while (cursor <= range.to && buckets.length < 12) { const from = new Date(cursor); const to = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59, 999); buckets.push({ label: from.toLocaleDateString("en-IN", { month: "short" }), from, to }); cursor.setMonth(cursor.getMonth() + 1); } return buckets;
   }
-
-  private sumBucket(rows: any[], bucket: { from: Date; to: Date }): number {
-    return rows.reduce((sum, row) => {
-      const value = row.date || row.paymentDate || row.expenseDate || row.createdAt;
-      const timestamp = value ? new Date(value).getTime() : Number.NaN;
-      return Number.isFinite(timestamp) &&
-        timestamp >= bucket.from.getTime() &&
-        timestamp <= bucket.to.getTime()
-        ? sum + Math.abs(Number(row.amount || 0))
-        : sum;
-    }, 0);
-  }
-
-  private dateValue(value: string | Date | null | undefined): number {
-    const timestamp = value ? new Date(value).getTime() : 0;
-    return Number.isFinite(timestamp) ? timestamp : 0;
-  }
+  private sumBucket(rows: any[], bucket: { from: Date; to: Date }): number { return rows.reduce((sum, row) => { const value = this.dateOf(row); return value >= bucket.from.getTime() && value <= bucket.to.getTime() ? sum + this.amountOf(row) : sum; }, 0); }
 }

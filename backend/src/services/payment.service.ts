@@ -103,12 +103,13 @@ export async function updatePayment(id: string, patch: Partial<CreatePaymentInpu
 }
 
 export async function deletePayment(id: string) {
-  const result = await Payment.deleteOne({ _id: id });
-  if (result.deletedCount === 0) throw new AppError(404, "Payment not found");
+  const payment = await Payment.findByIdAndDelete(id).lean();
+  if (!payment) throw new AppError(404, "Payment not found");
+  return payment;
 }
 
 export async function getCollectionSummary(filter: { projectId?: string; from?: string; to?: string; scopeProjectIds?: ProjectScopeIds }) {
-  const match: Record<string, unknown> = { status: "Approved" };
+  const match: Record<string, unknown> = { status: { $ne: "Rejected" } };
   if (filter.projectId) match.projectId = new Types.ObjectId(filter.projectId);
   if (filter.from || filter.to) {
     match.date = {};

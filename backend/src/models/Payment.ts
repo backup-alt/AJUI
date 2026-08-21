@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-export type PaymentMode = "Cash" | "Bank Transfer" | "Cheque" | "UPI" | "NEFT";
+export type PaymentMode = "Cash" | "UPI" | "Bank Transfer" | "NEFT" | "RTGS" | "IMPS" | "Cheque" | "Credit Card" | "Debit Card" | "Net Banking" | "Demand Draft" | "Wallet" | "Other";
 export type PaymentStatus = "Pending" | "Approved" | "Rejected";
 
 export interface IPayment extends Document {
@@ -36,7 +36,7 @@ const paymentSchema = new Schema<IPayment>(
     amount: { type: Number, required: true },
     mode: {
       type: String,
-      enum: ["Cash", "Bank Transfer", "Cheque", "UPI", "NEFT"],
+      enum: ["Cash", "UPI", "Bank Transfer", "NEFT", "RTGS", "IMPS", "Cheque", "Credit Card", "Debit Card", "Net Banking", "Demand Draft", "Wallet", "Other"],
       required: true,
     },
     receiptNumber: { type: String, trim: true },

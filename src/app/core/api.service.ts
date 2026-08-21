@@ -476,15 +476,23 @@ export class ApiService {
   // =================== PAYMENTS ===================
   deletePayment(id: string): Observable<any> {
     return this.http.delete(`${this.baseUrl}/payments/${id}`, { headers: this.authHeaders() }).pipe(
-      tap(() => this.cache.invalidate("/payments")),
+      tap(() => this.invalidatePaymentCaches()),
       catchError(this.handleError)
     );
   }
   patchPayment(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/payments/${id}`, payload, { headers: this.authHeaders() }).pipe(
-      tap(() => this.cache.invalidate("/payments")),
+      tap(() => this.invalidatePaymentCaches()),
       catchError(this.handleError)
     );
+  }
+
+  private invalidatePaymentCaches(): void {
+    this.cache.invalidate("/payments");
+    this.cache.invalidate("/projects");
+    this.cache.invalidate("/clients");
+    this.cache.invalidate("/dashboard/kpis");
+    this.cache.invalidate("/dashboard/batch");
   }
 
   // =================== VENDORS ===================
@@ -1235,7 +1243,7 @@ export class ApiService {
   }
 
   // =================== EXPENSES ===================
-  listExpenses(params?: { type?: string; projectId?: string; siteId?: string; status?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
+  listExpenses(params?: { type?: string; projectId?: string; siteId?: string; status?: string; from?: string; to?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -1266,7 +1274,7 @@ export class ApiService {
   }
 
   // =================== PAYMENTS ===================
-  listPayments(params?: { projectId?: string; clientId?: string; status?: string; mode?: string; search?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listPayments(params?: { projectId?: string; clientId?: string; status?: string; mode?: string; from?: string; to?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();
@@ -1281,7 +1289,7 @@ export class ApiService {
     clientId: string;
     date: string;
     amount: number;
-    mode: "Cash" | "Bank Transfer" | "Cheque" | "UPI" | "NEFT";
+    mode: string;
     receiptNumber?: string;
     transactionReference?: string;
     collectedBy: string;
@@ -1289,7 +1297,10 @@ export class ApiService {
   }): Observable<{ payment: any }> {
     return this.http.post<{ payment: any }>(`${this.baseUrl}/payments`, payload, {
       headers: this.authHeaders(),
-    }).pipe(catchError(this.handleError));
+    }).pipe(
+      tap(() => this.invalidatePaymentCaches()),
+      catchError(this.handleError),
+    );
   }
 
   // =================== ACCOUNT ===================

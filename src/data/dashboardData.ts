@@ -248,7 +248,7 @@ export type PaymentRow = {
   projectId: string;
   date: string;
   amount: number;
-  mode: "Cash" | "Bank Transfer" | "Cheque" | "UPI" | "NEFT";
+  mode: "Cash" | "UPI" | "Bank Transfer" | "NEFT" | "RTGS" | "IMPS" | "Cheque" | "Credit Card" | "Debit Card" | "Net Banking" | "Demand Draft" | "Wallet" | "Other";
   receipt: string;
   reference: string;
   collectedBy: string;

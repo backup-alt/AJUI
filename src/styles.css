@@ -14041,3 +14041,42 @@ ion-menu.enterprise-sidebar .sidebar-project-scroll {
 :root {
   color-scheme: light !important;
 }
+
+/* Production-sized workspace navigation: readable labels and reliable tap targets. */
+.universal-workbench .operations-tabs,
+.project-workbench .operations-tabs {
+  min-height: 56px;
+  padding-inline: 10px;
+}
+
+.universal-workbench .operations-tabs button,
+.project-workbench .operations-tabs button {
+  min-height: 56px;
+  padding: 0 20px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.universal-workbench .operations-tabs button small,
+.project-workbench .operations-tabs button small {
+  min-width: 25px;
+  height: 25px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 25px;
+}
+
+@media (max-width: 760px) {
+  .universal-workbench .operations-tabs,
+  .project-workbench .operations-tabs,
+  .universal-workbench .operations-tabs button,
+  .project-workbench .operations-tabs button {
+    min-height: 52px;
+  }
+
+  .universal-workbench .operations-tabs button,
+  .project-workbench .operations-tabs button {
+    padding-inline: 16px;
+    font-size: 13px;
+  }
+}

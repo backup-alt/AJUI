@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { Project } from "../models/Project.js";
+import { Payment } from "../models/Payment.js";
 import { Client } from "../models/Client.js";
 import { Site } from "../models/Site.js";
 import { Supervisor } from "../models/Supervisor.js";
@@ -11,7 +12,7 @@ import {
   CreateProjectInput,
   UpdateProjectInput,
 } from "../schemas/entities.schema.js";
-import { recomputeClientTotals, computeProjectLedger } from "./financial.service.js";
+import { recomputeClientTotals, recomputeProjectTotals, computeProjectLedger } from "./financial.service.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
 
@@ -281,11 +282,34 @@ export async function listProjects(filter: {
     Object.assign(query, filter.scopeQuery);
   }
 
-  return paginateByCursor(Project, query, {
+  const result = await paginateByCursor(Project, query, {
     page: filter.page,
     limit: filter.limit,
     cursor: filter.cursor,
   });
+  const projectIds = result.items.map((project: any) => project._id as Types.ObjectId);
+  const paymentTotals = projectIds.length
+    ? await Payment.aggregate<{ _id: Types.ObjectId; total: number }>([
+        { $match: { projectId: { $in: projectIds }, status: { $ne: "Rejected" } } },
+        { $group: { _id: "$projectId", total: { $sum: "$amount" } } },
+      ])
+    : [];
+  const totalsByProject = new Map(paymentTotals.map((row) => [row._id.toString(), row.total]));
+  return {
+    ...result,
+    items: result.items.map((project: any) => {
+      const receivedAmount = totalsByProject.get(project._id.toString()) || 0;
+      const totalValue = Number(project.totalValue || 0);
+      return {
+        ...project,
+        receivedAmount,
+        pendingBalance: Math.max(0, totalValue - receivedAmount),
+        completion: totalValue > 0
+          ? Math.min(100, Math.max(0, (receivedAmount / totalValue) * 100))
+          : 0,
+      };
+    }),
+  };
 }
 
 export async function getProjectById(id: string, scopeProjectIds?: ProjectScopeIds) {
@@ -439,14 +463,18 @@ export async function deleteProject(id: string, scopeProjectIds?: ProjectScopeId
 
 export async function getProjectLedger(id: string, scopeProjectIds?: ProjectScopeIds) {
   const project = await getProjectById(id, scopeProjectIds);
+  await recomputeProjectTotals(project._id);
   await recomputeClientTotals(project.clientId);
-  return computeProjectLedger(project);
+  const refreshedProject = await getProjectById(id, scopeProjectIds);
+  return computeProjectLedger(refreshedProject);
 }
 
 export async function getProjectsSummary(scopeProjectIds?: ProjectScopeIds) {
   const projectQuery: Record<string, unknown> = {};
+  const paymentQuery: Record<string, unknown> = {};
   applyProjectScope(projectQuery, "_id", scopeProjectIds);
-  const [active, onHold, completed, financials] = await Promise.all([
+  applyProjectScope(paymentQuery, "projectId", scopeProjectIds);
+  const [active, onHold, completed, financials, paymentTotals] = await Promise.all([
     Project.countDocuments({ ...projectQuery, status: "Active" }),
     Project.countDocuments({ ...projectQuery, status: "On Hold" }),
     Project.countDocuments({ ...projectQuery, status: "Completed" }),
@@ -464,17 +492,28 @@ export async function getProjectsSummary(scopeProjectIds?: ProjectScopeIds) {
         },
       },
     ]),
+    Payment.aggregate([
+      { $match: { ...paymentQuery, status: { $ne: "Rejected" } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
   ]);
+
+  const financialSummary = financials[0] || {
+    totalValue: 0,
+    receivedAmount: 0,
+    pendingBalance: 0,
+    materialSpend: 0,
+    labourPayable: 0,
+    subcontractorSpend: 0,
+  };
+  const receivedAmount = paymentTotals[0]?.total || 0;
 
   return {
     counts: { active, onHold, completed, total: active + onHold + completed },
-    financials: financials[0] || {
-      totalValue: 0,
-      receivedAmount: 0,
-      pendingBalance: 0,
-      materialSpend: 0,
-      labourPayable: 0,
-      subcontractorSpend: 0,
+    financials: {
+      ...financialSummary,
+      receivedAmount,
+      pendingBalance: Math.max(0, financialSummary.totalValue - receivedAmount),
     },
   };
 }

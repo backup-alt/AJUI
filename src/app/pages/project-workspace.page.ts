@@ -9,7 +9,7 @@ import { ErpDataService, type SharedModuleKey, type SharedTableField, type Share
 import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
 import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
-import { mapMaterial, mapLabour, mapExpense, mapGeneralExpense, mapPayment, mapVendor, mapSubcontractor, mapInventory, mapWorker } from "../core/mappers";
+import { mapProject, mapMaterial, mapLabour, mapExpense, mapGeneralExpense, mapPayment, mapVendor, mapSubcontractor, mapInventory, mapWorker } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
@@ -3947,6 +3947,75 @@ export class ProjectWorkspacePage {
         console.error("[ProjectWorkspace] Failed to create material", err);
         await this.presentToast(
           err?.error?.message || err?.message || "Could not save the material request.",
+          "danger",
+        );
+        return;
+      }
+    }
+
+    if (section === "payments") {
+      const projectId = this.projectId();
+      const clientObjectId = String(currentProject?.clientId || this.client()?._id || "").trim();
+      const date = String(draft["paymentDate"] || draft["date"] || new Date().toISOString().slice(0, 10));
+      const amount = Math.abs(this.moneyNumber(draft["amount"]));
+      const mode = String(draft["mode"] || "").trim();
+      const collectedBy = String(draft["collectedBy"] || "").trim();
+
+      if (!projectId || !clientObjectId) {
+        await this.presentToast("Select a project before recording a payment.", "warning");
+        return;
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        await this.presentToast("Payment amount must be greater than zero.", "warning");
+        return;
+      }
+      if (!mode) {
+        await this.presentToast("Select a payment mode.", "warning");
+        return;
+      }
+      if (!collectedBy) {
+        await this.presentToast("Collected By is required.", "warning");
+        return;
+      }
+
+      try {
+        const result = await firstValueFrom(this.api.createPayment({
+          projectId,
+          clientId: clientObjectId,
+          date,
+          amount,
+          mode,
+          transactionReference: String(draft["transactionReference"] || "").trim() || undefined,
+          receiptNumber: String(draft["receiptNumber"] || "").trim() || undefined,
+          collectedBy,
+        }));
+        const savedPayment = mapPayment(result.payment);
+        this.data.payments.update((rows) => [
+          savedPayment,
+          ...rows.filter((row) => String(row._id || "") !== String(savedPayment._id || "")),
+        ]);
+
+        // Pull the recomputed project ledger immediately so the workspace
+        // totals and any subsequent dashboard navigation use server truth.
+        try {
+          const projectResult = await firstValueFrom(this.api.getProject(projectId));
+          const refreshedProject = mapProject(projectResult.project);
+          this.data.projects.update((rows) => rows.map((row) =>
+            String(row.id || (row as any)._id || "") === projectId ? refreshedProject : row));
+        } catch {
+          // The payment is already persisted; the normal workspace refresh
+          // will retry the project read if this secondary request fails.
+        }
+
+        this.recordDialogOpen.set(false);
+        this.clearRowSelection();
+        this.refreshSectionFromBackend("payments");
+        await this.presentToast("Payment recorded successfully.");
+        return;
+      } catch (err: any) {
+        console.error("[ProjectWorkspace] Failed to create payment", err);
+        await this.presentToast(
+          err?.error?.message || err?.message || "Could not save the payment.",
           "danger",
         );
         return;

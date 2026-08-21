@@ -28,10 +28,11 @@ export async function recomputeProjectTotals(projectObjectId: Types.ObjectId): P
   const project = await Project.findById(projectObjectId);
   if (!project) throw new AppError(404, "Project not found");
 
-  // Only approved records contribute to project totals
+  // A recorded payment affects collections immediately. Pending payments are
+  // still real receipts; only explicitly rejected records are excluded.
   const [paymentAgg, materialAgg, labourAgg, expenseAgg, subcontractorAgg] = await Promise.all([
     Payment.aggregate([
-      { $match: { projectId: projectObjectId, status: "Approved" } },
+      { $match: { projectId: projectObjectId, status: { $ne: "Rejected" } } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
     Material.aggregate([
@@ -82,6 +83,9 @@ export async function recomputeProjectTotals(projectObjectId: Types.ObjectId): P
   project.subcontractorSpend = subcontractorAgg[0]?.total ?? 0;
 
   project.pendingBalance = Math.max(0, project.totalValue - project.receivedAmount);
+  project.completion = project.totalValue > 0
+    ? Math.min(100, Math.max(0, (project.receivedAmount / project.totalValue) * 100))
+    : 0;
   project.lastActivityAt = new Date();
 
   await project.save();
