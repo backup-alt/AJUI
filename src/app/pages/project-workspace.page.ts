@@ -31,7 +31,7 @@ type MaterialDetails = {
   consumed: number;
   notes: string;
   purchaseHistory: Array<{ quantity: number; date: string; vendor: string; poNumber: string; notes: string }>;
-  consumptionHistory: Array<{ quantity: number; date: string; updatedBy: string; notes: string }>;
+  consumptionHistory: Array<{ quantity: number; date: string; notes: string }>;
 };
 type AssignmentOption = { id: string; name: string };
 type InventoryMaterialCard = {
@@ -1614,7 +1614,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div class="material-history-list" *ngIf="details.consumptionHistory.length; else noConsumption">
                   <div class="material-history-item" *ngFor="let entry of details.consumptionHistory">
                     <strong>{{ formatNumber(entry.quantity) }} {{ details.unit }}</strong>
-                    <span>{{ entry.date | date:'mediumDate' }}<ng-container *ngIf="entry.updatedBy"> · {{ entry.updatedBy }}</ng-container></span>
+                    <span>{{ entry.date | date:'mediumDate' }}</span>
                     <span *ngIf="entry.notes">{{ entry.notes }}</span>
                   </div>
                 </div>
@@ -2224,7 +2224,6 @@ export class ProjectWorkspacePage {
         (Array.isArray(item.consumptionHistory) ? item.consumptionHistory : []).map((entry: any) => ({
           quantity: Number(entry.quantity) || 0,
           date: String(entry.date || ""),
-          updatedBy: String(entry.updatedBy || ""),
           notes: String(entry.notes || ""),
         })),
       ).sort((a: any, b: any) => Date.parse(b.date) - Date.parse(a.date));
@@ -2233,7 +2232,6 @@ export class ProjectWorkspacePage {
           .map((item: any) => ({
             quantity: Number(item.consumedQuantity) || 0,
             date: String(item.updatedAt || item.createdAt || ""),
-            updatedBy: "",
             notes: Number(item.consumedQuantity) > 0 ? "Recorded inventory consumption total" : "",
           }))
           .filter((entry: any) => entry.quantity > 0)

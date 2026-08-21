@@ -48,15 +48,6 @@ interface SubcontractorRow {
                 <p>Click a name to open its full payment history across every project. Payments recorded here are automatically reflected in the project workspace.</p>
               </div>
               <div class="subcontractors-actions">
-                <label class="project-filter">
-                  <span>Project</span>
-                  <select [value]="selectedProjectId()" (change)="selectedProjectId.set($any($event.target).value)">
-                    <option value="">All projects</option>
-                    @for (project of projectOptions(); track project.id) {
-                      <option [value]="project.id">{{ project.name }}</option>
-                    }
-                  </select>
-                </label>
                 <button type="button" class="btn-primary" (click)="openCreate()">
                   <ion-icon name="add-outline"></ion-icon>
                   New Sub-contractor
@@ -80,7 +71,49 @@ interface SubcontractorRow {
             </section>
 
             <section class="table-wrap">
-              <table>
+              <div class="table-toolbar">
+                <div class="table-toolbar-copy">
+                  <strong>Sub-contractor directory</strong>
+                  <span>{{ filteredRows().length }} {{ filteredRows().length === 1 ? 'record' : 'records' }} shown</span>
+                </div>
+                <div class="project-filter-wrap">
+                  @if (projectFilterOpen()) {
+                    <button type="button" class="filter-dismiss" aria-label="Close project filter" (click)="projectFilterOpen.set(false)"></button>
+                  }
+                  <button
+                    type="button"
+                    class="project-filter-trigger"
+                    [class.open]="projectFilterOpen()"
+                    [attr.aria-expanded]="projectFilterOpen()"
+                    aria-haspopup="listbox"
+                    (click)="projectFilterOpen.set(!projectFilterOpen())"
+                  >
+                    <span class="filter-icon">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
+                    </span>
+                    <span class="filter-copy"><small>Filter by project</small><strong>{{ selectedProjectName() }}</strong></span>
+                    <svg class="filter-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+                  </button>
+                  @if (projectFilterOpen()) {
+                    <div class="project-filter-menu" role="listbox" aria-label="Filter sub-contractors by project">
+                      <button type="button" role="option" [attr.aria-selected]="!selectedProjectId()" [class.selected]="!selectedProjectId()" (click)="selectProject('')">
+                        <span class="project-option-icon">A</span>
+                        <span><strong>All projects</strong><small>Show the complete directory</small></span>
+                        @if (!selectedProjectId()) { <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg> }
+                      </button>
+                      @for (project of projectOptions(); track project.id) {
+                        <button type="button" role="option" [attr.aria-selected]="selectedProjectId() === project.id" [class.selected]="selectedProjectId() === project.id" (click)="selectProject(project.id)">
+                          <span class="project-option-icon">{{ project.name.slice(0, 1).toUpperCase() }}</span>
+                          <span><strong>{{ project.name }}</strong><small>Show assigned sub-contractors</small></span>
+                          @if (selectedProjectId() === project.id) { <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg> }
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table>
                 <thead>
                   <tr>
                     <th>Subcontractor Name</th>
@@ -125,7 +158,8 @@ interface SubcontractorRow {
                     </tr>
                   }
                 </tbody>
-              </table>
+                </table>
+              </div>
             </section>
           </main>
         </ion-content>
@@ -228,9 +262,6 @@ interface SubcontractorRow {
     .subcontractors-head h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; color: #0f172a; }
     .subcontractors-head p { margin: 0; color: #475569; font-size: 14px; max-width: 640px; }
     .subcontractors-actions { display: flex; align-items: flex-end; gap: 10px; }
-    .project-filter { display: flex; flex-direction: column; gap: 4px; }
-    .project-filter span { color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
-    .project-filter select { min-width: 210px; padding: 9px 34px 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #1e293b; font-size: 13px; }
     .btn-primary {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 9px 16px; background: #002263; color: #fff;
@@ -249,7 +280,34 @@ interface SubcontractorRow {
     }
     .stat-card span { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
     .stat-card strong { font-size: 20px; color: #0f172a; }
-    .table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow-x: auto; }
+    .table-wrap { background: #fff; border: 1px solid #dbe3ef; border-radius: 14px; overflow: visible; box-shadow: 0 4px 16px rgba(15, 23, 42, .035); }
+    .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; padding: 12px 14px 12px 16px; border-bottom: 1px solid #e2e8f0; border-radius: 14px 14px 0 0; background: linear-gradient(180deg, #fff 0%, #fbfdff 100%); }
+    .table-toolbar-copy { display: grid; gap: 3px; }
+    .table-toolbar-copy strong { color: #0f172a; font-size: 14px; }
+    .table-toolbar-copy span { color: #64748b; font-size: 11px; }
+    .project-filter-wrap { position: relative; z-index: 12; width: min(310px, 100%); }
+    .filter-dismiss { position: fixed; z-index: 1; inset: 0; padding: 0; border: 0; background: transparent; cursor: default; }
+    .project-filter-trigger { position: relative; z-index: 2; display: grid; grid-template-columns: 34px minmax(0, 1fr) 16px; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 11px 6px 8px; border: 1px solid #cbd5e1; border-radius: 11px; background: #fff; color: #1e293b; text-align: left; cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
+    .project-filter-trigger:hover { border-color: #94a3b8; background: #f8fafc; }
+    .project-filter-trigger.open { border-color: #174ea6; box-shadow: 0 0 0 3px rgba(23, 78, 166, .11); }
+    .filter-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: #eef4ff; color: #174ea6; }
+    .filter-icon svg, .filter-chevron, .project-filter-menu svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .filter-copy { display: grid; min-width: 0; gap: 2px; }
+    .filter-copy small { color: #64748b; font-size: 9px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+    .filter-copy strong { overflow: hidden; color: #0f172a; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .filter-chevron { color: #64748b; transition: transform .16s ease; }
+    .project-filter-trigger.open .filter-chevron { transform: rotate(180deg); }
+    .project-filter-menu { position: absolute; z-index: 3; top: calc(100% + 7px); right: 0; width: 100%; max-height: 310px; overflow-y: auto; padding: 6px; border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; box-shadow: 0 18px 45px rgba(15, 23, 42, .17); animation: filter-menu-in .14s ease-out; }
+    @keyframes filter-menu-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    .project-filter-menu button { display: grid; grid-template-columns: 32px minmax(0, 1fr) 16px; align-items: center; gap: 9px; width: 100%; min-height: 48px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: #334155; text-align: left; cursor: pointer; }
+    .project-filter-menu button:hover { background: #f8fafc; }
+    .project-filter-menu button.selected { background: #eef4ff; color: #174ea6; }
+    .project-filter-menu button > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+    .project-filter-menu button strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .project-filter-menu button small { color: #64748b; font-size: 9px; }
+    .project-option-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; background: #f1f5f9; color: #475569; font-size: 10px; font-weight: 800; }
+    .project-filter-menu button.selected .project-option-icon { background: #dbe8ff; color: #174ea6; }
+    .table-scroll { overflow-x: auto; border-radius: 0 0 14px 14px; }
     table { width: 100%; border-collapse: collapse; }
     th { background: #f8fafc; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 12px 14px; text-align: left; border-bottom: 2px solid #e2e8f0; }
     td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-size: 13px; vertical-align: middle; }
@@ -295,6 +353,8 @@ interface SubcontractorRow {
 
     @media (max-width: 720px) {
       .subcontractors-stats { grid-template-columns: 1fr; }
+      .table-toolbar { align-items: stretch; flex-direction: column; }
+      .project-filter-wrap { width: 100%; }
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -309,13 +369,18 @@ export class SubcontractorDashboardPage {
   readonly rows = signal<SubcontractorRow[]>([]);
   readonly loading = signal(false);
   readonly selectedProjectId = signal("");
+  readonly projectFilterOpen = signal(false);
 
   readonly projectOptions = computed(() => {
     const options = new Map<string, string>();
+    for (const project of this.erp.projects()) {
+      const id = String((project as any).id || (project as any)._id || "");
+      if (id) options.set(id, project.name || "Unnamed project");
+    }
     for (const row of this.rows()) {
       if (!row.projectId) continue;
       const hydratedName = this.erp.projects().find((project) => String(project.id) === row.projectId)?.name;
-      options.set(row.projectId, row.projectName || hydratedName || "Unnamed project");
+      if (!options.has(row.projectId)) options.set(row.projectId, row.projectName || hydratedName || "Unnamed project");
     }
     return [...options.entries()]
       .map(([id, name]) => ({ id, name }))
@@ -327,6 +392,13 @@ export class SubcontractorDashboardPage {
     return projectId ? this.rows().filter((row) => row.projectId === projectId) : this.rows();
   });
 
+  readonly selectedProjectName = computed(() => {
+    const projectId = this.selectedProjectId();
+    return projectId
+      ? this.projectOptions().find((project) => project.id === projectId)?.name || "Selected project"
+      : "All projects";
+  });
+
   readonly drawerOpen = signal(false);
   readonly editing = signal<SubcontractorRow | null>(null);
   readonly saving = signal(false);
@@ -336,6 +408,11 @@ export class SubcontractorDashboardPage {
 
   readonly activeCount = computed(() => this.filteredRows().filter((r) => r.status === "active").length);
   readonly totalPaid = computed(() => this.filteredRows().reduce((sum, r) => sum + r.totalPaid, 0));
+
+  selectProject(projectId: string) {
+    this.selectedProjectId.set(projectId);
+    this.projectFilterOpen.set(false);
+  }
 
   constructor() {
     this.refresh();
