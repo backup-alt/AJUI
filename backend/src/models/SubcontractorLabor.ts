@@ -42,7 +42,6 @@ const subcontractorLaborSchema = new Schema<ISubcontractorLabor>(
 );
 
 subcontractorLaborSchema.index({ subcontractorId: 1, name: 1 });
-subcontractorLaborSchema.index({ projectId: 1 });
 
 export const SubcontractorLabor = model<ISubcontractorLabor>("SubcontractorLabor", subcontractorLaborSchema);
 
