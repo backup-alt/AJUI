@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { Subject } from 'rxjs';
+import { firstValueFrom, Subject } from 'rxjs';
 import { Preferences } from '@capacitor/preferences';
 import { ApiService } from './api.service';
 import {
@@ -18,6 +18,8 @@ import {
   ApprovalActionRequest,
   Site,
   SitesResponse,
+  Project,
+  ProjectsResponse,
   Vendor,
   Worker,
   CreateWorkerRequest,
@@ -51,8 +53,8 @@ export class SupervisorService {
       this.api.getSelectedProjectName(),
       this.api.getSelectedSiteName(),
     ]);
-    if (siteId && projectId) {
-      this._selection.set({ siteId, projectId, projectName: projectName || '', siteName: siteName || '' });
+    if (projectId) {
+      this._selection.set({ siteId: siteId || '', projectId, projectName: projectName || '', siteName: siteName || '' });
     }
   }
 
@@ -107,6 +109,12 @@ export class SupervisorService {
   // ---------------- Sites ----------------
   getSites() {
     return this.api.get<SitesResponse>('/supervisor/sites');
+  }
+
+  getProjects(detailed = false, force = false) {
+    const path = detailed ? '/supervisor/projects/detailed' : '/supervisor/projects';
+    if (force) this.api.invalidateGetCache(path);
+    return this.api.get<ProjectsResponse>(path);
   }
 
   async getSelectedSiteOpeningBalance(): Promise<number> {
@@ -204,6 +212,13 @@ export class SupervisorService {
     return this.api.patch<{ material: Material }>(
       `/supervisor/materials/${materialId}/stock`,
       updates
+    );
+  }
+
+  setMaterialReceived(materialId: string, received: boolean) {
+    return this.api.patch<{ material: Material }>(
+      `/supervisor/materials/${materialId}/received`,
+      { received }
     );
   }
 
@@ -385,7 +400,24 @@ export class SupervisorService {
     await this.api.setSelectedSiteId(siteId);
     await this.api.setSelectedProjectId(projectId);
     await this.api.setSelectedProjectName(projectName);
-    if (siteName) await this.api.setSelectedSiteName(siteName);
+    await this.api.setSelectedSiteName(siteName || '');
+  }
+
+  async setSelectedProject(project: Pick<Project, 'id' | 'name'>): Promise<void> {
+    let internalSite: Site | undefined;
+    try {
+      const response = await firstValueFrom(this.getSites());
+      internalSite = (response.sites || []).find((site) => site.projectId === project.id);
+    } catch {
+      // Project-only selection remains valid for read APIs even when no location record exists.
+    }
+
+    await this.setSelectedSite(
+      internalSite?.id || '',
+      project.id,
+      project.name,
+      internalSite?.name || ''
+    );
   }
 
   selectedSiteId(): string | null {

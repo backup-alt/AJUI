@@ -627,11 +627,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <dd>
                     <input
                       class="project-metric-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      [value]="currentProject.totalValue"
+                      type="text"
+                      inputmode="numeric"
+                      [value]="formatNumber(currentProject.totalValue)"
                       (change)="updateProjectEstimatedValue($any($event.target).value)"
+                      (focus)="onMetricFocus($event)"
+                      (blur)="onMetricBlur($event)"
                       aria-label="Project estimated value"
                     />
                   </dd>
@@ -642,11 +643,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <dd>
                     <input
                       class="project-metric-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      [value]="projectReceivedAmount(currentProject)"
+                      type="text"
+                      inputmode="numeric"
+                      [value]="formatNumber(projectReceivedAmount(currentProject))"
                       readonly
+                      (focus)="onMetricFocus($event)"
+                      (blur)="onMetricBlur($event)"
                       aria-label="Project received amount from payment ledger"
                     />
                   </dd>
@@ -1644,6 +1646,20 @@ export class ProjectWorkspacePage {
   readonly queryParamMap = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
   readonly formatMoney = formatMoney;
   readonly formatNumber = formatNumber;
+
+  onMetricFocus(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const raw = Number(String(input.value).replace(/[^\d.-]/g, ""));
+    if (Number.isFinite(raw)) {
+      input.value = String(raw);
+    }
+  }
+
+  onMetricBlur(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const raw = Number(String(input.value).replace(/[^\d.-]/g, ""));
+    input.value = formatNumber(Number.isFinite(raw) ? raw : 0);
+  }
   readonly statusClass = statusClass;
   readonly showProjectForm = signal(false);
   readonly editingProject = signal<Project | null>(null);

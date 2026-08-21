@@ -34,17 +34,23 @@ export class AppComponent implements OnInit {
     await this.auth.init();
 
     if (this.auth.isAuthenticated()) {
-      // 2. Fetch supervisor sites, auto-select first site
+      // 2. Fetch assigned projects and restore the active project.
       // Fire-and-forget: don't block the splash screen on network calls.
       // If the backend is sleeping (Render.com), this could take 30+ seconds.
       void this.auth.initAfterLogin();
     }
 
-    // 3. Hydrate selected site from Preferences
+    // 3. Hydrate the selected project from Preferences.
     await this.supervisor.init();
 
     // 4. Load cached notifications from Preferences (no API call)
     await this.notifications.initFromStorage();
+    if (this.auth.isAuthenticated()) {
+      // Register a real FCM device token (and request OS permission on a new
+      // install) so notifications are delivered by Android/iOS, not only by
+      // the in-app notification feed.
+      void this.notifications.initializeDevicePush();
+    }
     // 4b. Defer backend notification fetch — not needed for dashboard display
     setTimeout(() => this.notifications.fetchFromBackend(), 3000);
 
@@ -52,13 +58,6 @@ export class AppComponent implements OnInit {
     // app is foregrounded. This makes in-app approval notifications appear
     // even when the user isn't on the notifications screen.
     this.notifications.startPolling(30_000);
-
-    // NOTE: We deliberately do NOT auto-prompt for push permission at app
-    // start. Showing the system permission dialog steals focus from the
-    // WebView and on devices where Firebase is misconfigured (e.g. no
-    // google-services.json) the subsequent register() call can force-close
-    // the app. Push opt-in is exposed as a toggle in the Profile screen so
-    // users explicitly enable it when they want it.
 
     this.registerDeepLink();
     this.registerAppStateListener();

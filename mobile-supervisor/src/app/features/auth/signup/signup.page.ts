@@ -93,9 +93,9 @@ import { VerifyInviteResponse } from '../../../shared/models';
             <div class="prefill-banner">
               <ion-icon name="home-outline"></ion-icon>
               <div>
-                <div class="prefill-label">Assigned sites</div>
+              <div class="prefill-label">Assigned projects</div>
                 <div class="prefill-value">
-                  {{ siteCount() }} site{{ siteCount() === 1 ? '' : 's' }} assigned to you
+                {{ siteCount() }} project{{ siteCount() === 1 ? '' : 's' }} assigned to you
                 </div>
               </div>
             </div>

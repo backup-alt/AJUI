@@ -227,15 +227,12 @@ export async function approveRequest(
     const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
     const notifDetail = approval.detail ? ` - ${approval.detail}` : '';
     const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString('en-IN')})` : '';
-    const approvalBody = generatedPoNumber
-      ? `Approved${notifDetail}${notifAmount}. PO: ${generatedPoNumber}`
-      : `Approved${notifDetail}${notifAmount}`;
+    const approvalBody = `Approved${notifDetail}${notifAmount}`;
     const notificationData = {
       approvalId: approval.approvalId,
       type: approval.type,
       status: "Approved",
       projectId: approval.projectId?.toString() || "",
-      ...(generatedPoNumber && { poNumber: generatedPoNumber }),
     };
     if (projectId) {
       await notifyProjectSupervisors(

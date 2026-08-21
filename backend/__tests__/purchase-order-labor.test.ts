@@ -119,6 +119,47 @@ async function seedProcurement() {
 }
 
 describe("Purchase order workflow", () => {
+  it("syncs the supervisor received checkbox to inventory and the web material status", async () => {
+    if (!app) return;
+    const { project, material, supervisorUser } = await seedProcurement();
+    const inventory = await Inventory.create({
+      projectId: project._id,
+      projectName: project.name,
+      site: "Project storage",
+      name: material.name,
+      unit: material.unit,
+      requestedQuantity: material.requestedQuantity,
+      approvedQuantity: material.approvedQuantity,
+      purchasedQuantity: material.approvedQuantity,
+      consumedQuantity: 0,
+      minimumQuantity: 0,
+      lastMaterialId: material._id,
+    });
+    const supervisorLogin = await request(app).post("/api/auth/login").send({
+      phone: supervisorUser.phone,
+      password: "TestPass123",
+    });
+
+    const markReceived = await request(app)
+      .patch(`/api/supervisor/materials/${inventory._id}/received`)
+      .set("Authorization", `Bearer ${supervisorLogin.body.accessToken}`)
+      .send({ received: true });
+
+    expect(markReceived.status).toBe(200);
+    expect(markReceived.body.material.received).toBe(true);
+    expect((await Inventory.findById(inventory._id).lean())?.received).toBe(true);
+    expect((await Material.findById(material._id).lean())?.status).toBe("Received");
+
+    const undoReceived = await request(app)
+      .patch(`/api/supervisor/materials/${inventory._id}/received`)
+      .set("Authorization", `Bearer ${supervisorLogin.body.accessToken}`)
+      .send({ received: false });
+
+    expect(undoReceived.status).toBe(200);
+    expect((await Inventory.findById(inventory._id).lean())?.received).toBe(false);
+    expect((await Material.findById(material._id).lean())?.status).toBe("Not Received");
+  });
+
   it("persists a readable PO, allocates full approved quantity, and creates manual project materials", async () => {
     if (!app) return;
     const { project, vendor, material, supervisorUser } = await seedProcurement();

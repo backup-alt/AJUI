@@ -55,7 +55,7 @@ imports: [
             <ion-icon name="close-outline"></ion-icon>
           </ion-button>
         </ion-buttons>
-        <ion-title>{{ mode === 'existing' ? 'Add Existing Material' : (preSelected ? 'Request More' : 'New Material Request') }}</ion-title>
+        <ion-title>{{ preSelected ? 'Request More' : 'New Material Request' }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -111,8 +111,7 @@ imports: [
             </div>
           </div>
 
-          @if (mode === 'request') {
-            <div class="form-row">
+          <div class="form-row">
             <div class="form-group">
               <label class="form-label">Issued Amount *</label>
               <ion-input
@@ -137,27 +136,7 @@ imports: [
                 }
               </ion-select>
             </div>
-            </div>
-          } @else {
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Vendor (optional)</label>
-                <ion-select class="form-input" [(ngModel)]="vendorId" interface="popover" placeholder="Select vendor" (ionChange)="onVendorChange()">
-                  @for (vendor of vendors(); track vendor._id) {
-                    <ion-select-option [value]="vendor._id">{{ vendor.name }}</ion-select-option>
-                  }
-                </ion-select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">PO Number (optional)</label>
-                <ion-input class="form-input" [(ngModel)]="poNumber" placeholder="PO number"></ion-input>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Minimum Stock (optional)</label>
-              <ion-input class="form-input" type="number" [(ngModel)]="minimumQuantity" placeholder="0"></ion-input>
-            </div>
-          }
+          </div>
 
           <div class="form-group">
             <label class="form-label">Notes (optional)</label>
@@ -186,7 +165,7 @@ imports: [
               Submitting...
             } @else {
               <ion-icon name="checkmark-outline" slot="start"></ion-icon>
-              {{ mode === 'existing' ? 'Add to Inventory' : 'Submit Request' }}
+              Submit Request
             }
           </ion-button>
         </div>
@@ -372,7 +351,6 @@ private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
 
   @Input() preSelected: InventoryItem | null = null;
-  @Input() mode: 'request' | 'existing' = 'request';
   @Input() materialCatalog: MaterialAutocompleteMatch[] = [];
   name = '';
   quantity: number | null = null;
@@ -380,8 +358,6 @@ private modalCtrl = inject(ModalController);
   issuedAmount: number | null = null;
   vendorId = '';
   vendorName = '';
-  poNumber = '';
-  minimumQuantity: number | null = null;
   notes = '';
   unitOptions = MATERIAL_UNITS;
   vendors = signal<Vendor[]>([]);
@@ -393,10 +369,6 @@ private modalCtrl = inject(ModalController);
       this.name = this.preSelected.name;
       this.unit = this.preSelected.unit;
       this.vendorName = this.preSelected.vendor || '';
-      this.poNumber = this.preSelected.poNumber || '';
-      if (this.preSelected.minimumQuantity != null) {
-        this.minimumQuantity = this.preSelected.minimumQuantity;
-      }
     }
     this.loadVendors();
   }
@@ -409,10 +381,6 @@ private modalCtrl = inject(ModalController);
     if (match.unit && !this.unit) this.unit = match.unit;
     if (match.vendor && !this.vendorName) this.vendorName = match.vendor;
     if (match.vendorId && !this.vendorId) this.vendorId = match.vendorId;
-    if (match.poNumber && !this.poNumber) this.poNumber = match.poNumber;
-    if (match.minimumQuantity != null && this.minimumQuantity == null) {
-      this.minimumQuantity = match.minimumQuantity;
-    }
   }
 
   loadVendors(): void {
@@ -432,7 +400,6 @@ private modalCtrl = inject(ModalController);
       && this.quantity !== null
       && this.quantity > 0
       && !!this.unit.trim();
-    if (this.mode === 'existing') return baseValid;
     return baseValid && this.issuedAmount !== null
       && this.issuedAmount >= 0
       && !!this.vendorName.trim();
@@ -451,7 +418,7 @@ private modalCtrl = inject(ModalController);
 
     if (!siteId || !siteName || !projectId) {
       const toast = await this.toastCtrl.create({
-        message: 'Please select a site first',
+        message: 'Please select a project first',
         duration: 2500,
         color: 'warning',
         position: 'top',
@@ -461,38 +428,6 @@ private modalCtrl = inject(ModalController);
     }
 
     this.isSubmitting.set(true);
-
-    if (this.mode === 'existing') {
-      this.supervisor.addExistingMaterial({
-        projectId,
-        siteId,
-        site: siteName,
-        name: this.name.trim(),
-        unit: this.unit.trim(),
-        quantity: this.quantity!,
-        vendor: this.vendorName.trim() || undefined,
-        vendorId: this.vendorId || undefined,
-        poNumber: this.poNumber.trim() || undefined,
-        minimumQuantity: this.minimumQuantity === null ? undefined : Math.max(0, Number(this.minimumQuantity) || 0),
-        notes: this.notes.trim() || undefined,
-      }).subscribe({
-        next: async (result) => {
-          this.isSubmitting.set(false);
-          await this.modalCtrl.dismiss({ added: true, message: result.message });
-        },
-        error: async (err) => {
-          this.isSubmitting.set(false);
-          const toast = await this.toastCtrl.create({
-            message: err?.message || 'Failed to update inventory',
-            duration: 3000,
-            color: 'danger',
-            position: 'top',
-          });
-          await toast.present();
-        },
-      });
-      return;
-    }
 
     this.supervisor.createMaterial({
       projectId,

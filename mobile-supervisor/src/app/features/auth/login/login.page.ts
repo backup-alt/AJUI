@@ -30,7 +30,7 @@ import { AuthService } from '../../../core/services/auth.service';
           <header class="hero">
             <h1 class="hero-title">Welcome Back, Builder</h1>
             <p class="hero-sub">
-              Sign in to manage your sites, materials, labor, and expenses in one place.
+          Sign in to manage your projects, materials, labor, and expenses in one place.
            </p>
          </header>
 

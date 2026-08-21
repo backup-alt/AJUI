@@ -45,7 +45,7 @@ import { DatePipe } from '@angular/common';
               <h2 class="item-name">{{ item()!.name }}</h2>
               <p class="meta">
                 <ion-icon name="business-outline"></ion-icon>
-                {{ item()!.site }} - {{ item()!.projectName }}
+                {{ item()!.projectName }}
               </p>
             </div>
           </div>
@@ -114,9 +114,6 @@ import { DatePipe } from '@angular/common';
                     <div class="log-info">
                       <span class="log-qty">+{{ entry.quantity }} {{ item()!.unit }}</span>
                       <span class="log-vendor">{{ entry.vendor || 'Unknown Vendor' }}</span>
-                      @if (entry.poNumber) {
-                        <span class="log-po">PO: {{ entry.poNumber }}</span>
-                      }
                       <span class="log-date">{{ entry.date | date:'MMM d, yyyy' }}</span>
                       @if (entry.billUrl) {
                         <button class="log-bill-btn" (click)="openBillViewer(entry.billUrl!); $event.stopPropagation()">
@@ -289,7 +286,7 @@ export class InventoryDetailPage implements OnInit {
   loading = signal(true);
 
   consumptionLog = signal<Array<{ quantity: number; date: string; updatedBy?: string; notes?: string }>>([]);
-  purchaseHistory = signal<Array<{ vendor: string; quantity: number; date: string; poNumber?: string; materialId?: string; billUrl?: string }>>([]);
+  purchaseHistory = signal<Array<{ vendor: string; quantity: number; date: string; materialId?: string; billUrl?: string }>>([]);
 
   viewerUrl = signal<string | null>(null);
   zoomScale = 1;

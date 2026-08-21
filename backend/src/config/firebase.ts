@@ -42,6 +42,16 @@ export async function sendPushNotification(
       token: fcmToken,
       notification: { title, body },
       data: data || {},
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "agb_updates",
+          sound: "default",
+        },
+      },
+      apns: {
+        payload: { aps: { sound: "default" } },
+      },
     });
     return true;
   } catch (error) {
@@ -63,6 +73,16 @@ export async function sendMulticast(
       tokens: fcmTokens,
       notification: { title, body },
       data: data || {},
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "agb_updates",
+          sound: "default",
+        },
+      },
+      apns: {
+        payload: { aps: { sound: "default" } },
+      },
     });
     return response.successCount;
   } catch (error) {

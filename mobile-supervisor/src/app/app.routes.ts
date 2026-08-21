@@ -115,13 +115,6 @@ export const routes: Routes = [
           import('./features/materials/materials.page').then((m) => m.MaterialsPage),
       },
       {
-        path: 'materials/create',
-        loadComponent: () =>
-          import('./features/materials/material-create/material-create.page').then(
-            (m) => m.MaterialCreatePage
-          ),
-      },
-      {
         path: 'materials/:id',
         loadComponent: () =>
           import('./features/materials/material-detail/material-detail.page').then(

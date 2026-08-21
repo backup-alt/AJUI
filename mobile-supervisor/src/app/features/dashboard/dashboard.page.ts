@@ -29,7 +29,7 @@ import {
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AppReadyService } from '../../core/services/app-ready.service';
-import { DashboardData, Site } from '../../shared/models';
+import { DashboardData, Project } from '../../shared/models';
 import { Expense } from '../../shared/models/expense.model';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
@@ -91,8 +91,8 @@ import { firstValueFrom } from 'rxjs';
             <div class="stat-icon si-navy">
               <ion-icon name="location-outline"></ion-icon>
             </div>
-            <span class="stat-val">{{ dashboard()?.counts?.sites || 0 }}</span>
-            <span class="stat-label">Sites</span>
+            <span class="stat-val">{{ dashboard()?.counts?.projects || 0 }}</span>
+            <span class="stat-label">Projects</span>
           </button>
           <button class="stat-card" (click)="navigateTo('/tabs/materials')">
             <div class="stat-icon si-gold">
@@ -151,7 +151,7 @@ import { firstValueFrom } from 'rxjs';
                     <div class="expense-row-details">
                       <span class="expense-row-desc">{{ expense.description }}</span>
                       <span class="expense-row-meta">
-                        {{ expense.materialVendor || expense.site || expense.type }}
+                        {{ expense.materialVendor || expense.projectName || expense.type }}
                         <span class="meta-dot">·</span>
                         {{ expense.createdAt | date:'MMM d' }}
                         <span class="meta-dot">·</span>
@@ -174,27 +174,27 @@ import { firstValueFrom } from 'rxjs';
           </div>
         </section>
 
-        <!-- ═══ ACTIVE SITES (OTHERS) ═══ -->
+        <!-- ═══ ASSIGNED PROJECTS ═══ -->
         <section class="sites-section">
           <div class="sites-head">
-            <h2 class="sites-title">Other Sites</h2>
+            <h2 class="sites-title">Other Projects</h2>
             <button class="viewall-btn" (click)="navigateTo('/tabs/sites')">View All</button>
           </div>
 
-          @if (sites().length === 0) {
+          @if (projects().length === 0) {
             <div class="sites-empty">
               <div class="sites-empty-icon">
                 <ion-icon name="location-outline"></ion-icon>
               </div>
-              <span class="sites-empty-text">No other sites assigned</span>
+              <span class="sites-empty-text">No other projects assigned</span>
             </div>
           } @else {
-            @for (site of sites(); track site.id) {
-              <button class="site-row" (click)="navigateToSite(site)">
+            @for (project of projects(); track project.id) {
+              <button class="site-row" (click)="navigateToProject(project)">
                 <div class="site-info">
-                  <span class="site-name">{{ site.name }}</span>
+                  <span class="site-name">{{ project.name }}</span>
                   <span class="site-meta">
-                    {{ site.employeeCount || 0 }} worker{{ (site.employeeCount || 0) !== 1 ? 's' : '' }}
+                    {{ project.completion || 0 }}% complete
                   </span>
                 </div>
                 <ion-icon name="chevron-forward-outline" class="site-arrow"></ion-icon>
@@ -716,7 +716,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   private destroyRef = inject(DestroyRef);
 
   dashboard = signal<DashboardData | null>(null);
-  sites = signal<Site[]>([]);
+  projects = signal<Project[]>([]);
   todayExpenses = signal<Expense[]>([]);
   userName = computed<string>(() => {
     const u = this.auth.currentUser();
@@ -777,10 +777,9 @@ export class DashboardPage implements OnInit, OnDestroy {
       this.supervisor.siteChanged$
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(() => {
-          // Clear stale data so cards don't show the previous site while the
-          // fresh fetch for the newly selected site is in flight.
+          // Clear stale data while the selected project's fresh data loads.
           this.dashboard.set(null);
-          this.sites.set([]);
+          this.projects.set([]);
           this.todayExpenses.set([]);
           this.loading.set(true);
           void this.loadDashboard(true);
@@ -830,12 +829,9 @@ export class DashboardPage implements OnInit, OnDestroy {
       const siteId = this.supervisor.selectedSiteId() || undefined;
       const projectId = this.supervisor.selectedProjectId() || undefined;
 
-      // Fetch dashboard (per-site counts) and the full assigned sites list in parallel.
-      // The sites list is needed to derive the total assigned sites count and the
-      // "other sites" the supervisor can switch to.
-      const [response, sitesRes] = await Promise.all([
+      const [response, projectsRes] = await Promise.all([
         firstValueFrom(this.supervisor.getDashboard({ siteId, projectId }, force)),
-        firstValueFrom(this.supervisor.getSites()).catch(() => null),
+        firstValueFrom(this.supervisor.getProjects()).catch(() => null),
       ]);
       const dashData = response?.dashboard || null;
 
@@ -849,14 +845,11 @@ export class DashboardPage implements OnInit, OnDestroy {
         return false;
       }
 
-      const allSites = (sitesRes?.sites || []) as Site[];
-      const currentId = this.supervisor.selectedSiteId();
-      // Total assigned sites stays global; the "Other Sites" list excludes the
-      // currently selected site so the supervisor can switch to the others.
-      const totalAssignedSites = allSites.length;
-      const otherSites = allSites.filter((s) => s.id !== currentId);
+      const allProjects = (projectsRes?.projects || []) as Project[];
+      const currentId = this.supervisor.selectedProjectId();
+      const otherProjects = allProjects.filter((project) => project.id !== currentId);
 
-      this.applyDashboard(dashData, totalAssignedSites, otherSites);
+      this.applyDashboard(dashData, allProjects.length, otherProjects);
       void this.supervisor.cacheDashboard(dashData);
 
       this.loading.set(false);
@@ -873,17 +866,14 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   private applyDashboard(
     data: DashboardData,
-    totalAssignedSites: number | null = null,
-    otherSites: Site[] | null = null,
+    totalAssignedProjects: number | null = null,
+    otherProjects: Project[] | null = null,
   ): void {
-    // The "Sites" card shows the total number of sites the supervisor is
-    // assigned to (global), not a per-site count. The other cards (inventory,
-    // labour, approvals) remain scoped to the currently selected site.
     const counts = data.counts
-      ? { ...data.counts, sites: totalAssignedSites ?? data.counts.sites }
+      ? { ...data.counts, projects: totalAssignedProjects ?? data.counts.projects }
       : data.counts;
     this.dashboard.set({ ...data, counts });
-    this.sites.set(otherSites ?? ((data.sites || []) as Site[]));
+    this.projects.set(otherProjects ?? data.projects ?? []);
     this.todayExpenses.set((data.todayExpenses || []) as Expense[]);
   }
 
@@ -891,13 +881,8 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.router.navigate([path]);
   }
 
-  navigateToSite(site: Site): void {
-    void this.supervisor.setSelectedSite(
-      site.id,
-      site.projectId || '',
-      site.projectName || site.name,
-      site.name,
-    );
+  navigateToProject(project: Project): void {
+    void this.supervisor.setSelectedProject(project);
     this.router.navigate(['/tabs/sites']);
   }
 }

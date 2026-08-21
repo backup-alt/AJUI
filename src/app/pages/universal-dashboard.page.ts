@@ -14,6 +14,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 import { ProjectFormDialogComponent } from "../shared/project-form-dialog.component";
 import { VendorFormDialogComponent } from "../shared/vendor-form-dialog.component";
 import { formatMoney } from "../shared/format";
+import { CalendarPopupComponent, type CalendarMode } from "../shared/calendar-popup.component";
 
 type PeriodKey = "today" | "week" | "month" | "3m" | "6m" | "year" | "custom";
 
@@ -49,6 +50,7 @@ interface DashboardKpis {
     VendorFormDialogComponent,
     DashboardBarChartComponent,
     DashboardDonutChartComponent,
+    CalendarPopupComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -76,26 +78,15 @@ interface DashboardKpis {
                         <span><strong>Filter by date</strong><small>Choose one day or a custom range.</small></span>
                         <button type="button" aria-label="Close date filter" (click)="cancelDateFilter()"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
                       </div>
-                      <div class="date-mode-tabs" role="tablist" aria-label="Date selection mode">
-                        <button type="button" role="tab" [class.active]="datePickerMode() === 'single'" [attr.aria-selected]="datePickerMode() === 'single'" (click)="setDatePickerMode('single')">Single date</button>
-                        <button type="button" role="tab" [class.active]="datePickerMode() === 'range'" [attr.aria-selected]="datePickerMode() === 'range'" (click)="setDatePickerMode('range')">Date range</button>
-                      </div>
-                      @if (datePickerMode() === 'single') {
-                        <label class="date-field">
-                          <span>Select date</span>
-                          <input type="date" [value]="draftSingleDate()" (input)="draftSingleDate.set($any($event.target).value)" />
-                        </label>
-                      } @else {
-                        <div class="date-range-fields">
-                          <label class="date-field"><span>From</span><input type="date" [value]="draftRangeFrom()" [max]="draftRangeTo() || undefined" (input)="draftRangeFrom.set($any($event.target).value)" /></label>
-                          <label class="date-field"><span>To</span><input type="date" [value]="draftRangeTo()" [min]="draftRangeFrom() || undefined" (input)="draftRangeTo.set($any($event.target).value)" /></label>
-                        </div>
-                        @if (dateRangeInvalid()) { <small class="date-error">The end date must be on or after the start date.</small> }
-                      }
-                      <div class="date-menu-actions">
-                        <button type="button" class="date-cancel" (click)="cancelDateFilter()">Cancel</button>
-                        <button type="button" class="date-apply" [disabled]="!canApplyDateFilter()" (click)="applyDateFilter()">Apply filter</button>
-                      </div>
+                      <agb-calendar-popup
+                        [initialMode]="datePickerMode()"
+                        [initialSingle]="draftSingleDate()"
+                        [initialRangeFrom]="draftRangeFrom()"
+                        [initialRangeTo]="draftRangeTo()"
+                        [maxDate]="todayIso"
+                        (cancel)="cancelDateFilter()"
+                        (apply)="onCalendarApply($event)"
+                      ></agb-calendar-popup>
                     </section>
                   }
                 </div>
@@ -145,22 +136,6 @@ interface DashboardKpis {
               <article class="panel cash-panel">
                 <div class="panel-heading">
                   <h2>Cash Flow Overview</h2>
-                  <div class="period-picker mini" (click)="$event.stopPropagation()">
-                    <button type="button" class="mini-period" aria-haspopup="listbox" [attr.aria-expanded]="openPeriodMenu() === 'chart'" (click)="togglePeriodMenu('chart')">
-                      <strong>{{ periodLabel() }}</strong>
-                      <svg [class.open]="openPeriodMenu() === 'chart'" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
-                    </button>
-                    @if (openPeriodMenu() === 'chart') {
-                      <div class="period-menu mini-menu" role="listbox" aria-label="Cash flow period">
-                        @for (option of chartPeriodOptions; track option.value) {
-                          <button type="button" class="period-option" [class.active]="periodKey() === option.value" [attr.aria-selected]="periodKey() === option.value" (click)="selectPeriod(option.value)">
-                            <span>{{ option.label }}</span>
-                            @if (periodKey() === option.value) { <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg> }
-                          </button>
-                        }
-                      </div>
-                    }
-                  </div>
                 </div>
                 <div class="chart-wrap">
                   @if (hasFinancialTrend()) {
@@ -217,12 +192,12 @@ interface DashboardKpis {
               </article>
 
               <article class="panel summary-panel">
-                <div class="panel-heading"><h2>Project Summary</h2></div>
+                <div class="panel-heading"><h2>Workforce &amp; Partners</h2></div>
                 <div class="summary-grid">
                   <a routerLink="/projects"><span class="summary-icon blue"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4V7ZM8 7V4h8v3"/></svg></span><span><small>Total Projects</small><strong>{{ totalProjectCount() }}</strong></span></a>
                   <a routerLink="/projects"><span class="summary-icon green"><svg viewBox="0 0 24 24"><path d="M4 20V8l8-5 8 5v12H4Z"/><path d="m9 14 2 2 4-5"/></svg></span><span><small>Active Projects</small><strong>{{ activeProjectCount() }}</strong><b>{{ activeProjectRate() }}%</b></span></a>
-                  <a routerLink="/subcontractors"><span class="summary-icon orange"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2M17 11a4 4 0 0 1 4 4v2"/></svg></span><span><small>Team Members</small><strong>{{ teamMemberCount() }}</strong></span></a>
-                  <a routerLink="/projects"><span class="summary-icon purple"><svg viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/></svg></span><span><small>Materials in Stock</small><strong>{{ inventoryItemCount() }}</strong><em>Items</em></span></a>
+                  <a routerLink="/subcontractors"><span class="summary-icon orange"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2M17 11a4 4 0 0 1 4 4v2"/></svg></span><span><small>Subcontractors</small><strong>{{ subcontractorCount() }}</strong><em>{{ activeSubcontractorCount() }} active</em></span></a>
+                  <a routerLink="/vendors"><span class="summary-icon purple"><svg viewBox="0 0 24 24"><path d="M3 7h18l-2 12H5L3 7Z"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg></span><span><small>Vendors</small><strong>{{ vendorCount() }}</strong><em>{{ activeVendorCount() }} active</em></span></a>
                 </div>
               </article>
 
@@ -253,7 +228,15 @@ interface DashboardKpis {
       </div>
 
       @if (showClientDialog()) { <agb-client-form-dialog [initialValue]="null" (cancel)="closeClientDialog()" (create)="onClientCreated()"></agb-client-form-dialog> }
-      @if (showProjectDialog()) { <agb-project-form-dialog [currentClientId]="''" [initialValue]="null" (cancel)="closeProjectDialog()" (create)="onProjectCreated()"></agb-project-form-dialog> }
+      @if (showProjectDialog()) {
+        <agb-project-form-dialog
+          [currentClientId]="''"
+          [clients]="dashboardClients()"
+          [initialValue]="null"
+          (cancel)="closeProjectDialog()"
+          (create)="onProjectCreated($event)"
+        ></agb-project-form-dialog>
+      }
       @if (showVendorDialog()) { <agb-vendor-form-dialog [initialValue]="null" (cancel)="closeVendorDialog()" (create)="onVendorCreated()"></agb-vendor-form-dialog> }
     </ion-split-pane>
   `,
@@ -269,10 +252,8 @@ interface DashboardKpis {
     .dashboard-header p { margin: 8px 0 0; color: #667085; font-size: 14px; line-height: 1.5; }
     .header-controls { display: flex; align-items: center; gap: 12px; }
     .date-control, .period-control, .new-project-button { position: relative; display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 14px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; color: #1d2939; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-    .date-picker { position: relative; z-index: 32; }.date-control { min-width: 176px; cursor: pointer; }.date-control strong { flex: 1; font-size: 14px; text-align: left; white-space: nowrap; }.date-control:hover { border-color: #98a2b3; background: #f9fafb; }.date-control:focus-visible { outline: 3px solid rgba(47,107,255,.18); outline-offset: 1px; }
-    .date-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 50; display: grid; width: 360px; gap: 16px; padding: 16px; border: 1px solid #d0d5dd; border-radius: 13px; background: #fff; box-shadow: 0 18px 40px rgba(16,24,40,.17), 0 4px 10px rgba(16,24,40,.08); }.date-menu-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }.date-menu-heading > span { display: grid; gap: 3px; }.date-menu-heading strong { color: #101828; font-size: 15px; }.date-menu-heading small { color: #667085; font-size: 12px; }.date-menu-heading > button { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; padding: 0; border: 1px solid #e4e7ec; border-radius: 7px; background: #fff; color: #667085; cursor: pointer; }.date-menu-heading > button:hover { background: #f2f4f7; color: #101828; }.date-menu-heading > button svg { width: 15px; height: 15px; }
-    .date-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 9px; background: #f2f4f7; }.date-mode-tabs button { min-height: 36px; padding: 7px 10px; border: 0; border-radius: 7px; background: transparent; color: #667085; font-size: 13px; font-weight: 700; cursor: pointer; }.date-mode-tabs button:hover { color: #344054; }.date-mode-tabs button.active { background: #fff; color: #175cd3; box-shadow: 0 1px 3px rgba(16,24,40,.12); }
-    .date-range-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }.date-field { display: grid; gap: 6px; }.date-field > span { color: #344054; font-size: 12px; font-weight: 700; }.date-field input { width: 100%; height: 42px; padding: 0 10px; border: 1px solid #d0d5dd; border-radius: 8px; outline: 0; background: #fff; color: #101828; font-size: 13px; color-scheme: light; }.date-field input:hover { border-color: #98a2b3; }.date-field input:focus { border-color: #2f6bff; box-shadow: 0 0 0 3px rgba(47,107,255,.13); }.date-error { margin-top: -8px; color: #d92d20; font-size: 12px; }.date-menu-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }.date-menu-actions button { min-height: 38px; padding: 8px 13px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }.date-cancel { border: 1px solid #d0d5dd; background: #fff; color: #344054; }.date-cancel:hover { background: #f9fafb; }.date-apply { border: 1px solid #175cd3; background: #175cd3; color: #fff; box-shadow: 0 2px 5px rgba(23,92,211,.18); }.date-apply:hover:not(:disabled) { background: #1849a9; }.date-apply:disabled { border-color: #d0d5dd; background: #e4e7ec; color: #98a2b3; box-shadow: none; cursor: not-allowed; }
+    .date-picker { position: relative; z-index: 60; }.date-control { min-width: 176px; cursor: pointer; }.date-control strong { flex: 1; font-size: 14px; text-align: left; white-space: nowrap; }.date-control:hover { border-color: #98a2b3; background: #f9fafb; }.date-control:focus-visible { outline: 3px solid rgba(47,107,255,.18); outline-offset: 1px; }
+    .date-menu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; z-index: 80; display: grid; width: max-content; max-width: min(640px, calc(100vw - 32px)); gap: 14px; padding: 16px; border: 1px solid #d0d5dd; border-radius: 14px; background: #fff; box-shadow: 0 18px 40px rgba(16,24,40,.17), 0 4px 10px rgba(16,24,40,.08); }.date-menu-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }.date-menu-heading > span { display: grid; gap: 3px; }.date-menu-heading strong { color: #101828; font-size: 15px; }.date-menu-heading small { color: #667085; font-size: 12px; }.date-menu-heading > button { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; padding: 0; border: 1px solid #e4e7ec; border-radius: 7px; background: #fff; color: #667085; cursor: pointer; }.date-menu-heading > button:hover { background: #f2f4f7; color: #101828; }.date-menu-heading > button svg { width: 15px; height: 15px; }
     .period-picker { position: relative; z-index: 30; }.period-control { min-width: 160px; cursor: pointer; }.period-control strong { flex: 1; color: #1d2939; font-size: 14px; font-weight: 700; text-align: left; white-space: nowrap; }.period-control:hover, .mini-period:hover { border-color: #98a2b3; background: #f9fafb; }.period-control:focus-visible, .mini-period:focus-visible, .period-option:focus-visible { outline: 3px solid rgba(47, 107, 255, .18); outline-offset: 1px; }.period-control .chevron { pointer-events: none; transition: transform 160ms ease; }
     .chevron { width: 14px; }.chevron.open, .mini-period svg.open { transform: rotate(180deg); }.new-project-button { border-color: #175cd3; background: #175cd3; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 3px 8px rgba(23,92,211,.18); }
     .period-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; display: grid; width: 192px; gap: 3px; padding: 6px; border: 1px solid #d0d5dd; border-radius: 11px; background: #fff; box-shadow: 0 14px 32px rgba(16,24,40,.16), 0 3px 8px rgba(16,24,40,.08); }.period-option { display: flex; width: 100%; min-height: 38px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: #344054; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }.period-option:hover { background: #f2f4f7; color: #101828; }.period-option.active { background: #eef4ff; color: #175cd3; }.period-option svg { width: 15px; height: 15px; stroke-width: 2.3; }
@@ -318,12 +299,13 @@ export class UniversalDashboardPage implements OnInit {
   readonly openPeriodMenu = signal<"header" | "chart" | null>(null);
   readonly selectedDate = signal(new Date().toISOString().slice(0, 10));
   readonly dateMenuOpen = signal(false);
-  readonly datePickerMode = signal<"single" | "range">("single");
+  readonly datePickerMode = signal<CalendarMode>("single");
   readonly customDateFrom = signal("");
   readonly customDateTo = signal("");
   readonly draftSingleDate = signal(this.selectedDate());
   readonly draftRangeFrom = signal(this.selectedDate());
   readonly draftRangeTo = signal(this.selectedDate());
+  readonly todayIso = new Date().toISOString().slice(0, 10);
   readonly showClientDialog = signal(false);
   readonly showProjectDialog = signal(false);
   readonly showVendorDialog = signal(false);
@@ -338,6 +320,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly chartPeriodOptions = this.periodOptions.filter((option) => option.value !== "today");
 
   readonly projects = computed(() => this.loadedProjects() ?? (this.data.projects() as any[]));
+  readonly dashboardClients = computed(() => this.data.clients() as any[]);
   readonly activeProjects = computed(() => this.projects().filter((row) => String(row.status || "").trim().toLowerCase() === "active"));
   readonly legacyPayments = computed<any[]>(() => this.data.tableRowsFor("payments", [])
     .filter((row) => String(row["__rowId"] || "").startsWith("custom:payments:"))
@@ -415,12 +398,10 @@ export class UniversalDashboardPage implements OnInit {
   readonly activeProjectCount = computed(() => this.activeProjects().length);
   readonly activeProjectRate = computed(() => this.totalProjectCount() ? Math.round(this.activeProjectCount() / this.totalProjectCount() * 100) : 0);
   readonly averageActiveProjectValue = computed(() => this.activeProjectCount() ? this.financials().portfolio / this.activeProjectCount() : 0);
-  readonly teamMemberCount = computed(() => {
-    const labour = this.data.labour() as any[];
-    if (labour.length) return new Set(labour.map((row) => row.employeeId || row.workerId || row.name || row.subcontractorName).filter(Boolean)).size || labour.reduce((sum, row) => sum + Number(row.presentCount || 0), 0);
-    return this.data.subcontractors().length;
-  });
-  readonly inventoryItemCount = computed(() => new Set((this.data.inventory() as any[]).map((row) => String(row.normalizedName || row.name || "").toLowerCase()).filter(Boolean)).size);
+  readonly subcontractorCount = computed(() => (this.data.subcontractors() as any[]).length);
+  readonly activeSubcontractorCount = computed(() => (this.data.subcontractors() as any[]).filter((row) => String(row.status || "").toLowerCase() === "active").length);
+  readonly vendorCount = computed(() => (this.data.vendors() as any[]).length);
+  readonly activeVendorCount = computed(() => (this.data.vendors() as any[]).filter((row) => String(row.status || "").toLowerCase() === "active").length);
 
   private readonly palette = ["#175cd3", "#039855", "#e04f16", "#0e9384", "#c11574", "#6938c6"];
   readonly recentProjects = computed(() => this.projects().slice(0, 5).map((row, index) => {
@@ -541,21 +522,25 @@ export class UniversalDashboardPage implements OnInit {
     this.datePickerMode.set(this.periodKey() === "custom" ? "range" : "single");
     this.dateMenuOpen.set(true);
   }
-  setDatePickerMode(mode: "single" | "range"): void { this.datePickerMode.set(mode); }
+  setDatePickerMode(mode: CalendarMode): void { this.datePickerMode.set(mode); }
   canApplyDateFilter(): boolean {
     if (this.datePickerMode() === "single") return Boolean(this.draftSingleDate());
     return Boolean(this.draftRangeFrom() && this.draftRangeTo() && !this.dateRangeInvalid());
   }
-  applyDateFilter(): void {
-    if (!this.canApplyDateFilter()) return;
-    if (this.datePickerMode() === "single") {
-      this.selectedDate.set(this.draftSingleDate());
+  onCalendarApply(event: { mode: CalendarMode; single?: string; from?: string; to?: string }): void {
+    if (event.mode === "single" && event.single) {
+      this.draftSingleDate.set(event.single);
+      this.selectedDate.set(event.single);
       this.periodKey.set("today");
-    } else {
-      this.customDateFrom.set(this.draftRangeFrom());
-      this.customDateTo.set(this.draftRangeTo());
-      this.selectedDate.set(this.draftRangeTo());
+    } else if (event.mode === "range" && event.from && event.to) {
+      this.draftRangeFrom.set(event.from);
+      this.draftRangeTo.set(event.to);
+      this.customDateFrom.set(event.from);
+      this.customDateTo.set(event.to);
+      this.selectedDate.set(event.to);
       this.periodKey.set("custom");
+    } else {
+      return;
     }
     this.dateMenuOpen.set(false);
   }
@@ -582,9 +567,59 @@ export class UniversalDashboardPage implements OnInit {
   openClientDialog(): void { this.showClientDialog.set(true); }
   closeClientDialog(): void { this.showClientDialog.set(false); }
   onClientCreated(): void { this.closeClientDialog(); void this.refreshAll(); }
-  openProjectDialog(): void { this.showProjectDialog.set(true); }
+  openProjectDialog(): void {
+    this.showProjectDialog.set(true);
+    if (this.data.clients().length === 0) {
+      firstValueFrom(this.api.listClients({ page: 1, limit: 200 })).then((res) => {
+        const items = ((res as any)?.items || []) as any[];
+        this.data.clients.set(items.map((c) => this.toClient(c)));
+      }).catch(() => undefined);
+    }
+  }
   closeProjectDialog(): void { this.showProjectDialog.set(false); }
-  onProjectCreated(): void { this.closeProjectDialog(); void this.refreshAll(); }
+  async onProjectCreated(value: any): Promise<void> {
+    const clientId = String(value?.clientId || "").trim();
+    const stored = this.data.clients().find((c) => String(c._id || c.id) === clientId);
+    const client = stored ?? (clientId ? this.toClient({ _id: clientId, name: "(unknown)" }) : null);
+    if (!client) {
+      this.closeProjectDialog();
+      void this.refreshAll();
+      return;
+    }
+    try {
+      await this.data.addProject(client, {
+        name: String(value.name || "").trim(),
+        sites: Array.isArray(value.sites) ? value.sites : [],
+        startDate: String(value.startDate || "").trim(),
+        supervisor: String(value.supervisor || "").trim(),
+        supervisorId: value.supervisorId || undefined,
+        status: value.status || "Active",
+        totalValue: Number(value.totalValue) || 0,
+      });
+    } catch (err) {
+      console.error("[UniversalDashboard] Failed to create project:", (err as any)?.message ?? err);
+    } finally {
+      this.closeProjectDialog();
+      void this.refreshAll();
+    }
+  }
+  private toClient(raw: any) {
+    const name = String(raw?.name || raw?.clientName || "Unnamed Client").trim();
+    const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "C";
+    return {
+      id: String(raw?.id || raw?.clientId || raw?._id || ""),
+      initials,
+      name,
+      mobile: String(raw?.mobile || ""),
+      address: String(raw?.address || ""),
+      gstNumber: raw?.gstNumber || raw?.gst || undefined,
+      state: raw?.state || undefined,
+      status: (raw?.status === "On Hold" || raw?.status === "Completed") ? raw.status : "Active",
+      projectIds: Array.isArray(raw?.projectIds) ? raw.projectIds : [],
+      supervisor: String(raw?.supervisor || ""),
+      _id: raw?._id ? String(raw._id) : undefined,
+    } as any;
+  }
   openVendorDialog(): void { this.showVendorDialog.set(true); }
   closeVendorDialog(): void { this.showVendorDialog.set(false); }
   onVendorCreated(): void { this.closeVendorDialog(); void this.refreshAll(); }
@@ -731,7 +766,7 @@ export class UniversalDashboardPage implements OnInit {
   private isPostedExpense(row: any): boolean {
     if (String(row?.transactionType || "").toLowerCase() === "cash added") return false;
     const status = String(row?.status || "").toLowerCase();
-    if (["Expense", "Material Expense", "Subcontractor Payment"].includes(String(row?.dashboardSource || ""))) return status !== "rejected";
+    if (["Expense", "Supervisor Expense", "Material Expense", "Subcontractor Payment"].includes(String(row?.dashboardSource || ""))) return status !== "rejected";
     return !status || status === "approved" || status === "completed" || status === "paid";
   }
 

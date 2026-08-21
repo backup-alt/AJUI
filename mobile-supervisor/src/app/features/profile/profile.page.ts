@@ -31,7 +31,7 @@ import { NotificationService } from '../../core/services/notification.service';
             <span class="status-dot"></span>
           </div>
           <h2 class="user-name">{{ currentUser()?.name || 'Supervisor' }}</h2>
-          <p class="user-role">Site Supervisor</p>
+        <p class="user-role">Project Supervisor</p>
           @if (currentUser()?.email) {
             <p class="user-email">
               <ion-icon name="mail-outline"></ion-icon>

@@ -162,7 +162,7 @@ interface RequestItem {
                 <ion-icon name="time-outline"></ion-icon>
                 {{ item.date | date:'MMM d, yyyy' }}
                 <span class="meta-sep">·</span>
-                {{ item.site }}
+                    {{ item.site }}
               </p>
 
               @if (item.issuedAmount) {
@@ -195,9 +195,9 @@ interface RequestItem {
                           [(ngModel)]="isReceivedInput"
                           [disabled]="isUploading()"
                           class="received-checkbox"
-                          aria-label="Received materials reached the site"
+                  aria-label="Received materials reached the project"
                         ></ion-checkbox>
-                        <span class="received-label">Received (materials reached the site)</span>
+                  <span class="received-label">Received (materials delivered)</span>
                       </div>
                     }
 
@@ -683,7 +683,7 @@ export class RequestsPage implements OnInit {
             type: requestType,
             title: approval.title || (requestType === 'labour' ? 'Labour request' : `${requestType} request`),
             subtitle: approval.projectName || approval.sourceCollection || '',
-            site: approval.site || 'General',
+            site: approval.projectName || 'General',
             date: approval.submittedAt,
             status: approval.status || 'Pending',
             amount: approval.amount,
@@ -721,7 +721,7 @@ export class RequestsPage implements OnInit {
             type: 'material',
             title: m.name,
             subtitle: m.approvedQuantity ? `${m.approvedQuantity} ${m.unit} approved` : `${m.requestedQuantity} ${m.unit} requested`,
-            site: m.site,
+            site: m.projectName,
             date: m.requestDate,
             status: m.status,
             issuedAmount: m.issuedAmount,
@@ -755,7 +755,7 @@ export class RequestsPage implements OnInit {
             subtitle: (e as any).isSiteMaterial
               ? `${(e as any).materialQuantity || ''} ${(e as any).materialUnit || ''} - ${txLabel}`
               : `${txLabel} expense`,
-            site: e.site || 'General',
+            site: e.projectName || 'General',
             date: e.date,
             status: e.status,
             amount: e.amount,
@@ -833,7 +833,7 @@ export class RequestsPage implements OnInit {
       subtitle: material.approvedQuantity
         ? `${material.approvedQuantity} ${material.unit} approved`
         : `${material.requestedQuantity} ${material.unit} requested`,
-      site: material.site,
+      site: material.projectName,
       date: material.requestDate,
       status: material.status,
       issuedAmount: material.issuedAmount,

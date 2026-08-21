@@ -95,12 +95,12 @@ const LABOUR_TYPES = [
           </div>
         </div>
 
-        @if (selectedSiteName()) {
+      @if (selectedProjectName()) {
           <div class="site-banner">
             <ion-icon name="location-outline"></ion-icon>
             <div>
-              <div class="site-banner-label">Site</div>
-              <div class="site-banner-value">{{ selectedSiteName() }}</div>
+            <div class="site-banner-label">Project</div>
+            <div class="site-banner-value">{{ selectedProjectName() }}</div>
             </div>
           </div>
         }
@@ -288,6 +288,7 @@ export class LabourCreateWorkerPage implements OnInit {
 
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
+  selectedProjectName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
@@ -295,6 +296,7 @@ export class LabourCreateWorkerPage implements OnInit {
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
+    this.selectedProjectName.set(this.supervisor.selectedProjectName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
     // Always fetch the freshest list of subcontractors when the form opens —
     // the GET cache may hold a stale snapshot if a sub-contractor was created
@@ -339,7 +341,7 @@ export class LabourCreateWorkerPage implements OnInit {
 
     if (!siteId || !siteName || !projectId) {
       const toast = await this.toastCtrl.create({
-        message: 'Please select a site first',
+        message: 'Please select a project first',
         duration: 2500,
         color: 'warning',
         position: 'top',

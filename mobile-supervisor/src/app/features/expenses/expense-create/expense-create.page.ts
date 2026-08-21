@@ -86,17 +86,17 @@ import { Vendor } from '../../../shared/models';
               <ion-icon name="wallet-outline"></ion-icon>
             </div>
             <div>
-              <h1 class="page-title">Site Expense</h1>
-              <p class="page-subtitle">Record a site expense for approval</p>
+          <h1 class="page-title">Project Expense</h1>
+          <p class="page-subtitle">Record a project expense for approval</p>
             </div>
           </div>
 
-          @if (selectedSiteName()) {
+        @if (selectedProjectName()) {
             <div class="site-banner">
               <ion-icon name="location-outline"></ion-icon>
               <div>
-                <div class="site-banner-label">Site</div>
-                <div class="site-banner-value">{{ selectedSiteName() }}</div>
+              <div class="site-banner-label">Project</div>
+              <div class="site-banner-value">{{ selectedProjectName() }}</div>
               </div>
             </div>
           }
@@ -117,7 +117,7 @@ import { Vendor } from '../../../shared/models';
               </div>
               <div class="type-info">
                 <strong>Add Cash</strong>
-                <span>Request cash for the project site</span>
+              <span>Request cash for the selected project</span>
               </div>
             </div>
           </div>
@@ -147,8 +147,8 @@ import { Vendor } from '../../../shared/models';
               <div class="form-item toggle-item">
                 <div class="toggle-row">
                   <div class="toggle-info">
-                    <div class="toggle-label">Includes Site Material</div>
-                    <div class="toggle-sub">Does this purchase include site material?</div>
+                <div class="toggle-label">Includes Project Material</div>
+                <div class="toggle-sub">Does this purchase include project material?</div>
                   </div>
                   <ion-toggle [(ngModel)]="isSiteMaterial" (ionChange)="onSiteMaterialToggle()"></ion-toggle>
                 </div>
@@ -416,6 +416,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
+  selectedProjectName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
   currentBalance = signal<number | null>(null);
   vendors = signal<Vendor[]>([]);
@@ -442,6 +443,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
+    this.selectedProjectName.set(this.supervisor.selectedProjectName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
     await this.loadVendors();
     this.loadMaterialNames();
@@ -630,7 +632,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
 
     if (!siteId || !siteName) {
       const toast = await this.toastCtrl.create({
-        message: 'Please select a site first',
+        message: 'Please select a project first',
         duration: 2500,
         color: 'warning',
         position: 'top',
@@ -641,7 +643,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
 
     if (!projectId) {
       const toast = await this.toastCtrl.create({
-        message: 'Project for this site is not set. Please contact admin.',
+        message: 'This project is not configured for mobile updates. Please contact admin.',
         duration: 3000,
         color: 'danger',
         position: 'top',

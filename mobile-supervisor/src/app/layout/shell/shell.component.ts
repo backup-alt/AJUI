@@ -45,12 +45,13 @@ import {
   clipboardOutline,
   barChartOutline,
   fileTrayOutline,
+  checkmarkCircle,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { MenuController } from '@ionic/angular/standalone';
-import { Site } from '../../shared/models';
+import { Project } from '../../shared/models';
 
 @Component({
   selector: 'app-shell',
@@ -101,7 +102,7 @@ import { Site } from '../../shared/models';
           <div class="user-avatar">{{ userInitial() }}</div>
           <div class="user-info">
             <span class="user-name">{{ userName() }}</span>
-            <span class="user-role">Site Supervisor · {{ userSite() }}</span>
+            <span class="user-role">Supervisor · {{ userProject() }}</span>
           </div>
         </div>
 
@@ -112,8 +113,8 @@ import { Site } from '../../shared/models';
             <ion-label>Dashboard</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/sites" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
-            <ion-icon name="location-outline" slot="start"></ion-icon>
-            <ion-label>My Sites</ion-label>
+            <ion-icon name="business-outline" slot="start"></ion-icon>
+            <ion-label>My Projects</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/inventory" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="grid-outline" slot="start"></ion-icon>
@@ -174,9 +175,9 @@ import { Site } from '../../shared/models';
           </ion-buttons>
 
           <ion-title>
-            <button class="site-selector" id="site-selector-btn">
-              <span class="site-icon"><ion-icon name="location-outline"></ion-icon></span>
-              <span class="site-name">{{ selectedSiteName() || 'Select site' }}</span>
+            <button class="site-selector" id="project-selector-btn">
+              <span class="site-icon"><ion-icon name="business-outline"></ion-icon></span>
+              <span class="site-name">{{ selectedProjectName() || 'Select project' }}</span>
               <span class="site-chev"><ion-icon name="chevron-down-outline"></ion-icon></span>
             </button>
           </ion-title>
@@ -194,42 +195,42 @@ import { Site } from '../../shared/models';
 
       <ion-router-outlet />
 
-      <ion-popover #sitePopover trigger="site-selector-btn" trigger-action="click" side="bottom" alignment="center" size="auto" (didDismiss)="closeSitePopover()" (ionPopoverWillPresent)="onSitePopoverOpen()">
+      <ion-popover #projectPopover trigger="project-selector-btn" trigger-action="click" side="bottom" alignment="center" size="auto" (didDismiss)="closeProjectPopover()" (ionPopoverWillPresent)="onProjectPopoverOpen()">
         <ng-template>
           <ion-content>
             <ion-list lines="none">
               <ion-list-header class="popover-header">
-                <ion-label>Switch site</ion-label>
+                <ion-label>Switch project</ion-label>
               </ion-list-header>
-              @if (isLoadingSites()) {
+              @if (isLoadingProjects()) {
                 <ion-item>
                   <ion-spinner name="crescent" slot="start"></ion-spinner>
-                  <ion-label>Loading sites...</ion-label>
+                  <ion-label>Loading projects...</ion-label>
                 </ion-item>
               } @else {
-                @for (site of sites(); track site.id) {
+                @for (project of projects(); track project.id) {
                   <ion-item
                     button
                     detail
-                    (click)="selectSite(site)"
-                    [class.selected-site]="site.id === selectedSiteId()"
+                    (click)="selectProject(project)"
+                    [class.selected-site]="project.id === selectedProjectId()"
                   >
                     <span class="site-tile-icon" slot="start">
-                      <ion-icon name="location-outline"></ion-icon>
+                      <ion-icon name="business-outline"></ion-icon>
                     </span>
                     <ion-label>
-                      <h3>{{ site.name }}</h3>
-                      <p>Site ID: {{ site.siteId }}</p>
+                      <h3>{{ project.name }}</h3>
+                      <p>{{ project.status }}</p>
                     </ion-label>
-                    @if (site.id === selectedSiteId()) {
+                    @if (project.id === selectedProjectId()) {
                       <ion-icon name="checkmark-circle" slot="end" color="success"></ion-icon>
                     }
                   </ion-item>
                 }
-                @if (sites().length === 0) {
+                @if (projects().length === 0) {
                   <div class="empty-sites">
-                    <ion-icon name="location-outline"></ion-icon>
-                    <p>No sites assigned</p>
+                    <ion-icon name="business-outline"></ion-icon>
+                    <p>No projects assigned</p>
                     <span>Contact your admin to be assigned</span>
                   </div>
                 }
@@ -611,13 +612,12 @@ export class ShellComponent implements OnInit {
   }
 
   currentUser = signal<{ name: string; email: string } | null>(null);
-  sites = signal<Site[]>([]);
-  selectedSiteId = signal<string | null>(null);
-  selectedSiteName = signal<string | null>(null);
-  isSitePopoverOpen = signal(false);
-  isLoadingSites = signal(false);
+  projects = signal<Project[]>([]);
+  selectedProjectId = signal<string | null>(null);
+  selectedProjectName = signal<string | null>(null);
+  isProjectPopoverOpen = signal(false);
+  isLoadingProjects = signal(false);
   isLoggingOut = signal(false);
-  siteCount = computed(() => this.sites().length);
   unreadCount = computed(() => this.notifications.unreadCount());
   pendingApprovals = signal<number>(0);
   pendingExpenses = signal<number>(0);
@@ -631,8 +631,8 @@ export class ShellComponent implements OnInit {
     return this.currentUser()?.name || 'Supervisor';
   }
 
-  userSite(): string {
-    return this.selectedSiteName() || 'No site';
+  userProject(): string {
+    return this.selectedProjectName() || 'No project selected';
   }
 
   isActiveRoute(path: string): boolean {
@@ -646,60 +646,47 @@ export class ShellComponent implements OnInit {
       logOutOutline, chevronDownOutline, notificationsOutline,
       businessOutline, shieldCheckmarkOutline, locationOutline,
       gridOutline, clipboardOutline, barChartOutline,
-      fileTrayOutline,
+      fileTrayOutline, checkmarkCircle,
     });
 
     this.currentUser.set(this.auth.currentUser());
     await this.supervisor.init();
 
-    // Sites are loaded from the dashboard response — no separate API call needed.
-    // The site selector popover will fetch sites lazily when opened.
+    // Projects are loaded lazily when the project selector opens.
     const sel = this.supervisor.selection();
     if (sel) {
-      this.selectedSiteId.set(sel.siteId);
-      this.selectedSiteName.set(sel.siteName || null);
+      this.selectedProjectId.set(sel.projectId);
+      this.selectedProjectName.set(sel.projectName || null);
     }
 
     // Badge counts: derive from dashboard data if available, otherwise defer
     this.loadBadgeCountsDeferred();
   }
 
-  async loadSites(): Promise<void> {
-    if (this.isLoadingSites() || this.sites().length > 0) return;
-    this.isLoadingSites.set(true);
+  async loadProjects(): Promise<void> {
+    if (this.isLoadingProjects() || this.projects().length > 0) return;
+    this.isLoadingProjects.set(true);
     try {
-      const response = await new Promise<{ sites: Site[] }>((resolve) => {
-        this.supervisor.getSites().subscribe({
-          next: (data) => resolve(data as { sites: Site[] }),
-          error: () => resolve({ sites: [] }),
+      const response = await new Promise<{ projects: Project[] }>((resolve) => {
+        this.supervisor.getProjects().subscribe({
+          next: (data) => resolve(data as { projects: Project[] }),
+          error: () => resolve({ projects: [] }),
         });
       });
 
-      this.sites.set(response.sites);
-
-      const savedSiteId = this.supervisor.selectedSiteId();
-      const savedSiteName = this.supervisor.selectedSiteName();
-
-      if (savedSiteId) {
-        const saved = response.sites.find((site) => site.id === savedSiteId);
-        this.selectedSiteId.set(savedSiteId);
-        this.selectedSiteName.set(savedSiteName || saved?.name || null);
-        if (saved && !savedSiteName) {
-          await this.supervisor.setSelectedSite(
-            saved.id,
-            saved.projectId || '',
-            saved.projectName || saved.name,
-            saved.name
-          );
-        }
-      } else if (response.sites.length > 0) {
-        const first = response.sites[0];
-        await this.selectSite(first);
+      this.projects.set(response.projects);
+      const savedProjectId = this.supervisor.selectedProjectId();
+      const saved = response.projects.find((project) => project.id === savedProjectId);
+      if (saved) {
+        this.selectedProjectId.set(saved.id);
+        this.selectedProjectName.set(saved.name);
+      } else if (response.projects.length > 0) {
+        await this.selectProject(response.projects[0]);
       }
     } catch (error) {
-      console.error('Failed to load sites:', error);
+      console.error('Failed to load projects:', error);
     } finally {
-      this.isLoadingSites.set(false);
+      this.isLoadingProjects.set(false);
     }
   }
 
@@ -718,35 +705,30 @@ export class ShellComponent implements OnInit {
     }, 2000);
   }
 
-  toggleSitePopover(event: Event): void {
+  toggleProjectPopover(event: Event): void {
     event.preventDefault();
-    if (!this.isSitePopoverOpen() && this.sites().length === 0 && !this.isLoadingSites()) {
-      void this.loadSites();
+    if (!this.isProjectPopoverOpen() && this.projects().length === 0 && !this.isLoadingProjects()) {
+      void this.loadProjects();
     }
-    this.isSitePopoverOpen.set(!this.isSitePopoverOpen());
+    this.isProjectPopoverOpen.set(!this.isProjectPopoverOpen());
   }
 
-  closeSitePopover(): void {
-    this.isSitePopoverOpen.set(false);
+  closeProjectPopover(): void {
+    this.isProjectPopoverOpen.set(false);
   }
 
-  onSitePopoverOpen(): void {
-    if (this.sites().length === 0 && !this.isLoadingSites()) {
-      void this.loadSites();
+  onProjectPopoverOpen(): void {
+    if (this.projects().length === 0 && !this.isLoadingProjects()) {
+      void this.loadProjects();
     }
   }
 
-  async selectSite(site: Site): Promise<void> {
-    this.selectedSiteId.set(site.id);
-    this.selectedSiteName.set(site.name);
-    await this.supervisor.setSelectedSite(
-      site.id,
-      site.projectId || '',
-      site.projectName || site.name,
-      site.name
-    );
-    this.closeSitePopover();
-    window.dispatchEvent(new CustomEvent('agb:site-changed', { detail: site.id }));
+  async selectProject(project: Project): Promise<void> {
+    this.selectedProjectId.set(project.id);
+    this.selectedProjectName.set(project.name);
+    await this.supervisor.setSelectedProject(project);
+    this.closeProjectPopover();
+    window.dispatchEvent(new CustomEvent('agb:project-changed', { detail: project.id }));
   }
 
   async logout(): Promise<void> {

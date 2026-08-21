@@ -44,11 +44,17 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
+def servicesJSON = file('google-services.json')
+def pushConfigMarker = file('src/main/assets/public/push-configured.json')
+if (servicesJSON.exists() && servicesJSON.length() > 0) {
+    apply plugin: 'com.google.gms.google-services'
+    pushConfigMarker.parentFile.mkdirs()
+    pushConfigMarker.text = '{"configured":true}'
+} else {
+    pushConfigMarker.delete()
+    def releaseRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+    if (releaseRequested) {
+        throw new GradleException('android/app/google-services.json is required for release builds so device notifications can be delivered')
     }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+    logger.warn("google-services.json not found; debug builds will not receive device push notifications")
 }

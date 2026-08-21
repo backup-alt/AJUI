@@ -307,6 +307,26 @@ export async function updateMaterialStock(req: Request, res: Response, next: Nex
   } catch (e) { next(e); }
 }
 
+export async function updateMaterialReceived(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const material = await mobileService.updateMaterialReceivedForSupervisor(
+      userId,
+      req.params.id,
+      req.body.received
+    );
+
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/inventory");
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/supervisor/material-bill-requests");
+    invalidateCachePrefix("/api/supervisor/dashboard");
+    invalidateCachePrefix("/api/dashboard/batch");
+
+    res.json({ material });
+  } catch (e) { next(e); }
+}
+
 // =================== LABOUR (mobile) ===================
 export async function listLabour(req: Request, res: Response, next: NextFunction) {
   try {

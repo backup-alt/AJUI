@@ -50,14 +50,14 @@ type SupervisorOption = { id: string; name: string };
         </div>
 
         <form class="erp-form" (submit)="submit($event)">
-          <label class="span-2" *ngIf="clients.length">
+          <label>
             <span>Client</span>
             <select name="clientId" required [value]="initialValue?.clientId || currentClientId">
               <option value="">Select client</option>
               <option *ngFor="let client of clients" [value]="client._id || client.id">{{ client.name }}</option>
             </select>
           </label>
-          <label class="span-2">
+          <label>
             <span>Project Name</span>
             <input name="name" required [value]="initialValue?.name || ''" placeholder="Example: Green Nest Villas Phase 2" />
           </label>

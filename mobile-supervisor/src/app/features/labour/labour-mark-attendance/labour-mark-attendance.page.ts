@@ -346,7 +346,7 @@ export class LabourMarkAttendancePage implements OnInit {
 
     if (!siteId || !siteName || !projectId) {
       const toast = await this.toastCtrl.create({
-        message: 'Please select a site first',
+        message: 'Please select a project first',
         duration: 2500,
         color: 'warning',
         position: 'top',

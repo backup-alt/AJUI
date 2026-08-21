@@ -76,16 +76,16 @@ import { AuthService } from '../../../core/services/auth.service';
           </div>
           <div>
             <h1 class="page-title">Labour Attendance</h1>
-            <p class="page-subtitle">Log daily attendance for the active site</p>
+          <p class="page-subtitle">Log daily attendance for the active project</p>
           </div>
         </div>
 
-        @if (selectedSiteName()) {
+        @if (selectedProjectName()) {
           <div class="site-banner">
             <ion-icon name="location-outline"></ion-icon>
             <div>
-              <div class="site-banner-label">Site</div>
-              <div class="site-banner-value">{{ selectedSiteName() }}</div>
+              <div class="site-banner-label">Project</div>
+              <div class="site-banner-value">{{ selectedProjectName() }}</div>
             </div>
           </div>
         }
@@ -271,6 +271,7 @@ export class LabourCreatePage implements OnInit {
   isSubmitting = signal(false);
   selectedSiteId = signal<string | null>(null);
   selectedSiteName = signal<string | null>(null);
+  selectedProjectName = signal<string | null>(null);
   siteProjectId = signal<string | null>(null);
   supervisorName = signal<string>('');
 
@@ -280,6 +281,7 @@ export class LabourCreatePage implements OnInit {
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
+    this.selectedProjectName.set(this.supervisor.selectedProjectName());
     this.siteProjectId.set(this.supervisor.selectedProjectId());
     const user = this.auth.currentUser();
     const name = user?.name?.trim() || '';
@@ -305,7 +307,7 @@ export class LabourCreatePage implements OnInit {
 
     if (!siteId || !siteName) {
       const toast = await this.toastCtrl.create({
-        message: 'Please select a site first',
+        message: 'Please select a project first',
         duration: 2500,
         color: 'warning',
         position: 'top',
@@ -316,7 +318,7 @@ export class LabourCreatePage implements OnInit {
 
     if (!projectId) {
       const toast = await this.toastCtrl.create({
-        message: 'Project for this site is not set. Please contact admin.',
+        message: 'This project is not configured for mobile updates. Please contact admin.',
         duration: 3000,
         color: 'danger',
         position: 'top',

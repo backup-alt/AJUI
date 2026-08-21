@@ -115,10 +115,10 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
           <h1 class="type-title">{{ labourType() || 'Workers' }}</h1>
           <p class="type-subtitle">
             {{ workers().length }} {{ workers().length === 1 ? 'worker' : 'workers' }}
-            @if (selectedSiteName()) {
+        @if (selectedProjectName()) {
               <span class="site-pill">
                 <ion-icon name="location-outline"></ion-icon>
-                {{ selectedSiteName() }}
+            {{ selectedProjectName() }}
               </span>
             }
           </p>
@@ -145,7 +145,7 @@ const LABOUR_TYPE_COLORS: Record<string, string> = {
           <app-empty-state
             icon="person-outline"
             title="No workers yet"
-            [message]="'No ' + (labourType() || '') + ' workers added for this site yet. Tap Add to create one.'"
+            [message]="'No ' + (labourType() || '') + ' workers added for this project yet. Tap Add to create one.'"
           ></app-empty-state>
         } @else {
           @for (worker of workers(); track worker._id) {
@@ -480,6 +480,7 @@ export class LabourWorkersPage implements OnInit {
   isLoadingMore = signal(false);
   nextCursor = signal<string | null>(null);
   selectedSiteName = signal<string>('');
+  selectedProjectName = signal<string>('');
 
   markedWorkerIds = computed(() => new Set(this.todayAttendance().map(a => a.workerId)));
   hasWorkers = computed(() => this.workers().length > 0);
@@ -511,11 +512,13 @@ export class LabourWorkersPage implements OnInit {
     await this.supervisor.init().catch(() => {});
     this.labourType.set(decodeURIComponent(this.route.snapshot.paramMap.get('type') || ''));
     this.selectedSiteName.set(this.supervisor.selectedSiteName() || '');
+    this.selectedProjectName.set(this.supervisor.selectedProjectName() || '');
 
     this.supervisor.siteChanged$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
-        this.selectedSiteName.set(this.supervisor.selectedSiteName() || '');
+      this.selectedSiteName.set(this.supervisor.selectedSiteName() || '');
+      this.selectedProjectName.set(this.supervisor.selectedProjectName() || '');
         void this.loadWorkers();
       });
 

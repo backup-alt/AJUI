@@ -10,6 +10,8 @@ import {
   IonRefresherContent,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
+  IonCheckbox,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
@@ -35,7 +37,6 @@ interface ConsolidatedMaterial {
   name: string;
   unit: string;
   totalConsumed: number;
-  siteCount: number;
   projectNames: string[];
   items: Material[];
 }
@@ -53,6 +54,7 @@ interface ConsolidatedMaterial {
     IonRefresherContent,
     IonInfiniteScroll,
     IonInfiniteScrollContent,
+    IonCheckbox,
     DatePipe,
     PageHeaderComponent,
     EmptyStateComponent,
@@ -72,7 +74,7 @@ interface ConsolidatedMaterial {
 
       <div class="filter-stack">
         <ion-searchbar
-          placeholder="Search by material, site, vendor"
+          placeholder="Search by material, project, vendor"
           [ngModel]="searchQuery"
           (ngModelChange)="onSearchChange($event)"
           class="search"
@@ -118,7 +120,7 @@ interface ConsolidatedMaterial {
                     <h3 class="material-name">{{ group.name }}</h3>
                     <p class="material-site">
                       <ion-icon name="business-outline"></ion-icon>
-                      <span class="site-text">{{ group.siteCount }} site{{ group.siteCount === 1 ? '' : 's' }} &bull; {{ group.projectNames.slice(0, 2).join(', ') }}{{ group.projectNames.length > 2 ? ' +' + (group.projectNames.length - 2) : '' }}</span>
+                      <span class="site-text">{{ group.projectNames.slice(0, 2).join(', ') }}{{ group.projectNames.length > 2 ? ' +' + (group.projectNames.length - 2) : '' }}</span>
                     </p>
                   </div>
                   <ion-icon class="expand-chevron" name="chevron-down-outline"></ion-icon>
@@ -148,12 +150,21 @@ interface ConsolidatedMaterial {
                   @for (item of group.items; track item._id) {
                     <div class="breakdown-item">
                       <div class="breakdown-info">
-                        <span class="breakdown-site">{{ item.site }}</span>
-                        <span class="breakdown-project">{{ item.projectName }}</span>
+                        <span class="breakdown-site">{{ item.projectName }}</span>
+                        <span class="breakdown-project">{{ item.vendor || 'Vendor not recorded' }}</span>
                       </div>
                       <div class="breakdown-stats">
                         <span class="breakdown-qty">{{ item.consumedQuantity || 0 }} {{ item.unit }} consumed</span>
                       </div>
+                      <label class="received-control">
+                        <ion-checkbox
+                          aria-label="Mark material as received"
+                          [checked]="item.received || item.status === 'Received'"
+                          [disabled]="updatingReceived().has(item._id)"
+                          (ionChange)="setReceived(item, $event.detail.checked)"
+                        ></ion-checkbox>
+                        <span>{{ item.received || item.status === 'Received' ? 'Received' : 'Mark received' }}</span>
+                      </label>
                       <div class="consumption-log">
                         <div class="consumption-log-title">Consumption logs</div>
                         @if (loadingConsumptionKeys().has(item._id)) {
@@ -338,6 +349,8 @@ interface ConsolidatedMaterial {
     .breakdown-project { font-size: 12px; color: var(--m3-on-surface-muted); margin-top: 2px; }
     .breakdown-stats { display: flex; align-items: center; gap: 10px; }
     .breakdown-qty { font-size: 14px; font-weight: 600; color: var(--m3-on-surface); }
+    .received-control { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--m3-on-surface); }
+    .received-control ion-checkbox { --size: 21px; --checkbox-background-checked: var(--m3-success); --border-color-checked: var(--m3-success); }
     .breakdown-chevron { font-size: 16px; color: var(--m3-on-surface-muted); }
     .consumption-log {
       width: 100%;
@@ -399,6 +412,7 @@ interface ConsolidatedMaterial {
 export class MaterialsPage implements OnInit {
   private destroyRef = inject(DestroyRef);
   private supervisor = inject(SupervisorService);
+  private toastCtrl = inject(ToastController);
 
   materials = signal<Material[]>([]);
   consolidatedMaterials = signal<ConsolidatedMaterial[]>([]);
@@ -407,6 +421,7 @@ export class MaterialsPage implements OnInit {
   errorMessage = signal<string>('');
   expandedKey = signal<string>('');
   loadingConsumptionKeys = signal<Set<string>>(new Set());
+  updatingReceived = signal<Set<string>>(new Set());
   nextCursor = signal<string | null>(null);
   searchQuery = '';
   private loadGeneration = 0;
@@ -527,14 +542,12 @@ export class MaterialsPage implements OnInit {
           existing.projectNames.push(m.projectName);
         }
         existing.items.push(m);
-        existing.siteCount = new Set(existing.items.map((item) => item.siteId || item.site)).size;
       } else {
         map.set(key, {
           key,
           name: m.name.trim(),
           unit: m.unit,
           totalConsumed: m.consumedQuantity ?? 0,
-          siteCount: 1,
           projectNames: [m.projectName],
           items: [m],
         });
@@ -593,6 +606,45 @@ export class MaterialsPage implements OnInit {
       for (const item of pending) next.delete(item._id);
       return next;
     });
+  }
+
+  async setReceived(item: Material, received: boolean): Promise<void> {
+    const wasReceived = Boolean(item.received || item.status === 'Received');
+    if (wasReceived === received || this.updatingReceived().has(item._id)) return;
+    this.updatingReceived.update((current) => new Set([...current, item._id]));
+    this.materials.update((items) => items.map((entry) => entry._id === item._id
+      ? { ...entry, received, status: received ? 'Received' : 'Not Received' }
+      : entry));
+    this.filterMaterials();
+    try {
+      await firstValueFrom(this.supervisor.setMaterialReceived(item._id, received));
+      window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: item._id, reason: 'received' } }));
+      const toast = await this.toastCtrl.create({
+        message: received ? `${item.name} marked as received` : `${item.name} marked as not received`,
+        duration: 1800,
+        color: 'success',
+        position: 'top',
+      });
+      await toast.present();
+    } catch (error) {
+      this.materials.update((items) => items.map((entry) => entry._id === item._id
+        ? { ...entry, received: wasReceived, status: item.status }
+        : entry));
+      this.filterMaterials();
+      const toast = await this.toastCtrl.create({
+        message: (error as Error)?.message || 'Could not update received status',
+        duration: 2200,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+    } finally {
+      this.updatingReceived.update((current) => {
+        const next = new Set(current);
+        next.delete(item._id);
+        return next;
+      });
+    }
   }
 
 }

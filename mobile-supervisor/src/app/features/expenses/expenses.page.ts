@@ -41,8 +41,8 @@ import {
       </ion-refresher>
 
       <app-page-header
-        title="Site expenses"
-        subtitle="Across all assigned sites"
+        title="Project expenses"
+        subtitle="Across all assigned projects"
       ></app-page-header>
 
       <div class="filter-stack">
@@ -67,7 +67,7 @@ import {
             <ion-icon name="wallet-outline"></ion-icon>
             Cash ledger
           </span>
-          <span class="ledger-site">All assigned sites</span>
+            <span class="ledger-site">All assigned projects</span>
         </header>
         <div class="ledger-stats">
           <div class="ledger-stat added">
@@ -98,7 +98,7 @@ import {
           <app-empty-state
             icon="wallet-outline"
             title="No expenses yet"
-            message="Log a site expense or cash top-up to get started."
+            message="Log a project expense or cash top-up to get started."
           ></app-empty-state>
         } @else {
             @for (expense of filteredExpenses(); track expense._id) {
@@ -118,7 +118,7 @@ import {
                   <h3 class="expense-desc">{{ expense.description }}</h3>
                   <p class="expense-meta">
                     <ion-icon name="location-outline"></ion-icon>
-                    {{ expense.site || 'General' }} - {{ expense.projectName || 'N/A' }}
+                  {{ expense.projectName || 'General' }}
                   </p>
                 </div>
                 <app-status-pill [tone]="getStatusTone(expense.status)">{{ expense.status }}</app-status-pill>
@@ -465,7 +465,7 @@ export class ExpensesPage implements OnInit {
     let filtered = this.expenses();
     if (this.searchQuery) {
       const q = this.searchQuery.toLowerCase();
-      filtered = filtered.filter((e) => e.description.toLowerCase().includes(q) || e.site?.toLowerCase().includes(q));
+      filtered = filtered.filter((e) => e.description.toLowerCase().includes(q) || e.projectName?.toLowerCase().includes(q));
     }
     if (this.statusFilter) filtered = filtered.filter((e) => e.status === this.statusFilter);
     this.filteredExpenses.set(filtered);

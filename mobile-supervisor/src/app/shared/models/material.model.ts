@@ -21,6 +21,8 @@ export interface Material {
   poNumber?: string;
   billUrl?: string;
   receiptImageName?: string;
+  received?: boolean;
+  receivedDate?: string;
   requestDate: string;
   approvalDate?: string;
   status: MaterialStatus;
@@ -42,6 +44,7 @@ export interface PurchaseHistoryEntry {
   quantity: number;
   date: string;
   notes?: string;
+  billUrl?: string;
 }
 
 export interface ConsumptionHistoryEntry {

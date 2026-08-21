@@ -209,43 +209,53 @@ export class AuthService {
   private async completeLogin(response: LoginResponse): Promise<LoginResponse> {
     await this.saveAuthData(response);
     await this.initAfterLogin();
+    void this.notifications.initializeDevicePush();
     return response;
   }
 
   /**
    * Called after a successful login/signup to load the supervisor's profile
-   * and auto-select the first assigned site. The dashboard page also calls
-   * this on init so the site is always loaded on app start.
+   * and auto-select the first assigned project. A project's first location
+   * record is retained internally for compatibility with existing write APIs.
    */
   async initAfterLogin(): Promise<void> {
     try {
-      const response = await firstValueFrom(
+      const [projectResponse, siteResponse] = await Promise.all([
+        firstValueFrom(
+          this.api.get<{
+            projects: Array<{ id: string; name: string }>;
+          }>('/supervisor/projects')
+        ),
+        firstValueFrom(
         this.api.get<{
           sites: Array<{ id: string; name: string; projectId?: string; projectName?: string }>;
         }>('/supervisor/sites')
-      );
+        ),
+      ]);
 
-      const sites = response.sites || [];
+      const projects = projectResponse.projects || [];
+      const sites = siteResponse.sites || [];
 
-      // Only auto-select if no site is currently selected (preserve previous choice)
-      const currentSiteId = this.supervisorService.selectedSiteId();
-      if (currentSiteId && sites.some((s) => s.id === currentSiteId)) {
+      // Preserve a previously selected project when it is still assigned.
+      const currentProjectId = this.supervisorService.selectedProjectId();
+      if (currentProjectId && projects.some((project) => project.id === currentProjectId)) {
         return;
       }
 
-      if (sites.length === 0) {
+      if (projects.length === 0) {
         return;
       }
 
-      const selected = sites[0];
+      const project = projects[0];
+      const selected = sites.find((site) => site.projectId === project.id);
       await this.supervisorService.setSelectedSite(
-        selected.id,
-        selected.projectId || '',
-        selected.projectName || '',
-        selected.name
+        selected?.id || '',
+        project.id,
+        project.name,
+        selected?.name || ''
       );
     } catch (err) {
-      console.warn('[Auth] initAfterLogin failed - site may not be auto-selected', err);
+      console.warn('[Auth] initAfterLogin failed - project may not be auto-selected', err);
     }
   }
 

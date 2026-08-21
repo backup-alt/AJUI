@@ -42,8 +42,8 @@ export class NotificationService {
 
   /**
    * One-time check for whether Firebase is actually configured for this
-   * app build. The Capacitor sync step copies `google-services.json` (when
-   * present) into the APK as `assets/public/google-services.json`. If that
+   * app build. The Android build writes a small marker when a valid
+   * `google-services.json` is present. If that
    * file is absent `PushNotifications.register()` will synchronously throw
    * `IllegalStateException("Default FirebaseApp is not initialized")` on
    * the bridge's main thread — Capacitor rethrows that as a RuntimeException
@@ -56,9 +56,9 @@ export class NotificationService {
     if (!this.fcmAvailable()) return false;
     if (typeof fetch === 'undefined') return true;
     try {
-      const res = await fetch('google-services.json', { method: 'HEAD', cache: 'no-store' });
+      const res = await fetch('push-configured.json', { method: 'HEAD', cache: 'no-store' });
       if (!res.ok) {
-        console.warn('[Notification] google-services.json missing — push disabled');
+        console.warn('[Notification] native Firebase configuration missing — push disabled');
         this.fcmAvailable.set(false);
         return false;
       }
@@ -91,11 +91,10 @@ export class NotificationService {
       //    RuntimeException rethrow (see probeFirebaseConfigured for details).
       const fcmOk = await this.probeFirebaseConfigured();
       if (!fcmOk) {
-        console.warn('[Notification] FCM unavailable — keeping permission but skipping register()');
-        // Persist pushEnabled=true so the toggle UI reflects what the user
-        // asked for; they still get notifications via in-app polling.
-        await this.persistPreference(true);
-        return true;
+        console.warn('[Notification] FCM unavailable — device push cannot be enabled');
+        this.pushEnabled.set(false);
+        await this.persistPreference(false);
+        return false;
       }
 
       // 3. Firebase is configured. register() is wrapped defensively so an
@@ -177,6 +176,16 @@ export class NotificationService {
     return this.requestPermission();
   }
 
+  /**
+   * Restore real device delivery after login. Enabled users are registered
+   * again on every app launch so refreshed FCM tokens reach the backend.
+   * New installs receive the operating-system permission prompt once.
+   */
+  async initializeDevicePush(): Promise<boolean> {
+    if (this.pushEnabled()) return this.requestPermission();
+    return this.ensurePushPermissionOnce();
+  }
+
   /** Mark the user as opted out so we never ask again. */
   async markOptedOut(): Promise<void> {
     this.optedOut = true;
@@ -190,22 +199,10 @@ export class NotificationService {
    * Firebase init can never block the Angular zone.
    */
   private async register(): Promise<void> {
-    // 1. Tell Capacitor we want to receive pushes.
-    try {
-      await this.raceWithTimeout(
-        PushNotifications.register(),
-        5000,
-        'PushNotifications.register'
-      );
-    } catch (err) {
-      console.warn('[Notification] register failed (push disabled):', err);
-      this.fcmAvailable.set(false);
-      return;
-    }
-
-    // 2. Add listeners — each is wrapped independently so a single failure
-    // does not abort the others and does not propagate out of register().
-    this.safeAddListener('registration', async (token: Token) => {
+    // Add listeners before register(). Android can emit the token immediately,
+    // so attaching them afterwards intermittently loses device registration.
+    await Promise.all([
+      this.safeAddListener('registration', async (token: Token) => {
       if (!token?.value) return;
       this.fcmToken.set(token.value);
       try {
@@ -225,41 +222,73 @@ export class NotificationService {
       } catch (err) {
         console.warn('[Notification] failed to register device with backend:', err);
       }
-    });
+      }),
 
-    this.safeAddListener('registrationError', (err) => {
-      console.warn('[Notification] FCM registration error:', err);
-    });
+      this.safeAddListener('registrationError', (err) => {
+        console.warn('[Notification] FCM registration error:', err);
+      }),
 
-    this.safeAddListener('pushNotificationReceived', (notification) => {
-      try {
-        this.addInApp({
-          id: notification.id || String(Date.now()),
-          title: notification.title || 'Notification',
-          body: notification.body || '',
-          data: notification.data,
-          receivedAt: Date.now(),
-          read: false,
-        });
-      } catch (err) {
-        console.warn('[Notification] failed to add in-app notification:', err);
-      }
-    });
-
-    this.safeAddListener('pushNotificationActionPerformed', (action) => {
-      try {
-        const data = action.notification?.data;
-        if (data?.['route']) {
-          window.dispatchEvent(
-            new CustomEvent('agb:push-navigate', { detail: data['route'] })
-          );
+      this.safeAddListener('pushNotificationReceived', (notification) => {
+        try {
+          this.addInApp({
+            id: notification.id || String(Date.now()),
+            title: notification.title || 'Notification',
+            body: notification.body || '',
+            data: notification.data,
+            receivedAt: Date.now(),
+            read: false,
+          });
+        } catch (err) {
+          console.warn('[Notification] failed to add in-app notification:', err);
         }
-      } catch (err) {
-        console.warn('[Notification] action handler failed:', err);
-      }
-    });
+      }),
 
-    // 3. Drain any already-delivered notifications into the in-app list.
+      this.safeAddListener('pushNotificationActionPerformed', (action) => {
+        try {
+          const data = action.notification?.data;
+          if (data?.['route']) {
+            window.dispatchEvent(
+              new CustomEvent('agb:push-navigate', { detail: data['route'] })
+            );
+          }
+        } catch (err) {
+          console.warn('[Notification] action handler failed:', err);
+        }
+      }),
+    ]);
+
+    try {
+      await this.raceWithTimeout(
+        PushNotifications.createChannel({
+          id: 'agb_updates',
+          name: 'AGB updates',
+          description: 'Project approvals and material updates',
+          importance: 5,
+          visibility: 1,
+          vibration: true,
+        }),
+        3000,
+        'PushNotifications.createChannel'
+      );
+    } catch (err) {
+      console.warn('[Notification] notification channel setup failed:', err);
+    }
+
+    try {
+      await this.raceWithTimeout(
+        PushNotifications.register(),
+        5000,
+        'PushNotifications.register'
+      );
+    } catch (err) {
+      console.warn('[Notification] register failed (push disabled):', err);
+      this.fcmAvailable.set(false);
+      this.pushEnabled.set(false);
+      await this.persistPreference(false);
+      return;
+    }
+
+    // Drain any already-delivered notifications into the in-app list.
     try {
       await this.raceWithTimeout(
         PushNotifications.getDeliveredNotifications(),

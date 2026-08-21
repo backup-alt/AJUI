@@ -136,7 +136,7 @@ interface WageCalculation {
             </p>
             <p class="profile-site">
               <ion-icon name="location-outline"></ion-icon>
-              {{ worker()!.site }}
+              {{ worker()!.projectName }}
             </p>
           </div>
         </div>
@@ -176,8 +176,8 @@ interface WageCalculation {
                 <div class="info-row">
                   <span class="info-icon"><ion-icon name="business-outline"></ion-icon></span>
                   <div class="info-data">
-                    <span class="info-label">Site</span>
-                    <span class="info-value">{{ worker()!.site }}</span>
+                    <span class="info-label">Project</span>
+                    <span class="info-value">{{ worker()!.projectName }}</span>
                   </div>
                 </div>
                 @if (worker()!.address) {

@@ -13,6 +13,7 @@ import {
   uploadExpenseReceiptMobileSchema,
   approvalActionSchema,
   updateMaterialStockSchema,
+  updateMaterialReceivedSchema,
   createWorkerSchema,
   markAttendanceSchema,
   updateAttendanceSchema,
@@ -51,6 +52,7 @@ router.get("/supervisor/materials/:id", cache(30), ctrl.getMaterial);
 router.post("/supervisor/materials", validate(createMaterialMobileSchema), ctrl.createMaterial);
 router.post("/supervisor/inventory/add-existing", validate(addExistingMaterialMobileSchema), ctrl.addExistingMaterial);
 router.patch("/supervisor/materials/:id/stock", validate(updateMaterialStockSchema), ctrl.updateMaterialStock);
+router.patch("/supervisor/materials/:id/received", validate(updateMaterialReceivedSchema), ctrl.updateMaterialReceived);
 router.post("/supervisor/materials/:id/receipt", validate(uploadExpenseReceiptMobileSchema), ctrl.uploadMaterialReceipt);
 
 // Labour

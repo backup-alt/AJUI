@@ -10,8 +10,7 @@ import {
   IonRefresherContent,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
-  IonFab,
-  IonFabButton,
+  IonCheckbox,
   IonSelect,
   IonSelectOption,
   ModalController,
@@ -43,7 +42,6 @@ import { Router } from '@angular/router';
 import { PageHeaderComponent, EmptyStateComponent } from '../../shared/components';
 import { InventoryEditModalComponent } from './inventory-edit-modal/inventory-edit-modal.component';
 import { InventoryRequestModalComponent } from './inventory-request-modal/inventory-request-modal.component';
-import { InventoryActionSheetComponent } from './inventory-action-sheet/inventory-action-sheet.component';
 
 export interface InventoryItem {
   _id: string;
@@ -55,8 +53,8 @@ export interface InventoryItem {
   minimumQuantity: number;
   lastUpdated: string;
   vendor: string;
-  poNumber: string;
   status: MaterialStatus;
+  received: boolean;
   projectId: string;
   projectName: string;
   siteId: string;
@@ -82,8 +80,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
     FormsModule,
     IonContent,
     IonSearchbar,
-    IonFab,
-    IonFabButton,
+    IonCheckbox,
     IonSelect,
     IonSelectOption,
     IonIcon,
@@ -104,7 +101,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
 
       <app-page-header
         title="Materials"
-        subtitle="Current material stock at your site"
+        subtitle="Current material stock for the selected project"
       >
         <span actions class="count-chip">{{ filteredItems().length }} item{{ filteredItems().length === 1 ? '' : 's' }}</span>
       </app-page-header>
@@ -175,7 +172,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                   <h3 class="material-name">{{ item.name }}</h3>
                   <p class="material-meta">
                     <ion-icon name="business-outline"></ion-icon>
-                    {{ item.site }}
+                    {{ item.projectName }}
                   </p>
                 </div>
                 @if (item.currentQuantity <= item.minimumQuantity) {
@@ -207,12 +204,6 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                     <span class="detail-value">{{ item.vendor }}</span>
                   </div>
                 }
-                @if (item.poNumber) {
-                  <div class="detail-row">
-                    <span class="detail-label">PO Number</span>
-                    <span class="detail-value po-value">{{ item.poNumber }}</span>
-                  </div>
-                }
                 <div class="detail-row">
                   <span class="detail-label">Last Updated</span>
                   <span class="detail-value">{{ item.lastUpdated | date:'MMM d, yyyy' }}</span>
@@ -242,6 +233,15 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
               }
 
               <footer class="card-footer">
+                <label class="received-control" (click)="$event.stopPropagation()">
+                  <ion-checkbox
+                    aria-label="Mark material as received"
+                    [checked]="item.received"
+                    [disabled]="updatingReceived().has(item._id)"
+                    (ionChange)="setReceived(item, $event.detail.checked)"
+                  ></ion-checkbox>
+                  <span>{{ item.received ? 'Received' : 'Mark received' }}</span>
+                </label>
                 <button class="request-btn" (click)="raiseRequest(item); $event.stopPropagation()">
                   <ion-icon name="add-outline"></ion-icon>
                   Raise Request
@@ -251,12 +251,6 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
           }
         }
       </div>
-
-      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button (click)="showInventoryActions()">
-          <ion-icon name="add-outline"></ion-icon>
-        </ion-fab-button>
-      </ion-fab>
 
       <ion-infinite-scroll
         threshold="160px"
@@ -503,16 +497,15 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
       font-weight: 600;
       color: var(--m3-on-surface);
     }
-    .detail-value.po-value {
-      font-family: var(--m3-font-mono);
-      font-size: 12px;
-      color: var(--m3-success);
-    }
-
     .card-footer {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
     }
+
+    .received-control { display: inline-flex; align-items: center; gap: 8px; color: var(--m3-on-surface); font-size: 13px; font-weight: 700; }
+    .received-control ion-checkbox { --size: 21px; --checkbox-background-checked: var(--m3-success); --border-color-checked: var(--m3-success); }
 
     .request-btn {
       display: inline-flex;
@@ -620,23 +613,6 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
     }
     .retry-btn ion-icon { font-size: 16px; }
 
-    ion-fab-button { --background: var(--m3-primary); --color: var(--m3-on-primary); }
-
-    :host ::ng-deep .action-sheet-modal {
-      --backdrop-opacity: 0;
-      --width: 100%;
-      --max-width: 480px;
-      --height: auto;
-      --border-radius: var(--md-radius-2xl) var(--md-radius-2xl) 0 0;
-      --box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
-      align-self: center;
-    }
-
-    :host ::ng-deep .action-sheet-modal ion-content {
-      --background: transparent;
-      --overflow: hidden;
-    }
-
     .bill-viewer-overlay {
       position: fixed; inset: 0; z-index: 9999;
       background: rgba(0,0,0,0.92);
@@ -680,6 +656,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   isLoadingMore = signal(false);
   errorMessage = signal<string>('');
   nextCursor = signal<string | null>(null);
+  updatingReceived = signal<Set<string>>(new Set());
   searchQuery = signal('');
   stockFilter = signal<InventoryStockFilter>('all');
   sortField = signal<SortField>('name');
@@ -706,8 +683,7 @@ export class InventoryPage implements OnInit, OnDestroy {
         (i) =>
           i.name.toLowerCase().includes(q) ||
           (i.vendor || '').toLowerCase().includes(q) ||
-          (i.poNumber || '').toLowerCase().includes(q) ||
-          (i.site || '').toLowerCase().includes(q) ||
+          (i.projectName || '').toLowerCase().includes(q) ||
           (i.category || '').toLowerCase().includes(q)
       );
     }
@@ -763,13 +739,13 @@ export class InventoryPage implements OnInit, OnDestroy {
         ...(existing.purchaseHistory || []),
         ...(item.purchaseHistory || []),
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      existing.received = existing.received && item.received;
 
       if (new Date(item.lastUpdated).getTime() > new Date(existing.lastUpdated).getTime()) {
         existing.lastUpdated = item.lastUpdated;
         existing._id = item._id;
         existing.materialId = item.materialId;
         existing.vendor = item.vendor;
-        existing.poNumber = item.poNumber;
         existing.billUrl = item.billUrl;
       }
     }
@@ -904,8 +880,8 @@ export class InventoryPage implements OnInit, OnDestroy {
       minimumQuantity: material.minimumQuantity || 0,
       lastUpdated: material.updatedAt || material.requestDate,
       vendor: material.vendor || '',
-      poNumber: material.poNumber || '',
       status: material.status,
+      received: Boolean(material.received || material.status === 'Received'),
       projectId: material.projectId,
       projectName: material.projectName,
       siteId: material.siteId || '',
@@ -978,53 +954,36 @@ export class InventoryPage implements OnInit, OnDestroy {
     }
   }
 
-  async showInventoryActions(): Promise<void> {
-    const modal = await this.modalCtrl.create({
-      component: InventoryActionSheetComponent,
-      cssClass: 'action-sheet-modal',
-      breakpoints: [0, 0.5, 0.7],
-      initialBreakpoint: 0.5,
-      handle: false,
-      showBackdrop: false,
-    });
-    await modal.present();
-    const { data } = await modal.onDidDismiss();
-    if (data?.action === 'existing') {
-      void this.openAddExisting();
-    } else if (data?.action === 'request') {
-      void this.raiseRequest(null);
+  async setReceived(item: InventoryItem, received: boolean): Promise<void> {
+    if (item.received === received || this.updatingReceived().has(item._id)) return;
+    this.updatingReceived.update((current) => new Set([...current, item._id]));
+    this.items.update((items) => items.map((entry) => entry._id === item._id ? { ...entry, received } : entry));
+    try {
+      await firstValueFrom(this.supervisor.setMaterialReceived(item._id, received));
+      window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: item._id, reason: 'received' } }));
+      const toast = await this.toastCtrl.create({
+        message: received ? `${item.name} marked as received` : `${item.name} marked as not received`,
+        duration: 1800,
+        color: 'success',
+        position: 'top',
+      });
+      await toast.present();
+    } catch (error) {
+      this.items.update((items) => items.map((entry) => entry._id === item._id ? { ...entry, received: item.received } : entry));
+      const toast = await this.toastCtrl.create({
+        message: (error as Error)?.message || 'Could not update received status',
+        duration: 2200,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+    } finally {
+      this.updatingReceived.update((current) => {
+        const next = new Set(current);
+        next.delete(item._id);
+        return next;
+      });
     }
-  }
-
-  private async openAddExisting(): Promise<void> {
-    const modal = await this.modalCtrl.create({
-      component: InventoryRequestModalComponent,
-      componentProps: {
-        mode: 'existing',
-        // Build the autofill catalog from the current inventory items:
-        // unit / vendor / poNumber / minimumQuantity / remainingStock
-        // are derived from the most-recent stock entry per material name.
-        materialCatalog: this.items().map((item) => ({
-          name: item.name,
-          unit: item.unit,
-          vendor: item.vendor || undefined,
-          poNumber: item.poNumber || undefined,
-          minimumQuantity: item.minimumQuantity ?? null,
-          remainingStock: item.currentQuantity ?? null,
-        })),
-      },
-    });
-    await modal.present();
-    const { data } = await modal.onDidDismiss();
-    if (!data?.added) return;
-    await this.loadInventory(true);
-    const toast = await this.toastCtrl.create({
-      message: data.message || 'Inventory updated successfully',
-      duration: 2500,
-      color: 'success',
-      position: 'top',
-    });
-    await toast.present();
   }
 
   openBillViewer(url: string): void {

@@ -94,7 +94,7 @@ import { Labour } from '../../../shared/models';
           </div>
           <p class="site">
             <ion-icon name="location-outline"></ion-icon>
-            {{ labour()!.site }} - {{ labour()!.projectName }}
+            {{ labour()!.projectName }}
           </p>
 
           <ion-card>

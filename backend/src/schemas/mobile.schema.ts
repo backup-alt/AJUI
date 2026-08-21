@@ -114,6 +114,12 @@ export const updateMaterialStockSchema = z.object({
   }),
 });
 
+export const updateMaterialReceivedSchema = z.object({
+  body: z.object({
+    received: z.boolean(),
+  }),
+});
+
 /**
  * Schema for "Add Existing Material" workflow (supervisor mobile app).
  *

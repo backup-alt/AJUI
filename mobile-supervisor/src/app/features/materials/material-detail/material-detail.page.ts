@@ -47,7 +47,7 @@ import { StatusPillComponent } from '../../../shared/components';
               <h2 class="material-name">{{ material()!.name }}</h2>
               <p class="meta">
                 <ion-icon name="business-outline"></ion-icon>
-                {{ material()!.site }} - {{ material()!.projectName }}
+                {{ material()!.projectName }}
               </p>
             </div>
             <app-status-pill [tone]="getStatusTone(material()!.status)">{{ material()!.status }}</app-status-pill>
@@ -70,12 +70,6 @@ import { StatusPillComponent } from '../../../shared/components';
                 <div class="kv">
                   <span class="kv-label">Vendor</span>
                   <span class="kv-value">{{ material()!.vendor }}</span>
-                </div>
-              }
-              @if (material()!.poNumber) {
-                <div class="kv">
-                  <span class="kv-label">PO Number</span>
-                  <span class="kv-value po-value">{{ material()!.poNumber }}</span>
                 </div>
               }
               <div class="kv">

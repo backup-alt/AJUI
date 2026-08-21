@@ -393,7 +393,6 @@ export async function getAssignedProjects(userId: string) {
 
   const projects = await Project.find({
     _id: { $in: access.projectIds },
-    status: { $ne: "Completed" },
   })
     .sort({ lastActivityAt: -1 })
     .lean();
@@ -1352,6 +1351,53 @@ export async function updateMaterialStockForSupervisor(
   }
 
   return inventory.toObject();
+}
+
+export async function updateMaterialReceivedForSupervisor(
+  userId: string,
+  materialId: string,
+  received: boolean
+) {
+  const { query } = await buildScopedEntityQuery(userId);
+  const receivedDate = received ? new Date().toISOString() : undefined;
+
+  const inventory = await Inventory.findOne({ ...query, _id: materialId });
+  if (inventory) {
+    inventory.received = received;
+    inventory.receivedDate = receivedDate;
+    inventory.lastUpdatedBy = userId;
+    await inventory.save();
+
+    if (inventory.lastMaterialId) {
+      await Material.updateOne(
+        { _id: inventory.lastMaterialId, projectId: inventory.projectId },
+        received
+          ? { status: "Received", receivedDate }
+          : { status: "Not Received", $unset: { receivedDate: 1 } }
+      );
+    }
+
+    return {
+      ...inventory.toObject(),
+      status: received ? "Received" : "Not Received",
+    };
+  }
+
+  const material = await Material.findOne({ ...query, _id: materialId });
+  if (!material) throw new AppError(404, "Material not found or not accessible");
+
+  material.status = received ? "Received" : "Not Received";
+  material.receivedDate = receivedDate;
+  await material.save();
+
+  await Inventory.updateMany(
+    { projectId: material.projectId, lastMaterialId: material._id },
+    received
+      ? { received: true, receivedDate, lastUpdatedBy: userId }
+      : { received: false, lastUpdatedBy: userId, $unset: { receivedDate: 1 } }
+  );
+
+  return material.toObject();
 }
 
 export async function getLabourDetailForSupervisor(userId: string, labourId: string) {
