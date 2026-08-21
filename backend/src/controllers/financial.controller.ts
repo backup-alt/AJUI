@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import * as materialService from "../services/material.service.js";
 import * as labourService from "../services/labour.service.js";
 import * as expenseService from "../services/expense.service.js";
+import * as generalExpenseService from "../services/general-expense.service.js";
 import * as paymentService from "../services/payment.service.js";
 import * as vendorService from "../services/vendor.service.js";
 import * as subcontractorService from "../services/subcontractor.service.js";
@@ -11,6 +12,7 @@ import * as subcontractorLaborService from "../services/subcontractor-labor.serv
 import * as purchaseOrderService from "../services/purchase-order.service.js";
 import * as approvalService from "../services/approval.service.js";
 import * as inventoryService from "../services/inventory.service.js";
+import * as workerService from "../services/worker.service.js";
 import { recomputeProjectTotals } from "../services/financial.service.js";
 import { getScopedProjectIds } from "../middleware/rbac.js";
 import { User } from "../models/User.js";
@@ -267,6 +269,8 @@ export async function uploadMaterialReceipt(req: Request, res: Response, next: N
       fileName: req.body.fileName,
       givenAmount: req.body.givenAmount,
     });
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ material });
   } catch (e) { next(e); }
 }
@@ -551,6 +555,130 @@ export async function getPendingExpenses(req: Request, res: Response, next: Next
   } catch (e) { next(e); }
 }
 
+// =================== GENERAL EXPENSES (project-level "Expense") ===================
+export async function createGeneralExpense(req: Request, res: Response, next: NextFunction) {
+  try {
+    const expense = await generalExpenseService.createGeneralExpense(req.body);
+    invalidateCachePrefix("/api/general-expenses");
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.status(201).json({ expense });
+  } catch (e) { next(e); }
+}
+
+export async function listGeneralExpenses(req: Request, res: Response, next: NextFunction) {
+  try {
+    const t0 = Date.now();
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const rawStatus = req.query.status as string | undefined;
+    const status = (["Pending", "Approved", "Rejected"] as const).includes(rawStatus as any)
+      ? (rawStatus as "Pending" | "Approved" | "Rejected")
+      : undefined;
+    const result = await generalExpenseService.listGeneralExpenses({
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      category: req.query.category as string | undefined,
+      status,
+      from: req.query.from as string | undefined,
+      to: req.query.to as string | undefined,
+      search: req.query.search as string | undefined,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 200,
+      cursor: req.query.cursor as string | undefined,
+      scopeProjectIds,
+    });
+    if (result.queryFailed) {
+      res.status(503).json({ error: "General expenses are temporarily unavailable. Please retry.", ...result });
+      return;
+    }
+    const dt = Date.now() - t0;
+    console.log(
+      `[listGeneralExpenses] dt=${dt}ms limit=${req.query.limit ?? "default"} items=${result.items?.length ?? 0} total=${result.total} scope=${scopeProjectIds?.length ?? "null"}`
+    );
+    res.json(result);
+  } catch (e) {
+    if (res.headersSent) {
+      console.error("[listGeneralExpenses] error after headers sent:", (e as Error).message);
+      return;
+    }
+    console.error("[listGeneralExpenses] failed:", (e as Error).message);
+    res.status(503).json({
+      error: "Database temporarily unavailable, please retry",
+      items: [],
+      total: 0,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 200,
+      pages: 0,
+    });
+  }
+}
+
+export async function listAllGeneralExpenses(req: Request, res: Response, next: NextFunction) {
+  try {
+    const t0 = Date.now();
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const rawStatus = req.query.status as string | undefined;
+    const status = (["Pending", "Approved", "Rejected"] as const).includes(rawStatus as any)
+      ? (rawStatus as "Pending" | "Approved" | "Rejected")
+      : undefined;
+    const result = await generalExpenseService.listAllGeneralExpenses({
+      projectId: req.query.projectId as string | undefined,
+      siteId: req.query.siteId as string | undefined,
+      category: req.query.category as string | undefined,
+      status,
+      from: req.query.from as string | undefined,
+      to: req.query.to as string | undefined,
+      search: req.query.search as string | undefined,
+      scopeProjectIds,
+    });
+    const dt = Date.now() - t0;
+    console.log(
+      `[listAllGeneralExpenses] dt=${dt}ms count=${result.items?.length ?? 0} scope=${scopeProjectIds?.length ?? "null"}`
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getGeneralExpense(req: Request, res: Response, next: NextFunction) {
+  try {
+    const expense = await generalExpenseService.getGeneralExpenseById(req.params.id);
+    res.json({ expense });
+  } catch (e) { next(e); }
+}
+
+export async function uploadGeneralExpenseReceipt(req: Request, res: Response, next: NextFunction) {
+  try {
+    const expense = await generalExpenseService.uploadGeneralExpenseReceipt(req.params.id, {
+      data: req.body.data,
+      mimeType: req.body.mimeType,
+      fileName: req.body.fileName,
+    });
+    invalidateCachePrefix("/api/general-expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.json({ expense });
+  } catch (e) { next(e); }
+}
+
+export async function updateGeneralExpense(req: Request, res: Response, next: NextFunction) {
+  try {
+    const expense = await generalExpenseService.updateGeneralExpense(req.params.id, req.body);
+    invalidateCachePrefix("/api/general-expenses");
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.json({ expense });
+  } catch (e) { next(e); }
+}
+
+export async function deleteGeneralExpense(req: Request, res: Response, next: NextFunction) {
+  try {
+    await generalExpenseService.deleteGeneralExpense(req.params.id);
+    invalidateCachePrefix("/api/general-expenses");
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.json({ success: true });
+  } catch (e) { next(e); }
+}
+
 // =================== PAYMENTS ===================
 export async function createPayment(req: Request, res: Response, next: NextFunction) {
   try {
@@ -756,6 +884,18 @@ export async function listSubcontractorsForWorker(req: Request, res: Response, n
 }
 
 /**
+ * Assignment picker source for the web project workspace. This deliberately
+ * returns every active profile so an existing subcontractor can be assigned
+ * to an additional project instead of being duplicated.
+ */
+export async function listAllActiveSubcontractors(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const items = await subcontractorService.listAllActiveSubcontractors();
+    res.json({ items });
+  } catch (e) { next(e); }
+}
+
+/**
  * Spend rollup for the project workspace "total expense" line. Returns
  * the sum of every SubcontractorPayment row for the given project (or
  * the user's scoped projects, when no projectId is given).
@@ -864,6 +1004,9 @@ export async function createSubcontractorLabor(req: Request, res: Response, next
   try {
     const labor = await subcontractorLaborService.createSubcontractorLabor({ ...req.body, createdBy: req.user?.sub });
     invalidateCachePrefix("/api/subcontractor-labor");
+    invalidateCachePrefix("/api/subcontractors");
+    invalidateCachePrefix("/api/workers");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.status(201).json({ labor });
   } catch (e) { next(e); }
 }
@@ -872,6 +1015,9 @@ export async function updateSubcontractorLabor(req: Request, res: Response, next
   try {
     const labor = await subcontractorLaborService.updateSubcontractorLabor(req.params.id, req.body);
     invalidateCachePrefix("/api/subcontractor-labor");
+    invalidateCachePrefix("/api/subcontractors");
+    invalidateCachePrefix("/api/workers");
+    invalidateCachePrefix("/api/dashboard/batch");
     res.json({ labor });
   } catch (e) { next(e); }
 }
@@ -1057,5 +1203,69 @@ export async function getApprovalCount(req: Request, res: Response, next: NextFu
       userId: req.user?.sub,
     });
     res.json(count);
+  } catch (e) { next(e); }
+}
+
+// =================== WORKER ROSTER (web admin) ===================
+// Powers the "Labour" tab in the project workspace. The same Worker
+// collection the mobile supervisor app writes to — these endpoints expose
+// it to the web admin so editing phone/notes/address doesn't require
+// opening the supervisor app.
+export async function listWorkers(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const requestedProjectId = req.query.projectId as string | undefined;
+    // Non-admins: clamp the requested project to their scope.
+    if (scopeProjectIds !== null) {
+      if (!requestedProjectId || !scopeProjectIds.some((id) => String(id) === requestedProjectId)) {
+        res.json({ items: [], page: 1, limit: 0, total: 0, hasMore: false, nextCursor: null });
+        return;
+      }
+    }
+    const result = await workerService.listWorkers({
+      projectId: requestedProjectId,
+      siteId: req.query.siteId as string | undefined,
+      labourType: req.query.labourType as string | undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      cursor: req.query.cursor as string | undefined,
+    });
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function createWorker(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) throw new AppError(401, "Not authenticated");
+    const worker = await workerService.createWorker({
+      ...req.body,
+      createdBy: userId,
+    });
+    invalidateCachePrefix("/api/workers");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.status(201).json({ worker });
+  } catch (e) { next(e); }
+}
+
+export async function updateWorker(req: Request, res: Response, next: NextFunction) {
+  try {
+    const worker = await workerService.updateWorker(req.params.id, req.body);
+    invalidateCachePrefix("/api/workers");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.json({ worker });
+  } catch (e) { next(e); }
+}
+
+export async function deleteWorker(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { Worker } = await import("../models/Worker.js");
+    const { Types } = await import("mongoose");
+    if (!Types.ObjectId.isValid(req.params.id)) throw new AppError(400, "Invalid worker id");
+    const result = await Worker.deleteOne({ _id: new Types.ObjectId(req.params.id) });
+    if (result.deletedCount === 0) throw new AppError(404, "Worker not found");
+    invalidateCachePrefix("/api/workers");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.json({ ok: true });
   } catch (e) { next(e); }
 }

@@ -15,6 +15,7 @@ type PurchaseOrderInputItem = {
   source: "existing" | "manual";
   description?: string;
   unit?: string;
+  quantity: number;
   rate: number;
   gstPercent: number;
 };
@@ -23,6 +24,7 @@ export type CreatePurchaseOrderInput = {
   projectId: string;
   vendorId: string;
   date: string;
+  paymentMode: string;
   roundOff?: number;
   items: PurchaseOrderInputItem[];
   createdBy?: string;
@@ -31,6 +33,7 @@ export type CreatePurchaseOrderInput = {
 export type UpdatePurchaseOrderInput = {
   vendorId: string;
   date: string;
+  paymentMode: string;
   roundOff?: number;
   items: PurchaseOrderInputItem[];
   createdBy?: string;
@@ -38,6 +41,17 @@ export type UpdatePurchaseOrderInput = {
 
 function money(value: number): number {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+function inputGrandTotal(input: { items: PurchaseOrderInputItem[]; roundOff?: number }): number {
+  const subtotal = input.items.reduce((sum, item) => {
+    const quantity = Math.max(0, Number(item.quantity) || 0);
+    const rate = Math.max(0, Number(item.rate) || 0);
+    const amount = money(quantity * rate);
+    const gstPercent = Math.max(0, Math.min(100, Number(item.gstPercent) || 0));
+    return sum + amount + money(amount * gstPercent / 100);
+  }, 0);
+  return money(subtotal + (Number(input.roundOff) || 0));
 }
 
 async function nextPoNumber(): Promise<string> {
@@ -59,6 +73,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
   if (!project) throw new AppError(404, "Project not found");
   if (!vendor) throw new AppError(404, "Vendor not found");
   if (!input.items.length) throw new AppError(400, "At least one purchase order item is required");
+  if (inputGrandTotal(input) <= 0) throw new AppError(400, "Purchase order total must be greater than ₹0");
 
   const poNumber = await nextPoNumber();
   const normalized: Array<{
@@ -91,9 +106,15 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
     if (inputItem.source === "existing") {
       const material = existingById.get(String(inputItem.materialId || ""));
       if (!material) throw new AppError(404, "Project material not found");
+      if (material.isExistingMaterial) throw new AppError(400, `${material.name} is existing inventory and cannot be added to a purchase order`);
       const currentPo = String(material.poNumber || "").trim();
       if (currentPo && currentPo !== "Pending") throw new AppError(409, `${material.name} is already allocated to ${currentPo}`);
-      if ((Number(material.approvedQuantity) || 0) <= 0) throw new AppError(400, `${material.name} has no approved quantity`);
+      const approvedQuantity = Number(material.approvedQuantity) || 0;
+      const quantity = Number(inputItem.quantity) || 0;
+      if (quantity <= 0 || (approvedQuantity > 0 && quantity > approvedQuantity)) {
+        const range = approvedQuantity > 0 ? `between 0 and ${approvedQuantity}` : "greater than 0";
+        throw new AppError(400, `${material.name} quantity must be ${range}`);
+      }
     } else {
       const manual = inputItem as PurchaseOrderInputItem & { quantity?: number };
       if (!String(manual.description || "").trim() || !String(manual.unit || "").trim() || (Number(manual.quantity) || 0) <= 0) {
@@ -110,8 +131,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
       if (!inputItem.materialId) throw new AppError(400, "Existing material id is required");
       const material = existingById.get(inputItem.materialId);
       if (!material) throw new AppError(404, "Project material not found");
-      const quantity = Number(material.approvedQuantity) || 0;
-      if (quantity <= 0) throw new AppError(400, `${material.name} has no approved quantity`);
+      const quantity = Number(inputItem.quantity) || 0;
       const itemAmount = money(quantity * rate);
       normalized.push({
         materialId: material._id,
@@ -149,6 +169,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
         vendorId: vendor._id,
         poNumber,
         requestDate: input.date,
+        orderedDate: input.date,
         approvalDate: input.date,
         approvedAt: new Date(),
         status: "Not Received",
@@ -175,6 +196,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
   const totalGst = money(normalized.reduce((sum, item) => sum + item.gstAmount, 0));
   const roundOff = money(Number(input.roundOff) || 0);
   const grandTotal = money(subtotal + totalGst + roundOff);
+  if (grandTotal <= 0) throw new AppError(400, "Purchase order total must be greater than ₹0");
 
   const existingIds = normalized.filter((item) => item.source === "existing").map((item) => item.materialId);
   try {
@@ -185,7 +207,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
           projectId: project._id,
           $or: [{ poNumber: { $exists: false } }, { poNumber: "" }, { poNumber: "Pending" }, { poNumber: null }],
         },
-        { $set: { poNumber, vendor: vendor.name, vendorId: vendor._id } },
+        { $set: { poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date } },
       );
       if (claimed.modifiedCount !== existingIds.length) {
         throw new AppError(409, "One or more approved materials were allocated by another purchase order");
@@ -203,6 +225,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
       vendorId: vendor._id,
       vendorName: vendor.name,
       date: input.date,
+      paymentMode: input.paymentMode,
       items: normalized,
       subtotal,
       totalGst,
@@ -236,6 +259,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
   if (!vendor) throw new AppError(404, "Vendor not found");
   const project = await Project.findById(purchaseOrder.projectId).lean();
   if (!project) throw new AppError(404, "Project not found");
+  if (inputGrandTotal(input) <= 0) throw new AppError(400, "Purchase order total must be greater than ₹0");
 
   const previous = purchaseOrder.items || [];
   const previousExistingIds = previous.filter((item) => item.source === "existing").map((item) => String(item.materialId || ""));
@@ -263,13 +287,22 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     if (previousExistingIds.includes(id)) continue;
     const currentPo = String(material.poNumber || "").trim();
     if (currentPo && currentPo !== "Pending") throw new AppError(409, `${material.name} is already allocated to ${currentPo}`);
-    if ((Number(material.approvedQuantity) || 0) <= 0) throw new AppError(400, `${material.name} has no approved quantity`);
     toClaim.add(id);
   }
   const toUnclaim = previousExistingIds.filter((id) => !newExistingIds.includes(id));
 
   for (const inputItem of input.items) {
-    if (inputItem.source === "manual") {
+    if (inputItem.source === "existing") {
+      const material = existingById.get(String(inputItem.materialId || ""));
+      if (!material) throw new AppError(404, "Project material not found");
+      if (material.isExistingMaterial) throw new AppError(400, `${material.name} is existing inventory and cannot be added to a purchase order`);
+      const approvedQuantity = Number(material.approvedQuantity) || 0;
+      const quantity = Number(inputItem.quantity) || 0;
+      if (quantity <= 0 || (approvedQuantity > 0 && quantity > approvedQuantity)) {
+        const range = approvedQuantity > 0 ? `between 0 and ${approvedQuantity}` : "greater than 0";
+        throw new AppError(400, `${material.name} quantity must be ${range}`);
+      }
+    } else {
       const manual = inputItem as PurchaseOrderInputItem & { quantity?: number };
       if (!String(manual.description || "").trim() || !String(manual.unit || "").trim() || (Number(manual.quantity) || 0) <= 0) {
         throw new AppError(400, "New materials require description, unit, and quantity");
@@ -296,8 +329,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     if (inputItem.source === "existing") {
       const material = existingById.get(String(inputItem.materialId || ""));
       if (!material) throw new AppError(404, "Project material not found");
-      const quantity = Number(material.approvedQuantity) || 0;
-      if (quantity <= 0) throw new AppError(400, `${material.name} has no approved quantity`);
+      const quantity = Number(inputItem.quantity) || 0;
       const itemAmount = money(quantity * rate);
       normalized.push({
         materialId: material._id,
@@ -347,6 +379,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
           vendorId: vendor._id,
           poNumber: purchaseOrder.poNumber,
           requestDate: input.date,
+          orderedDate: input.date,
           approvalDate: input.date,
           approvedAt: new Date(),
           status: "Not Received",
@@ -374,6 +407,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
   const totalGst = money(normalized.reduce((sum, item) => sum + item.gstAmount, 0));
   const roundOff = money(Number(input.roundOff) || 0);
   const grandTotal = money(subtotal + totalGst + roundOff);
+  if (grandTotal <= 0) throw new AppError(400, "Purchase order total must be greater than ₹0");
 
   const claimIds = [...toClaim];
   try {
@@ -384,7 +418,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
           projectId: project._id,
           $or: [{ poNumber: { $exists: false } }, { poNumber: "" }, { poNumber: "Pending" }, { poNumber: null }],
         },
-        { $set: { poNumber: purchaseOrder.poNumber, vendor: vendor.name, vendorId: vendor._id } },
+        { $set: { poNumber: purchaseOrder.poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date } },
       );
       if (claimed.modifiedCount !== claimIds.length) {
         throw new AppError(409, "One or more approved materials were allocated by another purchase order");
@@ -412,6 +446,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     purchaseOrder.vendorId = vendor._id;
     purchaseOrder.vendorName = vendor.name;
     purchaseOrder.date = input.date;
+    purchaseOrder.paymentMode = input.paymentMode;
     purchaseOrder.items = normalized;
     purchaseOrder.subtotal = subtotal;
     purchaseOrder.totalGst = totalGst;

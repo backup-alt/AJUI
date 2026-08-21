@@ -17,8 +17,11 @@ export const createMaterialSchema = z.object({
     vendorId: objectIdSchema.optional(),
     poNumber: z.string().trim().optional(),
     requestDate: z.string().min(1),
+    receivedDate: z.string().optional(),
     issuedAmount: z.coerce.number().nonnegative().optional(),
     givenAmount: z.coerce.number().nonnegative().optional(),
+    isExistingMaterial: z.boolean().optional(),
+    orderedDate: z.string().optional(),
     notes: z.string().trim().max(2000).optional(),
     createdBy: z.string().trim().optional(),
   }),
@@ -26,6 +29,7 @@ export const createMaterialSchema = z.object({
 
 export const updateMaterialSchema = z.object({
   body: createMaterialSchema.shape.body.partial().extend({
+    status: z.enum(["Received", "Not Received"]).optional(),
     customFields: z.record(z.unknown()).optional(),
   }),
   params: z.object({ id: objectIdSchema }),
@@ -168,6 +172,60 @@ export const listExpensesSchema = z.object({
   }),
 });
 
+// =================== GENERAL EXPENSE ===================
+// Project-level "Expense" — a separate concept from the legacy site
+// expense ledger. Captures admin / manually-logged entries (rent, fuel,
+// software, etc.) and is rolled up into the project Total Expense KPI.
+export const generalExpenseBaseSchema = z.object({
+  origin: z.string().trim().min(1).max(50).optional().default("manual"),
+  category: z.string().trim().max(100).optional(),
+  amount: z.coerce.number().nonnegative(),
+  date: z.string().min(1),
+  description: z.string().trim().min(1).max(500),
+  projectId: objectIdSchema.optional().nullable(),
+  projectName: z.string().trim().max(200).optional(),
+  clientId: objectIdSchema.optional().nullable(),
+  clientName: z.string().trim().max(200).optional(),
+  siteId: objectIdSchema.optional().nullable(),
+  site: z.string().trim().max(200).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  paymentMode: z.string().trim().min(1).max(50).optional().default("Cash"),
+  paidBy: z.string().trim().max(200).optional(),
+  reference: z.string().trim().max(500).optional(),
+  status: z.enum(["Pending", "Approved", "Rejected"]).optional().default("Approved"),
+  customFields: z.record(z.unknown()).optional(),
+  createdBy: z.string().trim().optional(),
+});
+
+export const createGeneralExpenseSchema = z.object({
+  body: generalExpenseBaseSchema,
+});
+
+export const updateGeneralExpenseSchema = z.object({
+  body: generalExpenseBaseSchema.partial().extend({
+    // Allow clearing the project/client/site by sending an empty string.
+    projectId: z.union([objectIdSchema, z.literal("")]).optional(),
+    clientId: z.union([objectIdSchema, z.literal("")]).optional(),
+    siteId: z.union([objectIdSchema, z.literal("")]).optional(),
+  }),
+  params: z.object({ id: objectIdSchema }),
+});
+
+export const listGeneralExpensesSchema = z.object({
+  query: z.object({
+    projectId: objectIdSchema.optional(),
+    siteId: objectIdSchema.optional(),
+    category: z.string().trim().optional(),
+    status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    search: z.string().trim().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(200).default(200),
+    cursor: z.string().optional(),
+  }),
+});
+
 export const createPaymentSchema = z.object({
   body: z.object({
     projectId: objectIdSchema,
@@ -215,12 +273,14 @@ export const createVendorSchema = z.object({
     rating: z.coerce.number().min(0).max(5).default(0),
     status: z.enum(["Active", "Inactive", "Not Active"]).default("Active"),
     siteIds: z.array(objectIdSchema).min(0).optional(),
+    projectIds: z.array(objectIdSchema).min(0).optional(),
   }),
 });
 
 export const updateVendorSchema = z.object({
   body: createVendorSchema.shape.body.partial().extend({
     siteIds: z.array(objectIdSchema).min(0).optional(),
+    projectIds: z.array(objectIdSchema).min(0).optional(),
     customFields: z.record(z.unknown()).optional(),
   }),
   params: z.object({ id: objectIdSchema }),
@@ -240,12 +300,14 @@ export const listVendorsSchema = z.object({
 export const createSubcontractorSchema = z.object({
   body: z.object({
     projectId: objectIdSchema,
+    projectIds: z.array(objectIdSchema).min(0).optional(),
     subcontractorName: z.string().trim().min(1).max(200),
     description: z.string().trim().max(500).optional().default(""),
     employeeCount: z.coerce.number().int().nonnegative().optional(),
     note: z.string().trim().max(1000).optional().default(""),
     address: z.string().trim().max(500).optional().default(""),
     phone: z.string().trim().max(40).optional().default(""),
+    paymentMode: z.string().trim().min(1).max(50).optional().default("Bank Transfer"),
     status: z.enum(["active", "inactive"]).optional().default("active"),
     payments: z
       .array(
@@ -279,8 +341,9 @@ export const createSubcontractorPaymentSchema = z.object({
   body: z.object({
     subcontractorId: objectIdSchema,
     projectId: objectIdSchema,
-    siteId: objectIdSchema,
+    siteId: objectIdSchema.optional(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
+    paymentType: z.string().trim().min(1).max(50).default("Bank Transfer"),
     description: z.string().trim().max(500).optional().default(""),
     employeeCount: z.coerce.number().int().min(1),
     amount: z.coerce.number().positive(),
@@ -291,16 +354,32 @@ export const createSubcontractorPaymentSchema = z.object({
 export const createSubcontractorLaborSchema = z.object({
   body: z.object({
     subcontractorId: objectIdSchema,
+    // Optional project linkage — when set, the labour row is mirrored
+    // into the project's worker roster. May be cleared by passing an
+    // empty string on update.
+    projectId: objectIdSchema.optional().or(z.literal("")),
+    projectName: z.string().trim().max(200).optional().default(""),
     name: z.string().trim().min(1).max(200),
     address: z.string().trim().max(500).optional().default(""),
-    phone: z.string().trim().min(5).max(40),
+    // Optional — site supervisors frequently roster labour without a
+    // phone number (e.g. walk-in workers). The web admin's labour
+    // drawer mirrors that permissiveness.
+    phone: z.string().trim().max(40).optional().default(""),
     role: z.string().trim().min(1).max(100),
     notes: z.string().trim().max(1000).optional().default(""),
   }),
 });
 
 export const updateSubcontractorLaborSchema = z.object({
-  body: createSubcontractorLaborSchema.shape.body.omit({ subcontractorId: true }).partial(),
+  body: createSubcontractorLaborSchema.shape.body
+    .omit({ subcontractorId: true })
+    .partial()
+    .extend({
+      // Allow callers to clear the project linkage by sending an empty
+      // string explicitly (Zod's `.optional()` would otherwise drop the
+      // key entirely on PATCH bodies).
+      projectId: z.union([objectIdSchema, z.literal("")]).optional(),
+    }),
   params: z.object({ id: objectIdSchema }),
 });
 
@@ -308,6 +387,7 @@ const purchaseOrderItemSchema = z.discriminatedUnion("source", [
   z.object({
     source: z.literal("existing"),
     materialId: objectIdSchema,
+    quantity: z.coerce.number().positive(),
     rate: z.coerce.number().nonnegative(),
     gstPercent: z.coerce.number().min(0).max(100),
   }),
@@ -327,6 +407,7 @@ export const createPurchaseOrderSchema = z.object({
     projectId: objectIdSchema,
     vendorId: objectIdSchema,
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
+    paymentMode: z.string().trim().min(1).max(50),
     items: z.array(purchaseOrderItemSchema).min(1),
     roundOff: z.coerce.number().min(-1000).max(1000).optional().default(0),
   }),
@@ -336,6 +417,7 @@ export const updatePurchaseOrderSchema = z.object({
   body: z.object({
     vendorId: objectIdSchema,
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
+    paymentMode: z.string().trim().min(1).max(50),
     items: z.array(purchaseOrderItemSchema).min(1),
     roundOff: z.coerce.number().min(-1000).max(1000).optional().default(0),
   }),
@@ -441,9 +523,13 @@ export const initializeInventorySchema = z.object({
 export const addInventoryMaterialSchema = z.object({
   body: z.object({
     siteId: objectIdSchema,
+    projectId: objectIdSchema.optional(),
     name: z.string().trim().min(1).max(200),
     unit: z.string().trim().min(1).max(50),
     quantity: z.coerce.number().nonnegative().default(0),
+    isExistingMaterial: z.boolean().default(false),
+    issuedAmount: z.coerce.number().nonnegative().optional(),
+    givenAmount: z.coerce.number().nonnegative().optional(),
     remarks: z.string().trim().max(2000).optional(),
     requestDate: z.string().min(1).optional(),
   }),
@@ -454,4 +540,45 @@ export type CreateLabourInput = z.infer<typeof createLabourSchema>["body"];
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>["body"];
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>["body"];
 export type CreateVendorInput = z.infer<typeof createVendorSchema>["body"];
+
+// =================== WORKER ROSTER (web admin) ===================
+// The mobile supervisor app maintains the worker roster via
+// /api/mobile/supervisor/workers. The web admin uses these endpoints to
+// read + edit the same collection (e.g. fixing a phone number, taking
+// notes on a worker) from the project workspace "Labour" tab.
+export const createWorkerSchema = z.object({
+  body: z.object({
+    projectId: objectIdSchema,
+    projectIds: z.array(objectIdSchema).min(0).optional(),
+    siteId: objectIdSchema.optional(),
+    site: z.string().trim().max(200).optional(),
+    name: z.string().trim().min(1).max(200),
+    address: z.string().trim().max(500).optional(),
+    phone: z.string().trim().max(32).optional(),
+    notes: z.string().trim().max(1000).optional(),
+    labourType: z.string().trim().min(1).max(100),
+    weeklyPay: z.coerce.number().nonnegative().optional(),
+    isSubcontract: z.boolean().default(true),
+    subcontractorId: objectIdSchema,
+    subcontractorName: z.string().trim().min(1).max(200),
+    supervisorId: objectIdSchema.optional(),
+    supervisorName: z.string().trim().max(200).optional(),
+  }),
+});
+
+export const updateWorkerSchema = z.object({
+  body: createWorkerSchema.shape.body.partial(),
+  params: z.object({ id: objectIdSchema }),
+});
+
+export const listWorkersSchema = z.object({
+  query: z.object({
+    projectId: objectIdSchema.optional(),
+    siteId: objectIdSchema.optional(),
+    labourType: z.string().trim().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(500).optional(),
+    cursor: z.string().optional(),
+  }),
+});
 export type CreateSubcontractorInput = z.infer<typeof createSubcontractorSchema>["body"];

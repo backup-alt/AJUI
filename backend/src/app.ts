@@ -325,11 +325,11 @@ export async function bootstrap(): Promise<void> {
     // Fire-and-forget — the bootstrap() resolves immediately, the backfill
     // runs in the background. M0 may take 10-30s to process 50+ materials.
     setImmediate(() => {
-      Promise.resolve().catch((err: any) =>
+      backfillApprovedMaterialsToInventory({}).catch((err: any) =>
         console.error("[Startup] backfill inventory failed (non-fatal):", err?.message || err)
       );
     });
-    console.log("[Startup] inventory backfill skipped; dashboard inventory is material-backed");
+    console.log("[Startup] inventory backfill scheduled");
   } catch (err) {
     console.warn("[Bootstrap] backfill import failed (non-fatal):", (err as Error).message);
   }

@@ -83,7 +83,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                     </div>
 
                     <div class="client-card-footer">
-                      <span class="footer-label">View Sites</span>
+            <span class="footer-label">View Purchases</span>
                       <div class="client-card-footer-actions">
                         <button type="button" class="client-edit-action" aria-label="Edit vendor" title="Edit Vendor" (click)="editVendor(vendor, $event)">
                           <ion-icon name="create-outline"></ion-icon>
@@ -103,13 +103,13 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
             } @else if (!selectedSite()) {
               <section class="vendor-breadcrumb">
                 <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
-                <h2>{{ selectedVendor()!.name }} – Sites</h2>
+              <h2>{{ selectedVendor()!.name }} – Purchases</h2>
               </section>
 
               @if (loadingSites()) {
                 <div class="loading-indicator">
-                  <span class="spinner-inline"></span>
-                  <span>Loading sites…</span>
+                  <span class="agb-loading-spinner" aria-hidden="true"></span>
+                <span>Loading purchases…</span>
                 </div>
               }
 
@@ -126,7 +126,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
 <div class="card-head">
                           <div class="identity">
                             <div class="avatar-block">
-                              <ion-icon name="location-outline"></ion-icon>
+                              <ion-icon name="business-outline"></ion-icon>
                             </div>
                             <div class="identity-text">
                               <h3>{{ site.name }}</h3>
@@ -159,8 +159,8 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
 
                 @if (vendorSites().length === 0 && !loadingSites()) {
                   <div class="empty-state">
-                    <ion-icon name="location-off-outline"></ion-icon>
-                    <p>No sites with material purchases for this vendor.</p>
+                    <ion-icon name="business-outline"></ion-icon>
+                <p>No project purchases for this vendor.</p>
                   </div>
                 }
               </section>
@@ -170,12 +170,12 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                 <span class="breadcrumb-sep">›</span>
                 <button type="button" class="breadcrumb-link" (click)="backToSites()">{{ selectedVendor()!.name }}</button>
                 <span class="breadcrumb-sep">›</span>
-                <span class="breadcrumb-current">{{ selectedSite()!.name }}</span>
+                <span>{{ selectedSite()!.name }}</span>
               </nav>
 
               @if (loadingMaterials()) {
                 <div class="loading-indicator">
-                  <span class="spinner-inline"></span>
+                  <span class="agb-loading-spinner" aria-hidden="true"></span>
                   <span>Loading materials…</span>
                 </div>
               }
@@ -195,7 +195,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                 </div>
                 <div class="table-actions">
                   <button type="button" class="btn-add-row" (click)="addMaterialRow()">
-                    <ion-icon name="add-circle-outline"></ion-icon>
+                    <svg viewBox="0 0 20 20" aria-hidden="true" class="action-svg"><path d="M10 4v12M4 10h12" /></svg>
                     Add Row
                   </button>
                   <button type="button" class="btn-add-col" (click)="showAddColumnInput.set(true)">
@@ -226,7 +226,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                       <th class="col-material">Material</th>
                       <th class="col-qty">Qty</th>
                       <th class="col-unit">Unit</th>
-                      <th class="col-date">Purchase Date</th>
+                      <th class="col-date">Ordered Date</th>
                       <th class="col-amount">Issued Amt</th>
                       <th class="col-amount">Given Amt</th>
                       <th class="col-payment">Payment Type</th>
@@ -273,7 +273,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                           @if (editingRowId() === row.id) {
                             <input type="date" [value]="row.purchasedDate" (blur)="updateField(row, 'purchasedDate', $any($event.target).value)" class="table-input" />
                           } @else {
-                            {{ row.purchasedDate || '-' }}
+                            {{ dateOnly(row.orderedDate || row.purchasedDate) || '-' }}
                           }
                         </td>
                         <td class="col-amount">
@@ -305,11 +305,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                           }
                         </td>
                         <td class="col-date">
-                          @if (editingRowId() === row.id) {
-                            <input type="date" [value]="row.deliveredOn" (blur)="updateField(row, 'deliveredOn', $any($event.target).value)" class="table-input" />
-                          } @else {
-                            {{ row.deliveredOn || '-' }}
-                          }
+                          {{ receivedDateFor(row) || '-' }}
                         </td>
                         <td class="col-bill">
                           @if (row.billUrl) {
@@ -359,7 +355,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                     @if (filteredSiteMaterials().length === 0 && !loadingMaterials()) {
                       <tr>
                         <td class="empty-row" [attr.colspan]="11 + customColumns().length">
-                          <span>{{ materialSearchQuery() ? 'No materials match your search.' : 'No material purchases recorded for this site.' }}</span>
+                <span>{{ materialSearchQuery() ? 'No materials match your search.' : 'No material purchases recorded.' }}</span>
                         </td>
                       </tr>
                     }
@@ -377,6 +373,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
           description="{{ editingVendor() ? 'Update vendor contact, material type, GST, and address information.' : 'Create the vendor record to track material purchases and GST.' }}"
           submitLabel="{{ editingVendor() ? 'Save Changes' : 'Create Vendor' }}"
           [initialValue]="editingVendor() ? vendorEditValue(editingVendor()!) : null"
+          [submitting]="vendorSaving()"
           (cancel)="closeVendorForm()"
           (create)="editingVendor() ? updateVendor($event) : createVendor($event)"
         ></agb-vendor-form-dialog>
@@ -572,14 +569,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       color: #64748b;
       font-size: 14px;
     }
-    .spinner-inline {
-      width: 16px;
-      height: 16px;
-      border: 2px solid #cbd5e1;
-      border-top-color: #2c5cff;
-      border-radius: 50%;
-      animation: vd-spin 0.8s linear infinite;
-    }
     .empty-state {
       grid-column: 1 / -1;
       text-align: center;
@@ -694,6 +683,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       border-color: #2c5cff;
       color: #2c5cff;
     }
+    .action-svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
     .add-col-inline {
       display: flex;
       align-items: center;
@@ -742,7 +732,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       text-transform: uppercase;
       letter-spacing: 0.05em;
       padding: 12px 10px;
-      text-align: left;
+      text-align: center;
       border-bottom: 2px solid #e2e8f0;
     }
     .materials-table td {
@@ -751,16 +741,17 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       font-size: 13px;
       color: #1e293b;
       vertical-align: middle;
+      text-align: center;
     }
     .materials-table tr:last-child td { border-bottom: none; }
     .materials-table tr:hover td { background: #fafbfc; }
     .materials-table tr.editing td { background: #f0f9ff; }
     .col-sno { width: 50px; text-align: center; }
     .col-material { min-width: 120px; }
-    .col-qty { width: 80px; text-align: right; }
+    .col-qty { width: 80px; text-align: center; }
     .col-unit { width: 80px; }
     .col-date { width: 120px; }
-    .col-amount { width: 110px; text-align: right; }
+    .col-amount { width: 110px; text-align: center; }
     .col-payment { width: 120px; }
     .col-bill { width: 200px; }
     .col-custom { min-width: 100px; }
@@ -780,7 +771,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       border-color: #2c5cff;
       box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.1);
     }
-    .table-input[type="number"] { text-align: right; }
+    .table-input { text-align: center; }
     .table-input.input-error { border-color: #dc2626; }
     .table-input.input-error:focus { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1); }
     .name-error { display: block; color: #dc2626; font-size: 11px; margin-top: 2px; }
@@ -924,8 +915,19 @@ export class VendorDashboardPage {
   readonly formatMoney = formatMoney;
   readonly toastController = inject(ToastController);
 
+  dateOnly(value: unknown): string {
+    return /^(\d{4}-\d{2}-\d{2})/.exec(String(value || "").trim())?.[1] || "";
+  }
+
+  receivedDateFor(row: MaterialRow): string {
+    const status = String(row.status || "").trim().toLowerCase();
+    const fallback = status === "received" ? (row as any).updatedAt : "";
+    return this.dateOnly(row.receivedDate || fallback || row.deliveredOn);
+  }
+
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
+  readonly vendorSaving = signal(false);
   readonly vendors = computed<Vendor[]>(() => this.data.vendors());
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
@@ -953,53 +955,33 @@ export class VendorDashboardPage {
     const vendor = this.selectedVendor();
     if (!vendor) return [] as VendorSite[];
 
-    const materialSites = new Map<string, { count: number; materialNames: string[]; totalIssued: number; totalGiven: number }>();
+    const materialProjects = new Map<string, { name: string; count: number; materialNames: string[]; totalIssued: number; totalGiven: number }>();
     for (const m of this.data.materials()) {
-      if (m.vendor === vendor.name && m.site) {
-        const existing = materialSites.get(m.site) || { count: 0, materialNames: [], totalIssued: 0, totalGiven: 0 };
+      if (m.vendor === vendor.name && m.projectId) {
+        const project = this.data.projectById(m.projectId);
+        const projectName = project?.name || String((m as any).projectName || "Unnamed Project");
+        const existing = materialProjects.get(m.projectId) || { name: projectName, count: 0, materialNames: [], totalIssued: 0, totalGiven: 0 };
         existing.count++;
         existing.totalIssued += m.issuedAmount || 0;
         existing.totalGiven += m.givenAmount || 0;
         if (!existing.materialNames.includes(m.name)) {
           existing.materialNames.push(m.name);
         }
-        materialSites.set(m.site, existing);
+        materialProjects.set(m.projectId, existing);
       }
     }
 
-    const siteNamesFromIds = new Set<string>();
-    if (vendor.siteIds?.length) {
-      // vendor.siteIds are MongoDB ObjectIds from the backend. data.sites() uses
-      // composite name-keys as ids, so the lookup there always fails. We also
-      // check siteEntities (which carries the real _id) and the legacy `sites()`
-      // list to cover all id formats the backend might return.
-      const allSites = [
-        ...this.data.siteEntities(),
-        ...this.data.sites(),
-      ];
-      for (const sid of vendor.siteIds) {
-        const target = String(sid);
-        const s = allSites.find(
-          (x) =>
-            x.id === target ||
-            (x as any)._id === target ||
-            (x as any).siteId === target,
-        );
-        if (s?.name) siteNamesFromIds.add(s.name);
-      }
-    }
-    const vendorSiteNames = [...new Set([...siteNamesFromIds, ...Array.from(materialSites.keys())])];
-
-    return vendorSiteNames
-      .map((siteName) => ({
-        id: siteName,
-        name: siteName,
-        status: "Active" as const,
-        materialEntryCount: materialSites.get(siteName)?.count ?? 0,
-        materialNames: materialSites.get(siteName)?.materialNames ?? [],
-        totalIssued: materialSites.get(siteName)?.totalIssued ?? 0,
-        totalGiven: materialSites.get(siteName)?.totalGiven ?? 0,
-        materialCount: materialSites.get(siteName)?.materialNames.length ?? 0,
+    return Array.from(materialProjects.entries())
+      .map(([projectId, summary]) => ({
+        id: projectId,
+        projectId,
+        name: summary.name,
+        status: this.data.projectById(projectId)?.status === "Completed" ? "Completed" as const : "Active" as const,
+        materialEntryCount: summary.count,
+        materialNames: summary.materialNames,
+        totalIssued: summary.totalIssued,
+        totalGiven: summary.totalGiven,
+        materialCount: summary.materialNames.length,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   });
@@ -1008,8 +990,8 @@ export class VendorDashboardPage {
     const vendor = this.selectedVendor();
     const site = this.selectedSite();
     if (!vendor || !site) return [] as MaterialRow[];
-    return this.materialsService.materials().filter(
-      (m) => m.vendor === vendor.name && m.site === site.name
+    return this.data.materials().filter(
+      (m) => m.vendor === vendor.name && m.projectId === site.id
     );
   });
 
@@ -1029,6 +1011,7 @@ export class VendorDashboardPage {
 
   constructor() {
     this.loadVendorsFromBackend();
+    void this.materialsService.refresh();
     effect(() => {
       const vendor = this.selectedVendor();
       const site = this.selectedSite();
@@ -1089,7 +1072,7 @@ export class VendorDashboardPage {
     if (updated) {
       this.selectedVendor.set(updated);
       const site = this.selectedSite();
-      if (site && !(updated.siteIds || []).includes(site.id)) {
+      if (site && !this.vendorSites().some((project) => project.id === site.id)) {
         this.selectedSite.set(null);
       }
     }
@@ -1221,7 +1204,7 @@ export class VendorDashboardPage {
     const site = this.selectedSite();
     if (!vendor || !site) {
       this.toastController.create({
-        message: "Please select a vendor and site first",
+        message: "Please select a vendor purchase group first",
         duration: 3000,
         color: "warning",
         position: "top",
@@ -1353,6 +1336,7 @@ export class VendorDashboardPage {
   }
 
   async createVendor(value: VendorFormValue) {
+    if (this.vendorSaving()) return; // guard against double-submit
     if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) {
       const toast = await this.toastController.create({
         message: "Please fill all required fields before saving",
@@ -1376,6 +1360,7 @@ export class VendorDashboardPage {
       siteIds: [],
     };
 
+    this.vendorSaving.set(true);
     try {
       const res = await this.api.createVendor(payload).toPromise();
       const v = res?.vendor || res;
@@ -1416,6 +1401,9 @@ export class VendorDashboardPage {
         position: "top",
       });
       await toast.present();
+      // Keep the dialog open so the user can correct and retry.
+    } finally {
+      this.vendorSaving.set(false);
     }
   }
 
@@ -1479,6 +1467,7 @@ export class VendorDashboardPage {
       await toast.present();
       return;
     }
+    if (this.vendorSaving()) return; // guard against double-submit
 
     const statusValue: VendorStatus = "Active";
 
@@ -1492,6 +1481,7 @@ export class VendorDashboardPage {
       siteIds: [],
     };
 
+    this.vendorSaving.set(true);
     try {
       const apiId = vendor._id || vendor.id;
       const res = await this.api.patchVendor(apiId, payload).toPromise();
@@ -1527,6 +1517,9 @@ export class VendorDashboardPage {
         position: "top",
       });
       await toast.present();
+      // Keep the dialog open so the user can correct and retry.
+    } finally {
+      this.vendorSaving.set(false);
     }
   }
 

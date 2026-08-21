@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
-import { IonBadge, IonContent, IonIcon, IonSpinner, IonSplitPane } from "@ionic/angular/standalone";
+import { IonBadge, IonContent, IonIcon, IonSpinner, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { ApiService } from "../core/api.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
@@ -50,7 +50,7 @@ interface ApiProject {
               </div>
               <label class="projects-directory-search">
                 <ion-icon name="search-outline"></ion-icon>
-                <input [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" placeholder="Search project, client, supervisor, site..." />
+              <input [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" placeholder="Search project, client, supervisor..." />
               </label>
             </section>
 
@@ -85,7 +85,6 @@ interface ApiProject {
                 <div class="projects-directory-meta">
                   <span><ion-icon name="time-outline"></ion-icon>{{ lastWorkedLabel(project) }}</span>
                   <span><ion-icon name="calendar-outline"></ion-icon>{{ project.startDate }}</span>
-                  <span>{{ project.siteNames.length }} sites</span>
                 </div>
 
                 <div class="projects-directory-ledger">
@@ -96,7 +95,6 @@ interface ApiProject {
                 </div>
 
                 <div class="projects-directory-footer">
-                  <span>{{ project.siteNames.join(", ") }}</span>
                   <button type="button" (click)="openProject(project); $event.stopPropagation()">
                     Open Project
                     <ion-icon name="arrow-forward-outline"></ion-icon>
@@ -122,7 +120,7 @@ interface ApiProject {
             <div class="erp-form">
               <label>
                 <span>Client</span>
-                <select required [(ngModel)]="projectDraft.clientId" name="clientId">
+                <select required [(ngModel)]="projectDraft.clientId" name="clientId" (ngModelChange)="applyClientDefaults($event)">
                   <option value="">Select client</option>
                   <option *ngFor="let client of clients()" [value]="client._id || client.clientId">{{ client.name }}</option>
                 </select>
@@ -156,8 +154,13 @@ interface ApiProject {
               </label>
             </div>
             <div class="dialog-actions">
-              <button type="button" class="secondary-action" (click)="closeProjectForm()">Cancel</button>
-              <button type="submit" class="primary-action">Create Project</button>
+              <button type="button" class="secondary-action" (click)="closeProjectForm()" [disabled]="creating()">Cancel</button>
+              <button type="submit" class="primary-action" [disabled]="creating()" [attr.aria-busy]="creating() ? 'true' : null">
+                @if (creating()) {
+                  <span class="agb-loading-spinner" aria-hidden="true"></span>
+                }
+                {{ creating() ? 'Creating…' : 'Create Project' }}
+              </button>
             </div>
           </form>
         </section>
@@ -199,6 +202,7 @@ interface ApiProject {
 export class ProjectsDirectoryPage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  private readonly toastController = inject(ToastController);
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
 
@@ -208,6 +212,7 @@ export class ProjectsDirectoryPage implements OnInit {
   readonly supervisors = signal<any[]>([]);
   readonly loading = signal(true);
   readonly showProjectForm = signal(false);
+  readonly creating = signal(false);
   projectDraft = this.emptyProjectDraft();
 
   private readonly allProjects = computed(() => this.projects());
@@ -260,34 +265,84 @@ export class ProjectsDirectoryPage implements OnInit {
     this.projectDraft.supervisor = supervisor?.name || "";
   }
 
+  applyClientDefaults(clientId: string) {
+    const client = this.clients().find((item) => String(item._id || item.clientId) === String(clientId));
+    if (!client) return;
+    // Backend's createProjectSchema requires `mobile` and `address`. The service
+    // also falls back to the client's stored values, so we copy them here so the
+    // schema validation passes without adding extra form fields.
+    if (!this.projectDraft.mobile) this.projectDraft.mobile = String(client.mobile || "");
+    if (!this.projectDraft.address) this.projectDraft.address = String(client.address || "");
+  }
+
   openProjectForm() {
     this.projectDraft = this.emptyProjectDraft();
     this.showProjectForm.set(true);
+    if (this.projectDraft.clientId) this.applyClientDefaults(this.projectDraft.clientId);
   }
 
   closeProjectForm() {
     this.showProjectForm.set(false);
   }
 
-  createProject() {
-    if (!this.projectDraft.clientId || !this.projectDraft.name || !this.projectDraft.startDate || !this.projectDraft.supervisor) return;
-    this.api.createProject({
-      clientId: this.projectDraft.clientId,
-      name: this.projectDraft.name,
-      startDate: this.projectDraft.startDate,
-      supervisor: this.projectDraft.supervisor,
-      supervisorId: this.projectDraft.supervisorId,
-      status: this.projectDraft.status,
-      totalValue: Number(this.projectDraft.totalValue) || 0,
-      siteIds: [],
-      sites: [],
-    }).subscribe({
-      next: () => {
-        this.closeProjectForm();
-        this.loadProjects();
-      },
-      error: () => {},
+  async createProject() {
+    if (this.creating()) return; // double-submit guard
+    if (!this.projectDraft.clientId || !this.projectDraft.name || !this.projectDraft.startDate || !this.projectDraft.supervisor) {
+      await this.presentToast("Fill in client, name, start date, and supervisor.", "warning");
+      return;
+    }
+    // Backend createProjectSchema requires a 24-hex Mongo ObjectId for clientId.
+    // Clients imported before Mongo (or seeded manually) may only carry a string
+    // `clientId` like "C-001" — those are not safe to send through this endpoint.
+    if (!/^[a-f0-9]{24}$/i.test(this.projectDraft.clientId)) {
+      await this.presentToast("Selected client is not persisted yet — please re-save the client before creating a project.", "warning");
+      return;
+    }
+    if (!this.projectDraft.mobile || !this.projectDraft.address) {
+      await this.presentToast("Client is missing contact details — please add a mobile and address on the client first.", "warning");
+      return;
+    }
+    this.creating.set(true);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this.api.createProject({
+          clientId: this.projectDraft.clientId,
+          name: this.projectDraft.name,
+          startDate: this.projectDraft.startDate,
+          supervisor: this.projectDraft.supervisor,
+          supervisorId: this.projectDraft.supervisorId,
+          mobile: this.projectDraft.mobile,
+          address: this.projectDraft.address,
+          status: this.projectDraft.status,
+          totalValue: Number(this.projectDraft.totalValue) || 0,
+          siteIds: [],
+          sites: [],
+        }).subscribe({
+          next: () => resolve(),
+          error: (err) => reject(err),
+        });
+      });
+      await this.presentToast(`Project "${this.projectDraft.name}" created.`, "success");
+      this.closeProjectForm();
+      this.loadProjects();
+    } catch (err) {
+      const message = (err as any)?.error?.message || (err as any)?.message || "Could not create the project. Please try again.";
+      console.error("[ProjectsDirectoryPage] createProject failed:", err);
+      await this.presentToast(message, "danger");
+      // Keep the dialog open so the user can correct and retry.
+    } finally {
+      this.creating.set(false);
+    }
+  }
+
+  private async presentToast(message: string, color: "success" | "warning" | "danger" = "success"): Promise<void> {
+    const toast = await this.toastController.create({
+      message,
+      color,
+      duration: color === "danger" ? 4500 : 2500,
+      position: "bottom",
     });
+    await toast.present();
   }
 
   private emptyProjectDraft() {
@@ -297,6 +352,8 @@ export class ProjectsDirectoryPage implements OnInit {
       startDate: new Date().toISOString().slice(0, 10),
       supervisor: "",
       supervisorId: "",
+      mobile: "",
+      address: "",
       status: "Active" as ApiProject["status"],
       totalValue: 0,
     };

@@ -8,7 +8,7 @@ import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { TaxInvoiceDialogComponent } from "../shared/tax-invoice-dialog.component";
 import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
-import type { TaxInvoice, TaxInvoiceRow } from "../../data/dashboardData";
+import type { Quotation, TaxInvoice, TaxInvoiceRow } from "../../data/dashboardData";
 import { formatMoney } from "../shared/format";
 import { buildBusinessDocumentXlsx } from "../shared/excel-export";
 
@@ -142,6 +142,13 @@ function numberToWords(num: number): string {
                     <button type="button" class="btn-primary" (click)="saveInvoice('Sent')" [disabled]="saving()">Save & Send</button>
                   </div>
                 </div>
+
+                @if (sourceQuotationNumber()) {
+                  <div class="conversion-notice">
+                    <ion-icon name="receipt-outline"></ion-icon>
+                    <span>Reviewing invoice created from quotation <strong>{{ sourceQuotationNumber() }}</strong>. Nothing will be created until you save and confirm.</span>
+                  </div>
+                }
 
                 <div class="quotation-document" id="invoice-print-area">
                   <div class="doc-header">
@@ -482,6 +489,8 @@ function numberToWords(num: number): string {
     .btn-secondary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #fff; color: #2c5cff; border: 1.5px solid #2c5cff; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .btn-outline { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .editor-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .conversion-notice { max-width: 900px; margin: 16px auto 0; padding: 11px 14px; display: flex; align-items: center; gap: 9px; border: 1px solid #c4b5fd; border-radius: 9px; background: #f5f3ff; color: #5b21b6; font-size: 13px; }
+    .conversion-notice ion-icon { flex: 0 0 auto; font-size: 18px; }
     .back-link { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: #2c5cff; cursor: pointer; font-size: 14px; padding: 6px 0; }
     .editor-actions { display: flex; gap: 8px; align-items: center; }
     .quotation-editor { }
@@ -681,6 +690,7 @@ export class TaxInvoicePage {
   readonly saving = signal(false);
   readonly savingExcel = signal(false);
   readonly showInvoicePreview = signal(false);
+  readonly sourceQuotationNumber = signal("");
 
   readonly invoiceRows = signal<TaxInvoiceRow[]>([]);
   readonly customColumns = signal<string[]>([]);
@@ -873,6 +883,8 @@ export class TaxInvoicePage {
 
   constructor() {
     this.loadInvoicesFromBackend();
+    const quotation = history.state?.quotationForInvoice as Quotation | undefined;
+    if (quotation?.id) this.startInvoiceFromQuotation(quotation);
   }
 
   onClientSearchInput(event: Event) {
@@ -1009,6 +1021,7 @@ export class TaxInvoicePage {
   }
 
   startNewInvoice() {
+    this.sourceQuotationNumber.set("");
     this.editingInvoiceId.set(null);
     this.invoiceRows.set([this.newRow()]);
     this.customColumns.set([]);
@@ -1027,6 +1040,7 @@ export class TaxInvoicePage {
   }
 
   editInvoice(inv: TaxInvoice) {
+    this.sourceQuotationNumber.set("");
     this.editingInvoiceId.set(inv.id);
     const rows = inv.items.length > 0 ? inv.items.map((it: any, idx) => {
       const merged: any = { ...it };
@@ -1095,6 +1109,40 @@ export class TaxInvoicePage {
   cancelEdit() {
     this.editingInvoice.set(false);
     this.editingInvoiceId.set(null);
+    this.sourceQuotationNumber.set("");
+  }
+
+  private startInvoiceFromQuotation(quotation: Quotation) {
+    const rows = (quotation.items || []).map((item: any, index) => ({
+      ...item,
+      ...(item?.customValues || {}),
+      id: item?.id != null ? String(item.id) : `ROW-${Date.now()}-${index}`,
+      sno: Number(item?.sno) || index + 1,
+      description: item?.description || "",
+      hsnCode: item?.hsnCode || "",
+      unit: item?.unit || "",
+      qty: Number(item?.qty) || 0,
+      rate: Number(item?.rate) || 0,
+      amount: Number(item?.amount) || ((Number(item?.qty) || 0) * (Number(item?.rate) || 0)),
+      parentRowId: item?.parentRowId ? String(item.parentRowId) : null,
+    })) as TaxInvoiceRow[];
+
+    this.editingInvoiceId.set(null);
+    this.invoiceRows.set(rows.length ? rows : [this.newRow()]);
+    this.customColumns.set([...(quotation.customColumns || [])]);
+    this.showAddColumnInput.set(false);
+    this.newColumnName.set("");
+    this.clientName = quotation.clientName || "";
+    this.clientAddress = quotation.clientAddress || "";
+    this.clientState = quotation.clientState || "Tamil Nadu";
+    this.clientGstin = quotation.clientGstin || "";
+    this.clientSearchTerm.set(quotation.clientName || "");
+    this.selectedClientId.set(quotation.clientId || this.findClientIdByName(quotation.clientName || ""));
+    this.cgstPercent.set(Number(quotation.cgstPercent) || 0);
+    this.sgstPercent.set(Number(quotation.sgstPercent) || 0);
+    this.roundOff.set(Number(quotation.roundOff) || 0);
+    this.sourceQuotationNumber.set(quotation.quotationNumber || "Quotation");
+    this.editingInvoice.set(true);
   }
 
   deleteInvoice(id: string) {
@@ -1339,6 +1387,12 @@ export class TaxInvoicePage {
       return;
     }
 
+    if (!this.editingInvoiceId() && this.sourceQuotationNumber() && !confirm(
+      `Create this invoice from ${this.sourceQuotationNumber()}? You can continue editing before confirming.`,
+    )) {
+      return;
+    }
+
     this.saving.set(true);
 
     const rowSno = this.rowSnoMap();
@@ -1406,6 +1460,7 @@ export class TaxInvoicePage {
       }
       this.editingInvoice.set(false);
       this.editingInvoiceId.set(null);
+      this.sourceQuotationNumber.set("");
       this.loadInvoicesFromBackend();
     } catch (err: any) {
       alert("Failed to save invoice: " + (err?.message || "please try again"));

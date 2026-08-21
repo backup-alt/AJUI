@@ -40,7 +40,7 @@ interface NotificationPrefs {
         <label class="settings-w11-toggle-row">
           <div>
             <strong>One approval for material and expense</strong>
-            <small>When a site material is added as expense, only one approval on either table is required.</small>
+              <small>When a material purchase is added as an expense, only one approval on either table is required.</small>
           </div>
           <input type="checkbox" [checked]="singleApprovalForSiteExpenseMaterials()" (change)="onToggle('singleApprovalForSiteExpenseMaterials', $any($event.target).checked)" />
         </label>

@@ -107,7 +107,7 @@ export class SettingsAccessManagementComponent implements OnInit {
   readonly approvalTypes: ApprovalType[] = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },
     { key: "labour", label: "Labour / Attendance", note: "Daily attendance submissions" },
-    { key: "site_expense", label: "Site Expenses", note: "Diesel, equipment, transport" },
+    { key: "site_expense", label: "Supervisor Expenses", note: "Diesel, equipment, transport" },
     { key: "general_expense", label: "General Expenses", note: "Office supplies, miscellaneous" },
     { key: "payment", label: "Client Payments", note: "Collections from clients" },
     { key: "subcontract", label: "Subcontracts", note: "Subcontractor agreements" },

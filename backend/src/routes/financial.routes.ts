@@ -16,6 +16,9 @@ import {
   updateExpenseSchema,
   uploadExpenseReceiptSchema,
   listExpensesSchema,
+  createGeneralExpenseSchema,
+  updateGeneralExpenseSchema,
+  listGeneralExpensesSchema,
   createPaymentSchema,
   updatePaymentSchema,
   listPaymentsSchema,
@@ -40,6 +43,9 @@ import {
   missingMaterialsForSiteSchema,
   initializeInventorySchema,
   addInventoryMaterialSchema,
+  createWorkerSchema,
+  updateWorkerSchema,
+  listWorkersSchema,
 } from "../schemas/financial.schema.js";
 
 const router = Router();
@@ -117,6 +123,20 @@ router.post("/expenses/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.
 router.post("/expenses/:id/received", ctrl.markAsReceived);
 router.delete("/expenses/:id", requireRole("admin", "accountant"), ctrl.deleteExpense);
 
+// =================== GENERAL EXPENSES (project-level "Expense") ===================
+router.post(
+  "/general-expenses",
+  validate(createGeneralExpenseSchema),
+  requireRole("admin", "accountant", "project_manager"),
+  ctrl.createGeneralExpense
+);
+router.get("/general-expenses", validate(listGeneralExpensesSchema, "query"), cache(60), ctrl.listGeneralExpenses);
+router.get("/general-expenses/all", cache(60), ctrl.listAllGeneralExpenses);
+router.get("/general-expenses/:id", cache(30), ctrl.getGeneralExpense);
+router.patch("/general-expenses/:id", validate(updateGeneralExpenseSchema), ctrl.updateGeneralExpense);
+router.post("/general-expenses/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadGeneralExpenseReceipt);
+router.delete("/general-expenses/:id", requireRole("admin", "accountant"), ctrl.deleteGeneralExpense);
+
 // =================== PAYMENTS ===================
 router.post(
   "/payments",
@@ -154,6 +174,12 @@ router.post(
 router.get("/subcontractors", validate(listSubcontractorsSchema, "query"), cache(20), ctrl.listSubcontractors);
 router.get("/subcontractors/for-worker", cache(20), ctrl.listSubcontractorsForWorker);
 router.get("/subcontractors/spend-rollup", cache(10), ctrl.getSubcontractorSpendRollup);
+router.get(
+  "/subcontractors/all-active",
+  requireRole("admin", "project_manager"),
+  cache(20),
+  ctrl.listAllActiveSubcontractors
+);
 router.get("/subcontractors/:id", cache(30), ctrl.getSubcontractor);
 router.patch("/subcontractors/:id", validate(updateSubcontractorSchema), ctrl.updateSubcontractor);
 router.delete("/subcontractors/:id", requireRole("admin", "project_manager"), ctrl.deleteSubcontractor);
@@ -201,6 +227,34 @@ router.patch(
   validate(updateSubcontractorLaborSchema),
   requireRole("admin", "project_manager"),
   ctrl.updateSubcontractorLabor
+);
+
+// =================== WORKER ROSTER (web admin) ===================
+// Read/write endpoints for the project workspace "Labour" tab. The same
+// Worker collection the mobile supervisor app maintains via
+// /api/mobile/supervisor/workers.
+router.get(
+  "/workers",
+  validate(listWorkersSchema, "query"),
+  cache(30),
+  ctrl.listWorkers
+);
+router.post(
+  "/workers",
+  validate(createWorkerSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.createWorker
+);
+router.patch(
+  "/workers/:id",
+  validate(updateWorkerSchema),
+  requireRole("admin", "project_manager"),
+  ctrl.updateWorker
+);
+router.delete(
+  "/workers/:id",
+  requireRole("admin", "project_manager"),
+  ctrl.deleteWorker
 );
 
 // =================== PURCHASE ORDERS ===================

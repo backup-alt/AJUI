@@ -20,10 +20,13 @@ export interface IMaterial extends Document {
   remainingStock: number;
   issuedAmount?: number;
   givenAmount?: number;
+  isExistingMaterial?: boolean;
+  orderedDate?: string;
   vendor?: string;
   vendorId?: Types.ObjectId;
   poNumber?: string;
   requestDate: string;
+  receivedDate?: string;
   approvalDate?: string;
   status: MaterialStatus;
   notes?: string;
@@ -61,10 +64,13 @@ const materialSchema = new Schema<IMaterial>(
     remainingStock: { type: Number, default: 0 },
     issuedAmount: { type: Number },
     givenAmount: { type: Number },
+    isExistingMaterial: { type: Boolean, default: false, index: true },
+    orderedDate: { type: String, index: true },
     vendor: { type: String, trim: true },
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor" },
     poNumber: { type: String, trim: true },
     requestDate: { type: String, required: true, index: true },
+    receivedDate: { type: String, index: true },
     approvalDate: { type: String },
     status: {
       type: String,

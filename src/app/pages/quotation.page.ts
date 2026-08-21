@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, HostListener, inject, signal, computed, ViewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { Router } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
 import { ErpDataService, type Client } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
@@ -109,6 +110,10 @@ function numberToWords(num: number): string {
                             <span class="status-pill" [class]="quote.status.toLowerCase()">{{ quote.status }}</span>
                           </td>
                           <td>
+                            <button type="button" class="invoice-action-btn" title="Make Invoice" aria-label="Make invoice from quotation" (click)="makeInvoice(quote)">
+                              <ion-icon name="receipt-outline"></ion-icon>
+                              Make Invoice
+                            </button>
                             <button type="button" class="icon-action-btn edit" title="Edit" (click)="editQuotation(quote)">
                               <ion-icon name="pencil-outline"></ion-icon>
                             </button>
@@ -568,6 +573,9 @@ function numberToWords(num: number): string {
     .icon-action-btn.delete:hover { background: #fecaca; }
     .icon-action-btn.client { background: #d1fae5; color: #059669; }
     .icon-action-btn.client:hover { background: #a7f3d0; }
+    .invoice-action-btn { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; margin-right: 6px; padding: 0 10px; border: 0; border-radius: 999px; background: #ede9fe; color: #6d28d9; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .invoice-action-btn:hover { background: #ddd6fe; }
+    .invoice-action-btn ion-icon { font-size: 15px; }
     .editor-header {
       display: flex;
       justify-content: space-between;
@@ -1150,6 +1158,7 @@ function numberToWords(num: number): string {
 export class QuotationPage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
+  readonly router = inject(Router);
   readonly formatMoney = formatMoney;
   readonly states = INDIAN_STATES;
 
@@ -1409,6 +1418,12 @@ readonly savingPdf = signal(false);
       sourceId: quote.id,
     });
     this.showMakeClientDialog.set(true);
+  }
+
+  makeInvoice(quote: Quotation) {
+    void this.router.navigate(["/tax-invoices"], {
+      state: { quotationForInvoice: quote },
+    });
   }
 
   onMakeClientCreated(value: ClientFormValue) {

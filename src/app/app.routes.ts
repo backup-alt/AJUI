@@ -73,6 +73,11 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: "general-expenses",
+    loadComponent: () => import("./pages/general-expenses.page").then((m) => m.GeneralExpensesPage),
+    canActivate: [authGuard],
+  },
+  {
     path: "projects",
     loadComponent: () => import("./pages/projects-directory.page").then((m) => m.ProjectsDirectoryPage),
     canActivate: [authGuard],
@@ -93,7 +98,6 @@ export const routes: Routes = [
       { path: "notifications", loadComponent: () => import("./pages/settings/settings-notifications.component").then((m) => m.SettingsNotificationsComponent) },
       { path: "roles", loadComponent: () => import("./pages/settings/settings-roles.component").then((m) => m.SettingsRolesComponent) },
       { path: "roles/employee/:id", loadComponent: () => import("./pages/settings/settings-employee-detail.component").then((m) => m.SettingsEmployeeDetailComponent) },
-      { path: "sites", loadComponent: () => import("./pages/settings/settings-sites.component").then((m) => m.SettingsSitesComponent) },
       { path: "access-schedule", loadComponent: () => import("./pages/settings/settings-access-schedule.component").then((m) => m.SettingsAccessScheduleComponent) },
       { path: "sessions", loadComponent: () => import("./pages/settings/settings-sessions.component").then((m) => m.SettingsSessionsComponent) },
     ],

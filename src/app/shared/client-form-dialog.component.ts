@@ -66,8 +66,13 @@ const INDIAN_STATES = [
           </label>
 
           <div class="dialog-actions span-2">
-            <button type="button" class="secondary-action" (click)="cancel.emit()">Cancel</button>
-            <button type="submit" class="primary-action">{{ submitLabel }}</button>
+            <button type="button" class="secondary-action" (click)="cancel.emit()" [disabled]="submitting">Cancel</button>
+            <button type="submit" class="primary-action" [disabled]="submitting" [attr.aria-busy]="submitting ? 'true' : null">
+              @if (submitting) {
+                <span class="agb-loading-spinner" aria-hidden="true"></span>
+              }
+              {{ submitting ? 'Saving…' : submitLabel }}
+            </button>
           </div>
         </form>
       </section>
@@ -78,10 +83,11 @@ const INDIAN_STATES = [
 export class ClientFormDialogComponent {
   @Input() eyebrow = "Client Setup";
   @Input() title = "Add New Client";
-  @Input() description = "Create the client record first. Projects, ledgers, and site records stay separated under this client.";
+  @Input() description = "Create the client record first. Projects and ledgers stay separated under this client.";
   @Input() submitLabel = "Create Client";
   @Input() initialValue: ClientFormValue | null = null;
   @Input() defaultSupervisor = "";
+  @Input() submitting = false;
   @Output() cancel = new EventEmitter<void>();
   @Output() create = new EventEmitter<ClientFormValue>();
 

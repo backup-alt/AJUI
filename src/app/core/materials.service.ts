@@ -66,14 +66,19 @@ export class MaterialsService {
         vendor: input.vendor,
         poNumber: input.poNumber,
         requestDate: input.requestDate || new Date().toISOString().slice(0, 10),
+        receivedDate: input.receivedDate,
         issuedAmount: input.issuedAmount,
         givenAmount: input.givenAmount,
+        isExistingMaterial: input.isExistingMaterial,
+        orderedDate: input.orderedDate,
         notes: (input as any).notes,
       };
       this.api.createMaterial(payload).subscribe({
         next: (res: any) => {
           const material: MaterialRow = {
+            _id: res.material?._id || res._id,
             id: res.material?.materialId || res.material?._id || res.materialId || res._id,
+            materialId: res.material?.materialId || res.materialId,
             projectId: input.projectId || "",
             site: input.site || "",
             name: input.name || "",
@@ -87,9 +92,12 @@ export class MaterialsService {
             poNumber: input.poNumber || "",
             status: input.status || "Pending",
             requestDate: input.requestDate,
+            receivedDate: input.receivedDate,
             purchasedDate: input.purchasedDate,
             issuedAmount: input.issuedAmount,
             givenAmount: input.givenAmount,
+            isExistingMaterial: input.isExistingMaterial,
+            orderedDate: input.orderedDate,
             paymentType: input.paymentType,
             deliveredOn: input.deliveredOn,
           };
@@ -136,7 +144,9 @@ export class MaterialsService {
   }
 
   private mapMaterial = (row: any): MaterialRow => ({
+    _id: row._id,
     id: row.materialId || row._id || row.id,
+    materialId: row.materialId,
     projectId: row.projectId,
     site: row.site || row.siteId,
     name: row.name,
@@ -156,11 +166,16 @@ export class MaterialsService {
       : "") || "",
     status: row.status,
     requestDate: row.requestDate,
-    purchasedDate: row.purchasedDate,
+    receivedDate: row.receivedDate,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    purchasedDate: row.orderedDate || row.purchasedDate,
+    orderedDate: row.orderedDate,
+    isExistingMaterial: Boolean(row.isExistingMaterial),
     issuedAmount: row.issuedAmount,
     givenAmount: row.givenAmount,
     paymentType: row.paymentType,
-    deliveredOn: row.deliveredOn,
+    deliveredOn: row.receivedDate || row.deliveredOn,
     billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
     receiptImage: row.receiptImage,
     receiptImageMimeType: row.receiptImageMimeType,

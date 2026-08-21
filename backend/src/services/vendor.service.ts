@@ -7,10 +7,10 @@ import { generateId } from "./id-generator.service.js";
 import { CreateVendorInput } from "../schemas/financial.schema.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
 
-export async function createVendor(input: CreateVendorInput & { siteIds?: string[] }) {
+export async function createVendor(input: CreateVendorInput & { siteIds?: string[]; projectIds?: string[] }) {
   const vendorId = await generateId("VEN");
-  const { siteIds, ...rest } = input;
-  const vendor = await Vendor.create({ ...rest, vendorId, siteIds: siteIds || [] });
+  const { siteIds, projectIds, ...rest } = input;
+  const vendor = await Vendor.create({ ...rest, vendorId, siteIds: siteIds || [], projectIds: projectIds || [] });
   if (siteIds?.length) {
     await Site.updateMany({ _id: { $in: siteIds } }, { $addToSet: { vendorIds: vendor._id } });
   }
@@ -49,11 +49,11 @@ export async function getVendorById(id: string) {
   return vendor;
 }
 
-export async function updateVendor(id: string, patch: Partial<CreateVendorInput & { siteIds?: string[] }>) {
+export async function updateVendor(id: string, patch: Partial<CreateVendorInput & { siteIds?: string[]; projectIds?: string[] }>) {
   const vendor = await Vendor.findById(id);
   if (!vendor) throw new AppError(404, "Vendor not found");
 
-  const { siteIds, ...rest } = patch;
+  const { siteIds, projectIds, ...rest } = patch;
   const oldSiteIds = (vendor.siteIds || []).map((s: Types.ObjectId) => s.toString());
 
   if (siteIds !== undefined) {
@@ -64,6 +64,10 @@ export async function updateVendor(id: string, patch: Partial<CreateVendorInput 
       Site.updateMany({ _id: { $in: removed } }, { $pull: { vendorIds: vendor._id } }),
     ]);
     vendor.siteIds = siteIds.map((sid: string) => new Types.ObjectId(sid));
+  }
+
+  if (projectIds !== undefined) {
+    vendor.projectIds = projectIds.map((projectId: string) => new Types.ObjectId(projectId));
   }
 
   const customFields = (rest as any).customFields as Record<string, unknown> | undefined;

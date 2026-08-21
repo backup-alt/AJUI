@@ -156,6 +156,11 @@ export const createWorkerSchema = z.object({
     site: z.string().trim().min(1).max(200),
     name: z.string().trim().min(1).max(200),
     address: z.string().trim().max(500).optional(),
+    // Optional on the wire — the mobile supervisor form does not collect
+    // these today, but the web admin "Add Worker" dialog does. Validation
+    // is permissive so existing mobile clients keep working.
+    phone: z.string().trim().max(32).optional(),
+    notes: z.string().trim().max(1000).optional(),
     labourType: z.string().trim().min(1).max(100),
     // The supervisor mobile worker-create form no longer collects
     // weeklyPay (per-project wages are tracked via admin-side custom

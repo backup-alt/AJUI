@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
-import { IonContent, IonIcon, IonProgressBar, IonSplitPane } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonProgressBar, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { Client, ErpDataService } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
@@ -34,7 +34,7 @@ import { formatMoney } from "../shared/format";
                   <ion-icon name="add-outline"></ion-icon>
                 </div>
                 <h3>Add New Client</h3>
-                <p>Create a client profile before adding construction projects, ledgers, and site records.</p>
+              <p>Create a client profile before adding construction projects and ledgers.</p>
               </article>
 
               <article
@@ -60,7 +60,7 @@ import { formatMoney } from "../shared/format";
 
                   <div class="ledger-box">
                     <div class="ledger-row strong">
-                      <span>{{ summary(client).projectCount }} Projects  -  {{ summary(client).activeSites }} Active Sites</span>
+                    <span>{{ summary(client).projectCount }} Projects</span>
                       <strong>{{ formatMoney(summary(client).totalValue) }}</strong>
                     </div>
                     <div class="ledger-row">
@@ -88,9 +88,10 @@ import { formatMoney } from "../shared/format";
           *ngIf="showClientForm() || editingClient()"
           eyebrow="{{ editingClient() ? 'Client Edit' : 'Client Setup' }}"
           title="{{ editingClient() ? 'Edit Client' : 'Add New Client' }}"
-          description="{{ editingClient() ? 'Update client contact and address information.' : 'Create the client record first. Projects, ledgers, and site records stay separated under this client.' }}"
+          description="{{ editingClient() ? 'Update client contact and address information.' : 'Create the client record first. Projects and ledgers stay separated under this client.' }}"
           submitLabel="{{ editingClient() ? 'Save Changes' : 'Create Client' }}"
           [initialValue]="editingClient() ? clientEditValue(editingClient()!) : null"
+          [submitting]="clientSaving()"
           (cancel)="closeClientForm()"
           (create)="editingClient() ? updateClient($event) : createClient($event)"
         ></agb-client-form-dialog>
@@ -104,12 +105,14 @@ export class ClientDashboardPage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly router = inject(Router);
+  private readonly toastController = inject(ToastController);
   readonly search = signal("");
   readonly showClientForm = signal(false);
   readonly editingClient = signal<Client | null>(null);
   readonly clients = this.data.clients;
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
+  readonly clientSaving = signal(false);
   readonly formatMoney = formatMoney;
 
   refreshFromBackend() {
@@ -145,22 +148,20 @@ export class ClientDashboardPage {
     });
   }
   async openClient(client: Client) {
-    let project = this.data.firstProjectForClient(client);
-    if (!project) {
-      try {
-        project = await this.data.createDefaultProject(client);
-      } catch (err) {
-        console.error("[ClientDashboard] Failed to create default project:", (err as any)?.message ?? err);
-        void this.router.navigate(["/clients", client.id]);
-        return;
-      }
+    // Don't auto-create projects on open — clients without projects land on
+    // the workspace empty state, where they can create a project explicitly.
+    const project = this.data.firstProjectForClient(client);
+    if (project) {
+      this.data.touchProject(project.id);
+      void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]);
+      return;
     }
-    this.data.touchProject(project.id);
-    void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]);
+    void this.router.navigate(["/clients", client.id]);
   }
 
-  createClient(value: ClientFormValue) {
+  async createClient(value: ClientFormValue) {
     if (!value.name || !value.mobile || !value.address) return;
+    if (this.clientSaving()) return; // guard against double-submit
 
     const payload = {
       name: value.name,
@@ -172,30 +173,49 @@ export class ClientDashboardPage {
       status: "Active",
     };
 
-    this.api.createClient(payload).subscribe({
-      next: async (res) => {
-        const created = res?.client || res;
-        const clientId = created?.clientId || created?.id || res?.clientId || res?.id;
-        const client = this.data.addClient({
-          ...value,
-          id: clientId,
-          _id: created?._id,
-          supervisor: "",
-        } as Client);
-        try {
-          const project = await this.data.createDefaultProject(client);
-          this.showClientForm.set(false);
-          setTimeout(() => void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]));
-        } catch (err) {
-          console.error("[ClientDashboard] Failed to create default project:", (err as any)?.message ?? err);
-          this.showClientForm.set(false);
-          setTimeout(() => void this.router.navigate(["/clients", client.id]));
-        }
-      },
-      error: (err) => {
-        console.error("Failed to create client", err);
-      },
-    });
+    this.clientSaving.set(true);
+    try {
+      const res: any = await new Promise((resolve, reject) => {
+        this.api.createClient(payload).subscribe({ next: resolve, error: reject });
+      });
+      const created = res?.client || res;
+      const clientId = created?.clientId || created?.id || res?.clientId || res?.id;
+      // Client creation must not auto-create a project — project setup is a
+      // deliberate, separate step the user takes from inside the client
+      // workspace.
+      this.data.addClient({
+        ...value,
+        id: clientId,
+        _id: created?._id,
+        supervisor: "",
+      } as Client);
+      this.closeClientForm();
+      await this.presentToast(`Client "${value.name}" created. Open the client to add a project.`, "success");
+    } catch (err: any) {
+      console.error("Failed to create client", err);
+      // Keep the dialog open so the user can correct and retry.
+      await this.presentToast(
+        err?.error?.message || err?.message || "Could not create the client. Please try again.",
+        "danger",
+      );
+    } finally {
+      this.clientSaving.set(false);
+    }
+  }
+
+  private async presentToast(message: string, color: "success" | "warning" | "danger" = "success") {
+    try {
+      const toast = await this.toastController.create({
+        message,
+        duration: color === "danger" ? 4000 : 2500,
+        color,
+        position: "top",
+      });
+      await toast.present();
+    } catch (err) {
+      // Toast failures should never block the underlying action.
+      console.warn("[ClientDashboard] Failed to present toast:", err);
+    }
   }
 
   editClient(client: Client, event: Event) {
@@ -218,11 +238,19 @@ export class ClientDashboardPage {
     };
   }
 
-  updateClient(value: ClientFormValue) {
+  async updateClient(value: ClientFormValue) {
     const client = this.editingClient();
     if (!client || !value.name || !value.mobile || !value.address) return;
-    this.data.updateClient(client.id, value);
-    this.closeClientForm();
+    if (this.clientSaving()) return; // guard against double-submit
+
+    this.clientSaving.set(true);
+    try {
+      this.data.updateClient(client.id, value);
+      this.closeClientForm();
+      await this.presentToast(`Client "${value.name}" updated.`);
+    } finally {
+      this.clientSaving.set(false);
+    }
   }
 
   deleteClient(client: Client, event: Event) {

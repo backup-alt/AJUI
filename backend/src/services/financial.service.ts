@@ -6,6 +6,7 @@ import { Labour } from "../models/Labour.js";
 import { Expense } from "../models/Expense.js";
 import { Payment } from "../models/Payment.js";
 import { SubcontractorPayment } from "../models/SubcontractorPayment.js";
+import { recomputeProjectExpenseTotal } from "./general-expense.service.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 export interface ProjectFinancialSummary {
@@ -77,13 +78,26 @@ export async function recomputeProjectTotals(projectObjectId: Types.ObjectId): P
   project.receivedAmount = paymentAgg[0]?.total ?? 0;
   project.materialSpend = materialAgg[0]?.total ?? 0;
   project.labourPayable = labourAgg[0]?.total ?? 0;
-  project.totalExpenseReceived = expenseAgg[0]?.total ?? 0;
+  const legacyExpenseTotal = expenseAgg[0]?.total ?? 0;
   project.subcontractorSpend = subcontractorAgg[0]?.total ?? 0;
 
   project.pendingBalance = Math.max(0, project.totalValue - project.receivedAmount);
   project.lastActivityAt = new Date();
 
   await project.save();
+
+  // Fold the new project-level GeneralExpense collection into
+  // totalExpenseReceived. Done after save so the legacy field read is
+  // authoritative and we add the general-expense sum on top (additive,
+  // idempotent — safe to rerun on each project recompute).
+  try {
+    await recomputeProjectExpenseTotal(projectObjectId, legacyExpenseTotal);
+  } catch (e) {
+    console.warn(
+      `[recomputeProjectTotals] failed to fold GeneralExpense total for project=${projectObjectId}:`,
+      (e as Error).message
+    );
+  }
 }
 
 export async function recomputeClientTotals(clientObjectId: Types.ObjectId): Promise<void> {

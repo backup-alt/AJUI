@@ -12,6 +12,7 @@ export interface CreateSubcontractorPaymentInput {
   projectId: string;
   siteId?: string;
   date: string;
+  paymentType: string;
   description: string;
   employeeCount: number;
   amount: number;
@@ -23,6 +24,7 @@ export interface UpdateSubcontractorPaymentInput {
   projectId?: string;
   siteId?: string;
   date?: string;
+  paymentType?: string;
   description?: string;
   employeeCount?: number;
   amount?: number;
@@ -137,6 +139,7 @@ export async function createSubcontractorPayment(
     projectName: project.name,
     siteName: site?.name,
     date: input.date,
+    paymentType: input.paymentType,
     description: String(input.description || "").trim(),
     employeeCount: Number(input.employeeCount),
     amount: Number(input.amount),
@@ -221,6 +224,7 @@ export async function updateSubcontractorPayment(
   }
 
   if (patch.date !== undefined) existing.date = patch.date;
+  if (patch.paymentType !== undefined) existing.paymentType = patch.paymentType;
   if (patch.description !== undefined) existing.description = String(patch.description).trim();
   if (patch.employeeCount !== undefined) existing.employeeCount = Number(patch.employeeCount);
   if (patch.amount !== undefined) existing.amount = Number(patch.amount);

@@ -130,21 +130,6 @@ type ToastManager = {
       background: rgba(255, 255, 255, 0.25);
     }
 
-    /* Inline spinner shown on the approve/decline buttons while a row is in-flight. */
-    .approval-spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid currentColor;
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: approval-spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-    @keyframes approval-spin {
-      to { transform: rotate(360deg); }
-    }
     .approval-actions button[disabled] {
       opacity: 0.55;
       cursor: not-allowed;
@@ -170,7 +155,7 @@ type ToastManager = {
               <div>
                 <span>Project Manager Review</span>
                 <h1>Pending Approvals</h1>
-                <p>Review each pending item with the project, site, requester, quantity, amount, and approval context visible before taking action.</p>
+          <p>Review each pending item with the project, requester, quantity, amount, and approval context visible before taking action.</p>
               </div>
               <div class="approval-summary-grid">
                 <div><span>Pending Items</span><strong>{{ pendingTotal() }}</strong></div>
@@ -180,113 +165,12 @@ type ToastManager = {
             </section>
 
             <div class="approvals-stack">
-              @if (showMaterial()) {
-              <section class="operations-workbench approvals-workbench approval-section">
-                <div class="module-toolbar table-first-toolbar">
-                  <div>
-                    <h2>Material Requests</h2>
-                    <p>Approve requested material quantities with vendor and site context.</p>
-                  </div>
-                  <span class="approval-count-pill">{{ materialApprovals().length }} pending</span>
-                </div>
-                <div class="table-wrap operations-table approvals-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Client</th>
-                        <th>Project</th>
-                        <th>Site</th>
-                        <th>Material</th>
-                        <th>Requested Qty</th>
-                        <th>Approved Qty</th>
-                        <th>Vendor</th>
-                        <th>Supervisor</th>
-                        <th>Date</th>
-                        <th>Issued Amt</th>
-                        <th>Given Amt</th>
-                        <th>Notes</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let row of materialApprovals()">
-                        <td>{{ row.client || "-" }}</td>
-                        <td>{{ row.project || "-" }}</td>
-                        <td>{{ row.site || "-" }}</td>
-                        <td><strong>{{ row.materialName }}</strong></td>
-                        <td>{{ row.requestedQuantity }} {{ row.unit }}</td>
-                        <td>
-                          <input
-                            class="approval-table-input"
-                            inputmode="decimal"
-                            type="number"
-                            [(ngModel)]="row.approvedQuantity"
-                            aria-label="Approved quantity"
-                            min="0"
-                          />
-                        </td>
-                        <td>
-                          <select class="approval-table-select" [(ngModel)]="row.vendor">
-                            <option *ngFor="let vendor of vendorOptions()" [value]="vendor">{{ vendor }}</option>
-                          </select>
-                        </td>
-                        <td>{{ row.supervisor || "-" }}</td>
-                        <td>{{ row.requestDate || "-" }}</td>
-                        <td>
-                          <input
-                            class="approval-table-input"
-                            inputmode="decimal"
-                            type="number"
-                            [(ngModel)]="row.issuedAmount"
-                            aria-label="Issued amount"
-                            min="0"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            class="approval-table-input"
-                            inputmode="decimal"
-                            type="number"
-                            [(ngModel)]="row.givenAmount"
-                            aria-label="Given amount"
-                            min="0"
-                          />
-                        </td>
-                        <td>{{ row.notes || "-" }}</td>
-                        <td><span class="approval-status-pill">{{ row.status }}</span></td>
-                        <td class="approval-actions">
-                          <button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)" aria-label="Approve material">
-                            @if (isRowProcessing(row.rowId)) {
-                              <span class="approval-spinner" aria-hidden="true"></span>
-                            } @else {
-                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
-                            }
-                            Approve
-                          </button>
-                          <button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)" aria-label="Decline material">
-                            @if (isRowProcessing(row.rowId)) {
-                              <span class="approval-spinner" aria-hidden="true"></span>
-                            } @else {
-                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>
-                            }
-                            Decline
-                          </button>
-                        </td>
-                      </tr>
-                      <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" colspan="14"><span>No pending material approvals.</span></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-              }
-
               @if (showSiteExpense()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
                   <div>
-                    <h2>Site Expenses</h2>
-                    <p>Approve project-linked expenses with site, transaction type, supervisor, and bill reference visible.</p>
+            <h2>Supervisor Expenses</h2>
+            <p>Approve project-linked expenses with transaction type, supervisor, and bill reference visible.</p>
                   </div>
                   <span class="approval-count-pill">{{ siteExpenseApprovals().length }} pending</span>
                 </div>
@@ -296,7 +180,6 @@ type ToastManager = {
                       <tr>
                         <th>Client</th>
                         <th>Project</th>
-                        <th>Site</th>
                         <th>Date</th>
                         <th>Transaction Type</th>
                         <th>Description</th>
@@ -313,7 +196,6 @@ type ToastManager = {
                       <tr *ngFor="let row of siteExpenseApprovals()">
                         <td>{{ row.client || "-" }}</td>
                         <td>{{ row.project || "-" }}</td>
-                        <td>{{ row.site || "-" }}</td>
                         <td>{{ row.expenseDate || "-" }}</td>
                         <td>{{ transactionTypeLabel(row.transactionType) }}</td>
                         <td><strong>{{ row.description || "-" }}</strong></td>
@@ -357,7 +239,7 @@ type ToastManager = {
                         <td class="approval-actions">
                           <button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">
                             @if (isRowProcessing(row.rowId)) {
-                              <span class="approval-spinner" aria-hidden="true"></span>
+                              <span class="agb-loading-spinner" aria-hidden="true"></span>
                             } @else {
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
                             }
@@ -365,7 +247,7 @@ type ToastManager = {
                           </button>
                           <button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)">
                             @if (isRowProcessing(row.rowId)) {
-                              <span class="approval-spinner" aria-hidden="true"></span>
+                              <span class="agb-loading-spinner" aria-hidden="true"></span>
                             } @else {
                               <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="m5.5 5.5 9 9" /><path d="m14.5 5.5-9 9" /></svg>
                             }
@@ -373,7 +255,7 @@ type ToastManager = {
                           </button>
                         </td>
                       </tr>
-                      <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="13"><span>No pending site expense approvals.</span></td></tr>
+              <tr *ngIf="siteExpenseApprovals().length === 0"><td class="empty-row" colspan="12"><span>No pending supervisor expense approvals.</span></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -405,6 +287,10 @@ export class PendingApprovalsPage implements OnInit {
   private readonly approvalsService = inject(ApprovalsService);
   private readonly api = inject(ApiService);
 
+  // Material approvals are no longer surfaced on this page — they are
+  // managed inline in the project workspace "Materials" tab (and on the
+  // universal dashboard). Keep the signal for legacy callers that might
+  // still toggle it; the section is always hidden.
   readonly showMaterial = signal(false);
   readonly showLabour = signal(false);
   readonly showSiteExpense = signal(false);
@@ -430,7 +316,6 @@ export class PendingApprovalsPage implements OnInit {
   private _siteExpenseRows = signal<ExpenseApprovalRow[]>([]);
 
   async ngOnInit() {
-    this.showMaterial.set(true);
     this.showSiteExpense.set(true);
     await this.refreshApprovals();
   }
@@ -440,6 +325,10 @@ export class PendingApprovalsPage implements OnInit {
     this.loadError.set(false);
     try {
       const all = await this.approvalsService.fetchApprovals({ status: "Pending", limit: 25 });
+      // Material rows are filtered out of the queue (the project workspace
+      // "Materials" tab is now the single source of truth for material
+      // approvals). We still split them so any caller that peeks the signal
+      // sees the original layout.
       this._materialRows.set(all.filter((r) => r.module === "materials") as MaterialApprovalRow[]);
       this._labourRows.set(all.filter((r) => r.module === "labour") as LabourApprovalRow[]);
       this._siteExpenseRows.set(all.filter((r) => r.module === "expenses") as ExpenseApprovalRow[]);
@@ -450,9 +339,7 @@ export class PendingApprovalsPage implements OnInit {
     }
   }
 
-  readonly materialApprovals = computed(() =>
-    this.showMaterial() ? this._materialRows().filter((row) => this.isPending(row.status)) : []
-  );
+  readonly materialApprovals = computed(() => [] as MaterialApprovalRow[]);
   readonly labourApprovals = computed(() =>
     this.showLabour() ? this._labourRows().filter((row) => this.isPending(row.status)) : []
   );
@@ -474,7 +361,7 @@ export class PendingApprovalsPage implements OnInit {
 
   toggleFilter(type: string) {
     switch (type) {
-      case "material": this.showMaterial.update(v => !v); break;
+      case "material": /* no-op — material approvals hidden */ break;
       case "labour": this.showLabour.update(v => !v); break;
       case "site_expense": this.showSiteExpense.update(v => !v); break;
     }
@@ -482,7 +369,7 @@ export class PendingApprovalsPage implements OnInit {
 
   isFilterActive(type: string): boolean {
     switch (type) {
-      case "material": return this.showMaterial();
+      case "material": return false;
       case "labour": return this.showLabour();
       case "site_expense": return this.showSiteExpense();
       default: return true;

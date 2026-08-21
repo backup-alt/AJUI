@@ -122,28 +122,28 @@ interface ActivityEntry {
             <section class="settings-w11-card">
               <div class="settings-w11-card-head">
                 <div>
-                  <h2>Assigned Sites</h2>
-                  <p>Sites that this supervisor is assigned to.</p>
+                  <h2>Assigned Projects</h2>
+                  <p>Projects that this supervisor can manage.</p>
                 </div>
-                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openSitePicker()">
+                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openProjectPicker()">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                  Manage Sites
+                  Manage Projects
                 </button>
               </div>
               <div class="settings-w11-card-body">
-                @if (supervisorAssignedSiteNames().length > 0) {
+                @if (supervisorAssignedProjectNames().length > 0) {
                   <div class="settings-w11-site-list">
-                    @for (site of supervisorAssignedSiteNames(); track site.id) {
+                    @for (project of supervisorAssignedProjectNames(); track project.id) {
                       <div class="settings-w11-site-chip">
-                        <span>{{ site.name }}</span>
-                        <button type="button" class="settings-w11-chip-remove" (click)="removeSupervisorSite(site.id)" title="Remove site">
+                        <span>{{ project.name }}</span>
+                        <button type="button" class="settings-w11-chip-remove" (click)="removeSupervisorProject(project.id)" title="Remove project">
                           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                         </button>
                       </div>
                     }
                   </div>
                 } @else {
-                  <p class="settings-w11-empty-hint">No sites assigned yet.</p>
+                  <p class="settings-w11-empty-hint">No projects assigned yet.</p>
                 }
               </div>
             </section>
@@ -230,39 +230,39 @@ interface ActivityEntry {
           </section>
         }
 
-        @if (showSitePicker()) {
-          <div class="settings-w11-picker-overlay" (click)="showSitePicker.set(false)">
+        @if (showProjectPicker()) {
+          <div class="settings-w11-picker-overlay" (click)="showProjectPicker.set(false)">
             <div class="settings-w11-picker-modal" (click)="$event.stopPropagation()">
               <div class="settings-w11-picker-head">
-                <h3>Manage Assigned Sites</h3>
-                <button type="button" class="settings-w11-chip-remove" (click)="showSitePicker.set(false)">
+                <h3>Manage Assigned Projects</h3>
+                <button type="button" class="settings-w11-chip-remove" (click)="showProjectPicker.set(false)">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </button>
               </div>
               <div class="settings-w11-picker-body">
-                @if (allSitesForPicker().length === 0) {
-                  <p class="settings-w11-empty-hint">No sites found.</p>
+                @if (allProjectsForPicker().length === 0) {
+                  <p class="settings-w11-empty-hint">No projects found.</p>
                 } @else {
                   <div class="settings-w11-picker-list">
-                    @for (site of allSitesForPicker(); track site.id) {
-                      <label class="settings-w11-site-checkbox" [class.checked]="pendingSiteIds().has(site.id)">
-                        <input type="checkbox" [checked]="pendingSiteIds().has(site.id)" (change)="togglePickerSite(site.id)" />
+                    @for (project of allProjectsForPicker(); track project.id) {
+                      <label class="settings-w11-site-checkbox" [class.checked]="pendingProjectIds().has(project.id)">
+                        <input type="checkbox" [checked]="pendingProjectIds().has(project.id)" (change)="togglePickerProject(project.id)" />
                         <span class="cb-box">
-                          @if (pendingSiteIds().has(site.id)) {
+                          @if (pendingProjectIds().has(project.id)) {
                             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                           }
                         </span>
-                        <span class="cb-label">{{ site.name }}</span>
+                        <span class="cb-label">{{ project.name }}</span>
                       </label>
                     }
                   </div>
                 }
               </div>
               <div class="settings-w11-picker-footer">
-                <span class="settings-w11-picker-count">{{ pendingSiteIds().size }} site(s) selected</span>
+                <span class="settings-w11-picker-count">{{ pendingProjectIds().size }} project(s) selected</span>
                 <div class="settings-w11-picker-actions">
-                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="showSitePicker.set(false)">Cancel</button>
-                  <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="saveSiteSelection()" [disabled]="siteSaving()">{{ siteSaving() ? 'Saving…' : 'Save' }}</button>
+                  <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="showProjectPicker.set(false)">Cancel</button>
+                  <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="saveProjectSelection()" [disabled]="projectSaving()">{{ projectSaving() ? 'Saving…' : 'Save' }}</button>
                 </div>
               </div>
             </div>
@@ -459,6 +459,9 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   // Picker-local site list (independent of shared siteEntities) — always shows all available sites
   readonly pickerSites = signal<any[]>([]);
   readonly pickerSitesLoading = signal(false);
+  readonly showProjectPicker = signal(false);
+  readonly pendingProjectIds = signal<Set<string>>(new Set());
+  readonly projectSaving = signal(false);
 
   // Activity
   readonly activity = signal<ActivityEntry[]>([]);
@@ -474,6 +477,63 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       .map((pid) => projects.find((p) => p.id === pid || String(p.id) === pid)?.name || pid)
       .filter(Boolean);
   });
+
+  readonly allProjectsForPicker = computed<Array<{ id: string; name: string }>>(() =>
+    this.erp.projects().map((project) => ({ id: String(project.id), name: project.name })),
+  );
+
+  readonly supervisorAssignedProjectNames = computed<Array<{ id: string; name: string }>>(() => {
+    const employee = this.employee();
+    if (!employee || employee.role !== "Supervisor") return [];
+    const ids = employee.assignedProjectIds || employee.projectIds || [];
+    return ids.map((id) => ({
+      id: String(id),
+      name: this.erp.projects().find((project) => String(project.id) === String(id))?.name || String(id),
+    }));
+  });
+
+  openProjectPicker() {
+    const employee = this.employee();
+    if (!employee) return;
+    this.pendingProjectIds.set(new Set(employee.assignedProjectIds || employee.projectIds || []));
+    this.showProjectPicker.set(true);
+  }
+
+  togglePickerProject(projectId: string) {
+    this.pendingProjectIds.update((current) => {
+      const next = new Set(current);
+      next.has(projectId) ? next.delete(projectId) : next.add(projectId);
+      return next;
+    });
+  }
+
+  saveProjectSelection() {
+    const employee = this.employee();
+    if (!employee?.supervisorId) return;
+    const assignedProjectIds = [...this.pendingProjectIds()];
+    this.projectSaving.set(true);
+    this.api.updateSupervisor(employee.supervisorId, { assignedProjectIds }).subscribe({
+      next: () => {
+        this.employee.update((row) => row ? { ...row, assignedProjectIds, projectIds: assignedProjectIds } : row);
+        this.projectSaving.set(false);
+        this.showProjectPicker.set(false);
+      },
+      error: () => {
+        this.projectSaving.set(false);
+        alert("Failed to update project assignments.");
+      },
+    });
+  }
+
+  removeSupervisorProject(projectId: string) {
+    const employee = this.employee();
+    if (!employee?.supervisorId) return;
+    const assignedProjectIds = (employee.assignedProjectIds || []).filter((id) => String(id) !== projectId);
+    this.api.updateSupervisor(employee.supervisorId, { assignedProjectIds }).subscribe({
+      next: () => this.employee.update((row) => row ? { ...row, assignedProjectIds, projectIds: assignedProjectIds } : row),
+      error: () => alert("Failed to update project assignments."),
+    });
+  }
 
   private annotateProject(site: any): { id: string; name: string } {
     const siteAny = site as any;
@@ -545,7 +605,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly approvalTypes = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },
     { key: "labour", label: "Labour Attendance", note: "Daily worker attendance entries" },
-    { key: "site_expense", label: "Site Expenses", note: "Diesel, equipment, transport costs" },
+    { key: "site_expense", label: "Supervisor Expenses", note: "Diesel, equipment, transport costs" },
     { key: "general_expense", label: "General Expenses", note: "Office supplies, miscellaneous" },
     { key: "payment", label: "Client Payments", note: "Collections from clients" },
     { key: "subcontract", label: "Subcontracts", note: "Subcontractor agreements and payments" },

@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Worker } from "../models/Worker.js";
 import { Attendance } from "../models/Attendance.js";
 import { Subcontractor } from "../models/Subcontractor.js";
+import { SubcontractorLabor } from "../models/SubcontractorLabor.js";
 import { User } from "../models/User.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
@@ -16,9 +17,11 @@ async function resolveSupervisorName(userId: string): Promise<string> {
 export async function createWorker(input: {
   projectId: string;
   siteId?: string;
-  site: string;
+  site?: string;
   name: string;
   address?: string;
+  phone?: string;
+  notes?: string;
   labourType: string;
   weeklyPay?: number;
   isSubcontract: boolean;
@@ -85,6 +88,8 @@ export async function createWorker(input: {
     site: input.site,
     name: input.name,
     address: input.address,
+    phone: input.phone,
+    notes: input.notes,
     labourType: input.labourType,
     // weeklyPay is optional on the supervisor mobile create form —
     // admin-side custom fields drive the per-project wage.
@@ -96,6 +101,30 @@ export async function createWorker(input: {
     supervisorName: input.supervisorName,
     createdBy: input.createdBy,
   });
+
+  if (subcontractorObjectId) {
+    await SubcontractorLabor.findOneAndUpdate(
+      {
+        workerId: worker._id,
+      },
+      {
+        $set: {
+          projectName: project.name,
+          address: input.address || "",
+          role: input.labourType,
+          notes: input.notes || "",
+        },
+        $setOnInsert: {
+          subcontractorId: subcontractorObjectId,
+          workerId: worker._id,
+          projectId: project._id,
+          name: input.name,
+          phone: input.phone || "",
+        },
+      },
+      { upsert: true, new: true },
+    );
+  }
 
   return worker.toObject();
 }
@@ -158,16 +187,58 @@ export async function getWorkerById(id: string) {
   return worker;
 }
 
-export async function updateWorker(id: string, updates: { weeklyPay?: number }) {
+export async function updateWorker(
+  id: string,
+  updates: {
+    weeklyPay?: number;
+    phone?: string;
+    notes?: string;
+    address?: string;
+    name?: string;
+    labourType?: string;
+    site?: string;
+    subcontractorId?: string;
+    subcontractorName?: string;
+  }
+) {
   if (!Types.ObjectId.isValid(id)) {
     throw new AppError(400, "Invalid worker id");
   }
   const worker = await Worker.findById(id);
   if (!worker) throw new AppError(404, "Worker not found");
-  if (updates.weeklyPay !== undefined) {
-    worker.weeklyPay = updates.weeklyPay;
+  if (updates.weeklyPay !== undefined) worker.weeklyPay = updates.weeklyPay;
+  if (updates.phone !== undefined) worker.phone = updates.phone;
+  if (updates.notes !== undefined) worker.notes = updates.notes;
+  if (updates.address !== undefined) worker.address = updates.address;
+  if (updates.name !== undefined) worker.name = updates.name;
+  if (updates.labourType !== undefined) worker.labourType = updates.labourType;
+  if (updates.site !== undefined) worker.site = updates.site;
+  if (updates.subcontractorId !== undefined) {
+    worker.subcontractorId = new Types.ObjectId(updates.subcontractorId);
+    worker.isSubcontract = true;
   }
+  if (updates.subcontractorName !== undefined) worker.subcontractorName = updates.subcontractorName;
   await worker.save();
+  if (worker.subcontractorId) {
+    await SubcontractorLabor.findOneAndUpdate(
+      {
+        workerId: worker._id,
+      },
+      {
+        $set: {
+          subcontractorId: worker.subcontractorId,
+          projectId: worker.projectId,
+          name: worker.name,
+          phone: worker.phone || "",
+          projectName: worker.projectName,
+          address: worker.address || "",
+          role: worker.labourType,
+          notes: worker.notes || "",
+        },
+      },
+      { upsert: true, new: true },
+    );
+  }
   return worker.toObject();
 }
 

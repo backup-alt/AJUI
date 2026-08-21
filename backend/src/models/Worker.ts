@@ -7,9 +7,15 @@ export interface IWorker extends Document {
   projectName: string;
   clientId: Types.ObjectId;
   siteId?: Types.ObjectId;
-  site: string;
+  site?: string;
   name: string;
   address?: string;
+  // Optional contact number — captured by the web admin worker form. Left
+  // unset (rather than validated required) so the mobile supervisor app
+  // can keep creating workers without it.
+  phone?: string;
+  // Free-form notes about the worker (skills, shift preference, ID docs, etc).
+  notes?: string;
   labourType: string;
   weeklyPay: number;
   isSubcontract: boolean;
@@ -32,9 +38,11 @@ const workerSchema = new Schema<IWorker>(
     projectName: { type: String, required: true },
     clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true },
     siteId: { type: Schema.Types.ObjectId, ref: "Site" },
-    site: { type: String, required: true },
+    site: { type: String },
     name: { type: String, required: true, trim: true },
     address: { type: String, trim: true },
+    phone: { type: String, trim: true, maxlength: 32 },
+    notes: { type: String, trim: true, maxlength: 1000 },
     labourType: { type: String, required: true, trim: true, index: true },
     weeklyPay: { type: Number, min: 0 },
     isSubcontract: { type: Boolean, default: false },

@@ -80,6 +80,7 @@ export interface SubcontractorPayment {
   projectName: string;
   siteName?: string;
   date: string;
+  paymentType: string;
   description: string;
   employeeCount: number;
   amount: number;
@@ -93,6 +94,7 @@ export interface CreateSubcontractorPaymentPayload {
   projectId: string;
   siteId?: string;
   date: string;
+  paymentType: string;
   description: string;
   employeeCount: number;
   amount: number;
@@ -102,6 +104,10 @@ export interface CreateSubcontractorPaymentPayload {
 export interface SubcontractorLabor {
   _id: string;
   subcontractorId: string;
+  /** Optional project linkage — when set, the labour row mirrors into
+   * that project's worker roster. */
+  projectId?: string;
+  projectName?: string;
   name: string;
   address?: string;
   phone: string;
@@ -131,6 +137,7 @@ export interface PurchaseOrder {
   vendorId: string;
   vendorName: string;
   date: string;
+  paymentMode: string;
   items: PurchaseOrderItem[];
   subtotal: number;
   totalGst: number;
@@ -268,13 +275,14 @@ export class ApiService {
     supervisorEmail: string;
     supervisorPhone?: string;
     projectId?: string;
+    projectIds?: string[];
     siteIds?: string[];
     sendEmail?: boolean; // true = send deep link email, false = generate QR only
   }): Observable<{
     inviteId: string;
     token: string;
     qrUrl: string;
-    qrPayload: { token: string; supervisorName: string; supervisorPhone?: string; siteIds?: string[]; expiresAt: number };
+    qrPayload: { token: string; supervisorName: string; supervisorPhone?: string; projectIds?: string[]; expiresAt: number };
     qrDataUrl: string;
     supervisorName: string;
     supervisorEmail: string;
@@ -352,6 +360,15 @@ export class ApiService {
       catchError(this.handleError)
     );
   }
+  uploadMaterialReceipt(id: string, payload: { data: string; mimeType: string; fileName?: string }): Observable<{ material: any }> {
+    return this.http.post<{ material: any }>(`${this.baseUrl}/materials/${id}/receipt`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.cache.invalidate("/materials");
+        this.cache.invalidate("/dashboard/batch");
+      }),
+      catchError(this.handleError)
+    );
+  }
   createMaterial(payload: any): Observable<any> {
     return this.http.post(`${this.baseUrl}/materials`, payload, { headers: this.authHeaders() }).pipe(
       tap(() => this.cache.invalidate("/materials")),
@@ -383,6 +400,75 @@ export class ApiService {
   patchExpense(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/expenses/${id}`, payload, { headers: this.authHeaders() }).pipe(
       tap(() => this.cache.invalidate("/expenses")),
+      catchError(this.handleError)
+    );
+  }
+
+  // =================== GENERAL EXPENSES (project-level "Expense") ===================
+  listGeneralExpenses(params?: {
+    projectId?: string;
+    siteId?: string;
+    category?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    cursor?: string;
+  }): Observable<{ items: any[]; total: number; page: number; limit: number; pages: number; queryFailed?: boolean }> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.cachedGet<{ items: any[]; total: number; page: number; limit: number; pages: number; queryFailed?: boolean }>(
+      `${this.baseUrl}/general-expenses${query}`
+    );
+  }
+  listAllGeneralExpenses(params?: {
+    projectId?: string;
+    siteId?: string;
+    category?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    search?: string;
+    limit?: number;
+  }): Observable<{ items: any[]; total: number }> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.cachedGet<{ items: any[]; total: number }>(`${this.baseUrl}/general-expenses/all${query}`);
+  }
+  createGeneralExpense(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/general-expenses`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/general-expenses")),
+      catchError(this.handleError)
+    );
+  }
+  uploadGeneralExpenseReceipt(id: string, payload: { data: string; mimeType: string; fileName?: string }): Observable<{ expense: any }> {
+    return this.http.post<{ expense: any }>(`${this.baseUrl}/general-expenses/${id}/receipt`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.cache.invalidate("/general-expenses");
+        this.cache.invalidate("/dashboard/batch");
+      }),
+      catchError(this.handleError)
+    );
+  }
+  patchGeneralExpense(id: string, payload: any): Observable<any> {
+    return this.http.patch(`${this.baseUrl}/general-expenses/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/general-expenses")),
+      catchError(this.handleError)
+    );
+  }
+  deleteGeneralExpense(id: string): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/general-expenses/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/general-expenses")),
       catchError(this.handleError)
     );
   }
@@ -541,6 +627,7 @@ export class ApiService {
     note?: string;
     address?: string;
     phone?: string;
+    paymentMode?: string;
     status?: "active" | "inactive";
   }): Observable<{ subcontractor: any }> {
     return this.http.post<{ subcontractor: any }>(`${this.baseUrl}/subcontractors`, payload, {
@@ -700,6 +787,7 @@ export class ApiService {
     projectId: string;
     vendorId: string;
     date: string;
+    paymentMode: string;
     roundOff: number;
     items: Array<{
       source: "existing" | "manual";
@@ -725,6 +813,7 @@ export class ApiService {
   updatePurchaseOrder(id: string, payload: {
     vendorId: string;
     date: string;
+    paymentMode: string;
     roundOff: number;
     items: Array<{
       source: "existing" | "manual";
@@ -1044,15 +1133,28 @@ export class ApiService {
 
   addInventoryMaterial(payload: {
     siteId: string;
+    projectId?: string;
     name: string;
     unit: string;
     quantity: number;
+    isExistingMaterial?: boolean;
+    issuedAmount?: number;
+    givenAmount?: number;
     remarks?: string;
     requestDate?: string;
   }): Observable<{ material: any; created: boolean }> {
     return this.http.post<{ material: any; created: boolean }>(`${this.baseUrl}/inventory/material`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.cache.invalidate("/materials");
+        this.cache.invalidate("/inventory");
+      }),
       catchError(this.handleError)
     );
+  }
+  listAllActiveSubcontractors(): Observable<{ items: any[] }> {
+    return this.http.get<{ items: any[] }>(`${this.baseUrl}/subcontractors/all-active`, {
+      headers: this.authHeaders(),
+    }).pipe(catchError(this.handleError));
   }
 
   // =================== LABOUR ===================
@@ -1064,6 +1166,49 @@ export class ApiService {
       query = `?${q.toString()}`;
     }
     return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/labour${query}`);
+  }
+
+  // =================== WORKERS (web admin) ===================
+  // Used by the project workspace "Labour" tab. The same collection the
+  // mobile supervisor app maintains via /api/mobile/supervisor/workers.
+  listWorkers(params?: { projectId?: string; siteId?: string; labourType?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/workers${query}`);
+  }
+
+  createWorker(payload: any): Observable<{ worker: any }> {
+    return this.http.post<{ worker: any }>(`${this.baseUrl}/workers`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.cache.invalidate("/workers");
+        this.cache.invalidate("/dashboard/batch");
+      }),
+      catchError(this.handleError)
+    );
+  }
+
+  patchWorker(id: string, payload: any): Observable<{ worker: any }> {
+    return this.http.patch<{ worker: any }>(`${this.baseUrl}/workers/${id}`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.cache.invalidate("/workers");
+        this.cache.invalidate("/dashboard/batch");
+      }),
+      catchError(this.handleError)
+    );
+  }
+
+  deleteWorker(id: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/workers/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.cache.invalidate("/workers");
+        this.cache.invalidate("/dashboard/batch");
+      }),
+      catchError(this.handleError)
+    );
   }
 
   // =================== ATTENDANCE (New Model) ===================

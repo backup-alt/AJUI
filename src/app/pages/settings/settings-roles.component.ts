@@ -437,7 +437,7 @@ type CombinedInvite = {
         <header class="settings-w11-modal-head">
           <div>
             <h2>Add Supervisor</h2>
-            <small>{{ supervisorStep() === 1 ? 'Enter supervisor details and choose how to send the invite' : (supervisorStep() === 2 ? 'Select sites for this supervisor' : 'QR Code generated') }}</small>
+          <small>{{ supervisorStep() === 1 ? 'Enter supervisor details and choose how to send the invite' : (supervisorStep() === 2 ? 'Select projects for this supervisor' : 'QR Code generated') }}</small>
           </div>
           <button type="button" class="settings-w11-icon-btn" (click)="closeAddSupervisor()" aria-label="Close">
             <svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -454,7 +454,7 @@ type CombinedInvite = {
               <div class="step-line" [class.done]="supervisorStep() > 1"></div>
               <div class="settings-w11-step" [class.active]="supervisorStep() === 2" [class.done]="supervisorStep() > 2">
                 <span class="step-circle">{{ supervisorStep() > 2 ? '✓' : '2' }}</span>
-                <span class="step-label">Sites</span>
+              <span class="step-label">Projects</span>
               </div>
               <div class="step-line" [class.done]="supervisorStep() > 2"></div>
               <div class="settings-w11-step" [class.active]="supervisorStep() === 3" [class.done]="supervisorStep() > 3">
@@ -507,31 +507,31 @@ type CombinedInvite = {
                 class="settings-w11-btn settings-w11-btn-primary"
                 (click)="nextStep()"
               >
-                Next: Select Sites
+                Next: Select Projects
               </button>
             </div>
           }
 
           @if (supervisorStep() === 2) {
             <div class="settings-w11-form">
-              <p class="settings-w11-step-hint">Select the sites this supervisor will manage:</p>
+              <p class="settings-w11-step-hint">Select the projects this supervisor will manage:</p>
               @if (sitesLoading()) {
-                <div class="settings-w11-loading">Loading sites...</div>
+                <div class="settings-w11-loading">Loading projects...</div>
               }
               @if (!sitesLoading() && availableSites().length === 0) {
-                <div class="settings-w11-message info">No sites available.</div>
+                <div class="settings-w11-message info">No projects available.</div>
               }
               <div class="settings-w11-site-list">
-                @for (site of availableSites(); track site.id) {
-                  <label class="settings-w11-site-item" [class.selected]="selectedSiteIds().has(site.id)">
+                  @for (project of availableSites(); track project.id) {
+                    <label class="settings-w11-site-item" [class.selected]="selectedSiteIds().has(project.id)">
                     <input
                       type="checkbox"
-                      [checked]="selectedSiteIds().has(site.id)"
-                      (change)="toggleSite(site.id)"
+                        [checked]="selectedSiteIds().has(project.id)"
+                        (change)="toggleSite(project.id)"
                     />
                     <div class="site-item-info">
-                      <strong>{{ site.name }}</strong>
-                      <small>{{ site.projectName || 'No project' }}</small>
+                        <strong>{{ project.name }}</strong>
+                        <small>{{ project.client || 'Project' }}</small>
                     </div>
                   </label>
                 }
@@ -1052,7 +1052,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly approvalTypes = [
     { key: "material", label: "Material Requests", note: "Cement, steel, sand, etc." },
     { key: "labour", label: "Labour Attendance", note: "Daily attendance submissions" },
-    { key: "expense", label: "Site Expenses", note: "Diesel, equipment, transport" },
+    { key: "expense", label: "Supervisor Expenses", note: "Diesel, equipment, transport" },
     { key: "payment", label: "Client Payments", note: "Collections from clients" },
     { key: "subcontract", label: "Subcontracts", note: "Subcontractor agreements" },
   ];
@@ -1466,15 +1466,13 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
 
   loadAvailableSites() {
     this.sitesLoading.set(true);
-    // Use listSitesAll() which tries /admin/sites first (all sites for admins)
-    // and falls back to cursor-paginated /sites for non-admins to collect all pages.
-    this.api.listSitesAll().subscribe({
+    this.api.listProjects({ limit: 200 }).subscribe({
       next: (res) => {
-        const rawSites = res.sites || [];
+        const rawSites = res.items || [];
         this.availableSites.set(
           rawSites.map((site: any, index: number) => ({
             ...site,
-            id: site.id || site._id || `site-${index}`,
+            id: site.id || site._id || `project-${index}`,
           }))
         );
         this.sitesLoading.set(false);
@@ -1561,7 +1559,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     }
     const siteIds = Array.from(this.selectedSiteIds());
     if (siteIds.length === 0) {
-      this.supervisorError.set("Please select at least one site.");
+      this.supervisorError.set("Please select at least one project.");
       return;
     }
     this.supervisorError.set(null);
@@ -1586,7 +1584,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     const name = this.supervisorNameDraft().trim();
     const email = this.supervisorEmailDraft().trim();
     const phone = this.supervisorPhoneDraft().trim();
-    const siteIds = Array.from(this.selectedSiteIds());
+    const projectIds = Array.from(this.selectedSiteIds());
     this.supervisorError.set(null);
     this.supervisorLoading.set(true);
 
@@ -1594,7 +1592,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
       supervisorName: name, 
       supervisorEmail: email, 
       supervisorPhone: phone, 
-      siteIds,
+      projectIds,
       sendEmail: method === 'email'
     }).subscribe({
       next: (invite) => {

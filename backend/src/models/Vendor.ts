@@ -17,6 +17,7 @@ export interface IVendor extends Document {
   rating: number;
   status: VendorStatus;
   siteIds: Types.ObjectId[];
+  projectIds: Types.ObjectId[];
   customFields?: Record<string, string | number | boolean | null>;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +42,7 @@ const vendorSchema = new Schema<IVendor>(
       default: "Active",
     },
     siteIds: [{ type: Schema.Types.ObjectId, ref: "Site", index: true }],
+    projectIds: [{ type: Schema.Types.ObjectId, ref: "Project", index: true }],
     customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }

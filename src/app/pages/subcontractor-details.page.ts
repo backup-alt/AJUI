@@ -19,7 +19,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
       <div class="ion-page" id="main-content">
         <agb-enterprise-header
           [title]="subcontractorName() || 'Sub-contractor'"
-          eyebrow="Payment history across every project and site"
+          eyebrow="Payment and labour history across projects"
           [showTitle]="false"
         />
 
@@ -45,6 +45,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                   @if (subcontractor()!.phone) {
                     <p class="detail-meta"><ion-icon name="call-outline"></ion-icon>{{ subcontractor()!.phone }}</p>
                   }
+                  <p class="detail-meta"><ion-icon name="card-outline"></ion-icon>Payment Mode: {{ subcontractor()!.paymentMode || 'Bank Transfer' }}</p>
                   <p class="detail-status">
                     <span class="status-pill" [class.active]="subcontractor()!.status === 'active'" [class.inactive]="subcontractor()!.status === 'inactive'">
                       {{ subcontractor()!.status === 'active' ? 'Active' : 'Not Active' }}
@@ -73,10 +74,6 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                   <span>Projects</span>
                   <strong>{{ summary()?.projectCount ?? 0 }}</strong>
                 </article>
-                <article class="stat-card">
-                  <span>Sites</span>
-                  <strong>{{ summary()?.siteCount ?? 0 }}</strong>
-                </article>
               </section>
 
               <nav class="detail-tabs">
@@ -97,21 +94,6 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                     }
                   </select>
                 </label>
-                <label class="filter-field">
-                  <span>Site</span>
-                  @if (!filterProjectId()) {
-                    <select disabled>
-                      <option>Select a project</option>
-                    </select>
-                  } @else {
-                    <select [ngModel]="filterSiteId()" (ngModelChange)="filterSiteId.set($event)">
-                      <option value="">All sites in this project</option>
-                      @for (s of availableSites(); track s.id) {
-                        <option [value]="s.id">{{ s.name }}</option>
-                      }
-                    </select>
-                  }
-                </label>
               </section>
 
               <section class="table-wrap">
@@ -119,8 +101,8 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                   <thead>
                     <tr>
                       <th>Date</th>
+                      <th>Payment Mode</th>
                       <th>Project</th>
-                      <th>Site</th>
                       <th>Description</th>
                       <th>Employees</th>
                       <th>Amount</th>
@@ -131,8 +113,8 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                     @for (p of filteredPayments(); track p._id) {
                       <tr>
                         <td>{{ p.date }}</td>
+                        <td>{{ p.paymentType || 'Bank Transfer' }}</td>
                         <td>{{ p.projectName }}</td>
-                        <td>{{ p.siteName || '—' }}</td>
                         <td class="wrap">{{ p.description || '—' }}</td>
                         <td>{{ p.employeeCount }}</td>
                         <td>{{ formatMoney(p.amount) }}</td>
@@ -175,6 +157,17 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                     Add labour
                   </button>
                 </div>
+                <section class="filters">
+                  <label class="filter-field">
+                    <span>Project</span>
+                    <select [ngModel]="laborFilterProjectId()" (ngModelChange)="onLaborFilterProjectChange($event)">
+                      <option value="">All projects</option>
+                      @for (p of availableProjects(); track p.id) {
+                        <option [value]="p.id">{{ p.name }}</option>
+                      }
+                    </select>
+                  </label>
+                </section>
                 <section class="table-wrap labor-table-wrap">
                   <table class="labor-table">
                     <thead>
@@ -183,24 +176,26 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                         <th>Phone</th>
                         <th>Role</th>
                         <th>Address</th>
+                        <th>Project</th>
                         <th>Notes</th>
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      @for (laborer of laborRoster(); track laborer._id) {
+                      @for (laborer of filteredLabor(); track laborer._id) {
                         <tr>
                           <td><strong>{{ laborer.name }}</strong></td>
                           <td>{{ laborer.phone }}</td>
                           <td>{{ laborer.role }}</td>
                           <td class="wrap">{{ laborer.address || 'No address' }}</td>
+                          <td>{{ laborer.projectName || '—' }}</td>
                           <td class="wrap">{{ laborer.notes || 'No notes' }}</td>
-                          <td><button type="button" class="icon-btn" aria-label="Edit labor" title="Edit labor" (click)="editLaborer(laborer)"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="m14.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></td>
+                          <td class="row-actions"><button type="button" class="icon-btn" aria-label="Edit labor" title="Edit labor" (click)="editLaborer(laborer)"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="m14.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></td>
                         </tr>
                       }
-                      @if (laborRoster().length === 0) {
+                      @if (filteredLabor().length === 0) {
                         <tr>
-                          <td colspan="6" class="empty-row">No laborers linked to this sub-contractor yet.</td>
+                          <td colspan="7" class="empty-row">No laborers linked to this sub-contractor yet.</td>
                         </tr>
                       }
                     </tbody>
@@ -239,22 +234,6 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
             </label>
 
             <label>
-              <span>Site *</span>
-              <select
-                required
-                [ngModel]="paymentDraft().siteId"
-                (ngModelChange)="updatePaymentDraft('siteId', $event)"
-                name="siteId"
-                [disabled]="!paymentDraft().projectId"
-              >
-                <option value="">Select a site</option>
-                @for (s of paymentDraftSites(); track s) {
-                  <option [value]="s.id">{{ s.name }}</option>
-                }
-              </select>
-            </label>
-
-            <label>
               <span>Date *</span>
               <input
                 type="date"
@@ -263,6 +242,18 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                 (ngModelChange)="updatePaymentDraft('date', $event)"
                 name="date"
               />
+            </label>
+
+            <label>
+              <span>Payment Mode *</span>
+              <select required [ngModel]="paymentDraft().paymentType" (ngModelChange)="updatePaymentDraft('paymentType', $event)" name="paymentType">
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cash">Cash</option>
+                <option value="UPI">UPI</option>
+                <option value="Cheque">Cheque</option>
+                <option value="NEFT">NEFT</option>
+                <option value="RTGS">RTGS</option>
+              </select>
             </label>
 
             <label>
@@ -336,13 +327,25 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
               <input [ngModel]="laborDraft().address" (ngModelChange)="updateLaborDraft('address', $event)" name="laborAddress" placeholder="Optional address" />
             </label>
             <label>
-              <span>Number / Phone *</span>
-              <input required [ngModel]="laborDraft().phone" (ngModelChange)="updateLaborDraft('phone', $event)" name="laborPhone" />
+              <span>Number / Phone</span>
+              <input [ngModel]="laborDraft().phone" (ngModelChange)="updateLaborDraft('phone', $event)" name="laborPhone" placeholder="Optional" />
             </label>
             <label>
               <span>Role *</span>
               <input required list="labor-role-suggestions" [ngModel]="laborDraft().role" (ngModelChange)="updateLaborDraft('role', $event)" name="laborRole" />
               <datalist id="labor-role-suggestions"><option value="Carpenter"></option><option value="Civil Worker"></option><option value="Mason"></option><option value="Electrician"></option><option value="Plumber"></option><option value="General Labor"></option></datalist>
+            </label>
+            <label>
+              <span>Project (optional)</span>
+              <select [ngModel]="laborDraft().projectId" (ngModelChange)="onLaborProjectChange($event)" name="laborProjectId">
+                <option value="">No specific project</option>
+                @for (p of allProjects(); track p.id) {
+                  <option [value]="p.id">{{ p.name }}</option>
+                }
+              </select>
+              @if (laborDraft().projectId) {
+                <small class="hint">This labour will appear in the project's worker roster.</small>
+              }
             </label>
             <label>
               <span>Notes (optional)</span>
@@ -426,12 +429,13 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
     .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
     .labor-table { min-width: 760px; table-layout: fixed; }
     .labor-table th, .labor-table td { padding: 10px 8px; overflow-wrap: anywhere; max-width: none; }
-    .labor-table th:nth-child(1) { width: 18%; }
-    .labor-table th:nth-child(2) { width: 15%; }
-    .labor-table th:nth-child(3) { width: 17%; }
-    .labor-table th:nth-child(4) { width: 20%; }
-    .labor-table th:nth-child(5) { width: 22%; }
-    .labor-table th:nth-child(6) { width: 56px; }
+    .labor-table th:nth-child(1), .labor-table td:nth-child(1) { width: 16%; }
+    .labor-table th:nth-child(2), .labor-table td:nth-child(2) { width: 13%; }
+    .labor-table th:nth-child(3), .labor-table td:nth-child(3) { width: 15%; }
+    .labor-table th:nth-child(4), .labor-table td:nth-child(4) { width: 18%; }
+    .labor-table th:nth-child(5), .labor-table td:nth-child(5) { width: 18%; }
+    .labor-table th:nth-child(6), .labor-table td:nth-child(6) { width: 14%; }
+    .labor-table th:nth-child(7), .labor-table td:nth-child(7) { width: 56px; padding-right: 12px; }
     .labor-table td:last-child { text-align: right; }
     .labor-cell-detail { display: block; margin-top: 3px; color: #64748b; font-size: 11px; font-weight: 400; }
     .icon-btn {
@@ -495,13 +499,18 @@ export class SubcontractorDetailsPage {
   readonly loadError = signal<string | null>(null);
 
   readonly filterProjectId = signal<string>("");
-  readonly filterSiteId = signal<string>("");
 
   readonly paymentDialogOpen = signal(false);
   readonly editingPayment = signal<SubcontractorPayment | null>(null);
   readonly paymentSaving = signal(false);
   readonly paymentError = signal<string | null>(null);
   readonly laborRoster = signal<SubcontractorLabor[]>([]);
+  readonly laborFilterProjectId = signal<string>("");
+  readonly filteredLabor = computed(() => {
+    const projectId = this.laborFilterProjectId();
+    if (!projectId) return this.laborRoster();
+    return this.laborRoster().filter((l) => (l.projectId || "") === projectId);
+  });
   readonly editingLabor = signal<SubcontractorLabor | null>(null);
   readonly laborSaving = signal(false);
   readonly laborError = signal<string | null>(null);
@@ -510,8 +519,8 @@ export class SubcontractorDetailsPage {
   readonly activeTab = signal<"payments" | "labor">("payments");
   readonly paymentDraft = signal<{
     projectId: string;
-    siteId: string;
     date: string;
+    paymentType: string;
     description: string;
     employeeCount: number;
     amount: number;
@@ -532,18 +541,10 @@ export class SubcontractorDetailsPage {
 
   readonly availableProjects = computed(() => this.allProjects());
 
-  readonly availableSites = computed(() => {
-    const projectId = this.filterProjectId();
-    if (!projectId) return [] as { id: string; name: string }[];
-    return this.sitesForProject(projectId);
-  });
-
   readonly filteredPayments = computed(() => {
     const projectId = this.filterProjectId();
-    const siteId = this.filterSiteId();
     return this.payments().filter((p) => {
       if (projectId && p.projectId !== projectId) return false;
-      if (siteId && String(p.siteId || "") !== siteId) return false;
       return true;
     });
   });
@@ -551,19 +552,6 @@ export class SubcontractorDetailsPage {
   readonly subcontractorName = computed(() => this.subcontractor()?.subcontractorName || "");
 
   readonly canRecordPayment = computed(() => this.allProjects().length > 0);
-
-  readonly paymentDraftSites = computed(() => this.sitesForProject(this.paymentDraft().projectId));
-
-  /** Resolve a project's site names to { id, name } using the site entities. */
-  private sitesForProject(projectId: string): { id: string; name: string }[] {
-    if (!projectId) return [];
-    const project = this.allProjects().find((p) => p.id === projectId);
-    if (!project) return [];
-    return (project.sites || []).map((s) => {
-      const id = this.erp.siteEntities().find((se) => se.name === s)?._id || s;
-      return { id: String(id), name: String(s) };
-    });
-  }
 
   private get subcontractorId(): string {
     return this.route.snapshot.paramMap.get("id") || "";
@@ -621,7 +609,10 @@ export class SubcontractorDetailsPage {
   // ---------- FILTERS ----------
   onProjectFilterChange(value: string) {
     this.filterProjectId.set(value);
-    this.filterSiteId.set("");
+  }
+
+  onLaborFilterProjectChange(value: string) {
+    this.laborFilterProjectId.set(value);
   }
 
   updateLaborDraft<K extends keyof ReturnType<typeof emptyLaborDraft>>(key: K, value: string) {
@@ -645,9 +636,22 @@ export class SubcontractorDetailsPage {
       phone: laborer.phone,
       role: laborer.role,
       notes: laborer.notes || "",
+      projectId: laborer.projectId || "",
+      projectName: laborer.projectName || "",
     });
     this.laborError.set(null);
     this.laborDialogOpen.set(true);
+  }
+
+  /** When the labour drawer project dropdown changes, keep projectName
+   * in sync so the create/update payload carries a denormalised label. */
+  onLaborProjectChange(value: string) {
+    const project = this.allProjects().find((p) => p.id === value);
+    this.laborDraft.set({
+      ...this.laborDraft(),
+      projectId: value,
+      projectName: project?.name || "",
+    });
   }
 
   openLaborDialog() {
@@ -670,22 +674,112 @@ export class SubcontractorDetailsPage {
 
   saveLaborer() {
     const draft = this.laborDraft();
-    if (!draft.name.trim() || !draft.phone.trim() || !draft.role.trim()) {
-      this.laborError.set("Name, phone number, and role are required.");
+    if (!draft.name.trim() || !draft.role.trim()) {
+      this.laborError.set("Name and role are required.");
       return;
     }
     this.laborSaving.set(true);
     const payload = {
       subcontractorId: this.subcontractorId,
-      name: draft.name.trim(), address: draft.address.trim(), phone: draft.phone.trim(), role: draft.role.trim(), notes: draft.notes.trim(),
+      name: draft.name.trim(),
+      address: draft.address.trim(),
+      phone: draft.phone.trim(),
+      role: draft.role.trim(),
+      notes: draft.notes.trim(),
+      // Project linkage is optional — empty string means "sub-contractor
+      // scoped only", which is the historical behaviour.
+      projectId: draft.projectId?.trim() || "",
+      projectName: draft.projectName?.trim() || "",
     };
     const editing = this.editingLabor();
     const request = editing
       ? this.api.updateSubcontractorLabor(editing._id, payload)
       : this.api.createSubcontractorLabor(payload);
     request.subscribe({
-      next: () => { this.laborSaving.set(false); this.closeLaborDialog(); this.refreshLabor(); this.presentToast(editing ? "Labor updated." : "Labor added."); },
-      error: (error) => { this.laborSaving.set(false); this.laborError.set(error?.error?.error || error?.message || "Could not save labor."); },
+      next: (response) => {
+        this.laborSaving.set(false);
+        this.closeLaborDialog();
+        this.refreshLabor();
+        // Mirror into the per-project Worker roster when a project is set,
+        // so the labour shows up in the project's worker table. We don't
+        // block the labour save on this — worker mirror failures are
+        // logged and the user is notified via toast.
+        if (payload.projectId) {
+          this.mirrorLaborToWorker(payload, response?.labor, editing?._id);
+        }
+        this.presentToast(editing ? "Labor updated." : "Labor added.");
+      },
+      error: (error) => {
+        this.laborSaving.set(false);
+        this.laborError.set(error?.error?.error || error?.message || "Could not save labor.");
+      },
+    });
+  }
+
+  /**
+   * Create or update a Worker entry that mirrors a SubcontractorLabor
+   * row, so the labour shows up in the matching project's worker
+   * roster. We match by name+phone within the project — for new labour
+   * rows a fresh Worker is created; for edits we look up the existing
+   * Worker (if any) and patch it. Failures here never block the
+   * labour save (the labour already persisted to the
+   * SubcontractorLabor collection). Errors are toasted, not thrown.
+   */
+  private mirrorLaborToWorker(
+    payload: { name: string; phone: string; role: string; address: string; notes: string; projectId: string },
+    savedLabor: { _id?: string } | undefined,
+    previousLaborId?: string
+  ) {
+    if (!payload.projectId) return;
+    const userId = this.api.user()?.id || "system";
+    const projectName = this.allProjects().find((p) => p.id === payload.projectId)?.name || "";
+    const subcontractor = this.subcontractor();
+    const subName = subcontractor?.subcontractorName || "";
+
+    const workerPayload = {
+      projectId: payload.projectId,
+      name: payload.name,
+      phone: payload.phone,
+      address: payload.address,
+      notes: payload.notes,
+      labourType: payload.role,
+      isSubcontract: true,
+      subcontractorId: this.subcontractorId,
+      subcontractorName: subName,
+      createdBy: userId,
+    };
+
+    // Try to find an existing Worker (projectId + name + phone) so
+    // re-saves don't create duplicate rows.
+    this.api.listWorkers({ projectId: payload.projectId, limit: 200 }).subscribe({
+      next: (res) => {
+        const items = (res.items || []) as Array<Record<string, unknown>>;
+        const match = items.find((w) =>
+          String(w["name"] || "").trim() === payload.name.trim() &&
+          String(w["phone"] || "").trim() === payload.phone.trim(),
+        );
+        const matchId = match ? String(match["_id"] || "") : "";
+        if (matchId) {
+          this.api.patchWorker(matchId, {
+            name: payload.name,
+            phone: payload.phone,
+            address: payload.address,
+            notes: payload.notes,
+            labourType: payload.role,
+          }).subscribe({
+            error: (err) => console.warn("Worker mirror patch failed:", err?.message || err),
+          });
+        } else {
+          this.api.createWorker(workerPayload).subscribe({
+            error: (err) => console.warn("Worker mirror create failed:", err?.message || err),
+          });
+        }
+        // Touch unused params so the linter doesn't complain — they may be
+        // useful for future caching of the labour→worker mapping.
+        void previousLaborId;
+        void savedLabor;
+      },
+      error: (err) => console.warn("Worker mirror lookup failed:", err?.message || err),
     });
   }
 
@@ -702,8 +796,8 @@ export class SubcontractorDetailsPage {
     this.editingPayment.set(p);
     this.paymentDraft.set({
       projectId: p.projectId,
-      siteId: p.siteId || "",
       date: p.date,
+      paymentType: p.paymentType || "Bank Transfer",
       description: p.description,
       employeeCount: p.employeeCount,
       amount: p.amount,
@@ -721,7 +815,7 @@ export class SubcontractorDetailsPage {
   }
 
   onPaymentProjectChange(value: string) {
-    this.paymentDraft.set({ ...this.paymentDraft(), projectId: value, siteId: "" });
+    this.paymentDraft.set({ ...this.paymentDraft(), projectId: value });
   }
 
   updatePaymentDraft<K extends keyof ReturnType<typeof emptyPaymentDraft>>(key: K, value: ReturnType<typeof emptyPaymentDraft>[K]) {
@@ -732,8 +826,8 @@ export class SubcontractorDetailsPage {
     const draft = this.paymentDraft();
     const errors: string[] = [];
     if (!draft.projectId) errors.push("Project is required.");
-    if (!draft.siteId) errors.push("Site is required.");
     if (!draft.date) errors.push("Date is required.");
+    if (!draft.paymentType) errors.push("Payment mode is required.");
     if (!Number.isInteger(draft.employeeCount) || draft.employeeCount < 1) errors.push("Number of employees must be a positive whole number.");
     if (!Number.isFinite(draft.amount) || draft.amount <= 0) errors.push("Amount must be greater than zero.");
     if (errors.length) {
@@ -753,8 +847,8 @@ export class SubcontractorDetailsPage {
     const payload = {
       subcontractorId: id,
       projectId: draft.projectId,
-      siteId: draft.siteId,
       date: draft.date,
+      paymentType: draft.paymentType,
       description: draft.description.trim(),
       employeeCount: draft.employeeCount,
       amount: draft.amount,
@@ -801,8 +895,8 @@ export class SubcontractorDetailsPage {
 function emptyPaymentDraft() {
   return {
     projectId: "",
-    siteId: "",
     date: new Date().toISOString().slice(0, 10),
+    paymentType: "Bank Transfer",
     description: "",
     employeeCount: 1,
     amount: 0,
@@ -817,5 +911,7 @@ function emptyLaborDraft() {
     phone: "",
     role: "",
     notes: "",
+    projectId: "",
+    projectName: "",
   };
 }

@@ -4,6 +4,7 @@ import { ErpDataService } from "../data/erp-data.service";
 import {
   mapClient,
   mapExpense,
+  mapGeneralExpense,
   mapInventory,
   mapInvoice,
   mapLabour,
@@ -38,7 +39,7 @@ interface PersistedSnapshot {
   totals: Record<string, number>;
 }
 
-const SNAPSHOT_VERSION = 7;
+const SNAPSHOT_VERSION = 9;
 const SNAPSHOT_KEY = "agb-erp:hydrationSnapshotV1";
 const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -46,6 +47,7 @@ export type PageModule =
   | "materials"
   | "inventory"
   | "expenses"
+  | "generalExpenses"
   | "labour"
   | "payments"
   | "subcontractors"
@@ -273,7 +275,7 @@ export class WorkspaceHydrationService {
    */
   private async hydrateModulesFirstPage(): Promise<void> {
     const modules: PageModule[] = [
-      "materials", "expenses", "inventory", "labour", "payments",
+      "materials", "expenses", "generalExpenses", "inventory", "labour", "payments",
       "subcontractors", "sites", "invoices",
     ];
     const concurrentRequests = 1;
@@ -412,6 +414,7 @@ export class WorkspaceHydrationService {
       materials: (opts) => this.api.listMaterials(opts),
       inventory: (opts) => this.api.listInventory(opts),
       expenses: (opts) => this.api.listExpenses(opts),
+      generalExpenses: (opts) => this.api.listGeneralExpenses(opts),
       labour: (opts) => this.api.listLabour(opts),
       payments: (opts) => this.api.listPayments(opts),
       subcontractors: (opts) => this.api.listSubcontractors(opts),
@@ -426,6 +429,7 @@ export class WorkspaceHydrationService {
       materials: mapMaterial,
       inventory: mapInventory,
       expenses: mapExpense,
+      generalExpenses: mapGeneralExpense,
       labour: mapLabour,
       payments: mapPayment,
       subcontractors: mapSubcontractor,
@@ -440,6 +444,7 @@ export class WorkspaceHydrationService {
       materials: this.erp.materials,
       inventory: this.erp.inventory,
       expenses: this.erp.expenses,
+      generalExpenses: this.erp.generalExpenses,
       labour: this.erp.labour,
       payments: this.erp.payments,
       subcontractors: this.erp.subcontractors,

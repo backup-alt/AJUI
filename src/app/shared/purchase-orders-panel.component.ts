@@ -13,8 +13,10 @@ type ExistingMaterial = {
   name: string;
   unit: string;
   approvedQuantity: number;
+  requestedQuantity?: number;
   givenAmount?: number;
   issuedAmount?: number;
+  isExistingMaterial?: boolean;
   poNumber?: string;
 };
 
@@ -130,11 +132,17 @@ type PoDraftLine = {
                 <label>PO Date *</label>
                 <input type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" />
               </div>
+              <div class="form-field">
+                <label>Payment Mode *</label>
+                <select [ngModel]="paymentMode()" (ngModelChange)="paymentMode.set($event)">
+                  @for (mode of paymentModes; track mode) { <option [value]="mode">{{ mode }}</option> }
+                </select>
+              </div>
             </div>
           </div>
 
           <div class="items-section">
-            <div class="section-label">Items</div>
+            <div class="section-label">Review Items and Quantities</div>
             <div class="po-table-wrap">
               <table class="items-table po-items">
                 <colgroup>
@@ -178,7 +186,7 @@ type PoDraftLine = {
                                 @for (material of filteredMaterials(); track material._id) {
                                   <button type="button" [class.selected]="line.materialId === material._id" (mousedown)="$event.preventDefault()" (click)="selectMaterial(index, material._id)">
                                     <span class="po-option-main">{{ material.name }}</span>
-                                    <span class="po-option-meta">{{ material.approvedQuantity }} {{ material.unit }}</span>
+                                    <span class="po-option-meta">{{ materialQuantityLabel(material) }}</span>
                                   </button>
                                 }
                                 @if (filteredMaterials().length === 0) { <div class="po-select-empty">No matching materials</div> }
@@ -194,7 +202,7 @@ type PoDraftLine = {
                         }
                       </td>
                       <td class="col-unit"><input [readonly]="line.source === 'existing'" [ngModel]="line.unit" (ngModelChange)="updateLine(index, 'unit', $event)" /></td>
-                      <td class="col-qty"><input type="number" min="0" [readonly]="line.source === 'existing'" [ngModel]="line.quantity" (ngModelChange)="updateLine(index, 'quantity', +$event || 0)" /></td>
+                      <td class="col-qty"><input type="number" min="0" [attr.max]="line.source === 'existing' ? approvedQuantityFor(line) : null" [ngModel]="line.quantity" (ngModelChange)="updateLine(index, 'quantity', +$event || 0)" /></td>
                       <td class="col-amount"><input type="number" min="0" step="0.01" [ngModel]="line.amount" (ngModelChange)="updateLine(index, 'amount', +$event || 0)" /></td>
                       <td class="col-gst">
                         <select [ngModel]="line.gstPercent" (ngModelChange)="updateLine(index, 'gstPercent', +$event || 0)">
@@ -264,6 +272,7 @@ type PoDraftLine = {
               <div class="client-form-grid po-fields">
                 <div class="form-field"><label>Project</label><div class="po-readonly">{{ order.projectName }}</div></div>
                 <div class="form-field"><label>Vendor</label><div class="po-readonly">{{ order.vendorName }}</div></div>
+                <div class="form-field"><label>Payment Mode</label><div class="po-readonly">{{ order.paymentMode || 'Bank Transfer' }}</div></div>
               </div>
             </div>
 
@@ -483,6 +492,7 @@ type PoDraftLine = {
 export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   @Input() projectId = "";
   @Input() projectName = "Current project";
+  @Input() preselectedMaterialIds: string[] = [];
   @Input() view: "list" | "create" | "detail" | "edit" = "list";
   @Input() openNumber = "";
   @Output() closeCreate = new EventEmitter<void>();
@@ -519,6 +529,8 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   readonly draftProjectId = signal("");
   readonly vendorId = signal("");
   readonly date = signal(new Date().toISOString().slice(0, 10));
+  readonly paymentMode = signal("Bank Transfer");
+  readonly paymentModes = ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS", "IMPS", "Credit Card", "Debit Card", "Net Banking", "Other"];
   readonly roundOff = signal(0);
   readonly lines = signal<PoDraftLine[]>([this.emptyLine()]);
   readonly subtotal = computed(() => this.lines().reduce((sum, line) => sum + this.lineAmount(line), 0));
@@ -546,6 +558,9 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges) {
     if (changes["projectId"] && !changes["projectId"].firstChange) this.loadOrders();
     if (changes["view"]?.currentValue === "create") this.resetDraft();
+    if (this.view === "create" && this.projectId && (changes["projectId"] || changes["preselectedMaterialIds"] || changes["view"]?.currentValue === "create")) {
+      void this.selectProject(this.projectId);
+    }
     if (changes["view"]?.currentValue === "edit") void this.startEdit(this.openNumber);
     if (changes["view"]?.currentValue === "detail" && this.openNumber && !this.selectedOrder()) {
       this.openOrder(this.openNumber);
@@ -598,16 +613,56 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     if (!projectId) return;
     try {
       const items = await this.loadAllMaterials(projectId);
-      this.materials.set(items.filter((item) => !String(item.poNumber || "").trim() || item.poNumber === "Pending"));
+      this.materials.set(items.filter((item) => !item.isExistingMaterial && (!String(item.poNumber || "").trim() || item.poNumber === "Pending")));
+      this.applyPreselectedMaterials();
     } catch { this.error.set("Could not load project materials."); }
   }
 
   selectMaterial(index: number, materialId: string) {
     const material = this.materials().find((item) => item._id === materialId);
     if (!material) return;
-    const quantity = Number(material.approvedQuantity) || 0;
+    const quantity = this.defaultQuantityFor(material);
     const knownAmount = Number(material.givenAmount ?? material.issuedAmount ?? 0);
     this.updateLineObject(index, { source: "existing", materialId, description: material.name, unit: material.unit, quantity, amount: knownAmount || 0 });
+    this.openMenu.set("");
+  }
+
+  private applyPreselectedMaterials() {
+    if (!this.preselectedMaterialIds.length) return;
+    const selected = new Set(this.preselectedMaterialIds);
+    const rows = this.materials()
+      .filter((material) => selected.has(material._id))
+      .map((material) => this.draftLineForMaterial(material));
+    if (rows.length) this.lines.set(rows);
+  }
+
+  private draftLineForMaterial(material: ExistingMaterial): PoDraftLine {
+    const quantity = this.defaultQuantityFor(material);
+    const knownAmount = Number(material.givenAmount ?? material.issuedAmount ?? 0);
+    return {
+      key: crypto.randomUUID(),
+      source: "existing",
+      materialId: material._id,
+      description: material.name,
+      unit: material.unit,
+      quantity,
+      amount: knownAmount || 0,
+      gstPercent: 18,
+    };
+  }
+
+  approvedQuantityFor(line: PoDraftLine) {
+    const approved = Number(this.materials().find((material) => material._id === line.materialId)?.approvedQuantity) || 0;
+    return approved > 0 ? approved : null;
+  }
+
+  private defaultQuantityFor(material: ExistingMaterial) {
+    return Number(material.approvedQuantity) || Number(material.requestedQuantity) || 1;
+  }
+
+  materialQuantityLabel(material: ExistingMaterial) {
+    const approved = Number(material.approvedQuantity) || 0;
+    return approved > 0 ? `Approved: ${approved} ${material.unit}` : "Set quantity in PO";
   }
 
   setExistingLine(index: number) { this.updateLineObject(index, { source: "existing", materialId: "", description: "", unit: "", quantity: 0, amount: 0 }); }
@@ -631,20 +686,25 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     this.error.set("");
     if (!this.draftProjectId()) { this.error.set("Select the project first."); return; }
     if (!this.vendorId()) { this.error.set("Select a vendor."); return; }
-    const invalid = this.lines().some((line) => line.source === "existing" ? !line.materialId : !line.description.trim() || !line.unit.trim() || line.quantity <= 0);
+    if (!this.paymentMode()) { this.error.set("Select a payment mode."); return; }
+    const invalid = this.lines().some((line) => line.source === "existing"
+      ? !line.materialId || line.quantity <= 0 || (this.approvedQuantityFor(line) !== null && line.quantity > Number(this.approvedQuantityFor(line)))
+      : !line.description.trim() || !line.unit.trim() || line.quantity <= 0);
     if (invalid) { this.error.set("Complete every purchase order line."); return; }
+    if (this.grandTotal() <= 0) { this.error.set("Purchase order total must be greater than ₹0. Enter an amount before saving."); return; }
     this.saving.set(true);
     try {
       const payload = {
         vendorId: this.vendorId(),
         date: this.date(),
+        paymentMode: this.paymentMode(),
         roundOff: this.roundOff(),
         items: this.lines().map((line) => ({
           source: line.source,
           materialId: line.materialId || undefined,
           description: line.source === "manual" ? line.description || undefined : undefined,
           unit: line.source === "manual" ? line.unit || undefined : undefined,
-          quantity: line.source === "manual" ? line.quantity : undefined,
+          quantity: line.quantity,
           rate: line.quantity > 0 ? line.amount / line.quantity : 0,
           gstPercent: line.gstPercent,
         })),
@@ -695,6 +755,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     this.draftProjectId.set(order.projectId);
     this.vendorId.set(order.vendorId);
     this.date.set(order.date);
+    this.paymentMode.set(order.paymentMode || "Bank Transfer");
     this.roundOff.set(order.roundOff || 0);
     this.lines.set(order.items.map((item) => ({
       key: crypto.randomUUID(),
@@ -765,7 +826,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     this.updateLineObject(index, { source: "manual", materialId: "", description: "", unit: "", quantity: 0, amount: 0 });
   }
 
-  private resetDraft() { this.openMenu.set(""); this.editingId.set(""); this.draftProjectId.set(""); this.vendorId.set(""); this.date.set(new Date().toISOString().slice(0, 10)); this.roundOff.set(0); this.lines.set([this.emptyLine()]); this.materials.set([]); this.error.set(""); }
+  private resetDraft() { this.openMenu.set(""); this.editingId.set(""); this.draftProjectId.set(""); this.vendorId.set(""); this.date.set(new Date().toISOString().slice(0, 10)); this.paymentMode.set("Bank Transfer"); this.roundOff.set(0); this.lines.set([this.emptyLine()]); this.materials.set([]); this.error.set(""); }
   private emptyLine(): PoDraftLine { return { key: crypto.randomUUID(), source: "existing", materialId: "", description: "", unit: "", quantity: 0, amount: 0, gstPercent: 18 }; }
 }
 

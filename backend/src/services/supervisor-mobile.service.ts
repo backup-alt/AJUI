@@ -1592,6 +1592,12 @@ async function syncExistingMaterialWithNotes(params: {
     const existingMaterial = await Material.findOne(query);
     if (existingMaterial) {
       let changed = false;
+      const receivedDate = new Date().toISOString().slice(0, 10);
+      if (existingMaterial.status !== "Received" || !existingMaterial.receivedDate) {
+        existingMaterial.status = "Received";
+        existingMaterial.receivedDate = receivedDate;
+        changed = true;
+      }
       // Only refresh the note if the supervisor actually provided one — we
       // never clobber a non-empty note with empty.
       if (params.notes) {
@@ -1651,6 +1657,7 @@ async function syncExistingMaterialWithNotes(params: {
       vendorId: m.vendorId,
       poNumber: m.poNumber,
       requestDate: today,
+      receivedDate: today,
       status: "Received",
       createdBy: params.userId,
       supervisorName: params.userId,

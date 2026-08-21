@@ -355,6 +355,7 @@ export async function verifySupervisorInvite(req: Request, res: Response, next: 
       requiresOtp: true,
       role: invite.role,
       projectId: invite.projectId,
+      projectIds: (invite.projectIds || []).map((id) => id.toString()),
       siteIds: (invite.siteIds || []).map((id) => id.toString()),
       supervisorName: inviteService.extractSupervisorName(invite),
       supervisorEmail: invite.supervisorEmail || "",
@@ -397,7 +398,7 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
     const { generateId } = await import("../services/id-generator.service.js");
     const { Supervisor } = await import("../models/Supervisor.js");
 
-    let managedProjectIds: Types.ObjectId[] = [];
+    let managedProjectIds: Types.ObjectId[] = [...(invite.projectIds || [])];
     if (invite.projectId) managedProjectIds.push(invite.projectId);
     if (siteIds.length > 0) {
       const sites = await Site.find({ _id: { $in: siteIds } }).select("projectIds").lean();
@@ -430,7 +431,7 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
         phone: finalPhone,
         email: finalEmail.toLowerCase(),
         address: (invite.metadata as any)?.address || undefined,
-        role: "Site Supervisor",
+        role: "Project Supervisor",
         assignedProjectId: managedProjectIds[0] || undefined,
         assignedProjects: managedProjectIds,
         assignedProject: undefined,
@@ -489,6 +490,7 @@ const adminCreateInviteSchema = z.object({
   supervisorEmail: z.string().email("Valid email is required"),
   supervisorPhone: z.string().min(8, "Phone must be at least 8 characters").max(20),
   projectId: z.string().optional(),
+  projectIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid project id")).min(1, "Select at least one project").optional(),
   siteIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid site id")).min(1, "Select at least one site").optional(),
   cashLimit: z.coerce.number().nonnegative().optional(),
   address: z.string().trim().max(500).optional(),
@@ -522,6 +524,7 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       supervisorEmail: body.supervisorEmail,
       supervisorPhone: body.supervisorPhone,
       projectId: body.projectId,
+      projectIds: body.projectIds,
       siteIds: body.siteIds,
       cashLimit: body.cashLimit,
       address: body.address,
@@ -544,6 +547,7 @@ export async function adminCreateInvite(req: Request, res: Response, next: NextF
       supervisorPhone: body.supervisorPhone,
       role: invite.role,
       projectId: invite.projectId,
+      projectIds: body.projectIds || [],
       siteIds: body.siteIds || [],
       cashLimit: body.cashLimit || 0,
       address: body.address || "",
@@ -570,6 +574,7 @@ export async function listActiveInvites(req: Request, res: Response, next: NextF
         supervisorPhone: inv.supervisorPhone,
         role: inv.role,
         projectId: inv.projectId,
+        projectIds: (inv.projectIds || []).map((id) => id.toString()),
         siteIds: (inv.siteIds || []).map((id) => id.toString()),
         expiresAt: inv.expiresAt,
         createdAt: inv.createdAt,

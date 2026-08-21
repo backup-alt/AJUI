@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal } from "@angular/core";
 import { lastValueFrom } from "rxjs";
 import {
   type ExpenseRow,
+  type GeneralExpenseRow,
   type InventoryRow,
   type LabourRow,
   type MaterialRow,
@@ -48,6 +49,7 @@ export type Vendor = {
   status?: VendorStatus;
   _id?: string;
   siteIds?: string[];
+  projectIds?: string[];
   customFields?: Record<string, string | number | boolean | null>;
 };
 
@@ -68,6 +70,7 @@ export type Supervisor = {
 export type Subcontractor = {
   id: string;
   projectId: string;
+  projectIds?: string[];
   projectName: string;
   subcontractorName: string;
   description: string;
@@ -75,9 +78,38 @@ export type Subcontractor = {
   note: string;
   address: string;
   phone: string;
+  paymentMode: string;
   status: "active" | "inactive";
   _id?: string;
   customFields?: Record<string, string | number | boolean | null>;
+};
+
+/**
+ * Worker roster entry. Backed by the same `workers` collection the
+ * mobile supervisor app maintains via /api/mobile/supervisor/workers.
+ * The web admin's project workspace "Labour" tab reads/writes these.
+ */
+export type Worker = {
+  id: string;
+  _id?: string;
+  workerId?: string;
+  name: string;
+  phone: string;
+  labourType: string; // role: Carpenter, Plumber, etc.
+  address: string;
+  notes: string;
+  site: string;
+  siteId?: string;
+  projectId: string;
+  projectName?: string;
+  clientId?: string;
+  isSubcontract: boolean;
+  subcontractorId?: string;
+  subcontractorName?: string;
+  supervisorName?: string;
+  weeklyPay: number;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Site = {
@@ -110,15 +142,17 @@ export type SharedModuleKey =
   | "purchaseOrders"
   | "clients"
   | "labour"
+  | "attendance"
   | "expenses"
   | "generalExpenses"
   | "payments"
   | "vendors"
   | "supervisors"
   | "subcontractors"
+  | "subcontractorsRoster"
   | "inventory"
-  | "reports"
-  | "settings";
+  | "settings"
+  | "workers";
 export type SharedFieldType = "text" | "number" | "date";
 export type SharedTableField = { key: string; label: string; type?: SharedFieldType; afterKey?: string };
 export type SharedTableRow = Record<string, string | number | undefined>;
@@ -180,11 +214,14 @@ export class ErpDataService {
   readonly materials = signal<MaterialRow[]>([]);
   readonly labour = signal<LabourRow[]>([]);
   readonly expenses = signal<ExpenseRow[]>([]);
+  readonly generalExpenses = signal<GeneralExpenseRow[]>([]);
   readonly payments = signal<PaymentRow[]>([]);
   readonly inventory = signal<InventoryRow[]>([]);
   readonly vendors = signal<Vendor[]>([]);
   readonly supervisors = signal<Supervisor[]>([]);
   readonly subcontractors = signal<Subcontractor[]>([]);
+
+  readonly workers = signal<Worker[]>([]);
 
   readonly siteEntities = signal<Site[]>([]);
 
@@ -495,8 +532,10 @@ export class ErpDataService {
     this.materials.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
     this.labour.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
     this.expenses.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
+    this.generalExpenses.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId || "")));
     this.payments.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
     this.subcontractors.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
+    this.workers.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
   }
 
   addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; status?: VendorStatus; siteIds?: string[]; id?: string; _id?: string }): Vendor {
@@ -580,32 +619,6 @@ export class ErpDataService {
 
   deleteMaterial(materialId: string) {
     this.materials.update((materials) => materials.filter((m) => m.id !== materialId));
-  }
-
-  private readonly defaultProjectInFlight = new Set<string>();
-
-  async createDefaultProject(client: Client): Promise<Project> {
-    const existing = this.firstProjectForClient(client);
-    if (existing) return existing;
-    if (this.defaultProjectInFlight.has(client.id)) {
-      const inFlight = this.firstProjectForClient(client);
-      if (inFlight) return inFlight;
-    }
-    this.defaultProjectInFlight.add(client.id);
-    try {
-      const recheck = this.firstProjectForClient(client);
-      if (recheck) return recheck;
-      return await this.addProject(client, {
-        name: `${client.name} Project`,
-        sites: [],
-        startDate: new Date().toISOString().slice(0, 10),
-        supervisor: client.supervisor || "",
-        status: "Active",
-        totalValue: 0,
-      });
-    } finally {
-      this.defaultProjectInFlight.delete(client.id);
-    }
   }
 
   firstProjectForClient(client: Client | undefined): Project | undefined {
@@ -875,6 +888,14 @@ export class ErpDataService {
     this.expenses.set(rows);
   }
 
+  setGeneralExpenses(rows: GeneralExpenseRow[]) {
+    this.generalExpenses.set(rows);
+  }
+
+  generalExpensesForProject(projectId: string): GeneralExpenseRow[] {
+    return this.generalExpenses().filter((row) => row.projectId === projectId);
+  }
+
   updateSettings(patch: Partial<ErpSettings>) {
     this.settings.update((settings) => ({ ...settings, ...patch }));
   }
@@ -1031,6 +1052,10 @@ export class ErpDataService {
 
   labourForProject(projectId: string): LabourRow[] {
     return this.labour().filter((row) => row.projectId === projectId);
+  }
+
+  workersForProject(projectId: string): Worker[] {
+    return this.workers().filter((row) => row.projectId === projectId);
   }
 
   expensesForProject(projectId: string): ExpenseRow[] {
@@ -1650,15 +1675,17 @@ export class ErpDataService {
       purchaseOrders: [],
       clients: [],
       labour: [],
+      attendance: [],
       expenses: [],
       generalExpenses: [],
       payments: [],
       vendors: [],
       supervisors: [],
       subcontractors: [],
+      subcontractorsRoster: [],
       inventory: [],
-      reports: [],
       settings: [],
+      workers: [],
     };
   }
 
@@ -1668,15 +1695,17 @@ export class ErpDataService {
       purchaseOrders: [],
       clients: [],
       labour: [],
+      attendance: [],
       expenses: [],
       generalExpenses: [],
       payments: [],
       vendors: [],
       supervisors: [],
       subcontractors: [],
+      subcontractorsRoster: [],
       inventory: [],
-      reports: [],
       settings: [],
+      workers: [],
     };
   }
 
@@ -1686,15 +1715,17 @@ export class ErpDataService {
       purchaseOrders: [],
       clients: [],
       labour: [],
+      attendance: [],
       expenses: [],
       generalExpenses: [],
       payments: [],
       vendors: [],
       supervisors: [],
       subcontractors: [],
+      subcontractorsRoster: [],
       inventory: [],
-      reports: [],
       settings: [],
+      workers: [],
     };
   }
 

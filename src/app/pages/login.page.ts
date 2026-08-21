@@ -53,7 +53,7 @@ type Mode = 'login' | 'forgot' | 'reset';
 
         @if (loading()) {
           <div class="login-loading" role="status">
-            <span class="spinner"></span>
+            <span class="agb-loading-spinner" aria-hidden="true"></span>
             <span>{{ loadingMessage() }}</span>
           </div>
         }
@@ -224,16 +224,6 @@ type Mode = 'login' | 'forgot' | 'reset';
       align-items: center;
       gap: 10px;
     }
-    .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid #b8c5e8;
-      border-top-color: #2c5cff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      flex-shrink: 0;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
     .auth-form { margin-top: 18px; display: flex; flex-direction: column; gap: 14px; }
     .form-field { display: flex; flex-direction: column; gap: 6px; }
     .form-field span {

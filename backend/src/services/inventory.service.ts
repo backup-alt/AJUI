@@ -94,6 +94,75 @@ export async function addApprovedMaterialToInventory(
 }
 
 /**
+ * Ensure every material request is represented in Inventory immediately.
+ * This does not treat a request as purchased stock; approval/PO/receiving
+ * workflows update those quantities separately.
+ */
+export async function ensureMaterialInInventory(
+  materialId: Types.ObjectId | string,
+  updatedBy?: string
+) {
+  const material = await Material.findById(materialId).lean();
+  if (!material) throw new AppError(404, "Material not found");
+  if (!material.projectId) return null;
+
+  const requested = Math.max(0, Number(material.requestedQuantity) || 0);
+  const match = inventoryMatchForMaterial(material);
+  const inventory = await Inventory.findOne(match);
+  if (inventory) {
+    inventory.requestedQuantity = Math.max(0, Number(inventory.requestedQuantity) || 0) + requested;
+    inventory.lastMaterialId = material._id;
+    inventory.lastUpdatedBy = updatedBy;
+    if (material.status === "Received") {
+      inventory.received = true;
+      inventory.receivedDate = material.receivedDate || new Date().toISOString().slice(0, 10);
+    }
+    await inventory.save();
+    return inventory.toObject();
+  }
+
+  const created = await Inventory.create({
+    ...match,
+    projectName: material.projectName || "Project",
+    clientId: material.clientId,
+    clientName: material.clientName,
+    siteId: material.siteId,
+    site: material.site || "",
+    name: material.name,
+    unit: material.unit,
+    requestedQuantity: requested,
+    approvedQuantity: Math.max(0, Number(material.approvedQuantity) || 0),
+    purchasedQuantity: Math.max(0, Number(material.purchasedQuantity) || 0),
+    consumedQuantity: Math.max(0, Number(material.consumedQuantity) || 0),
+    minimumQuantity: 0,
+    vendor: material.vendor,
+    vendorId: material.vendorId,
+    poNumber: material.poNumber,
+    lastMaterialId: material._id,
+    lastUpdatedBy: updatedBy,
+    received: material.status === "Received",
+    receivedDate: material.receivedDate,
+  });
+  return created.toObject();
+}
+
+export async function syncMaterialReceivedStatus(materialId: Types.ObjectId | string) {
+  const material = await Material.findById(materialId).lean();
+  if (!material?.projectId) return null;
+  return Inventory.findOneAndUpdate(
+    inventoryMatchForMaterial(material),
+    {
+      $set: {
+        received: material.status === "Received",
+        receivedDate: material.status === "Received" ? material.receivedDate : undefined,
+        lastMaterialId: material._id,
+      },
+    },
+    { new: true }
+  ).lean();
+}
+
+/**
  * Single-shot "give me everything" endpoint.
  *
  * Strategy: try one big query first. If M0 times out (which happens
@@ -278,7 +347,7 @@ async function listMaterialBackedInventory(
   const foundMaterials = await dbMutex.run(() =>
     withRetry(
       () => Material.find(materialQuery)
-        .select("_id projectId projectName clientId clientName siteId site name unit requestedQuantity approvedQuantity purchasedQuantity consumedQuantity remainingStock vendor vendorId poNumber createdAt updatedAt")
+        .select("_id projectId projectName clientId clientName siteId site name unit requestedQuantity approvedQuantity purchasedQuantity consumedQuantity remainingStock vendor vendorId poNumber status receivedDate createdAt updatedAt")
         .sort({ _id: -1 })
         .skip(hasCursor ? 0 : skip)
         .limit(effectiveLimit)
@@ -315,6 +384,8 @@ async function listMaterialBackedInventory(
       vendor: material.vendor,
       vendorId: material.vendorId,
       poNumber: material.poNumber,
+      received: material.status === "Received",
+      receivedDate: material.receivedDate,
       lastMaterialId: material._id,
       createdAt: material.createdAt,
       updatedAt: material.updatedAt,
@@ -329,8 +400,11 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
   const grouped = new Map<string, {
     material: any;
     requested: number;
-    quantity: number;
+    approved: number;
+    purchased: number;
     consumed: number;
+    received: boolean;
+    receivedDate?: string;
     history: any[];
   }>();
   let cursor: Types.ObjectId | undefined;
@@ -338,15 +412,12 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
 
   try {
     while (true) {
-      const pageQuery: Record<string, unknown> = {
-        ...materialQuery,
-        status: { $in: ["Approved", "Received", "Completed", "Not Received"] },
-      };
+      const pageQuery: Record<string, unknown> = { ...materialQuery };
       if (cursor) pageQuery._id = { $gt: cursor };
 
       const materials = await withRetry(
         () => Material.find(pageQuery)
-          .select("_id projectId projectName clientId clientName siteId site name unit requestedQuantity approvedQuantity purchasedQuantity consumedQuantity vendor vendorId poNumber createdBy createdAt updatedAt")
+          .select("_id projectId projectName clientId clientName siteId site name unit requestedQuantity approvedQuantity purchasedQuantity consumedQuantity vendor vendorId poNumber status receivedDate createdBy createdAt updatedAt")
           .sort({ _id: 1 })
           .limit(batchSize)
           .lean()
@@ -355,34 +426,41 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
       );
 
       for (const material of materials) {
-        const quantity = Math.max(
-          0,
-          Number(material.approvedQuantity) || Number(material.requestedQuantity) || 0
-        );
-        if (quantity <= 0) continue;
+        if (!material.projectId) continue;
+        const requested = Math.max(0, Number(material.requestedQuantity) || 0);
+        const approved = Math.max(0, Number(material.approvedQuantity) || 0);
+        const purchased = Math.max(0, Number(material.purchasedQuantity) || 0);
 
         const key = inventoryKeyForMaterial(material);
         const current = grouped.get(key);
         const history = {
           vendor: material.vendor || "",
           vendorId: material.vendorId,
-          quantity,
+          quantity: purchased,
           date: material.updatedAt || material.createdAt || new Date(),
           poNumber: material.poNumber,
           materialId: material._id,
         };
         if (current) {
           current.material = material;
-          current.requested += Number(material.requestedQuantity) || 0;
-          current.quantity += quantity;
+          current.requested += requested;
+          current.approved += approved;
+          current.purchased += purchased;
           current.consumed += Number(material.consumedQuantity) || 0;
+          current.received ||= material.status === "Received";
+          if (material.receivedDate && (!current.receivedDate || material.receivedDate > current.receivedDate)) {
+            current.receivedDate = material.receivedDate;
+          }
           current.history.push(history);
         } else {
           grouped.set(key, {
             material,
-            requested: Number(material.requestedQuantity) || 0,
-            quantity,
+            requested,
+            approved,
+            purchased,
             consumed: Number(material.consumedQuantity) || 0,
+            received: material.status === "Received",
+            receivedDate: material.receivedDate,
             history: [history],
           });
         }
@@ -422,7 +500,7 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
   let inserted = 0;
   for (let i = 0; i < missing.length; i += batchSize) {
     const operations = missing.slice(i, i + batchSize).map(
-      ({ material, requested, quantity, consumed, history }) => {
+      ({ material, requested, approved, purchased, consumed, received, receivedDate, history }) => {
         const match = inventoryMatchForMaterial(material);
         return {
           updateOne: {
@@ -430,24 +508,26 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
             update: {
               $setOnInsert: {
                 ...match,
-                projectName: material.projectName,
+                projectName: material.projectName || "Project",
                 clientId: material.clientId,
                 clientName: material.clientName,
                 siteId: material.siteId,
-                site: material.site,
+                site: material.site || "",
                 name: material.name,
                 unit: material.unit,
                 requestedQuantity: requested,
-                approvedQuantity: quantity,
-                purchasedQuantity: quantity,
+                approvedQuantity: approved,
+                purchasedQuantity: purchased,
                 consumedQuantity: consumed,
-                remainingStock: Math.max(0, quantity - consumed),
+                remainingStock: Math.max(0, purchased - consumed),
                 minimumQuantity: 0,
                 vendor: material.vendor,
                 vendorId: material.vendorId,
                 poNumber: material.poNumber,
                 lastMaterialId: material._id,
-                purchaseHistory: history,
+                received,
+                receivedDate,
+                purchaseHistory: history.filter((entry) => entry.quantity > 0),
               },
             },
             upsert: true,
@@ -526,6 +606,7 @@ export async function uploadInventoryReceipt(
   } else if (payload.received !== undefined) {
     inventory.received = payload.received;
   }
+  if (inventory.received) inventory.receivedDate = new Date().toISOString().slice(0, 10);
 
   await inventory.save();
 
@@ -537,6 +618,7 @@ export async function uploadInventoryReceipt(
           billUrl: inventory.billUrl,
           pcloudFileId: inventory.pcloudFileId,
           pcloudPublicCode: inventory.pcloudPublicCode,
+          ...(inventory.received ? { status: "Received", receivedDate: inventory.receivedDate } : {}),
         },
         $unset: { receiptImage: "", receiptImageMimeType: "" },
       };
@@ -691,9 +773,13 @@ export async function initializeSiteInventory(
 export async function addInventoryMaterial(
   input: {
     siteId: string;
+    projectId?: string;
     name: string;
     unit: string;
     quantity?: number;
+    isExistingMaterial?: boolean;
+    issuedAmount?: number;
+    givenAmount?: number;
     minimumStock?: number;
     remarks?: string;
     requestDate?: string;
@@ -719,8 +805,11 @@ export async function addInventoryMaterial(
   let clientId: Types.ObjectId | undefined;
   let clientName: string | undefined;
   const projectIds = (site as any).projectIds || [];
-  if (projectIds.length > 0) {
-    const project = await Project.findById(projectIds[0]).lean();
+  const requestedProjectId = input.projectId && Types.ObjectId.isValid(input.projectId)
+    ? input.projectId
+    : projectIds[0];
+  if (requestedProjectId) {
+    const project = await Project.findById(requestedProjectId).lean();
     if (project) {
       projectId = project._id;
       projectName = project.name;
@@ -734,6 +823,9 @@ export async function addInventoryMaterial(
   }
 
   const quantity = Math.max(0, Number(input.quantity) || 0);
+  const isExistingMaterial = Boolean(input.isExistingMaterial);
+  const issuedAmount = isExistingMaterial ? undefined : Math.max(0, Number(input.issuedAmount) || 0);
+  const givenAmount = isExistingMaterial ? undefined : Math.max(0, Number(input.givenAmount) || 0);
   const minimumStockRaw = input.minimumStock !== undefined && input.minimumStock !== null
     ? Number(input.minimumStock)
     : undefined;
@@ -743,11 +835,71 @@ export async function addInventoryMaterial(
   const remarks = input.remarks ? String(input.remarks).trim() : undefined;
   const requestDate = input.requestDate || new Date().toISOString().slice(0, 10);
 
-  const existing = await Material.findOne({
+  const syncInventory = async (materialId: Types.ObjectId) => {
+    const invMatch = {
+      projectId: projectId || undefined,
+      siteKey: siteKeyValue,
+      normalizedName,
+      normalizedUnit,
+    };
+    const existingInv = await Inventory.findOne(invMatch);
+    if (existingInv) {
+      existingInv.approvedQuantity = Math.max(0, Number(existingInv.approvedQuantity) || 0) + quantity;
+      existingInv.purchasedQuantity = Math.max(0, Number(existingInv.purchasedQuantity) || 0) + quantity;
+      existingInv.remainingStock = Math.max(0, existingInv.purchasedQuantity - (Number(existingInv.consumedQuantity) || 0));
+      if (minimumStock !== undefined) existingInv.minimumQuantity = minimumStock;
+      existingInv.lastMaterialId = materialId;
+      existingInv.lastUpdatedBy = updatedBy;
+      if (quantity > 0) {
+        existingInv.purchaseHistory = existingInv.purchaseHistory || [];
+        existingInv.purchaseHistory.push({
+          vendor: "",
+          quantity,
+          date: new Date(),
+          materialId,
+        });
+      }
+      await existingInv.save();
+      return;
+    }
+
+    const inv = new Inventory({
+      projectId,
+      projectName,
+      clientId,
+      clientName,
+      siteId: siteObjectId,
+      site: site.name,
+      siteKey: siteKeyValue,
+      name: trimmedName,
+      normalizedName,
+      unit: trimmedUnit,
+      normalizedUnit,
+      requestedQuantity: quantity,
+      approvedQuantity: quantity,
+      purchasedQuantity: quantity,
+      consumedQuantity: 0,
+      remainingStock: quantity,
+      minimumQuantity: minimumStock ?? 0,
+      lastMaterialId: materialId,
+      lastUpdatedBy: updatedBy,
+      purchaseHistory: quantity > 0 ? [{
+        quantity,
+        date: new Date(),
+        materialId,
+      }] : [],
+    });
+    await inv.save();
+  };
+
+  // Existing stock intentionally updates its original row. A material
+  // entered with the toggle off is a new procurement record, even when
+  // its name/unit already exists, so its amounts and PO state stay distinct.
+  const existing = isExistingMaterial ? await Material.findOne({
     siteId: siteObjectId,
     name: { $regex: new RegExp(`^${trimmedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
     unit: { $regex: new RegExp(`^${trimmedUnit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-  });
+  }) : null;
 
   if (existing) {
     if (quantity > 0) {
@@ -761,8 +913,12 @@ export async function addInventoryMaterial(
     if (remarks) {
       existing.notes = remarks;
     }
+    existing.isExistingMaterial = isExistingMaterial;
+    existing.issuedAmount = issuedAmount;
+    existing.givenAmount = givenAmount;
     (existing as any).createdBy = updatedBy;
     await existing.save();
+    await syncInventory(existing._id);
     return { material: existing.toObject(), created: false };
   }
 
@@ -784,6 +940,9 @@ export async function addInventoryMaterial(
     purchasedQuantity: quantity,
     consumedQuantity: 0,
     remainingStock: quantity,
+    isExistingMaterial,
+    issuedAmount,
+    givenAmount,
     ...(minimumStock !== undefined ? { minimumQuantity: minimumStock } : {}),
     status: "Not Received",
     requestDate,
@@ -791,57 +950,8 @@ export async function addInventoryMaterial(
     createdBy: updatedBy,
   });
 
-  // Also create an Inventory record so the item appears immediately
-  const invMatch = {
-    projectId: projectId || undefined,
-    siteKey: siteKeyValue,
-    normalizedName,
-    normalizedUnit,
-  };
-  const existingInv = await Inventory.findOne(invMatch);
-  if (existingInv) {
-    existingInv.approvedQuantity = Math.max(0, Number(existingInv.approvedQuantity) || 0) + quantity;
-    existingInv.purchasedQuantity = Math.max(0, Number(existingInv.purchasedQuantity) || 0) + quantity;
-    existingInv.remainingStock = Math.max(0, existingInv.purchasedQuantity - (Number(existingInv.consumedQuantity) || 0));
-    existingInv.lastMaterialId = created._id;
-    existingInv.lastUpdatedBy = updatedBy;
-    existingInv.purchaseHistory = existingInv.purchaseHistory || [];
-    existingInv.purchaseHistory.push({
-      vendor: "",
-      quantity,
-      date: new Date(),
-      materialId: created._id,
-    });
-    await existingInv.save();
-  } else {
-    const inv = new Inventory({
-      projectId,
-      projectName,
-      clientId,
-      clientName,
-      siteId: siteObjectId,
-      site: site.name,
-      siteKey: siteKeyValue,
-      name: trimmedName,
-      normalizedName,
-      unit: trimmedUnit,
-      normalizedUnit,
-      requestedQuantity: quantity,
-      approvedQuantity: quantity,
-      purchasedQuantity: quantity,
-      consumedQuantity: 0,
-      remainingStock: quantity,
-      minimumQuantity: minimumStock ?? 0,
-      lastMaterialId: created._id,
-      lastUpdatedBy: updatedBy,
-      purchaseHistory: [{
-        quantity,
-        date: new Date(),
-        materialId: created._id,
-      }],
-    });
-    await inv.save();
-  }
+  // Also create or update Inventory so both project tables stay in sync.
+  await syncInventory(created._id);
 
   return { material: created.toObject(), created: true };
 }

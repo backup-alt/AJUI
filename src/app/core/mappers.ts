@@ -3,6 +3,7 @@ import type {
   Vendor,
   Supervisor,
   Subcontractor,
+  Worker,
   ClientStatus,
 } from "../data/erp-data.service";
 import type { TaxInvoice, TaxInvoiceRow } from "../../data/dashboardData";
@@ -95,6 +96,7 @@ export function mapVendor(v: any): Vendor {
     gst: v.gstNumber || "",
     status: v.status === "Not Active" ? "Not Active" : "Active",
     siteIds: Array.isArray(v.siteIds) ? v.siteIds.map((id: any) => String(id)) : [],
+    projectIds: Array.isArray(v.projectIds) ? v.projectIds.map((id: any) => String(id)) : [],
     customFields: v.customFields || {},
   };
 }
@@ -143,7 +145,14 @@ export function mapMaterial(m: any): any {
     billUrl: billUrlFor(m),
     issuedAmount: m.issuedAmount,
     givenAmount: m.givenAmount,
+    isExistingMaterial: Boolean(m.isExistingMaterial),
+    orderedDate: m.orderedDate,
     requestDate: m.requestDate,
+    receivedDate: m.receivedDate,
+    createdAt: m.createdAt,
+    updatedAt: m.updatedAt,
+    purchasedDate: m.orderedDate,
+    deliveredOn: m.receivedDate,
     approvalDate: m.approvalDate,
     notes: m.notes || "",
     status: m.status,
@@ -233,6 +242,37 @@ export function mapExpense(e: any): any {
   };
 }
 
+export function mapGeneralExpense(e: any): any {
+  const amount = Number(e.amount) || 0;
+  return {
+    _id: e._id,
+    id: e.expenseId,
+    expenseId: e.expenseId,
+    origin: e.origin || "manual",
+    category: e.category || "",
+    amount,
+    spent: amount,
+    date: e.date,
+    description: e.description,
+    notes: e.notes || "",
+    paymentMode: e.paymentMode || "Cash",
+    paidBy: e.paidBy || "",
+    reference: e.reference || e.receiptImageName || "",
+    billUrl: billUrlFor(e) || "",
+    pcloudFileId: e.pcloudFileId || "",
+    receiptImageName: e.receiptImageName || "",
+    projectId: e.projectId,
+    projectName: e.projectName,
+    clientId: e.clientId,
+    clientName: e.clientName,
+    siteId: e.siteId,
+    site: e.site,
+    status: e.status || "Approved",
+    customFields: e.customFields || {},
+    createdBy: e.createdBy,
+  };
+}
+
 export function mapPayment(p: any): any {
   return {
     _id: p._id,
@@ -258,6 +298,7 @@ export function mapSubcontractor(s: any): Subcontractor {
     _id: s._id,
     id: s._id || s.id,
     projectId: s.projectId ? String(s.projectId) : "",
+    projectIds: Array.isArray(s.projectIds) ? s.projectIds.map((id: any) => String(id)) : (s.projectId ? [String(s.projectId)] : []),
     projectName: s.projectName || "",
     subcontractorName: s.subcontractorName || "",
     description: s.description || "",
@@ -265,6 +306,7 @@ export function mapSubcontractor(s: any): Subcontractor {
     note: s.note || "",
     address: s.address || "",
     phone: s.phone || "",
+    paymentMode: s.paymentMode || "Bank Transfer",
     status: s.status === "inactive" ? "inactive" : "active",
     customFields: s.customFields || {},
   };
@@ -320,6 +362,31 @@ function getInitials(name: string): string {
     .join("") || "AG";
 }
 
+export function mapWorker(w: any): Worker {
+  return {
+    _id: w._id,
+    id: w.workerId || w._id,
+    workerId: w.workerId,
+    name: w.name || "",
+    phone: w.phone || "",
+    labourType: w.labourType || "",
+    address: w.address || "",
+    notes: w.notes || "",
+    site: w.site || "",
+    siteId: w.siteId,
+    projectId: w.projectId ? String(w.projectId) : "",
+    projectName: w.projectName || "",
+    clientId: w.clientId ? String(w.clientId) : "",
+    isSubcontract: !!w.isSubcontract,
+    subcontractorId: w.subcontractorId ? String(w.subcontractorId) : "",
+    subcontractorName: w.subcontractorName || "",
+    supervisorName: w.supervisorName || "",
+    weeklyPay: Number(w.weeklyPay) || 0,
+    createdAt: w.createdAt,
+    updatedAt: w.updatedAt,
+  };
+}
+
 export function mapInventory(i: any): any {
   const lastPurchaseNote = Array.isArray(i?.purchaseHistory) && i.purchaseHistory.length
     ? (i.purchaseHistory[i.purchaseHistory.length - 1]?.notes || "")
@@ -346,6 +413,8 @@ export function mapInventory(i: any): any {
     minimumQuantity: i.minimumQuantity ?? 0,
     vendor: i.vendor,
     poNumber: i.poNumber,
+    received: Boolean(i.received),
+    receivedDate: i.receivedDate || "",
     billUrl: billUrlFor(i),
     // Prefer the top-level notes (latest "Add existing material" entry wins)
     // but fall back to the most recent purchaseHistory entry's note so older

@@ -42,7 +42,7 @@ type SupervisorOption = { id: string; name: string };
           <div>
             <span>{{ eyebrow }}</span>
             <h2 id="project-form-title">{{ title }}</h2>
-            <p>{{ description || clientName + ' project records will open with site-wise material, labour, expense, and payment ledgers.' }}</p>
+            <p>{{ description || clientName + ' project records will open with material, labour, expense, and payment ledgers.' }}</p>
           </div>
           <button type="button" class="icon-button" aria-label="Close project form" (click)="cancel.emit()">
             <ion-icon name="close-outline"></ion-icon>
@@ -119,8 +119,13 @@ type SupervisorOption = { id: string; name: string };
           </label>
 
           <div class="dialog-actions span-2">
-            <button type="button" class="secondary-action" (click)="cancel.emit()">Cancel</button>
-            <button type="submit" class="primary-action">{{ submitLabel }}</button>
+            <button type="button" class="secondary-action" (click)="cancel.emit()" [disabled]="submitting">Cancel</button>
+            <button type="submit" class="primary-action" [disabled]="submitting" [attr.aria-busy]="submitting ? 'true' : null">
+              @if (submitting) {
+                <span class="agb-loading-spinner" aria-hidden="true"></span>
+              }
+              {{ submitting ? 'Saving…' : submitLabel }}
+            </button>
           </div>
         </form>
       </section>
@@ -183,6 +188,7 @@ export class ProjectFormDialogComponent implements OnInit {
   @Input() defaultSupervisor = "";
   @Input() clients: Array<{ id?: string; _id?: string; name: string }> = [];
   @Input() currentClientId = "";
+  @Input() submitting = false;
   @Output() cancel = new EventEmitter<void>();
   @Output() create = new EventEmitter<ProjectFormValue>();
 

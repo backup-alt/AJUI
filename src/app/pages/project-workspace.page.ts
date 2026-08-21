@@ -3,24 +3,46 @@ import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inj
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
-import { IonContent, IonIcon, IonSplitPane } from "@ionic/angular/standalone";
+import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardData";
-import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow } from "../data/erp-data.service";
+import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow, type Worker } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
 import { ApiService } from "../core/api.service";
 import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
-import { mapMaterial, mapLabour, mapExpense, mapPayment, mapVendor, mapSubcontractor, mapInventory } from "../core/mappers";
+import { mapMaterial, mapLabour, mapExpense, mapGeneralExpense, mapPayment, mapVendor, mapSubcontractor, mapInventory, mapWorker } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.component";
+import { WorkerFormDialogComponent, type WorkerFormValue } from "../shared/worker-form-dialog.component";
+import { SubcontractorFormDialogComponent, type SubcontractorFormValue } from "../shared/subcontractor-form-dialog.component";
 
-type ModuleKey = Exclude<SharedModuleKey, "clients" | "generalExpenses" | "purchaseOrders" | "settings" | "supervisors">;
+type ModuleKey = Exclude<SharedModuleKey, "clients" | "purchaseOrders" | "settings" | "supervisors">;
 type TableRow = SharedTableRow;
 type FieldSchema = SharedTableField;
 type FilterBuilderStep = "fields" | "values";
+type MaterialDetails = {
+  name: string;
+  unit: string;
+  currentStock: number;
+  purchases: number;
+  consumed: number;
+  notes: string;
+  purchaseHistory: Array<{ quantity: number; date: string; vendor: string; poNumber: string; notes: string }>;
+  consumptionHistory: Array<{ quantity: number; date: string; updatedBy: string; notes: string }>;
+};
+type AssignmentOption = { id: string; name: string };
+type InventoryMaterialCard = {
+  key: string;
+  name: string;
+  unit: string;
+  purchasedQuantity: number;
+  consumedQuantity: number;
+  remainingStock: number;
+  sourceRow: TableRow;
+};
 type SectionConfig = {
   key: ModuleKey;
   label: string;
@@ -40,14 +62,13 @@ const sectionConfigs: SectionConfig[] = [
     title: "Material Requests",
     description: "Fixed procurement fields for requests, approvals, vendors, purchase orders, and stock visibility.",
     columns: [
-      { key: "site", label: "Site" },
       { key: "materialName", label: "Material Name" },
       { key: "unit", label: "Unit" },
+      { key: "quantity", label: "Quantity", type: "number" },
       { key: "issuedAmount", label: "Issued Amount", type: "number" },
       { key: "givenAmount", label: "Given Amount", type: "number" },
-      { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
-      { key: "approvedQuantity", label: "Approved Quantity", type: "number" },
-      { key: "requestDate", label: "Request Date", type: "date" },
+      { key: "requestDate", label: "Added Date", type: "date" },
+      { key: "receivedDate", label: "Received Date", type: "date" },
       { key: "vendor", label: "Vendor" },
       { key: "poNumber", label: "PO Number" },
       { key: "reference", label: "Bill / Reference" },
@@ -57,13 +78,12 @@ const sectionConfigs: SectionConfig[] = [
     ],
   },
   {
-    key: "labour",
-    label: "Labour",
-    title: "Labour Attendance",
-    description: "Staff attendance with site, date, supervisor name, labour types, staff count, shift count, overtime, and fine.",
+    key: "attendance",
+    label: "Attendance",
+    title: "Attendance Register",
+    description: "Staff attendance with date, subcontractor, labour types, staff count, shift count, overtime, and notes.",
     columns: [
       { key: "client", label: "Client" },
-      { key: "site", label: "Site" },
       { key: "attendanceDate", label: "Date", type: "date" },
       { key: "subcontractorName", label: "Subcontractor" },
       { key: "labourTypes", label: "Labour Types" },
@@ -75,21 +95,49 @@ const sectionConfigs: SectionConfig[] = [
     ],
   },
   {
+    key: "workers",
+    label: "Labour",
+    title: "Worker Roster",
+    description: "Worker roster for this project — every worker is assigned to a subcontractor and is also visible on that subcontractor's page.",
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "phone", label: "Phone" },
+      { key: "labourType", label: "Role" },
+      { key: "subcontractorName", label: "Subcontractor" },
+      { key: "address", label: "Address" },
+      { key: "notes", label: "Notes" },
+    ],
+  },
+  {
     key: "expenses",
-    label: "Expenses",
-    title: "Site Expense Ledger",
-    description: "Supervisor cash ledger and site expense fields with receipt and approval status.",
+    label: "Supervisor Expense",
+    title: "Supervisor Expense Ledger",
+    description: "Supervisor cash ledger with receipt and approval status. The project-wide Expense tab captures admin and general entries separately.",
     columns: [
       { key: "expenseDate", label: "Expense Date", type: "date" },
       { key: "transactionType", label: "Transaction Type" },
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
-      { key: "siteMaterial", label: "Site Material" },
+      { key: "siteMaterial", label: "Material Purchase" },
       { key: "runningBalance", label: "Balance" },
-      { key: "site", label: "Site" },
       { key: "supervisor", label: "Supervisor" },
       { key: "reference", label: "Bill / Reference" },
       { key: "approvalStatus", label: "Approval Status" },
+    ],
+  },
+  {
+    key: "generalExpenses",
+    label: "Expense",
+    title: "Expense",
+    description: "Project-wide admin and general expenses recorded directly against this project. Sums roll up into the project's Total Expense KPI.",
+    columns: [
+      { key: "date", label: "Date", type: "date" },
+      { key: "category", label: "Category" },
+      { key: "description", label: "Description" },
+      { key: "amount", label: "Amount" },
+      { key: "origin", label: "Origin" },
+      { key: "notes", label: "Notes" },
+      { key: "status", label: "Status" },
     ],
   },
   {
@@ -113,11 +161,26 @@ const sectionConfigs: SectionConfig[] = [
     description: "Vendor master fields for material type, contact, address, GST, and purchase history.",
     columns: [
       { key: "vendorName", label: "Vendor Name" },
+      { key: "projects", label: "Projects" },
       { key: "materialType", label: "Material Type" },
       { key: "materialsBought", label: "Materials Bought" },
       { key: "phoneNumber", label: "Phone Number" },
       { key: "address", label: "Address" },
       { key: "gstNumber", label: "GST Number" },
+    ],
+  },
+  {
+    key: "subcontractorsRoster",
+    label: "Subcontractors",
+    title: "Sub-contractor Roster",
+    description: "Sub-contractor profiles assigned to this project. Use the Add Row button to pick an existing sub-contractor or create a new one — it'll appear here and on the universal sub-contractors page. Use the Subcontractor Payments tab below to record actual payments.",
+    columns: [
+      { key: "subcontractorName", label: "Subcontractor Name" },
+      { key: "address", label: "Address" },
+      { key: "phone", label: "Phone No." },
+      { key: "paymentMode", label: "Payment Mode" },
+      { key: "note", label: "Notes" },
+      { key: "status", label: "Status" },
     ],
   },
   {
@@ -127,8 +190,8 @@ const sectionConfigs: SectionConfig[] = [
     description: "Every payment recorded against sub-contractors for this project. Each row is a separate record and folds into the project total expense.",
     columns: [
       { key: "date", label: "Date", type: "date" },
+      { key: "paymentType", label: "Payment Mode" },
       { key: "subcontractorName", label: "Subcontractor" },
-      { key: "siteName", label: "Site" },
       { key: "description", label: "Work Description" },
       { key: "employeeCount", label: "Number of Employees", type: "number" },
       { key: "amount", label: "Total Paid", type: "number" },
@@ -137,33 +200,17 @@ const sectionConfigs: SectionConfig[] = [
   {
     key: "inventory",
     label: "Inventory",
-    title: "Inventory by Site",
-    description: "Approved materials, purchased/consumed quantities, and remaining stock per site.",
+    title: "Project Inventory",
+    description: "All project materials with received status, purchased and consumed quantities, and remaining stock.",
     columns: [
-      { key: "site", label: "Site" },
       { key: "materialName", label: "Material Name" },
       { key: "unit", label: "Unit" },
-      { key: "requestedQuantity", label: "Requested", type: "number" },
-      { key: "approvedQuantity", label: "Approved", type: "number" },
       { key: "purchasedQuantity", label: "Purchased", type: "number" },
       { key: "consumedQuantity", label: "Consumed", type: "number" },
       { key: "remainingStock", label: "Remaining Stock" },
-      { key: "minimumQuantity", label: "Min Qty", type: "number" },
       { key: "vendor", label: "Vendor" },
       { key: "poNumber", label: "PO Number" },
-    ],
-  },
-  {
-    key: "reports",
-    label: "Reports",
-    title: "Reports Register",
-    description: "Report fields for financial, labour, material, and project exports.",
-    columns: [
-      { key: "category", label: "Category" },
-      { key: "reportName", label: "Report Name" },
-      { key: "description", label: "Description" },
-      { key: "owner", label: "Owner" },
-      { key: "exportFormat", label: "Export Format" },
+      { key: "receivedStatus", label: "Status" },
     ],
   },
 ];
@@ -173,7 +220,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
   { key: "unit", label: "Unit" },
   { key: "requestedQuantity", label: "Requested Quantity", type: "number" },
   { key: "vendor", label: "Vendor Name" },
-  { key: "requestDate", label: "Request Date", type: "date" },
+  { key: "requestDate", label: "Added Date", type: "date" },
   { key: "remainingStock", label: "Remaining Stock" },
 ];
 
@@ -189,6 +236,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
     ProjectFormDialogComponent,
     VendorFormDialogComponent,
     InventoryInitDialogComponent,
+    WorkerFormDialogComponent,
+    SubcontractorFormDialogComponent,
   ],
   styles: [`
     .operations-dialog:has(.draft-select-menu.open) {
@@ -196,6 +245,117 @@ const siteMaterialDetailFields: FieldSchema[] = [
     }
     .operations-dialog:has(.draft-select-menu.open) > .erp-form {
       overflow: visible;
+    }
+    .assignment-dialog {
+      width: min(520px, calc(100vw - 48px));
+    }
+    .assignment-dialog > .erp-form {
+      grid-template-columns: minmax(0, 1fr);
+      padding: 18px 24px 20px;
+      overflow: visible;
+    }
+    .assignment-dialog:has(.assignment-select-menu.open) {
+      overflow: visible;
+    }
+    .assignment-select-menu {
+      width: 100%;
+      min-width: 0;
+    }
+    .assignment-select-menu .erp-select-trigger {
+      min-height: 40px;
+      font-weight: 600;
+    }
+    .assignment-select-menu.open .erp-select-trigger {
+      border-color: var(--ui-accent, #3b82f6);
+    }
+    .assignment-select-panel {
+      position: absolute;
+      z-index: 80;
+      width: 100%;
+      min-width: 0;
+      max-height: 248px;
+      pointer-events: auto;
+    }
+    .assignment-select-panel > button {
+      justify-content: space-between;
+      min-height: 42px;
+      padding: 7px 10px;
+    }
+    .assignment-option-copy {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+    .assignment-option-copy strong {
+      overflow: hidden;
+      color: inherit;
+      font-size: 13px;
+      font-weight: 720;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .assignment-option-copy small {
+      color: var(--ui-muted, #64748b);
+      font-size: 11px;
+      font-weight: 550;
+    }
+    .assignment-option-check {
+      display: inline-grid;
+      width: 22px;
+      height: 22px;
+      flex: 0 0 22px;
+      place-items: center;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #174ea6;
+    }
+    .assignment-option-check svg {
+      width: 13px;
+      height: 13px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.2;
+    }
+    .assignment-field { min-width: 0; }
+    .assignment-field-label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--ui-text, #172033);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .assignment-create-new {
+      width: 100%;
+      min-height: 40px;
+      margin-top: 10px;
+      border: 1px dashed var(--ui-line, #cbd5e1);
+      border-radius: 9px;
+      background: var(--ui-soft, #f8fafc);
+      color: var(--ui-accent, #174ea6);
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .assignment-select-panel > button em {
+      font-style: normal;
+      color: var(--ui-muted, #64748b);
+    }
+    .assignment-empty {
+      margin: 0;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--ui-muted, #64748b);
+    }
+    .assignment-hint {
+      display: block;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--ui-muted, #64748b);
+      line-height: 1.4;
+    }
+    .assignment-dialog .dialog-actions {
+      padding: 14px 24px 18px;
     }
     .draft-select-menu .erp-select-panel {
       width: 100%;
@@ -264,6 +424,166 @@ const siteMaterialDetailFields: FieldSchema[] = [
     .custom-mode-input {
       width: 100%;
     }
+    .material-bill-upload {
+      border: 0;
+      cursor: pointer;
+    }
+    .material-bill-upload:disabled {
+      cursor: wait;
+      opacity: 0.65;
+    }
+    .primary-table-action .svg-icon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .material-details-dialog {
+      width: min(760px, calc(100vw - 32px));
+      max-height: min(760px, calc(100vh - 32px));
+      overflow: auto;
+      padding: 0;
+      border-radius: 14px;
+    }
+    .material-details-overlay,
+    .assignment-overlay {
+      z-index: 2147483000;
+      background: rgba(15, 23, 42, 0.48);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .material-details-close {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      border: 1px solid var(--ui-line, #e2e8f0);
+      border-radius: 10px;
+      background: var(--ui-soft, #f8fafc);
+      color: var(--ui-text, #0f172a);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+    .material-details-close:hover {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: #1d4ed8;
+      transform: translateY(-1px);
+    }
+    .material-details-close:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.2); outline-offset: 2px; }
+    .material-details-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+    .material-details-content { padding: 18px 24px 22px; }
+    .material-detail-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0 0 20px;
+    }
+    .material-detail-stat, .material-history-item {
+      border: 1px solid var(--ui-line, #e2e8f0);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--ui-panel, #fff);
+    }
+    .material-detail-stat span, .material-history-item span {
+      display: block;
+      color: var(--ui-muted, #64748b);
+      font-size: 12px;
+    }
+    .material-detail-stat strong { display: block; margin-top: 5px; font-size: 20px; }
+    .material-history { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    .material-history h3 { margin: 0 0 9px; font-size: 15px; }
+    .material-history-list { display: grid; gap: 8px; }
+    .material-history-item strong { display: block; margin-bottom: 3px; }
+    .material-detail-note { margin-top: 16px; }
+    .material-detail-note p { white-space: pre-wrap; }
+    .material-detail-error, .material-detail-empty { color: var(--ui-muted, #64748b); }
+    .inventory-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 16px;
+      padding: 18px;
+      background: #f6f8fc;
+    }
+    .inventory-material-card {
+      display: grid;
+      gap: 18px;
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid #dbe3ef;
+      border-radius: 16px;
+      background: #fff;
+      color: #172033;
+      text-align: left;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+    .inventory-material-card:hover {
+      transform: translateY(-2px);
+      border-color: #9db5df;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+    }
+    .inventory-material-card:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.2); outline-offset: 2px; }
+    .inventory-card-head, .inventory-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .inventory-card-title { display: grid; gap: 4px; min-width: 0; }
+    .inventory-card-title strong { overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
+    .inventory-card-title span { color: #64748b; font-size: 12px; font-weight: 650; }
+    .inventory-card-icon {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      place-items: center;
+      border-radius: 11px;
+      background: #eef4ff;
+      color: #174ea6;
+    }
+    .inventory-card-icon svg, .inventory-card-footer svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+    }
+    .inventory-card-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .inventory-card-metric { min-width: 0; padding: 10px; border-radius: 10px; background: #f8fafc; }
+    .inventory-card-metric span { display: block; color: #64748b; font-size: 10px; font-weight: 700; }
+    .inventory-card-metric strong { display: block; overflow: hidden; margin-top: 5px; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+    .inventory-card-metric.stock { background: #ecfdf3; color: #166534; }
+    .inventory-card-metric.stock span { color: #4b8060; }
+    .inventory-card-footer { padding-top: 12px; border-top: 1px solid #edf1f6; color: #174ea6; font-size: 12px; font-weight: 750; }
+    .inventory-card-empty { grid-column: 1 / -1; padding: 42px 18px; color: #64748b; text-align: center; }
+    .material-history-po {
+      display: inline-flex;
+      width: fit-content;
+      margin-top: 5px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #174ea6;
+      font-size: 12px;
+      font-weight: 750;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    @media (max-width: 640px) {
+      .material-detail-stats, .material-history { grid-template-columns: 1fr; }
+      .inventory-card-grid { grid-template-columns: 1fr; padding: 12px; }
+    }
   `],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
@@ -280,8 +600,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
         <agb-enterprise-header
           title="Project Workspace"
           eyebrow="Project Operations"
-          metaLabel="Site records"
-          [blurred]="recordDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm() || showVendorDialog() || !!editingInlineVendor()"
+          metaLabel="Project records"
+          [blurred]="recordDialogOpen() || labourTypeDialogOpen() || filterBuilderOpen() || showProjectForm() || showVendorDialog() || showSubcontractorDialog() || !!assignmentDialogType() || !!editingInlineVendor() || showWorkerDialog()"
           [showTitle]="false"
           searchPlaceholder="Search"
         />
@@ -375,13 +695,35 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded() && !isNoCreateTab()"
-                    title="Add row"
-                    aria-label="Add row"
+                    *ngIf="!tableViewExpanded() && activeSection() === 'vendors'"
+                    title="Assign Vendor"
+                    aria-label="Assign Vendor"
+                    (click)="openAssignmentDialog('vendor')"
+                  >
+                    <ion-icon name="add-outline"></ion-icon>
+                    Assign Vendor
+                  </button>
+                  <button
+                    type="button"
+                    class="primary-table-action add-row-action"
+                    *ngIf="!tableViewExpanded() && (activeSection() === 'subcontractors' || activeSection() === 'subcontractorsRoster')"
+                    title="Assign Subcontractor"
+                    aria-label="Assign Subcontractor"
+                    (click)="openAssignmentDialog('subcontractor')"
+                  >
+                    <ion-icon name="add-outline"></ion-icon>
+                    Assign Subcontractor
+                  </button>
+                  <button
+                    type="button"
+                    class="primary-table-action add-row-action"
+                    *ngIf="!tableViewExpanded() && !isNoCreateTab() && activeSection() !== 'vendors' && activeSection() !== 'subcontractors' && activeSection() !== 'subcontractorsRoster'"
+                    [title]="activeSection() === 'materials' ? 'Add materials' : 'Add row'"
+                    [attr.aria-label]="activeSection() === 'materials' ? 'Add materials' : 'Add row'"
                     (click)="openRecordDialog()"
                   >
                     <ion-icon name="add-outline"></ion-icon>
-                    Add Row
+                    {{ activeSection() === 'materials' ? 'Add Materials' : 'Add Row' }}
                   </button>
                   <button
                     type="button"
@@ -391,8 +733,37 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     aria-label="Edit selected row"
                     (click)="editSelectedRows()"
                   >
-                    <ion-icon name="create-outline"></ion-icon>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20Z" />
+                      <path d="m13.5 6 4.5 4.5" />
+                    </svg>
                     Edit Row
+                  </button>
+                  <button
+                    type="button"
+                    class="primary-table-action"
+                    *ngIf="!tableViewExpanded() && activeSection() === 'materials' && selectedRowCount() > 0"
+                    [title]="selectedContainsExistingMaterial() ? 'Existing inventory materials cannot be ordered again' : 'Create a purchase order from selected materials'"
+                    aria-label="Create purchase order from selected materials"
+                    [disabled]="selectedContainsExistingMaterial()"
+                    (click)="createPurchaseOrderFromSelection()"
+                  >
+                    <ion-icon name="document-text-outline"></ion-icon>
+                    {{ selectedContainsExistingMaterial() ? 'Existing Material — PO unavailable' : 'Create PO (' + selectedRowCount() + ')' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="primary-table-action"
+                    *ngIf="!tableViewExpanded() && activeSection() === 'materials' && selectedRowCount() === 1"
+                    title="View selected material details"
+                    aria-label="View selected material details"
+                    (click)="openSelectedMaterialDetails()"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
+                      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                      <circle cx="12" cy="12" r="2.75" />
+                    </svg>
+                    View Details
                   </button>
                   <button
                     *ngIf="!tableViewExpanded() && selectedRowCount()"
@@ -412,7 +783,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   </button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
-                  <button type="button" class="view-table-action" *ngIf="!tableViewExpanded()" (click)="openTableView()">
+                  <button type="button" class="view-table-action" *ngIf="!tableViewExpanded() && activeSection() !== 'inventory'" (click)="openTableView()">
                     <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                       <path d="M4 5h16v14H4z" />
                       <path d="M4 10h16" />
@@ -510,11 +881,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
               <ng-container *ngIf="tableState() as tableState">
               <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
-                    <span>{{ tableState.rows.length }} rows</span>
-                <span>{{ tableState.columns.length }} fields</span>
+                <span>{{ activeSection() === 'inventory' ? inventoryMaterialCards().length + ' unique materials' : tableState.rows.length + ' rows' }}</span>
+                <span>{{ activeSection() === 'inventory' ? 'Card view' : tableState.columns.length + ' fields' }}</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
-                <span>Rows edit after selection</span>
-                <button type="button" class="meta-reset-action" *ngIf="hiddenFieldCount(activeSection())" (click)="resetFields(activeSection())">
+                <span *ngIf="activeSection() !== 'inventory'">Rows edit after selection</span>
+                <button type="button" class="meta-reset-action" *ngIf="activeSection() !== 'inventory' && hiddenFieldCount(activeSection())" (click)="resetFields(activeSection())">
                   Reset fields
                 </button>
               </div>
@@ -525,11 +896,49 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div><span>Current Balance</span><strong>{{ expenseCurrentBalanceLabel() }}</strong></div>
               </div>
 
-              <div class="table-wrap operations-table">
+              <section class="inventory-card-grid" *ngIf="activeSection() === 'inventory'">
+                <button
+                  *ngFor="let card of inventoryMaterialCards(); trackBy: trackInventoryCard"
+                  type="button"
+                  class="inventory-material-card"
+                  (click)="openInventoryMaterialDetails(card)"
+                >
+                  <span class="inventory-card-head">
+                    <span class="inventory-card-title">
+                      <strong>{{ card.name }}</strong>
+                      <span>Unit · {{ card.unit || 'Not specified' }}</span>
+                    </span>
+                    <span class="inventory-card-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z" /><path d="M4 7.5V16l8 5 8-5V7.5" /><path d="M12 12v9" /></svg>
+                    </span>
+                  </span>
+                  <span class="inventory-card-metrics">
+                    <span class="inventory-card-metric">
+                      <span>Purchased</span>
+                      <strong>{{ formatNumber(card.purchasedQuantity) }}</strong>
+                    </span>
+                    <span class="inventory-card-metric">
+                      <span>Consumed</span>
+                      <strong>{{ formatNumber(card.consumedQuantity) }}</strong>
+                    </span>
+                    <span class="inventory-card-metric stock">
+                      <span>Remaining</span>
+                      <strong>{{ formatNumber(card.remainingStock) }}</strong>
+                    </span>
+                  </span>
+                  <span class="inventory-card-footer">
+                    <span>View purchases, consumption, PO and vendor</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                  </span>
+                </button>
+                <p class="inventory-card-empty" *ngIf="inventoryMaterialCards().length === 0">No inventory materials match the current filters.</p>
+              </section>
+
+              <div class="table-wrap operations-table" *ngIf="activeSection() !== 'inventory'">
                 <table>
                   <thead>
                     <tr>
-                      <th *ngIf="hasSelectedRows()" class="row-check-column">
+                      <th *ngIf="showRowCheckboxes()" class="row-check-column">
                         <input
                           type="checkbox"
                           [checked]="allVisibleRowsSelected()"
@@ -558,7 +967,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       [class.row-editing]="isRowEditing(row)"
                       (click)="selectRow(row, $event)"
                     >
-                      <td *ngIf="hasSelectedRows()" class="row-check-column">
+                      <td *ngIf="showRowCheckboxes()" class="row-check-column">
                         <input
                           type="checkbox"
                           [checked]="isRowChecked(row)"
@@ -570,7 +979,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
                         [class.readonly-cell]="isReadonlyColumn(column.key)"
                         [class.select-cell]="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeSection(), column.key).length > 0"
-                        [class.labour-types-cell-host]="activeSection() === 'labour' && column.key === 'labourTypes'"
+                        [class.labour-types-cell-host]="activeSection() === 'attendance' && column.key === 'labourTypes'"
                       >
                         <div
                           *ngIf="first && selectedRowKey() === rowKey(row)"
@@ -585,20 +994,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                               <path d="m13.5 6 4.5 4.5" />
                             </svg>
                           </button>
-                          <button
-                            *ngIf="activeSection() === 'reports'"
-                            type="button"
-                            class="icon-row-action"
-                            aria-label="Download report"
-                            title="Download report"
-                            (click)="downloadReportRow(row)"
-                          >
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M12 4v10" />
-                              <path d="m8 10 4 4 4-4" />
-                              <path d="M5 20h14" />
-                            </svg>
-                          </button>
                           <button type="button" class="icon-row-action danger" aria-label="Delete row" title="Delete row" (click)="deleteRow(row)">
                             <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                               <path d="M4 7h16" />
@@ -609,7 +1004,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </svg>
                           </button>
                         </div>
-                        <ng-container *ngIf="activeSection() === 'labour' && column.key === 'labourTypes'; else standardProjectCell">
+                        <ng-container *ngIf="activeSection() === 'attendance' && column.key === 'labourTypes'; else standardProjectCell">
                           <div class="labour-types-cell">
                             <span class="labour-group-badge" *ngIf="isLabourGroupRow(row)">{{ labourGroupCount(row) }} entries</span>
                             <div class="labour-type-chip-row" *ngIf="labourTypeCards(row).length; else emptyLabourTypes">
@@ -689,17 +1084,38 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </div>
                           </div>
                           <ng-template #editableProjectCell>
-                            <ng-container *ngIf="activeSection() === 'materials' && column.key === 'poNumber' && isReadablePurchaseOrderNumber(row['poNumber']); else billOrEditableCell">
+                            <ng-container *ngIf="(activeSection() === 'materials' || activeSection() === 'inventory') && column.key === 'poNumber' && isReadablePurchaseOrderNumber(row['poNumber']); else billOrEditableCell">
                               <button type="button" class="bill-link" (click)="openPurchaseOrder(row['poNumber'], $event)">{{ row['poNumber'] }}</button>
                             </ng-container>
                             <ng-template #billOrEditableCell>
-                            <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
-                              @if (isDataUrl($any(row['billUrl']))) {
-                                <button type="button" class="bill-link" (click)="openImagePreview($any(row['billUrl']))">View Bill</button>
-                              } @else {
-                                <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
-                              }
-                            </ng-container>
+                              <ng-container *ngIf="activeSection() === 'materials' && column.key === 'reference'; else standardBillOrEditableCell">
+                                @if (row['billUrl']) {
+                                  @if (isDataUrl($any(row['billUrl']))) {
+                                    <button type="button" class="bill-link" (click)="$event.stopPropagation(); openImagePreview($any(row['billUrl']))">View Bill</button>
+                                  } @else {
+                                    <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
+                                  }
+                                } @else {
+                                  <input #materialBillInput type="file" hidden accept="image/*,application/pdf" (change)="uploadMaterialBill(row, $event)" />
+                                  <button
+                                    type="button"
+                                    class="bill-link material-bill-upload"
+                                    [disabled]="isMaterialBillUploading(row)"
+                                    (click)="$event.stopPropagation(); materialBillInput.click()"
+                                  >
+                                    {{ isMaterialBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}
+                                  </button>
+                                }
+                              </ng-container>
+                              <ng-template #standardBillOrEditableCell>
+                                <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
+                                  @if (isDataUrl($any(row['billUrl']))) {
+                                    <button type="button" class="bill-link" (click)="openImagePreview($any(row['billUrl']))">View Bill</button>
+                                  } @else {
+                                    <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
+                                  }
+                                </ng-container>
+                              </ng-template>
                             </ng-template>
                             <ng-template #normalEditableCell>
                               <span
@@ -717,7 +1133,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       </td>
                     </tr>
                     <tr *ngIf="tableState.rows.length === 0">
-                      <td class="empty-row" [attr.colspan]="tableState.columns.length + (hasSelectedRows() ? 1 : 0)">
+                      <td class="empty-row" [attr.colspan]="tableState.columns.length + (showRowCheckboxes() ? 1 : 0)">
                         <div class="empty-record-state icon-only" aria-label="No records in this table">
                           <span class="empty-box-icon" aria-hidden="true">
                             <svg viewBox="0 0 226.512 226.512" aria-hidden="true">
@@ -792,7 +1208,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div class="dialog-head">
                   <div>
                     <span>{{ activeConfig().label }}</span>
-                    <h2>Add Record</h2>
+                    <h2>{{ activeSection() === 'materials' ? 'Add Materials' : 'Add Record' }}</h2>
                   </div>
                   <button type="button" class="icon-button" (click)="recordDialogOpen.set(false)">
                     <ion-icon name="close-outline"></ion-icon>
@@ -839,6 +1255,14 @@ const siteMaterialDetailFields: FieldSchema[] = [
                               (input)="draftSelectSearch.set($any($event.target).value)"
                               (keydown.escape)="closeDraftSelect()"
                             />
+                            <label class="custom-select-entry" *ngIf="allowsCustomOption(activeSection(), column.key)">
+                              <span>Custom</span>
+                              <input
+                                #draftCustomValue
+                                (keydown.enter)="saveCustomDraftOption(column.key, draftCustomValue.value, $event)"
+                                placeholder="Type value and press Enter"
+                              />
+                            </label>
                             <button
                               *ngFor="let option of filteredSelectOptions(activeSection(), column.key)"
                               type="button"
@@ -861,14 +1285,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                               </span>
                               {{ option }}
                             </button>
-                            <label class="custom-select-entry" *ngIf="allowsCustomOption(activeSection(), column.key)">
-                              <span>Custom</span>
-                              <input
-                                #draftCustomValue
-                                (keydown.enter)="saveCustomDraftOption(column.key, draftCustomValue.value, $event)"
-                                placeholder="Type value and press Enter"
-                              />
-                            </label>
                           </div>
                         </div>
                       </ng-container>
@@ -884,7 +1300,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <ng-container *ngIf="showSiteMaterialDetails()">
                     <div class="material-detail-heading span-2">
                       <strong>Material details</strong>
-                      <span>These fields create the linked Material Requests row for this site purchase.</span>
+                      <span>These fields create the linked Material Requests row for this purchase.</span>
                     </div>
                     <label *ngFor="let field of siteMaterialDetailFields">
                       <span>{{ field.label }}</span>
@@ -918,8 +1334,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   </ng-container>
                 </div>
                 <div class="dialog-actions">
-                  <button type="button" class="secondary-action" (click)="recordDialogOpen.set(false)">Cancel</button>
-                  <button type="submit" class="primary-action">Add Record</button>
+                  <button type="button" class="secondary-action" (click)="recordDialogOpen.set(false)" [disabled]="recordSaving()">Cancel</button>
+                  <button type="submit" class="primary-action" [disabled]="recordSaving()" [attr.aria-busy]="recordSaving() ? 'true' : null">
+                    @if (recordSaving()) {
+                      <span class="agb-loading-spinner" aria-hidden="true"></span>
+                    }
+                    {{ recordSaving() ? 'Saving…' : (activeSection() === 'materials' ? 'Add Materials' : 'Add Record') }}
+                  </button>
                 </div>
               </form>
             </section>
@@ -981,8 +1402,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   </label>
                 </div>
                 <div class="dialog-actions">
-                  <button type="button" class="secondary-action" (click)="closeLabourTypeDialog()">Cancel</button>
-                  <button type="submit" class="primary-action">Add Labor Type</button>
+                  <button type="button" class="secondary-action" (click)="closeLabourTypeDialog()" [disabled]="labourTypeSaving()">Cancel</button>
+                  <button type="submit" class="primary-action" [disabled]="labourTypeSaving()" [attr.aria-busy]="labourTypeSaving() ? 'true' : null">
+                    @if (labourTypeSaving()) {
+                      <span class="agb-loading-spinner" aria-hidden="true"></span>
+                    }
+                    {{ labourTypeSaving() ? 'Saving…' : 'Add Labor Type' }}
+                  </button>
                 </div>
               </form>
             </section>
@@ -1001,26 +1427,31 @@ const siteMaterialDetailFields: FieldSchema[] = [
               (create)="saveProject($event)"
             ></agb-project-form-dialog>
 
-            <agb-vendor-form-dialog
-              *ngIf="showVendorDialog()"
-              [eyebrow]="editingInlineVendor() ? 'Vendor Edit' : 'Vendor Setup'"
-              [title]="editingInlineVendor() ? 'Edit Vendor' : 'Add New Vendor'"
-              [description]="editingInlineVendor() ? 'Update vendor contact, material type, GST, and address information.' : 'Create the vendor record to track material purchases and GST.'"
-              [submitLabel]="editingInlineVendor() ? 'Save Changes' : 'Create Vendor'"
-              [initialValue]="editingInlineVendor() ? inlineVendorEditValue() : null"
-              (cancel)="closeVendorDialog()"
-              (create)="editingInlineVendor() ? updateInlineVendor($event) : createInlineVendor($event)"
-            ></agb-vendor-form-dialog>
-
             <agb-inventory-init-dialog
               *ngIf="showInventoryInitDialog()"
               [sites]="inventoryInitSites()"
               [materialNames]="inventoryInitMaterialNames()"
               [materialRows]="inventoryInitMaterialRows()"
               [presetSiteId]="activeSiteFilter() !== 'All' ? activeSiteId() : ''"
+              [projectId]="projectId()"
               (saved)="onInventoryInitSaved()"
               (cancelled)="closeInventoryInitDialog()"
             ></agb-inventory-init-dialog>
+
+            <agb-worker-form-dialog
+              *ngIf="showWorkerDialog()"
+              [eyebrow]="editingWorker() ? 'Worker Edit' : 'Worker Setup'"
+              [title]="editingWorker() ? 'Edit Worker' : 'Add New Worker'"
+              [description]="editingWorker() ? 'Update worker details and subcontractor assignment.' : 'Create a worker and assign them to a subcontractor.'"
+              [submitLabel]="editingWorker() ? 'Save Changes' : 'Add Worker'"
+              [initialValue]="editingWorker() ? workerEditValue() : null"
+              [subcontractorOptions]="workerSubcontractorOptions()"
+              [extraRoleOptions]="existingWorkerRoles()"
+              [submitting]="workerDialogSaving()"
+              (cancel)="closeWorkerDialog()"
+              (create)="editingWorker() ? updateWorkerEntry($event) : createWorkerEntry($event)"
+            ></agb-worker-form-dialog>
+
           </main>
         </ion-content>
       </div>
@@ -1032,6 +1463,172 @@ const siteMaterialDetailFields: FieldSchema[] = [
         </div>
       }
     </ion-split-pane>
+
+    <agb-vendor-form-dialog
+      *ngIf="showVendorDialog()"
+      [eyebrow]="editingInlineVendor() ? 'Vendor Edit' : 'New Vendor'"
+      [title]="editingInlineVendor() ? 'Edit Vendor' : 'Create New Vendor'"
+      [description]="editingInlineVendor() ? 'Update vendor contact, material type, GST, and address information.' : 'This name is not in the vendor list. Complete the profile to create and assign it to this project.'"
+      [submitLabel]="editingInlineVendor() ? 'Save Changes' : 'Create & Assign'"
+      [initialValue]="editingInlineVendor() ? inlineVendorEditValue() : pendingVendorValue()"
+      [submitting]="vendorDialogSaving()"
+      (cancel)="closeVendorDialog()"
+      (create)="editingInlineVendor() ? updateInlineVendor($event) : createInlineVendor($event)"
+    ></agb-vendor-form-dialog>
+
+    <agb-subcontractor-form-dialog
+      *ngIf="showSubcontractorDialog()"
+      [eyebrow]="'Sub-contractor Roster'"
+      [title]="'Create New Subcontractor'"
+      [description]="'This name is not in the subcontractor list. Complete the profile to create and assign it to this project.'"
+      [submitLabel]="'Create & Assign'"
+      [initialValue]="pendingSubcontractorValue()"
+      [submitting]="subcontractorDialogSaving()"
+      (cancel)="closeSubcontractorDialog()"
+      (create)="createRosterSubcontractor($event)"
+    ></agb-subcontractor-form-dialog>
+
+    <section class="form-overlay assignment-overlay" *ngIf="assignmentDialogType() as assignmentType">
+      <form class="erp-dialog operations-dialog assignment-dialog" (submit)="saveAssignment($event)">
+        <div class="dialog-head">
+          <div>
+            <span>Project Assignment</span>
+            <h2>Assign {{ assignmentType === 'vendor' ? 'Vendor' : 'Subcontractor' }}</h2>
+            <p>Select an existing profile, or create a new {{ assignmentType }}.</p>
+          </div>
+          <button type="button" class="icon-button" (click)="closeAssignmentDialog()">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </div>
+        <div class="erp-form assignment-form">
+          <div class="span-2 assignment-field">
+            <span class="assignment-field-label">{{ assignmentType === 'vendor' ? 'Vendor' : 'Subcontractor' }}</span>
+            <div
+              class="erp-select-menu assignment-select-menu"
+              [class.open]="assignmentDropdownOpen()"
+            >
+              <button
+                type="button"
+                class="erp-select-trigger"
+                aria-haspopup="listbox"
+                [attr.aria-expanded]="assignmentDropdownOpen()"
+                (click)="toggleAssignmentDropdown()"
+              >
+                <span>{{ assignmentTriggerLabel() }}</span>
+                <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
+                  <path d="M5.5 7.5 10 12l4.5-4.5" />
+                </svg>
+              </button>
+              <div
+                class="erp-select-panel assignment-select-panel"
+                role="listbox"
+                *ngIf="assignmentDropdownOpen()"
+                (pointerdown)="$event.stopPropagation()"
+              >
+                <input
+                  type="search"
+                  class="erp-select-filter"
+                  placeholder="Search existing {{ assignmentType }}s"
+                  aria-label="Search existing {{ assignmentType }}s"
+                  autofocus
+                  [value]="assignmentSelectSearch()"
+                  (input)="assignmentSelectSearch.set($any($event.target).value)"
+                  (keydown.escape)="closeAssignmentDropdown()"
+                />
+                <button
+                  *ngFor="let option of filteredAssignmentOptions()"
+                  type="button"
+                  role="option"
+                  [attr.aria-selected]="assignmentSelection() === option.id"
+                  [class.selected]="assignmentSelection() === option.id"
+                  (pointerdown)="selectExistingAssignment(option, $event)"
+                  (click)="selectExistingAssignment(option)"
+                >
+                  <span class="assignment-option-copy">
+                    <strong>{{ option.name }}</strong>
+                    <small>Existing {{ assignmentType }} profile</small>
+                  </span>
+                  <span class="assignment-option-check" *ngIf="assignmentSelection() === option.id">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
+                  </span>
+                </button>
+                <p class="assignment-empty" *ngIf="!filteredAssignmentOptions().length">
+                  No existing {{ assignmentType }} matches your search.
+                </p>
+              </div>
+            </div>
+            <button type="button" class="assignment-create-new" (click)="openNewAssignmentForm(assignmentType)">
+              + Create new {{ assignmentType }}
+            </button>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="secondary-action" (click)="closeAssignmentDialog()" [disabled]="assignmentSaving()">Cancel</button>
+          <button type="submit" class="primary-action" [disabled]="assignmentSaving() || !assignmentSelection()" [attr.aria-busy]="assignmentSaving() ? 'true' : null">
+            @if (assignmentSaving()) {
+              <span class="agb-loading-spinner" aria-hidden="true"></span>
+            }
+            {{ assignmentSaving() ? 'Assigning…' : 'Assign' }}
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="form-overlay material-details-overlay" *ngIf="materialDetailsOpen()" (click)="closeMaterialDetails()">
+      <article class="erp-dialog operations-dialog material-details-dialog" (click)="$event.stopPropagation()">
+        <div class="dialog-head">
+          <div>
+            <span>Material</span>
+            <h2>{{ selectedMaterialDetails()?.name || 'Material Details' }}</h2>
+          </div>
+          <button type="button" class="material-details-close" aria-label="Close material details" title="Close" (click)="closeMaterialDetails()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <div class="material-details-content">
+          @if (materialDetailsLoading()) {
+            <p class="material-detail-empty">Loading live inventory details…</p>
+          } @else if (materialDetailsError()) {
+            <p class="material-detail-error">{{ materialDetailsError() }}</p>
+          } @else if (selectedMaterialDetails(); as details) {
+            <div class="material-detail-stats">
+              <div class="material-detail-stat"><span>Current Stock</span><strong>{{ formatNumber(details.currentStock) }} {{ details.unit }}</strong></div>
+              <div class="material-detail-stat"><span>Purchases</span><strong>{{ formatNumber(details.purchases) }} {{ details.unit }}</strong></div>
+              <div class="material-detail-stat"><span>Consumed</span><strong>{{ formatNumber(details.consumed) }} {{ details.unit }}</strong></div>
+            </div>
+            <div class="material-history">
+              <section>
+                <h3>Purchases</h3>
+                <div class="material-history-list" *ngIf="details.purchaseHistory.length; else noPurchases">
+                  <div class="material-history-item" *ngFor="let entry of details.purchaseHistory">
+                    <strong>{{ formatNumber(entry.quantity) }} {{ details.unit }}</strong>
+                    <span>{{ entry.date | date:'mediumDate' }} · {{ entry.vendor || 'Vendor not recorded' }}</span>
+                    <button *ngIf="entry.poNumber" type="button" class="material-history-po" (click)="openPurchaseOrder(entry.poNumber, $event)">{{ entry.poNumber }}</button>
+                    <span *ngIf="entry.notes">{{ entry.notes }}</span>
+                  </div>
+                </div>
+                <ng-template #noPurchases><p class="material-detail-empty">No purchase entries recorded.</p></ng-template>
+              </section>
+              <section>
+                <h3>Consumption Logs</h3>
+                <div class="material-history-list" *ngIf="details.consumptionHistory.length; else noConsumption">
+                  <div class="material-history-item" *ngFor="let entry of details.consumptionHistory">
+                    <strong>{{ formatNumber(entry.quantity) }} {{ details.unit }}</strong>
+                    <span>{{ entry.date | date:'mediumDate' }}<ng-container *ngIf="entry.updatedBy"> · {{ entry.updatedBy }}</ng-container></span>
+                    <span *ngIf="entry.notes">{{ entry.notes }}</span>
+                  </div>
+                </div>
+                <ng-template #noConsumption><p class="material-detail-empty">No consumption logs recorded.</p></ng-template>
+              </section>
+            </div>
+            <section class="material-detail-note" *ngIf="details.notes">
+              <h3>Notes</h3>
+              <p>{{ details.notes }}</p>
+            </section>
+          }
+        </div>
+      </article>
+    </section>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -1040,11 +1637,13 @@ export class ProjectWorkspacePage {
   readonly api = inject(ApiService);
   readonly materialsService = inject(MaterialsService);
   readonly hydration = inject(WorkspaceHydrationService);
+  private readonly toastController = inject(ToastController);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
   readonly paramMap = toSignal(this.route.paramMap, { initialValue: this.route.snapshot.paramMap });
   readonly queryParamMap = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
   readonly formatMoney = formatMoney;
+  readonly formatNumber = formatNumber;
   readonly statusClass = statusClass;
   readonly showProjectForm = signal(false);
   readonly editingProject = signal<Project | null>(null);
@@ -1075,9 +1674,38 @@ export class ProjectWorkspacePage {
   readonly calendarWeekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   readonly tableViewExpanded = signal(false);
   readonly recordDialogOpen = signal(false);
+  readonly recordSaving = signal(false);
+  readonly uploadingMaterialBills = signal<string[]>([]);
+  readonly materialDetailsOpen = signal(false);
+  readonly materialDetailsLoading = signal(false);
+  readonly materialDetailsError = signal("");
+  readonly selectedMaterialDetails = signal<MaterialDetails | null>(null);
+  readonly labourTypeSaving = signal(false);
   readonly showVendorDialog = signal(false);
+  readonly vendorDialogSaving = signal(false);
   readonly showInventoryInitDialog = signal(false);
+  readonly showWorkerDialog = signal(false);
+  // Per-project sub-contractor roster dialog — opens when the user
+  // clicks "Add Row" on the new Subcontractors tab. Distinct from the
+  // universal sub-contractor editor because the roster tab also
+  // creates the underlying record when a new name is entered.
+  readonly showSubcontractorDialog = signal(false);
+  readonly subcontractorDialogSaving = signal(false);
+  readonly assignmentDialogType = signal<"vendor" | "subcontractor" | null>(null);
+  readonly assignmentSelection = signal("");
+  readonly assignmentSelectedLabel = signal("");
+  readonly assignmentCustomName = signal("");
+  readonly assignmentSaving = signal(false);
+  // The custom-styled vendor/subcontractor dropdown inside the assignment
+  // dialog — `assignmentDropdownOpen` controls the panel, `assignmentSelectSearch`
+  // powers the live filter inside the panel. Both are reset every time the
+  // dialog opens or closes.
+  readonly assignmentDropdownOpen = signal(false);
+  readonly assignmentSelectSearch = signal("");
+  readonly pendingVendorName = signal("");
+  readonly pendingSubcontractorName = signal("");
   readonly editingInlineVendor = signal<{ id: string; vendorName: string; materialType: string; phoneNumber: string; address: string; gstNumber: string } | null>(null);
+  readonly editingWorker = signal<Worker | null>(null);
   readonly draftRow = signal<TableRow>({});
   readonly activeSite = signal("All");
   readonly siteDraftOpen = signal(false);
@@ -1096,9 +1724,48 @@ export class ProjectWorkspacePage {
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
   readonly attendanceRows = signal<TableRow[]>([]);
   readonly tableState = computed(() => ({
-    rows: this.activeSection() === "labour" ? this.groupLabourRows(this.visibleRows("labour")) : this.visibleRows(this.activeSection()),
+    rows: this.activeSection() === "attendance" ? this.groupLabourRows(this.visibleRows("attendance")) : this.visibleRows(this.activeSection()),
     columns: this.columnsFor(this.activeSection()),
   }));
+  readonly inventoryMaterialCards = computed((): InventoryMaterialCard[] => {
+    const cards = new Map<string, InventoryMaterialCard>();
+    for (const row of this.visibleRows("inventory")) {
+      const name = String(row["materialName"] || "").trim().replace(/\s+/g, " ");
+      if (!name) continue;
+      const key = name.toLowerCase();
+      const purchasedQuantity = this.moneyNumber(row["purchasedQuantity"]);
+      const consumedQuantity = this.moneyNumber(row["consumedQuantity"]);
+      const remainingStock = this.moneyNumber(row["remainingStock"]);
+      const existing = cards.get(key);
+      if (existing) {
+        existing.purchasedQuantity += purchasedQuantity;
+        existing.consumedQuantity += consumedQuantity;
+        existing.remainingStock += remainingStock;
+        if (!existing.unit) existing.unit = String(row["unit"] || "").trim();
+        continue;
+      }
+      cards.set(key, {
+        key,
+        name,
+        unit: String(row["unit"] || "").trim(),
+        purchasedQuantity,
+        consumedQuantity,
+        remainingStock,
+        sourceRow: row,
+      });
+    }
+    return [...cards.values()].sort((a, b) => a.name.localeCompare(b.name));
+  });
+  readonly inventoryUniqueMaterialCount = computed(() => {
+    const projectId = this.projectId();
+    const names = new Set<string>();
+    for (const row of this.data.inventory()) {
+      if (String(row.projectId || "") !== projectId) continue;
+      const name = String(row.name || "").trim().replace(/\s+/g, " ").toLowerCase();
+      if (name) names.add(name);
+    }
+    return names.size;
+  });
 
   readonly clientId = computed(() => this.paramMap().get("clientId") ?? "");
   readonly projectId = computed(() => this.paramMap().get("projectId") ?? "");
@@ -1178,6 +1845,22 @@ export class ProjectWorkspacePage {
         this.activeSection.set(urlSection);
       }
     });
+    // Legacy redirect: the "Labour" workspace tab was renamed "Attendance"
+    // in this iteration. Anyone with a bookmarked URL like
+    // /clients/:c/projects/:p/labour should land on the new tab.
+    effect(() => {
+      const raw = this.paramMap().get("section");
+      if (raw === "labour") {
+        const projectId = this.projectId();
+        const clientId = this.clientId();
+        if (projectId && clientId) {
+          void this.router.navigate(
+            ["/clients", clientId, "projects", projectId, "attendance"],
+            { replaceUrl: true },
+          );
+        }
+      }
+    });
     effect(() => {
       const projectId = this.projectId();
       if (projectId) this.fetchAttendanceData(projectId);
@@ -1226,42 +1909,74 @@ export class ProjectWorkspacePage {
   private refreshSectionFromBackend(section: ModuleKey) {
     const apiMap: Record<string, () => any> = {
       materials: () => this.api.listMaterials({ limit: 200, projectId: this.projectId() }),
+      // The "Attendance" tab is backed by the legacy /labour endpoint
+      // (party-level wage lines) plus the Attendance collection (mobile
+      // worker attendance). Both are merged in the table by
+      // fetchAttendanceData; the mapper below normalises them.
       labour: () => this.api.listLabour({ limit: 200, projectId: this.projectId() }),
+      attendance: () => this.api.listLabour({ limit: 200, projectId: this.projectId() }),
       expenses: () => this.api.listExpenses({ limit: 200, projectId: this.projectId() }),
+      generalExpenses: () => this.api.listGeneralExpenses({ limit: 500, projectId: this.projectId() }),
       payments: () => this.api.listPayments({ limit: 200, projectId: this.projectId() }),
       vendors: () => this.api.listVendors({ limit: 200 }),
       // Subcontractors are universal across projects on the backend — never
       // filter by projectId here, or the dropdown will be empty when the
       // current project doesn't own the subs the user wants to pick.
       subcontractors: () => this.api.listSubcontractors({ limit: 200 }),
+      // Subcontractor roster — same upstream call, but routed to the
+      // per-project roster signal (not the universal subcontractors
+      // signal). The roster view filters client-side by projectId.
+      subcontractorsRoster: () => this.api.listSubcontractors({ limit: 200 }),
       inventory: () => this.api.listInventory({ limit: 200, projectId: this.projectId() }),
+      workers: () => this.api.listWorkers({ limit: 200, projectId: this.projectId() }),
     };
     const mapperMap: Record<string, (x: any) => any> = {
       materials: mapMaterial,
       labour: mapLabour,
+      attendance: mapLabour,
       expenses: mapExpense,
+      generalExpenses: mapGeneralExpense,
       payments: mapPayment,
       vendors: mapVendor,
       subcontractors: mapSubcontractor,
+      // Subcontractor roster — same upstream mapper as the universal
+      // subcontractors table (the records are the same shape); the
+      // per-project filter happens at render time in
+      // `subcontractorRosterRows()`.
+      subcontractorsRoster: mapSubcontractor,
       inventory: mapInventory,
+      workers: mapWorker,
     };
     const storageMap: Record<string, string> = {
       materials: "agb-erp:materials",
       labour: "agb-erp:labour",
+      attendance: "agb-erp:attendance",
       expenses: "agb-erp:expenses",
+      generalExpenses: "agb-erp:generalExpenses",
       payments: "agb-erp:payments",
       vendors: "agb-erp:vendors",
       subcontractors: "agb-erp:subcontractors",
+      // Reuses the universal subcontractors storage key — the roster
+      // is a per-project filtered view of the same upstream data.
+      subcontractorsRoster: "agb-erp:subcontractors",
       inventory: "agb-erp:inventory",
+      workers: "agb-erp:workers",
     };
     const dataMap: Record<string, any> = {
       materials: this.data.materials,
       labour: this.data.labour,
+      attendance: this.data.labour,
       expenses: this.data.expenses,
+      generalExpenses: this.data.generalExpenses,
       payments: this.data.payments,
       vendors: this.data.vendors,
       subcontractors: this.data.subcontractors,
+      // Roster reads from the same hydrated signal as the universal
+      // subcontractors table; the project filter is applied at render
+      // time so all workspaces share the cached list.
+      subcontractorsRoster: this.data.subcontractors,
       inventory: this.data.inventory,
+      workers: this.data.workers,
     };
     const apiCall = apiMap[section];
     const mapper = mapperMap[section];
@@ -1316,6 +2031,8 @@ export class ProjectWorkspacePage {
 
   trackColumn = (_index: number, column: FieldSchema): string => column.key;
 
+  trackInventoryCard = (_index: number, card: InventoryMaterialCard): string => card.key;
+
   selectRow(row: TableRow, event?: MouseEvent) {
     this.positionRowToolbar(event);
     const key = this.rowKey(row);
@@ -1365,6 +2082,14 @@ export class ProjectWorkspacePage {
     return this.selectedRowCount() > 0;
   }
 
+  selectedContainsExistingMaterial(): boolean {
+    return this.activeSection() === "materials" && this.selectedRows().some((row) => row["isExistingMaterial"] === "Yes");
+  }
+
+  showRowCheckboxes(): boolean {
+    return this.activeSection() === "materials" || this.hasSelectedRows();
+  }
+
   isRowChecked(row: TableRow): boolean {
     return this.selectedRowKeys().includes(this.rowKey(row));
   }
@@ -1372,6 +2097,16 @@ export class ProjectWorkspacePage {
   toggleRowSelection(row: TableRow, event?: Event) {
     event?.stopPropagation();
     const key = this.rowKey(row);
+    if (this.activeSection() === "materials") {
+      this.selectedRowKeys.update((keys) => keys.includes(key)
+        ? keys.filter((selectedKey) => selectedKey !== key)
+        : [...keys, key]);
+      this.selectedRowKey.set(this.selectedRowKeys()[0] ?? "");
+      this.editingRowKey.set("");
+      this.editingRowKeys.set([]);
+      this.openSelectKey.set("");
+      return;
+    }
     if (this.selectedRowKeys().includes(key)) {
       this.clearRowSelection();
     } else {
@@ -1392,6 +2127,17 @@ export class ProjectWorkspacePage {
 
   toggleVisibleRowsSelection(event?: Event) {
     event?.stopPropagation();
+    if (this.activeSection() === "materials") {
+      const rows = this.visibleRows("materials");
+      if (this.allVisibleRowsSelected()) {
+        this.clearRowSelection();
+      } else {
+        const keys = rows.map((row) => this.rowKey(row));
+        this.selectedRowKeys.set(keys);
+        this.selectedRowKey.set(keys[0] ?? "");
+      }
+      return;
+    }
     if (this.hasSelectedRows()) {
       this.clearRowSelection();
     }
@@ -1400,6 +2146,197 @@ export class ProjectWorkspacePage {
   private selectedRows(): TableRow[] {
     const selected = new Set(this.selectedRowKeys());
     return this.visibleRows(this.activeSection()).filter((row) => selected.has(this.rowKey(row)));
+  }
+
+  async openSelectedMaterialDetails() {
+    const [row] = this.selectedRows();
+    if (!row || this.selectedRowCount() !== 1 || this.activeSection() !== "materials") return;
+    await this.openMaterialDetails(row);
+  }
+
+  async openInventoryMaterialDetails(card: InventoryMaterialCard) {
+    await this.openMaterialDetails({
+      ...card.sourceRow,
+      materialName: card.name,
+      unit: card.unit,
+    });
+  }
+
+  private async openMaterialDetails(row: TableRow) {
+    this.materialDetailsOpen.set(true);
+    this.materialDetailsLoading.set(true);
+    this.materialDetailsError.set("");
+    this.selectedMaterialDetails.set(null);
+
+    try {
+      const [materialsResponse, inventoryResponse] = await Promise.all([
+        firstValueFrom(this.api.listMaterials({ projectId: this.projectId(), limit: 200 })),
+        firstValueFrom(this.api.listInventory({ projectId: this.projectId(), limit: 200 })),
+      ]);
+      const normalizedName = String(row["materialName"] || "").trim().replace(/\s+/g, " ").toLowerCase();
+      const matchingMaterials = (materialsResponse.items || []).filter((item: any) =>
+        String(item.name || "").trim().replace(/\s+/g, " ").toLowerCase() === normalizedName,
+      );
+      const inventories = (inventoryResponse.items || []).filter((item: any) => {
+        const inventoryName = String(item.name || "").trim().replace(/\s+/g, " ").toLowerCase();
+        return inventoryName === normalizedName;
+      });
+      if (!matchingMaterials.length && !inventories.length) throw new Error("The selected material could not be found.");
+      const material = [...matchingMaterials].sort((a: any, b: any) =>
+        Date.parse(String(b.createdAt || b.requestDate || "")) - Date.parse(String(a.createdAt || a.requestDate || "")),
+      )[0] || inventories[0] || {};
+
+      let purchaseHistory = inventories.flatMap((item: any) =>
+        (Array.isArray(item.purchaseHistory) ? item.purchaseHistory : [])
+          .map((entry: any) => ({
+            quantity: Number(entry.quantity) || 0,
+            date: String(entry.date || ""),
+            vendor: String(entry.vendor || item.vendor || material.vendor || ""),
+            poNumber: String(entry.poNumber || item.poNumber || material.poNumber || ""),
+            notes: String(entry.notes || ""),
+          })),
+      ).sort((a: any, b: any) => Date.parse(b.date) - Date.parse(a.date));
+      if (!purchaseHistory.length) {
+        purchaseHistory = inventories
+          .map((item: any) => ({
+            quantity: Number(item.purchasedQuantity) || 0,
+            date: String(item.updatedAt || item.createdAt || ""),
+            vendor: String(item.vendor || ""),
+            poNumber: String(item.poNumber || ""),
+            notes: String(item.notes || ""),
+          }))
+          .filter((entry: any) => entry.quantity > 0)
+          .sort((a: any, b: any) => Date.parse(b.date) - Date.parse(a.date));
+      }
+      if (!purchaseHistory.length) {
+        purchaseHistory = matchingMaterials
+          .map((item: any) => ({
+            quantity: Number(item.purchasedQuantity) || Number(item.approvedQuantity) || Number(item.requestedQuantity) || 0,
+            date: String(item.orderedDate || item.requestDate || item.createdAt || ""),
+            vendor: String(item.vendor || ""),
+            poNumber: String(item.poNumber || ""),
+            notes: String(item.notes || ""),
+          }))
+          .filter((entry: any) => entry.quantity > 0)
+          .sort((a: any, b: any) => Date.parse(b.date) - Date.parse(a.date));
+      }
+      let consumptionHistory = inventories.flatMap((item: any) =>
+        (Array.isArray(item.consumptionHistory) ? item.consumptionHistory : []).map((entry: any) => ({
+          quantity: Number(entry.quantity) || 0,
+          date: String(entry.date || ""),
+          updatedBy: String(entry.updatedBy || ""),
+          notes: String(entry.notes || ""),
+        })),
+      ).sort((a: any, b: any) => Date.parse(b.date) - Date.parse(a.date));
+      if (!consumptionHistory.length) {
+        consumptionHistory = inventories
+          .map((item: any) => ({
+            quantity: Number(item.consumedQuantity) || 0,
+            date: String(item.updatedAt || item.createdAt || ""),
+            updatedBy: "",
+            notes: Number(item.consumedQuantity) > 0 ? "Recorded inventory consumption total" : "",
+          }))
+          .filter((entry: any) => entry.quantity > 0)
+          .sort((a: any, b: any) => Date.parse(b.date) - Date.parse(a.date));
+      }
+
+      const inventoryHasActivity = inventories.some((item: any) =>
+        (Number(item.remainingStock) || 0) > 0
+        || (Number(item.purchasedQuantity) || 0) > 0
+        || (Number(item.consumedQuantity) || 0) > 0
+        || (Array.isArray(item.purchaseHistory) && item.purchaseHistory.length > 0)
+        || (Array.isArray(item.consumptionHistory) && item.consumptionHistory.length > 0),
+      );
+      const materialPurchased = matchingMaterials.reduce((sum: number, item: any) => sum + (Number(item.purchasedQuantity) || 0), 0);
+      const materialApproved = matchingMaterials.reduce((sum: number, item: any) => sum + (Number(item.approvedQuantity) || 0), 0);
+      const materialRequested = matchingMaterials.reduce((sum: number, item: any) => sum + (Number(item.requestedQuantity) || 0), 0);
+      const materialConsumed = matchingMaterials.reduce((sum: number, item: any) => sum + (Number(item.consumedQuantity) || 0), 0);
+      const materialRemaining = matchingMaterials.reduce((sum: number, item: any) => sum + (Number(item.remainingStock) || 0), 0);
+      const inventoryPurchased = inventories.reduce((sum: number, item: any) => sum + (Number(item.purchasedQuantity) || 0), 0);
+      const inventoryConsumed = inventories.reduce((sum: number, item: any) => sum + (Number(item.consumedQuantity) || 0), 0);
+      const inventoryRemaining = inventories.reduce((sum: number, item: any) => sum + (Number(item.remainingStock) || 0), 0);
+      const fallbackPurchases = materialPurchased || materialApproved || materialRequested;
+      const fallbackStock = materialRemaining || Math.max(0, fallbackPurchases - materialConsumed);
+
+      this.selectedMaterialDetails.set({
+        name: String(material.name || row["materialName"] || "Material"),
+        unit: String(material.unit || row["unit"] || ""),
+        currentStock: inventoryHasActivity ? inventoryRemaining : fallbackStock,
+        // Prefer the Material record's purchasedQuantity (the "quantity"
+        // the user typed when adding the material) since that is the
+        // actual figure. Inventory's purchaseHistory can carry stale
+        // entries from the older initialization flow, so we only fall
+        // back to it when the Material record has no purchase figure.
+        purchases: fallbackPurchases > 0
+          ? fallbackPurchases
+          : (purchaseHistory.length
+            ? purchaseHistory.reduce((sum: number, entry: any) => sum + entry.quantity, 0)
+            : (inventoryHasActivity ? inventoryPurchased : 0)),
+        consumed: inventoryHasActivity ? inventoryConsumed : materialConsumed,
+        notes: String(material.notes || inventories.find((item: any) => item.notes)?.notes || ""),
+        purchaseHistory,
+        consumptionHistory,
+      });
+    } catch (err: any) {
+      this.materialDetailsError.set(err?.error?.message || err?.message || "Could not load the material details.");
+    } finally {
+      this.materialDetailsLoading.set(false);
+    }
+  }
+
+  closeMaterialDetails() {
+    this.materialDetailsOpen.set(false);
+    this.materialDetailsLoading.set(false);
+    this.materialDetailsError.set("");
+    this.selectedMaterialDetails.set(null);
+  }
+
+  async createPurchaseOrderFromSelection() {
+    const rows = this.selectedRows();
+    if (!rows.length) return;
+    let backendMaterials: any[] = [];
+    try {
+      const response = await firstValueFrom(this.api.listMaterials({ projectId: this.projectId(), limit: 200 }));
+      backendMaterials = response.items || [];
+    } catch {
+      await this.presentToast("Could not verify the selected materials. Please try again.", "danger");
+      return;
+    }
+    const resolved = rows.map((row) => {
+      const mongoId = String(row["_id"] || "").trim();
+      const materialId = String(row["materialId"] || row["id"] || "").trim();
+      return backendMaterials.find((material) =>
+        (mongoId && String(material._id) === mongoId)
+        || (materialId && String(material.materialId) === materialId));
+    });
+    const unavailable = resolved.filter((material) => {
+      if (!material?._id) return true;
+      const poNumber = String(material.poNumber || "").trim();
+      return poNumber !== "" && poNumber !== "Pending";
+    });
+    if (resolved.some((material) => Boolean(material?.isExistingMaterial))) {
+      await this.presentToast(
+        "Existing inventory materials cannot be added to a purchase order. Select only materials that still need to be ordered.",
+        "warning",
+      );
+      return;
+    }
+    if (unavailable.length || resolved.some((material) => !material)) {
+      await this.presentToast(
+        "One or more selected materials are already assigned to a purchase order or could not be found.",
+        "danger",
+      );
+      return;
+    }
+    const materialIds = resolved.map((material) => String(material._id));
+    void this.router.navigate(["/purchase-orders"], {
+      queryParams: {
+        create: "1",
+        projectId: this.projectId(),
+        projectName: this.project()?.name || "",
+        materials: materialIds.join(","),
+      },
+    });
   }
 
   editSelectedRows() {
@@ -1439,17 +2376,26 @@ export class ProjectWorkspacePage {
       materials: (id) => this.api.deleteMaterial(id),
       labour: (id) => this.api.deleteLabour(id),
       expenses: (id) => this.api.deleteExpense(id),
+      generalExpenses: (id) => this.api.deleteGeneralExpense(id),
       payments: (id) => this.api.deletePayment(id),
       vendors: (id) => this.api.deleteVendor(id),
       subcontractors: (id) => this.api.deleteSubcontractor(id),
+      // Roster deletes target the same sub-contractor record — the
+      // roster is just a per-project filtered view of the same data.
+      subcontractorsRoster: (id) => this.api.deleteSubcontractor(id),
+      workers: (id) => this.api.deleteWorker(id),
     };
     const dataMap: Record<string, any> = {
       materials: this.data.materials,
       labour: this.data.labour,
       expenses: this.data.expenses,
+      generalExpenses: this.data.generalExpenses,
       payments: this.data.payments,
       vendors: this.data.vendors,
       subcontractors: this.data.subcontractors,
+      // Roster deletes target the same global signal.
+      subcontractorsRoster: this.data.subcontractors,
+      workers: this.data.workers,
     };
     const idField = "id";
     const apiDelete = apiDeleters[section];
@@ -1491,38 +2437,65 @@ export class ProjectWorkspacePage {
     const apiMap: Record<string, (opts: any) => any> = {
       materials: (opts: any) => this.api.listMaterials(opts),
       labour: (opts: any) => this.api.listLabour(opts),
+      attendance: (opts: any) => this.api.listLabour(opts),
       expenses: (opts: any) => this.api.listExpenses(opts),
       payments: (opts: any) => this.api.listPayments(opts),
       vendors: (opts: any) => this.api.listVendors(opts),
       subcontractors: (opts: any) => this.api.listSubcontractors(opts),
+      // Subcontractor roster — pulls the same upstream list as the
+      // universal subcontractors table; the per-project filter is
+      // applied client-side in `subcontractorRosterRows()`.
+      subcontractorsRoster: (opts: any) => this.api.listSubcontractors(opts),
       inventory: (opts: any) => this.api.listInventory(opts),
+      workers: (opts: any) => this.api.listWorkers(opts),
     };
     const mapperMap: Record<string, (x: any) => any> = {
       materials: mapMaterial,
       labour: mapLabour,
+      attendance: mapLabour,
       expenses: mapExpense,
+      generalExpenses: mapGeneralExpense,
       payments: mapPayment,
       vendors: mapVendor,
       subcontractors: mapSubcontractor,
+      // Subcontractor roster — same upstream mapper as the universal
+      // subcontractors table (the records are the same shape); the
+      // per-project filter happens at render time in
+      // `subcontractorRosterRows()`.
+      subcontractorsRoster: mapSubcontractor,
       inventory: mapInventory,
+      workers: mapWorker,
     };
     const storageMap: Record<string, string> = {
       materials: "agb-erp:materials",
       labour: "agb-erp:labour",
+      attendance: "agb-erp:attendance",
       expenses: "agb-erp:expenses",
+      generalExpenses: "agb-erp:generalExpenses",
       payments: "agb-erp:payments",
       vendors: "agb-erp:vendors",
       subcontractors: "agb-erp:subcontractors",
+      // Reuses the universal subcontractors storage key — the roster
+      // is a per-project filtered view of the same upstream data.
+      subcontractorsRoster: "agb-erp:subcontractors",
       inventory: "agb-erp:inventory",
+      workers: "agb-erp:workers",
     };
     const dataMap: Record<string, any> = {
       materials: this.data.materials,
       labour: this.data.labour,
+      attendance: this.data.labour,
       expenses: this.data.expenses,
+      generalExpenses: this.data.generalExpenses,
       payments: this.data.payments,
       vendors: this.data.vendors,
       subcontractors: this.data.subcontractors,
+      // Roster reads from the same hydrated signal as the universal
+      // subcontractors table; the project filter is applied at render
+      // time so all workspaces share the cached list.
+      subcontractorsRoster: this.data.subcontractors,
       inventory: this.data.inventory,
+      workers: this.data.workers,
     };
     const apiCall = apiMap[section];
     const mapper = mapperMap[section];
@@ -1569,13 +2542,15 @@ export class ProjectWorkspacePage {
     this.draftSelectSearch.set("");
     this.activeFilterValueKey.set("");
     this.selectCustomValue.set("");
+    this.assignmentDropdownOpen.set(false);
+    this.assignmentSelectSearch.set("");
   }
 
   columnsFor(section: ModuleKey): FieldSchema[] {
     const base = sectionConfigs.find((config) => config.key === section)?.columns ?? [];
     const custom = this.data.customFieldsFor(section);
     const hidden = new Set(this.data.hiddenFieldsFor(section));
-    const columns = section === "labour" ? this.withLabourWageColumns(base, custom) : this.data.composeTableColumns(base, custom);
+    const columns = section === "attendance" ? this.withLabourWageColumns(base, custom) : this.data.composeTableColumns(base, custom);
     return columns.filter((column) => !hidden.has(column.key));
   }
 
@@ -1617,8 +2592,11 @@ export class ProjectWorkspacePage {
     } else {
       rows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (row) => this.rowBelongsToProject(row));
     }
-    if (section === "labour") {
+    if (section === "attendance") {
       rows = [...rows, ...this.attendanceRows()];
+    }
+    if (section === "materials") {
+      rows = this.consolidateMaterialRows(rows);
     }
     const site = this.activeSiteFilter();
     if (this.isSiteAware(section) && site !== "All") {
@@ -1640,7 +2618,45 @@ export class ProjectWorkspacePage {
         this.dateInRange(this.normalizedDateValue(row[dateKey]), range.start, range.end);
       return matchesFilters && matchesDate;
     });
+    if (section === "materials") {
+      rows = [...rows].sort((a, b) => {
+        const byCreated = this.materialSortValue(b) - this.materialSortValue(a);
+        if (byCreated !== 0) return byCreated;
+        return String(b["_id"] || b["materialId"] || "").localeCompare(String(a["_id"] || a["materialId"] || ""));
+      });
+    }
     return rows;
+  }
+
+  private consolidateMaterialRows(rows: TableRow[]): TableRow[] {
+    const groups = new Map<string, TableRow[]>();
+    for (const row of rows) {
+      const key = String(row["materialName"] || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase();
+      if (!key) continue;
+      groups.set(key, [...(groups.get(key) || []), row]);
+    }
+
+    return [...groups.entries()].map(([key, group]) => {
+      const sorted = [...group].sort((a, b) => this.materialSortValue(b) - this.materialSortValue(a));
+      const newest = sorted[0];
+      const sum = (field: string) => group.reduce((total, row) => total + this.moneyNumber(row[field]), 0);
+      const existingCount = group.filter((row) => row["isExistingMaterial"] === "Yes").length;
+      const issuedAmount = sum("issuedAmount");
+      const givenAmount = sum("givenAmount");
+      return {
+        ...newest,
+        __rowId: `material-group:${key}`,
+        quantity: formatNumber(sum("quantity")),
+        issuedAmount: existingCount === group.length ? "Existing material" : issuedAmount,
+        givenAmount: existingCount === group.length ? "Existing material" : givenAmount,
+        isExistingMaterial: existingCount === group.length ? "Yes" : "",
+        vendor: [...new Set(group.map((row) => String(row["vendor"] || "").trim()).filter(Boolean))].join(", "),
+        poNumber: [...new Set(group.map((row) => String(row["poNumber"] || "").trim()).filter(Boolean))].join(", "),
+      };
+    });
   }
 
   /**
@@ -2008,7 +3024,7 @@ export class ProjectWorkspacePage {
 
   private dateFilterKey(section: ModuleKey): string {
     if (section === "materials") return "requestDate";
-    if (section === "labour") return "attendanceDate";
+    if (section === "attendance") return "attendanceDate";
     if (section === "expenses") return "expenseDate";
     if (section === "payments") return "paymentDate";
     if (section === "subcontractors") return "date";
@@ -2068,10 +3084,35 @@ export class ProjectWorkspacePage {
       this.showInventoryInitDialog.set(true);
       return;
     }
+    if (this.activeSection() === "workers") {
+      // Workers have their own dialog (Name / Phone / Role / Address / Notes /
+      // Site) — distinct from the generic column-driven record form used by
+      // materials, expenses, etc.
+      this.editingWorker.set(null);
+      this.refreshSectionFromBackend("subcontractors");
+      this.showWorkerDialog.set(true);
+      return;
+    }
+    if (this.activeSection() === "subcontractorsRoster") {
+      // Per-project sub-contractor roster uses a dedicated dialog
+      // (Name / Address / Phone / Notes / Status). The form either
+      // reuses an existing record (by name) or creates a new one —
+      // either way the record appears on this project's roster AND on
+      // the universal sub-contractors page.
+      this.showSubcontractorDialog.set(true);
+      return;
+    }
     const row: TableRow = { ...this.defaultRowFor(this.activeSection()) };
     this.draftRow.set(row);
     for (const column of this.recordFormColumns()) {
       const options = this.selectOptions(this.activeSection(), column.key);
+      // A new material must start blank. Auto-selecting the first known
+      // material made every dialog appear as "Bricks" and could save the
+      // wrong material when the user only intended to open the form.
+      if (this.activeSection() === "materials" && (column.key === "materialName" || column.key === "unit")) {
+        row[column.key] = "";
+        continue;
+      }
       // Subcontractor payments must be explicitly chosen — never
       // silently default to the first option (the reported "only the
       // first subcontractor can receive payments" bug).
@@ -2096,6 +3137,133 @@ export class ProjectWorkspacePage {
     this.showInventoryInitDialog.set(false);
   }
 
+  // ---- Worker roster dialog state ----
+  readonly workerDialogSaving = signal(false);
+
+  workerEditValue(): WorkerFormValue | null {
+    const editing = this.editingWorker();
+    if (!editing) return null;
+    return {
+      name: editing.name,
+      phone: editing.phone,
+      labourType: editing.labourType,
+      address: editing.address,
+      notes: editing.notes,
+      subcontractorId: String(editing.subcontractorId || ""),
+      subcontractorName: editing.subcontractorName || "",
+    };
+  }
+
+  workerSubcontractorOptions(): Array<{ id: string; name: string }> {
+    const projectId = this.projectId();
+    return this.data.subcontractors()
+      .filter((row) => row.status !== "inactive" && (!row.projectId || String(row.projectId) === projectId))
+      .map((row) => ({
+        id: String(row._id || row.id || ""),
+        name: String(row.subcontractorName || "").trim(),
+      }))
+      .filter((row) => Boolean(row.id && row.name))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Existing roles used across this project's workers — surfaced as
+   * suggestions in the Role autocomplete. */
+  existingWorkerRoles(): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const worker of this.data.workers()) {
+      const role = String(worker.labourType || "").trim();
+      if (role && !seen.has(role.toLowerCase())) {
+        seen.add(role.toLowerCase());
+        result.push(role);
+      }
+    }
+    return result;
+  }
+
+  closeWorkerDialog() {
+    this.showWorkerDialog.set(false);
+    this.editingWorker.set(null);
+  }
+
+  async createWorkerEntry(value: WorkerFormValue) {
+    if (this.workerDialogSaving()) return;
+    if (!this.projectId()) {
+      await this.presentToast("Select a project before adding a worker.", "warning");
+      return;
+    }
+    this.workerDialogSaving.set(true);
+    this.api
+      .createWorker({
+        projectId: this.projectId(),
+        name: value.name,
+        phone: value.phone || undefined,
+        address: value.address || undefined,
+        notes: value.notes || undefined,
+        labourType: value.labourType,
+        isSubcontract: true,
+        subcontractorId: value.subcontractorId,
+        subcontractorName: value.subcontractorName,
+      })
+      .subscribe({
+        next: () => {
+          this.workerDialogSaving.set(false);
+          this.closeWorkerDialog();
+          this.refreshFromBackend();
+        },
+        error: async (err) => {
+          this.workerDialogSaving.set(false);
+          await this.presentToast(
+            err?.error?.message || err?.message || "Could not save the worker.",
+            "danger",
+          );
+        },
+      });
+  }
+
+  async updateWorkerEntry(value: WorkerFormValue) {
+    const editing = this.editingWorker();
+    if (!editing) return;
+    const mongoId = String(editing._id || editing.id || "").trim();
+    if (!mongoId) return;
+    if (this.workerDialogSaving()) return;
+    this.workerDialogSaving.set(true);
+    this.api
+      .patchWorker(mongoId, {
+        name: value.name,
+        phone: value.phone || undefined,
+        address: value.address || undefined,
+        notes: value.notes || undefined,
+        labourType: value.labourType,
+        subcontractorId: value.subcontractorId,
+        subcontractorName: value.subcontractorName,
+      })
+      .subscribe({
+        next: () => {
+          this.workerDialogSaving.set(false);
+          this.closeWorkerDialog();
+          this.refreshFromBackend();
+        },
+        error: async (err) => {
+          this.workerDialogSaving.set(false);
+          await this.presentToast(
+            err?.error?.message || err?.message || "Could not save the worker.",
+            "danger",
+          );
+        },
+      });
+  }
+
+  /** Edit trigger — wired to the row-action toolbar in the workers tab. */
+  openWorkerEdit(row: TableRow) {
+    const worker = this.data.workers().find((entry) =>
+      String(entry._id || entry.id) === String(row["_id"] || row["id"] || ""),
+    );
+    if (!worker) return;
+    this.editingWorker.set(worker);
+    this.showWorkerDialog.set(true);
+  }
+
   onInventoryInitSaved() {
     const pid = this.projectId();
     this.api.listMaterials({ limit: 200, projectId: pid }).subscribe({
@@ -2103,6 +3271,7 @@ export class ProjectWorkspacePage {
         try {
           const items = ((r as any).items || []).map(mapMaterial);
           this.data.materials.set(items);
+          this.materialsService.materials.set(items);
         } catch {}
       },
       error: () => {},
@@ -2118,9 +3287,212 @@ export class ProjectWorkspacePage {
     });
   }
 
+  openAssignmentDialog(type: "vendor" | "subcontractor") {
+    this.assignmentDialogType.set(type);
+    this.assignmentSelection.set("");
+    this.assignmentSelectedLabel.set("");
+    this.assignmentCustomName.set("");
+    this.assignmentSaving.set(false);
+    this.assignmentDropdownOpen.set(false);
+    this.assignmentSelectSearch.set("");
+    if (type === "vendor") {
+      this.refreshSectionFromBackend("vendors");
+    } else {
+      // Load the complete accessible roster without a project/status filter.
+      // The picker itself removes profiles already assigned to this project.
+      this.api.listSubcontractors({ limit: 500 }).subscribe({
+        next: (response) => this.data.subcontractors.set((response.items || []).map(mapSubcontractor)),
+        error: () => this.refreshSectionFromBackend("subcontractors"),
+      });
+    }
+  }
+
+  openNewAssignmentForm(type: "vendor" | "subcontractor") {
+    this.closeAssignmentDialog();
+    if (type === "vendor") {
+      this.pendingVendorName.set("");
+      this.editingInlineVendor.set(null);
+      this.showVendorDialog.set(true);
+      return;
+    }
+    this.pendingSubcontractorName.set("");
+    this.showSubcontractorDialog.set(true);
+  }
+
+  closeAssignmentDialog() {
+    this.assignmentDialogType.set(null);
+    this.assignmentSelection.set("");
+    this.assignmentSelectedLabel.set("");
+    this.assignmentCustomName.set("");
+    this.assignmentSaving.set(false);
+    this.assignmentDropdownOpen.set(false);
+    this.assignmentSelectSearch.set("");
+  }
+
+  toggleAssignmentDropdown() {
+    this.assignmentDropdownOpen.update((current) => !current);
+    if (!this.assignmentDropdownOpen()) this.assignmentSelectSearch.set("");
+  }
+
+  closeAssignmentDropdown() {
+    this.assignmentDropdownOpen.set(false);
+    this.assignmentSelectSearch.set("");
+  }
+
+  /**
+   * Resolve the label that should appear in the assignment trigger.
+   * Falls back to "Custom — create new" when the user is typing a new
+   * name, otherwise shows the picked vendor/subcontractor name.
+   */
+  assignmentTriggerLabel(): string {
+    const selection = this.assignmentSelection();
+    if (selection === "__custom__") {
+      const custom = this.assignmentCustomName().trim();
+      return custom ? `${custom} (new)` : "Custom — create new";
+    }
+    if (!selection) return "Select an existing profile";
+    return this.assignmentSelectedLabel() || "Select an existing profile";
+  }
+
+  /**
+   * Filter the assignment dropdown by the live search input. When the
+   * search box is empty the full list is returned so the panel behaves
+   * the same way as the other dropdowns in the project.
+   */
+  filteredAssignmentOptions(): AssignmentOption[] {
+    const query = this.assignmentSelectSearch().trim().toLowerCase();
+    return this.assignmentOptions().filter((option) =>
+      !query || option.name.toLowerCase().includes(query),
+    );
+  }
+
+  /**
+   * Persist the user's pick from the dropdown, then close the panel.
+   * When the user picks the Custom option we also focus the new-name
+   * input so they can start typing immediately.
+   */
+  selectAssignmentOption(value: string, customInput?: HTMLInputElement, label = "") {
+    this.assignmentSelection.set(value);
+    this.assignmentSelectedLabel.set(value === "__custom__" ? "Custom — create new" : label);
+    this.assignmentDropdownOpen.set(false);
+    this.assignmentSelectSearch.set("");
+    if (value === "__custom__") {
+      // Defer to the next tick so the input has rendered before we focus it.
+      setTimeout(() => customInput?.focus(), 0);
+    }
+  }
+
+  selectExistingAssignment(option: AssignmentOption, event?: PointerEvent) {
+    // Select on pointerdown so the document-level transient UI handler cannot
+    // remove the option button before its later click event is dispatched.
+    // Preventing the default also keeps focus in the search field and avoids a
+    // second synthetic activation; the click binding remains for keyboard use.
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.selectAssignmentOption(option.id, undefined, option.name);
+  }
+
+  assignmentOptions(): AssignmentOption[] {
+    const type = this.assignmentDialogType();
+    const projectId = this.projectId();
+    const byId = new Map<string, AssignmentOption>();
+    if (type === "vendor") {
+      for (const vendor of this.data.vendors()) {
+        const name = String(vendor.name || "").trim();
+        const id = String(vendor._id || "").trim();
+        if (!name || !id) continue;
+        const assigned = (vendor.projectIds || []).some((value) => String(value) === projectId);
+        if (assigned || byId.has(id)) continue;
+        byId.set(id, { id, name });
+      }
+    }
+    if (type === "subcontractor") {
+      for (const subcontractor of this.data.subcontractors()) {
+        const name = String(subcontractor.subcontractorName || "").trim();
+        const id = String(subcontractor._id || subcontractor.id || "").trim();
+        if (!name || !id) continue;
+        const assigned = String(subcontractor.projectId || "") === projectId
+          || (subcontractor.projectIds || []).some((value) => String(value) === projectId);
+        if (assigned || byId.has(id)) continue;
+        byId.set(id, { id, name });
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  pendingVendorValue(): VendorFormValue | null {
+    const name = this.pendingVendorName();
+    return name ? { name, materialType: "", phone: "", address: "", gst: "" } : null;
+  }
+
+  pendingSubcontractorValue(): SubcontractorFormValue | null {
+    const subcontractorName = this.pendingSubcontractorName();
+    return subcontractorName
+      ? { subcontractorName, address: "", phone: "", paymentMode: "Bank Transfer", notes: "", status: "active" }
+      : null;
+  }
+
+  async saveAssignment(event: Event) {
+    event.preventDefault();
+    if (this.assignmentSaving()) return;
+    const type = this.assignmentDialogType();
+    const selection = this.assignmentSelection();
+    const projectId = this.projectId();
+    if (!type || !selection || !projectId) return;
+
+    if (selection === "__custom__") {
+      const name = this.assignmentCustomName().trim();
+      if (!name) {
+        await this.presentToast(`Enter the new ${type} name.`, "warning");
+        return;
+      }
+      this.closeAssignmentDialog();
+      if (type === "vendor") {
+        this.pendingVendorName.set(name);
+        this.editingInlineVendor.set(null);
+        this.showVendorDialog.set(true);
+      } else {
+        this.pendingSubcontractorName.set(name);
+        this.showSubcontractorDialog.set(true);
+      }
+      return;
+    }
+
+    this.assignmentSaving.set(true);
+    try {
+      if (type === "vendor") {
+        const vendor = this.data.vendors().find((item) => String(item._id || "") === selection);
+        if (!vendor) throw new Error("Vendor not found");
+        const projectIds = [...new Set([...(vendor.projectIds || []), projectId])];
+        await firstValueFrom(this.api.patchVendor(selection, { projectIds }));
+        this.refreshSectionFromBackend("vendors");
+      } else {
+        const subcontractor = this.data.subcontractors().find((item) => String(item._id || item.id || "") === selection);
+        if (!subcontractor) throw new Error("Subcontractor not found");
+        const projectIds = [...new Set([...(subcontractor.projectIds || []), subcontractor.projectId, projectId].filter(Boolean))];
+        const response = await firstValueFrom(this.api.patchSubcontractor(selection, { projectIds }));
+        const saved = response?.subcontractor ? mapSubcontractor(response.subcontractor) : null;
+        this.data.subcontractors.update((items) => items.map((item) => {
+          const itemId = String(item._id || item.id || "");
+          if (itemId !== selection) return item;
+          return saved || { ...item, projectIds };
+        }));
+        this.refreshSectionFromBackend("subcontractors");
+        this.refreshSectionFromBackend("subcontractorsRoster");
+      }
+      this.closeAssignmentDialog();
+      await this.presentToast(`${type === "vendor" ? "Vendor" : "Subcontractor"} assigned to this project.`);
+    } catch (err: any) {
+      this.assignmentSaving.set(false);
+      await this.presentToast(err?.error?.message || err?.message || "Could not save the assignment.", "danger");
+    }
+  }
+
   closeVendorDialog() {
     this.showVendorDialog.set(false);
+    this.vendorDialogSaving.set(false);
     this.editingInlineVendor.set(null);
+    this.pendingVendorName.set("");
   }
 
   inlineVendorEditValue(): VendorFormValue | null {
@@ -2136,32 +3508,65 @@ export class ProjectWorkspacePage {
   }
 
   createInlineVendor(value: VendorFormValue) {
-    if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
+    if (this.vendorDialogSaving()) return;
+    const name = value.name?.trim() || "";
+    const materialType = value.materialType?.trim() || "";
+    const phone = value.phone?.trim() || "";
+    const gst = value.gst?.trim() || "";
+    const address = value.address?.trim() || "";
+    if (!name || !materialType || !phone || !address) {
+      this.presentToast(
+        "Fill the vendor name, material type, phone, and address before saving. GST is optional.",
+        "warning",
+      );
+      return;
+    }
+    const projectId = this.projectId();
+    if (!projectId) {
+      this.presentToast("Select a project before adding a vendor.", "warning");
+      return;
+    }
+    const existing = this.data.vendors().find((vendor) => vendor.name.trim().toLowerCase() === name.toLowerCase());
+    this.vendorDialogSaving.set(true);
+    if (existing?._id) {
+      const projectIds = [...new Set([...(existing.projectIds || []), projectId].filter(Boolean))];
+      this.api.patchVendor(existing._id, { projectIds }).subscribe({
+        next: () => {
+          this.closeVendorDialog();
+          this.refreshSectionFromBackend("vendors");
+          this.presentToast(`${name} assigned to this project.`);
+        },
+        error: (err) => {
+          this.vendorDialogSaving.set(false);
+          console.error("Failed to assign existing vendor", err);
+          this.presentToast("Could not assign the existing vendor. Please try again.", "danger");
+        },
+      });
+      return;
+    }
     const payload = {
-      name: value.name,
-      materialType: value.materialType,
-      phone: value.phone,
-      address: value.address,
-      gstNumber: value.gst,
+      name,
+      materialType,
+      phone,
+      address,
+      gstNumber: gst,
       status: "Active",
       siteIds: [],
+      projectIds: [projectId],
     };
     this.api.createVendor(payload).subscribe({
       next: () => {
-        this.showVendorDialog.set(false);
-        this.editingInlineVendor.set(null);
-        this.data.addVendor({
-          name: value.name,
-          materialType: value.materialType,
-          phone: value.phone,
-          address: value.address,
-          gst: value.gst,
-          status: "Active",
-          siteIds: [],
-        });
+        this.closeVendorDialog();
+        this.refreshSectionFromBackend("vendors");
+        this.presentToast(`${name} created and assigned to this project.`);
       },
       error: (err) => {
+        this.vendorDialogSaving.set(false);
         console.error("Failed to create vendor", err);
+        this.presentToast(
+          err?.error?.message || "Could not create the vendor. Please try again.",
+          "danger",
+        );
       },
     });
   }
@@ -2197,11 +3602,100 @@ export class ProjectWorkspacePage {
     });
   }
 
+  closeSubcontractorDialog() {
+    this.showSubcontractorDialog.set(false);
+    this.subcontractorDialogSaving.set(false);
+    this.pendingSubcontractorName.set("");
+  }
+
+  /**
+   * Create (or upsert) a sub-contractor from the per-project roster
+   * dialog. If a record with the same name already exists on this
+   * project we patch it with the new fields instead of creating a
+   * duplicate; otherwise we POST a new sub-contractor. Either way the
+   * record ends up in `data.subcontractors`, which is the source the
+   * roster view filters against — so the new row appears on the
+   * project workspace AND on the universal sub-contractors page.
+   */
+  createRosterSubcontractor(value: SubcontractorFormValue) {
+    if (this.subcontractorDialogSaving()) return;
+    const projectId = this.projectId();
+    if (!projectId) {
+      this.presentToast("Select a project before adding a sub-contractor.", "warning");
+      return;
+    }
+    const name = String(value.subcontractorName || "").trim();
+    if (!name) {
+      this.presentToast("Sub-contractor name is required.", "warning");
+      return;
+    }
+    this.subcontractorDialogSaving.set(true);
+    const payload = {
+      projectId,
+      subcontractorName: name,
+      address: String(value.address || "").trim() || undefined,
+      phone: String(value.phone || "").trim() || undefined,
+      paymentMode: String(value.paymentMode || "Bank Transfer").trim(),
+      note: String(value.notes || "").trim() || undefined,
+      status: (value.status === "inactive" ? "inactive" : "active") as
+        | "active"
+        | "inactive",
+    };
+    const existing = this.data.subcontractors().find(
+      (s) => String(s.subcontractorName || "").trim().toLowerCase() === name.toLowerCase(),
+    );
+    const finalize = () => {
+      this.showSubcontractorDialog.set(false);
+      this.subcontractorDialogSaving.set(false);
+      this.pendingSubcontractorName.set("");
+      try {
+        // Refresh the global subcontractors signal from the backend so
+        // the new/updated record is reflected in both this roster view
+        // AND the universal sub-contractors page.
+        this.refreshSectionFromBackend("subcontractors");
+        this.refreshSectionFromBackend("subcontractorsRoster");
+      } catch {}
+      this.presentToast(
+        existing && existing.id
+          ? `${name} assigned to this project.`
+          : `${name} created and assigned to this project.`,
+      );
+    };
+    const onError = (err: unknown) => {
+      this.subcontractorDialogSaving.set(false);
+      console.error("Failed to save sub-contractor from roster", err);
+      this.presentToast("Could not save sub-contractor. Please try again.", "danger");
+    };
+    if (existing && existing.id) {
+      const projectIds = [...new Set([...(existing.projectIds || []), existing.projectId, projectId].filter(Boolean))];
+      this.api.patchSubcontractor(existing.id, { ...payload, projectIds }).subscribe({
+        next: finalize,
+        error: onError,
+      });
+    } else {
+      this.api.createSubcontractor(payload).subscribe({
+        next: finalize,
+        error: onError,
+      });
+    }
+  }
+
   recordFormColumns(): FieldSchema[] {
     const hiddenInExpenseForm = new Set(["approvalStatus", "openingBalance", "runningBalance"]);
+    const hiddenInMaterialForm = new Set([
+      "requestedQuantity",
+      "approvedQuantity",
+      "poNumber",
+      "reference",
+      "remainingStock",
+      "status",
+      "vendor",
+      "receivedDate",
+    ]);
     const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor", "reference"]);
     return this.columnsFor(this.activeSection()).filter((column) => {
       if (this.activeSection() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
+      if (this.activeSection() === "materials" && hiddenInMaterialForm.has(column.key)) return false;
       const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
       if (this.activeSection() === "expenses" && isCashAdded && !cashAddedFields.has(column.key)) return false;
       if (this.activeSection() === "expenses" && column.key === "siteMaterial" && this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) !== "Purchase") {
@@ -2232,8 +3726,43 @@ export class ProjectWorkspacePage {
         const unit = nextRow["unit"] || "Item";
         nextRow["remainingStock"] = `${quantity} ${unit}`;
       }
+      // Materials: when the user picks an existing material name, auto-fill
+      // (or refresh) the Unit from the same-named row so they don't have
+      // to re-type it. We always overwrite so a stale Unit from a prior
+      // selection doesn't bleed into the new one. The user can still
+      // override Unit manually after this.
+      if (this.activeSection() === "materials" && key === "materialName") {
+        const matchedUnit = this.preferredUnitForMaterialName(String(value || ""));
+        if (matchedUnit) {
+          nextRow["unit"] = matchedUnit;
+        }
+      }
       return nextRow;
     });
+  }
+
+  private preferredUnitForMaterialName(name: string): string {
+    const normalized = String(name || "").trim().toLowerCase();
+    if (!normalized) return "";
+    const candidates: { unit: string }[] = [];
+    for (const material of this.materialsService.materials()) {
+      if (
+        String(material.name || "").trim().toLowerCase() === normalized
+        && String(material.unit || "").trim()
+      ) {
+        candidates.push({ unit: String(material.unit).trim() });
+      }
+    }
+    if (!candidates.length) {
+      for (const row of this.data.tableRowsFor("materials", this.tableRows().materials ?? [], (entry) => this.rowBelongsToProject(entry))) {
+        const rowName = String(row["materialName"] || row["name"] || "").trim().toLowerCase();
+        const rowUnit = String(row["unit"] || "").trim();
+        if (rowName === normalized && rowUnit) {
+          candidates.push({ unit: rowUnit });
+        }
+      }
+    }
+    return candidates[0]?.unit || "";
   }
 
   toggleDraftSelect(key: string) {
@@ -2288,12 +3817,28 @@ export class ProjectWorkspacePage {
 
   async saveRecord(event: Event) {
     event.preventDefault();
+    if (this.recordSaving()) return; // guard against double-submit
     const section = this.activeSection();
     const currentProject = this.project();
     const selectedSite = this.activeSiteFilter();
     const draft = section === "expenses" ? this.normalizedExpenseInputRow(this.draftRow()) : this.draftRow();
     if (section === "payments") this.registerPaymentMode(String(draft["mode"] || ""));
     if (section === "expenses") this.ensureExpenseOpeningForInput(draft);
+
+    this.recordSaving.set(true);
+    try {
+      await this.performSaveRecord(section, currentProject, selectedSite, draft);
+    } finally {
+      this.recordSaving.set(false);
+    }
+  }
+
+  private async performSaveRecord(
+    section: ModuleKey,
+    currentProject: any,
+    selectedSite: string,
+    draft: any
+  ): Promise<void> {
 
     const isCashAdded = section === "expenses" && draft["transactionType"] === "Cash Added";
 
@@ -2307,6 +3852,7 @@ export class ProjectWorkspacePage {
 
       if (!this.projectId()) {
         console.warn("[ProjectWorkspace] Cannot save Cash Added: no project selected");
+        await this.presentToast("Select a project before saving a cash entry.", "warning");
         return;
       }
 
@@ -2342,8 +3888,12 @@ export class ProjectWorkspacePage {
         });
         this.recordDialogOpen.set(false);
         return;
-      } catch (err) {
+      } catch (err: any) {
         console.error("[ProjectWorkspace] Failed to create Cash Added expense", err);
+        await this.presentToast(
+          err?.error?.message || err?.message || "Could not save the cash entry.",
+          "danger",
+        );
         return;
       }
     }
@@ -2353,19 +3903,30 @@ export class ProjectWorkspacePage {
       return;
     }
 
+    if (section === "generalExpenses") {
+      await this.saveGeneralExpenseDraft(draft, selectedSite);
+      return;
+    }
+
     if (section === "materials") {
+      const quantity = Number(draft["quantity"]) || 0;
       const materialInput: Partial<MaterialRow> = {
         projectId: this.projectId() || undefined,
         site: String(draft["site"] || selectedSite || ""),
         name: String(draft["materialName"] || draft["description"] || ""),
         unit: String(draft["unit"] || ""),
-        requested: Number(draft["requestedQuantity"]) || 0,
-        approved: Number(draft["approvedQuantity"]) || 0,
-        purchased: 0,
+        requested: quantity,
+        quantity,
+        approved: quantity,
+        purchased: quantity,
+        requestDate: String(draft["requestDate"] || new Date().toISOString().slice(0, 10)),
+        issuedAmount: Math.max(0, Number(draft["issuedAmount"]) || 0),
+        givenAmount: Math.max(0, Number(draft["givenAmount"]) || 0),
         notes: String(draft["notes"] || ""),
       };
       if (!materialInput.name) {
         console.warn("[ProjectWorkspace] Cannot save material: no material name");
+        await this.presentToast("Material name is required.", "warning");
         return;
       }
       try {
@@ -2377,10 +3938,19 @@ export class ProjectWorkspacePage {
         });
         Object.assign(draft, {
           __rowId: `material:${result.id}`,
+          _id: result._id,
           materialId: result.id,
         });
-      } catch (err) {
+        this.recordDialogOpen.set(false);
+        this.clearRowSelection();
+        this.refreshSectionFromBackend("materials");
+        return;
+      } catch (err: any) {
         console.error("[ProjectWorkspace] Failed to create material", err);
+        await this.presentToast(
+          err?.error?.message || err?.message || "Could not save the material request.",
+          "danger",
+        );
         return;
       }
     }
@@ -2397,6 +3967,20 @@ export class ProjectWorkspacePage {
     });
     if (section === "expenses") this.createMaterialFromSiteExpense(savedRow);
     this.recordDialogOpen.set(false);
+  }
+
+  private async presentToast(message: string, color: "success" | "warning" | "danger" = "success") {
+    try {
+      const toast = await this.toastController.create({
+        message,
+        duration: color === "danger" ? 4000 : 2500,
+        color,
+        position: "top",
+      });
+      await toast.present();
+    } catch (err) {
+      console.warn("[ProjectWorkspace] Failed to present toast:", err);
+    }
   }
 
   /**
@@ -2420,12 +4004,6 @@ export class ProjectWorkspacePage {
       window.alert("Please select a subcontractor.");
       return;
     }
-    const siteName = String(draft["siteName"] || draft["site"] || selectedSite || "").trim();
-    const siteId = this.data.resolveSiteNameToId(siteName);
-    if (!siteId) {
-      window.alert("Please select a valid site for this project.");
-      return;
-    }
     const date = String(draft["date"] || new Date().toISOString().slice(0, 10));
     const description = String(draft["description"] || "").trim();
     if (!description) {
@@ -2445,8 +4023,8 @@ export class ProjectWorkspacePage {
     const payload = {
       subcontractorId: subcontractor._id,
       projectId,
-      siteId,
       date,
+      paymentType: String(draft["paymentType"] || "Bank Transfer"),
       description,
       employeeCount,
       amount,
@@ -2468,6 +4046,94 @@ export class ProjectWorkspacePage {
     }
   }
 
+  /**
+   * Persist a project-level "Expense" row. Distinct from the legacy
+   * Site Expense tab — these are admin / general entries (rent, fuel,
+   * software, office overhead) recorded against the project and rolled
+   * into the project Total Expense KPI.
+   */
+  private async saveGeneralExpenseDraft(draft: TableRow, selectedSite: string) {
+    const projectId = this.projectId();
+    if (!projectId) {
+      await this.presentToast("Select a project before saving an expense entry.", "warning");
+      return;
+    }
+    const description = String(draft["description"] || "").trim();
+    if (!description) {
+      await this.presentToast("Description is required.", "warning");
+      return;
+    }
+    const amount = Math.abs(this.moneyNumber(draft["amount"]));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      await this.presentToast("Amount must be a number greater than zero.", "warning");
+      return;
+    }
+    const date = String(draft["date"] || new Date().toISOString().slice(0, 10));
+    const payload: Record<string, unknown> = {
+      origin: String(draft["origin"] || "manual"),
+      category: String(draft["category"] || "").trim() || undefined,
+      amount,
+      date,
+      description,
+      projectId,
+      projectName: this.project()?.name,
+      ...(this.isMongoObjectId(this.clientId()) ? { clientId: this.clientId() } : {}),
+      notes: String(draft["notes"] || "").trim() || undefined,
+      status: "Approved",
+      createdBy: this.api.user()?.name || this.api.user()?.email || "",
+    };
+    try {
+      await new Promise<any>((resolve, reject) => {
+        this.api.createGeneralExpense(payload).subscribe({ next: resolve, error: reject });
+      });
+      this.recordDialogOpen.set(false);
+      this.clearRowSelection();
+      this.api.listGeneralExpenses({ limit: 500 }).subscribe({
+        next: (result) => {
+          const mapped = (result.items || []).map((item: any) => ({
+            _id: item._id,
+            id: item.expenseId || item._id,
+            expenseId: item.expenseId,
+            origin: item.origin || "manual",
+            category: item.category || "",
+            amount: Number(item.amount) || 0,
+            spent: Number(item.amount) || 0,
+            date: item.date,
+            description: item.description,
+            notes: item.notes || "",
+            projectId: item.projectId,
+            projectName: item.projectName,
+            clientId: item.clientId,
+            clientName: item.clientName,
+            siteId: item.siteId,
+            site: item.site,
+            status: item.status || "Approved",
+            customFields: item.customFields || {},
+            createdBy: item.createdBy,
+          }));
+          this.data.setGeneralExpenses(mapped);
+          this.loadProjectExpenseRollup(projectId);
+          void this.hydration.loadModule("generalExpenses");
+        },
+        error: () => {
+          // Even if the list call fails the create succeeded; the next page
+          // load will reconcile.
+          this.loadProjectExpenseRollup(projectId);
+        },
+      });
+    } catch (err: any) {
+      console.error("[ProjectWorkspace] Failed to save general expense", err);
+      await this.presentToast(
+        err?.error?.message || err?.error?.error || err?.message || "Could not save the expense.",
+        "danger",
+      );
+    }
+  }
+
+  private isMongoObjectId(value: unknown): boolean {
+    return /^[a-f\d]{24}$/i.test(String(value || ""));
+  }
+
   isReadablePurchaseOrderNumber(value: unknown): boolean {
     return /^PO-\d{4}-\d{4,}$/.test(String(value || "").trim());
   }
@@ -2480,7 +4146,87 @@ export class ProjectWorkspacePage {
     void this.router.navigate(["/purchase-orders"], { queryParams: { open: poNumber } });
   }
 
+  isMaterialBillUploading(row: TableRow): boolean {
+    return this.uploadingMaterialBills().includes(this.rowKey(row));
+  }
+
+  async uploadMaterialBill(row: TableRow, event: Event) {
+    event.stopPropagation();
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      await this.presentToast("Choose an image or PDF bill.", "warning");
+      input.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      await this.presentToast("The bill file must be 10 MB or smaller.", "warning");
+      input.value = "";
+      return;
+    }
+
+    const uploadKey = this.rowKey(row);
+    this.uploadingMaterialBills.update((keys) => [...new Set([...keys, uploadKey])]);
+    try {
+      const mongoId = await this.resolveMaterialMongoId(row);
+      if (!mongoId) throw new Error("Material record could not be found.");
+      const data = await this.fileAsBase64(file);
+      const response = await firstValueFrom(this.api.uploadMaterialReceipt(mongoId, {
+        data,
+        mimeType: file.type,
+        fileName: file.name,
+      }));
+      const billUrl = String(response.material?.billUrl || "");
+      const materialId = String(response.material?.materialId || row["materialId"] || "");
+      this.data.materials.update((materials) => materials.map((material) =>
+        String(material._id || "") === mongoId || String(material.id) === materialId
+          ? { ...material, billUrl }
+          : material));
+      this.materialsService.materials.update((materials) => materials.map((material) =>
+        String(material._id || "") === mongoId || String(material.id) === materialId
+          ? { ...material, billUrl }
+          : material));
+      const rowId = String(row["__rowId"] || "");
+      if (rowId) this.data.updateSharedRowCell(rowId, "billUrl", billUrl);
+      await this.presentToast("Bill uploaded to pCloud.");
+    } catch (err: any) {
+      await this.presentToast(
+        err?.error?.message || err?.error?.error || err?.message || "Could not upload the bill.",
+        "danger",
+      );
+    } finally {
+      this.uploadingMaterialBills.update((keys) => keys.filter((key) => key !== uploadKey));
+      input.value = "";
+    }
+  }
+
+  private async resolveMaterialMongoId(row: TableRow): Promise<string> {
+    const directId = String(row["_id"] || "").trim();
+    if (this.isMongoObjectId(directId)) return directId;
+    const materialId = String(row["materialId"] || row["id"] || "").trim();
+    if (!materialId) return "";
+    const response = await firstValueFrom(this.api.listMaterials({ projectId: this.projectId(), limit: 200 }));
+    const material = (response.items || []).find((item: any) => String(item.materialId) === materialId);
+    return String(material?._id || "");
+  }
+
+  private fileAsBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const comma = result.indexOf(",");
+        if (comma < 0) reject(new Error("The selected bill could not be read."));
+        else resolve(result.slice(comma + 1));
+      };
+      reader.onerror = () => reject(reader.error || new Error("The selected bill could not be read."));
+      reader.readAsDataURL(file);
+    });
+  }
+
   sectionCount(section: ModuleKey): number {
+    if (section === "inventory") return this.inventoryUniqueMaterialCount();
     return this.visibleRows(section).length;
   }
 
@@ -2549,6 +4295,58 @@ export class ProjectWorkspacePage {
     });
   }
 
+  /**
+   * Per-project sub-contractor roster cell edits. PATCH the
+   * underlying Subcontractor record (which is also visible on the
+   * universal sub-contractors page), so changes stay in sync across
+   * both views.
+   */
+  private updateSubcontractorRosterRow(row: TableRow, key: string, value: string) {
+    const mongoId = String(row["_id"] || "").trim();
+    if (!mongoId) return;
+    const patch: Record<string, unknown> = {};
+    switch (key) {
+      case "subcontractorName":
+        patch.subcontractorName = value;
+        break;
+      case "address":
+        patch.address = value;
+        break;
+      case "phone":
+        patch.phone = value;
+        break;
+      case "notes":
+        patch.note = value;
+        break;
+      case "status":
+        patch.status = value === "inactive" ? "inactive" : "active";
+        break;
+      default:
+        return;
+    }
+    // Optimistic local update so the cell reflects the change
+    // immediately.
+    this.data.subcontractors.update((list) =>
+      list.map((s) => (String(s._id) === mongoId ? { ...s, ...patch } : s)),
+    );
+    this.api.patchSubcontractor(mongoId, patch).subscribe({
+      next: () => {
+        // Backend is source of truth — refresh from server to pick up
+        // any server-side normalisation (e.g. trimmed fields, status
+        // coercion).
+        try {
+          this.refreshSectionFromBackend("subcontractors");
+        } catch {}
+      },
+      error: (err) => {
+        console.warn("[ProjectWorkspace] Failed to update sub-contractor from roster", err);
+        try {
+          this.refreshSectionFromBackend("subcontractors");
+        } catch {}
+      },
+    });
+  }
+
   private createMaterialFromSiteExpense(row: TableRow) {
     const isSiteMaterial = String(row["siteMaterial"] || "").trim().toLowerCase() === "yes";
     if (!isSiteMaterial) return;
@@ -2566,7 +4364,7 @@ export class ProjectWorkspacePage {
       client: currentProject?.client ?? "",
       project: currentProject?.name ?? "",
       site: row["site"] || this.expenseEditableSite(),
-      materialName: row["materialName"] || row["description"] || "Site material purchase",
+      materialName: row["materialName"] || row["description"] || "Material purchase",
       unit: row["unit"] || "Item",
       requestedQuantity: row["requestedQuantity"] || "1",
       approvedQuantity: row["approvedQuantity"] || "",
@@ -2580,12 +4378,17 @@ export class ProjectWorkspacePage {
   }
 
   isSiteAware(section: ModuleKey): boolean {
-    return section === "materials" || section === "labour" || section === "expenses" || section === "subcontractors";
+    return section === "materials" || section === "attendance" || section === "expenses" || section === "subcontractors";
   }
 
   isNoCreateTab(): boolean {
     const s = this.activeSection();
-    return s === "materials" || s === "labour" || s === "expenses" || s === "vendors";
+    // Attendance is the supervisors' domain (mobile app). The web
+    // admin dashboard is read-only on attendance — supervisors own
+    // those records. Hide the Add Row button on that tab.
+    // `vendors` opens its own Assign Vendor dialog from a dedicated
+    // toolbar button, so the generic Add Row button is hidden there too.
+    return s === "expenses" || s === "vendors" || s === "attendance";
   }
 
   selectSite(site: string) {
@@ -2643,20 +4446,78 @@ export class ProjectWorkspacePage {
       this.updateSubcontractorPaymentRow(row, key, cleanValue);
       return;
     }
+    if (section === "subcontractorsRoster") {
+      // Per-project roster cell edits PATCH the underlying
+      // sub-contractor record (the same one the universal page shows),
+      // so changes are visible in both views.
+      this.updateSubcontractorRosterRow(row, key, cleanValue);
+      return;
+    }
+    if (section === "workers") {
+      // Worker cells PATCH the worker record directly through the API.
+      // Optimistic local update so the cell reflects the new value
+      // before the network round-trip completes.
+      this.updateWorkerCellRow(row, key, cleanValue);
+      return;
+    }
+    if (section === "materials" && key === "quantity") {
+      const quantity = Math.max(0, this.moneyNumber(cleanValue));
+      this.data.updateSharedRowCell(rowId, key, quantity);
+      this.data.materials.update((materials) => materials.map((material) =>
+        String(material._id || "") === String(row["_id"] || "") || String(material.id) === String(row["materialId"] || "")
+          ? { ...material, requested: quantity, quantity, purchasedQuantity: quantity }
+          : material));
+      void this.resolveMaterialMongoId(row).then((mongoId) => {
+        if (!mongoId) throw new Error("Material record could not be found.");
+        // Mirrors the Add Materials dialog: Quantity typed into the
+        // table is the amount actually purchased, so we keep the
+        // backend's Material.purchasedQuantity in sync. The pre-save
+        // hook on the Material model recomputes remainingStock from
+        // purchasedQuantity - consumedQuantity.
+        return firstValueFrom(this.api.patchMaterial(mongoId, {
+          requestedQuantity: quantity,
+          purchasedQuantity: quantity,
+        }));
+      }).catch(() => this.refreshSectionFromBackend("materials"));
+      return;
+    }
     if (section === "expenses" && key === "amount") {
       this.data.updateSharedRowCell(rowId, key, this.positiveExpenseAmountValue(cleanValue));
       return;
     }
     this.data.updateSharedRowCell(rowId, key, cleanValue);
-    if (section === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", cleanValue);
+    if (section === "attendance" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", cleanValue);
     if (section === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: cleanValue });
+  }
+
+  private updateWorkerCellRow(row: TableRow, key: string, value: string) {
+    const mongoId = String(row["_id"] || "").trim();
+    if (!mongoId) return;
+    const payload: Record<string, string | number | undefined> = {};
+    if (key === "name") payload.name = value;
+    else if (key === "phone") payload.phone = value;
+    else if (key === "labourType") payload.labourType = value;
+    else if (key === "address") payload.address = value;
+    else if (key === "notes") payload.notes = value;
+    else if (key === "site") payload.site = value;
+    else return; // unknown column — leave alone
+    // Optimistic local update.
+    this.data.workers.update((list) =>
+      list.map((entry) => (String(entry._id || entry.id || "") === mongoId ? { ...entry, [key]: value } : entry)),
+    );
+    this.api.patchWorker(mongoId, payload).subscribe({
+      error: () => {
+        // On failure, re-pull the page so the cell reflects truth.
+        try { this.refreshFromBackend(); } catch {}
+      },
+    });
   }
 
   async deleteRow(row: TableRow) {
     const key = this.rowKey(row);
     const section = this.activeSection();
     const group = (row as TableRow & { __labourGroup?: TableRow[] })["__labourGroup"];
-    const isGroup = section === "labour" && Array.isArray(group) && group.length > 0;
+    const isGroup = section === "attendance" && Array.isArray(group) && group.length > 0;
     const targets = isGroup ? (group as TableRow[]) : [row];
     const confirmMessage = isGroup
       ? `Delete ${targets.length} labour records on this date? This will permanently delete them from the backend.`
@@ -2693,17 +4554,26 @@ export class ProjectWorkspacePage {
       materials: (id) => this.api.deleteMaterial(id),
       labour: (id) => this.api.deleteLabour(id),
       expenses: (id) => this.api.deleteExpense(id),
+      generalExpenses: (id) => this.api.deleteGeneralExpense(id),
       payments: (id) => this.api.deletePayment(id),
       vendors: (id) => this.api.deleteVendor(id),
       subcontractors: (id) => this.api.deleteSubcontractor(id),
+      // Roster deletes target the same sub-contractor record — the
+      // roster is just a per-project filtered view of the same data.
+      subcontractorsRoster: (id) => this.api.deleteSubcontractor(id),
+      workers: (id) => this.api.deleteWorker(id),
     };
     const dataMap: Record<string, any> = {
       materials: this.data.materials,
       labour: this.data.labour,
       expenses: this.data.expenses,
+      generalExpenses: this.data.generalExpenses,
       payments: this.data.payments,
       vendors: this.data.vendors,
       subcontractors: this.data.subcontractors,
+      // Roster deletes target the same global signal.
+      subcontractorsRoster: this.data.subcontractors,
+      workers: this.data.workers,
     };
     const idField = "id";
     const apiDelete = apiDeleters[section];
@@ -2820,18 +4690,24 @@ export class ProjectWorkspacePage {
 
   saveLabourType(event: Event) {
     event.preventDefault();
+    if (this.labourTypeSaving()) return; // guard against double-submit
     const rowId = this.labourTypeRowId();
     const type = this.labourTypeName().trim();
     const count = Math.max(0, Math.round(this.moneyNumber(this.labourTypeCount())));
     const dailyWage = Math.max(0, this.moneyNumber(this.labourTypeDailyWage()));
     if (!rowId || !type || !count) return;
-    const row = this.visibleRows("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
-    const nextTypes = this.mergeLabourType(String(row?.["labourTypes"] || ""), type, count, dailyWage);
-    const wageField = this.ensureLabourWageField(type);
-    this.data.updateSharedRowCell(rowId, "labourTypes", nextTypes);
-    this.data.updateSharedRowCell(rowId, "notes", nextTypes);
-    if (dailyWage) this.data.updateSharedRowCell(rowId, wageField.key, formatMoney(dailyWage));
-    this.closeLabourTypeDialog();
+    this.labourTypeSaving.set(true);
+    try {
+      const row = this.visibleRows("labour").find((entry) => String(entry["__rowId"] || "") === rowId);
+      const nextTypes = this.mergeLabourType(String(row?.["labourTypes"] || ""), type, count, dailyWage);
+      const wageField = this.ensureLabourWageField(type);
+      this.data.updateSharedRowCell(rowId, "labourTypes", nextTypes);
+      this.data.updateSharedRowCell(rowId, "notes", nextTypes);
+      if (dailyWage) this.data.updateSharedRowCell(rowId, wageField.key, formatMoney(dailyWage));
+      this.closeLabourTypeDialog();
+    } finally {
+      this.labourTypeSaving.set(false);
+    }
   }
 
   labourTypeCards(row: TableRow): Array<{ type: string; count: number; wage: number }> {
@@ -2897,25 +4773,13 @@ export class ProjectWorkspacePage {
     const sourceRows = this.visibleRows(section);
     const rows = this.reportRows(section, sourceRows);
     const currentProject = this.project();
-    const summary = section === "labour" ? this.labourSummaryHtml(rows) : section === "expenses" ? this.expenseSummaryHtml(sourceRows) : "";
+    const summary = section === "attendance" ? this.labourSummaryHtml(rows) : section === "expenses" ? this.expenseSummaryHtml(sourceRows) : "";
     this.openPrintableReport({
-      title: section === "labour" ? "Labour Attendance Report" : section === "expenses" ? "Expense Ledger Report" : this.activeConfig().title,
-      subtitle: `${currentProject?.name ?? this.projectId()} - ${this.activeSiteFilter() === "All" ? "All Sites" : this.activeSiteFilter()}`,
+      title: section === "attendance" ? "Labour Attendance Report" : section === "expenses" ? "Expense Ledger Report" : this.activeConfig().title,
+      subtitle: `${currentProject?.name ?? this.projectId()}`,
       columns,
       rows,
       summary,
-    });
-  }
-
-  downloadReportRow(row: TableRow) {
-    const columns = this.columnsFor("reports");
-    const currentProject = this.project();
-    this.openPrintableReport({
-      title: String(row["reportName"] || "Project Report"),
-      subtitle: `${currentProject?.name ?? this.projectId()} - ${String(row["category"] || "Report")}`,
-      columns,
-      rows: [row],
-      summary: `<section class="summary"><h2>Report Details</h2><div><strong>Owner</strong><span>${this.escapeHtml(String(row["owner"] || "-"))}</span></div><div><strong>Format</strong><span>${this.escapeHtml(String(row["exportFormat"] || "PDF / Excel"))}</span></div></section>`,
     });
   }
 
@@ -3039,6 +4903,12 @@ export class ProjectWorkspacePage {
 
   private subcontractorSpend = signal<number>(0);
   private subcontractorPayments = signal<any[]>([]);
+  /**
+   * Sub-contractor profiles (one row per sub) assigned to the current
+   * project. Distinct from `subcontractorPayments`, which holds the
+   * payment ledger. Populated by `loadProjectExpenseRollup`.
+   */
+  private subcontractorRoster = signal<any[]>([]);
 
   /**
    * Map SubcontractorPayment rows to the table shape the generic
@@ -3051,6 +4921,7 @@ export class ProjectWorkspacePage {
       __projectId: p.projectId,
       _id: p._id,
       date: p.date,
+      paymentType: p.paymentType || "Bank Transfer",
       subcontractorId: p.subcontractorId,
       subcontractorName: p.subcontractorName,
       projectId: p.projectId,
@@ -3063,14 +4934,44 @@ export class ProjectWorkspacePage {
   }
 
   /**
+   * Map the project's subcontractor profile roster (one row per
+   * sub-contractor assigned to this project) to the table shape the
+   * generic column-driven workspace CRUD table expects. Reads from
+   * the shared `data.subcontractors` signal so the roster stays in
+   * sync with the universal sub-contractors page (and the
+   * workspace hydration cache).
+   */
+  private subcontractorRosterRows(): TableRow[] {
+    const projectId = this.projectId();
+    return this.data.subcontractors()
+      .filter((row) => String(row.projectId) === projectId || (row.projectIds || []).includes(projectId))
+      .map((row) => ({
+        __rowId: `sub-roster:${row._id || row.id}`,
+        __projectId: row.projectId || projectId,
+        _id: row._id || row.id,
+        projectId: row.projectId || projectId,
+        subcontractorId: row._id || row.id,
+        subcontractorName: row.subcontractorName || "",
+        address: row.address || "",
+        phone: row.phone || "",
+        paymentMode: row.paymentMode || "Bank Transfer",
+        note: row.note || "",
+        status: row.status === "inactive" ? "inactive" : "active",
+      }));
+  }
+
+  /**
    * Fetch the subcontractor spend rollup for this project so the
    * workspace "Total expense" line includes subcontractor payments
    * (per spec) and the new Sub-contractors page total stays in sync.
+   * Also loads the project's sub-contractor profile roster so the new
+   * Subcontractors tab can render immediately.
    */
   private loadProjectExpenseRollup(projectId: string | null) {
     if (!projectId) {
       this.subcontractorSpend.set(0);
       this.subcontractorPayments.set([]);
+      this.subcontractorRoster.set([]);
       return;
     }
     this.api.getSubcontractorSpendRollup(projectId).subscribe({
@@ -3081,6 +4982,12 @@ export class ProjectWorkspacePage {
     this.api.listSubcontractorPayments({ projectId, limit: 500 }).subscribe({
       next: (res) => this.subcontractorPayments.set(res.items || []),
       error: () => this.subcontractorPayments.set([]),
+    });
+    // Load sub-contractor profiles for the roster tab. Backend doesn't
+    // expose a project filter on /subcontractors, so we filter client-side.
+    this.api.listSubcontractors({ limit: 500, page: 1 }).subscribe({
+      next: (res) => this.subcontractorRoster.set(res.items || []),
+      error: () => this.subcontractorRoster.set([]),
     });
   }
 
@@ -3124,6 +5031,15 @@ export class ProjectWorkspacePage {
       const amount = this.expenseSignedAmount(row);
       return amount < 0 ? sum + Math.abs(amount) : sum;
     }, 0);
+    const generalExpenseRows = this.data.tableRowsFor(
+      "generalExpenses",
+      this.tableRows().generalExpenses,
+      (row) => this.rowBelongsToProject(row)
+    );
+    const generalExpenseTotal = generalExpenseRows.reduce(
+      (sum, row) => sum + Math.abs(this.moneyNumber(row["amount"])),
+      0
+    );
     const labourRows = this.data.tableRowsFor("labour", this.tableRows().labour, (row) => this.rowBelongsToProject(row));
     const labourTotal = labourRows.reduce((sum, row) => sum + this.labourWeeklyPayForRow(this.withLabourPayable(row)).total, 0);
     const subcontractorTotal = this.subcontractorSpend();
@@ -3132,7 +5048,7 @@ export class ProjectWorkspacePage {
       (sum, row) => sum + this.moneyNumber(row["givenAmount"]),
       0
     );
-    return expenseTotal + labourTotal + subcontractorTotal + materialsGivenTotal;
+    return expenseTotal + generalExpenseTotal + labourTotal + subcontractorTotal + materialsGivenTotal;
   }
 
   /**
@@ -3215,15 +5131,20 @@ export class ProjectWorkspacePage {
     const materials = this.data.materials().filter((row) => row.projectId === projectId).map((row) => ({
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
+      _id: (row as any)._id,
+      createdAt: (row as any).createdAt,
+      updatedAt: (row as any).updatedAt,
+      materialId: row.id,
       projectId: row.projectId,
       site: row.site,
       materialName: row.name,
       unit: row.unit,
-      issuedAmount: row.issuedAmount ?? "",
-      givenAmount: row.givenAmount ?? "",
-      requestedQuantity: formatNumber(row.requested),
-      approvedQuantity: formatNumber(row.approved),
-      requestDate: row.requestDate || "2026-06-05",
+      quantity: formatNumber(row.requested || row.quantity || row.approved),
+      isExistingMaterial: row.isExistingMaterial ? "Yes" : "",
+      issuedAmount: row.isExistingMaterial ? "Existing material" : (row.issuedAmount ?? ""),
+      givenAmount: row.isExistingMaterial ? "Existing material" : (row.givenAmount ?? ""),
+      requestDate: row.requestDate || (row as any).createdAt || "",
+      receivedDate: this.dateOnly(row.receivedDate || (String(row.status).toLowerCase() === "received" ? ((row as any).updatedAt || "") : "")),
       vendor: row.vendor,
       poNumber: row.poNumber,
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
@@ -3261,7 +5182,7 @@ export class ProjectWorkspacePage {
         projectId: row.projectId,
         expenseScope: row.type,
         expenseDate: row.date,
-        transactionType: row.transactionType || "Site Expense",
+        transactionType: row.transactionType || "Purchase",
         description: row.description,
         amount: formatMoney(-row.spent),
         siteMaterial: row.isSiteMaterial ? "Yes" : "No",
@@ -3274,6 +5195,20 @@ export class ProjectWorkspacePage {
         approvalStatus: row.status,
         notes: (row as any).notes,
       }));
+
+    const generalExpenses = this.data.generalExpensesForProject(projectId).map((row) => ({
+      __rowId: `general-expense:${row.id}`,
+      __projectId: row.projectId || projectId,
+      projectId: row.projectId || projectId,
+      date: row.date,
+      category: row.category || "",
+      description: row.description,
+      amount: formatMoney(Number(row.amount) || 0),
+      origin: row.origin || "manual",
+      site: row.site || "",
+      notes: row.notes || "",
+      status: row.status,
+    }));
 
     const payments = this.data.paymentsForProject(projectId).map((row) => ({
       __rowId: `payment:${row.id}`,
@@ -3289,6 +5224,9 @@ export class ProjectWorkspacePage {
 
     const projectMaterials = this.data.materials().filter((row) => row.projectId === projectId);
     const vendorNamesInProject = new Set(projectMaterials.map((m) => m.vendor).filter(Boolean));
+    for (const vendor of this.data.vendors()) {
+      if ((vendor.projectIds || []).includes(projectId)) vendorNamesInProject.add(vendor.name);
+    }
 
     const projectSiteIds = new Set<string>();
     for (const site of this.data.siteEntities()) {
@@ -3310,6 +5248,7 @@ export class ProjectWorkspacePage {
         __projectId: projectId,
         projectId,
         vendorName: vendor.name,
+        projects: this.projectNamesForVendor(vendor.name),
         materialType: vendor.materialType,
         materialsBought: this.materialPurchaseSummaryForVendor(vendor.name, projectId),
         phoneNumber: vendor.phone,
@@ -3330,24 +5269,6 @@ export class ProjectWorkspacePage {
       date: p.date,
     }));
 
-    const reports = [
-      ["Financial", "Payment Collection Report", "Client receipt and pending receivable export", "Accountant", "PDF / Excel"],
-      ["Financial", "Expense Report", "Supervisor expense and bill reference export", "Admin", "PDF / Excel"],
-      ["Labour", "Attendance Report", "Site-wise attendance and wage export", "Project Manager", "Excel"],
-      ["Material", "Inventory Report", "Purchased, consumed, and remaining stock export", "Project Manager", "Excel"],
-      ["Subcontract", "Subcontractor Ledger", "Work package value, advance, balance, and status export", "Project Manager", "Excel"],
-      ["Project", "Project Summary", "Project value, progress, sites, and status export", "Admin", "PDF"],
-    ].map(([category, reportName, description, owner, exportFormat], index) => ({
-      __rowId: `project-report:${projectId}:${index}`,
-      __projectId: projectId,
-      projectId,
-      category,
-      reportName,
-      description,
-      owner,
-      exportFormat,
-    }));
-
     const inventory = this.data.inventory().filter((row) => String(row.projectId) === projectId).map((row) => ({
       __rowId: `inventory:${row.id}`,
       __projectId: row.projectId,
@@ -3355,25 +5276,48 @@ export class ProjectWorkspacePage {
       site: row.site,
       materialName: row.name,
       unit: row.unit,
-      requestedQuantity: formatNumber(row.requestedQuantity),
-      approvedQuantity: formatNumber(row.approvedQuantity),
       purchasedQuantity: formatNumber(row.purchasedQuantity),
       consumedQuantity: formatNumber(row.consumedQuantity),
       remainingStock: `${formatNumber(row.remainingStock)} ${row.unit}`,
-      minimumQuantity: formatNumber(row.minimumQuantity),
       vendor: row.vendor,
       poNumber: row.poNumber,
+      receivedStatus: row.received ? "Received" : "Not Received",
+    }));
+
+    // The Attendance tab is backed by the same labour/wage lines that the
+    // legacy Labour tab uses, but renders them as attendance-register rows.
+    // Sharing the source keeps the surface area one source of truth.
+    const attendance = labour.map((row) => ({ ...row, __rowId: `attendance:${row.__rowId?.toString().replace(/^labour:/, "") ?? ""}` }));
+
+    // Workers tab — roster scoped to the current project. Each worker is a
+    // row of its own; the column set (name, phone, role, address, notes,
+    // site) is what the column-driven inline editor renders/edits.
+    const workers = this.data.workersForProject(projectId).map((row) => ({
+      __rowId: `worker:${row.id}`,
+      __projectId: row.projectId,
+      projectId: row.projectId,
+      _id: row._id,
+      name: row.name,
+      phone: row.phone || "",
+      labourType: row.labourType || "",
+      subcontractorId: row.subcontractorId || "",
+      subcontractorName: row.subcontractorName || "",
+      address: row.address || "",
+      notes: row.notes || "",
     }));
 
     return {
       materials,
       labour,
+      attendance,
       expenses,
+      generalExpenses,
       payments,
       vendors,
       subcontractors,
+      subcontractorsRoster: this.subcontractorRosterRows(),
       inventory,
-      reports,
+      workers,
     };
   }
 
@@ -3391,7 +5335,7 @@ export class ProjectWorkspacePage {
   }
 
   isReadonlyColumn(key: string): boolean {
-    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId";
+    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus";
   }
 
   /**
@@ -3402,8 +5346,25 @@ export class ProjectWorkspacePage {
   displayCell(row: TableRow, key: string): string {
     const raw = row[key];
     if (this.activeSection() === "materials" && key === "poNumber" && raw && !this.isReadablePurchaseOrderNumber(raw)) return "";
+    if (this.activeSection() === "materials" && row["isExistingMaterial"] === "Yes" && (key === "issuedAmount" || key === "givenAmount")) return "Existing material";
+    if ((key === "requestDate" || key === "receivedDate") && raw) return this.dateOnly(raw);
     if (key === "transactionType" && raw === "Cash Added") return "Add Cash";
     return raw == null ? "" : String(raw);
+  }
+
+  private dateOnly(value: unknown): string {
+    const text = String(value || "").trim();
+    const match = /^(\d{4}-\d{2}-\d{2})/.exec(text);
+    return match?.[1] || text;
+  }
+
+  private materialSortValue(row: TableRow): number {
+    const createdAt = Date.parse(String(row["createdAt"] || ""));
+    if (Number.isFinite(createdAt)) return createdAt;
+    const mongoId = String(row["_id"] || "");
+    if (/^[a-f\d]{24}$/i.test(mongoId)) return parseInt(mongoId.slice(0, 8), 16) * 1000;
+    const requestDate = Date.parse(String(row["requestDate"] || ""));
+    return Number.isFinite(requestDate) ? requestDate : 0;
   }
 
   /**
@@ -3450,12 +5411,12 @@ export class ProjectWorkspacePage {
     if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
     if (section === "materials" && key === "materialName") return this.materialNameOptions();
     if (section === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
-    if (section === "labour" && key === "staffName") return this.staffNameOptionsForProject();
+    if (section === "attendance" && key === "staffName") return this.staffNameOptionsForProject();
     if (section === "expenses" && key === "transactionType") {
       return ["Purchase", "Add Cash"];
     }
     if (section === "expenses" && key === "siteMaterial") return ["No", "Yes"];
-    if (section === "labour" && key === "attendance") return ["Present", "Absent"];
+    if (section === "attendance" && key === "attendance") return ["Present", "Absent"];
     // Subcontractor section — dropdowns are sourced from the live
     // /api/subcontractors and the project's site list. Every
     // sub-contractor (active or not) is offered so existing records
@@ -3477,6 +5438,11 @@ export class ProjectWorkspacePage {
       if (section === "materials") {
         return ["Pending", "Approved", "Declined", "Completed", "Received", "Not Received"];
       }
+      // Sub-contractor roster uses a simple Active / Inactive toggle
+      // (matches the universal Sub-contractors page status field).
+      if (section === "subcontractorsRoster") {
+        return ["active", "inactive"];
+      }
       return ["Pending", "Approved", "Declined"];
     }
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
@@ -3485,6 +5451,21 @@ export class ProjectWorkspacePage {
       return [...paymentModeOptions, ...custom];
     }
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
+    if (key === "paymentType") return ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS"];
+    // Workers — offer a select dropdown for the Role column with the
+    // union of preset labour types plus any custom roles the user has
+    // already created (deduplicated, case-insensitive).
+    if (section === "workers" && key === "labourType") {
+      const preset = [
+        "Mason", "Helper", "Carpenter", "Plumber", "Electrician", "Painter",
+        "Bar bender", "Welder", "Tile mason", "Centring", "Fitter", "Maid",
+        "Cook", "Watchman", "Cleaner", "Driver",
+      ];
+      const fromData = this.data.workers()
+        .map((row) => (row.labourType || "").trim())
+        .filter((value): value is string => Boolean(value));
+      return [...new Set([...preset, ...fromData])].sort((a, b) => a.localeCompare(b));
+    }
     return [];
   }
 
@@ -3527,8 +5508,9 @@ export class ProjectWorkspacePage {
         site,
         materialName: "",
         unit: "",
-        requestedQuantity: "",
-        approvedQuantity: "",
+        quantity: "",
+        issuedAmount: "",
+        givenAmount: "",
         requestDate: today,
         vendor: "",
         poNumber: "",
@@ -3565,6 +5547,16 @@ export class ProjectWorkspacePage {
         reference: "",
         approvalStatus: "Pending",
       },
+      generalExpenses: {
+        date: today,
+        category: "",
+        description: "",
+        amount: "0",
+        origin: "manual",
+        site,
+        notes: "",
+        status: "Approved",
+      },
       payments: {
         paymentDate: today,
         amount: "0",
@@ -3583,11 +5575,19 @@ export class ProjectWorkspacePage {
       },
       subcontractors: {
         date: today,
+        paymentType: "Bank Transfer",
         subcontractorName: "",
         siteName: site,
         description: "",
         employeeCount: 1,
         amount: 0,
+      },
+      subcontractorsRoster: {
+        subcontractorName: "",
+        address: "",
+        phone: "",
+        note: "",
+        status: "active",
       },
       inventory: {
         materialName: "",
@@ -3596,12 +5596,31 @@ export class ProjectWorkspacePage {
         siteCount: 0,
         lastUpdated: "",
       },
-      reports: {
-        category: "",
-        reportName: "",
-        description: "",
-        owner: "",
-        exportFormat: "PDF / Excel",
+      attendance: {
+        client: currentProject?.client ?? "",
+        clientId: this.clientId(),
+        projectId: this.projectId(),
+        site,
+        attendanceDate: today,
+        staffName: this.staffNameOptionsForProject()[0] ?? "",
+        labourTypes: "Carpenter: 1",
+        staffCount: "1",
+        attendance: "Present",
+        shift: "1",
+        overtime: "0",
+        lateFine: "0",
+        presentUnits: 1,
+        paymentMode: "Cash",
+        notes: "Mason: 1",
+        status: "Pending",
+      },
+      workers: {
+        name: "",
+        phone: "",
+        labourType: "",
+        subcontractorName: "",
+        address: "",
+        notes: "",
       },
     };
     return defaults[section];
@@ -3610,7 +5629,7 @@ export class ProjectWorkspacePage {
   private withComputedRows(section: ModuleKey, rows: TableRow[]): TableRow[] {
     const normalizedRows = rows.map((row) => this.withNormalizedApprovalStatus(row));
     if (section === "expenses") return this.withExpenseBalances(normalizedRows);
-    if (section === "labour") return normalizedRows.map((row) => this.withLabourPayable(row));
+    if (section === "attendance") return normalizedRows.map((row) => this.withLabourPayable(row));
     return normalizedRows;
   }
 
@@ -3693,6 +5712,19 @@ export class ProjectWorkspacePage {
       .filter((row) => (row.vendor || "").toLowerCase() === vendorName.toLowerCase());
     const purchased = rows.reduce((sum, row) => sum + row.purchased, 0);
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
+  }
+
+  private projectNamesForVendor(vendorName: string): string {
+    const names = this.data.materials()
+      .filter((row) => (row.vendor || "").toLowerCase() === vendorName.toLowerCase())
+      .map((row) => this.data.projectById(row.projectId)?.name || String((row as any).projectName || ""))
+      .filter(Boolean);
+    const vendor = this.data.vendors().find((row) => row.name.toLowerCase() === vendorName.toLowerCase());
+    for (const projectId of vendor?.projectIds || []) {
+      const projectName = this.data.projectById(projectId)?.name;
+      if (projectName) names.push(projectName);
+    }
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b)).join(", ");
   }
 
   private vendorNameOptions(): string[] {
@@ -4017,7 +6049,7 @@ export class ProjectWorkspacePage {
         { key: "runningBalance", label: "Balance" },
       ];
     }
-    if (section === "labour") {
+    if (section === "attendance") {
       // Mirror the labour table exactly — no synthetic pay totals, no
       // late-fine amount. Payment mode, status, notes, and staff count are
       // dropped from the report along with the table. The PDF is an
@@ -4044,7 +6076,7 @@ export class ProjectWorkspacePage {
           ...row,
           expenseDate: String(row["expenseDate"] || row["date"] || ""),
           transactionType: "Opening Balance",
-          description: `Opening balance - ${row["site"] || "Project"}`,
+      description: "Opening balance",
           amount: formatMoney(opening),
           runningBalance: formatMoney(opening),
         });

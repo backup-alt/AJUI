@@ -192,6 +192,7 @@ export class EnterpriseSidebarComponent {
       { key: "quotations", label: "Quotations", icon: "document-text-outline", route: ["/quotations"] },
       { key: "tax-invoices", label: "Invoice", icon: "receipt-outline", route: ["/tax-invoices"] },
       { key: "purchase-orders", label: "Purchase Orders", icon: "cart-outline", route: ["/purchase-orders"] },
+      { key: "general-expenses", label: "General Expenses", icon: "wallet-outline", route: ["/general-expenses"] },
       { key: "approvals", label: "Pending Approvals", icon: "checkmark-done-outline", route: ["/approvals"] },
       { key: "settings", label: "Settings", icon: "settings-outline", route: ["/settings"] },
     ];

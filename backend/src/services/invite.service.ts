@@ -73,6 +73,7 @@ export interface CreateInviteParams {
   supervisorEmail: string;
   supervisorPhone: string;
   projectId?: string;
+  projectIds?: string[];
   siteIds?: string[];
   cashLimit?: number;
   address?: string;
@@ -109,7 +110,7 @@ export async function createInvite(params: CreateInviteParams): Promise<{
     supervisorName: string;
     supervisorPhone: string;
     supervisorEmail: string;
-    siteIds: string[];
+    projectIds: string[];
     projectId?: string;
     expiresAt: number;
   };
@@ -135,6 +136,7 @@ export async function createInvite(params: CreateInviteParams): Promise<{
     token,
     createdByAdmin: new Types.ObjectId(params.createdByAdmin),
     projectId: params.projectId ? new Types.ObjectId(params.projectId) : undefined,
+    projectIds: (params.projectIds || []).map((id) => new Types.ObjectId(id)),
     siteIds: (params.siteIds || []).map((id) => new Types.ObjectId(id)),
     role: "supervisor",
     expiresAt,
@@ -204,7 +206,7 @@ const webFallbackUrl = `${resolveBackendBaseUrl(params.req)}/signup.html?token=$
     supervisorName: params.supervisorName,
     supervisorPhone: params.supervisorPhone,
     supervisorEmail: params.supervisorEmail,
-    siteIds: params.siteIds || [],
+    projectIds: params.projectIds || [],
     projectId: params.projectId,
     expiresAt: expiresAt.getTime(),
   };

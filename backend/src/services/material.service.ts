@@ -107,27 +107,6 @@ export async function createMaterial(input: CreateMaterialInput) {
   const { project, client, vendor } = await populateRefs(input);
   const siteName = await resolveSiteName(input.site, input.siteId);
 
-  if (project) {
-    const existingPending = await Material.findOne({
-      projectId: project._id,
-      site: siteName,
-      name: input.name,
-      unit: input.unit,
-      status: { $in: ["Pending", "Not Received"] },
-    });
-
-    if (existingPending) {
-      existingPending.requestedQuantity = input.requestedQuantity;
-      existingPending.notes = input.notes;
-      existingPending.vendor = input.vendor || vendor?.name;
-      existingPending.vendorId = input.vendorId ? new Types.ObjectId(input.vendorId) : vendor?.vendorId;
-      existingPending.poNumber = input.poNumber;
-      existingPending.createdBy = input.createdBy;
-      await existingPending.save();
-      return existingPending.toObject();
-    }
-  }
-
   const materialId = await generateId("MAT");
   const material = await Material.create({
     materialId,
@@ -144,6 +123,10 @@ export async function createMaterial(input: CreateMaterialInput) {
     purchasedQuantity: input.purchasedQuantity,
     consumedQuantity: input.consumedQuantity,
     remainingStock: Math.max(0, input.purchasedQuantity - input.consumedQuantity),
+    issuedAmount: input.issuedAmount,
+    givenAmount: input.givenAmount,
+    isExistingMaterial: Boolean(input.isExistingMaterial),
+    orderedDate: input.orderedDate,
     vendor: input.vendor || vendor?.name,
     vendorId: input.vendorId ? new Types.ObjectId(input.vendorId) : vendor?.vendorId,
     poNumber: input.poNumber,
@@ -153,6 +136,9 @@ export async function createMaterial(input: CreateMaterialInput) {
     createdBy: input.createdBy,
     notes: input.notes,
   });
+
+  const { ensureMaterialInInventory } = await import("./inventory.service.js");
+  await ensureMaterialInInventory(material._id, input.createdBy);
 
   return material.toObject();
 }
@@ -364,7 +350,10 @@ export async function getMaterialById(id: string) {
   return material;
 }
 
-export async function updateMaterial(id: string, patch: Partial<CreateMaterialInput>) {
+export async function updateMaterial(
+  id: string,
+  patch: Partial<CreateMaterialInput> & { status?: "Received" | "Not Received" },
+) {
   const update: Record<string, unknown> = { ...patch };
   for (const key of ["receiptImage", "receiptImageMimeType", "billUrl", "pcloudFileId", "pcloudPublicCode", "pcloudContentHash"]) {
     delete update[key];
@@ -375,6 +364,13 @@ export async function updateMaterial(id: string, patch: Partial<CreateMaterialIn
     if (site) update.site = site.name;
   }
   if (patch.vendorId) update.vendorId = new Types.ObjectId(patch.vendorId);
+  // Received Date is system-owned. The supervisor action only needs to
+  // change the status; the API records the exact day of that transition.
+  if (patch.status === "Received") {
+    update.receivedDate = new Date().toISOString().slice(0, 10);
+  } else if (patch.status === "Not Received") {
+    update.receivedDate = undefined;
+  }
 
   const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
   if (customFields) {
@@ -386,6 +382,10 @@ export async function updateMaterial(id: string, patch: Partial<CreateMaterialIn
 
   const material = await Material.findByIdAndUpdate(id, update, { new: true });
   if (!material) throw new AppError(404, "Material not found");
+  if (patch.status) {
+    const { syncMaterialReceivedStatus } = await import("./inventory.service.js");
+    await syncMaterialReceivedStatus(material._id);
+  }
   return material.toObject();
 }
 
@@ -431,7 +431,10 @@ export async function uploadMaterialReceipt(
   if (payload.givenAmount !== undefined) {
     material.givenAmount = payload.givenAmount;
   }
-  if (payload.received) material.status = "Received";
+  if (payload.received) {
+    material.status = "Received";
+    material.receivedDate = new Date().toISOString().slice(0, 10);
+  }
 
   await material.save();
   return material.toObject();

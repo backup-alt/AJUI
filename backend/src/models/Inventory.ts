@@ -34,6 +34,7 @@ export interface IInventory extends Document {
   receiptImageMimeType?: string;
   receiptImageName?: string;
   received?: boolean;
+  receivedDate?: string;
   purchaseHistory?: Array<{
     vendor: string;
     vendorId?: Types.ObjectId;
@@ -61,7 +62,7 @@ const inventorySchema = new Schema<IInventory>(
     clientId: { type: Schema.Types.ObjectId, ref: "Client" },
     clientName: { type: String },
     siteId: { type: Schema.Types.ObjectId, ref: "Site" },
-    site: { type: String, required: true },
+    site: { type: String, default: "" },
     siteKey: { type: String, required: true, index: true },
     name: { type: String, required: true, trim: true },
     normalizedName: { type: String, required: true, index: true },
@@ -87,6 +88,7 @@ const inventorySchema = new Schema<IInventory>(
     receiptImageMimeType: { type: String, select: false },
     receiptImageName: { type: String },
     received: { type: Boolean, default: false },
+    receivedDate: { type: String },
     purchaseHistory: {
       type: [{
         vendor: { type: String, trim: true },

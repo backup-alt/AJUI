@@ -37,7 +37,9 @@ export type Approval = {
 };
 
 export type MaterialRow = {
+  _id?: string;
   id: string;
+  materialId?: string;
   projectId: string;
   site: string;
   name: string;
@@ -51,9 +53,12 @@ export type MaterialRow = {
   poNumber: string;
   status: ApprovalStatus;
   requestDate?: string;
+  receivedDate?: string;
   purchasedDate?: string;
   issuedAmount?: number;
   givenAmount?: number;
+  isExistingMaterial?: boolean;
+  orderedDate?: string;
   paymentType?: "Cash" | "NEFT" | "Bank Transfer" | "UPI" | "Cheque";
   deliveredOn?: string;
   billUrl?: string;
@@ -209,6 +214,34 @@ export type ExpenseRow = {
   customFields?: Record<string, string | number | boolean | null>;
 };
 
+export type GeneralExpenseRow = {
+  _id?: string;
+  id: string;
+  expenseId?: string;
+  origin?: string;
+  category?: string;
+  amount: number;
+  spent?: number;
+  date: string;
+  description: string;
+  notes?: string;
+  paymentMode?: string;
+  paidBy?: string;
+  reference?: string;
+  billUrl?: string;
+  pcloudFileId?: string;
+  receiptImageName?: string;
+  projectId?: string;
+  projectName?: string;
+  clientId?: string;
+  clientName?: string;
+  siteId?: string;
+  site?: string;
+  status: "Pending" | "Approved" | "Rejected";
+  customFields?: Record<string, string | number | boolean | null>;
+  createdBy?: string;
+};
+
 export type PaymentRow = {
   _id?: string;
   id: string;
@@ -243,6 +276,8 @@ export type InventoryRow = {
   minimumQuantity: number;
   vendor?: string;
   poNumber?: string;
+  received?: boolean;
+  receivedDate?: string;
   customFields?: Record<string, string | number | boolean | null>;
 };
 

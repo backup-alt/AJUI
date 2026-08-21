@@ -8,12 +8,14 @@ import { getSupervisorAccess } from "./supervisor-mobile.service.js";
 
 export interface CreateSubcontractorInput {
   projectId: string;
+  projectIds?: string[];
   subcontractorName: string;
   description?: string;
   employeeCount?: number;
   note?: string;
   address?: string;
   phone?: string;
+  paymentMode?: string;
   status?: "active" | "inactive";
 }
 
@@ -30,6 +32,7 @@ export async function createSubcontractor(input: CreateSubcontractorInput) {
 
   const sub = await Subcontractor.create({
     projectId: project._id,
+    projectIds: input.projectIds?.length ? input.projectIds : [project._id],
     projectName: project.name,
     clientId: project.clientId,
     subcontractorName: input.subcontractorName,
@@ -38,6 +41,7 @@ export async function createSubcontractor(input: CreateSubcontractorInput) {
     note: input.note || "",
     address: input.address || "",
     phone: input.phone || "",
+    paymentMode: input.paymentMode || "Bank Transfer",
     status: input.status || "active",
   });
   return sub.toObject();
@@ -52,9 +56,21 @@ export async function listSubcontractors(filter: {
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
-  if (filter.projectId) query.projectId = toObjectId(filter.projectId);
+  const projectConditions: Record<string, unknown>[] = [];
+  if (filter.projectId) {
+    const projectId = toObjectId(filter.projectId);
+    projectConditions.push({ $or: [{ projectId }, { projectIds: projectId }] });
+  }
   if (filter.status) query.status = filter.status;
-  applyProjectScope(query, "projectId", filter.scopeProjectIds);
+  if (filter.scopeProjectIds !== undefined && filter.scopeProjectIds !== null) {
+    projectConditions.push({
+      $or: [
+        { projectId: { $in: filter.scopeProjectIds } },
+        { projectIds: { $in: filter.scopeProjectIds } },
+      ],
+    });
+  }
+  if (projectConditions.length) query.$and = projectConditions;
 
   return paginateByCursor(Subcontractor, query, {
     page: filter.page,
@@ -143,16 +159,19 @@ export async function listSubcontractorsForSupervisor(userId: string) {
  */
 export async function listAllActiveSubcontractors() {
   const items = await Subcontractor.find({ status: "active" })
-    .select("_id subcontractorName projectId address phone note")
+    .select("_id subcontractorName projectId projectIds address phone note paymentMode status")
     .sort({ subcontractorName: 1 })
     .lean();
   return items.map((s) => ({
     _id: String(s._id),
     subcontractorName: s.subcontractorName,
     projectId: s.projectId ? String(s.projectId) : "",
+    projectIds: (s.projectIds || []).map((projectId) => String(projectId)),
     address: s.address || "",
     phone: s.phone || "",
+    paymentMode: s.paymentMode || "Bank Transfer",
     note: s.note || "",
+    status: s.status,
   }));
 }
 
@@ -168,7 +187,9 @@ export async function updateSubcontractor(
   patch: Partial<CreateSubcontractorInput>
 ) {
   if (!Types.ObjectId.isValid(id)) throw new AppError(400, "Invalid subcontractor id");
-  const sub = await Subcontractor.findByIdAndUpdate(id, patch, { new: true });
+  const normalizedPatch: Record<string, unknown> = { ...patch };
+  if (patch.projectIds) normalizedPatch.projectIds = patch.projectIds.map((projectId) => toObjectId(projectId));
+  const sub = await Subcontractor.findByIdAndUpdate(id, normalizedPatch, { new: true });
   if (!sub) throw new AppError(404, "Subcontractor not found");
   return sub.toObject();
 }

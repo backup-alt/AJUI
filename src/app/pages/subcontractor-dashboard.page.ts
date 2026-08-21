@@ -19,6 +19,7 @@ interface SubcontractorRow {
   note: string;
   address: string;
   phone: string;
+  paymentMode: string;
   status: "active" | "inactive";
   totalPaid: number;
   paymentCount: number;
@@ -47,6 +48,15 @@ interface SubcontractorRow {
                 <p>Click a name to open its full payment history across every project. Payments recorded here are automatically reflected in the project workspace.</p>
               </div>
               <div class="subcontractors-actions">
+                <label class="project-filter">
+                  <span>Project</span>
+                  <select [value]="selectedProjectId()" (change)="selectedProjectId.set($any($event.target).value)">
+                    <option value="">All projects</option>
+                    @for (project of projectOptions(); track project.id) {
+                      <option [value]="project.id">{{ project.name }}</option>
+                    }
+                  </select>
+                </label>
                 <button type="button" class="btn-primary" (click)="openCreate()">
                   <ion-icon name="add-outline"></ion-icon>
                   New Sub-contractor
@@ -57,7 +67,7 @@ interface SubcontractorRow {
             <section class="subcontractors-stats">
               <article class="stat-card">
                 <span>Sub-contractors</span>
-                <strong>{{ rows().length }}</strong>
+                <strong>{{ filteredRows().length }}</strong>
               </article>
               <article class="stat-card">
                 <span>Active</span>
@@ -74,6 +84,9 @@ interface SubcontractorRow {
                 <thead>
                   <tr>
                     <th>Subcontractor Name</th>
+                    <th>Address</th>
+                    <th>Phone No.</th>
+                    <th>Payment Mode</th>
                     <th>Total Paid</th>
                     <th>Note</th>
                     <th>Status</th>
@@ -81,11 +94,14 @@ interface SubcontractorRow {
                   </tr>
                 </thead>
                 <tbody>
-                  @for (row of rows(); track row.id) {
+                  @for (row of filteredRows(); track row.id) {
                     <tr [class.inactive]="row.status === 'inactive'" (click)="openDetails(row)" style="cursor:pointer;">
                       <td>
                         <a class="name-link" [routerLink]="['/subcontractors', row.id]" (click)="$event.stopPropagation()">{{ row.subcontractorName }}</a>
                       </td>
+                      <td>{{ row.address || '—' }}</td>
+                      <td>{{ row.phone || '—' }}</td>
+                      <td>{{ row.paymentMode || 'Bank Transfer' }}</td>
                       <td>{{ formatMoney(row.totalPaid) }}</td>
                       <td>{{ row.note || '—' }}</td>
                       <td>
@@ -103,9 +119,9 @@ interface SubcontractorRow {
                       </td>
                     </tr>
                   }
-                  @if (rows().length === 0) {
+                  @if (filteredRows().length === 0) {
                     <tr>
-                      <td colspan="5" class="empty-row">No sub-contractors yet. Click "New Sub-contractor" to add one.</td>
+                      <td colspan="8" class="empty-row">{{ selectedProjectId() ? 'No sub-contractors are assigned to this project.' : 'No sub-contractors yet. Click "New Sub-contractor" to add one.' }}</td>
                     </tr>
                   }
                 </tbody>
@@ -163,6 +179,24 @@ interface SubcontractorRow {
               ></textarea>
             </label>
             <label>
+              <span>Payment Mode</span>
+              <select [value]="draft().paymentMode" (change)="patchDraft('paymentMode', $any($event.target).value)" required>
+                <option value="Cash">Cash</option>
+                <option value="UPI">UPI</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="NEFT">NEFT</option>
+                <option value="RTGS">RTGS</option>
+                <option value="IMPS">IMPS</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Debit Card">Debit Card</option>
+                <option value="Net Banking">Net Banking</option>
+                <option value="Demand Draft">Demand Draft</option>
+                <option value="Wallet">Wallet</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>
               <span>Status</span>
               <select
                 [value]="draft().status"
@@ -193,7 +227,10 @@ interface SubcontractorRow {
     .subcontractors-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
     .subcontractors-head h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; color: #0f172a; }
     .subcontractors-head p { margin: 0; color: #475569; font-size: 14px; max-width: 640px; }
-    .subcontractors-actions { display: flex; gap: 8px; }
+    .subcontractors-actions { display: flex; align-items: flex-end; gap: 10px; }
+    .project-filter { display: flex; flex-direction: column; gap: 4px; }
+    .project-filter span { color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .project-filter select { min-width: 210px; padding: 9px 34px 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #1e293b; font-size: 13px; }
     .btn-primary {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 9px 16px; background: #002263; color: #fff;
@@ -271,6 +308,24 @@ export class SubcontractorDashboardPage {
 
   readonly rows = signal<SubcontractorRow[]>([]);
   readonly loading = signal(false);
+  readonly selectedProjectId = signal("");
+
+  readonly projectOptions = computed(() => {
+    const options = new Map<string, string>();
+    for (const row of this.rows()) {
+      if (!row.projectId) continue;
+      const hydratedName = this.erp.projects().find((project) => String(project.id) === row.projectId)?.name;
+      options.set(row.projectId, row.projectName || hydratedName || "Unnamed project");
+    }
+    return [...options.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  readonly filteredRows = computed(() => {
+    const projectId = this.selectedProjectId();
+    return projectId ? this.rows().filter((row) => row.projectId === projectId) : this.rows();
+  });
 
   readonly drawerOpen = signal(false);
   readonly editing = signal<SubcontractorRow | null>(null);
@@ -279,8 +334,8 @@ export class SubcontractorDashboardPage {
 
   readonly draft = signal<SubcontractorRow>(emptyDraft());
 
-  readonly activeCount = computed(() => this.rows().filter((r) => r.status === "active").length);
-  readonly totalPaid = computed(() => this.rows().reduce((sum, r) => sum + r.totalPaid, 0));
+  readonly activeCount = computed(() => this.filteredRows().filter((r) => r.status === "active").length);
+  readonly totalPaid = computed(() => this.filteredRows().reduce((sum, r) => sum + r.totalPaid, 0));
 
   constructor() {
     this.refresh();
@@ -386,6 +441,7 @@ export class SubcontractorDashboardPage {
       note: d.note,
       address: d.address,
       phone: d.phone,
+      paymentMode: d.paymentMode,
       status: d.status,
     };
     const editing = this.editing();
@@ -424,6 +480,7 @@ function emptyDraft(): SubcontractorRow {
     note: "",
     address: "",
     phone: "",
+    paymentMode: "Bank Transfer",
     status: "active",
     totalPaid: 0,
     paymentCount: 0,
@@ -441,6 +498,7 @@ function normalizeRow(input: any): SubcontractorRow {
     note: input.note || "",
     address: input.address || "",
     phone: input.phone || "",
+    paymentMode: input.paymentMode || "Bank Transfer",
     status: input.status === "inactive" ? "inactive" : "active",
     totalPaid: 0,
     paymentCount: 0,

@@ -22,6 +22,7 @@ export interface IPurchaseOrder extends Document {
   vendorId: Types.ObjectId;
   vendorName: string;
   date: string;
+  paymentMode: string;
   items: IPurchaseOrderItem[];
   subtotal: number;
   totalGst: number;
@@ -55,11 +56,12 @@ const purchaseOrderSchema = new Schema<IPurchaseOrder>(
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor", required: true, index: true },
     vendorName: { type: String, required: true, trim: true },
     date: { type: String, required: true, index: true },
+    paymentMode: { type: String, required: true, default: "Bank Transfer", trim: true, maxlength: 50 },
     items: { type: [purchaseOrderItemSchema], required: true },
     subtotal: { type: Number, required: true, min: 0 },
     totalGst: { type: Number, required: true, min: 0 },
     roundOff: { type: Number, default: 0 },
-    grandTotal: { type: Number, required: true, min: 0 },
+    grandTotal: { type: Number, required: true, min: 0.01 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true },
@@ -69,4 +71,3 @@ purchaseOrderSchema.index({ projectId: 1, createdAt: -1 });
 purchaseOrderSchema.index({ vendorId: 1, createdAt: -1 });
 
 export const PurchaseOrder = model<IPurchaseOrder>("PurchaseOrder", purchaseOrderSchema);
-

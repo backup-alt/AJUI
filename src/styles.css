@@ -2573,6 +2573,44 @@ ion-menu.enterprise-sidebar::part(container) {
   color: #745b03;
 }
 
+/* Canonical loading spinner used by inline preloader states across dialogs
+   and pages. Use the `appLoadingButton` directive (or a manual <span
+   class="agb-loading-spinner" aria-hidden="true"></span>) wherever a button
+   or status indicator needs to communicate "in progress". Replaces the
+   .spinner-inline / .approval-spinner / .spinner duplicates that previously
+   lived inside individual pages. */
+.agb-loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(15, 23, 42, 0.18);
+  border-top-color: #2c5cff;
+  border-radius: 50%;
+  animation: agb-spin 0.8s linear infinite;
+  vertical-align: -3px;
+  flex-shrink: 0;
+}
+
+.agb-loading-spinner.agb-loading-spinner--light {
+  border-color: rgba(255, 255, 255, 0.32);
+  border-top-color: #ffffff;
+}
+
+@keyframes agb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Disabled state for primary/secondary actions while a save is in flight.
+   Inherits the existing button styling but prevents double-click submission
+   and signals the disabled state to assistive tech. */
+button.primary-action[disabled],
+button.secondary-action[disabled] {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .section-stack {
   display: grid;
   gap: 18px;
@@ -7424,7 +7462,7 @@ body {
 .empty-box-icon {
   display: inline-grid;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   width: 58px;
   height: 58px;
@@ -7550,6 +7588,58 @@ body {
   margin: 0;
   font-size: 13px;
   line-height: 1.45;
+}
+
+/* Empty state shown when a client has no projects yet. Centered column layout
+   with icon, headline, description, and a primary "Create Project" CTA. */
+.project-empty-state.no-projects-empty {
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  padding: 56px 24px;
+}
+
+.project-empty-state.no-projects-empty .empty-box-icon {
+  /* keep the boxed icon styling without forcing the bigger "large" overrides */
+}
+
+.project-empty-state.no-projects-empty .no-projects-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 480px;
+}
+
+.project-empty-state.no-projects-empty .no-projects-copy h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.project-empty-state.no-projects-empty .no-projects-copy p {
+  max-width: 460px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #64748b;
+}
+
+.project-empty-state.no-projects-empty .no-projects-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.project-empty-state.no-projects-empty .no-projects-cta ion-icon {
+  font-size: 18px;
 }
 
 .empty-box-icon {
@@ -8888,6 +8978,11 @@ body {
 .dark-mode .dialog-head h2,
 .dark-mode .erp-form label span {
   color: #f7faff !important;
+}
+
+.dark-mode .agb-loading-spinner {
+  border-color: rgba(255, 255, 255, 0.2);
+  border-top-color: #8ab0ff;
 }
 
 .dark-mode .status-edit-shell.active,

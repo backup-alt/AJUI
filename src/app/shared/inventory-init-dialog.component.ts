@@ -23,8 +23,8 @@ export type InventoryInitMaterialRow = {
         <div class="dialog-head">
           <div>
             <span>Add Materials</span>
-            <h2 id="inv-init-title">Add a material to this site</h2>
-            <p>Pick a site, then enter the material name, unit, and starting stock. New material names are saved automatically.</p>
+            <h2 id="inv-init-title">Add a project material</h2>
+            <p>Enter the material name, unit, and starting stock. New material names are saved automatically.</p>
           </div>
           <button type="button" class="icon-button" aria-label="Close add material dialog" (click)="close()">
             <ion-icon name="close-outline"></ion-icon>
@@ -39,47 +39,16 @@ export type InventoryInitMaterialRow = {
             <div class="inventory-init-error">{{ error() }}</div>
           }
 
-          <div class="inventory-init-field" [class.has-error]="!!fieldErrors()['siteId']">
-            <label class="inventory-init-label">
-              <span>Site <em class="required">*</em></span>
-            </label>
-            <div class="erp-select-menu" [class.open]="openMenu() === 'site'">
-              <button type="button" class="erp-select-trigger" (click)="toggleMenu('site')" aria-haspopup="listbox" [attr.aria-expanded]="openMenu() === 'site'">
-                <span>{{ selectedSiteName() || 'Select a site…' }}</span>
-                <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon">
-                  <path d="M5.5 7.5 10 12l4.5-4.5" />
-                </svg>
-              </button>
-              <small class="inventory-init-site-count" *ngIf="sites.length > 0">
-                {{ sites.length }} site{{ sites.length === 1 ? '' : 's' }} available
-              </small>
-              <div class="erp-select-panel" *ngIf="openMenu() === 'site'">
-                <input
-                  type="text"
-                  class="inventory-init-menu-search"
-                  placeholder="Search sites…"
-                  (click)="$event.stopPropagation()"
-                  (input)="menuSearch.set($any($event.target).value); $event.stopPropagation()"
-                  [value]="menuSearch()"
-                  autocomplete="off"
-                />
-                <button
-                  *ngFor="let site of filteredSites(); trackBy: trackSiteById"
-                  type="button"
-                  [class.selected]="form().siteId === site.id"
-                  (click)="pickFromMenu('siteId', site.id)"
-                  [attr.data-site-id]="site.id"
-                >{{ site.name }}</button>
-                <div *ngIf="sites.length === 0" class="inventory-init-menu-empty inventory-init-menu-empty--friendly">
-                  <strong>No sites available.</strong>
-                  <span class="inventory-init-menu-empty-help">No sites were returned for your access scope. Ask an admin to assign you to a project so its sites become visible here.</span>
-                </div>
-                <div *ngIf="sites.length > 0 && filteredSites().length === 0" class="inventory-init-menu-empty">No sites match.</div>
-              </div>
+          <div class="inventory-init-field inventory-existing-toggle">
+            <div>
+              <strong>Existing Material</strong>
+              <small>Turn this on for stock that already exists and must not be ordered through a PO.</small>
             </div>
-            @if (fieldErrors()['siteId']) {
-              <small class="inventory-init-field-error">{{ fieldErrors()['siteId'] }}</small>
-            }
+            <label class="toggle-switch">
+              <input type="checkbox" [checked]="form().isExistingMaterial" (change)="patchForm({ isExistingMaterial: $any($event.target).checked })" />
+              <span aria-hidden="true"></span>
+              <em>{{ form().isExistingMaterial ? 'Yes' : 'No' }}</em>
+            </label>
           </div>
 
           <div class="inventory-init-field" [class.has-error]="!!fieldErrors()['name']">
@@ -179,6 +148,25 @@ export type InventoryInitMaterialRow = {
             }
           </div>
 
+          @if (!form().isExistingMaterial) {
+            <div class="inventory-amount-grid">
+              <div class="inventory-init-field">
+                <label class="inventory-init-label">
+                  <span>Issued Amount</span>
+                  <input type="number" min="0" step="0.01" class="inventory-init-input" [value]="form().issuedAmount" (input)="patchForm({ issuedAmount: $any($event.target).value })" />
+                </label>
+              </div>
+              <div class="inventory-init-field">
+                <label class="inventory-init-label">
+                  <span>Given Amount</span>
+                  <input type="number" min="0" step="0.01" class="inventory-init-input" [value]="form().givenAmount" (input)="patchForm({ givenAmount: $any($event.target).value })" />
+                </label>
+              </div>
+            </div>
+          } @else {
+            <div class="existing-material-note">Issued and given amount: <strong>Existing material</strong></div>
+          }
+
           <div class="inventory-init-field">
             <label class="inventory-init-label">
               <span>Remarks</span>
@@ -265,6 +253,26 @@ export type InventoryInitMaterialRow = {
     .inventory-init-field {
       display: flex; flex-direction: column; gap: 6px;
     }
+    .inventory-existing-toggle {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid #dbe4f0;
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+    .inventory-existing-toggle strong { display: block; color: #0f172a; font-size: 13px; }
+    .inventory-existing-toggle small { display: block; color: #64748b; font-size: 11px; margin-top: 3px; }
+    .toggle-switch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+    .toggle-switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .toggle-switch > span { width: 38px; height: 22px; border-radius: 999px; background: #cbd5e1; position: relative; transition: .2s; }
+    .toggle-switch > span::after { content: ""; width: 16px; height: 16px; border-radius: 50%; background: #fff; position: absolute; left: 3px; top: 3px; transition: .2s; box-shadow: 0 1px 3px rgba(15,23,42,.3); }
+    .toggle-switch input:checked + span { background: #002263; }
+    .toggle-switch input:checked + span::after { transform: translateX(16px); }
+    .toggle-switch em { min-width: 22px; font-size: 12px; font-style: normal; font-weight: 700; color: #334155; }
+    .inventory-amount-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .existing-material-note { padding: 10px 12px; border-radius: 9px; background: #eff6ff; color: #475569; font-size: 12px; }
     .inventory-init-field.has-error .inventory-init-label > span { color: #b91c1c; }
     .inventory-init-label > span {
       font-size: 12px; font-weight: 700;
@@ -404,6 +412,9 @@ export class InventoryInitDialogComponent {
 
   @Input() set sites(value: InventoryInitSite[]) {
     this._sites = value || [];
+    if (!this.form().siteId && this._sites.length) {
+      this.patchForm({ siteId: this.presetSiteId || this._sites[0].id });
+    }
   }
   get sites(): InventoryInitSite[] {
     return this._sites;
@@ -427,15 +438,19 @@ export class InventoryInitDialogComponent {
   private _materialRows: InventoryInitMaterialRow[] = [];
 
   @Input() presetSiteId = "";
+  @Input() projectId = "";
 
   @Output() saved = new EventEmitter<void>();
   @Output() cancelled = new EventEmitter<void>();
 
-  readonly form = signal<{ siteId: string; name: string; unit: string; quantity: number; remarks: string }>({
+  readonly form = signal<{ siteId: string; name: string; unit: string; quantity: number; isExistingMaterial: boolean; issuedAmount: number; givenAmount: number; remarks: string }>({
     siteId: "",
     name: "",
     unit: "",
     quantity: 0,
+    isExistingMaterial: false,
+    issuedAmount: 0,
+    givenAmount: 0,
     remarks: "",
   });
   readonly saving = signal(false);
@@ -483,6 +498,9 @@ export class InventoryInitDialogComponent {
       name: "",
       unit: "",
       quantity: 0,
+      isExistingMaterial: false,
+      issuedAmount: 0,
+      givenAmount: 0,
       remarks: "",
     });
   }
@@ -493,11 +511,11 @@ export class InventoryInitDialogComponent {
     this.fieldErrors.set({});
     this.openMenu.set("");
     this.menuSearch.set("");
-    this.form.set({ siteId: "", name: "", unit: "", quantity: 0, remarks: "" });
+    this.form.set({ siteId: "", name: "", unit: "", quantity: 0, isExistingMaterial: false, issuedAmount: 0, givenAmount: 0, remarks: "" });
     this.cancelled.emit();
   }
 
-  patchForm(patch: Partial<{ siteId: string; name: string; unit: string; quantity: number; remarks: string }>) {
+  patchForm(patch: Partial<{ siteId: string; name: string; unit: string; quantity: number; isExistingMaterial: boolean; issuedAmount: number; givenAmount: number; remarks: string }>) {
     this.form.update((form) => ({ ...form, ...patch }));
     if (patch.name !== undefined || patch.unit !== undefined || patch.quantity !== undefined || patch.siteId !== undefined) {
       if (this.error()) this.error.set(null);
@@ -577,7 +595,7 @@ export class InventoryInitDialogComponent {
   submit() {
     const form = this.form();
     const fieldErrors: Record<string, string> = {};
-    if (!form.siteId) fieldErrors["siteId"] = "Choose a site.";
+    if (!form.siteId) fieldErrors["siteId"] = "This project has no inventory scope configured.";
     const name = form.name.trim();
     const unit = form.unit.trim();
     if (!name) fieldErrors["name"] = "Material name is required.";
@@ -590,7 +608,17 @@ export class InventoryInitDialogComponent {
       return;
     }
     const remarks = form.remarks.trim() || undefined;
-    const payload = { siteId: form.siteId, name, unit, quantity, remarks };
+    const payload = {
+      siteId: form.siteId,
+      projectId: this.projectId || undefined,
+      name,
+      unit,
+      quantity,
+      isExistingMaterial: form.isExistingMaterial,
+      issuedAmount: form.isExistingMaterial ? undefined : Math.max(0, Number(form.issuedAmount) || 0),
+      givenAmount: form.isExistingMaterial ? undefined : Math.max(0, Number(form.givenAmount) || 0),
+      remarks,
+    };
     this.saving.set(true);
     this.error.set(null);
     this.fieldErrors.set({});

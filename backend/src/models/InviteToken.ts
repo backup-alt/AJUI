@@ -8,6 +8,7 @@ export interface IInviteToken extends Document {
   token: string;
   createdByAdmin: Types.ObjectId;
   projectId?: Types.ObjectId;
+  projectIds?: Types.ObjectId[];
   siteIds?: Types.ObjectId[];
   role: InviteRole;
   status: InviteStatus;
@@ -30,6 +31,7 @@ const inviteTokenSchema = new Schema<IInviteToken>(
     token: { type: String, required: true, unique: true, index: true },
     createdByAdmin: { type: Schema.Types.ObjectId, ref: "User", required: true },
     projectId: { type: Schema.Types.ObjectId, ref: "Project" },
+    projectIds: [{ type: Schema.Types.ObjectId, ref: "Project" }],
     siteIds: [{ type: Schema.Types.ObjectId, ref: "Site" }],
     role: {
       type: String,

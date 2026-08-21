@@ -29,7 +29,7 @@ import { PurchaseOrdersPanelComponent } from "../shared/purchase-orders-panel.co
               <section class="quotation-header-section">
                 <div class="section-header">
                   <h2>Saved Purchase Orders <small *ngIf="orderCount() > 0">{{ orderCount() }}</small></h2>
-                  <button type="button" class="btn-primary" (click)="view.set('create')">
+                  <button type="button" class="btn-primary" (click)="startCreate()">
                     <ion-icon name="add-outline"></ion-icon>
                     New Purchase Order
                   </button>
@@ -38,8 +38,9 @@ import { PurchaseOrdersPanelComponent } from "../shared/purchase-orders-panel.co
             }
 
             <agb-purchase-orders-panel
-              [projectId]="''"
-              [projectName]="'Current project'"
+              [projectId]="initialProjectId()"
+              [projectName]="initialProjectName() || 'Current project'"
+              [preselectedMaterialIds]="initialMaterialIds()"
               [view]="view()"
               [openNumber]="openNumber()"
               (closeCreate)="view.set('list')"
@@ -118,10 +119,29 @@ export class PurchaseOrdersPage implements OnInit {
   readonly view = signal<"list" | "create" | "detail" | "edit">("list");
   readonly openNumber = signal("");
   readonly orderCount = signal(0);
+  readonly initialProjectId = signal("");
+  readonly initialProjectName = signal("");
+  readonly initialMaterialIds = signal<string[]>([]);
 
   ngOnInit() {
     this.route.queryParams.subscribe((params) => {
       const open = params["open"];
+      const create = params["create"];
+      const projectId = String(params["projectId"] || "").trim();
+      const projectName = String(params["projectName"] || "").trim();
+      const materialIds = String(params["materials"] || "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+      if (create === "1" && projectId && materialIds.length) {
+        this.initialProjectId.set(projectId);
+        this.initialProjectName.set(projectName);
+        this.initialMaterialIds.set(materialIds);
+        this.openNumber.set("");
+        this.view.set("create");
+        void this.router.navigate(["/purchase-orders"], { replaceUrl: true });
+        return;
+      }
       if (open) {
         this.openNumber.set(String(open));
         this.view.set("detail");
@@ -132,6 +152,14 @@ export class PurchaseOrdersPage implements OnInit {
         });
       }
     });
+  }
+
+  startCreate() {
+    this.initialProjectId.set("");
+    this.initialProjectName.set("");
+    this.initialMaterialIds.set([]);
+    this.openNumber.set("");
+    this.view.set("create");
   }
 
   onSaved(order: PurchaseOrder) {

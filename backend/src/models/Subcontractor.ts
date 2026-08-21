@@ -9,6 +9,7 @@ import { Schema, model, Document, Types } from "mongoose";
 export interface ISubcontractor extends Document {
   _id: Types.ObjectId;
   projectId: Types.ObjectId;
+  projectIds: Types.ObjectId[];
   projectName: string;
   clientId: Types.ObjectId;
   subcontractorName: string;
@@ -18,6 +19,7 @@ export interface ISubcontractor extends Document {
   // The four fields the admin types into the create form:
   address?: string;
   phone?: string;
+  paymentMode: string;
   status: "active" | "inactive";
   createdBy?: Types.ObjectId;
   customFields?: Record<string, string | number | boolean | null>;
@@ -28,6 +30,7 @@ export interface ISubcontractor extends Document {
 const subcontractorSchema = new Schema<ISubcontractor>(
   {
     projectId: { type: Schema.Types.ObjectId, ref: "Project", index: true },
+    projectIds: [{ type: Schema.Types.ObjectId, ref: "Project", index: true }],
     projectName: { type: String },
     clientId: { type: Schema.Types.ObjectId, ref: "Project" },
     subcontractorName: { type: String, required: true, trim: true, index: true },
@@ -36,6 +39,7 @@ const subcontractorSchema = new Schema<ISubcontractor>(
     note: { type: String, default: "" },
     address: { type: String, default: "" },
     phone: { type: String, default: "" },
+    paymentMode: { type: String, default: "Bank Transfer", trim: true },
     status: {
       type: String,
       enum: ["active", "inactive"],
