@@ -66,7 +66,11 @@ export interface DonutSegment {
     </div>
   `,
   styles: [`
-    :host { display: block; }
+    :host {
+      display: block;
+      min-width: 0;
+      container-type: inline-size;
+    }
     .donut-chart {
       display: flex;
       align-items: center;
@@ -157,6 +161,31 @@ export interface DonutSegment {
       text-align: center;
       color: #94a3b8;
       font-size: 12px;
+    }
+    @container (max-width: 440px) {
+      .donut-chart {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 20px;
+      }
+      .donut-canvas {
+        width: min(170px, 52vw);
+        height: min(170px, 52vw);
+        align-self: center;
+      }
+      .donut-legend { width: 100%; }
+      .donut-legend-label {
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+      }
+    }
+    @container (max-width: 290px) {
+      .donut-legend li {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .donut-legend-meta { padding-left: 18px; }
     }
   `],
 })

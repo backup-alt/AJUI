@@ -102,8 +102,19 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
               </section>
             } @else if (!selectedSite()) {
               <section class="vendor-breadcrumb">
-                <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
-              <h2>{{ selectedVendor()!.name }} – Purchases</h2>
+                <div class="vendor-breadcrumb-copy">
+                  <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
+                  <h2>{{ selectedVendor()!.name }} – Purchases</h2>
+                </div>
+                <button
+                  type="button"
+                  class="vendor-header-edit"
+                  aria-label="Edit vendor"
+                  title="Edit vendor"
+                  (click)="editVendor(selectedVendor()!, $event)"
+                >
+                  <ion-icon name="create-outline" aria-hidden="true"></ion-icon>
+                </button>
               </section>
 
               @if (loadingSites()) {
@@ -422,8 +433,16 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     .vendor-breadcrumb {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 12px;
       padding: 12px 0;
+      flex-wrap: wrap;
+    }
+    .vendor-breadcrumb-copy {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: 12px;
       flex-wrap: wrap;
     }
     .vendor-breadcrumb h2 {
@@ -442,6 +461,24 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
       color: #1e293b;
     }
     .back-btn:hover { background: #e2e8f0; }
+    .vendor-header-edit {
+      display: inline-flex;
+      width: 38px;
+      height: 38px;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 9px;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+      transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+    }
+    .vendor-header-edit:hover { border-color: #94a3b8; background: #f8fafc; color: #0f3b82; }
+    .vendor-header-edit:focus-visible { outline: 3px solid rgba(37, 99, 235, .18); outline-offset: 1px; }
+    .vendor-header-edit ion-icon { font-size: 18px; }
     .client-card-footer-actions {
       display: flex;
       align-items: center;

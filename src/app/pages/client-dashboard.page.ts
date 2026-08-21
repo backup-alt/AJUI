@@ -148,14 +148,8 @@ export class ClientDashboardPage {
     });
   }
   async openClient(client: Client) {
-    // Don't auto-create projects on open — clients without projects land on
-    // the workspace empty state, where they can create a project explicitly.
-    const project = this.data.firstProjectForClient(client);
-    if (project) {
-      this.data.touchProject(project.id);
-      void this.router.navigate(["/clients", client.id, "projects", project.id, "materials"]);
-      return;
-    }
+    // A client can own several projects. Always open the client workspace
+    // first so the user can choose the correct project card.
     void this.router.navigate(["/clients", client.id]);
   }
 

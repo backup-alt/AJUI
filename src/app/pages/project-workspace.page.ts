@@ -135,9 +135,6 @@ const sectionConfigs: SectionConfig[] = [
       { key: "category", label: "Category" },
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
-      { key: "origin", label: "Origin" },
-      { key: "notes", label: "Notes" },
-      { key: "status", label: "Status" },
     ],
   },
   {
@@ -1293,6 +1290,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       <ng-template #projectDraftInput>
                         <input
                           [type]="column.type || 'text'"
+                          [attr.min]="activeSection() === 'materials' && column.key === 'quantity' ? '0.01' : null"
+                          [attr.step]="activeSection() === 'materials' && column.key === 'quantity' ? 'any' : null"
+                          [required]="activeSection() === 'materials' && column.key === 'quantity'"
                           [value]="draftRow()[column.key] || ''"
                           (input)="updateDraftField(column.key, $any($event.target).value)"
                         />
@@ -1448,7 +1448,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
               [submitLabel]="editingWorker() ? 'Save Changes' : 'Add Worker'"
               [initialValue]="editingWorker() ? workerEditValue() : null"
               [subcontractorOptions]="workerSubcontractorOptions()"
-              [extraRoleOptions]="existingWorkerRoles()"
               [submitting]="workerDialogSaving()"
               (cancel)="closeWorkerDialog()"
               (create)="editingWorker() ? updateWorkerEntry($event) : createWorkerEntry($event)"
@@ -1932,7 +1931,7 @@ export class ProjectWorkspacePage {
       labour: () => this.api.listLabour({ limit: 200, projectId: this.projectId() }),
       attendance: () => this.api.listLabour({ limit: 200, projectId: this.projectId() }),
       expenses: () => this.api.listExpenses({ limit: 200, projectId: this.projectId() }),
-      generalExpenses: () => this.api.listGeneralExpenses({ limit: 500, projectId: this.projectId() }),
+      generalExpenses: () => this.api.listGeneralExpenses({ limit: 200, projectId: this.projectId() }),
       payments: () => this.api.listPayments({ limit: 200, projectId: this.projectId() }),
       vendors: () => this.api.listVendors({ limit: 200 }),
       // Subcontractors are universal across projects on the backend — never
@@ -3180,21 +3179,6 @@ export class ProjectWorkspacePage {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  /** Existing roles used across this project's workers — surfaced as
-   * suggestions in the Role autocomplete. */
-  existingWorkerRoles(): string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const worker of this.data.workers()) {
-      const role = String(worker.labourType || "").trim();
-      if (role && !seen.has(role.toLowerCase())) {
-        seen.add(role.toLowerCase());
-        result.push(role);
-      }
-    }
-    return result;
-  }
-
   closeWorkerDialog() {
     this.showWorkerDialog.set(false);
     this.editingWorker.set(null);
@@ -3923,7 +3907,7 @@ export class ProjectWorkspacePage {
     }
 
     if (section === "materials") {
-      const quantity = Number(draft["quantity"]) || 0;
+      const quantity = Number(draft["quantity"]);
       const materialInput: Partial<MaterialRow> = {
         projectId: this.projectId() || undefined,
         site: String(draft["site"] || selectedSite || ""),
@@ -3941,6 +3925,10 @@ export class ProjectWorkspacePage {
       if (!materialInput.name) {
         console.warn("[ProjectWorkspace] Cannot save material: no material name");
         await this.presentToast("Material name is required.", "warning");
+        return;
+      }
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        await this.presentToast("Material quantity must be greater than zero.", "warning");
         return;
       }
       try {
@@ -4166,34 +4154,21 @@ export class ProjectWorkspacePage {
       createdBy: this.api.user()?.name || this.api.user()?.email || "",
     };
     try {
-      await new Promise<any>((resolve, reject) => {
+      const created = await new Promise<any>((resolve, reject) => {
         this.api.createGeneralExpense(payload).subscribe({ next: resolve, error: reject });
       });
+      const createdExpense = created?.expense ? mapGeneralExpense(created.expense) : null;
+      if (createdExpense) {
+        this.data.generalExpenses.update((rows) => [
+          createdExpense,
+          ...rows.filter((row) => String(row._id || row.id || "") !== String(createdExpense._id || createdExpense.id || "")),
+        ]);
+      }
       this.recordDialogOpen.set(false);
       this.clearRowSelection();
-      this.api.listGeneralExpenses({ limit: 500 }).subscribe({
+      this.api.listGeneralExpenses({ limit: 200, projectId }).subscribe({
         next: (result) => {
-          const mapped = (result.items || []).map((item: any) => ({
-            _id: item._id,
-            id: item.expenseId || item._id,
-            expenseId: item.expenseId,
-            origin: item.origin || "manual",
-            category: item.category || "",
-            amount: Number(item.amount) || 0,
-            spent: Number(item.amount) || 0,
-            date: item.date,
-            description: item.description,
-            notes: item.notes || "",
-            projectId: item.projectId,
-            projectName: item.projectName,
-            clientId: item.clientId,
-            clientName: item.clientName,
-            siteId: item.siteId,
-            site: item.site,
-            status: item.status || "Approved",
-            customFields: item.customFields || {},
-            createdBy: item.createdBy,
-          }));
+          const mapped = (result.items || []).map(mapGeneralExpense);
           this.data.setGeneralExpenses(mapped);
           this.loadProjectExpenseRollup(projectId);
           void this.hydration.loadModule("generalExpenses");

@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import {
@@ -12,7 +12,6 @@ import {
 } from "@ionic/angular/standalone";
 import { type Project } from "../../data/dashboardData";
 import { ErpDataService } from "../data/erp-data.service";
-import { ClientFormDialogComponent, type ClientFormValue } from "../shared/client-form-dialog.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
@@ -29,7 +28,6 @@ import { formatMoney, statusClass } from "../shared/format";
     IonSplitPane,
     EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
-    ClientFormDialogComponent,
     ProjectFormDialogComponent,
   ],
   template: `
@@ -47,7 +45,7 @@ import { formatMoney, statusClass } from "../shared/format";
           title="Client Projects"
           eyebrow="Projects"
           metaLabel=""
-          [blurred]="showProjectForm() || editingClient()"
+          [blurred]="showProjectForm()"
           [showTitle]="false"
         />
 
@@ -58,30 +56,6 @@ import { formatMoney, statusClass } from "../shared/format";
                 <div>
                   <h2>Project Management</h2>
               <p>Select a project to open its details, activity, and settings.</p>
-                </div>
-                <div class="project-toolbar-icons" aria-label="Project actions">
-                  <button type="button" class="project-tool-action primary" aria-label="Create new project" title="Create new project" (click)="openCreateProject()">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M4 5.5h10" />
-                      <path d="M4 11.5h7" />
-                      <path d="M4 17.5h6" />
-                      <path d="M17 10v8" />
-                      <path d="M13 14h8" />
-                    </svg>
-                  </button>
-                  <button type="button" class="project-tool-action" aria-label="Edit client" title="Edit client" (click)="editingClient.set(true)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
-                      <path d="m14.8 7.2 3 3" />
-                    </svg>
-                  </button>
-                  <button type="button" *ngIf="projects().length > 0" class="project-tool-action" aria-label="Export projects" title="Export projects">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M12 3v11" />
-                      <path d="m8 10 4 4 4-4" />
-                      <path d="M5 20h14" />
-                    </svg>
-                  </button>
                 </div>
               </div>
 
@@ -167,17 +141,6 @@ import { formatMoney, statusClass } from "../shared/format";
               (create)="saveProject($event)"
             ></agb-project-form-dialog>
 
-            <agb-client-form-dialog
-              *ngIf="editingClient()"
-              eyebrow="Client Edit"
-              title="Edit Client"
-              description="Update client contact and address information."
-              submitLabel="Save Client"
-              [initialValue]="clientEditValue()"
-              [submitting]="clientEditSaving()"
-              (cancel)="editingClient.set(false)"
-              (create)="saveClient($event)"
-            ></agb-client-form-dialog>
           </main>
         </ion-content>
       </div>
@@ -195,39 +158,11 @@ export class ClientWorkspacePage {
   readonly showProjectForm = signal(false);
   readonly editingProject = signal<Project | null>(null);
   readonly projectSaving = signal(false);
-  readonly editingClient = signal(false);
-  readonly clientEditSaving = signal(false);
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
 
   readonly client = computed(() => this.data.clientById(this.clientId()));
   readonly projects = computed(() => this.data.projectsForClient(this.client()));
-
-  private readonly autoOpenedClientId = new Set<string>();
-
-  constructor() {
-    // Route params are reactive so a reused component instance (e.g. navigating
-    // from one client's workspace to another) always resolves the correct
-    // client instead of the snapshot from the previous URL.
-    effect(() => {
-      const clientId = this.clientId();
-      if (!clientId || this.autoOpenedClientId.has(clientId)) return;
-      const currentClient = this.client();
-      if (!currentClient) return;
-      this.autoOpenedClientId.add(clientId);
-      void this.openClientWorkspace(currentClient);
-    });
-  }
-
-  private async openClientWorkspace(currentClient: NonNullable<ReturnType<ErpDataService["clientById"]>>) {
-    // Don't auto-create projects here either — let the empty-state UI render
-    // when the client has no projects yet.
-    const project = this.data.firstProjectForClient(currentClient);
-    if (project) {
-      this.data.touchProject(project.id);
-      void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"], { replaceUrl: true });
-    }
-  }
 
   openProject(project: Project) {
     this.data.touchProject(project.id);
@@ -351,31 +286,4 @@ export class ClientWorkspacePage {
     this.data.deleteProject(project.id);
   }
 
-  clientEditValue(): ClientFormValue | null {
-    const currentClient = this.client();
-    if (!currentClient) return null;
-    return {
-      name: currentClient.name,
-      mobile: currentClient.mobile,
-      address: currentClient.address,
-      gstNumber: currentClient.gstNumber || "",
-      state: currentClient.state || "",
-      supervisor: currentClient.supervisor || "",
-      status: currentClient.status,
-    };
-  }
-
-  async saveClient(value: ClientFormValue) {
-    const currentClient = this.client();
-    if (!currentClient || !value.name || !value.mobile || !value.address) return;
-    if (this.clientEditSaving()) return; // guard against double-submit
-    this.clientEditSaving.set(true);
-    try {
-      this.data.updateClient(currentClient.id, value);
-      this.editingClient.set(false);
-      await this.presentToast(`Client "${value.name}" updated.`);
-    } finally {
-      this.clientEditSaving.set(false);
-    }
-  }
 }
