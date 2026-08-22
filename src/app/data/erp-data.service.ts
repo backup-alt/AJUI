@@ -80,6 +80,7 @@ export type Subcontractor = {
   address: string;
   phone: string;
   gstType: "GST" | "Non-GST";
+  gstNumber: string;
   status: "active" | "inactive";
   _id?: string;
   customFields?: Record<string, string | number | boolean | null>;

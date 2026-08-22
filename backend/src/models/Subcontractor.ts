@@ -20,6 +20,7 @@ export interface ISubcontractor extends Document {
   address?: string;
   phone?: string;
   gstType: "GST" | "Non-GST";
+  gstNumber?: string;
   status: "active" | "inactive";
   createdBy?: Types.ObjectId;
   customFields?: Record<string, string | number | boolean | null>;
@@ -40,6 +41,7 @@ const subcontractorSchema = new Schema<ISubcontractor>(
     address: { type: String, default: "" },
     phone: { type: String, default: "" },
     gstType: { type: String, enum: ["GST", "Non-GST"], default: "Non-GST" },
+    gstNumber: { type: String, default: "", trim: true },
     status: {
       type: String,
       enum: ["active", "inactive"],

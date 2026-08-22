@@ -183,7 +183,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "subcontractorName", label: "Subcontractor Name" },
       { key: "address", label: "Address" },
       { key: "phone", label: "Phone No." },
-      { key: "gstType", label: "GST Registration" },
+      { key: "gstDisplay", label: "GST" },
       { key: "note", label: "Notes" },
       { key: "status", label: "Status" },
     ],
@@ -3385,7 +3385,7 @@ export class ProjectWorkspacePage {
   pendingSubcontractorValue(): SubcontractorFormValue | null {
     const subcontractorName = this.pendingSubcontractorName();
     return subcontractorName
-      ? { subcontractorName, address: "", phone: "", gstType: "Non-GST", notes: "", status: "active" }
+      ? { subcontractorName, address: "", phone: "", gstType: "Non-GST", gstNumber: "", notes: "", status: "active" }
       : null;
   }
 
@@ -3597,6 +3597,7 @@ export class ProjectWorkspacePage {
       address: String(value.address || "").trim() || undefined,
       phone: String(value.phone || "").trim() || undefined,
       gstType: value.gstType,
+      gstNumber: value.gstType === "GST" ? value.gstNumber.trim().toUpperCase() : "",
       note: String(value.notes || "").trim() || undefined,
       status: (value.status === "inactive" ? "inactive" : "active") as
         | "active"
@@ -4988,7 +4989,7 @@ export class ProjectWorkspacePage {
         subcontractorName: row.subcontractorName || "",
         address: row.address || "",
         phone: row.phone || "",
-        gstType: row.gstType || "Non-GST",
+        gstDisplay: row.gstType === "GST" ? (row.gstNumber || "—") : "No GST",
         note: row.note || "",
         status: row.status === "inactive" ? "inactive" : "active",
       }));

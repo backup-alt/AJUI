@@ -309,6 +309,7 @@ export const createSubcontractorSchema = z.object({
     address: z.string().trim().max(500).optional().default(""),
     phone: z.string().trim().max(40).optional().default(""),
     gstType: z.enum(["GST", "Non-GST"]).optional().default("Non-GST"),
+    gstNumber: z.string().trim().max(40).optional().default(""),
     status: z.enum(["active", "inactive"]).optional().default("active"),
     payments: z
       .array(

@@ -311,6 +311,7 @@ export function mapSubcontractor(s: any): Subcontractor {
     address: s.address || "",
     phone: s.phone || "",
       gstType: s.gstType === "GST" ? "GST" : "Non-GST",
+      gstNumber: s.gstType === "GST" ? (s.gstNumber || "") : "",
     status: s.status === "inactive" ? "inactive" : "active",
     customFields: s.customFields || {},
   };

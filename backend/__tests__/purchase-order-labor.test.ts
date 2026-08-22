@@ -568,10 +568,35 @@ describe("Subcontractor labor roster", () => {
         projectId: project._id.toString(),
         subcontractorName: "GST Contractor",
         gstType: "GST",
+        gstNumber: "33aabcs1402p1z8",
       });
     expect(subcontractor.status).toBe(201);
     expect(subcontractor.body.subcontractor.gstType).toBe("GST");
+    expect(subcontractor.body.subcontractor.gstNumber).toBe("33AABCS1402P1Z8");
     expect(subcontractor.body.subcontractor.paymentMode).toBeUndefined();
+
+    const missingGstNumber = await request(app)
+      .post("/api/subcontractors")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        projectId: project._id.toString(),
+        subcontractorName: "Invalid GST Contractor",
+        gstType: "GST",
+      });
+    expect(missingGstNumber.status).toBe(400);
+
+    const nonGst = await request(app)
+      .post("/api/subcontractors")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        projectId: project._id.toString(),
+        subcontractorName: "Non GST Contractor",
+        gstType: "Non-GST",
+        gstNumber: "SHOULD-BE-CLEARED",
+      });
+    expect(nonGst.status).toBe(201);
+    expect(nonGst.body.subcontractor.gstType).toBe("Non-GST");
+    expect(nonGst.body.subcontractor.gstNumber).toBe("");
   });
 
   it("supports add and edit without exposing delete", async () => {

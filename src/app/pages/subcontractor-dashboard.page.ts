@@ -21,6 +21,7 @@ interface SubcontractorRow {
   address: string;
   phone: string;
   gstType: "GST" | "Non-GST";
+  gstNumber: string;
   status: "active" | "inactive";
   totalPaid: number;
   paymentCount: number;
@@ -120,7 +121,7 @@ interface SubcontractorRow {
                     <th>Subcontractor Name</th>
                     <th>Address</th>
                     <th>Phone No.</th>
-                    <th>GST Registration</th>
+                    <th>GST</th>
                     <th>Total Paid</th>
                     <th>Note</th>
                     <th>Status</th>
@@ -135,7 +136,7 @@ interface SubcontractorRow {
                       </td>
                       <td>{{ row.address || '—' }}</td>
                       <td>{{ row.phone || '—' }}</td>
-                      <td>{{ row.gstType }}</td>
+                      <td>{{ row.gstType === 'GST' ? (row.gstNumber || '—') : 'No GST' }}</td>
                       <td>{{ formatMoney(row.totalPaid) }}</td>
                       <td>{{ row.note || '—' }}</td>
                       <td>
@@ -215,8 +216,17 @@ interface SubcontractorRow {
             </label>
             <label>
               <span>GST Registration</span>
-              <agb-searchable-select [value]="draft().gstType" [options]="gstTypeOptions" (valueChange)="patchDraft('gstType', $any($event))" />
+              <span class="gst-toggle" role="group" aria-label="GST registration">
+                <button type="button" [class.active]="draft().gstType === 'GST'" (click)="patchDraft('gstType', 'GST')">GST</button>
+                <button type="button" [class.active]="draft().gstType === 'Non-GST'" (click)="patchDraft('gstType', 'Non-GST'); patchDraft('gstNumber', '')">Non-GST</button>
+              </span>
             </label>
+            @if (draft().gstType === 'GST') {
+              <label>
+                <span>GST Number</span>
+                <input [value]="draft().gstNumber" (input)="patchDraft('gstNumber', $any($event.target).value)" placeholder="33AABCS1402P1Z8" />
+              </label>
+            }
             <label>
               <span>Status</span>
               <agb-searchable-select [value]="draft().status" [options]="statusOptions" (valueChange)="patchDraft('status', $any($event))" />
@@ -331,6 +341,9 @@ interface SubcontractorRow {
     }
     .drawer-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
     .drawer-error { color: #b91c1c; font-size: 13px; margin: 0; }
+    .gst-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid #cbd5e1; border-radius: 9px; background: #f8fafc; }
+    .gst-toggle button { min-height: 34px; border: 0; border-radius: 6px; background: transparent; color: #64748b; font: inherit; font-weight: 700; cursor: pointer; }
+    .gst-toggle button.active { background: #0f3b82; color: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, .16); }
 
     @media (max-width: 720px) {
       .subcontractors-stats { grid-template-columns: 1fr; }
@@ -341,7 +354,6 @@ interface SubcontractorRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SubcontractorDashboardPage {
-  readonly gstTypeOptions = ["GST", "Non-GST"];
   readonly statusOptions = [
     { label: "Active", value: "active" },
     { label: "Not Active", value: "inactive" },
@@ -494,6 +506,11 @@ export class SubcontractorDashboardPage {
       this.drawerError.set("Pick a project for this sub-contractor.");
       return;
     }
+    const gstNumber = d.gstNumber.trim().toUpperCase();
+    if (d.gstType === "GST" && !gstNumber) {
+      this.drawerError.set("GST number is required when GST is selected.");
+      return;
+    }
     this.saving.set(true);
     this.drawerError.set(null);
     const payload = {
@@ -505,6 +522,7 @@ export class SubcontractorDashboardPage {
       address: d.address,
       phone: d.phone,
       gstType: d.gstType,
+      gstNumber: d.gstType === "GST" ? gstNumber : "",
       status: d.status,
     };
     const editing = this.editing();
@@ -544,6 +562,7 @@ function emptyDraft(): SubcontractorRow {
     address: "",
     phone: "",
     gstType: "Non-GST",
+    gstNumber: "",
     status: "active",
     totalPaid: 0,
     paymentCount: 0,
@@ -562,6 +581,7 @@ function normalizeRow(input: any): SubcontractorRow {
     address: input.address || "",
     phone: input.phone || "",
     gstType: input.gstType === "GST" ? "GST" : "Non-GST",
+    gstNumber: input.gstType === "GST" ? (input.gstNumber || "") : "",
     status: input.status === "inactive" ? "inactive" : "active",
     totalPaid: 0,
     paymentCount: 0,

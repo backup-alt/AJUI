@@ -639,6 +639,7 @@ export class ApiService {
     address?: string;
     phone?: string;
     gstType?: "GST" | "Non-GST";
+    gstNumber?: string;
     status?: "active" | "inactive";
   }): Observable<{ subcontractor: any }> {
     return this.http.post<{ subcontractor: any }>(`${this.baseUrl}/subcontractors`, payload, {

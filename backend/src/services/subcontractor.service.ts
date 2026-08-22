@@ -16,6 +16,7 @@ export interface CreateSubcontractorInput {
   address?: string;
   phone?: string;
   gstType?: "GST" | "Non-GST";
+  gstNumber?: string;
   status?: "active" | "inactive";
 }
 
@@ -29,6 +30,9 @@ export async function createSubcontractor(input: CreateSubcontractorInput) {
   const projectId = toObjectId(input.projectId);
   const project = projectId ? await Project.findById(projectId) : null;
   if (!project) throw new AppError(404, "Project not found");
+  const gstType = input.gstType || "Non-GST";
+  const gstNumber = input.gstNumber?.trim().toUpperCase() || "";
+  if (gstType === "GST" && !gstNumber) throw new AppError(400, "GST number is required for GST subcontractors");
 
   const sub = await Subcontractor.create({
     projectId: project._id,
@@ -41,7 +45,8 @@ export async function createSubcontractor(input: CreateSubcontractorInput) {
     note: input.note || "",
     address: input.address || "",
     phone: input.phone || "",
-    gstType: input.gstType || "Non-GST",
+    gstType,
+    gstNumber: gstType === "GST" ? gstNumber : "",
     status: input.status || "active",
   });
   return sub.toObject();
@@ -159,7 +164,7 @@ export async function listSubcontractorsForSupervisor(userId: string) {
  */
 export async function listAllActiveSubcontractors() {
   const items = await Subcontractor.find({ status: "active" })
-    .select("_id subcontractorName projectId projectIds address phone note gstType status")
+    .select("_id subcontractorName projectId projectIds address phone note gstType gstNumber status")
     .sort({ subcontractorName: 1 })
     .lean();
   return items.map((s) => ({
@@ -170,6 +175,7 @@ export async function listAllActiveSubcontractors() {
     address: s.address || "",
     phone: s.phone || "",
     gstType: s.gstType || "Non-GST",
+    gstNumber: s.gstType === "GST" ? (s.gstNumber || "") : "",
     note: s.note || "",
     status: s.status,
   }));
@@ -189,6 +195,12 @@ export async function updateSubcontractor(
   if (!Types.ObjectId.isValid(id)) throw new AppError(400, "Invalid subcontractor id");
   const normalizedPatch: Record<string, unknown> = { ...patch };
   if (patch.projectIds) normalizedPatch.projectIds = patch.projectIds.map((projectId) => toObjectId(projectId));
+  if (patch.gstType === "Non-GST") normalizedPatch.gstNumber = "";
+  if (patch.gstNumber !== undefined) normalizedPatch.gstNumber = patch.gstNumber.trim().toUpperCase();
+  if (patch.gstType === "GST" && !String(normalizedPatch.gstNumber || "")) {
+    const existing = await Subcontractor.findById(id).select("gstNumber").lean();
+    if (!existing?.gstNumber) throw new AppError(400, "GST number is required for GST subcontractors");
+  }
   const sub = await Subcontractor.findByIdAndUpdate(id, normalizedPatch, { new: true });
   if (!sub) throw new AppError(404, "Subcontractor not found");
   return sub.toObject();

@@ -9,6 +9,7 @@ export type SubcontractorFormValue = {
   address: string;
   phone: string;
   gstType: "GST" | "Non-GST";
+  gstNumber: string;
   notes: string;
   status: "active" | "inactive";
 };
@@ -65,7 +66,14 @@ export type SubcontractorFormValue = {
           </label>
           <label>
             <span>GST Registration</span>
-            <agb-searchable-select name="gstType" [(ngModel)]="gstTypeValue" [options]="gstTypeOptions" />
+            <span class="gst-toggle" role="group" aria-label="GST registration">
+              <button type="button" [class.active]="gstTypeValue === 'GST'" (click)="gstTypeValue = 'GST'">GST</button>
+              <button type="button" [class.active]="gstTypeValue === 'Non-GST'" (click)="gstTypeValue = 'Non-GST'; gstNumberValue = ''">Non-GST</button>
+            </span>
+          </label>
+          <label *ngIf="gstTypeValue === 'GST'">
+            <span>GST Number</span>
+            <input name="gstNumber" [(ngModel)]="gstNumberValue" placeholder="33AABCS1402P1Z8" />
           </label>
           <label class="span-2">
             <span>Notes</span>
@@ -94,6 +102,11 @@ export type SubcontractorFormValue = {
       </section>
     </div>
   `,
+  styles: [`
+    .gst-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid #cbd5e1; border-radius: 9px; background: #f8fafc; }
+    .gst-toggle button { min-height: 34px; border: 0; border-radius: 6px; background: transparent; color: #64748b; font: inherit; font-weight: 700; cursor: pointer; }
+    .gst-toggle button.active { background: #0f3b82; color: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, .16); }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SubcontractorFormDialogComponent implements OnInit {
@@ -110,8 +123,8 @@ export class SubcontractorFormDialogComponent implements OnInit {
   addressValue = "";
   phoneValue = "";
   gstTypeValue: "GST" | "Non-GST" = "Non-GST";
+  gstNumberValue = "";
   notesValue = "";
-  readonly gstTypeOptions = ["GST", "Non-GST"];
   readonly statusOptions = [
     { label: "Active", value: "active" },
     { label: "Not Active", value: "inactive" },
@@ -125,6 +138,7 @@ export class SubcontractorFormDialogComponent implements OnInit {
       this.addressValue = this.initialValue.address || "";
       this.phoneValue = this.initialValue.phone || "";
       this.gstTypeValue = this.initialValue.gstType || "Non-GST";
+      this.gstNumberValue = this.initialValue.gstNumber || "";
       this.notesValue = this.initialValue.notes || "";
       this.statusValue = this.initialValue.status || "active";
     }
@@ -137,12 +151,18 @@ export class SubcontractorFormDialogComponent implements OnInit {
       this.validationError.set("Subcontractor's name is required.");
       return;
     }
+    const gstNumber = this.gstNumberValue.trim().toUpperCase();
+    if (this.gstTypeValue === "GST" && !gstNumber) {
+      this.validationError.set("GST number is required when GST is selected.");
+      return;
+    }
     this.validationError.set(null);
     this.create.emit({
       subcontractorName,
       address: this.addressValue.trim(),
       phone: this.phoneValue.trim(),
       gstType: this.gstTypeValue,
+      gstNumber: this.gstTypeValue === "GST" ? gstNumber : "",
       notes: this.notesValue.trim(),
       status: this.statusValue,
     });
