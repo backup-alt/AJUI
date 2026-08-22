@@ -19,7 +19,7 @@ export interface ISubcontractor extends Document {
   // The four fields the admin types into the create form:
   address?: string;
   phone?: string;
-  paymentMode: string;
+  gstType: "GST" | "Non-GST";
   status: "active" | "inactive";
   createdBy?: Types.ObjectId;
   customFields?: Record<string, string | number | boolean | null>;
@@ -39,7 +39,7 @@ const subcontractorSchema = new Schema<ISubcontractor>(
     note: { type: String, default: "" },
     address: { type: String, default: "" },
     phone: { type: String, default: "" },
-    paymentMode: { type: String, default: "Bank Transfer", trim: true },
+    gstType: { type: String, enum: ["GST", "Non-GST"], default: "Non-GST" },
     status: {
       type: String,
       enum: ["active", "inactive"],

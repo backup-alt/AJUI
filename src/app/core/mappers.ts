@@ -93,7 +93,8 @@ export function mapVendor(v: any): Vendor {
     materialType: v.materialType,
     phone: v.phone,
     address: v.address,
-    gst: v.gstNumber || "",
+      gst: v.gstNumber || "",
+      gstType: v.gstType === "Non-GST" ? "Non-GST" : (v.gstNumber ? "GST" : "Non-GST"),
     status: v.status === "Not Active" ? "Not Active" : "Active",
     siteIds: Array.isArray(v.siteIds) ? v.siteIds.map((id: any) => String(id)) : [],
     projectIds: Array.isArray(v.projectIds) ? v.projectIds.map((id: any) => String(id)) : [],
@@ -309,7 +310,7 @@ export function mapSubcontractor(s: any): Subcontractor {
     note: s.note || "",
     address: s.address || "",
     phone: s.phone || "",
-    paymentMode: s.paymentMode || "Bank Transfer",
+      gstType: s.gstType === "GST" ? "GST" : "Non-GST",
     status: s.status === "inactive" ? "inactive" : "active",
     customFields: s.customFields || {},
   };

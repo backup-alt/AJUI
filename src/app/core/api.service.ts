@@ -638,7 +638,7 @@ export class ApiService {
     note?: string;
     address?: string;
     phone?: string;
-    paymentMode?: string;
+    gstType?: "GST" | "Non-GST";
     status?: "active" | "inactive";
   }): Observable<{ subcontractor: any }> {
     return this.http.post<{ subcontractor: any }>(`${this.baseUrl}/subcontractors`, payload, {

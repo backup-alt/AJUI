@@ -8,7 +8,7 @@ export type SubcontractorFormValue = {
   subcontractorName: string;
   address: string;
   phone: string;
-  paymentMode: string;
+  gstType: "GST" | "Non-GST";
   notes: string;
   status: "active" | "inactive";
 };
@@ -64,8 +64,8 @@ export type SubcontractorFormValue = {
             <agb-searchable-select name="status" [(ngModel)]="statusValue" [options]="statusOptions" />
           </label>
           <label>
-            <span>Payment Mode</span>
-            <agb-searchable-select name="paymentMode" [(ngModel)]="paymentModeValue" [options]="paymentModeOptions" [allowCustom]="true" />
+            <span>GST Registration</span>
+            <agb-searchable-select name="gstType" [(ngModel)]="gstTypeValue" [options]="gstTypeOptions" />
           </label>
           <label class="span-2">
             <span>Notes</span>
@@ -109,9 +109,9 @@ export class SubcontractorFormDialogComponent implements OnInit {
   nameValue = "";
   addressValue = "";
   phoneValue = "";
-  paymentModeValue = "Bank Transfer";
+  gstTypeValue: "GST" | "Non-GST" = "Non-GST";
   notesValue = "";
-  readonly paymentModeOptions = ["Cash", "UPI", "Bank Transfer", "NEFT", "RTGS", "IMPS", "Cheque", "Credit Card", "Debit Card", "Net Banking", "Demand Draft", "Wallet", "Other"];
+  readonly gstTypeOptions = ["GST", "Non-GST"];
   readonly statusOptions = [
     { label: "Active", value: "active" },
     { label: "Not Active", value: "inactive" },
@@ -124,7 +124,7 @@ export class SubcontractorFormDialogComponent implements OnInit {
       this.nameValue = this.initialValue.subcontractorName || "";
       this.addressValue = this.initialValue.address || "";
       this.phoneValue = this.initialValue.phone || "";
-      this.paymentModeValue = this.initialValue.paymentMode || "Bank Transfer";
+      this.gstTypeValue = this.initialValue.gstType || "Non-GST";
       this.notesValue = this.initialValue.notes || "";
       this.statusValue = this.initialValue.status || "active";
     }
@@ -142,7 +142,7 @@ export class SubcontractorFormDialogComponent implements OnInit {
       subcontractorName,
       address: this.addressValue.trim(),
       phone: this.phoneValue.trim(),
-      paymentMode: this.paymentModeValue,
+      gstType: this.gstTypeValue,
       notes: this.notesValue.trim(),
       status: this.statusValue,
     });

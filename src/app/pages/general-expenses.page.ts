@@ -3333,6 +3333,7 @@ export class GeneralExpensesPage implements OnInit {
       phone: v.phoneNumber,
       address: v.address,
       gst: v.gstNumber,
+      gstType: v.gstNumber ? "GST" : "Non-GST",
       status: "Active",
       siteIds: [],
     };
@@ -3340,13 +3341,14 @@ export class GeneralExpensesPage implements OnInit {
 
   async createInlineVendor(value: VendorFormValue) {
     if (this.inlineVendorSaving()) return; // guard against double-submit
-    if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) return;
+    if (!value.name || !value.materialType || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) return;
     const payload = {
       name: value.name,
       materialType: value.materialType,
       phone: value.phone,
       address: value.address,
       gstNumber: value.gst,
+      gstType: value.gstType,
       status: "Active",
       siteIds: value.siteIds || [],
     };
@@ -3363,6 +3365,7 @@ export class GeneralExpensesPage implements OnInit {
         phone: value.phone,
         address: value.address,
         gst: value.gst,
+        gstType: value.gstType,
         status: "Active",
         siteIds: value.siteIds || [],
       });
@@ -3385,6 +3388,7 @@ export class GeneralExpensesPage implements OnInit {
       phone: value.phone,
       address: value.address,
       gstNumber: value.gst,
+      gstType: value.gstType,
       status: "Active",
       siteIds: value.siteIds || [],
     };
@@ -3401,6 +3405,7 @@ export class GeneralExpensesPage implements OnInit {
         phone: value.phone,
         address: value.address,
         gst: value.gst,
+        gstType: value.gstType,
         status: "Active",
       });
     } catch (err) {

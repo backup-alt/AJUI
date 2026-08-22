@@ -15,7 +15,7 @@ export interface CreateSubcontractorInput {
   note?: string;
   address?: string;
   phone?: string;
-  paymentMode?: string;
+  gstType?: "GST" | "Non-GST";
   status?: "active" | "inactive";
 }
 
@@ -41,7 +41,7 @@ export async function createSubcontractor(input: CreateSubcontractorInput) {
     note: input.note || "",
     address: input.address || "",
     phone: input.phone || "",
-    paymentMode: input.paymentMode || "Bank Transfer",
+    gstType: input.gstType || "Non-GST",
     status: input.status || "active",
   });
   return sub.toObject();
@@ -159,7 +159,7 @@ export async function listSubcontractorsForSupervisor(userId: string) {
  */
 export async function listAllActiveSubcontractors() {
   const items = await Subcontractor.find({ status: "active" })
-    .select("_id subcontractorName projectId projectIds address phone note paymentMode status")
+    .select("_id subcontractorName projectId projectIds address phone note gstType status")
     .sort({ subcontractorName: 1 })
     .lean();
   return items.map((s) => ({
@@ -169,7 +169,7 @@ export async function listAllActiveSubcontractors() {
     projectIds: (s.projectIds || []).map((projectId) => String(projectId)),
     address: s.address || "",
     phone: s.phone || "",
-    paymentMode: s.paymentMode || "Bank Transfer",
+    gstType: s.gstType || "Non-GST",
     note: s.note || "",
     status: s.status,
   }));

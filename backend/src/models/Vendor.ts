@@ -1,6 +1,7 @@
 import { Schema, model, Document, Types } from "mongoose";
 
 export type VendorStatus = "Active" | "Inactive" | "Not Active";
+export type GstType = "GST" | "Non-GST";
 
 export interface IVendor extends Document {
   _id: Types.ObjectId;
@@ -12,6 +13,7 @@ export interface IVendor extends Document {
   email?: string;
   address: string;
   gstNumber?: string;
+  gstType: GstType;
   materialsBought: number;
   totalPurchaseValue: number;
   rating: number;
@@ -33,6 +35,7 @@ const vendorSchema = new Schema<IVendor>(
     email: { type: String, trim: true, lowercase: true },
     address: { type: String, required: true },
     gstNumber: { type: String, trim: true },
+    gstType: { type: String, enum: ["GST", "Non-GST"], default: "GST" },
     materialsBought: { type: Number, default: 0 },
     totalPurchaseValue: { type: Number, default: 0 },
     rating: { type: Number, default: 0, min: 0, max: 5 },

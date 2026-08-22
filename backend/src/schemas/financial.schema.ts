@@ -270,6 +270,7 @@ export const createVendorSchema = z.object({
     email: z.string().email().optional(),
     address: z.string().trim().min(1).max(500),
     gstNumber: z.string().trim().optional(),
+    gstType: z.enum(["GST", "Non-GST"]).optional().default("GST"),
     rating: z.coerce.number().min(0).max(5).default(0),
     status: z.enum(["Active", "Inactive", "Not Active"]).default("Active"),
     siteIds: z.array(objectIdSchema).min(0).optional(),
@@ -307,7 +308,7 @@ export const createSubcontractorSchema = z.object({
     note: z.string().trim().max(1000).optional().default(""),
     address: z.string().trim().max(500).optional().default(""),
     phone: z.string().trim().max(40).optional().default(""),
-    paymentMode: z.string().trim().min(1).max(50).optional().default("Bank Transfer"),
+    gstType: z.enum(["GST", "Non-GST"]).optional().default("Non-GST"),
     status: z.enum(["active", "inactive"]).optional().default("active"),
     payments: z
       .array(

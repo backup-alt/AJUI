@@ -1076,6 +1076,7 @@ export class VendorDashboardPage {
             phone: v.phone || v.phoneNumber,
             address: v.address,
             gst: v.gstNumber || v.gst,
+            gstType: v.gstType === "Non-GST" ? "Non-GST" : ((v.gstNumber || v.gst) ? "GST" : "Non-GST"),
             status,
             _id: v._id,
             siteIds: v.siteIds || [],
@@ -1369,7 +1370,7 @@ export class VendorDashboardPage {
 
   async createVendor(value: VendorFormValue) {
     if (this.vendorSaving()) return; // guard against double-submit
-    if (!value.name || !value.materialType || !value.phone || !value.gst || !value.address) {
+    if (!value.name || !value.materialType || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) {
       const toast = await this.toastController.create({
         message: "Please fill all required fields before saving",
         duration: 3000,
@@ -1388,6 +1389,7 @@ export class VendorDashboardPage {
       phone: value.phone,
       address: value.address,
       gstNumber: value.gst,
+      gstType: value.gstType,
       status: statusValue,
       siteIds: [],
     };
@@ -1409,6 +1411,7 @@ export class VendorDashboardPage {
         phone: value.phone,
         address: value.address,
         gst: value.gst,
+        gstType: value.gstType,
         status: statusValue,
         siteIds: serverSiteIds,
       } as Vendor);
@@ -1483,12 +1486,13 @@ export class VendorDashboardPage {
       phone: vendor.phone,
       address: vendor.address,
       gst: vendor.gst,
+      gstType: vendor.gstType || (vendor.gst ? "GST" : "Non-GST"),
     };
   }
 
   async updateVendor(value: VendorFormValue) {
     const vendor = this.editingVendor();
-    if (!vendor || !value.name || !value.materialType || !value.phone || !value.gst || !value.address) {
+    if (!vendor || !value.name || !value.materialType || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) {
       if (!vendor) return;
       const toast = await this.toastController.create({
         message: "Please fill all required fields before saving",
@@ -1509,6 +1513,7 @@ export class VendorDashboardPage {
       phone: value.phone,
       address: value.address,
       gstNumber: value.gst,
+      gstType: value.gstType,
       status: statusValue,
       siteIds: [],
     };

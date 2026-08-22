@@ -544,6 +544,36 @@ describe("Purchase order workflow", () => {
 });
 
 describe("Subcontractor labor roster", () => {
+  it("persists GST registration choices for vendors and subcontractors", async () => {
+    if (!app) return;
+    const { project } = await seedProcurement();
+
+    const vendor = await request(app)
+      .post("/api/vendors")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        name: "Non GST Vendor",
+        materialType: "Sand",
+        phone: "+919876500099",
+        address: "Chennai",
+        gstType: "Non-GST",
+      });
+    expect(vendor.status).toBe(201);
+    expect(vendor.body.vendor.gstType).toBe("Non-GST");
+
+    const subcontractor = await request(app)
+      .post("/api/subcontractors")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        projectId: project._id.toString(),
+        subcontractorName: "GST Contractor",
+        gstType: "GST",
+      });
+    expect(subcontractor.status).toBe(201);
+    expect(subcontractor.body.subcontractor.gstType).toBe("GST");
+    expect(subcontractor.body.subcontractor.paymentMode).toBeUndefined();
+  });
+
   it("supports add and edit without exposing delete", async () => {
     if (!app) return;
     const { client, project } = await seedProcurement();

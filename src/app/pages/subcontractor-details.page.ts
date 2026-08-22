@@ -46,7 +46,7 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
                   @if (subcontractor()!.phone) {
                     <p class="detail-meta"><ion-icon name="call-outline"></ion-icon>{{ subcontractor()!.phone }}</p>
                   }
-                  <p class="detail-meta"><ion-icon name="card-outline"></ion-icon>Payment Mode: {{ subcontractor()!.paymentMode || 'Bank Transfer' }}</p>
+                  <p class="detail-meta"><ion-icon name="document-text-outline"></ion-icon>GST Registration: {{ subcontractor()!.gstType || 'Non-GST' }}</p>
                   <p class="detail-status">
                     <span class="status-pill" [class.active]="subcontractor()!.status === 'active'" [class.inactive]="subcontractor()!.status === 'inactive'">
                       {{ subcontractor()!.status === 'active' ? 'Active' : 'Not Active' }}

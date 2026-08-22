@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { IonIcon } from "@ionic/angular/standalone";
+import { SearchableSelectComponent } from "./searchable-select.component";
 
 export type VendorFormValue = {
   name: string;
@@ -9,6 +10,7 @@ export type VendorFormValue = {
   phone: string;
   address: string;
   gst: string;
+  gstType: "GST" | "Non-GST";
   status?: "Active" | "Not Active";
   siteIds?: string[];
 };
@@ -16,7 +18,7 @@ export type VendorFormValue = {
 @Component({
   selector: "agb-vendor-form-dialog",
   standalone: true,
-  imports: [CommonModule, FormsModule, IonIcon],
+  imports: [CommonModule, FormsModule, IonIcon, SearchableSelectComponent],
   template: `
     <div class="form-overlay" role="presentation">
       <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="vendor-form-title">
@@ -45,6 +47,10 @@ export type VendorFormValue = {
             <input name="phone" [(ngModel)]="phoneValue" placeholder="+91 98765 43210" />
           </label>
           <label>
+            <span>GST Registration</span>
+            <agb-searchable-select name="gstType" [(ngModel)]="gstTypeValue" [options]="gstTypeOptions" />
+          </label>
+          <label *ngIf="gstTypeValue === 'GST'">
             <span>GST Number</span>
             <input name="gst" [(ngModel)]="gstValue" placeholder="33AABCS1402P1Z8" />
           </label>
@@ -82,6 +88,8 @@ export class VendorFormDialogComponent implements OnInit {
   materialTypeValue = "";
   phoneValue = "";
   gstValue = "";
+  gstTypeValue: "GST" | "Non-GST" = "GST";
+  readonly gstTypeOptions = ["GST", "Non-GST"];
   addressValue = "";
 
   ngOnInit() {
@@ -89,6 +97,7 @@ export class VendorFormDialogComponent implements OnInit {
     this.materialTypeValue = this.initialValue?.materialType ?? "";
     this.phoneValue = this.initialValue?.phone ?? "";
     this.gstValue = this.initialValue?.gst ?? "";
+    this.gstTypeValue = this.initialValue?.gstType ?? (this.gstValue ? "GST" : "Non-GST");
     this.addressValue = this.initialValue?.address ?? "";
   }
 
@@ -99,7 +108,8 @@ export class VendorFormDialogComponent implements OnInit {
       materialType: this.materialTypeValue.trim(),
       phone: this.phoneValue.trim(),
       address: this.addressValue.trim(),
-      gst: this.gstValue.trim(),
+      gst: this.gstTypeValue === "GST" ? this.gstValue.trim() : "",
+      gstType: this.gstTypeValue,
     });
   }
 }

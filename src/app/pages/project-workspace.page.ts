@@ -178,12 +178,12 @@ const sectionConfigs: SectionConfig[] = [
     key: "subcontractorsRoster",
     label: "Subcontractors",
     title: "Sub-contractor Roster",
-    description: "Sub-contractor profiles assigned to this project. Use the Add Row button to pick an existing sub-contractor or create a new one — it'll appear here and on the universal sub-contractors page. Use the Subcontractor Payments tab below to record actual payments.",
+    description: "Sub-contractor profiles assigned to this project. Assign an existing sub-contractor or create a new one here. Use the Subcontractor Payments tab below to record actual payments.",
     columns: [
       { key: "subcontractorName", label: "Subcontractor Name" },
       { key: "address", label: "Address" },
       { key: "phone", label: "Phone No." },
-      { key: "paymentMode", label: "Payment Mode" },
+      { key: "gstType", label: "GST Registration" },
       { key: "note", label: "Notes" },
       { key: "status", label: "Status" },
     ],
@@ -3379,13 +3379,13 @@ export class ProjectWorkspacePage {
 
   pendingVendorValue(): VendorFormValue | null {
     const name = this.pendingVendorName();
-    return name ? { name, materialType: "", phone: "", address: "", gst: "" } : null;
+    return name ? { name, materialType: "", phone: "", address: "", gst: "", gstType: "Non-GST" } : null;
   }
 
   pendingSubcontractorValue(): SubcontractorFormValue | null {
     const subcontractorName = this.pendingSubcontractorName();
     return subcontractorName
-      ? { subcontractorName, address: "", phone: "", paymentMode: "Bank Transfer", notes: "", status: "active" }
+      ? { subcontractorName, address: "", phone: "", gstType: "Non-GST", notes: "", status: "active" }
       : null;
   }
 
@@ -3461,6 +3461,7 @@ export class ProjectWorkspacePage {
       phone: v.phoneNumber,
       address: v.address,
       gst: v.gstNumber,
+      gstType: v.gstNumber ? "GST" : "Non-GST",
     };
   }
 
@@ -3507,6 +3508,7 @@ export class ProjectWorkspacePage {
       phone,
       address,
       gstNumber: gst,
+      gstType: value.gstType,
       status: "Active",
       siteIds: [],
       projectIds: [projectId],
@@ -3537,6 +3539,7 @@ export class ProjectWorkspacePage {
       phone: value.phone,
       address: value.address,
       gstNumber: value.gst,
+      gstType: value.gstType,
       status: "Active",
       siteIds: [],
     };
@@ -3550,6 +3553,7 @@ export class ProjectWorkspacePage {
           phone: value.phone,
           address: value.address,
           gst: value.gst,
+          gstType: value.gstType,
           status: "Active",
         });
       },
@@ -3592,7 +3596,7 @@ export class ProjectWorkspacePage {
       subcontractorName: name,
       address: String(value.address || "").trim() || undefined,
       phone: String(value.phone || "").trim() || undefined,
-      paymentMode: String(value.paymentMode || "Bank Transfer").trim(),
+      gstType: value.gstType,
       note: String(value.notes || "").trim() || undefined,
       status: (value.status === "inactive" ? "inactive" : "active") as
         | "active"
@@ -4413,7 +4417,7 @@ export class ProjectWorkspacePage {
     // those records. Hide the Add Row button on that tab.
     // `vendors` opens its own Assign Vendor dialog from a dedicated
     // toolbar button, so the generic Add Row button is hidden there too.
-    return s === "expenses" || s === "vendors" || s === "attendance";
+    return s === "expenses" || s === "vendors" || s === "attendance" || s === "inventory";
   }
 
   selectSite(site: string) {
@@ -4984,7 +4988,7 @@ export class ProjectWorkspacePage {
         subcontractorName: row.subcontractorName || "",
         address: row.address || "",
         phone: row.phone || "",
-        paymentMode: row.paymentMode || "Bank Transfer",
+        gstType: row.gstType || "Non-GST",
         note: row.note || "",
         status: row.status === "inactive" ? "inactive" : "active",
       }));

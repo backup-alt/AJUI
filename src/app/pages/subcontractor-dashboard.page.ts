@@ -20,7 +20,7 @@ interface SubcontractorRow {
   note: string;
   address: string;
   phone: string;
-  paymentMode: string;
+  gstType: "GST" | "Non-GST";
   status: "active" | "inactive";
   totalPaid: number;
   paymentCount: number;
@@ -120,7 +120,7 @@ interface SubcontractorRow {
                     <th>Subcontractor Name</th>
                     <th>Address</th>
                     <th>Phone No.</th>
-                    <th>Payment Mode</th>
+                    <th>GST Registration</th>
                     <th>Total Paid</th>
                     <th>Note</th>
                     <th>Status</th>
@@ -135,7 +135,7 @@ interface SubcontractorRow {
                       </td>
                       <td>{{ row.address || '—' }}</td>
                       <td>{{ row.phone || '—' }}</td>
-                      <td>{{ row.paymentMode || 'Bank Transfer' }}</td>
+                      <td>{{ row.gstType }}</td>
                       <td>{{ formatMoney(row.totalPaid) }}</td>
                       <td>{{ row.note || '—' }}</td>
                       <td>
@@ -214,8 +214,8 @@ interface SubcontractorRow {
               ></textarea>
             </label>
             <label>
-              <span>Payment Mode</span>
-              <agb-searchable-select [value]="draft().paymentMode" [options]="paymentModeOptions" [allowCustom]="true" (valueChange)="patchDraft('paymentMode', $any($event))" />
+              <span>GST Registration</span>
+              <agb-searchable-select [value]="draft().gstType" [options]="gstTypeOptions" (valueChange)="patchDraft('gstType', $any($event))" />
             </label>
             <label>
               <span>Status</span>
@@ -341,7 +341,7 @@ interface SubcontractorRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SubcontractorDashboardPage {
-  readonly paymentModeOptions = ["Cash", "UPI", "Bank Transfer", "NEFT", "RTGS", "IMPS", "Cheque", "Credit Card", "Debit Card", "Net Banking", "Demand Draft", "Wallet", "Other"];
+  readonly gstTypeOptions = ["GST", "Non-GST"];
   readonly statusOptions = [
     { label: "Active", value: "active" },
     { label: "Not Active", value: "inactive" },
@@ -504,7 +504,7 @@ export class SubcontractorDashboardPage {
       note: d.note,
       address: d.address,
       phone: d.phone,
-      paymentMode: d.paymentMode,
+      gstType: d.gstType,
       status: d.status,
     };
     const editing = this.editing();
@@ -543,7 +543,7 @@ function emptyDraft(): SubcontractorRow {
     note: "",
     address: "",
     phone: "",
-    paymentMode: "Bank Transfer",
+    gstType: "Non-GST",
     status: "active",
     totalPaid: 0,
     paymentCount: 0,
@@ -561,7 +561,7 @@ function normalizeRow(input: any): SubcontractorRow {
     note: input.note || "",
     address: input.address || "",
     phone: input.phone || "",
-    paymentMode: input.paymentMode || "Bank Transfer",
+    gstType: input.gstType === "GST" ? "GST" : "Non-GST",
     status: input.status === "inactive" ? "inactive" : "active",
     totalPaid: 0,
     paymentCount: 0,
