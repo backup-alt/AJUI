@@ -295,6 +295,14 @@ describe("Purchase order workflow", () => {
     expect(mobileCard?.received).toBe(false);
     expect(mobileCard?.purchaseHistory).toHaveLength(2);
 
+    const hiddenBeforeLatestReceipt = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+      status: "Approved",
+      receivedOnly: true,
+      view: "inventory",
+    });
+    expect(hiddenBeforeLatestReceipt.materials.find((item) => item.name === "Cement")).toBeUndefined();
+
     await updateMaterialReceivedForSupervisor(supervisorUser._id.toString(), older._id.toString(), true);
 
     const afterOlderReceipt = await Inventory.findOne({
@@ -310,6 +318,14 @@ describe("Purchase order workflow", () => {
       (entry) => entry.materialId?.toString() === latest._id.toString()
     )?.received).toBe(false);
     expect((await Material.findById(latest._id).lean())?.status).toBe("Not Received");
+
+    const hiddenAfterOlderReceipt = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+      status: "Approved",
+      receivedOnly: true,
+      view: "inventory",
+    });
+    expect(hiddenAfterOlderReceipt.materials.find((item) => item.name === "Cement")).toBeUndefined();
 
     const webInventory = await listInventory({
       projectId: project._id.toString(),
@@ -333,6 +349,14 @@ describe("Purchase order workflow", () => {
 
     await updateMaterialReceivedForSupervisor(supervisorUser._id.toString(), latest._id.toString(), true);
     expect((await Inventory.findById(afterOlderReceipt?._id).lean())?.received).toBe(true);
+
+    const visibleAfterLatestReceipt = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+      status: "Approved",
+      receivedOnly: true,
+      view: "inventory",
+    });
+    expect(visibleAfterLatestReceipt.materials.find((item) => item.name === "Cement")).toBeDefined();
   });
 
   it("uses the purchase entry id when repeated additions share one material id", async () => {

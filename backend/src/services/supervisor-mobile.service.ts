@@ -855,23 +855,23 @@ export async function listMaterialsForSupervisor(
     // Materials is a project-level list in the mobile UI. A project selection
     // also stores its first site internally for site-specific workflows, but
     // that hidden value must not remove the project's other material rows.
-    siteId: filters.view === "materials" ? undefined : filters.siteId,
+    siteId: filters.view ? undefined : filters.siteId,
   });
   if (filters.status) query.status = filters.status;
 
-  const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
+  // Project inventory is consolidated by name in the app. Fetch enough source
+  // rows to avoid same-name/site records crowding unique materials off page 1.
+  const maxLimit = filters.view === "inventory" ? 100 : 25;
+  const limit = Math.min(Math.max(filters.limit ?? 25, 1), maxLimit);
 
   if (filters.status === "Approved" && filters.view !== "materials") {
     const invQuery: Record<string, any> = { ...query };
     delete invQuery.status;
     const andConditions: Record<string, unknown>[] = [];
     if (filters.receivedOnly) {
-      andConditions.push({
-        $or: [
-          { received: true },
-          { "purchaseHistory.received": true },
-        ],
-      });
+      // Inventory visibility follows the latest purchase only. An older
+      // received purchase must not expose stock from a newer pending purchase.
+      andConditions.push({ received: true });
     }
     const search = String(filters.search || "").trim();
     if (search) {
@@ -902,7 +902,7 @@ export async function listMaterialsForSupervisor(
       withRetry(
         () => Inventory.find(invQuery)
           .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
-          .sort({ _id: -1 })
+          .sort({ updatedAt: -1, _id: -1 })
           .limit(limit)
           .lean()
           .maxTimeMS(20_000),
@@ -933,7 +933,7 @@ export async function listMaterialsForSupervisor(
         withRetry(
           () => Inventory.find(fallbackQuery)
             .select({ receiptImage: 0, receiptImageMimeType: 0, receiptImageName: 0 })
-            .sort({ _id: -1 })
+            .sort({ updatedAt: -1, _id: -1 })
             .limit(limit)
             .lean()
             .maxTimeMS(20_000),

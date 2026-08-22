@@ -423,25 +423,35 @@ export class MaterialsPage implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => void this.loadMaterials());
 
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agb:inventory-changed', this.handleInventoryChange);
+    }
+
     this.destroyRef.onDestroy(() => {
       if (this.searchTimer) clearTimeout(this.searchTimer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('agb:inventory-changed', this.handleInventoryChange);
+      }
     });
   }
+
+  private handleInventoryChange = (): void => {
+    void this.loadMaterials(true);
+  };
 
   async loadMaterials(force = false): Promise<void> {
     this.isLoading.set(true);
     this.errorMessage.set('');
     const gen = ++this.loadGeneration;
     try {
-      const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
       const response = await firstValueFrom(
         this.supervisor.getMaterials({
-          siteId: siteId || undefined,
           projectId: projectId || undefined,
           status: 'Approved',
           receivedOnly: true,
-          limit: 25,
+          view: 'inventory',
+          limit: 100,
           search: this.searchQuery.trim() || undefined,
         }, force)
       );
@@ -470,11 +480,11 @@ export class MaterialsPage implements OnInit {
     try {
       const response = await firstValueFrom(
         this.supervisor.getMaterials({
-          siteId: this.supervisor.selectedSiteId() || undefined,
           projectId: this.supervisor.selectedProjectId() || undefined,
           status: 'Approved',
           receivedOnly: true,
-          limit: 25,
+          view: 'inventory',
+          limit: 100,
           cursor,
           search: this.searchQuery.trim() || undefined,
         })
@@ -540,9 +550,10 @@ export class MaterialsPage implements OnInit {
       }
     }
 
-    return Array.from(map.values()).sort(
-      (a, b) => new Date(b.items[0].requestDate).getTime() - new Date(a.items[0].requestDate).getTime()
+    const latestActivity = (group: ConsolidatedMaterial): number => Math.max(
+      ...group.items.map((item) => new Date(item.updatedAt || item.requestDate).getTime())
     );
+    return Array.from(map.values()).sort((a, b) => latestActivity(b) - latestActivity(a));
   }
 
   private normalizedMaterialName(name: string): string {

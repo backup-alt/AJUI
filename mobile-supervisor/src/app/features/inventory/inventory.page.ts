@@ -21,7 +21,6 @@ import { addIcons } from 'ionicons';
 import {
   gridOutline,
   searchOutline,
-  addOutline,
   chevronDownOutline,
   timeOutline,
   businessOutline,
@@ -41,7 +40,6 @@ import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { PageHeaderComponent, EmptyStateComponent } from '../../shared/components';
 import { InventoryEditModalComponent } from './inventory-edit-modal/inventory-edit-modal.component';
-import { InventoryRequestModalComponent } from './inventory-request-modal/inventory-request-modal.component';
 
 export interface InventoryItem {
   _id: string;
@@ -192,7 +190,12 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                 </div>
                 <div class="qty-meta">
                   <span class="qty-min">Min: {{ item.minimumQuantity }} {{ item.unit }}</span>
-                  <button class="edit-qty-btn" (click)="openEditQuantity(item); $event.stopPropagation()">
+                  <button
+                    class="edit-qty-btn"
+                    [disabled]="!item.received"
+                    [attr.aria-label]="item.received ? 'Update material quantity' : 'Mark material as received before updating quantity'"
+                    (click)="openEditQuantity(item); $event.stopPropagation()"
+                  >
                     <ion-icon name="pencil-outline"></ion-icon>
                     Update
                   </button>
@@ -244,10 +247,6 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                   ></ion-checkbox>
                   <span>{{ item.received ? 'Received' : 'Mark received' }}</span>
                 </label>
-                <button class="request-btn" (click)="raiseRequest(item); $event.stopPropagation()">
-                  <ion-icon name="add-outline"></ion-icon>
-                  Raise Request
-                </button>
               </footer>
             </div>
           }
@@ -475,6 +474,10 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
       transition: background var(--md-motion-duration-short1);
     }
     .edit-qty-btn:active { background: var(--m3-surface-container-high); }
+    .edit-qty-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
     .edit-qty-btn ion-icon { font-size: 12px; }
 
     .card-details {
@@ -508,25 +511,6 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
 
     .received-control { display: inline-flex; align-items: center; gap: 8px; color: var(--m3-on-surface); font-size: 13px; font-weight: 700; }
     .received-control ion-checkbox { --size: 21px; --checkbox-background-checked: var(--m3-success); --border-color-checked: var(--m3-success); }
-
-    .request-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--md-space-1);
-      background: var(--m3-primary);
-      color: var(--m3-on-primary);
-      border: none;
-      border-radius: var(--md-radius-lg);
-      padding: 10px var(--md-space-4);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-      transition: box-shadow var(--md-motion-duration-short1) var(--md-motion-easing-standard),
-                  transform var(--md-motion-duration-short1) var(--md-motion-easing-standard);
-    }
-    .request-btn:active { transform: scale(0.98); }
-    .request-btn ion-icon { font-size: 16px; }
 
     .vendor-history {
       margin-top: var(--md-space-3);
@@ -661,8 +645,8 @@ export class InventoryPage implements OnInit, OnDestroy {
   updatingReceived = signal<Set<string>>(new Set());
   searchQuery = signal('');
   stockFilter = signal<InventoryStockFilter>('all');
-  sortField = signal<SortField>('name');
-  sortDir = signal<SortDir>('asc');
+  sortField = signal<SortField>('lastUpdated');
+  sortDir = signal<SortDir>('desc');
   private loadGeneration = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -766,7 +750,7 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      gridOutline, searchOutline, addOutline,
+      gridOutline, searchOutline,
       chevronDownOutline, timeOutline, businessOutline, documentTextOutline,
       checkmarkCircleOutline, alertCircleOutline, pencilOutline, closeOutline, close,
       swapVerticalOutline, cloudOfflineOutline, refreshOutline,
@@ -806,7 +790,7 @@ export class InventoryPage implements OnInit, OnDestroy {
           projectId: projectId || undefined,
           status: 'Approved',
           view: 'inventory',
-          limit: 25,
+          limit: 100,
           search: this.searchQuery().trim() || undefined,
           stockStatus: this.stockFilter(),
         }, force)
@@ -843,7 +827,7 @@ export class InventoryPage implements OnInit, OnDestroy {
           projectId: this.supervisor.selectedProjectId() || undefined,
           status: 'Approved',
           view: 'inventory',
-          limit: 25,
+          limit: 100,
           cursor,
           search: this.searchQuery().trim() || undefined,
           stockStatus: this.stockFilter(),
@@ -915,6 +899,16 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   async openEditQuantity(item: InventoryItem): Promise<void> {
+    if (!item.received) {
+      const toast = await this.toastCtrl.create({
+        message: 'Mark this material as received before updating it',
+        duration: 2200,
+        color: 'warning',
+        position: 'top',
+      });
+      await toast.present();
+      return;
+    }
     const modal = await this.modalCtrl.create({
       component: InventoryEditModalComponent,
       componentProps: { item },
@@ -928,25 +922,6 @@ export class InventoryPage implements OnInit, OnDestroy {
 
   openDetail(id: string): void {
     this.router.navigate(['/tabs/inventory', id]);
-  }
-
-  async raiseRequest(item: InventoryItem | null): Promise<void> {
-    const modal = await this.modalCtrl.create({
-      component: InventoryRequestModalComponent,
-      componentProps: { preSelected: item },
-    });
-    await modal.present();
-    const { data } = await modal.onDidDismiss();
-    if (data?.requested) {
-      await this.loadInventory(true);
-      const toast = await this.toastCtrl.create({
-        message: 'Material request submitted successfully',
-        duration: 2500,
-        color: 'success',
-        position: 'top',
-      });
-      await toast.present();
-    }
   }
 
   async setReceived(item: InventoryItem, received: boolean): Promise<void> {
