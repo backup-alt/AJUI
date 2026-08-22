@@ -103,7 +103,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
 
       <app-page-header
         title="Materials"
-        subtitle="All material purchases for the selected project"
+        subtitle="Unique materials with complete purchase history"
       >
         <span actions class="count-chip">{{ filteredItems().length }} item{{ filteredItems().length === 1 ? '' : 's' }}</span>
       </app-page-header>
@@ -677,7 +677,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   private isDragging = false;
 
   filteredItems = computed(() => {
-    let result = [...this.items()];
+    let result = this.consolidateByName(this.items());
 
     const q = this.searchQuery().toLowerCase().trim();
     if (q) {
@@ -711,6 +711,47 @@ export class InventoryPage implements OnInit, OnDestroy {
 
     return result;
   });
+
+  /**
+   * The project Materials screen mirrors the web Inventory table: one card
+   * per material name. Quantities and histories are combined here, while the
+   * detail API performs the same name-based aggregation for the full logs.
+   */
+  private consolidateByName(items: InventoryItem[]): InventoryItem[] {
+    const grouped = new Map<string, InventoryItem>();
+
+    for (const item of items) {
+      const key = item.name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+      if (!key) continue;
+      const existing = grouped.get(key);
+      if (!existing) {
+        grouped.set(key, {
+          ...item,
+          name: item.name.trim(),
+          purchaseHistory: [...(item.purchaseHistory || [])],
+        });
+        continue;
+      }
+
+      existing.currentQuantity += item.currentQuantity;
+      existing.minimumQuantity += item.minimumQuantity;
+      existing.purchaseHistory = [
+        ...(existing.purchaseHistory || []),
+        ...(item.purchaseHistory || []),
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      if (new Date(item.lastUpdated).getTime() > new Date(existing.lastUpdated).getTime()) {
+        existing.lastUpdated = item.lastUpdated;
+        existing._id = item._id;
+        existing.materialId = item.materialId;
+        existing.vendor = item.vendor;
+        existing.billUrl = item.billUrl;
+        existing.received = item.received;
+      }
+    }
+
+    return Array.from(grouped.values());
+  }
 
   sortLabel = computed(() => {
     const map: Record<SortField, string> = {
@@ -764,7 +805,7 @@ export class InventoryPage implements OnInit, OnDestroy {
         this.supervisor.getMaterials({
           projectId: projectId || undefined,
           status: 'Approved',
-          view: 'materials',
+          view: 'inventory',
           limit: 25,
           search: this.searchQuery().trim() || undefined,
           stockStatus: this.stockFilter(),
@@ -801,7 +842,7 @@ export class InventoryPage implements OnInit, OnDestroy {
         this.supervisor.getMaterials({
           projectId: this.supervisor.selectedProjectId() || undefined,
           status: 'Approved',
-          view: 'materials',
+          view: 'inventory',
           limit: 25,
           cursor,
           search: this.searchQuery().trim() || undefined,

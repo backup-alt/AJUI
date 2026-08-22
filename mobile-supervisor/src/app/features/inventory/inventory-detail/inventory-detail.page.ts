@@ -116,6 +116,9 @@ import { DatePipe } from '@angular/common';
                     <div class="log-info">
                       <span class="log-qty">+{{ entry.quantity }} {{ item()!.unit }}</span>
                       <span class="log-vendor">{{ entry.vendor || 'Unknown Vendor' }}</span>
+                      @if (entry.poNumber) {
+                        <span class="log-po">{{ entry.poNumber }}</span>
+                      }
                       <span class="log-date">{{ entry.date | date:'MMM d, yyyy' }}</span>
                       @if (entry.billUrl) {
                         <button class="log-bill-btn" (click)="openBillViewer(entry.billUrl!); $event.stopPropagation()">
@@ -306,7 +309,7 @@ export class InventoryDetailPage implements OnInit {
   loading = signal(true);
 
   consumptionLog = signal<Array<{ quantity: number; date: string; updatedBy?: string; notes?: string }>>([]);
-  purchaseHistory = signal<Array<{ purchaseId?: string; vendor: string; quantity: number; date: string; materialId?: string; billUrl?: string; received?: boolean; receivedDate?: string }>>([]);
+  purchaseHistory = signal<Array<{ purchaseId?: string; vendor: string; quantity: number; date: string; poNumber?: string; materialId?: string; billUrl?: string; received?: boolean; receivedDate?: string }>>([]);
   updatingReceived = signal<Set<string>>(new Set());
 
   viewerUrl = signal<string | null>(null);

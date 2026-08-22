@@ -1339,17 +1339,57 @@ export async function listExpensesForSupervisor(
 
 export async function getMaterialDetailForSupervisor(userId: string, materialId: string) {
   const { query } = await buildScopedEntityQuery(userId);
-  const material =
-    await Inventory.findOne({ ...query, _id: materialId }).lean() ||
-    await Material.findOne({ ...query, _id: materialId }).lean();
-  if (!material) throw new AppError(404, "Material not found or not accessible");
+  const inventoryMaterial = await Inventory.findOne({ ...query, _id: materialId }).lean();
+  const sourceMaterial = inventoryMaterial
+    ? null
+    : await Material.findOne({ ...query, _id: materialId }).lean();
+  if (!inventoryMaterial && !sourceMaterial) {
+    throw new AppError(404, "Material not found or not accessible");
+  }
 
-  const result: any = material;
+  let result: any = inventoryMaterial || sourceMaterial;
+  if (inventoryMaterial) {
+    // The list displays one card per normalized material name. Build its
+    // detail from every matching Inventory row in the selected project so
+    // purchases and consumption from different sites are never dropped.
+    const related = await Inventory.find({
+      ...query,
+      projectId: inventoryMaterial.projectId,
+      normalizedName: inventoryMaterial.normalizedName,
+    }).lean();
+    const records = related.length > 0 ? related : [inventoryMaterial];
+    const latest = [...records].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    )[0];
+    const purchaseHistory = records
+      .flatMap((record) => record.purchaseHistory || [])
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const consumptionHistory = records
+      .flatMap((record) => record.consumptionHistory || [])
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sites = uniqueStrings(records.map((record) => record.site));
+
+    result = {
+      ...latest,
+      _id: inventoryMaterial._id,
+      materialId: inventoryMaterial._id,
+      siteId: sites.length === 1 ? latest.siteId : undefined,
+      site: sites.length === 1 ? sites[0] : "Multiple sites",
+      requestedQuantity: records.reduce((sum, record) => sum + (Number(record.requestedQuantity) || 0), 0),
+      approvedQuantity: records.reduce((sum, record) => sum + (Number(record.approvedQuantity) || 0), 0),
+      purchasedQuantity: records.reduce((sum, record) => sum + (Number(record.purchasedQuantity) || 0), 0),
+      consumedQuantity: records.reduce((sum, record) => sum + (Number(record.consumedQuantity) || 0), 0),
+      remainingStock: records.reduce((sum, record) => sum + (Number(record.remainingStock) || 0), 0),
+      minimumQuantity: records.reduce((sum, record) => sum + (Number(record.minimumQuantity) || 0), 0),
+      purchaseHistory,
+      consumptionHistory,
+    };
+  }
   if (result.pcloudFileId) {
     result.billUrl = buildPCloudMediaUrl(String(result.pcloudFileId));
   }
 
-  const linkedId = (material as any).lastMaterialId;
+  const linkedId = result.lastMaterialId;
   if (linkedId) {
       try {
         const linked = await Material.findById(linkedId).select("billUrl pcloudFileId pcloudPublicCode poNumber vendor status receivedDate").lean();

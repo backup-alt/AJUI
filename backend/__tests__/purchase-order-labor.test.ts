@@ -16,6 +16,7 @@ import { Vendor } from "../src/models/Vendor";
 import { generateId } from "../src/services/id-generator.service";
 import { ensureMaterialInInventory, listInventory } from "../src/services/inventory.service";
 import {
+  getMaterialDetailForSupervisor,
   listMaterialsForSupervisor,
   updateMaterialReceivedForSupervisor,
 } from "../src/services/supervisor-mobile.service";
@@ -152,7 +153,7 @@ describe("Purchase order workflow", () => {
       }
     );
     for (const [index, site] of [firstSite, secondSite].entries()) {
-      await Material.create({
+      const siteMaterial = await Material.create({
         materialId: await generateId("MAT"),
         projectId: project._id,
         projectName: project.name,
@@ -160,7 +161,7 @@ describe("Purchase order workflow", () => {
         clientName: client.name,
         siteId: site._id,
         site: site.name,
-        name: `Site material ${index + 1}`,
+        name: "Cement",
         unit: "Nos",
         requestedQuantity: 10,
         approvedQuantity: 10,
@@ -169,6 +170,7 @@ describe("Purchase order workflow", () => {
         requestDate: `2026-08-2${index + 1}`,
         status: "Not Received",
       });
+      await ensureMaterialInInventory(siteMaterial._id, supervisorUser._id.toString());
     }
 
     const result = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
@@ -180,9 +182,40 @@ describe("Purchase order workflow", () => {
     });
 
     expect(result.materials.map((material) => material.name)).toEqual(
-      expect.arrayContaining(["Bricks", "Site material 1", "Site material 2"])
+      expect.arrayContaining(["Bricks", "Cement", "Cement"])
     );
     expect(result.materials).toHaveLength(3);
+
+    const cementInventory = await Inventory.find({
+      projectId: project._id,
+      normalizedName: "cement",
+    });
+    expect(cementInventory).toHaveLength(2);
+    cementInventory[0].consumedQuantity = 2;
+    cementInventory[0].consumptionHistory = [{
+      quantity: 2,
+      date: new Date("2026-08-23T10:00:00.000Z"),
+      notes: "North wall",
+    }];
+    await cementInventory[0].save();
+    cementInventory[1].consumedQuantity = 3;
+    cementInventory[1].consumptionHistory = [{
+      quantity: 3,
+      date: new Date("2026-08-24T10:00:00.000Z"),
+      notes: "South wall",
+    }];
+    await cementInventory[1].save();
+
+    const detail = await getMaterialDetailForSupervisor(
+      supervisorUser._id.toString(),
+      cementInventory[0]._id.toString()
+    );
+    expect(detail.site).toBe("Multiple sites");
+    expect(detail.purchasedQuantity).toBe(20);
+    expect(detail.consumedQuantity).toBe(5);
+    expect(detail.remainingStock).toBe(15);
+    expect(detail.purchaseHistory).toHaveLength(2);
+    expect(detail.consumptionHistory).toHaveLength(2);
   });
 
   it("syncs the supervisor received checkbox to inventory and the web material status", async () => {
