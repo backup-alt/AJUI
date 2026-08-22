@@ -87,7 +87,10 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
             <span class="footer-label">View Purchases</span>
                       <div class="client-card-footer-actions">
                         <button type="button" class="client-edit-action" aria-label="Edit vendor" title="Edit Vendor" (click)="editVendor(vendor, $event)">
-                          <ion-icon name="create-outline"></ion-icon>
+                          <svg class="vendor-edit-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
+                            <path d="m14.8 7.2 3 3" />
+                          </svg>
                           <strong>Edit Vendor</strong>
                         </button>
                       </div>
@@ -114,7 +117,10 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   title="Edit vendor"
                   (click)="editVendor(selectedVendor()!, $event)"
                 >
-                  <ion-icon name="create-outline" aria-hidden="true"></ion-icon>
+                  <svg class="vendor-edit-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
+                    <path d="m14.8 7.2 3 3" />
+                  </svg>
                 </button>
               </section>
 
@@ -472,7 +478,15 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     }
     .vendor-header-edit:hover { border-color: #94a3b8; background: #f8fafc; color: #0f3b82; }
     .vendor-header-edit:focus-visible { outline: 3px solid rgba(37, 99, 235, .18); outline-offset: 1px; }
-    .vendor-header-edit ion-icon { font-size: 18px; }
+    .vendor-edit-icon {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     .client-card-footer-actions {
       display: flex;
       align-items: center;

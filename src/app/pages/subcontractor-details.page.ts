@@ -128,15 +128,6 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
                               <path d="m14.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                           </button>
-                          <button type="button" class="icon-btn danger" aria-label="Delete" title="Delete payment" (click)="deletePayment(p)">
-                            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                              <path d="M5 7h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                              <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-                              <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-                              <path d="M10 11v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                              <path d="M14 11v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                            </svg>
-                          </button>
                         </td>
                       </tr>
                     }
@@ -911,19 +902,6 @@ export class SubcontractorDetailsPage {
       error: (err) => {
         this.paymentSaving.set(false);
         this.paymentError.set(err?.error?.error || err?.error?.message || err?.message || "Could not save payment.");
-      },
-    });
-  }
-
-  deletePayment(p: SubcontractorPayment) {
-    if (!window.confirm(`Delete this payment of ${this.formatMoney(p.amount)}?`)) return;
-    this.api.deleteSubcontractorPayment(p._id).subscribe({
-      next: () => {
-        this.refreshPayments();
-        this.presentToast("Payment deleted.");
-      },
-      error: (err) => {
-        this.presentToast(err?.error?.error || err?.message || "Delete failed.");
       },
     });
   }
