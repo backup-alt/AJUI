@@ -7257,6 +7257,35 @@ body {
   line-height: 1.35;
 }
 
+.project-management-panel > .module-toolbar .module-toolbar-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #d4b45a;
+  border-radius: 8px;
+  background: #d4b45a;
+  color: #17110a;
+  font-size: 13px;
+  font-weight: 820;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.project-management-panel > .module-toolbar .module-toolbar-add ion-icon {
+  font-size: 18px;
+}
+
+.project-management-panel > .module-toolbar .module-toolbar-add:hover,
+.project-management-panel > .module-toolbar .module-toolbar-add:focus-visible {
+  border-color: #c8a94e;
+  background: #c8a94e;
+  color: #17110a;
+  outline: none;
+}
+
 .project-management-panel .project-select-grid {
   flex: 1 1 auto;
   min-height: 0;

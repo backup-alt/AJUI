@@ -57,6 +57,16 @@ import { formatMoney, statusClass } from "../shared/format";
                   <h2>Project Management</h2>
               <p>Select a project to open its details, activity, and settings.</p>
                 </div>
+                <button
+                  type="button"
+                  class="module-toolbar-add"
+                  aria-label="Add project"
+                  title="Add Project"
+                  (click)="openCreateProject()"
+                >
+                  <ion-icon name="add-outline" aria-hidden="true"></ion-icon>
+                  <span>Add Project</span>
+                </button>
               </div>
 
               <div class="project-select-grid" *ngIf="projects().length; else noProjects">
