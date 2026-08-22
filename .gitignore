@@ -31,6 +31,7 @@ atlas-credentials.env
 *.apk
 *.aab
 mobile-supervisor/android/app/google-services.json
+backend/firebase-service-account.json
 mobile/www/
 mobile/apk-output/
 mobile/.angular/
