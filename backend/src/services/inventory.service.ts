@@ -15,6 +15,34 @@ function siteKey(siteId?: Types.ObjectId | string, site?: string): string {
   return siteId ? String(siteId) : normalized(site);
 }
 
+function applyLatestReceiptState(
+  inventory: IInventory,
+  material: Pick<IMaterial, "_id" | "status" | "receivedDate">
+): void {
+  inventory.lastMaterialId = material._id;
+  inventory.received = material.status === "Received";
+  inventory.receivedDate = inventory.received ? material.receivedDate : undefined;
+}
+
+function receiptHistoryEntry(
+  material: Pick<
+    IMaterial,
+    "_id" | "vendor" | "vendorId" | "poNumber" | "status" | "receivedDate" | "createdAt"
+  >,
+  quantity: number
+) {
+  return {
+    vendor: material.vendor || "",
+    vendorId: material.vendorId,
+    quantity,
+    date: material.createdAt || new Date(),
+    poNumber: material.poNumber,
+    materialId: material._id,
+    received: material.status === "Received",
+    receivedDate: material.status === "Received" ? material.receivedDate : undefined,
+  };
+}
+
 export function inventoryMatchForMaterial(material: Pick<IMaterial, "projectId" | "siteId" | "site" | "name" | "unit">) {
   return {
     projectId: material.projectId,
@@ -43,17 +71,10 @@ export async function addApprovedMaterialToInventory(
     inventory.vendor = material.vendor;
     inventory.vendorId = material.vendorId;
     inventory.poNumber = material.poNumber;
-    inventory.lastMaterialId = material._id;
+    applyLatestReceiptState(inventory, material);
     inventory.lastUpdatedBy = updatedBy;
     inventory.purchaseHistory = inventory.purchaseHistory || [];
-    inventory.purchaseHistory.push({
-      vendor: material.vendor || "",
-      vendorId: material.vendorId,
-      quantity: qty,
-      date: new Date(),
-      poNumber: material.poNumber,
-      materialId: material._id,
-    });
+    inventory.purchaseHistory.push(receiptHistoryEntry(material, qty));
   } else {
     inventory = new Inventory({
       projectId: material.projectId,
@@ -77,6 +98,8 @@ export async function addApprovedMaterialToInventory(
       poNumber: material.poNumber,
       lastMaterialId: material._id,
       lastUpdatedBy: updatedBy,
+      received: material.status === "Received",
+      receivedDate: material.status === "Received" ? material.receivedDate : undefined,
       purchaseHistory: [{
         vendor: material.vendor || "",
         vendorId: material.vendorId,
@@ -84,6 +107,8 @@ export async function addApprovedMaterialToInventory(
         date: new Date(),
         poNumber: material.poNumber,
         materialId: material._id,
+        received: material.status === "Received",
+        receivedDate: material.status === "Received" ? material.receivedDate : undefined,
       }],
     });
   }
@@ -95,8 +120,8 @@ export async function addApprovedMaterialToInventory(
 
 /**
  * Ensure every material request is represented in Inventory immediately.
- * This does not treat a request as purchased stock; approval/PO/receiving
- * workflows update those quantities separately.
+ * Quantity fields supplied by the web material form are accumulated here,
+ * while receipt state still starts from this newest Material document.
  */
 export async function ensureMaterialInInventory(
   materialId: Types.ObjectId | string,
@@ -107,15 +132,21 @@ export async function ensureMaterialInInventory(
   if (!material.projectId) return null;
 
   const requested = Math.max(0, Number(material.requestedQuantity) || 0);
+  const approved = Math.max(0, Number(material.approvedQuantity) || 0);
+  const purchased = Math.max(0, Number(material.purchasedQuantity) || 0);
   const match = inventoryMatchForMaterial(material);
   const inventory = await Inventory.findOne(match);
   if (inventory) {
     inventory.requestedQuantity = Math.max(0, Number(inventory.requestedQuantity) || 0) + requested;
-    inventory.lastMaterialId = material._id;
+    inventory.approvedQuantity = Math.max(0, Number(inventory.approvedQuantity) || 0) + approved;
+    inventory.purchasedQuantity = Math.max(0, Number(inventory.purchasedQuantity) || 0) + purchased;
+    applyLatestReceiptState(inventory, material);
     inventory.lastUpdatedBy = updatedBy;
-    if (material.status === "Received") {
-      inventory.received = true;
-      inventory.receivedDate = material.receivedDate || new Date().toISOString().slice(0, 10);
+    if (purchased > 0 && !inventory.purchaseHistory?.some(
+      (entry) => entry.materialId?.toString() === material._id.toString()
+    )) {
+      inventory.purchaseHistory = inventory.purchaseHistory || [];
+      inventory.purchaseHistory.push(receiptHistoryEntry(material, purchased));
     }
     await inventory.save();
     return inventory.toObject();
@@ -131,8 +162,8 @@ export async function ensureMaterialInInventory(
     name: material.name,
     unit: material.unit,
     requestedQuantity: requested,
-    approvedQuantity: Math.max(0, Number(material.approvedQuantity) || 0),
-    purchasedQuantity: Math.max(0, Number(material.purchasedQuantity) || 0),
+    approvedQuantity: approved,
+    purchasedQuantity: purchased,
     consumedQuantity: Math.max(0, Number(material.consumedQuantity) || 0),
     minimumQuantity: 0,
     vendor: material.vendor,
@@ -141,7 +172,8 @@ export async function ensureMaterialInInventory(
     lastMaterialId: material._id,
     lastUpdatedBy: updatedBy,
     received: material.status === "Received",
-    receivedDate: material.receivedDate,
+    receivedDate: material.status === "Received" ? material.receivedDate : undefined,
+    purchaseHistory: purchased > 0 ? [receiptHistoryEntry(material, purchased)] : [],
   });
   return created.toObject();
 }
@@ -149,17 +181,37 @@ export async function ensureMaterialInInventory(
 export async function syncMaterialReceivedStatus(materialId: Types.ObjectId | string) {
   const material = await Material.findById(materialId).lean();
   if (!material?.projectId) return null;
-  return Inventory.findOneAndUpdate(
-    inventoryMatchForMaterial(material),
-    {
-      $set: {
-        received: material.status === "Received",
-        receivedDate: material.status === "Received" ? material.receivedDate : undefined,
-        lastMaterialId: material._id,
-      },
-    },
-    { new: true }
-  ).lean();
+  const inventory = await Inventory.findOne({
+    projectId: material.projectId,
+    $or: [
+      { lastMaterialId: material._id },
+      { "purchaseHistory.materialId": material._id },
+      inventoryMatchForMaterial(material),
+    ],
+  });
+  if (!inventory) return null;
+
+  for (const purchase of inventory.purchaseHistory || []) {
+    if (purchase.materialId?.toString() === material._id.toString()) {
+      purchase.received = material.status === "Received";
+      purchase.receivedDate = material.status === "Received" ? material.receivedDate : undefined;
+    }
+  }
+
+  const latestMaterial = inventory.lastMaterialId?.toString() === material._id.toString()
+    ? material
+    : inventory.lastMaterialId
+      ? await Material.findById(inventory.lastMaterialId).select("_id status receivedDate").lean()
+      : null;
+  if (latestMaterial) {
+    inventory.received = latestMaterial.status === "Received";
+    inventory.receivedDate = inventory.received ? latestMaterial.receivedDate : undefined;
+  } else {
+    inventory.received = false;
+    inventory.receivedDate = undefined;
+  }
+  await inventory.save();
+  return inventory.toObject();
 }
 
 /**
@@ -315,6 +367,43 @@ export async function listInventory(filter: {
     queryFailed = true;
   }
 
+  // Inventory.received is a summary of the newest material addition only.
+  // Hydrate it from that Material document so legacy rows with an old
+  // any-purchase-is-received value cannot show a stale status on the web.
+  const latestIds = items
+    .map((item) => item["lastMaterialId"])
+    .filter((id): id is Types.ObjectId => Boolean(id));
+  if (latestIds.length > 0) {
+    const latestMaterials = await Material.find({ _id: { $in: latestIds } })
+      .select("_id status receivedDate")
+      .lean();
+    const latestReceiptById = new Map(latestMaterials.map((material) => [
+      material._id.toString(),
+      { received: material.status === "Received", receivedDate: material.receivedDate },
+    ]));
+    items = items.map((item) => {
+      const latestId = item["lastMaterialId"];
+      const latestReceipt = latestId ? latestReceiptById.get(String(latestId)) : undefined;
+      const history = Array.isArray(item["purchaseHistory"])
+        ? item["purchaseHistory"] as Array<{ materialId?: unknown; received?: boolean; receivedDate?: string }>
+        : [];
+      const latestHistory = history[history.length - 1];
+      const latestLinkedCount = latestId
+        ? history.filter((entry) => String(entry.materialId || "") === String(latestId)).length
+        : 0;
+      if (latestHistory && latestLinkedCount > 1) {
+        return {
+          ...item,
+          received: Boolean(latestHistory.received),
+          receivedDate: latestHistory.receivedDate,
+        };
+      }
+      return latestReceipt
+        ? { ...item, received: latestReceipt.received, receivedDate: latestReceipt.receivedDate }
+        : item;
+    });
+  }
+
   return {
     items: items as unknown as IInventory[],
     total,
@@ -440,6 +529,8 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
           date: material.updatedAt || material.createdAt || new Date(),
           poNumber: material.poNumber,
           materialId: material._id,
+          received: material.status === "Received",
+          receivedDate: material.status === "Received" ? material.receivedDate : undefined,
         };
         if (current) {
           current.material = material;
@@ -447,10 +538,10 @@ export async function backfillApprovedMaterialsToInventory(materialQuery: Record
           current.approved += approved;
           current.purchased += purchased;
           current.consumed += Number(material.consumedQuantity) || 0;
-          current.received ||= material.status === "Received";
-          if (material.receivedDate && (!current.receivedDate || material.receivedDate > current.receivedDate)) {
-            current.receivedDate = material.receivedDate;
-          }
+          // Materials are scanned oldest-to-newest, so the group status must
+          // follow this latest addition rather than any earlier receipt.
+          current.received = material.status === "Received";
+          current.receivedDate = current.received ? material.receivedDate : undefined;
           current.history.push(history);
         } else {
           grouped.set(key, {
@@ -718,6 +809,7 @@ export async function initializeSiteInventory(
       existing.purchasedQuantity += qty;
       existing.approvedQuantity = Math.max(existing.approvedQuantity, existing.purchasedQuantity);
       existing.lastUpdatedBy = updatedBy;
+      applyLatestReceiptState(existing, material);
       existing.purchaseHistory = existing.purchaseHistory || [];
       existing.purchaseHistory.push({
         vendor: material.vendor || "",
@@ -726,6 +818,8 @@ export async function initializeSiteInventory(
         date: new Date(),
         poNumber: material.poNumber,
         materialId: material._id,
+        received: material.status === "Received",
+        receivedDate: material.status === "Received" ? material.receivedDate : undefined,
       });
       existing.remainingStock = Math.max(0, existing.purchasedQuantity - existing.consumedQuantity);
       await existing.save();
@@ -753,6 +847,8 @@ export async function initializeSiteInventory(
         poNumber: material.poNumber,
         lastMaterialId: material._id,
         lastUpdatedBy: updatedBy,
+        received: material.status === "Received",
+        receivedDate: material.status === "Received" ? material.receivedDate : undefined,
         purchaseHistory: [{
           vendor: material.vendor || "",
           vendorId: material.vendorId,
@@ -760,6 +856,8 @@ export async function initializeSiteInventory(
           date: new Date(),
           poNumber: material.poNumber,
           materialId: material._id,
+          received: material.status === "Received",
+          receivedDate: material.status === "Received" ? material.receivedDate : undefined,
         }],
       });
       await inventory.save();
@@ -849,6 +947,8 @@ export async function addInventoryMaterial(
       existingInv.remainingStock = Math.max(0, existingInv.purchasedQuantity - (Number(existingInv.consumedQuantity) || 0));
       if (minimumStock !== undefined) existingInv.minimumQuantity = minimumStock;
       existingInv.lastMaterialId = materialId;
+      existingInv.received = false;
+      existingInv.receivedDate = undefined;
       existingInv.lastUpdatedBy = updatedBy;
       if (quantity > 0) {
         existingInv.purchaseHistory = existingInv.purchaseHistory || [];
@@ -857,6 +957,7 @@ export async function addInventoryMaterial(
           quantity,
           date: new Date(),
           materialId,
+          received: false,
         });
       }
       await existingInv.save();
@@ -883,10 +984,12 @@ export async function addInventoryMaterial(
       minimumQuantity: minimumStock ?? 0,
       lastMaterialId: materialId,
       lastUpdatedBy: updatedBy,
+      received: false,
       purchaseHistory: quantity > 0 ? [{
         quantity,
         date: new Date(),
         materialId,
+        received: false,
       }] : [],
     });
     await inv.save();
@@ -906,6 +1009,10 @@ export async function addInventoryMaterial(
       existing.approvedQuantity = Math.max(0, Number(existing.approvedQuantity) || 0) + quantity;
       existing.purchasedQuantity = Math.max(0, Number(existing.purchasedQuantity) || 0) + quantity;
       existing.remainingStock = Math.max(0, existing.purchasedQuantity - (Number(existing.consumedQuantity) || 0));
+      // A new addition has its own pending receipt even when it reuses the
+      // existing Material row. PurchaseHistory keeps older receipts intact.
+      existing.status = "Not Received";
+      existing.receivedDate = undefined;
     }
     if (minimumStock !== undefined) {
       (existing as any).minimumQuantity = minimumStock;

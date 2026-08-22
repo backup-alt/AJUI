@@ -33,6 +33,7 @@ import { withRetry } from "../utils/retry.js";
 import { applyCursor } from "../utils/cursor-pagination.js";
 import { dbMutex } from "../utils/db-mutex.js";
 import { approveRequest, rejectRequest } from "./approval.service.js";
+import { syncMaterialReceivedStatus } from "./inventory.service.js";
 
 type SupervisorAccess = {
   user: Awaited<ReturnType<typeof User.findById>>;
@@ -958,9 +959,10 @@ export async function listMaterialsForSupervisor(
       .maxTimeMS(20_000);
 
     // Batch-fetch billUrl for purchaseHistory entries across all items
-    const allMatIds = items.flatMap((m) =>
-      (m.purchaseHistory || []).filter((h: any) => h.materialId).map((h: any) => h.materialId)
-    );
+    const allMatIds = items.flatMap((m) => [
+      ...(m.purchaseHistory || []).filter((h: any) => h.materialId).map((h: any) => h.materialId),
+      ...(m.lastMaterialId ? [m.lastMaterialId] : []),
+    ]);
     let billMap = new Map<string, string>();
     let receiptMap = new Map<string, { received: boolean; receivedDate?: string }>();
     if (allMatIds.length > 0) {
@@ -978,43 +980,54 @@ export async function listMaterialsForSupervisor(
     }
 
     return {
-      materials: [...items.map((m) => ({
-        _id: m._id.toString(),
-        materialId: m._id.toString(),
-        projectId: m.projectId,
-        projectName: m.projectName,
-        siteId: m.siteId,
-        site: m.site,
-        name: m.name,
-        unit: m.unit,
-        requestedQuantity: m.requestedQuantity || m.approvedQuantity,
-        approvedQuantity: m.approvedQuantity,
-        purchasedQuantity: m.purchasedQuantity,
-        consumedQuantity: m.consumedQuantity,
-        remainingStock: m.remainingStock,
-        minimumQuantity: m.minimumQuantity,
-        vendor: m.vendor,
-        poNumber: m.poNumber,
-        billUrl: m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl,
-        received: m.received,
-        purchaseHistory: (m.purchaseHistory || []).map((h: any) => {
+      materials: [...items.map((m) => {
+        const materialIdCounts = new Map<string, number>();
+        for (const historyEntry of m.purchaseHistory || []) {
+          const linkedId = historyEntry.materialId?.toString();
+          if (linkedId) materialIdCounts.set(linkedId, (materialIdCounts.get(linkedId) || 0) + 1);
+        }
+        const purchaseHistory = (m.purchaseHistory || []).map((h: any) => {
           const linkedReceipt = h.materialId ? receiptMap.get(h.materialId.toString()) : undefined;
+          const hasSharedMaterialId = h.materialId && materialIdCounts.get(h.materialId.toString())! > 1;
           return {
+            purchaseId: h._id?.toString(),
             vendor: h.vendor,
             quantity: h.quantity,
             date: h.date,
             poNumber: h.poNumber,
             materialId: h.materialId,
             billUrl: h.materialId ? (billMap.get(h.materialId.toString()) || '') : '',
-            received: Boolean(h.received || linkedReceipt?.received),
-            receivedDate: h.receivedDate || linkedReceipt?.receivedDate,
+            received: !hasSharedMaterialId && linkedReceipt ? linkedReceipt.received : Boolean(h.received),
+            receivedDate: (!hasSharedMaterialId ? linkedReceipt?.receivedDate : undefined) || h.receivedDate,
           };
-        }),
-        requestDate: m.createdAt,
-        status: "Approved" as const,
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-      })), ...poMaterials.map((m) => ({
+        });
+        const latestPurchase = purchaseHistory[purchaseHistory.length - 1];
+        return {
+          _id: m._id.toString(),
+          materialId: m._id.toString(),
+          projectId: m.projectId,
+          projectName: m.projectName,
+          siteId: m.siteId,
+          site: m.site,
+          name: m.name,
+          unit: m.unit,
+          requestedQuantity: m.requestedQuantity || m.approvedQuantity,
+          approvedQuantity: m.approvedQuantity,
+          purchasedQuantity: m.purchasedQuantity,
+          consumedQuantity: m.consumedQuantity,
+          remainingStock: m.remainingStock,
+          minimumQuantity: m.minimumQuantity,
+          vendor: m.vendor,
+          poNumber: m.poNumber,
+          billUrl: m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl,
+          received: latestPurchase?.received ?? Boolean(m.received),
+          purchaseHistory,
+          requestDate: m.createdAt,
+          status: "Approved" as const,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+        };
+      }), ...poMaterials.map((m) => ({
         _id: m._id.toString(),
         materialId: m.materialId,
         projectId: m.projectId,
@@ -1291,13 +1304,15 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
   const linkedId = (material as any).lastMaterialId;
   if (linkedId) {
       try {
-        const linked = await Material.findById(linkedId).select("billUrl pcloudFileId pcloudPublicCode poNumber vendor").lean();
+        const linked = await Material.findById(linkedId).select("billUrl pcloudFileId pcloudPublicCode poNumber vendor status receivedDate").lean();
         if (linked) {
           result.billUrl = linked.pcloudFileId
             ? buildPCloudMediaUrl(String(linked.pcloudFileId))
             : (linked.billUrl || result.billUrl);
           result.pcloudFileId = linked.pcloudFileId || result.pcloudFileId;
           result.pcloudPublicCode = linked.pcloudPublicCode || result.pcloudPublicCode;
+          result.received = linked.status === "Received";
+          result.receivedDate = linked.status === "Received" ? linked.receivedDate : undefined;
         }
     } catch {}
   }
@@ -1322,14 +1337,21 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
           { received: m.status === "Received", receivedDate: m.receivedDate },
         ]));
         for (const entry of history) {
+          entry.purchaseId = entry._id?.toString();
           if (entry.materialId) {
             const entryMaterialId = entry.materialId.toString();
             entry.billUrl = billMap.get(entryMaterialId) || '';
             const receipt = receivedMap.get(entryMaterialId);
-            entry.received = Boolean(entry.received || receipt?.received);
-            entry.receivedDate = entry.receivedDate || receipt?.receivedDate;
+            const hasSharedMaterialId = history.filter(
+              (candidate: any) => candidate.materialId?.toString() === entryMaterialId
+            ).length > 1;
+            entry.received = !hasSharedMaterialId && receipt ? receipt.received : Boolean(entry.received);
+            entry.receivedDate = (!hasSharedMaterialId ? receipt?.receivedDate : undefined) || entry.receivedDate;
           }
         }
+        const latestPurchase = history[history.length - 1];
+        result.received = Boolean(latestPurchase?.received);
+        result.receivedDate = latestPurchase?.receivedDate;
       } catch {}
     }
   }
@@ -1394,21 +1416,13 @@ export async function updateMaterialReceivedForSupervisor(
 
   const inventory = await Inventory.findOne({ ...query, _id: materialId });
   if (inventory) {
-    if (inventory.received) return { ...inventory.toObject(), status: "Received" };
-    inventory.received = true;
-    inventory.receivedDate = receivedDate;
-    inventory.lastUpdatedBy = userId;
-    if (inventory.lastMaterialId && inventory.purchaseHistory?.length) {
-      const linkedId = inventory.lastMaterialId.toString();
-      for (const purchase of inventory.purchaseHistory) {
-        if (purchase.materialId?.toString() === linkedId) {
-          purchase.received = true;
-          purchase.receivedDate = receivedDate;
-        }
-      }
+    const latestPurchase = [...(inventory.purchaseHistory || [])]
+      .reverse()
+      .find((purchase) => purchase.materialId?.toString() === inventory.lastMaterialId?.toString());
+    if (latestPurchase) {
+      latestPurchase.received = true;
+      latestPurchase.receivedDate = receivedDate;
     }
-    await inventory.save();
-
     if (inventory.lastMaterialId) {
       await Material.updateOne(
         { _id: inventory.lastMaterialId, projectId: inventory.projectId },
@@ -1416,33 +1430,71 @@ export async function updateMaterialReceivedForSupervisor(
       );
     }
 
+    inventory.received = true;
+    inventory.receivedDate = receivedDate;
+    inventory.lastUpdatedBy = userId;
+    await inventory.save();
     return {
       ...inventory.toObject(),
       status: "Received",
     };
   }
 
+  const historyInventory = await Inventory.findOne({
+    ...query,
+    "purchaseHistory._id": materialId,
+  });
+  if (historyInventory) {
+    const purchases = historyInventory.purchaseHistory || [];
+    const purchase = purchases.find((entry) => String((entry as any)._id) === materialId);
+    if (!purchase) throw new AppError(404, "Purchase not found or not accessible");
+
+    purchase.received = true;
+    purchase.receivedDate = receivedDate;
+    historyInventory.lastUpdatedBy = userId;
+    const latestPurchase = purchases[purchases.length - 1];
+    const isLatestPurchase = String((latestPurchase as any)?._id) === materialId;
+
+    const linkedMaterialId = purchase.materialId;
+    const duplicateLinkedPurchases = linkedMaterialId
+      ? purchases.filter((entry) => entry.materialId?.toString() === linkedMaterialId.toString()).length
+      : 0;
+    if (linkedMaterialId && (duplicateLinkedPurchases === 1 || isLatestPurchase)) {
+      await Material.updateOne(
+        { _id: linkedMaterialId, projectId: historyInventory.projectId },
+        { status: "Received", receivedDate }
+      );
+    }
+    const latestLinkedMaterialId = latestPurchase?.materialId;
+    const latestLinkedCount = latestLinkedMaterialId
+      ? purchases.filter((entry) => entry.materialId?.toString() === latestLinkedMaterialId.toString()).length
+      : 0;
+    const latestLinkedMaterial = latestLinkedMaterialId && latestLinkedCount === 1
+      ? await Material.findById(latestLinkedMaterialId).select("status receivedDate").lean()
+      : null;
+    historyInventory.received = latestLinkedMaterial
+      ? latestLinkedMaterial.status === "Received"
+      : Boolean(latestPurchase?.received);
+    historyInventory.receivedDate = historyInventory.received
+      ? (latestLinkedMaterial?.receivedDate || latestPurchase?.receivedDate)
+      : undefined;
+    await historyInventory.save();
+    return historyInventory.toObject();
+  }
+
   const material = await Material.findOne({ ...query, _id: materialId });
   if (!material) throw new AppError(404, "Material not found or not accessible");
 
-  if (material.status === "Received") return material.toObject();
-  material.status = "Received";
-  material.receivedDate = receivedDate;
-  await material.save();
+  if (material.status !== "Received") {
+    material.status = "Received";
+    material.receivedDate = receivedDate;
+    await material.save();
+  }
 
-  await Inventory.updateMany(
-    { projectId: material.projectId, "purchaseHistory.materialId": material._id },
-    {
-      $set: {
-        received: true,
-        receivedDate,
-        lastUpdatedBy: userId,
-        "purchaseHistory.$[purchase].received": true,
-        "purchaseHistory.$[purchase].receivedDate": receivedDate,
-      },
-    },
-    { arrayFilters: [{ "purchase.materialId": material._id }] }
-  );
+  // Synchronize this exact history entry, then derive the card/web status
+  // from Inventory.lastMaterialId. Receiving an older purchase must never
+  // change a newer purchase's status.
+  await syncMaterialReceivedStatus(material._id);
 
   return material.toObject();
 }

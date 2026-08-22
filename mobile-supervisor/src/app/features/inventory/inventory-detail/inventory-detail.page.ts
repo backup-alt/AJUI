@@ -127,7 +127,7 @@ import { DatePipe } from '@angular/common';
                         <ion-checkbox
                           aria-label="Mark this purchase as received"
                           [checked]="entry.received"
-                          [disabled]="entry.received || !entry.materialId || updatingReceived().has(entry.materialId)"
+                          [disabled]="entry.received || (!entry.purchaseId && !entry.materialId) || updatingReceived().has(entry.purchaseId || entry.materialId || '')"
                           (ionChange)="setPurchaseReceived(entry, $event.detail.checked)"
                         ></ion-checkbox>
                         <span>{{ entry.received ? 'Received' : 'Mark received' }}</span>
@@ -306,7 +306,7 @@ export class InventoryDetailPage implements OnInit {
   loading = signal(true);
 
   consumptionLog = signal<Array<{ quantity: number; date: string; updatedBy?: string; notes?: string }>>([]);
-  purchaseHistory = signal<Array<{ vendor: string; quantity: number; date: string; materialId?: string; billUrl?: string; received?: boolean; receivedDate?: string }>>([]);
+  purchaseHistory = signal<Array<{ purchaseId?: string; vendor: string; quantity: number; date: string; materialId?: string; billUrl?: string; received?: boolean; receivedDate?: string }>>([]);
   updatingReceived = signal<Set<string>>(new Set());
 
   viewerUrl = signal<string | null>(null);
@@ -358,22 +358,22 @@ export class InventoryDetailPage implements OnInit {
   }
 
   async setPurchaseReceived(
-    entry: { materialId?: string; received?: boolean },
+    entry: { purchaseId?: string; materialId?: string; received?: boolean },
     received: boolean
   ): Promise<void> {
-    const materialId = entry.materialId;
-    if (!received || entry.received || !materialId || this.updatingReceived().has(materialId)) return;
+    const receiptId = entry.purchaseId || entry.materialId;
+    if (!received || entry.received || !receiptId || this.updatingReceived().has(receiptId)) return;
 
-    this.updatingReceived.update((current) => new Set([...current, materialId]));
+    this.updatingReceived.update((current) => new Set([...current, receiptId]));
     try {
-      await firstValueFrom(this.supervisor.setMaterialReceived(materialId, true));
+      await firstValueFrom(this.supervisor.setMaterialReceived(receiptId, true));
       this.purchaseHistory.update((history) => history.map((purchase) =>
-        purchase.materialId === materialId
+        (purchase.purchaseId || purchase.materialId) === receiptId
           ? { ...purchase, received: true, receivedDate: new Date().toISOString() }
           : purchase
       ));
       window.dispatchEvent(new CustomEvent('agb:inventory-changed', {
-        detail: { id: materialId, reason: 'received' },
+        detail: { id: receiptId, reason: 'received' },
       }));
       const toast = await this.toastCtrl.create({
         message: 'Purchase marked as received',
@@ -393,7 +393,7 @@ export class InventoryDetailPage implements OnInit {
     } finally {
       this.updatingReceived.update((current) => {
         const next = new Set(current);
-        next.delete(materialId);
+        next.delete(receiptId);
         return next;
       });
     }

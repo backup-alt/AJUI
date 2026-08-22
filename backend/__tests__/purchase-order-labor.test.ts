@@ -13,7 +13,11 @@ import { Supervisor } from "../src/models/Supervisor";
 import { User } from "../src/models/User";
 import { Vendor } from "../src/models/Vendor";
 import { generateId } from "../src/services/id-generator.service";
-import { listMaterialsForSupervisor } from "../src/services/supervisor-mobile.service";
+import { ensureMaterialInInventory, listInventory } from "../src/services/inventory.service";
+import {
+  listMaterialsForSupervisor,
+  updateMaterialReceivedForSupervisor,
+} from "../src/services/supervisor-mobile.service";
 import { hashPassword } from "../src/utils/password";
 
 let token = "";
@@ -158,6 +162,114 @@ describe("Purchase order workflow", () => {
     expect(undoReceived.status).toBe(409);
     expect((await Inventory.findById(inventory._id).lean())?.received).toBe(true);
     expect((await Material.findById(material._id).lean())?.status).toBe("Received");
+  });
+
+  it("keeps purchase receipts independent and summarizes only the latest web addition", async () => {
+    if (!app) return;
+    const { project, supervisorUser } = await seedProcurement();
+    const createWebMaterial = async (requestDate: string) => {
+      const material = await Material.create({
+        materialId: await generateId("MAT"),
+        projectId: project._id,
+        projectName: project.name,
+        site: "Main Store",
+        name: "Cement",
+        unit: "Bag",
+        requestedQuantity: 25,
+        approvedQuantity: 25,
+        purchasedQuantity: 25,
+        consumedQuantity: 0,
+        requestDate,
+        status: "Not Received",
+        createdBy: supervisorUser._id.toString(),
+      });
+      await ensureMaterialInInventory(material._id, supervisorUser._id.toString());
+      return material.toObject();
+    };
+    const older = await createWebMaterial("2026-08-20");
+    const latest = await createWebMaterial("2026-08-21");
+    // The web createMaterial service executes the same inventory sync after
+    // creating each Material document.
+
+    const beforeReceipt = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+      status: "Approved",
+    });
+    const mobileCard = beforeReceipt.materials.find((item) => item.name === "Cement");
+    expect(mobileCard).toBeDefined();
+    expect(mobileCard?.received).toBe(false);
+    expect(mobileCard?.purchaseHistory).toHaveLength(2);
+
+    await updateMaterialReceivedForSupervisor(supervisorUser._id.toString(), older._id.toString(), true);
+
+    const afterOlderReceipt = await Inventory.findOne({
+      projectId: project._id,
+      normalizedName: "cement",
+    }).lean();
+    expect(afterOlderReceipt?.lastMaterialId?.toString()).toBe(latest._id.toString());
+    expect(afterOlderReceipt?.received).toBe(false);
+    expect(afterOlderReceipt?.purchaseHistory?.find(
+      (entry) => entry.materialId?.toString() === older._id.toString()
+    )?.received).toBe(true);
+    expect(afterOlderReceipt?.purchaseHistory?.find(
+      (entry) => entry.materialId?.toString() === latest._id.toString()
+    )?.received).toBe(false);
+    expect((await Material.findById(latest._id).lean())?.status).toBe("Not Received");
+
+    const webInventory = await listInventory({
+      projectId: project._id.toString(),
+      page: 1,
+      limit: 25,
+    });
+    expect(webInventory.items.find((item) => item.name === "Cement")?.received).toBe(false);
+
+    const refreshedMobile = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+      status: "Approved",
+    });
+    const refreshedCard = refreshedMobile.materials.find((item) => item.name === "Cement");
+    expect(refreshedCard?.received).toBe(false);
+    expect(refreshedCard?.purchaseHistory.find(
+      (entry: any) => entry.materialId?.toString() === older._id.toString()
+    )?.received).toBe(true);
+    expect(refreshedCard?.purchaseHistory.find(
+      (entry: any) => entry.materialId?.toString() === latest._id.toString()
+    )?.received).toBe(false);
+
+    await updateMaterialReceivedForSupervisor(supervisorUser._id.toString(), latest._id.toString(), true);
+    expect((await Inventory.findById(afterOlderReceipt?._id).lean())?.received).toBe(true);
+  });
+
+  it("uses the purchase entry id when repeated additions share one material id", async () => {
+    if (!app) return;
+    const { project, material, supervisorUser } = await seedProcurement();
+    const inventory = await Inventory.create({
+      projectId: project._id,
+      projectName: project.name,
+      site: "Main Store",
+      name: material.name,
+      unit: material.unit,
+      requestedQuantity: 20_000,
+      approvedQuantity: 20_000,
+      purchasedQuantity: 20_000,
+      consumedQuantity: 0,
+      minimumQuantity: 0,
+      lastMaterialId: material._id,
+      received: false,
+      purchaseHistory: [
+        { vendor: "Vendor A", quantity: 10_000, date: new Date("2026-08-20"), materialId: material._id, received: false },
+        { vendor: "Vendor A", quantity: 10_000, date: new Date("2026-08-21"), materialId: material._id, received: false },
+      ],
+    });
+    const olderPurchaseId = String((inventory.purchaseHistory?.[0] as any)?._id);
+
+    await updateMaterialReceivedForSupervisor(supervisorUser._id.toString(), olderPurchaseId, true);
+
+    const refreshed = await Inventory.findById(inventory._id).lean();
+    expect(refreshed?.purchaseHistory?.[0]?.received).toBe(true);
+    expect(refreshed?.purchaseHistory?.[1]?.received).toBe(false);
+    expect(refreshed?.received).toBe(false);
+    expect((await Material.findById(material._id).lean())?.status).toBe("Not Received");
   });
 
   it("persists a readable PO, allocates full approved quantity, and creates manual project materials", async () => {
