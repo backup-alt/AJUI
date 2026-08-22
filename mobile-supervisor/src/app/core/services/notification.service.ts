@@ -40,6 +40,12 @@ export class NotificationService {
   /** Set when a periodic fetch is running to avoid duplicate timers. */
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
+  /** Native listeners must only be attached once per WebView lifetime. */
+  private listenersRegistered = false;
+
+  /** Completes the active registration attempt after the backend stores the token. */
+  private registrationResultResolver: ((registered: boolean) => void) | null = null;
+
   /**
    * One-time check for whether Firebase is actually configured for this
    * app build. The Android build writes a small marker when a valid
@@ -56,7 +62,9 @@ export class NotificationService {
     if (!this.fcmAvailable()) return false;
     if (typeof fetch === 'undefined') return true;
     try {
-      const res = await fetch('push-configured.json', { method: 'HEAD', cache: 'no-store' });
+      // Android's asset server is not consistent about HEAD requests. A small
+      // GET reliably verifies the marker that the Android build writes.
+      const res = await fetch('./push-configured.json', { method: 'GET', cache: 'no-store' });
       if (!res.ok) {
         console.warn('[Notification] native Firebase configuration missing — push disabled');
         this.fcmAvailable.set(false);
@@ -64,9 +72,8 @@ export class NotificationService {
       }
       return true;
     } catch (err) {
-      // fetch may fail in offline scenarios — treat as "unknown / unavailable"
-      console.warn('[Notification] google-services.json probe failed (push disabled):', err);
-      this.fcmAvailable.set(false);
+      // Do not permanently disable retries for a transient WebView/asset read.
+      console.warn('[Notification] Firebase marker probe failed:', err);
       return false;
     }
   }
@@ -84,8 +91,6 @@ export class NotificationService {
         this.pushEnabled.set(false);
         return false;
       }
-      this.pushEnabled.set(true);
-
       // 2. Probe Firebase BEFORE attempting register(). If google-services.json
       //    is missing the register() call crashes the WebView via Capacitor's
       //    RuntimeException rethrow (see probeFirebaseConfigured for details).
@@ -99,9 +104,10 @@ export class NotificationService {
 
       // 3. Firebase is configured. register() is wrapped defensively so an
       //    unexpected failure here cannot crash the app.
-      await this.register();
-      await this.persistPreference(true);
-      return true;
+      const registered = await this.register();
+      this.pushEnabled.set(registered);
+      await this.persistPreference(registered);
+      return registered;
     } catch (err) {
       console.error('[Notification] permission request failed', err);
       this.pushEnabled.set(false);
@@ -198,34 +204,43 @@ export class NotificationService {
    * actually wired up. Every step is still wrapped defensively — a stuck
    * Firebase init can never block the Angular zone.
    */
-  private async register(): Promise<void> {
+  private async register(): Promise<boolean> {
     // Add listeners before register(). Android can emit the token immediately,
     // so attaching them afterwards intermittently loses device registration.
-    await Promise.all([
+    if (!this.listenersRegistered) {
+      await Promise.all([
       this.safeAddListener('registration', async (token: Token) => {
-      if (!token?.value) return;
-      this.fcmToken.set(token.value);
-      try {
-        const deviceId = await this.getDeviceId();
-        await this.raceWithTimeout(
-          firstValueFrom(
-            this.api.post('/supervisor/device/register', {
-              fcmToken: token.value,
-              platform: this.getPlatform(),
-              deviceId,
-              appVersion: environment.version,
-            })
-          ),
-          8000,
-          'device register'
-        );
-      } catch (err) {
-        console.warn('[Notification] failed to register device with backend:', err);
-      }
+        if (!token?.value) {
+          this.registrationResultResolver?.(false);
+          return;
+        }
+        this.fcmToken.set(token.value);
+        try {
+          const deviceId = await this.getDeviceId();
+          await this.raceWithTimeout(
+            firstValueFrom(
+              this.api.post('/supervisor/device/register', {
+                fcmToken: token.value,
+                platform: this.getPlatform(),
+                deviceId,
+                appVersion: environment.version,
+              })
+            ),
+            8000,
+            'device register'
+          );
+          this.pushEnabled.set(true);
+          await this.persistPreference(true);
+          this.registrationResultResolver?.(true);
+        } catch (err) {
+          console.warn('[Notification] failed to register device with backend:', err);
+          this.registrationResultResolver?.(false);
+        }
       }),
 
       this.safeAddListener('registrationError', (err) => {
         console.warn('[Notification] FCM registration error:', err);
+        this.registrationResultResolver?.(false);
       }),
 
       this.safeAddListener('pushNotificationReceived', (notification) => {
@@ -255,7 +270,13 @@ export class NotificationService {
           console.warn('[Notification] action handler failed:', err);
         }
       }),
-    ]);
+      ]);
+      this.listenersRegistered = true;
+    }
+
+    const tokenRegistered = new Promise<boolean>((resolve) => {
+      this.registrationResultResolver = resolve;
+    });
 
     try {
       await this.raceWithTimeout(
@@ -285,7 +306,21 @@ export class NotificationService {
       this.fcmAvailable.set(false);
       this.pushEnabled.set(false);
       await this.persistPreference(false);
-      return;
+      this.registrationResultResolver = null;
+      return false;
+    }
+
+    let registered = false;
+    try {
+      registered = await this.raceWithTimeout(
+        tokenRegistered,
+        12_000,
+        'FCM token backend registration'
+      );
+    } catch (err) {
+      console.warn('[Notification] token registration did not complete:', err);
+    } finally {
+      this.registrationResultResolver = null;
     }
 
     // Drain any already-delivered notifications into the in-app list.
@@ -310,6 +345,7 @@ export class NotificationService {
     } catch (err) {
       console.warn('[Notification] getDeliveredNotifications outer failure:', err);
     }
+    return registered;
   }
 
   /**

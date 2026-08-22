@@ -174,7 +174,7 @@ import { Project } from '../../shared/models';
             <ion-menu-button color="primary"></ion-menu-button>
           </ion-buttons>
 
-          <ion-title>
+          <ion-title class="project-title">
             <button class="site-selector" id="project-selector-btn">
               <span class="site-icon"><ion-icon name="business-outline"></ion-icon></span>
               <span class="site-name">{{ selectedProjectName() || 'Select project' }}</span>
@@ -247,6 +247,8 @@ import { Project } from '../../shared/models';
     /* ─── Menu layout ─── */
     .agb-menu {
       --background: var(--m3-surface-bright);
+      --width: min(84vw, 360px);
+      --max-width: calc(100vw - 48px);
     }
     .agb-menu::part(container) {
       display: flex;
@@ -301,6 +303,9 @@ import { Project } from '../../shared/models';
 
     .menu-body {
       flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
       overflow-y: auto;
       background: var(--m3-surface-bright);
       padding: 0;
@@ -412,12 +417,13 @@ import { Project } from '../../shared/models';
     }
 
     /* ─── Spacer & Footer ─── */
-    .menu-spacer { flex: 0; min-height: 0; }
+    .menu-spacer { flex: 1 1 16px; min-height: 16px; }
 
     .menu-footer {
       padding: 4px var(--md-space-3) calc(8px + env(safe-area-inset-bottom));
       border-top: 1px solid var(--m3-outline-variant);
       flex-shrink: 0;
+      margin-top: auto;
     }
     .menu-footer ion-item {
       --background: transparent;
@@ -449,6 +455,31 @@ import { Project } from '../../shared/models';
       --background: var(--m3-surface-bright);
       --border-color: transparent;
     }
+    .agb-app-header ion-toolbar {
+      --min-height: 56px;
+      --padding-start: 0;
+      --padding-end: 0;
+      overflow: visible;
+    }
+    .agb-app-header ion-buttons {
+      margin: 0;
+      min-width: 48px;
+      z-index: 2;
+    }
+    .agb-app-header ion-menu-button,
+    .agb-app-header ion-button {
+      min-height: 44px;
+      width: 48px;
+      margin: 0;
+    }
+    .project-title {
+      position: absolute;
+      inset: 0 48px;
+      width: auto;
+      min-width: 0;
+      padding: 0 4px;
+      pointer-events: none;
+    }
     .site-selector {
       display: flex;
       align-items: center;
@@ -458,13 +489,15 @@ import { Project } from '../../shared/models';
       padding: 6px var(--md-space-3) 6px 6px;
       border-radius: var(--md-radius-pill);
       cursor: pointer;
-      max-width: min(55vw, 260px);
+      width: min(100%, 260px);
+      max-width: 100%;
       min-width: 0;
       margin: 0 auto;
       transition:
         background var(--md-motion-duration-short1) var(--md-motion-easing-standard),
         border-color var(--md-motion-duration-short1) var(--md-motion-easing-standard);
       font-family: inherit;
+      pointer-events: auto;
     }
     .site-selector:hover {
       background: var(--m3-surface-container-high);
@@ -563,6 +596,31 @@ import { Project } from '../../shared/models';
     .empty-sites span {
       font-size: 12px;
       color: var(--m3-on-surface-muted);
+    }
+
+    @media (max-width: 360px) {
+      .project-title { inset-inline: 46px; padding-inline: 2px; }
+      .site-selector { gap: 5px; padding: 5px 8px 5px 5px; }
+      .site-icon { width: 28px; height: 28px; }
+      .site-name { font-size: 12px; }
+      .agb-app-header ion-buttons { min-width: 46px; }
+      .agb-app-header ion-menu-button,
+      .agb-app-header ion-button { width: 46px; }
+    }
+
+    @media (max-width: 320px) {
+      .site-icon { display: none; }
+      .site-selector { justify-content: center; padding-left: 10px; }
+      .menu-brand-name { font-size: 12px; }
+      .menu-brand-sub { font-size: 9px; }
+    }
+
+    @media (max-height: 700px) {
+      .agb-menu-header { padding-bottom: 8px; }
+      .user-row { padding-top: 8px; padding-bottom: 8px; }
+      .menu-section-label { padding-top: 8px; }
+      .menu-list ion-item { --min-height: 42px; margin-block: 1px; }
+      .menu-spacer { min-height: 8px; }
     }
 
     /* ─── Shell header overlap fix ─── */

@@ -73,27 +73,38 @@ export async function notifyProjectSupervisors(
   data?: Record<string, string>
 ): Promise<number> {
   const { Project } = await import("../models/Project.js");
-  const { User } = await import("../models/User.js");
   const { Supervisor } = await import("../models/Supervisor.js");
 
   const pid = typeof projectId === "string" ? new Types.ObjectId(projectId) : projectId;
   const project = await Project.findById(pid).lean();
   if (!project) throw new AppError(404, "Project not found");
 
-  const supervisorIds: Types.ObjectId[] = [];
-  if (project.supervisorId) supervisorIds.push(project.supervisorId);
-
-  const supervisors = await Supervisor.find({ assignedProjectId: pid }).lean();
-  for (const s of supervisors) {
-    if (s.userId) supervisorIds.push(s.userId);
+  // Project.supervisorId points at a Supervisor profile, whereas device
+  // tokens belong to User records. Also include both the current multi-project
+  // assignment field and the legacy single-project field. The old code treated
+  // project.supervisorId as a User id and missed assignedProjects entirely,
+  // so most valid devices never received a push.
+  const supervisorConditions: Record<string, unknown>[] = [
+    { assignedProjectId: pid },
+    { assignedProjects: pid },
+  ];
+  if (project.supervisorId) {
+    supervisorConditions.push({ _id: project.supervisorId });
   }
+  const supervisors = await Supervisor.find({ $or: supervisorConditions })
+    .select("userId")
+    .lean();
+  const userIds = Array.from(new Set(
+    supervisors
+      .map((supervisor) => supervisor.userId?.toString())
+      .filter((id): id is string => Boolean(id))
+  ));
 
-  if (supervisorIds.length === 0) return 0;
+  if (userIds.length === 0) return 0;
 
-  const users = await User.find({ _id: { $in: supervisorIds } }).lean();
   let total = 0;
-  for (const user of users) {
-    total += await notifyUserOfApproval(user._id, title, body, data);
+  for (const userId of userIds) {
+    total += await notifyUserOfApproval(userId, title, body, data);
   }
   return total;
 }

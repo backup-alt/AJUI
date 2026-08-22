@@ -847,6 +847,7 @@ export async function listMaterialsForSupervisor(
     search?: string;
     stockStatus?: "all" | "available" | "low" | "out";
     receivedOnly?: boolean;
+    view?: "materials" | "inventory";
   }
 ) {
   const { access, query } = await buildScopedEntityQuery(userId, {
@@ -857,7 +858,7 @@ export async function listMaterialsForSupervisor(
 
   const limit = Math.min(Math.max(filters.limit ?? 25, 1), 25);
 
-  if (filters.status === "Approved") {
+  if (filters.status === "Approved" && filters.view !== "materials") {
     const invQuery: Record<string, any> = { ...query };
     delete invQuery.status;
     const andConditions: Record<string, unknown>[] = [];
@@ -1057,6 +1058,50 @@ export async function listMaterialsForSupervisor(
         nextCursor: items.length === limit ? String((items[items.length - 1] as any)?._id ?? "") : null,
       },
     };
+  }
+
+  // The mobile Materials screen represents every material/purchase row from
+  // the web Materials table.  Historically an "Approved" request was routed
+  // through the Inventory collection above, which merged same-name purchases
+  // into a handful of stock cards.  Keep that aggregation for the Inventory
+  // screen only and return the source Material documents for this view.
+  if (filters.view === "materials") {
+    delete query.status;
+    const conditions: Record<string, unknown>[] = [];
+    const search = String(filters.search || "").trim();
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = { $regex: escaped, $options: "i" };
+      conditions.push({
+        $or: [
+          { name: regex },
+          { vendor: regex },
+          { poNumber: regex },
+          { projectName: regex },
+          { site: regex },
+        ],
+      });
+    }
+    if (filters.stockStatus === "available") {
+      conditions.push({ remainingStock: { $gt: 0 } });
+    } else if (filters.stockStatus === "out") {
+      conditions.push({ remainingStock: { $lte: 0 } });
+    } else if (filters.stockStatus === "low") {
+      conditions.push({
+        $expr: {
+          $and: [
+            { $gt: ["$remainingStock", 0] },
+            { $lte: ["$remainingStock", { $ifNull: ["$minimumQuantity", 0] }] },
+          ],
+        },
+      });
+    }
+    if (conditions.length > 0) {
+      query.$and = [
+        ...(Array.isArray(query.$and) ? query.$and : []),
+        ...conditions,
+      ];
+    }
   }
 
   applyCursor(query, filters.cursor);

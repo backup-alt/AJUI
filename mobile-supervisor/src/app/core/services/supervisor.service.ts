@@ -161,6 +161,7 @@ export class SupervisorService {
     search?: string;
     stockStatus?: 'all' | 'available' | 'low' | 'out';
     receivedOnly?: boolean;
+    view?: 'materials' | 'inventory';
   }, force = false) {
     if (force) this.api.invalidateGetCache('/supervisor/materials');
     return this.api.get<MaterialsListResponse>('/supervisor/materials', filters);

@@ -141,6 +141,7 @@ export class AppComponent implements OnInit {
 
         // Fetch any approval notifications that may have arrived while
         // the app was backgrounded.
+        void this.notifications.initializeDevicePush();
         void this.notifications.fetchFromBackend();
       }
     });
