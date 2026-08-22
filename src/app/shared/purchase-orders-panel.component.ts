@@ -3,10 +3,14 @@ import { ChangeDetectionStrategy, Component, EventEmitter, HostListener, Input, 
 import { FormsModule } from "@angular/forms";
 import { IonIcon } from "@ionic/angular/standalone";
 import { firstValueFrom } from "rxjs";
+import ExcelJS from "exceljs";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { ApiService, PurchaseOrder } from "../core/api.service";
 import { mapMaterial } from "../core/mappers";
 import { ErpDataService } from "../data/erp-data.service";
 import { formatMoney } from "./format";
+import { SearchableSelectComponent } from "./searchable-select.component";
 
 type ExistingMaterial = {
   _id: string;
@@ -34,7 +38,7 @@ type PoDraftLine = {
 @Component({
   selector: "agb-purchase-orders-panel",
   standalone: true,
-  imports: [CommonModule, FormsModule, IonIcon],
+  imports: [CommonModule, FormsModule, IonIcon, SearchableSelectComponent],
   template: `
     @if (view === "list") {
       <section class="po-panel">
@@ -134,9 +138,7 @@ type PoDraftLine = {
               </div>
               <div class="form-field">
                 <label>Payment Mode *</label>
-                <select [ngModel]="paymentMode()" (ngModelChange)="paymentMode.set($event)">
-                  @for (mode of paymentModes; track mode) { <option [value]="mode">{{ mode }}</option> }
-                </select>
+                <agb-searchable-select [ngModel]="paymentMode()" (ngModelChange)="paymentMode.set($any($event))" [options]="paymentModes" [allowCustom]="true" />
               </div>
             </div>
           </div>
@@ -205,9 +207,11 @@ type PoDraftLine = {
                       <td class="col-qty"><input type="number" min="0" [attr.max]="line.source === 'existing' ? approvedQuantityFor(line) : null" [ngModel]="line.quantity" (ngModelChange)="updateLine(index, 'quantity', +$event || 0)" /></td>
                       <td class="col-amount"><input type="number" min="0" step="0.01" [ngModel]="line.amount" (ngModelChange)="updateLine(index, 'amount', +$event || 0)" /></td>
                       <td class="col-gst">
-                        <select [ngModel]="line.gstPercent" (ngModelChange)="updateLine(index, 'gstPercent', +$event || 0)">
-                          @for (rate of gstRates(); track rate) { <option [ngValue]="rate">{{ rate }}%</option> }
-                        </select>
+                        <agb-searchable-select
+                          [ngModel]="line.gstPercent"
+                          (ngModelChange)="updateLine(index, 'gstPercent', +$event || 0)"
+                          [options]="gstRateOptions()"
+                        />
                         <button type="button" class="custom-gst-action" (click)="customGstLine.set(index)">+ Custom</button>
                         @if (customGstLine() === index) {
                           <div class="custom-gst"><input type="number" min="0" max="100" #gst /><button type="button" (click)="saveCustomGst(index, gst.value)">Add</button></div>
@@ -246,12 +250,18 @@ type PoDraftLine = {
           </button>
           @if (selectedOrder()) {
             <div class="editor-actions">
+              <button type="button" class="btn-secondary" [disabled]="exporting()" (click)="downloadPdf()">
+                {{ exporting() === 'pdf' ? 'Preparing PDF…' : 'Download PDF' }}
+              </button>
+              <button type="button" class="btn-secondary" [disabled]="exporting()" (click)="downloadExcel()">
+                {{ exporting() === 'excel' ? 'Preparing Excel…' : 'Download Excel' }}
+              </button>
               <button type="button" class="btn-secondary" (click)="editRequest.emit(selectedOrder()!.poNumber)">Edit Purchase Order</button>
             </div>
           }
         </div>
         @if (selectedOrder(); as order) {
-          <div class="quotation-document po-doc">
+          <div class="quotation-document po-doc po-detail-document">
             <div class="doc-header">
               <div class="company-info">
                 <h1 class="company-name">{{ companyName }}</h1>
@@ -508,6 +518,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal("");
+  readonly exporting = signal<"" | "pdf" | "excel">("");
   readonly orders = signal<PurchaseOrder[]>([]);
   readonly selectedOrder = signal<PurchaseOrder | null>(null);
   readonly editingId = signal("");
@@ -531,6 +542,10 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   readonly date = signal(new Date().toISOString().slice(0, 10));
   readonly paymentMode = signal("Bank Transfer");
   readonly paymentModes = ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS", "IMPS", "Credit Card", "Debit Card", "Net Banking", "Other"];
+
+  gstRateOptions() {
+    return this.gstRates().map((rate) => ({ label: `${rate}%`, value: rate }));
+  }
   readonly roundOff = signal(0);
   readonly lines = signal<PoDraftLine[]>([this.emptyLine()]);
   readonly subtotal = computed(() => this.lines().reduce((sum, line) => sum + this.lineAmount(line), 0));
@@ -782,6 +797,126 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     if (local) { this.selectedOrder.set(local); return; }
     try { const response = await firstValueFrom(this.api.getPurchaseOrder(value)); this.selectedOrder.set(response.purchaseOrder); }
     catch { this.error.set("Purchase order could not be opened."); }
+  }
+
+  async downloadPdf() {
+    const order = this.selectedOrder();
+    if (!order || this.exporting()) return;
+    const element = document.querySelector<HTMLElement>(".po-detail-document");
+    if (!element) {
+      this.error.set("Purchase order preview is not ready yet.");
+      return;
+    }
+    this.exporting.set("pdf");
+    this.error.set("");
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        windowWidth: Math.max(element.scrollWidth, element.clientWidth),
+      });
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const imageWidth = pageWidth - margin * 2;
+      const imageHeight = canvas.height * imageWidth / canvas.width;
+      const image = canvas.toDataURL("image/png");
+      let remaining = imageHeight;
+      let offset = margin;
+      pdf.addImage(image, "PNG", margin, offset, imageWidth, imageHeight);
+      remaining -= pageHeight - margin * 2;
+      while (remaining > 0) {
+        offset = margin - (imageHeight - remaining);
+        pdf.addPage();
+        pdf.addImage(image, "PNG", margin, offset, imageWidth, imageHeight);
+        remaining -= pageHeight - margin * 2;
+      }
+      pdf.save(`${this.safeFileName(order.poNumber)}.pdf`);
+    } catch {
+      this.error.set("Could not generate the purchase order PDF.");
+    } finally {
+      this.exporting.set("");
+    }
+  }
+
+  async downloadExcel() {
+    const order = this.selectedOrder();
+    if (!order || this.exporting()) return;
+    this.exporting.set("excel");
+    this.error.set("");
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = this.companyName;
+      const sheet = workbook.addWorksheet("Purchase Order", {
+        views: [{ showGridLines: false }],
+      });
+      [8, 40, 12, 12, 16, 12, 16, 16].forEach((width, index) => {
+        sheet.getColumn(index + 1).width = width;
+      });
+      sheet.mergeCells("A1:H1");
+      sheet.getCell("A1").value = this.companyName;
+      sheet.getCell("A1").font = { bold: true, size: 16 };
+      sheet.mergeCells("A2:H2");
+      sheet.getCell("A2").value = this.companyAddress;
+      sheet.mergeCells("A3:H3");
+      sheet.getCell("A3").value = `${this.companyState}${this.companyGstin ? ` | GSTIN: ${this.companyGstin}` : ""}`;
+      sheet.mergeCells("A5:H5");
+      sheet.getCell("A5").value = "PURCHASE ORDER";
+      sheet.getCell("A5").font = { bold: true, size: 18, color: { argb: "FFFFFFFF" } };
+      sheet.getCell("A5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A4A8A" } };
+      sheet.getCell("A5").alignment = { horizontal: "center" };
+      sheet.addRow(["PO Number", order.poNumber, "Date", order.date, "Project", order.projectName, "Vendor", order.vendorName]);
+      sheet.addRow(["Payment Mode", order.paymentMode || "Bank Transfer"]);
+      sheet.addRow([]);
+      const header = sheet.addRow(["S.No", "Description", "Unit", "Qty", "Amount", "GST %", "GST Amount", "Total"]);
+      header.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FF002263" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEAF1FB" } };
+      });
+      order.items.forEach((item, index) => {
+        const row = sheet.addRow([
+          index + 1,
+          item.description,
+          item.unit,
+          item.quantity,
+          item.itemAmount,
+          item.gstPercent,
+          item.gstAmount,
+          this.itemTotal(item),
+        ]);
+        for (let column = 4; column <= 8; column += 1) row.getCell(column).numFmt = "#,##0.00";
+      });
+      sheet.addRow([]);
+      sheet.addRow(["", "", "", "", "", "", "Subtotal", order.subtotal]);
+      sheet.addRow(["", "", "", "", "", "", "Total GST", order.totalGst]);
+      sheet.addRow(["", "", "", "", "", "", "Round Off", order.roundOff]);
+      const grandTotalRow = sheet.addRow(["", "", "", "", "", "", "Grand Total", order.grandTotal]);
+      grandTotalRow.font = { bold: true };
+      for (let rowNumber = sheet.rowCount - 3; rowNumber <= sheet.rowCount; rowNumber += 1) {
+        sheet.getRow(rowNumber).getCell(8).numFmt = "#,##0.00";
+      }
+      sheet.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${this.safeFileName(order.poNumber)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      this.error.set("Could not generate the purchase order Excel file.");
+    } finally {
+      this.exporting.set("");
+    }
+  }
+
+  private safeFileName(value: string) {
+    return String(value || "purchase-order").replace(/[\\/:*?"<>|]+/g, "-");
   }
 
   @HostListener("document:pointerdown", ["$event"])

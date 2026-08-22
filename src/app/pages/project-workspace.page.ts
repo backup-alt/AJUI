@@ -7,7 +7,7 @@ import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angul
 import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow, type Worker } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
-import { ApiService } from "../core/api.service";
+import { ApiService, type PurchaseOrder } from "../core/api.service";
 import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
 import { mapProject, mapMaterial, mapLabour, mapExpense, mapGeneralExpense, mapPayment, mapVendor, mapSubcontractor, mapInventory, mapWorker } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -18,6 +18,7 @@ import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendo
 import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.component";
 import { WorkerFormDialogComponent, type WorkerFormValue } from "../shared/worker-form-dialog.component";
 import { SubcontractorFormDialogComponent, type SubcontractorFormValue } from "../shared/subcontractor-form-dialog.component";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 type ModuleKey = Exclude<SharedModuleKey, "clients" | "purchaseOrders" | "settings" | "supervisors">;
 type TableRow = SharedTableRow;
@@ -52,6 +53,11 @@ type SectionConfig = {
 };
 
 const paymentModeOptions = ["Cash", "UPI", "Bank Transfer", "NEFT", "RTGS", "IMPS", "Cheque", "Credit Card", "Debit Card", "Net Banking", "Demand Draft", "Wallet", "Other"];
+const labourTypeOptions = [
+  "Mason", "Helper", "Carpenter", "Plumber", "Electrician", "Painter",
+  "Bar bender", "Welder", "Tile mason", "Centring", "Fitter", "Maid",
+  "Cook", "Watchman", "Cleaner", "Driver", "General Labour",
+];
 
 const PAYMENT_MODE_STORAGE_KEY = "ajui_custom_payment_modes";
 
@@ -161,6 +167,8 @@ const sectionConfigs: SectionConfig[] = [
       { key: "projects", label: "Projects" },
       { key: "materialType", label: "Material Type" },
       { key: "materialsBought", label: "Materials Bought" },
+      { key: "totalPo", label: "Total PO", type: "number" },
+      { key: "totalPaid", label: "Total Paid", type: "number" },
       { key: "phoneNumber", label: "Phone Number" },
       { key: "address", label: "Address" },
       { key: "gstNumber", label: "GST Number" },
@@ -189,6 +197,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "date", label: "Date", type: "date" },
       { key: "paymentType", label: "Payment Mode" },
       { key: "subcontractorName", label: "Subcontractor" },
+      { key: "labourType", label: "Labour Type" },
       { key: "description", label: "Work Description" },
       { key: "employeeCount", label: "Number of Employees", type: "number" },
       { key: "amount", label: "Total Paid", type: "number" },
@@ -235,6 +244,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
     InventoryInitDialogComponent,
     WorkerFormDialogComponent,
     SubcontractorFormDialogComponent,
+    SearchableSelectComponent,
   ],
   styles: [`
     .operations-dialog:has(.draft-select-menu.open) {
@@ -657,11 +667,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <dd>
                     <label class="status-edit-shell" [ngClass]="statusClass(currentProject.status)">
                       <span class="sr-only">Project status</span>
-                      <select [value]="currentProject.status" (change)="updateProjectStatus($any($event.target).value, $event)">
-                        <option value="Active">Active</option>
-                        <option value="On Hold">On Hold</option>
-                        <option value="Completed">Completed</option>
-                      </select>
+                      <agb-searchable-select
+                        [value]="currentProject.status"
+                        [options]="projectStatusOptions"
+                        (valueChange)="updateProjectStatus($any($event))"
+                      />
                     </label>
                   </dd>
                 </div>
@@ -694,24 +704,24 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded() && activeSection() === 'vendors'"
-                    title="Assign Vendor"
-                    aria-label="Assign Vendor"
-                    (click)="openAssignmentDialog('vendor')"
-                  >
-                    <ion-icon name="add-outline"></ion-icon>
-                    Assign Vendor
-                  </button>
-                  <button
-                    type="button"
-                    class="primary-table-action add-row-action"
-                    *ngIf="!tableViewExpanded() && (activeSection() === 'subcontractors' || activeSection() === 'subcontractorsRoster')"
+                    *ngIf="!tableViewExpanded() && activeSection() === 'subcontractorsRoster'"
                     title="Assign Subcontractor"
                     aria-label="Assign Subcontractor"
                     (click)="openAssignmentDialog('subcontractor')"
                   >
                     <ion-icon name="add-outline"></ion-icon>
                     Assign Subcontractor
+                  </button>
+                  <button
+                    type="button"
+                    class="primary-table-action add-row-action"
+                    *ngIf="!tableViewExpanded() && activeSection() === 'subcontractors'"
+                    title="Add Payment"
+                    aria-label="Add Payment"
+                    (click)="openRecordDialog()"
+                  >
+                    <ion-icon name="add-outline"></ion-icon>
+                    Add Payment
                   </button>
                   <button
                     type="button"
@@ -723,20 +733,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   >
                     <ion-icon name="add-outline"></ion-icon>
                     {{ activeSection() === 'materials' ? 'Add Materials' : 'Add Row' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="primary-table-action"
-                    *ngIf="!tableViewExpanded() && selectedRowCount() > 0"
-                    title="Edit selected row"
-                    aria-label="Edit selected row"
-                    (click)="editSelectedRows()"
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20Z" />
-                      <path d="m13.5 6 4.5 4.5" />
-                    </svg>
-                    Edit Row
                   </button>
                   <button
                     type="button"
@@ -763,22 +759,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       <circle cx="12" cy="12" r="2.75" />
                     </svg>
                     View Details
-                  </button>
-                  <button
-                    *ngIf="!tableViewExpanded() && selectedRowCount()"
-                    type="button"
-                    class="danger-table-action"
-                    [attr.aria-label]="selectedRowCount() === 1 ? 'Delete selected row' : 'Delete selected rows'"
-                    (click)="deleteSelectedRows()"
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M4 7h16" />
-                      <path d="M10 11v6" />
-                      <path d="M14 11v6" />
-                      <path d="M6 7l1 14h10l1-14" />
-                      <path d="M9 7V4h6v3" />
-                    </svg>
-                    {{ selectedRowCount() === 1 ? 'Delete Row' : 'Delete Rows' }}
                   </button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
@@ -980,29 +960,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         [class.select-cell]="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeSection(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeSection() === 'attendance' && column.key === 'labourTypes'"
                       >
-                        <div
-                          *ngIf="first && selectedRowKey() === rowKey(row)"
-                          class="row-hover-toolbar"
-                          [style.left.px]="rowToolbarPosition().x"
-                          [style.top.px]="rowToolbarPosition().y"
-                          (click)="$event.stopPropagation()"
-                        >
-                          <button *ngIf="!isLabourGroupRow(row)" type="button" class="icon-row-action" aria-label="Edit row" title="Edit row" (click)="startRowEdit(row, $event)">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20Z" />
-                              <path d="m13.5 6 4.5 4.5" />
-                            </svg>
-                          </button>
-                          <button type="button" class="icon-row-action danger" aria-label="Delete row" title="Delete row" (click)="deleteRow(row)">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                              <path d="M4 7h16" />
-                              <path d="M10 11v6" />
-                              <path d="M14 11v6" />
-                              <path d="M6 7l1 14h10l1-14" />
-                              <path d="M9 7V4h6v3" />
-                            </svg>
-                          </button>
-                        </div>
                         <ng-container *ngIf="activeSection() === 'attendance' && column.key === 'labourTypes'; else standardProjectCell">
                           <div class="labour-types-cell">
                             <span class="labour-group-badge" *ngIf="isLabourGroupRow(row)">{{ labourGroupCount(row) }} entries</span>
@@ -1217,12 +1174,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <label *ngFor="let column of recordFormColumns()">
                     <span>{{ formColumnLabel(column) }}</span>
                     <ng-container *ngIf="isPaymentModeField(column); else standardRecordField">
-                      <select
+                      <agb-searchable-select
                         [value]="draftRow()[column.key] || ''"
-                        (change)="updateDraftField(column.key, $any($event.target).value)"
-                      >
-                        <option *ngFor="let option of selectOptions(activeSection(), column.key)" [value]="option">{{ option }}</option>
-                      </select>
+                        [options]="selectOptions(activeSection(), column.key)"
+                        [allowCustom]="true"
+                        (valueChange)="updateDraftField(column.key, $any($event))"
+                      />
                       <div class="custom-mode-row">
                         <input
                           class="custom-mode-input"
@@ -1317,13 +1274,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         <option *ngFor="let option of selectOptions('materials', field.key)" [value]="option"></option>
                       </datalist>
                       <ng-template #projectMaterialSelect>
-                        <select
+                        <agb-searchable-select
                           *ngIf="selectOptions('materials', field.key).length > 0; else projectMaterialInput"
                           [value]="draftRow()[field.key] || ''"
-                          (change)="updateDraftField(field.key, $any($event.target).value)"
-                        >
-                          <option *ngFor="let option of selectOptions('materials', field.key)" [value]="option">{{ option }}</option>
-                        </select>
+                          [options]="selectOptions('materials', field.key)"
+                          [allowCustom]="true"
+                          (valueChange)="updateDraftField(field.key, $any($event))"
+                        />
                       </ng-template>
                       <ng-template #projectMaterialInput>
                         <input
@@ -1635,6 +1592,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectWorkspacePage {
+  readonly projectStatusOptions = ["Active", "On Hold", "Completed"];
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly materialsService = inject(MaterialsService);
@@ -3811,6 +3769,9 @@ export class ProjectWorkspacePage {
   }
 
   formColumnLabel(column: FieldSchema): string {
+    if (this.activeSection() === "subcontractors" && column.key === "description") {
+      return "Work Description (optional)";
+    }
     return this.activeSection() === "expenses" && column.key === "amount" ? "Total Amount" : column.label;
   }
 
@@ -4077,11 +4038,12 @@ export class ProjectWorkspacePage {
       return;
     }
     const date = String(draft["date"] || new Date().toISOString().slice(0, 10));
-    const description = String(draft["description"] || "").trim();
-    if (!description) {
-      window.alert("Work description is required.");
+    const labourType = String(draft["labourType"] || "").trim();
+    if (!labourType) {
+      window.alert("Please select a labour type.");
       return;
     }
+    const description = String(draft["description"] || "").trim();
     const employeeCount = Math.round(Number(draft["employeeCount"]) || 0);
     if (!Number.isInteger(employeeCount) || employeeCount < 1) {
       window.alert("Number of employees must be a positive whole number.");
@@ -4097,6 +4059,7 @@ export class ProjectWorkspacePage {
       projectId,
       date,
       paymentType: String(draft["paymentType"] || "Bank Transfer"),
+      labourType,
       description,
       employeeCount,
       amount,
@@ -4319,6 +4282,9 @@ export class ProjectWorkspacePage {
       }
       case "description":
         patch.description = value;
+        break;
+      case "labourType":
+        patch.labourType = value;
         break;
       case "employeeCount":
         patch.employeeCount = Math.round(Number(value) || 0);
@@ -4968,6 +4934,7 @@ export class ProjectWorkspacePage {
    * payment ledger. Populated by `loadProjectExpenseRollup`.
    */
   private subcontractorRoster = signal<any[]>([]);
+  private projectPurchaseOrders = signal<PurchaseOrder[]>([]);
 
   /**
    * Map SubcontractorPayment rows to the table shape the generic
@@ -4981,6 +4948,7 @@ export class ProjectWorkspacePage {
       _id: p._id,
       date: p.date,
       paymentType: p.paymentType || "Bank Transfer",
+      labourType: p.labourType || "General Labour",
       subcontractorId: p.subcontractorId,
       subcontractorName: p.subcontractorName,
       projectId: p.projectId,
@@ -5006,7 +4974,10 @@ export class ProjectWorkspacePage {
       .filter((row) => String(row.projectId) === projectId || (row.projectIds || []).includes(projectId))
       .map((row) => ({
         __rowId: `sub-roster:${row._id || row.id}`,
-        __projectId: row.projectId || projectId,
+        // This row represents the assignment in the current workspace. Using
+        // the subcontractor's original projectId here caused the generic table
+        // filter to hide profiles assigned later through projectIds.
+        __projectId: projectId,
         _id: row._id || row.id,
         projectId: row.projectId || projectId,
         subcontractorId: row._id || row.id,
@@ -5031,6 +5002,7 @@ export class ProjectWorkspacePage {
       this.subcontractorSpend.set(0);
       this.subcontractorPayments.set([]);
       this.subcontractorRoster.set([]);
+      this.projectPurchaseOrders.set([]);
       return;
     }
     this.api.getSubcontractorSpendRollup(projectId).subscribe({
@@ -5045,9 +5017,31 @@ export class ProjectWorkspacePage {
     // Load sub-contractor profiles for the roster tab. Backend doesn't
     // expose a project filter on /subcontractors, so we filter client-side.
     this.api.listSubcontractors({ limit: 500, page: 1 }).subscribe({
-      next: (res) => this.subcontractorRoster.set(res.items || []),
+      next: (res) => {
+        const items = (res.items || []).map(mapSubcontractor);
+        this.subcontractorRoster.set(items);
+        this.data.subcontractors.set(items);
+      },
       error: () => this.subcontractorRoster.set([]),
     });
+    void this.loadProjectPurchaseOrders(projectId);
+  }
+
+  private async loadProjectPurchaseOrders(projectId: string) {
+    const orders: PurchaseOrder[] = [];
+    try {
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const response = await firstValueFrom(this.api.listPurchaseOrders({ projectId, page, limit: 200 }));
+        orders.push(...(response.items || []));
+        totalPages = Math.max(1, Number(response.pages) || 1);
+        page += 1;
+      } while (page <= totalPages);
+      if (this.projectId() === projectId) this.projectPurchaseOrders.set(orders);
+    } catch {
+      if (this.projectId() === projectId) this.projectPurchaseOrders.set([]);
+    }
   }
 
   totalProjectExpenseLabel(): string {
@@ -5282,51 +5276,57 @@ export class ProjectWorkspacePage {
     }));
 
     const projectMaterials = this.data.materials().filter((row) => row.projectId === projectId);
-    const vendorNamesInProject = new Set(projectMaterials.map((m) => m.vendor).filter(Boolean));
-    for (const vendor of this.data.vendors()) {
-      if ((vendor.projectIds || []).includes(projectId)) vendorNamesInProject.add(vendor.name);
+    const ordersByVendor = new Map<string, PurchaseOrder[]>();
+    for (const order of this.projectPurchaseOrders()) {
+      const vendorId = String(order.vendorId || "").trim();
+      const vendorName = String(order.vendorName || "").trim().toLowerCase();
+      const key = vendorId || `name:${vendorName}`;
+      if (!key || key === "name:") continue;
+      ordersByVendor.set(key, [...(ordersByVendor.get(key) || []), order]);
     }
 
-    const projectSiteIds = new Set<string>();
-    for (const site of this.data.siteEntities()) {
-      if ((site as any).projectIds?.includes(projectId)) {
-        projectSiteIds.add(site.id);
-        if ((site as any)._id) projectSiteIds.add((site as any)._id);
-      }
-    }
-    for (const vendor of this.data.vendors()) {
-      if (vendor.siteIds?.some((sid) => projectSiteIds.has(sid))) {
-        vendorNamesInProject.add(vendor.name);
-      }
-    }
-
-    const vendors = this.data.vendors()
-      .filter((vendor) => vendorNamesInProject.has(vendor.name))
-      .map((vendor) => ({
-        __rowId: `vendor:${vendor.id}`,
+    // A vendor belongs in this project table only after an actual PO exists.
+    // The PO itself carries vendorId/name, so the row remains available even
+    // when the vendor was never manually assigned to the project.
+    const vendors = [...ordersByVendor.entries()].map(([vendorKey, purchaseOrders]) => {
+      const firstOrder = purchaseOrders[0];
+      const orderVendorId = String(firstOrder.vendorId || "").trim();
+      const orderVendorName = String(firstOrder.vendorName || "").trim();
+      const vendor = this.data.vendors().find((item) =>
+        (orderVendorId && String(item._id || "") === orderVendorId)
+        || item.name.trim().toLowerCase() === orderVendorName.toLowerCase(),
+      );
+      const vendorName = vendor?.name || orderVendorName || "Vendor";
+      const normalizedName = vendorName.trim().toLowerCase();
+      const totalPaid = projectMaterials
+        .filter((material) => {
+          const materialVendorId = String((material as any).vendorId || "").trim();
+          return (orderVendorId && materialVendorId === orderVendorId)
+            || String(material.vendor || "").trim().toLowerCase() === normalizedName;
+        })
+        .reduce((sum, material) => sum + (Number(material.givenAmount) || 0), 0);
+      const poCount = new Set(
+        purchaseOrders
+          .map((order) => String(order.poNumber || "").trim())
+          .filter(Boolean),
+      ).size;
+      return {
+        __rowId: `vendor-po:${vendorKey}`,
         __projectId: projectId,
         projectId,
-        vendorName: vendor.name,
-        projects: this.projectNamesForVendor(vendor.name),
-        materialType: vendor.materialType,
-        materialsBought: this.materialPurchaseSummaryForVendor(vendor.name, projectId),
-        phoneNumber: vendor.phone,
-        address: vendor.address,
-        gstNumber: vendor.gst,
-      }));
+        vendorName,
+        projects: this.project()?.name || "",
+        materialType: vendor?.materialType || "",
+        materialsBought: this.materialPurchaseSummaryForVendor(vendorName, projectId),
+        totalPo: poCount,
+        totalPaid: formatMoney(totalPaid),
+        phoneNumber: vendor?.phone || "",
+        address: vendor?.address || "",
+        gstNumber: vendor?.gst || "",
+      };
+    });
 
-    const subcontractors = this.subcontractorPayments().map((p) => ({
-      __rowId: `sub-payment:${p._id}`,
-      __projectId: p.projectId,
-      projectId: p.projectId,
-      subcontractorName: p.subcontractorName,
-      projectName: p.projectName,
-      siteName: p.siteName || "",
-      description: p.description || "",
-      employeeCount: p.employeeCount,
-      amount: formatMoney(p.amount),
-      date: p.date,
-    }));
+    const subcontractors = this.subcontractorPaymentRows();
 
     const inventory = this.data.inventory().filter((row) => String(row.projectId) === projectId).map((row) => ({
       __rowId: `inventory:${row.id}`,
@@ -5394,7 +5394,7 @@ export class ProjectWorkspacePage {
   }
 
   isReadonlyColumn(key: string): boolean {
-    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus";
+    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus" || key === "totalPo" || key === "totalPaid";
   }
 
   /**
@@ -5511,19 +5511,20 @@ export class ProjectWorkspacePage {
     }
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
     if (key === "paymentType") return ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS"];
+    if (section === "subcontractors" && key === "labourType") {
+      const fromWorkers = this.data.workers()
+        .map((row) => String(row.labourType || "").trim())
+        .filter(Boolean);
+      return [...new Set([...labourTypeOptions, ...fromWorkers])].sort((a, b) => a.localeCompare(b));
+    }
     // Workers — offer a select dropdown for the Role column with the
     // union of preset labour types plus any custom roles the user has
     // already created (deduplicated, case-insensitive).
     if (section === "workers" && key === "labourType") {
-      const preset = [
-        "Mason", "Helper", "Carpenter", "Plumber", "Electrician", "Painter",
-        "Bar bender", "Welder", "Tile mason", "Centring", "Fitter", "Maid",
-        "Cook", "Watchman", "Cleaner", "Driver",
-      ];
       const fromData = this.data.workers()
         .map((row) => (row.labourType || "").trim())
         .filter((value): value is string => Boolean(value));
-      return [...new Set([...preset, ...fromData])].sort((a, b) => a.localeCompare(b));
+      return [...new Set([...labourTypeOptions, ...fromData])].sort((a, b) => a.localeCompare(b));
     }
     return [];
   }
@@ -5626,6 +5627,8 @@ export class ProjectWorkspacePage {
       },
       vendors: {
         vendorName: "",
+        totalPo: 0,
+        totalPaid: formatMoney(0),
         materialType: "",
         materialsBought: formatNumber(0),
         phoneNumber: "",
@@ -5636,6 +5639,7 @@ export class ProjectWorkspacePage {
         date: today,
         paymentType: "Bank Transfer",
         subcontractorName: "",
+        labourType: "General Labour",
         siteName: site,
         description: "",
         employeeCount: 1,

@@ -7,6 +7,7 @@ import { ApiService } from "../core/api.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, statusClass } from "../shared/format";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 interface ApiProject {
   _id: string;
@@ -26,7 +27,7 @@ interface ApiProject {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonBadge, IonSpinner, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonBadge, IonSpinner, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, SearchableSelectComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="projects"></agb-enterprise-sidebar>
@@ -120,10 +121,7 @@ interface ApiProject {
             <div class="erp-form">
               <label>
                 <span>Client</span>
-                <select required [(ngModel)]="projectDraft.clientId" name="clientId" (ngModelChange)="applyClientDefaults($event)">
-                  <option value="">Select client</option>
-                  <option *ngFor="let client of clients()" [value]="client._id || client.clientId">{{ client.name }}</option>
-                </select>
+                <agb-searchable-select [(ngModel)]="projectDraft.clientId" name="clientId" [options]="clientOptions()" placeholder="Select client" (ngModelChange)="applyClientDefaults($any($event))" />
               </label>
               <label>
                 <span>Project Name</span>
@@ -135,18 +133,11 @@ interface ApiProject {
               </label>
               <label>
                 <span>Supervisor</span>
-                <select required [(ngModel)]="projectDraft.supervisorId" name="supervisorId" (ngModelChange)="selectSupervisor($event)">
-                  <option value="">Select supervisor</option>
-                  <option *ngFor="let supervisor of supervisors()" [value]="supervisor._id || supervisor.id">{{ supervisor.name }}</option>
-                </select>
+                <agb-searchable-select [(ngModel)]="projectDraft.supervisorId" name="supervisorId" [options]="supervisorOptions()" placeholder="Select supervisor" (ngModelChange)="selectSupervisor($any($event))" />
               </label>
               <label>
                 <span>Status</span>
-                <select [(ngModel)]="projectDraft.status" name="status">
-                  <option value="Active">Active</option>
-                  <option value="On Hold">On Hold</option>
-                  <option value="Completed">Completed</option>
-                </select>
+                <agb-searchable-select [(ngModel)]="projectDraft.status" name="status" [options]="projectStatusOptions" />
               </label>
               <label>
                 <span>Estimated Project Value</span>
@@ -200,6 +191,7 @@ interface ApiProject {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectsDirectoryPage implements OnInit {
+  readonly projectStatusOptions = ["Active", "On Hold", "Completed"];
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toastController = inject(ToastController);
@@ -210,6 +202,14 @@ export class ProjectsDirectoryPage implements OnInit {
   readonly projects = signal<ApiProject[]>([]);
   readonly clients = signal<any[]>([]);
   readonly supervisors = signal<any[]>([]);
+
+  clientOptions() {
+    return this.clients().map((client) => ({ label: client.name, value: client._id || client.clientId || "" }));
+  }
+
+  supervisorOptions() {
+    return this.supervisors().map((supervisor) => ({ label: supervisor.name, value: supervisor._id || supervisor.id || "" }));
+  }
   readonly loading = signal(true);
   readonly showProjectForm = signal(false);
   readonly creating = signal(false);

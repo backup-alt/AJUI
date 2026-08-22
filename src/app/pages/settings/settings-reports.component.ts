@@ -3,11 +3,12 @@ import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, inject, signal }
 import { FormsModule } from "@angular/forms";
 import { Subject, debounceTime, takeUntil } from "rxjs";
 import { ApiService } from "../../core/api.service";
+import { SearchableSelectComponent } from "../../shared/searchable-select.component";
 
 @Component({
   selector: "agb-settings-reports",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
     <header class="settings-w11-header">
       <nav class="settings-w11-breadcrumb" aria-label="Breadcrumb">
@@ -34,11 +35,7 @@ import { ApiService } from "../../core/api.service";
       <div class="settings-w11-card-body">
         <div class="settings-w11-field">
           <label>Default export format</label>
-          <select [value]="format()" (change)="onChange('format', $any($event.target).value)">
-            <option value="Excel">Excel</option>
-            <option value="PDF">PDF</option>
-            <option value="CSV">CSV</option>
-          </select>
+          <agb-searchable-select [value]="format()" [options]="formatOptions" (valueChange)="onChange('format', $any($event))" />
         </div>
         <div class="settings-w11-field">
           <label>File name prefix</label>
@@ -108,6 +105,7 @@ import { ApiService } from "../../core/api.service";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsReportsComponent implements OnInit, OnDestroy {
+  readonly formatOptions = ["Excel", "PDF", "CSV"];
   private readonly api = inject(ApiService);
   private readonly destroy$ = new Subject<void>();
   private readonly saveSubject = new Subject<Record<string, any>>();

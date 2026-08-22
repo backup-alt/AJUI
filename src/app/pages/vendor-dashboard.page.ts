@@ -9,6 +9,7 @@ import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendo
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney } from "../shared/format";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 type VendorSite = Site & {
   materialEntryCount: number;
@@ -22,7 +23,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent],
+  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent, SearchableSelectComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="vendors"></agb-enterprise-sidebar>
@@ -303,14 +304,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                         </td>
                         <td class="col-payment">
                           @if (editingRowId() === row.id) {
-                            <select [value]="row.paymentType" (blur)="updateField(row, 'paymentType', $any($event.target).value)" class="table-input">
-                              <option value="">Select</option>
-                              <option value="Cash">Cash</option>
-                              <option value="NEFT">NEFT</option>
-                              <option value="Bank Transfer">Bank Transfer</option>
-                              <option value="UPI">UPI</option>
-                              <option value="Cheque">Cheque</option>
-                            </select>
+                            <agb-searchable-select [value]="row.paymentType" [options]="paymentTypeOptions" placeholder="Select" (valueChange)="updateField(row, 'paymentType', $any($event))" />
                           } @else {
                             {{ row.paymentType || '-' }}
                           }
@@ -946,6 +940,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VendorDashboardPage {
+  readonly paymentTypeOptions = ["Cash", "NEFT", "Bank Transfer", "UPI", "Cheque"];
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly materialsService = inject(MaterialsService);

@@ -62,6 +62,7 @@ export interface PaginatedResponse<T> {
   items: T[];
   total?: number;
   page?: number;
+  pages?: number;
   limit?: number;
   nextCursor?: string | null;
   hasMore?: boolean;
@@ -81,6 +82,7 @@ export interface SubcontractorPayment {
   siteName?: string;
   date: string;
   paymentType: string;
+  labourType: string;
   description: string;
   employeeCount: number;
   amount: number;
@@ -95,7 +97,8 @@ export interface CreateSubcontractorPaymentPayload {
   siteId?: string;
   date: string;
   paymentType: string;
-  description: string;
+  labourType?: string;
+  description?: string;
   employeeCount: number;
   amount: number;
   notes?: string;

@@ -8,6 +8,7 @@ import { ErpDataService } from "../data/erp-data.service";
 import { formatMoney } from "../shared/format";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 interface SubcontractorRow {
   id: string;
@@ -27,7 +28,7 @@ interface SubcontractorRow {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, FormsModule, RouterLink, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, SearchableSelectComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="subcontractors"></agb-enterprise-sidebar>
@@ -214,31 +215,11 @@ interface SubcontractorRow {
             </label>
             <label>
               <span>Payment Mode</span>
-              <select [value]="draft().paymentMode" (change)="patchDraft('paymentMode', $any($event.target).value)" required>
-                <option value="Cash">Cash</option>
-                <option value="UPI">UPI</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="NEFT">NEFT</option>
-                <option value="RTGS">RTGS</option>
-                <option value="IMPS">IMPS</option>
-                <option value="Cheque">Cheque</option>
-                <option value="Credit Card">Credit Card</option>
-                <option value="Debit Card">Debit Card</option>
-                <option value="Net Banking">Net Banking</option>
-                <option value="Demand Draft">Demand Draft</option>
-                <option value="Wallet">Wallet</option>
-                <option value="Other">Other</option>
-              </select>
+              <agb-searchable-select [value]="draft().paymentMode" [options]="paymentModeOptions" [allowCustom]="true" (valueChange)="patchDraft('paymentMode', $any($event))" />
             </label>
             <label>
               <span>Status</span>
-              <select
-                [value]="draft().status"
-                (change)="patchDraft('status', $any($event.target).value)"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Not Active</option>
-              </select>
+              <agb-searchable-select [value]="draft().status" [options]="statusOptions" (valueChange)="patchDraft('status', $any($event))" />
             </label>
 
             @if (drawerError()) {
@@ -360,6 +341,11 @@ interface SubcontractorRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SubcontractorDashboardPage {
+  readonly paymentModeOptions = ["Cash", "UPI", "Bank Transfer", "NEFT", "RTGS", "IMPS", "Cheque", "Credit Card", "Debit Card", "Net Banking", "Demand Draft", "Wallet", "Other"];
+  readonly statusOptions = [
+    { label: "Active", value: "active" },
+    { label: "Not Active", value: "inactive" },
+  ];
   readonly erp = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly router = inject(Router);

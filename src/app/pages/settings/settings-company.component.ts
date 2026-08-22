@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/cor
 import { FormsModule } from "@angular/forms";
 import { ErpDataService } from "../../data/erp-data.service";
 import { ApiService } from "../../core/api.service";
+import { SearchableSelectComponent } from "../../shared/searchable-select.component";
 
 const INDIAN_STATES = [
   "Tamil Nadu",
@@ -29,7 +30,7 @@ const INDIAN_STATES = [
 @Component({
   selector: "agb-settings-company",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
     <header class="settings-w11-header">
       <nav class="settings-w11-breadcrumb" aria-label="Breadcrumb">
@@ -72,15 +73,13 @@ const INDIAN_STATES = [
         <div class="settings-w11-field-row">
           <div class="settings-w11-field">
             <label for="company-state">State</label>
-            <select
-              id="company-state"
+            <agb-searchable-select
+              name="companyState"
               [value]="companyState()"
-              (change)="companyState.set($any($event.target).value)"
-            >
-              @for (state of states; track state) {
-                <option [value]="state" [selected]="state === companyState()">{{ state }}</option>
-              }
-            </select>
+              [options]="states"
+              placeholder="Select state"
+              (valueChange)="companyState.set($any($event))"
+            />
           </div>
           <div class="settings-w11-field">
             <label for="company-gstin">GSTIN</label>

@@ -14,6 +14,7 @@ import { buildBusinessDocumentXlsx } from "../shared/excel-export";
 import type { Quotation, QuotationRow } from "../../data/dashboardData";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 const INDIAN_STATES = [
   "Tamil Nadu", "Kerala", "Karnataka", "Andhra Pradesh", "Telangana",
@@ -53,7 +54,7 @@ function numberToWords(num: number): string {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, QuotationReportComponent, ClientFormDialogComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, QuotationReportComponent, ClientFormDialogComponent, SearchableSelectComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="quotations"></agb-enterprise-sidebar>
@@ -206,11 +207,7 @@ function numberToWords(num: number): string {
                       </div>
                       <div class="form-field">
                         <label>State</label>
-                        <select [(ngModel)]="clientState">
-                          @for (state of states; track state) {
-                            <option [value]="state">{{ state }}</option>
-                          }
-                        </select>
+                        <agb-searchable-select [(ngModel)]="clientState" [options]="states" placeholder="Select state" />
                       </div>
                       <div class="form-field full-width">
                         <label>Client Address</label>

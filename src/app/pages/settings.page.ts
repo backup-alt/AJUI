@@ -13,6 +13,7 @@ import {
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ApiService } from "../core/api.service";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 type PermissionModuleKey = Exclude<SharedModuleKey, "settings">;
 type PermissionField = { key: string; label: string };
@@ -180,7 +181,7 @@ export interface ActiveInviteDisplay {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, SearchableSelectComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="settings"></agb-enterprise-sidebar>
@@ -372,11 +373,7 @@ export interface ActiveInviteDisplay {
                 </label>
                 <label>
                   <span>Default Project Status</span>
-                  <select>
-                    <option>Active</option>
-                    <option>On Hold</option>
-                    <option>Completed</option>
-                  </select>
+                  <agb-searchable-select value="Active" [options]="projectStatusOptions" />
                 </label>
                 <div class="settings-toggle">
                   <div>
@@ -568,10 +565,7 @@ export interface ActiveInviteDisplay {
                 </div>
                 <label>
                   <span>Default Export Format</span>
-                  <select>
-                    <option>Excel</option>
-                    <option>PDF</option>
-                  </select>
+                  <agb-searchable-select value="Excel" [options]="exportFormatOptions" />
                 </label>
                 <label>
                   <span>Export Prefix</span>
@@ -595,6 +589,8 @@ export interface ActiveInviteDisplay {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsPage implements OnDestroy {
+  readonly projectStatusOptions = ["Active", "On Hold", "Completed"];
+  readonly exportFormatOptions = ["Excel", "PDF"];
   readonly data = inject(ErpDataService);
   private readonly api = inject(ApiService);
   private readonly destroyRef = inject(DestroyRef);

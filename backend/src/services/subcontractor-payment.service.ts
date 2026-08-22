@@ -13,7 +13,8 @@ export interface CreateSubcontractorPaymentInput {
   siteId?: string;
   date: string;
   paymentType: string;
-  description: string;
+  labourType?: string;
+  description?: string;
   employeeCount: number;
   amount: number;
   notes?: string;
@@ -25,6 +26,7 @@ export interface UpdateSubcontractorPaymentInput {
   siteId?: string;
   date?: string;
   paymentType?: string;
+  labourType?: string;
   description?: string;
   employeeCount?: number;
   amount?: number;
@@ -78,15 +80,15 @@ async function resolveRefs(
 
 function validatePaymentShape(input: {
   date?: string;
-  description?: string;
+  labourType?: string;
   employeeCount?: number;
   amount?: number;
 }) {
   if (input.date !== undefined && !/^\d{4}-\d{2}-\d{2}/.test(String(input.date))) {
     throw new AppError(400, "Date is invalid (expected YYYY-MM-DD)");
   }
-  if (input.description !== undefined && !String(input.description).trim()) {
-    throw new AppError(400, "Description is required");
+  if (input.labourType !== undefined && !String(input.labourType).trim()) {
+    throw new AppError(400, "Labour type is required");
   }
   if (input.employeeCount !== undefined) {
     if (!Number.isFinite(input.employeeCount) || input.employeeCount < 1 || !Number.isInteger(input.employeeCount)) {
@@ -140,6 +142,7 @@ export async function createSubcontractorPayment(
     siteName: site?.name,
     date: input.date,
     paymentType: input.paymentType,
+    labourType: String(input.labourType || "General Labour").trim(),
     description: String(input.description || "").trim(),
     employeeCount: Number(input.employeeCount),
     amount: Number(input.amount),
@@ -225,6 +228,7 @@ export async function updateSubcontractorPayment(
 
   if (patch.date !== undefined) existing.date = patch.date;
   if (patch.paymentType !== undefined) existing.paymentType = patch.paymentType;
+  if (patch.labourType !== undefined) existing.labourType = String(patch.labourType).trim();
   if (patch.description !== undefined) existing.description = String(patch.description).trim();
   if (patch.employeeCount !== undefined) existing.employeeCount = Number(patch.employeeCount);
   if (patch.amount !== undefined) existing.amount = Number(patch.amount);

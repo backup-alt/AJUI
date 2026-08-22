@@ -8,10 +8,11 @@ import { ErpDataService } from "../data/erp-data.service";
 import { formatMoney } from "../shared/format";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, IonContent, IonIcon, IonSplitPane, IonSpinner, EnterpriseHeaderComponent, EnterpriseSidebarComponent],
+  imports: [CommonModule, FormsModule, RouterLink, IonContent, IonIcon, IonSplitPane, IonSpinner, EnterpriseHeaderComponent, EnterpriseSidebarComponent, SearchableSelectComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="subcontractors"></agb-enterprise-sidebar>
@@ -87,12 +88,12 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
               <section class="filters">
                 <label class="filter-field">
                   <span>Project</span>
-                  <select [ngModel]="filterProjectId()" (ngModelChange)="onProjectFilterChange($event)">
-                    <option value="">All projects</option>
-                    @for (p of availableProjects(); track p.id) {
-                      <option [value]="p.id">{{ p.name }}</option>
-                    }
-                  </select>
+                  <agb-searchable-select
+                    [ngModel]="filterProjectId()"
+                    (ngModelChange)="onProjectFilterChange($event)"
+                    [options]="projectFilterOptions('All projects')"
+                    placeholder="All projects"
+                  ></agb-searchable-select>
                 </label>
               </section>
 
@@ -103,6 +104,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                       <th>Date</th>
                       <th>Payment Mode</th>
                       <th>Project</th>
+                      <th>Labour Type</th>
                       <th>Description</th>
                       <th>Employees</th>
                       <th>Amount</th>
@@ -115,6 +117,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                         <td>{{ p.date }}</td>
                         <td>{{ p.paymentType || 'Bank Transfer' }}</td>
                         <td>{{ p.projectName }}</td>
+                        <td>{{ p.labourType || 'General Labour' }}</td>
                         <td class="wrap">{{ p.description || '—' }}</td>
                         <td>{{ p.employeeCount }}</td>
                         <td>{{ formatMoney(p.amount) }}</td>
@@ -139,7 +142,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                     }
                     @if (filteredPayments().length === 0) {
                       <tr>
-                        <td colspan="7" class="empty-row">No payments recorded for this sub-contractor yet.</td>
+                        <td colspan="8" class="empty-row">No payments recorded for this sub-contractor yet.</td>
                       </tr>
                     }
                   </tbody>
@@ -160,12 +163,12 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
                 <section class="filters">
                   <label class="filter-field">
                     <span>Project</span>
-                    <select [ngModel]="laborFilterProjectId()" (ngModelChange)="onLaborFilterProjectChange($event)">
-                      <option value="">All projects</option>
-                      @for (p of availableProjects(); track p.id) {
-                        <option [value]="p.id">{{ p.name }}</option>
-                      }
-                    </select>
+                    <agb-searchable-select
+                      [ngModel]="laborFilterProjectId()"
+                      (ngModelChange)="onLaborFilterProjectChange($event)"
+                      [options]="projectFilterOptions('All projects')"
+                      placeholder="All projects"
+                    ></agb-searchable-select>
                   </label>
                 </section>
                 <section class="table-wrap labor-table-wrap">
@@ -220,17 +223,13 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
           <form class="drawer-body" (submit)="$event.preventDefault(); savePayment()">
             <label>
               <span>Project *</span>
-              <select
-                required
+              <agb-searchable-select
+                name="projectId"
                 [ngModel]="paymentDraft().projectId"
                 (ngModelChange)="onPaymentProjectChange($event)"
-                name="projectId"
-              >
-                <option value="">Select a project</option>
-                @for (p of allProjects(); track p.id) {
-                  <option [value]="p.id">{{ p.name }}</option>
-                }
-              </select>
+                [options]="allProjectOptions()"
+                placeholder="Search projects"
+              ></agb-searchable-select>
             </label>
 
             <label>
@@ -246,14 +245,25 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 
             <label>
               <span>Payment Mode *</span>
-              <select required [ngModel]="paymentDraft().paymentType" (ngModelChange)="updatePaymentDraft('paymentType', $event)" name="paymentType">
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Cash">Cash</option>
-                <option value="UPI">UPI</option>
-                <option value="Cheque">Cheque</option>
-                <option value="NEFT">NEFT</option>
-                <option value="RTGS">RTGS</option>
-              </select>
+              <agb-searchable-select
+                name="paymentType"
+                [ngModel]="paymentDraft().paymentType"
+                (ngModelChange)="updatePaymentDraft('paymentType', $event)"
+                [options]="paymentModes"
+                placeholder="Select payment mode"
+              ></agb-searchable-select>
+            </label>
+
+            <label>
+              <span>Labour Type *</span>
+              <agb-searchable-select
+                name="labourType"
+                [ngModel]="paymentDraft().labourType"
+                (ngModelChange)="updatePaymentDraft('labourType', $event)"
+                [options]="labourTypes"
+                [allowCustom]="true"
+                placeholder="Search or enter a labour type"
+              ></agb-searchable-select>
             </label>
 
             <label>
@@ -332,17 +342,24 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
             </label>
             <label>
               <span>Role *</span>
-              <input required list="labor-role-suggestions" [ngModel]="laborDraft().role" (ngModelChange)="updateLaborDraft('role', $event)" name="laborRole" />
-              <datalist id="labor-role-suggestions"><option value="Carpenter"></option><option value="Civil Worker"></option><option value="Mason"></option><option value="Electrician"></option><option value="Plumber"></option><option value="General Labor"></option></datalist>
+              <agb-searchable-select
+                name="laborRole"
+                [ngModel]="laborDraft().role"
+                (ngModelChange)="updateLaborDraft('role', $event)"
+                [options]="labourTypes"
+                [allowCustom]="true"
+                placeholder="Search or enter a labour role"
+              ></agb-searchable-select>
             </label>
             <label>
               <span>Project (optional)</span>
-              <select [ngModel]="laborDraft().projectId" (ngModelChange)="onLaborProjectChange($event)" name="laborProjectId">
-                <option value="">No specific project</option>
-                @for (p of allProjects(); track p.id) {
-                  <option [value]="p.id">{{ p.name }}</option>
-                }
-              </select>
+              <agb-searchable-select
+                name="laborProjectId"
+                [ngModel]="laborDraft().projectId"
+                (ngModelChange)="onLaborProjectChange($event)"
+                [options]="optionalProjectOptions()"
+                placeholder="No specific project"
+              ></agb-searchable-select>
               @if (laborDraft().projectId) {
                 <small class="hint">This labour will appear in the project's worker roster.</small>
               }
@@ -517,10 +534,32 @@ export class SubcontractorDetailsPage {
   readonly laborDraft = signal(emptyLaborDraft());
   readonly laborDialogOpen = signal(false);
   readonly activeTab = signal<"payments" | "labor">("payments");
+  readonly labourTypes = [
+    "Mason", "Helper", "Carpenter", "Plumber", "Electrician", "Painter",
+    "Bar bender", "Welder", "Tile mason", "Centring", "Fitter", "Maid",
+    "Cook", "Watchman", "Cleaner", "Driver", "General Labour",
+  ];
+  readonly paymentModes = ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS"];
+
+  projectFilterOptions(allLabel: string) {
+    return [
+      { label: allLabel, value: "" },
+      ...this.availableProjects().map((project) => ({ label: project.name, value: project.id })),
+    ];
+  }
+
+  allProjectOptions() {
+    return this.allProjects().map((project) => ({ label: project.name, value: project.id }));
+  }
+
+  optionalProjectOptions() {
+    return [{ label: "No specific project", value: "" }, ...this.allProjectOptions()];
+  }
   readonly paymentDraft = signal<{
     projectId: string;
     date: string;
     paymentType: string;
+    labourType: string;
     description: string;
     employeeCount: number;
     amount: number;
@@ -798,6 +837,7 @@ export class SubcontractorDetailsPage {
       projectId: p.projectId,
       date: p.date,
       paymentType: p.paymentType || "Bank Transfer",
+      labourType: p.labourType || "General Labour",
       description: p.description,
       employeeCount: p.employeeCount,
       amount: p.amount,
@@ -828,6 +868,7 @@ export class SubcontractorDetailsPage {
     if (!draft.projectId) errors.push("Project is required.");
     if (!draft.date) errors.push("Date is required.");
     if (!draft.paymentType) errors.push("Payment mode is required.");
+    if (!draft.labourType.trim()) errors.push("Labour type is required.");
     if (!Number.isInteger(draft.employeeCount) || draft.employeeCount < 1) errors.push("Number of employees must be a positive whole number.");
     if (!Number.isFinite(draft.amount) || draft.amount <= 0) errors.push("Amount must be greater than zero.");
     if (errors.length) {
@@ -849,6 +890,7 @@ export class SubcontractorDetailsPage {
       projectId: draft.projectId,
       date: draft.date,
       paymentType: draft.paymentType,
+      labourType: draft.labourType.trim(),
       description: draft.description.trim(),
       employeeCount: draft.employeeCount,
       amount: draft.amount,
@@ -897,6 +939,7 @@ function emptyPaymentDraft() {
     projectId: "",
     date: new Date().toISOString().slice(0, 10),
     paymentType: "Bank Transfer",
+    labourType: "General Labour",
     description: "",
     employeeCount: 1,
     amount: 0,

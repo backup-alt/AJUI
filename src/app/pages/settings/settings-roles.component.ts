@@ -4,6 +4,7 @@ import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ApiService } from "../../core/api.service";
 import { ErpDataService } from "../../data/erp-data.service";
+import { SearchableSelectComponent } from "../../shared/searchable-select.component";
 
 type Role = "Admin" | "Project Manager" | "Accountant" | "Supervisor";
 type Status = "active" | "inactive" | "on_leave";
@@ -61,7 +62,7 @@ type CombinedInvite = {
 @Component({
   selector: "agb-settings-roles",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
     <header class="settings-w11-header">
       <nav class="settings-w11-breadcrumb" aria-label="Breadcrumb">
@@ -410,11 +411,7 @@ type CombinedInvite = {
           </div>
           <div class="settings-w11-field">
             <label>Role</label>
-            <select [value]="inviteRole()" (change)="inviteRole.set($any($event.target).value)">
-              <option value="Admin">Admin</option>
-              <option value="Project Manager">Project Manager</option>
-              <option value="Accountant">Accountant</option>
-            </select>
+            <agb-searchable-select [value]="inviteRole()" [options]="inviteRoleOptions" (valueChange)="inviteRole.set($any($event))" />
           </div>
 
           @if (inviteError()) {
@@ -884,6 +881,7 @@ type CombinedInvite = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsRolesComponent implements OnInit, OnDestroy {
+  readonly inviteRoleOptions = ["Admin", "Project Manager", "Accountant"];
   private readonly api = inject(ApiService);
   private readonly erp = inject(ErpDataService);
   private readonly route = inject(ActivatedRoute);

@@ -17,6 +17,7 @@ import { IonIcon } from "@ionic/angular/standalone";
 import { firstValueFrom } from "rxjs";
 import { ApiService } from "../core/api.service";
 import type { ProjectStatus } from "../../data/dashboardData";
+import { SearchableSelectComponent } from "./searchable-select.component";
 
 export type ProjectFormValue = {
   clientId?: string;
@@ -34,7 +35,7 @@ type SupervisorOption = { id: string; name: string };
 @Component({
   selector: "agb-project-form-dialog",
   standalone: true,
-  imports: [CommonModule, IonIcon],
+  imports: [CommonModule, IonIcon, SearchableSelectComponent],
   template: `
     <div class="form-overlay" role="presentation">
       <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="project-form-title">
@@ -56,10 +57,12 @@ type SupervisorOption = { id: string; name: string };
               <input class="client-locked" type="text" [value]="clientName" readonly aria-readonly="true" />
               <input type="hidden" name="clientId" [value]="initialValue?.clientId || currentClientId" />
             } @else {
-              <select name="clientId" required [value]="initialValue?.clientId || currentClientId">
-                <option value="">Select client</option>
-                <option *ngFor="let client of clients" [value]="client._id || client.id">{{ client.name }}</option>
-              </select>
+              <agb-searchable-select
+                name="clientId"
+                [value]="initialValue?.clientId || currentClientId"
+                [options]="clientOptions()"
+                placeholder="Select client"
+              />
             }
           </label>
           <label>
@@ -112,11 +115,7 @@ type SupervisorOption = { id: string; name: string };
           </label>
           <label>
             <span>Status</span>
-            <select name="status" [value]="initialValue?.status || 'Active'">
-              <option value="Active">Active</option>
-              <option value="On Hold">On Hold</option>
-              <option value="Completed">Completed</option>
-            </select>
+            <agb-searchable-select name="status" [value]="initialValue?.status || 'Active'" [options]="statusOptions" />
           </label>
           <label>
             <span>Estimated Project Value</span>
@@ -190,6 +189,7 @@ type SupervisorOption = { id: string; name: string };
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectFormDialogComponent implements OnInit {
+  readonly statusOptions = ["Active", "On Hold", "Completed"];
   @Input() eyebrow = "Project Setup";
   @Input() title = "Create New Project";
   @Input() description = "";
@@ -221,6 +221,10 @@ export class ProjectFormDialogComponent implements OnInit {
     if (!q) return list;
     return list.filter((s) => s.name.toLowerCase().includes(q));
   });
+
+  clientOptions() {
+    return this.clients.map((client) => ({ label: client.name, value: client._id || client.id || "" }));
+  }
 
   @ViewChild("supervisorInput") private supervisorInput?: ElementRef<HTMLInputElement>;
 

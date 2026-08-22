@@ -464,6 +464,7 @@ export async function listPurchaseOrders(filter: { projectId?: string; page?: nu
     page: filter.page,
     limit: filter.limit,
     cursor: filter.cursor,
+    maxLimit: 200,
   });
 }
 

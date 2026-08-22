@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { IonIcon } from "@ionic/angular/standalone";
+import { SearchableSelectComponent } from "./searchable-select.component";
 
 export type SubcontractorFormValue = {
   subcontractorName: string;
@@ -15,7 +16,7 @@ export type SubcontractorFormValue = {
 @Component({
   selector: "agb-subcontractor-form-dialog",
   standalone: true,
-  imports: [CommonModule, FormsModule, IonIcon],
+  imports: [CommonModule, FormsModule, IonIcon, SearchableSelectComponent],
   template: `
     <div class="form-overlay" role="presentation">
       <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="subcontractor-form-title">
@@ -60,16 +61,11 @@ export type SubcontractorFormValue = {
           </label>
           <label>
             <span>Status</span>
-            <select name="status" [(ngModel)]="statusValue">
-              <option value="active">Active</option>
-              <option value="inactive">Not Active</option>
-            </select>
+            <agb-searchable-select name="status" [(ngModel)]="statusValue" [options]="statusOptions" />
           </label>
           <label>
             <span>Payment Mode</span>
-            <select name="paymentMode" [(ngModel)]="paymentModeValue" required>
-              <option *ngFor="let option of paymentModeOptions" [value]="option">{{ option }}</option>
-            </select>
+            <agb-searchable-select name="paymentMode" [(ngModel)]="paymentModeValue" [options]="paymentModeOptions" [allowCustom]="true" />
           </label>
           <label class="span-2">
             <span>Notes</span>
@@ -116,6 +112,10 @@ export class SubcontractorFormDialogComponent implements OnInit {
   paymentModeValue = "Bank Transfer";
   notesValue = "";
   readonly paymentModeOptions = ["Cash", "UPI", "Bank Transfer", "NEFT", "RTGS", "IMPS", "Cheque", "Credit Card", "Debit Card", "Net Banking", "Demand Draft", "Wallet", "Other"];
+  readonly statusOptions = [
+    { label: "Active", value: "active" },
+    { label: "Not Active", value: "inactive" },
+  ];
   statusValue: "active" | "inactive" = "active";
   readonly validationError = signal<string | null>(null);
 

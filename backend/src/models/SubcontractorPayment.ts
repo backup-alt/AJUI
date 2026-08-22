@@ -29,7 +29,8 @@ export interface ISubcontractorPayment extends Document {
   siteName?: string;
   date: string;            // ISO date (YYYY-MM-DD)
   paymentType: string;
-  description: string;     // free text — work the payment covers
+  labourType: string;      // trade/category the payment covers
+  description: string;     // optional free text — work the payment covers
   employeeCount: number;   // >= 1
   amount: number;          // > 0
   notes?: string;
@@ -62,6 +63,7 @@ const subcontractorPaymentSchema = new Schema<ISubcontractorPayment>(
     siteName: { type: String, trim: true },
     date: { type: String, required: true, index: true },
     paymentType: { type: String, required: true, default: "Bank Transfer", trim: true, maxlength: 50 },
+    labourType: { type: String, required: true, default: "General Labour", trim: true, maxlength: 100 },
     description: { type: String, default: "", trim: true, maxlength: 500 },
     employeeCount: { type: Number, required: true, min: 1 },
     amount: { type: Number, required: true, min: 0.01 },

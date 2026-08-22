@@ -11,6 +11,7 @@ import { ClientFormDialogComponent, type ClientFormValue } from "../shared/clien
 import type { Quotation, TaxInvoice, TaxInvoiceRow } from "../../data/dashboardData";
 import { formatMoney } from "../shared/format";
 import { buildBusinessDocumentXlsx } from "../shared/excel-export";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 const INDIAN_STATES = [
   "Tamil Nadu", "Kerala", "Karnataka", "Andhra Pradesh", "Telangana",
@@ -50,7 +51,7 @@ function numberToWords(num: number): string {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, TaxInvoiceDialogComponent, ClientFormDialogComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, TaxInvoiceDialogComponent, ClientFormDialogComponent, SearchableSelectComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="tax-invoices"></agb-enterprise-sidebar>
@@ -215,11 +216,7 @@ function numberToWords(num: number): string {
                       </div>
                       <div class="form-field">
                         <label>State</label>
-                        <select [(ngModel)]="clientState">
-                          @for (state of states; track state) {
-                            <option [value]="state">{{ state }}</option>
-                          }
-                        </select>
+                        <agb-searchable-select [(ngModel)]="clientState" [options]="states" placeholder="Select state" />
                       </div>
                       <div class="form-field full-width">
                         <label>Client Address</label>

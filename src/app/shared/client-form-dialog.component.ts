@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from "@angular/core";
 import { IonIcon } from "@ionic/angular/standalone";
+import { SearchableSelectComponent } from "./searchable-select.component";
 
 export type ClientFormValue = {
   name: string;
@@ -23,7 +24,7 @@ const INDIAN_STATES = [
 @Component({
   selector: "agb-client-form-dialog",
   standalone: true,
-  imports: [CommonModule, IonIcon],
+  imports: [CommonModule, IonIcon, SearchableSelectComponent],
   template: `
     <div class="form-overlay" role="presentation">
       <section class="erp-dialog" role="dialog" aria-modal="true" aria-labelledby="client-form-title">
@@ -57,12 +58,7 @@ const INDIAN_STATES = [
           </label>
           <label>
             <span>State</span>
-            <select name="state" [value]="initialValue?.state || ''">
-              <option value="">Select state</option>
-              @for (state of states; track state) {
-                <option [value]="state">{{ state }}</option>
-              }
-            </select>
+            <agb-searchable-select name="state" [value]="initialValue?.state || ''" [options]="states" placeholder="Select state" />
           </label>
 
           <div class="dialog-actions span-2">

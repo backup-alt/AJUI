@@ -13,6 +13,7 @@ import { WorkspaceHydrationService, type PageModule } from "../core/workspace-hy
 import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.component";
+import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 type DashboardModule =
   | "materials"
@@ -196,6 +197,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "paymentType", label: "Payment Type" },
       { key: "subcontractorName", label: "Subcontractor" },
       { key: "projectName", label: "Project" },
+      { key: "labourType", label: "Labour Type" },
       { key: "description", label: "Description" },
       { key: "employeeCount", label: "Number of Employees" },
       { key: "amount", label: "Amount", type: "number" },
@@ -230,7 +232,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
 @Component({
   standalone: true,
-  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent, InventoryInitDialogComponent],
+  imports: [CommonModule, IonContent, IonIcon, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, VendorFormDialogComponent, InventoryInitDialogComponent, SearchableSelectComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar [active]="isGeneralExpensesPage ? 'general-expenses' : 'dashboard'"></agb-enterprise-sidebar>
@@ -734,13 +736,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         <option *ngFor="let option of selectOptions('materials', field.key)" [value]="option"></option>
                       </datalist>
                       <ng-template #dashboardMaterialSelect>
-                        <select
+                        <agb-searchable-select
                           *ngIf="selectOptions('materials', field.key).length > 0; else dashboardMaterialInput"
                           [value]="draftRow()[field.key] || ''"
-                          (change)="updateDraftField(field.key, $any($event.target).value)"
-                        >
-                          <option *ngFor="let option of selectOptions('materials', field.key)" [value]="option">{{ option }}</option>
-                        </select>
+                          [options]="selectOptions('materials', field.key)"
+                          [allowCustom]="true"
+                          (valueChange)="updateDraftField(field.key, $any($event))"
+                        />
                       </ng-template>
                       <ng-template #dashboardMaterialInput>
                         <input [type]="field.type || 'text'" [value]="draftRow()[field.key] || ''" (input)="updateDraftField(field.key, $any($event.target).value)" />
@@ -3289,6 +3291,7 @@ export class GeneralExpensesPage implements OnInit {
       subcontractorName: String(row["subcontractorName"] || ""),
       projectName: String(row["projectName"] || ""),
       siteName: String(row["siteName"] || ""),
+      labourType: String(row["labourType"] || "General Labour"),
       description: String(row["description"] || ""),
       employeeCount: Number(row["employeeCount"] ?? 1),
       amount: String(row["amount"] ?? "0"),
@@ -3564,6 +3567,9 @@ export class GeneralExpensesPage implements OnInit {
   }
 
   formColumnLabel(column: FieldSchema): string {
+    if (this.activeModule() === "subcontractors" && column.key === "description") {
+      return "Description (optional)";
+    }
     return this.activeModule() === "expenses" && column.key === "amount" ? "Total Amount" : column.label;
   }
 
@@ -3712,10 +3718,11 @@ export class GeneralExpensesPage implements OnInit {
       return;
     }
     const description = String(row["description"] || "").trim();
+    const labourType = String(row["labourType"] || "").trim();
     const employeeCount = Math.round(Number(row["employeeCount"]) || 0);
     const amount = Math.abs(this.moneyNumber(row["amount"]));
-    if (!description || !Number.isInteger(employeeCount) || employeeCount < 1 || !Number.isFinite(amount) || amount <= 0) {
-      window.alert("Description, employee count (positive whole number) and amount (greater than zero) are required.");
+    if (!labourType || !Number.isInteger(employeeCount) || employeeCount < 1 || !Number.isFinite(amount) || amount <= 0) {
+      window.alert("Labour type, employee count (positive whole number) and amount (greater than zero) are required.");
       return;
     }
     const payload = {
@@ -3723,6 +3730,7 @@ export class GeneralExpensesPage implements OnInit {
       projectId: project.id,
       date: String(row["date"] || new Date().toISOString().slice(0, 10)),
       paymentType: String(row["paymentType"] || "Bank Transfer"),
+      labourType,
       description,
       employeeCount,
       amount,
@@ -4338,6 +4346,7 @@ export class GeneralExpensesPage implements OnInit {
         subcontractorName: p.subcontractorName,
         projectName: p.projectName,
         siteName: p.siteName || "",
+        labourType: p.labourType || "General Labour",
         description: p.description || "",
         employeeCount: p.employeeCount,
         amount: p.amount,
@@ -4475,6 +4484,13 @@ export class GeneralExpensesPage implements OnInit {
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
     if (key === "paymentType") return ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS"];
+    if (module === "subcontractors" && key === "labourType") {
+      return [
+        "Mason", "Helper", "Carpenter", "Plumber", "Electrician", "Painter",
+        "Bar bender", "Welder", "Tile mason", "Centring", "Fitter", "Maid",
+        "Cook", "Watchman", "Cleaner", "Driver", "General Labour",
+      ];
+    }
     return [];
   }
 
@@ -4586,6 +4602,7 @@ export class GeneralExpensesPage implements OnInit {
         subcontractorName: "",
         projectName: "",
         siteName: "",
+        labourType: "General Labour",
         description: "",
         employeeCount: 1,
         amount: "0",
