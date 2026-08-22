@@ -1083,9 +1083,8 @@ ion-split-pane.landing-split {
 }
 
 .add-client-card {
-  align-items: center;
-  justify-content: center;
-  min-height: 312px;
+  align-content: center;
+  justify-items: center;
   padding: 28px;
   border: 1px dashed #c9b46d;
   background: #fffdf6;
@@ -1833,10 +1832,6 @@ td {
   .client-landing-grid,
   .project-select-grid {
     gap: 18px;
-  }
-
-  .add-client-card {
-    min-height: 292px;
   }
 }
 

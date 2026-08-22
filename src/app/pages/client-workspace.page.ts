@@ -60,7 +60,7 @@ import { formatMoney, statusClass } from "../shared/format";
               </div>
 
               <div class="project-select-grid">
-                <article class="project-select-card add-client-card" role="button" tabindex="0" (click)="openCreateProject()" (keydown.enter)="openCreateProject()">
+                <article class="project-select-card add-client-card add-project-card" role="button" tabindex="0" (click)="openCreateProject()" (keydown.enter)="openCreateProject()">
                   <div class="add-client-icon">
                     <ion-icon name="add-outline"></ion-icon>
                   </div>
@@ -123,6 +123,43 @@ import { formatMoney, statusClass } from "../shared/format";
       </div>
     </ion-split-pane>
   `,
+  styles: [`
+    .add-project-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      align-self: stretch;
+      gap: 14px;
+      min-height: 248px;
+      box-sizing: border-box;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .add-project-card .add-client-icon {
+      flex: 0 0 44px;
+      width: 44px;
+      height: 44px;
+      margin: 0;
+    }
+
+    .add-project-card h3,
+    .add-project-card p {
+      margin: 0;
+    }
+
+    .add-project-card p {
+      width: min(100%, 280px);
+    }
+
+    @media (max-width: 760px) {
+      .add-project-card {
+        min-height: 210px;
+        padding: 22px 18px;
+      }
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ClientWorkspacePage {
