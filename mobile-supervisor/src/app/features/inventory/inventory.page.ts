@@ -757,13 +757,11 @@ export class InventoryPage implements OnInit, OnDestroy {
     this.isLoading.set(true);
     this.errorMessage.set('');
     const gen = ++this.loadGeneration;
-    const siteId = this.supervisor.selectedSiteId();
     const projectId = this.supervisor.selectedProjectId();
 
     try {
       const res = await firstValueFrom(
         this.supervisor.getMaterials({
-          siteId: siteId || undefined,
           projectId: projectId || undefined,
           status: 'Approved',
           view: 'materials',
@@ -801,7 +799,6 @@ export class InventoryPage implements OnInit, OnDestroy {
     try {
       const response = await firstValueFrom(
         this.supervisor.getMaterials({
-          siteId: this.supervisor.selectedSiteId() || undefined,
           projectId: this.supervisor.selectedProjectId() || undefined,
           status: 'Approved',
           view: 'materials',

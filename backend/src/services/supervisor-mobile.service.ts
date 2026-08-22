@@ -852,7 +852,10 @@ export async function listMaterialsForSupervisor(
 ) {
   const { access, query } = await buildScopedEntityQuery(userId, {
     projectId: filters.projectId,
-    siteId: filters.siteId,
+    // Materials is a project-level list in the mobile UI. A project selection
+    // also stores its first site internally for site-specific workflows, but
+    // that hidden value must not remove the project's other material rows.
+    siteId: filters.view === "materials" ? undefined : filters.siteId,
   });
   if (filters.status) query.status = filters.status;
 

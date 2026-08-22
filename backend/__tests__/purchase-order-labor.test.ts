@@ -6,6 +6,7 @@ import { GstRate } from "../src/models/GstRate";
 import { Inventory } from "../src/models/Inventory";
 import { Material } from "../src/models/Material";
 import { Project } from "../src/models/Project";
+import { Site } from "../src/models/Site";
 import { PurchaseOrder } from "../src/models/PurchaseOrder";
 import { Subcontractor } from "../src/models/Subcontractor";
 import { SubcontractorLabor } from "../src/models/SubcontractorLabor";
@@ -39,6 +40,7 @@ beforeEach(async () => {
     Inventory.deleteMany({}),
     Vendor.deleteMany({}),
     Project.deleteMany({}),
+    Site.deleteMany({}),
     Client.deleteMany({}),
     SubcontractorLabor.deleteMany({}),
     Subcontractor.deleteMany({}),
@@ -123,6 +125,66 @@ async function seedProcurement() {
 }
 
 describe("Purchase order workflow", () => {
+  it("returns every project material even when the app retains a hidden site selection", async () => {
+    if (!app) return;
+    const { client, project, supervisorUser } = await seedProcurement();
+    const [firstSite, secondSite] = await Site.create([
+      {
+        siteId: await generateId("SITE"),
+        name: "North Store",
+        projectIds: [project._id],
+        status: "Active",
+      },
+      {
+        siteId: await generateId("SITE"),
+        name: "South Store",
+        projectIds: [project._id],
+        status: "Active",
+      },
+    ]);
+    await Project.updateOne(
+      { _id: project._id },
+      {
+        $set: {
+          siteIds: [firstSite._id, secondSite._id],
+          siteNames: [firstSite.name, secondSite.name],
+        },
+      }
+    );
+    for (const [index, site] of [firstSite, secondSite].entries()) {
+      await Material.create({
+        materialId: await generateId("MAT"),
+        projectId: project._id,
+        projectName: project.name,
+        clientId: client._id,
+        clientName: client.name,
+        siteId: site._id,
+        site: site.name,
+        name: `Site material ${index + 1}`,
+        unit: "Nos",
+        requestedQuantity: 10,
+        approvedQuantity: 10,
+        purchasedQuantity: 10,
+        consumedQuantity: 0,
+        requestDate: `2026-08-2${index + 1}`,
+        status: "Not Received",
+      });
+    }
+
+    const result = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+      siteId: firstSite._id.toString(),
+      status: "Approved",
+      view: "materials",
+      limit: 25,
+    });
+
+    expect(result.materials.map((material) => material.name)).toEqual(
+      expect.arrayContaining(["Bricks", "Site material 1", "Site material 2"])
+    );
+    expect(result.materials).toHaveLength(3);
+  });
+
   it("syncs the supervisor received checkbox to inventory and the web material status", async () => {
     if (!app) return;
     const { project, material, supervisorUser } = await seedProcurement();
