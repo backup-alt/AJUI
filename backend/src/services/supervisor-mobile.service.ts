@@ -845,6 +845,7 @@ export async function listMaterialsForSupervisor(
     cursor?: string;
     search?: string;
     stockStatus?: "all" | "available" | "low" | "out";
+    receivedOnly?: boolean;
   }
 ) {
   const { access, query } = await buildScopedEntityQuery(userId, {
@@ -859,6 +860,14 @@ export async function listMaterialsForSupervisor(
     const invQuery: Record<string, any> = { ...query };
     delete invQuery.status;
     const andConditions: Record<string, unknown>[] = [];
+    if (filters.receivedOnly) {
+      andConditions.push({
+        $or: [
+          { received: true },
+          { "purchaseHistory.received": true },
+        ],
+      });
+    }
     const search = String(filters.search || "").trim();
     if (search) {
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -938,6 +947,7 @@ export async function listMaterialsForSupervisor(
       poNumber: { $regex: /^PO-\d{4}-\d{4,}$/ },
       notes: "Created from purchase order",
     };
+    if (filters.receivedOnly) poMaterialQuery.status = "Received";
     if (query.projectId) poMaterialQuery.projectId = query.projectId;
     else poMaterialQuery._id = { $exists: false };
     const poMaterials = await Material.find(poMaterialQuery)
@@ -952,12 +962,17 @@ export async function listMaterialsForSupervisor(
       (m.purchaseHistory || []).filter((h: any) => h.materialId).map((h: any) => h.materialId)
     );
     let billMap = new Map<string, string>();
+    let receiptMap = new Map<string, { received: boolean; receivedDate?: string }>();
     if (allMatIds.length > 0) {
       try {
-        const linkedMats = await Material.find({ _id: { $in: allMatIds } }).select("_id billUrl pcloudFileId").lean();
+        const linkedMats = await Material.find({ _id: { $in: allMatIds } }).select("_id billUrl pcloudFileId status receivedDate").lean();
         billMap = new Map(linkedMats.map((m: any) => [
           m._id.toString(),
           m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : (m.billUrl || ''),
+        ]));
+        receiptMap = new Map(linkedMats.map((m: any) => [
+          m._id.toString(),
+          { received: m.status === "Received", receivedDate: m.receivedDate },
         ]));
       } catch {}
     }
@@ -982,14 +997,19 @@ export async function listMaterialsForSupervisor(
         poNumber: m.poNumber,
         billUrl: m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl,
         received: m.received,
-        purchaseHistory: (m.purchaseHistory || []).map((h: any) => ({
-          vendor: h.vendor,
-          quantity: h.quantity,
-          date: h.date,
-          poNumber: h.poNumber,
-          materialId: h.materialId,
-          billUrl: h.materialId ? (billMap.get(h.materialId.toString()) || '') : '',
-        })),
+        purchaseHistory: (m.purchaseHistory || []).map((h: any) => {
+          const linkedReceipt = h.materialId ? receiptMap.get(h.materialId.toString()) : undefined;
+          return {
+            vendor: h.vendor,
+            quantity: h.quantity,
+            date: h.date,
+            poNumber: h.poNumber,
+            materialId: h.materialId,
+            billUrl: h.materialId ? (billMap.get(h.materialId.toString()) || '') : '',
+            received: Boolean(h.received || linkedReceipt?.received),
+            receivedDate: h.receivedDate || linkedReceipt?.receivedDate,
+          };
+        }),
         requestDate: m.createdAt,
         status: "Approved" as const,
         createdAt: m.createdAt,
@@ -1291,15 +1311,23 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
     if (matIds.length > 0) {
       try {
         const linkedMats = await Material.find({ _id: { $in: matIds } })
-          .select("_id billUrl pcloudFileId")
+          .select("_id billUrl pcloudFileId status receivedDate")
           .lean();
         const billMap = new Map(linkedMats.map((m: any) => [
           m._id.toString(),
           m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl,
         ]));
+        const receivedMap = new Map(linkedMats.map((m: any) => [
+          m._id.toString(),
+          { received: m.status === "Received", receivedDate: m.receivedDate },
+        ]));
         for (const entry of history) {
           if (entry.materialId) {
-            entry.billUrl = billMap.get(entry.materialId.toString()) || '';
+            const entryMaterialId = entry.materialId.toString();
+            entry.billUrl = billMap.get(entryMaterialId) || '';
+            const receipt = receivedMap.get(entryMaterialId);
+            entry.received = Boolean(entry.received || receipt?.received);
+            entry.receivedDate = entry.receivedDate || receipt?.receivedDate;
           }
         }
       } catch {}
@@ -1358,43 +1386,62 @@ export async function updateMaterialReceivedForSupervisor(
   materialId: string,
   received: boolean
 ) {
+  if (!received) {
+    throw new AppError(409, "A received material cannot be marked as not received");
+  }
   const { query } = await buildScopedEntityQuery(userId);
-  const receivedDate = received ? new Date().toISOString() : undefined;
+  const receivedDate = new Date().toISOString();
 
   const inventory = await Inventory.findOne({ ...query, _id: materialId });
   if (inventory) {
-    inventory.received = received;
+    if (inventory.received) return { ...inventory.toObject(), status: "Received" };
+    inventory.received = true;
     inventory.receivedDate = receivedDate;
     inventory.lastUpdatedBy = userId;
+    if (inventory.lastMaterialId && inventory.purchaseHistory?.length) {
+      const linkedId = inventory.lastMaterialId.toString();
+      for (const purchase of inventory.purchaseHistory) {
+        if (purchase.materialId?.toString() === linkedId) {
+          purchase.received = true;
+          purchase.receivedDate = receivedDate;
+        }
+      }
+    }
     await inventory.save();
 
     if (inventory.lastMaterialId) {
       await Material.updateOne(
         { _id: inventory.lastMaterialId, projectId: inventory.projectId },
-        received
-          ? { status: "Received", receivedDate }
-          : { status: "Not Received", $unset: { receivedDate: 1 } }
+        { status: "Received", receivedDate }
       );
     }
 
     return {
       ...inventory.toObject(),
-      status: received ? "Received" : "Not Received",
+      status: "Received",
     };
   }
 
   const material = await Material.findOne({ ...query, _id: materialId });
   if (!material) throw new AppError(404, "Material not found or not accessible");
 
-  material.status = received ? "Received" : "Not Received";
+  if (material.status === "Received") return material.toObject();
+  material.status = "Received";
   material.receivedDate = receivedDate;
   await material.save();
 
   await Inventory.updateMany(
-    { projectId: material.projectId, lastMaterialId: material._id },
-    received
-      ? { received: true, receivedDate, lastUpdatedBy: userId }
-      : { received: false, lastUpdatedBy: userId, $unset: { receivedDate: 1 } }
+    { projectId: material.projectId, "purchaseHistory.materialId": material._id },
+    {
+      $set: {
+        received: true,
+        receivedDate,
+        lastUpdatedBy: userId,
+        "purchaseHistory.$[purchase].received": true,
+        "purchaseHistory.$[purchase].receivedDate": receivedDate,
+      },
+    },
+    { arrayFilters: [{ "purchase.materialId": material._id }] }
   );
 
   return material.toObject();
@@ -1546,6 +1593,8 @@ export async function addExistingMaterialForSupervisor(
       quantity: qty,
       date: new Date(),
       poNumber: input.poNumber || existing.poNumber,
+      received: true,
+      receivedDate: new Date().toISOString(),
       ...(trimmedNotes ? { notes: trimmedNotes } : {}),
     });
     await existing.save();
@@ -1593,6 +1642,8 @@ export async function addExistingMaterialForSupervisor(
       quantity: qty,
       date: new Date(),
       poNumber: input.poNumber,
+      received: true,
+      receivedDate: new Date().toISOString(),
       ...(trimmedNotes ? { notes: trimmedNotes } : {}),
     }] : undefined,
   });
@@ -1723,6 +1774,7 @@ export async function getRecentNotificationsForSupervisor(userId: string, limit:
   // Fetch approved and rejected approvals (not pending) owned by this supervisor
   query.status = { $in: ["Approved", "Rejected"] };
   query.owner = userId;
+  query.sourceCollection = { $nin: ["materials", "Material"] };
 
   const approvals = await Approval.find(query)
     .sort({ reviewedAt: -1, submittedAt: -1 })

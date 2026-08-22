@@ -81,9 +81,6 @@ import {
                 }
               </header>
 
-              <div class="progress-head"><span>Progress</span><strong>{{ project.completion || 0 }}%</strong></div>
-              <div class="progress-track"><span [style.width.%]="project.completion || 0"></span></div>
-
               <div class="project-stats">
                 <div class="stat"><ion-icon name="cube-outline"></ion-icon><div><strong>{{ project.stats?.materials?.count || 0 }}</strong><span>Materials</span></div></div>
                 <div class="stat"><ion-icon name="people-outline"></ion-icon><div><strong>{{ project.stats?.labour?.count || 0 }}</strong><span>Labour records</span></div></div>
@@ -112,10 +109,6 @@ import {
     .project-title h3 { margin: 0; font-size: 17px; font-weight: 750; color: var(--m3-on-surface); }
     .project-title p { margin: 4px 0 0; font-size: 13px; color: var(--m3-on-surface-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .active-icon { font-size: 24px; }
-    .progress-head { display: flex; justify-content: space-between; margin-top: 18px; font-size: 12px; color: var(--m3-on-surface-muted); }
-    .progress-head strong { color: var(--m3-primary); }
-    .progress-track { height: 7px; border-radius: 99px; margin-top: 7px; overflow: hidden; background: var(--m3-surface-container); }
-    .progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--m3-primary); }
     .project-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
     .stat { display: flex; gap: 7px; align-items: center; min-width: 0; padding: 10px 8px; border-radius: 12px; background: var(--m3-surface-container-low); }
     .stat ion-icon { color: var(--m3-primary); font-size: 17px; flex-shrink: 0; }

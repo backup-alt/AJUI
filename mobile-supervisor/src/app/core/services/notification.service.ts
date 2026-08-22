@@ -363,6 +363,7 @@ export class NotificationService {
   }
 
   private addInApp(n: InAppNotification): void {
+    if (this.isMaterialApprovalNotification(n)) return;
     // Skip if this notification was received before the user cleared all
     if (this.clearedAt > 0 && n.receivedAt <= this.clearedAt) return;
 
@@ -432,9 +433,10 @@ export class NotificationService {
       try {
         const list = JSON.parse(value) as InAppNotification[];
         // Filter out notifications that were received before the last clear
+        const visible = list.filter((n) => !this.isMaterialApprovalNotification(n));
         const filtered = this.clearedAt > 0
-          ? list.filter((n) => n.receivedAt > this.clearedAt)
-          : list;
+          ? visible.filter((n) => n.receivedAt > this.clearedAt)
+          : visible;
         this.notifications.set(filtered);
         this.unreadCount.set(filtered.filter((n) => !n.read).length);
       } catch { /* ignore */ }
@@ -451,7 +453,7 @@ export class NotificationService {
         data: { type: n.type, status: n.status },
         receivedAt: n.receivedAt,
         read: false,
-      }));
+      })).filter((n) => !this.isMaterialApprovalNotification(n));
       if (backendNotifs.length === 0) return;
 
       const existing = this.notifications();
@@ -505,6 +507,16 @@ export class NotificationService {
 
   private recalcUnread(): void {
     this.unreadCount.set(this.notifications().filter((n) => !n.read).length);
+  }
+
+  private isMaterialApprovalNotification(notification: InAppNotification): boolean {
+    const type = String(notification.data?.['type'] || '').toLowerCase();
+    const status = String(notification.data?.['status'] || '').toLowerCase();
+    const text = `${notification.title} ${notification.body}`.toLowerCase();
+    const relatesToMaterial = type.includes('material') || text.includes('material approval');
+    const isApprovalResult = ['approved', 'rejected'].includes(status) ||
+      text.includes(' approved') || text.includes(' rejected');
+    return relatesToMaterial && isApprovalResult;
   }
 
   private async persistNotifications(): Promise<void> {

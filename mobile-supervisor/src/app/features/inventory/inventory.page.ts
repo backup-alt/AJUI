@@ -66,6 +66,8 @@ export interface InventoryItem {
     date: string;
     materialId?: string;
     billUrl?: string;
+    received?: boolean;
+    receivedDate?: string;
   }>;
 }
 
@@ -237,7 +239,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                   <ion-checkbox
                     aria-label="Mark material as received"
                     [checked]="item.received"
-                    [disabled]="updatingReceived().has(item._id)"
+                    [disabled]="item.received || updatingReceived().has(item._id)"
                     (ionChange)="setReceived(item, $event.detail.checked)"
                   ></ion-checkbox>
                   <span>{{ item.received ? 'Received' : 'Mark received' }}</span>
@@ -955,14 +957,14 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   async setReceived(item: InventoryItem, received: boolean): Promise<void> {
-    if (item.received === received || this.updatingReceived().has(item._id)) return;
+    if (!received || item.received || this.updatingReceived().has(item._id)) return;
     this.updatingReceived.update((current) => new Set([...current, item._id]));
     this.items.update((items) => items.map((entry) => entry._id === item._id ? { ...entry, received } : entry));
     try {
       await firstValueFrom(this.supervisor.setMaterialReceived(item._id, received));
       window.dispatchEvent(new CustomEvent('agb:inventory-changed', { detail: { id: item._id, reason: 'received' } }));
       const toast = await this.toastCtrl.create({
-        message: received ? `${item.name} marked as received` : `${item.name} marked as not received`,
+        message: `${item.name} marked as received`,
         duration: 1800,
         color: 'success',
         position: 'top',

@@ -13,6 +13,10 @@ import { recomputeSiteLedger } from "./expense.service.js";
 import { addApprovedMaterialToInventory } from "./inventory.service.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
 
+function isMaterialApproval(sourceCollection: string): boolean {
+  return ["materials", "material"].includes(sourceCollection.toLowerCase());
+}
+
 export interface CreateApprovalParams {
   type: ApprovalType;
   title: string;
@@ -222,9 +226,10 @@ export async function approveRequest(
     await recomputeProjectTotals(projectId);
   }
 
-  // Send push notification to project supervisors and owner (non-blocking best-effort)
-  try {
-    const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
+  // Material approvals are intentionally silent in the mobile app.
+  if (!isMaterialApproval(approval.sourceCollection)) {
+    try {
+      const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
     const notifDetail = approval.detail ? ` - ${approval.detail}` : '';
     const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString('en-IN')})` : '';
     const approvalBody = `Approved${notifDetail}${notifAmount}`;
@@ -251,8 +256,9 @@ export async function approveRequest(
         notificationData
       );
     }
-  } catch (err) {
-    console.warn("[Notification] Failed to send approval notification:", err);
+    } catch (err) {
+      console.warn("[Notification] Failed to send approval notification:", err);
+    }
   }
 
   return approval.toObject();
@@ -312,9 +318,10 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
   if (paymentProjectId) await recomputeProjectTotals(paymentProjectId);
   if (paymentClientId) await recomputeClientTotals(paymentClientId);
 
-  // Send push notification to project supervisors and owner
-  try {
-    const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
+  // Material approvals are intentionally silent in the mobile app.
+  if (!isMaterialApproval(approval.sourceCollection)) {
+    try {
+      const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
     const notifDetail = approval.detail ? ` - ${approval.detail}` : '';
     const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString('en-IN')})` : '';
     const rejectBody = `Rejected${notifDetail}${notifAmount}`;
@@ -343,8 +350,9 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
         }
       );
     }
-  } catch (err) {
-    console.warn("[Notification] Failed to send rejection notification:", err);
+    } catch (err) {
+      console.warn("[Notification] Failed to send rejection notification:", err);
+    }
   }
 
   return approval.toObject();

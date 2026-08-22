@@ -3,7 +3,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
   IonSpinner, IonIcon, IonButton, IonRefresher, IonRefresherContent,
+  IonCheckbox, ToastController,
 } from '@ionic/angular/standalone';
+import { firstValueFrom } from 'rxjs';
 import { addIcons } from 'ionicons';
 import { cubeOutline, timeOutline, businessOutline, alertCircleOutline, refreshOutline, swapVerticalOutline, documentTextOutline, close } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
@@ -12,7 +14,7 @@ import { DatePipe } from '@angular/common';
 @Component({
   selector: 'app-inventory-detail',
   standalone: true,
-  imports: [IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon, IonButton, IonRefresher, IonRefresherContent, DatePipe],
+  imports: [IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon, IonButton, IonRefresher, IonRefresherContent, IonCheckbox, DatePipe],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -121,6 +123,15 @@ import { DatePipe } from '@angular/common';
                           View Bill
                         </button>
                       }
+                      <label class="received-control">
+                        <ion-checkbox
+                          aria-label="Mark this purchase as received"
+                          [checked]="entry.received"
+                          [disabled]="entry.received || !entry.materialId || updatingReceived().has(entry.materialId)"
+                          (ionChange)="setPurchaseReceived(entry, $event.detail.checked)"
+                        ></ion-checkbox>
+                        <span>{{ entry.received ? 'Received' : 'Mark received' }}</span>
+                      </label>
                     </div>
                   </div>
                 }
@@ -235,6 +246,14 @@ import { DatePipe } from '@angular/common';
     .log-po { font-size: 12px; font-family: var(--m3-font-mono); font-weight: 700; color: var(--m3-success); }
     .log-date { font-size: 12px; color: var(--m3-on-surface-muted); }
     .log-notes { font-size: 12px; color: var(--m3-on-surface-variant); font-style: italic; }
+    .received-control {
+      display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+      margin-top: 7px; font-size: 13px; font-weight: 700; color: var(--m3-on-surface);
+    }
+    .received-control ion-checkbox {
+      --size: 21px; --checkbox-background-checked: var(--m3-success);
+      --border-color-checked: var(--m3-success);
+    }
 
     .log-bill-btn {
       display: inline-flex; align-items: center; gap: 4px;
@@ -281,12 +300,14 @@ import { DatePipe } from '@angular/common';
 export class InventoryDetailPage implements OnInit {
   private route = inject(ActivatedRoute);
   private supervisor = inject(SupervisorService);
+  private toastCtrl = inject(ToastController);
 
   item = signal<any>(null);
   loading = signal(true);
 
   consumptionLog = signal<Array<{ quantity: number; date: string; updatedBy?: string; notes?: string }>>([]);
-  purchaseHistory = signal<Array<{ vendor: string; quantity: number; date: string; materialId?: string; billUrl?: string }>>([]);
+  purchaseHistory = signal<Array<{ vendor: string; quantity: number; date: string; materialId?: string; billUrl?: string; received?: boolean; receivedDate?: string }>>([]);
+  updatingReceived = signal<Set<string>>(new Set());
 
   viewerUrl = signal<string | null>(null);
   zoomScale = 1;
@@ -334,6 +355,48 @@ export class InventoryDetailPage implements OnInit {
   async refresh(event?: CustomEvent): Promise<void> {
     await this.loadItem();
     if (event) setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
+  }
+
+  async setPurchaseReceived(
+    entry: { materialId?: string; received?: boolean },
+    received: boolean
+  ): Promise<void> {
+    const materialId = entry.materialId;
+    if (!received || entry.received || !materialId || this.updatingReceived().has(materialId)) return;
+
+    this.updatingReceived.update((current) => new Set([...current, materialId]));
+    try {
+      await firstValueFrom(this.supervisor.setMaterialReceived(materialId, true));
+      this.purchaseHistory.update((history) => history.map((purchase) =>
+        purchase.materialId === materialId
+          ? { ...purchase, received: true, receivedDate: new Date().toISOString() }
+          : purchase
+      ));
+      window.dispatchEvent(new CustomEvent('agb:inventory-changed', {
+        detail: { id: materialId, reason: 'received' },
+      }));
+      const toast = await this.toastCtrl.create({
+        message: 'Purchase marked as received',
+        duration: 1800,
+        color: 'success',
+        position: 'top',
+      });
+      await toast.present();
+    } catch (error) {
+      const toast = await this.toastCtrl.create({
+        message: (error as Error)?.message || 'Could not update received status',
+        duration: 2200,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+    } finally {
+      this.updatingReceived.update((current) => {
+        const next = new Set(current);
+        next.delete(materialId);
+        return next;
+      });
+    }
   }
 
   openBillViewer(url: string): void {

@@ -45,6 +45,9 @@ export interface PurchaseHistoryEntry {
   date: string;
   notes?: string;
   billUrl?: string;
+  materialId?: string;
+  received?: boolean;
+  receivedDate?: string;
 }
 
 export interface ConsumptionHistoryEntry {

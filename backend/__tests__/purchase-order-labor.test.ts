@@ -155,9 +155,9 @@ describe("Purchase order workflow", () => {
       .set("Authorization", `Bearer ${supervisorLogin.body.accessToken}`)
       .send({ received: false });
 
-    expect(undoReceived.status).toBe(200);
-    expect((await Inventory.findById(inventory._id).lean())?.received).toBe(false);
-    expect((await Material.findById(material._id).lean())?.status).toBe("Not Received");
+    expect(undoReceived.status).toBe(409);
+    expect((await Inventory.findById(inventory._id).lean())?.received).toBe(true);
+    expect((await Material.findById(material._id).lean())?.status).toBe("Received");
   });
 
   it("persists a readable PO, allocates full approved quantity, and creates manual project materials", async () => {

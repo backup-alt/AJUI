@@ -57,7 +57,7 @@ import { DatePipe } from '@angular/common';
               <ion-icon name="notifications-outline"></ion-icon>
             </div>
             <h3 class="empty-title">No notifications</h3>
-            <p class="empty-text">You'll see alerts for material approvals, wage updates, and inventory changes here.</p>
+          <p class="empty-text">You'll see wage, project, and inventory alerts here.</p>
           </div>
         } @else {
           @for (notif of notifications(); track notif.id) {

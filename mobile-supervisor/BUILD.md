@@ -8,6 +8,14 @@ Prerequisites (one-time setup):
 - Java JDK 17+ (set `JAVA_HOME`)
 - Android SDK + platform-tools (set `ANDROID_HOME`)
 - Gradle (bundled via wrapper)
+- Firebase Android configuration at `android/app/google-services.json`
+
+Push delivery also requires the backend `FIREBASE_PROJECT_ID`,
+`FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` environment variables.
+The Android Firebase project must contain an app with package name
+`com.annaibuilders.agb.supervisor`. Release builds intentionally fail when
+`google-services.json` is missing so an APK without device notifications is
+not shipped accidentally.
 
 Build steps:
 ```bash

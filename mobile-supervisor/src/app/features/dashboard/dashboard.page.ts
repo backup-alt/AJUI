@@ -193,9 +193,6 @@ import { firstValueFrom } from 'rxjs';
               <button class="site-row" (click)="navigateToProject(project)">
                 <div class="site-info">
                   <span class="site-name">{{ project.name }}</span>
-                  <span class="site-meta">
-                    {{ project.completion || 0 }}% complete
-                  </span>
                 </div>
                 <ion-icon name="chevron-forward-outline" class="site-arrow"></ion-icon>
               </button>

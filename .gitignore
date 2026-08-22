@@ -30,6 +30,7 @@ atlas-credentials.env
 # Mobile builds
 *.apk
 *.aab
+mobile-supervisor/android/app/google-services.json
 mobile/www/
 mobile/apk-output/
 mobile/.angular/

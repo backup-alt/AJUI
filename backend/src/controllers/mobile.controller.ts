@@ -156,6 +156,7 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
       cursor: req.query.cursor as string | undefined,
       search: req.query.search as string | undefined,
       stockStatus: req.query.stockStatus as "all" | "available" | "low" | "out" | undefined,
+      receivedOnly: req.query.receivedOnly === "true",
     });
     res.json(result);
   } catch (e) {

@@ -42,6 +42,8 @@ export interface IInventory extends Document {
     date: Date;
     poNumber?: string;
     materialId?: Types.ObjectId;
+    received?: boolean;
+    receivedDate?: string;
     /** Free-text note attached when this purchase entry was recorded (e.g. supervisor's "Add existing material" note). */
     notes?: string;
   }>;
@@ -97,6 +99,8 @@ const inventorySchema = new Schema<IInventory>(
         date: { type: Date, default: Date.now },
         poNumber: { type: String, trim: true },
         materialId: { type: Schema.Types.ObjectId, ref: "Material" },
+        received: { type: Boolean, default: false },
+        receivedDate: { type: String },
         notes: { type: String, trim: true, maxlength: 2000 },
       }],
       default: undefined,
