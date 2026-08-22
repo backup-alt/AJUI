@@ -1418,6 +1418,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
             <agb-project-form-dialog
               *ngIf="showProjectForm() && client() as currentClient"
               [clientName]="currentClient.name"
+              [lockClient]="!editingProject()"
               [defaultSupervisor]="currentClient.supervisor"
               [clients]="data.clients()"
               [currentClientId]="currentClient._id || currentClient.id"

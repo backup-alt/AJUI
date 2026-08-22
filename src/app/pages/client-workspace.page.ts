@@ -57,19 +57,17 @@ import { formatMoney, statusClass } from "../shared/format";
                   <h2>Project Management</h2>
               <p>Select a project to open its details, activity, and settings.</p>
                 </div>
-                <button
-                  type="button"
-                  class="module-toolbar-add"
-                  aria-label="Add project"
-                  title="Add Project"
-                  (click)="openCreateProject()"
-                >
-                  <ion-icon name="add-outline" aria-hidden="true"></ion-icon>
-                  <span>Add Project</span>
-                </button>
               </div>
 
-              <div class="project-select-grid" *ngIf="projects().length; else noProjects">
+              <div class="project-select-grid">
+                <article class="project-select-card add-client-card" role="button" tabindex="0" (click)="openCreateProject()" (keydown.enter)="openCreateProject()">
+                  <div class="add-client-icon">
+                    <ion-icon name="add-outline"></ion-icon>
+                  </div>
+                  <h3>Add Project</h3>
+                  <p>Create a new project under {{ currentClient.name }}.</p>
+                </article>
+
                 <article *ngFor="let project of projects()" class="project-select-card" role="button" tabindex="0" (click)="openProject(project)" (keydown.enter)="openProject(project)">
                   <div class="project-hover-actions" aria-label="Project actions">
                     <button type="button" aria-label="Edit project" (click)="openEditProject(project, $event)">
@@ -102,33 +100,12 @@ import { formatMoney, statusClass } from "../shared/format";
                   </div>
                 </article>
               </div>
-
-              <ng-template #noProjects>
-                <div class="project-empty-state no-projects-empty" role="status" aria-live="polite">
-                  <span class="empty-box-icon large" aria-hidden="true">
-                    <svg viewBox="0 0 96 96" aria-hidden="true">
-                      <path class="empty-box-fill" d="M22 50 30 28h36l8 22v22a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7V50Z" />
-                      <path class="empty-box-line" d="M30 28h36l8 22H60l-5 8H41l-5-8H22l8-22Z" />
-                      <path class="empty-box-line" d="M22 50v22a7 7 0 0 0 7 7h38a7 7 0 0 0 7-7V50" />
-                      <path class="empty-box-line" d="M36 40h24" />
-                      <path class="empty-box-line" d="M40 68h16" />
-                    </svg>
-                  </span>
-                  <div class="no-projects-copy">
-                    <h2>No projects under {{ currentClient.name }}</h2>
-              <p>This client doesn't have any projects yet. Projects hold material, labour, expense, and payment ledgers, so create the first one when you're ready to start tracking work.</p>
-                    <button type="button" class="primary-action no-projects-cta" (click)="openCreateProject()">
-                      <ion-icon name="add-outline" aria-hidden="true"></ion-icon>
-                      Create Project
-                    </button>
-                  </div>
-                </div>
-              </ng-template>
             </section>
 
             <agb-project-form-dialog
               *ngIf="showProjectForm()"
               [clientName]="currentClient.name"
+              [lockClient]="!editingProject()"
               [defaultSupervisor]="currentClient.supervisor"
               [clients]="data.clients()"
               [currentClientId]="currentClient._id || currentClient.id"

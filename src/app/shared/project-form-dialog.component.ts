@@ -52,10 +52,15 @@ type SupervisorOption = { id: string; name: string };
         <form class="erp-form" (submit)="submit($event)">
           <label>
             <span>Client</span>
-            <select name="clientId" required [value]="initialValue?.clientId || currentClientId">
-              <option value="">Select client</option>
-              <option *ngFor="let client of clients" [value]="client._id || client.id">{{ client.name }}</option>
-            </select>
+            @if (lockClient) {
+              <input class="client-locked" type="text" [value]="clientName" readonly aria-readonly="true" />
+              <input type="hidden" name="clientId" [value]="initialValue?.clientId || currentClientId" />
+            } @else {
+              <select name="clientId" required [value]="initialValue?.clientId || currentClientId">
+                <option value="">Select client</option>
+                <option *ngFor="let client of clients" [value]="client._id || client.id">{{ client.name }}</option>
+              </select>
+            }
           </label>
           <label>
             <span>Project Name</span>
@@ -133,6 +138,12 @@ type SupervisorOption = { id: string; name: string };
   `,
   styles: [
     `
+      .client-locked {
+        min-height: 38px;
+        background: #f8fafc;
+        color: #0f172a;
+        cursor: default;
+      }
       .supervisor-dropdown {
         position: relative;
         width: 100%;
@@ -185,6 +196,7 @@ export class ProjectFormDialogComponent implements OnInit {
   @Input() submitLabel = "Create Project";
   @Input() initialValue: ProjectFormValue | null = null;
   @Input() clientName = "Selected client";
+  @Input() lockClient = false;
   @Input() defaultSupervisor = "";
   @Input() clients: Array<{ id?: string; _id?: string; name: string }> = [];
   @Input() currentClientId = "";
