@@ -18,6 +18,8 @@ export interface MarkBulkAttendanceInput {
   siteName?: string;
   attendanceDate: string; // YYYY-MM-DD
   entries: AttendanceEntryInput[];
+  shifts?: number;
+  overtimeHours?: number;
   notes?: string;
 }
 
@@ -86,6 +88,8 @@ export async function markBulkAttendance(
     attendanceDate: input.attendanceDate,
     entries,
     totalCount,
+    shifts: input.shifts ?? 2,
+    overtimeHours: input.overtimeHours ?? 0,
     notes: input.notes?.trim() || "",
     submittedBy: toObjectId(submittedBy),
   };

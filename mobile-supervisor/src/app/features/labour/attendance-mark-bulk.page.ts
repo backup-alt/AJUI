@@ -149,6 +149,78 @@ interface DraftEntry {
           </div>
         </div>
 
+        <div class="section-head">
+          <h2>Shift & Overtime</h2>
+          <p>Track shift count and overtime hours for payroll.</p>
+        </div>
+
+        <div class="shift-overtime-grid">
+          <div class="input-card">
+            <ion-label>Number of Shifts</ion-label>
+            <div class="input-stepper">
+              <button
+                type="button"
+                class="step-btn"
+                [disabled]="shifts <= 1"
+                (click)="adjustShifts(-1)"
+              >
+                <ion-icon name="remove-outline"></ion-icon>
+              </button>
+              <input
+                type="number"
+                class="step-input"
+                [(ngModel)]="shifts"
+                (input)="validateShifts($event)"
+                min="1"
+                max="3"
+                inputmode="numeric"
+              />
+              <button
+                type="button"
+                class="step-btn"
+                [disabled]="shifts >= 3"
+                (click)="adjustShifts(1)"
+              >
+                <ion-icon name="add-outline"></ion-icon>
+              </button>
+            </div>
+            <div class="input-hint">1 = Half day, 2 = Full day, 3 = 1.5 days</div>
+          </div>
+
+          <div class="input-card">
+            <ion-label>Overtime Hours</ion-label>
+            <div class="input-stepper">
+              <button
+                type="button"
+                class="step-btn"
+                [disabled]="overtimeHours <= 0"
+                (click)="adjustOvertime(-0.5)"
+              >
+                <ion-icon name="remove-outline"></ion-icon>
+              </button>
+              <input
+                type="number"
+                class="step-input"
+                [(ngModel)]="overtimeHours"
+                (input)="validateOvertime($event)"
+                min="0"
+                max="24"
+                step="0.5"
+                inputmode="decimal"
+              />
+              <button
+                type="button"
+                class="step-btn"
+                [disabled]="overtimeHours >= 24"
+                (click)="adjustOvertime(0.5)"
+              >
+                <ion-icon name="add-outline"></ion-icon>
+              </button>
+            </div>
+            <div class="input-hint">Extra hours beyond regular shift</div>
+          </div>
+        </div>
+
         <ion-list lines="none" class="form-list">
           <ion-item class="form-item form-item-last">
             <ion-label position="stacked">Notes (optional)</ion-label>
@@ -362,6 +434,44 @@ interface DraftEntry {
       line-height: 1.3;
     }
 
+    .shift-overtime-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    @media (min-width: 480px) {
+      .shift-overtime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .input-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-card ion-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+    }
+    .input-stepper {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #f9fafb;
+    }
+    .input-hint {
+      font-size: 10px;
+      color: #94a3b8;
+      line-height: 1.3;
+    }
+
     .form-list { background: transparent; padding: 0; margin-bottom: 4px; }
     .form-item {
       --background: #ffffff;
@@ -406,6 +516,8 @@ export class AttendanceMarkBulkPage implements OnInit {
 
   attendanceDate = new Date().toISOString().slice(0, 10);
   notes = '';
+  shifts = 2;
+  overtimeHours = 0;
 
   subcontractorId = '';
 
@@ -466,12 +578,16 @@ export class AttendanceMarkBulkPage implements OnInit {
       if (existing) {
         this.existingAttendanceId.set(existing._id);
         this.notes = existing.notes || '';
+        this.shifts = existing.shifts ?? 2;
+        this.overtimeHours = existing.overtimeHours ?? 0;
         this.draftEntries.set(
           existing.entries.map((e) => ({ labourType: e.labourType, count: e.count }))
         );
       } else {
         this.existingAttendanceId.set(null);
         this.notes = '';
+        this.shifts = 2;
+        this.overtimeHours = 0;
         this.draftEntries.set([]);
       }
     } catch (err) {
@@ -509,6 +625,25 @@ export class AttendanceMarkBulkPage implements OnInit {
       list.push({ labourType: type, count: value });
     }
     this.draftEntries.set(list);
+  }
+
+  adjustShifts(delta: number): void {
+    this.shifts = Math.max(1, Math.min(3, this.shifts + delta));
+  }
+
+  validateShifts(event: Event): void {
+    const value = Math.max(1, Math.min(3, Math.floor(Number((event.target as HTMLInputElement).value) || 1)));
+    this.shifts = value;
+  }
+
+  adjustOvertime(delta: number): void {
+    this.overtimeHours = Math.max(0, Math.min(24, +(this.overtimeHours + delta).toFixed(1)));
+  }
+
+  validateOvertime(event: Event): void {
+    const raw = Number((event.target as HTMLInputElement).value) || 0;
+    const value = Math.max(0, Math.min(24, +(raw).toFixed(1)));
+    this.overtimeHours = value;
   }
 
   async handleRefresh(event: CustomEvent): Promise<void> {
@@ -557,6 +692,8 @@ export class AttendanceMarkBulkPage implements OnInit {
       siteName,
       attendanceDate: this.attendanceDate,
       entries,
+      shifts: this.shifts,
+      overtimeHours: this.overtimeHours,
       notes: this.notes?.trim() || undefined,
     };
 
