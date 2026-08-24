@@ -1,9 +1,9 @@
 @echo off
 echo Building angular app...
-call "C:\Program Files\nodejs\npm.cmd" run build
+call "C:\Program Files\nodejs\npm.cmd" run build -- --configuration=production
 echo Syncing capacitor...
 call "C:\Program Files\nodejs\npx.cmd" cap sync android
 echo Building APK...
 cd android
-call gradlew assembleDebug
+call .\gradlew.bat assembleDebug
 echo Done!
