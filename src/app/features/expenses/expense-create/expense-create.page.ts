@@ -1,0 +1,730 @@
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import {
+  IonContent,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonBackButton,
+  IonButtons,
+  IonButton,
+  IonInput,
+  IonItem,
+  IonLabel,
+  IonList,
+  IonSelect,
+  IonSelectOption,
+  IonIcon,
+  IonSpinner,
+  IonToggle,
+  IonRefresher,
+  IonRefresherContent,
+  ToastController,
+  ActionSheetController,
+} from '@ionic/angular/standalone';
+import { CurrencyPipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { addIcons } from 'ionicons';
+import {
+  alertCircleOutline,
+  cartOutline,
+  cashOutline,
+  checkmarkCircleOutline,
+  cubeOutline,
+  locationOutline,
+  searchOutline,
+  walletOutline,
+  warningOutline,
+} from 'ionicons/icons';
+import { SupervisorService } from '../../../core/services/supervisor.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { Vendor } from '../../../shared/models';
+
+@Component({
+  selector: 'app-expense-create',
+  standalone: true,
+  imports: [
+    IonContent,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonBackButton,
+    IonButtons,
+    IonButton,
+    IonInput,
+    IonItem,
+    IonLabel,
+    IonList,
+    IonSelect,
+    IonSelectOption,
+    IonIcon,
+    IonSpinner,
+    IonToggle,
+    IonRefresher,
+    IonRefresherContent,
+    FormsModule,
+    CurrencyPipe,
+  ],
+  template: `
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-back-button [defaultHref]="step() === 1 ? '/tabs/expenses' : undefined" (click)="step() === 2 ? step.set(1) : null"></ion-back-button>
+        </ion-buttons>
+        <ion-title>{{ getTitle() }}</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content class="create-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
+      <div class="form-container">
+        @if (step() === 1) {
+          <div class="page-header">
+            <div class="page-icon">
+              <ion-icon name="wallet-outline"></ion-icon>
+            </div>
+            <div>
+          <h1 class="page-title">Project Expense</h1>
+          <p class="page-subtitle">Record a project expense for approval</p>
+            </div>
+          </div>
+
+        @if (selectedProjectName()) {
+            <div class="site-banner">
+              <ion-icon name="location-outline"></ion-icon>
+              <div>
+              <div class="site-banner-label">Project</div>
+              <div class="site-banner-value">{{ selectedProjectName() }}</div>
+              </div>
+            </div>
+          }
+
+          <div class="type-grid">
+            <div class="type-card" [class.selected]="expenseType() === 'Purchase'" (click)="selectType('Purchase')">
+              <div class="type-icon">
+                <ion-icon name="cart-outline"></ion-icon>
+              </div>
+              <div class="type-info">
+                <strong>Purchase</strong>
+                <span>Record a purchase expense (goes through approval, checks balance)</span>
+              </div>
+            </div>
+            <div class="type-card" [class.selected]="expenseType() === 'Add Cash'" (click)="selectType('Add Cash')">
+              <div class="type-icon type-icon-green">
+                <ion-icon name="cash-outline"></ion-icon>
+              </div>
+              <div class="type-info">
+                <strong>Add Cash</strong>
+              <span>Request cash for the selected project</span>
+              </div>
+            </div>
+          </div>
+          <ion-button expand="block" [disabled]="!expenseType()" (click)="goToStep2()">
+            Continue
+          </ion-button>
+        }
+
+        @if (step() === 2) {
+          @if (expenseType() === 'Purchase' && currentBalance() !== null) {
+            <div class="balance-banner" [class.warning]="currentBalance()! < (expense.amount || 0)">
+              <div class="balance-info">
+                <span class="balance-label">Available Balance</span>
+                <span class="balance-value" [class.negative]="currentBalance()! < 0">{{ currentBalance()! | currency:'INR':'symbol':'1.0-0' }}</span>
+              </div>
+              @if (expense.amount && expense.amount > currentBalance()!) {
+                <div class="balance-warning">
+                  <ion-icon name="warning-outline"></ion-icon>
+                  Amount exceeds available balance
+                </div>
+              }
+            </div>
+          }
+
+          <ion-list lines="none" class="form-list">
+            @if (expenseType() === 'Purchase') {
+              <div class="form-item toggle-item">
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                <div class="toggle-label">Includes Project Material</div>
+                <div class="toggle-sub">Does this purchase include project material?</div>
+                  </div>
+                  <ion-toggle [(ngModel)]="isSiteMaterial" (ionChange)="onSiteMaterialToggle()"></ion-toggle>
+                </div>
+              </div>
+            }
+
+            @if (expenseType() === 'Purchase' && isSiteMaterial) {
+              <div class="form-group">
+                <label class="form-label">Material Name *</label>
+                <div class="search-wrap" (pointerdown)="onMaterialSearchWrapClick($event)">
+                  <ion-input
+                    placeholder="Search or enter material name"
+                    [(ngModel)]="expense.materialName"
+                    (ionInput)="onMaterialNameInput($event)"
+                    [clearInput]="true"
+                  ></ion-input>
+                  @if (filteredMaterialNames().length > 0 && showMaterialSuggestions()) {
+                    <div class="suggestions-list">
+                      @for (n of filteredMaterialNames(); track n) {
+                        <div class="suggestion-item" (pointerdown)="onSelectMaterialSuggestion($event, n)">
+                          <ion-icon name="search-outline"></ion-icon>
+                          {{ n }}
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <ion-item class="form-item">
+                <ion-label position="stacked">Unit *</ion-label>
+                <ion-select
+                  placeholder="Select Unit"
+                  [(ngModel)]="expense.materialUnit"
+                  interface="popover"
+                >
+                  <ion-select-option value="kg">Kilograms (kg)</ion-select-option>
+                  <ion-select-option value="bags">Bags</ion-select-option>
+                  <ion-select-option value="tons">Tons</ion-select-option>
+                  <ion-select-option value="cubic meters">Cubic Meters (m³)</ion-select-option>
+                  <ion-select-option value="pieces">Pieces</ion-select-option>
+                  <ion-select-option value="units">Units</ion-select-option>
+                  <ion-select-option value="liters">Liters</ion-select-option>
+                </ion-select>
+              </ion-item>
+
+              <ion-item class="form-item">
+                <ion-label position="stacked">Quantity *</ion-label>
+                <ion-input
+                  type="number"
+                  placeholder="0"
+                  [(ngModel)]="expense.materialQuantity"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item" (click)="openVendorActionSheet()">
+                <ion-label position="stacked">Vendor</ion-label>
+                <ion-input
+                  placeholder="Select Vendor"
+                  [value]="selectedVendorName()"
+                  readonly="true"
+                  class="vendor-input"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Issued Amount (INR) *</ion-label>
+                <ion-input
+                  type="number"
+                  placeholder="0"
+                  [(ngModel)]="expense.issuedAmount"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+            }
+
+            @if (expenseType() === 'Purchase') {
+              <ion-item class="form-item">
+                <ion-label position="stacked">Description *</ion-label>
+                <ion-input
+                  placeholder="e.g., Sand delivery"
+                  [(ngModel)]="expense.description"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Amount (INR) *</ion-label>
+                <ion-input
+                  type="number"
+                  placeholder="0"
+                  [(ngModel)]="expense.amount"
+                  (ionInput)="onAmountChange()"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Notes</ion-label>
+                <ion-input
+                  placeholder="Optional note for admin"
+                  [(ngModel)]="expense.notes"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+            }
+
+            @if (expenseType() === 'Add Cash') {
+              <ion-item class="form-item">
+                <ion-label position="stacked">Description *</ion-label>
+                <ion-input
+                  placeholder="e.g., Cash deposit by supervisor"
+                  [(ngModel)]="expense.description"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Amount (INR) *</ion-label>
+                <ion-input
+                  type="number"
+                  placeholder="0"
+                  [(ngModel)]="expense.amount"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+
+              <ion-item class="form-item form-item-last">
+                <ion-label position="stacked">Notes</ion-label>
+                <ion-input
+                  placeholder="Optional note for admin"
+                  [(ngModel)]="expense.notes"
+                  [clearInput]="true"
+                ></ion-input>
+              </ion-item>
+            }
+          </ion-list>
+
+          @if (expenseType() === 'Purchase' && !isSiteMaterial && expense.amount && expense.amount > currentBalance()!) {
+            <div class="block-notice">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              Cannot submit - amount exceeds available balance
+            </div>
+          }
+
+          <div class="form-actions">
+            <ion-button
+              expand="block"
+              [disabled]="!isValid() || isSubmitting() || (expenseType() === 'Purchase' && !isSiteMaterial && expense.amount! > currentBalance()!)"
+              (click)="submit()"
+            >
+              @if (isSubmitting()) {
+                <ion-spinner name="crescent" slot="start"></ion-spinner>
+                Submitting...
+              } @else {
+                {{ getSubmitLabel() }}
+              }
+            </ion-button>
+          </div>
+        }
+      </div>
+    </ion-content>
+  `,
+  styles: [`
+    .create-content { --background: #f5f6f8; }
+    .form-container { padding: 16px; }
+    .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+    .page-icon { width: 48px; height: 48px; background: rgba(217, 119, 6, 0.1); color: #d97706; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
+    .page-icon ion-icon { font-size: 24px; }
+    .page-title { font-size: 18px; font-weight: 700; color: #111827; margin: 0 0 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .page-subtitle { font-size: 12px; color: #6b7280; margin: 0; }
+    .site-banner { display: flex; align-items: center; gap: 10px; background: #ffffff; border: 1px solid #e5e7eb; border-left: 3px solid #c9a227; padding: 12px 14px; margin-bottom: 16px; }
+    .site-banner ion-icon { font-size: 18px; color: #c9a227; }
+    .site-banner-label { font-size: 10px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+    .site-banner-value { font-size: 14px; font-weight: 600; color: #111827; }
+    .type-grid { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    .type-card { display: flex; align-items: center; gap: 14px; background: #fff; border: 2px solid #e5e7eb; border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.15s; }
+    .type-card:active { transform: scale(0.98); }
+    .type-card.selected { border-color: #002263; background: #f0f4ff; }
+    .type-icon { width: 44px; height: 44px; background: rgba(0, 34, 99, 0.08); color: #002263; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .type-icon ion-icon { font-size: 22px; }
+    .type-icon.type-icon-gold { background: rgba(201, 162, 39, 0.12); color: #c9a227; }
+    .type-icon.type-icon-green { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+    .type-info { display: flex; flex-direction: column; gap: 2px; }
+    .type-info strong { font-size: 14px; font-weight: 600; color: #111827; }
+    .type-info span { font-size: 12px; color: #6b7280; }
+    .balance-banner { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #fff; border: 1px solid #e5e7eb; border-left: 3px solid #c9a227; border-radius: 8px; margin-bottom: 16px; }
+    .balance-banner.warning { border-left-color: #dc2626; background: #fff5f5; }
+    .balance-info { display: flex; flex-direction: column; gap: 2px; }
+    .balance-label { font-size: 10px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+    .balance-value { font-size: 18px; font-weight: 700; color: #002263; }
+    .balance-value.negative { color: #dc2626; }
+    .balance-warning { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #dc2626; font-weight: 600; }
+    .block-notice { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff5f5; border: 1px solid #fca5a5; border-radius: 8px; color: #dc2626; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
+    .form-list { background: transparent; padding: 0; }
+    .form-item { --background: #ffffff; --background-hover: #ffffff; --background-focused: #ffffff; --background-checked: #ffffff; --border-radius: 0 !important; --inner-border-radius: 0 !important; --padding-start: 14px; --padding-end: 14px; --min-height: 64px; border: 1px solid #e5e7eb; border-bottom: none; margin-bottom: 0; --highlight-color-checked: transparent; --highlight-color-focused: transparent; --highlight-color-valid: transparent; --highlight-color-invalid: transparent; }
+    .toggle-item { background: #ffffff; border: 1px solid #e5e7eb; border-bottom: none; padding: 14px; margin-bottom: 0; min-height: 64px; box-sizing: border-box; }
+    .form-item.form-item-last { border-bottom: 1px solid #e5e7eb; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 0; }
+    .toggle-info { display: flex; flex-direction: column; gap: 2px; }
+    .toggle-label { font-size: 14px; font-weight: 600; color: #111827; }
+    .toggle-sub { font-size: 12px; color: #6b7280; }
+    ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --handle-background: #fff; --handle-background-checked: #fff; --handle-box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    .form-actions { padding: 20px 0; }
+    .form-group { margin: 0; padding: 10px 14px; background: #ffffff; border: 1px solid #e5e7eb; }
+    .form-group:first-of-type { border-radius: 8px 8px 0 0; }
+    .form-group:last-of-type { border-radius: 0 0 8px 8px; border-bottom: 1px solid #e5e7eb; }
+    .form-label { display: block; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .search-wrap { position: relative; }
+    .search-wrap ion-input { --background: transparent; --border-radius: 0; --padding-start: 0; --padding-end: 0; --min-height: 36px; border: none; font-size: 15px; color: #111827; }
+    .suggestions-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #111827;
+      cursor: pointer;
+    }
+    .suggestion-item:hover, .suggestion-item:active {
+      background: #f0f4ff;
+    }
+    .suggestion-item ion-icon { font-size: 14px; color: #6b7280; flex-shrink: 0; }
+  `],
+})
+export class ExpenseCreatePage implements OnInit, OnDestroy {
+  private supervisor = inject(SupervisorService);
+  private router = inject(Router);
+  private toastCtrl = inject(ToastController);
+  private notifications = inject(NotificationService);
+
+  expense = {
+    description: '',
+    amount: null as number | null,
+    materialName: '',
+    materialUnit: '',
+    materialQuantity: null as number | null,
+    materialVendorId: '',
+    materialVendor: '',
+    issuedAmount: null as number | null,
+    notes: '',
+  };
+
+  selectedVendorId = signal<string>('');
+  selectedVendorName = signal<string>('');
+
+  isSiteMaterial = false;
+  step = signal(1);
+  expenseType = signal<'Purchase' | 'Add Cash' | ''>('');
+  isSubmitting = signal(false);
+  selectedSiteId = signal<string | null>(null);
+  selectedSiteName = signal<string | null>(null);
+  selectedProjectName = signal<string | null>(null);
+  siteProjectId = signal<string | null>(null);
+  currentBalance = signal<number | null>(null);
+  vendors = signal<Vendor[]>([]);
+  materialNames = signal<string[]>([]);
+  filteredMaterialNames = signal<string[]>([]);
+  showMaterialSuggestions = signal(false);
+  private selectingMaterial = false;
+  private hideMaterialTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private actionSheetCtrl = inject(ActionSheetController);
+
+  async ngOnInit(): Promise<void> {
+    addIcons({
+      alertCircleOutline,
+      cartOutline,
+      cashOutline,
+      checkmarkCircleOutline,
+      cubeOutline,
+      locationOutline,
+      searchOutline,
+      walletOutline,
+      warningOutline,
+    });
+    await this.supervisor.init();
+    this.selectedSiteId.set(this.supervisor.selectedSiteId());
+    this.selectedSiteName.set(this.supervisor.selectedSiteName());
+    this.selectedProjectName.set(this.supervisor.selectedProjectName());
+    this.siteProjectId.set(this.supervisor.selectedProjectId());
+    await this.loadVendors();
+    this.loadMaterialNames();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('pointerdown', this.onDocClick);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('pointerdown', this.onDocClick);
+    }
+  }
+
+  private onDocClick = (): void => {
+    this.showMaterialSuggestions.set(false);
+  };
+
+  selectType(type: 'Purchase' | 'Add Cash') {
+    this.expenseType.set(type);
+  }
+
+  getTitle(): string {
+    if (this.step() === 1) return 'Log Expense';
+    return this.expenseType() === 'Add Cash' ? 'Add Cash' : 'Purchase Expense';
+  }
+
+  getSubmitLabel(): string {
+    return this.expenseType() === 'Add Cash' ? 'Add Cash' : 'Submit Purchase';
+  }
+
+  async loadVendors() {
+    this.supervisor.getVendors({ limit: 25 }).subscribe({
+      next: (res) => this.vendors.set(res.items || []),
+      error: () => this.vendors.set([]),
+    });
+  }
+
+  loadMaterialNames(): void {
+    this.supervisor.getMaterialNames().subscribe({
+      next: (res) => this.materialNames.set(res.names || []),
+      error: () => this.materialNames.set([]),
+    });
+  }
+
+  onMaterialNameInput(event: Event): void {
+    if (this.selectingMaterial) return;
+    const value = (event as CustomEvent).detail?.value?.toLowerCase() || '';
+    this.showMaterialSuggestions.set(true);
+    if (!value) {
+      this.filteredMaterialNames.set(this.materialNames().slice(0, 10));
+    } else {
+      this.filteredMaterialNames.set(
+        this.materialNames().filter(n => n.toLowerCase().includes(value)).slice(0, 10)
+      );
+    }
+  }
+
+  onMaterialSearchWrapClick(event: Event): void {
+    event.stopPropagation();
+    this.showMaterialSuggestions.set(true);
+    if (this.filteredMaterialNames().length === 0) {
+      this.filteredMaterialNames.set(this.materialNames().slice(0, 10));
+    }
+  }
+
+  selectMaterialName(n: string): void {
+    this.selectingMaterial = true;
+    this.expense.materialName = n;
+    this.showMaterialSuggestions.set(false);
+    this.filteredMaterialNames.set([]);
+    setTimeout(() => { this.selectingMaterial = false; }, 100);
+  }
+
+  onSelectMaterialSuggestion(event: Event, n: string): void {
+    event.stopPropagation();
+    this.selectMaterialName(n);
+  }
+
+  hideMaterialSuggestionsDelayed(): void {
+    this.hideMaterialTimer = setTimeout(() => this.showMaterialSuggestions.set(false), 150);
+  }
+
+  async openVendorActionSheet() {
+    const buttons: Array<{ text: string; handler: () => void; role?: string }> = this.vendors().map((vendor) => ({
+      text: vendor.name,
+      handler: () => {
+        this.selectedVendorId.set(vendor._id);
+        this.selectedVendorName.set(vendor.name);
+        this.expense.materialVendorId = vendor._id;
+        this.expense.materialVendor = vendor.name;
+      },
+    }));
+    buttons.push({ text: 'Cancel', role: 'cancel', handler: () => {} });
+    const actionSheet = await this.actionSheetCtrl.create({
+      header: 'Select Vendor',
+      buttons,
+    });
+    await actionSheet.present();
+  }
+
+  async goToStep2() {
+    if (!this.expenseType()) return;
+    this.step.set(2);
+    if (this.expenseType() === 'Purchase') {
+      await this.loadBalance();
+    }
+  }
+
+  /**
+   * Recompute the running site balance from APPROVED expenses only.
+   * The balance shown to a supervisor is the running total of:
+   *   (sum of approved Cash Added) - (sum of approved Purchases)
+   * Pending / Rejected requests MUST NOT influence the balance that
+   * a supervisor sees while creating a new purchase.
+   */
+  async loadBalance() {
+    const siteId = this.supervisor.selectedSiteId();
+    const projectId = this.supervisor.selectedProjectId();
+    const openingBalance = await this.supervisor.getSelectedSiteOpeningBalance();
+    this.supervisor
+      .getExpenses({
+        siteId: siteId ?? undefined,
+        projectId: projectId ?? undefined,
+        type: 'site',
+        status: 'Approved',
+          limit: 25,
+      })
+      .subscribe({
+        next: (res) => {
+          const cashAdded = res.expenses
+            .filter((e) => e.transactionType === 'Cash Added')
+            .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+          const spent = res.expenses
+            .filter((e) => e.transactionType !== 'Cash Added')
+            .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+          this.currentBalance.set(openingBalance + cashAdded - spent);
+        },
+        error: () => this.currentBalance.set(0),
+      });
+  }
+
+  onAmountChange() {
+  }
+
+  onSiteMaterialToggle() {
+    if (!this.isSiteMaterial) {
+      this.expense.description = '';
+      this.expense.materialName = '';
+      this.expense.materialUnit = '';
+      this.expense.materialQuantity = null;
+      this.expense.materialVendorId = '';
+      this.expense.materialVendor = '';
+      this.expense.issuedAmount = null;
+      this.selectedVendorId.set('');
+      this.selectedVendorName.set('');
+    }
+  }
+
+  isValid(): boolean {
+    if (this.expenseType() === 'Purchase' && this.isSiteMaterial) {
+      return !!(
+        this.expense.materialName &&
+        this.expense.materialUnit &&
+        this.expense.materialQuantity &&
+        this.expense.description &&
+        this.expense.amount &&
+        this.expense.issuedAmount
+      );
+    }
+    if (this.expenseType() === 'Purchase' && !this.isSiteMaterial) {
+      return !!(this.expense.description && this.expense.amount);
+    }
+    if (this.expenseType() === 'Add Cash') {
+      return !!(this.expense.description && this.expense.amount);
+    }
+    return false;
+  }
+
+  async submit(): Promise<void> {
+    if (!this.isValid()) return;
+
+    const siteId = this.selectedSiteId();
+    const siteName = this.selectedSiteName();
+    const projectId = this.siteProjectId();
+
+    if (!siteId || !siteName) {
+      const toast = await this.toastCtrl.create({
+        message: 'Please select a project first',
+        duration: 2500,
+        color: 'warning',
+        position: 'top',
+      });
+      await toast.present();
+      return;
+    }
+
+    if (!projectId) {
+      const toast = await this.toastCtrl.create({
+        message: 'This project is not configured for mobile updates. Please contact admin.',
+        duration: 3000,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+      return;
+    }
+
+    if (this.expenseType() === 'Purchase' && !this.isSiteMaterial && this.expense.amount! > this.currentBalance()!) {
+      const toast = await this.toastCtrl.create({
+        message: 'Cannot submit - amount exceeds available balance',
+        duration: 3000,
+        color: 'danger',
+        position: 'top',
+      });
+      await toast.present();
+      return;
+    }
+
+    this.isSubmitting.set(true);
+
+    const selectedVendor = this.vendors().find(v => v._id === this.expense.materialVendorId);
+    const isCashAdded = this.expenseType() === 'Add Cash';
+
+    const payload: any = {
+      type: 'site',
+      projectId,
+      siteId,
+      site: siteName,
+      transactionType: isCashAdded ? 'Cash Added' : 'Purchase',
+      amount: this.expense.amount || 0,
+      date: new Date().toISOString().slice(0, 10),
+      description: this.expense.description,
+      notes: this.expense.notes?.trim() || undefined,
+    };
+
+    if (!isCashAdded) {
+      if (this.isSiteMaterial) {
+        payload.isSiteMaterial = true;
+        payload.transactionType = 'Purchase';
+        payload.materialName = this.expense.materialName;
+        payload.materialUnit = this.expense.materialUnit;
+        payload.materialQuantity = this.expense.materialQuantity;
+        payload.materialVendor = selectedVendor?.name || this.expense.materialVendor || undefined;
+        payload.materialVendorId = this.expense.materialVendorId || undefined;
+        payload.issuedAmount = this.expense.issuedAmount;
+      }
+    }
+
+    this.supervisor.createExpense(payload).subscribe({
+      next: async () => {
+        this.isSubmitting.set(false);
+        const toast = await this.toastCtrl.create({
+          message: isCashAdded ? 'Cash request submitted for approval' : 'Purchase submitted for approval',
+          duration: 2500,
+          color: 'success',
+          position: 'top',
+        });
+        await toast.present();
+        const expType = isCashAdded ? 'Cash Added' : 'Purchase';
+        const expAmt = this.expense.amount || 0;
+        this.notifications.notify(
+          'Expense Submitted',
+          `${expType}: ${this.expense.description || 'N/A'} - ₹${expAmt.toLocaleString('en-IN')} submitted for approval.`
+        );
+        this.router.navigate(['/tabs/expenses']);
+      },
+      error: async (err) => {
+        this.isSubmitting.set(false);
+        const toast = await this.toastCtrl.create({
+          message: err?.message || 'Failed to submit expense',
+          duration: 3000,
+          color: 'danger',
+          position: 'top',
+        });
+        await toast.present();
+      },
+    });
+  }
+
+  handleRefresh(event: CustomEvent): void {
+    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 300);
+  }
+}

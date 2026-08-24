@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:hardwareAccelerated="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Custom-scheme deep link for invite emails:
+                 agb-supervisor://invite?token=ABC&otp=123456
+                 Tapping a link in the email opens the app on the signup page with the token pre-filled. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="agb-supervisor" android:host="invite" />
+            </intent-filter>
+
+            <!-- Custom-scheme deep link for password reset emails:
+                 agb-supervisor://reset-password?token=ABC
+                 Opens the app on the reset-password page with token pre-filled. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="agb-supervisor" android:host="reset-password" />
+            </intent-filter>
+
+            <!-- Universal Link for invite emails:
+                 https://agb-o3cc.onrender.com/invite?token=ABC
+                 (If you set up assetlinks.json at /.well-known/assetlinks.json with the
+                 matching SHA-256 fingerprint, you can also drop the autoVerify="false".) -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="agb-o3cc.onrender.com" android:pathPrefix="/invite" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Android 13 (API 33) requires runtime permission for posting notifications.
+         Without this declaration, requestPermissions() returns DENIED and the
+         Capacitor Push plugin throws on subsequent register() calls. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required by Firebase Messaging on Android 13+ when the app process is
+         killed and a push needs to wake it up. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+</manifest>

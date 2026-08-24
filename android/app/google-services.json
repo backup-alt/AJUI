@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "742215600388",
+    "project_id": "agb1-40baa",
+    "storage_bucket": "agb1-40baa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:742215600388:android:c25e6b7ac840ffba21a851",
+        "android_client_info": {
+          "package_name": "com.annaibuilders.agb.supervisor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhdUH3HjbNVkzUtxbWkrOpXSYXwyMBzyY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
