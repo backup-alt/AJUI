@@ -123,7 +123,11 @@ export async function listSubcontractorsForSupervisor(userId: string) {
   const query: Record<string, unknown> = { status: "active" };
 
   if (access.projectIds.length > 0) {
-    query.projectId = { $in: access.projectIds };
+    // Match subcontractors assigned via EITHER projectId (singular) OR projectIds (array)
+    query.$or = [
+      { projectId: { $in: access.projectIds } },
+      { projectIds: { $in: access.projectIds } },
+    ];
   } else if (access.siteNames.length > 0) {
     // No explicit project assignment, but the supervisor is bound to
     // sites by name — match subcontractors whose project contains
@@ -134,19 +138,23 @@ export async function listSubcontractorsForSupervisor(userId: string) {
       .lean();
     const projectIds = projects.map((p) => p._id);
     if (projectIds.length === 0) return [];
-    query.projectId = { $in: projectIds };
+    query.$or = [
+      { projectId: { $in: projectIds } },
+      { projectIds: { $in: projectIds } },
+    ];
   } else {
     return [];
   }
 
   const items = await Subcontractor.find(query)
-    .select("_id subcontractorName projectId")
+    .select("_id subcontractorName projectId projectIds")
     .sort({ subcontractorName: 1 })
     .lean();
   return items.map((s) => ({
     _id: String(s._id),
     subcontractorName: s.subcontractorName,
     projectId: s.projectId ? String(s.projectId) : "",
+    projectIds: (s.projectIds || []).map((pid) => String(pid)),
   }));
 }
 

@@ -106,6 +106,9 @@ router.delete("/labour/:id", requireRole("admin", "project_manager"), ctrl.delet
 router.get("/attendance/grouped", attendanceCtrl.getGroupedAttendance);
 router.get("/attendance/report", attendanceCtrl.getLabourReportHandler);
 
+// =================== SUBCONTRACTOR ATTENDANCE (bulk headcount) ===================
+router.get("/subcontractor-attendance", cache(30), ctrl.listSubcontractorAttendance);
+
 // =================== EXPENSES ===================
 router.post(
   "/expenses",

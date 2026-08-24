@@ -1291,3 +1291,71 @@ export async function deleteWorker(req: Request, res: Response, next: NextFuncti
     res.json({ ok: true });
   } catch (e) { next(e); }
 }
+
+// =================== SUBCONTRACTOR ATTENDANCE (bulk headcount from mobile) ===================
+export async function listSubcontractorAttendance(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { default: subcontractorAttendanceService } = await import("../services/subcontractorAttendance.service.js");
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const { SubcontractorAttendance } = await import("../models/SubcontractorAttendance.js");
+    
+    const query: Record<string, any> = {};
+    
+    // Apply project scope
+    if (scopeProjectIds !== null) {
+      query.projectId = { $in: scopeProjectIds };
+    }
+    
+    // Filter by projectId if provided
+    if (req.query.projectId) {
+      const { Types } = await import("mongoose");
+      if (Types.ObjectId.isValid(req.query.projectId as string)) {
+        query.projectId = new Types.ObjectId(req.query.projectId as string);
+      }
+    }
+    
+    // Filter by date range if provided
+    if (req.query.dateFrom || req.query.dateTo) {
+      query.attendanceDate = {};
+      if (req.query.dateFrom) query.attendanceDate.$gte = req.query.dateFrom;
+      if (req.query.dateTo) query.attendanceDate.$lte = req.query.dateTo;
+    }
+    
+    // Pagination
+    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10));
+    const limit = Math.min(500, Math.max(1, parseInt(String(req.query.limit || "200"), 10)));
+    const skip = (page - 1) * limit;
+    
+    const [items, total] = await Promise.all([
+      SubcontractorAttendance.find(query)
+        .sort({ attendanceDate: -1, subcontractorName: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      SubcontractorAttendance.countDocuments(query),
+    ]);
+    
+    res.json({
+      items: items.map((item) => ({
+        _id: String(item._id),
+        subcontractorId: String(item.subcontractorId),
+        subcontractorName: item.subcontractorName,
+        projectId: item.projectId ? String(item.projectId) : undefined,
+        projectName: item.projectName,
+        siteId: item.siteId ? String(item.siteId) : undefined,
+        siteName: item.siteName,
+        attendanceDate: item.attendanceDate,
+        entries: item.entries,
+        totalCount: item.totalCount,
+        notes: item.notes,
+        submittedBy: item.submittedBy ? String(item.submittedBy) : undefined,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      })),
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (e) { next(e); }
+}
