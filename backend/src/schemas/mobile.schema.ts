@@ -220,3 +220,45 @@ export const updateAttendanceSchema = z.object({
     notes: z.string().trim().max(1000).optional(),
   }),
 });
+
+// ----- Bulk sub-contractor attendance (mobile) -----
+// Captures the daily muster as a list of (labourType, count) pairs per
+// sub-contractor. No individual worker data is stored — the user wants
+// the headcount only.
+export const bulkAttendanceEntrySchema = z.object({
+  labourType: z.string().trim().min(1).max(80),
+  count: z.coerce.number().int().min(0).max(1000).default(0),
+});
+
+export const markBulkAttendanceSchema = z.object({
+  body: z.object({
+    subcontractorId: objectIdSchema,
+    projectId: objectIdSchema.optional(),
+    siteId: objectIdSchema.optional(),
+    siteName: z.string().trim().max(200).optional(),
+    attendanceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date (YYYY-MM-DD)").refine(
+      (val) => {
+        const date = new Date(val + "T00:00:00");
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        return !isNaN(date.getTime()) && date <= today;
+      },
+      { message: "Attendance cannot be marked for future dates" }
+    ),
+    entries: z.array(bulkAttendanceEntrySchema).default([]),
+    notes: z.string().trim().max(1000).optional(),
+  }),
+});
+
+export const createQuickSubcontractorSchema = z.object({
+  body: z.object({
+    subcontractorName: z.string().trim().min(1).max(200),
+    phone: z.string().trim().max(40).optional(),
+    address: z.string().trim().max(500).optional(),
+    // The supervisor's currently-selected project is used as a fallback
+    // when this is omitted (the most common case when adding a fresh
+    // sub-contractor from the attendance screen).
+    projectId: objectIdSchema.optional(),
+  }),
+});
+

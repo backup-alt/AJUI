@@ -6,6 +6,7 @@ import * as mobileService from "../services/supervisor-mobile.service.js";
 import * as workerService from "../services/worker.service.js";
 import * as vendorService from "../services/vendor.service.js";
 import * as subcontractorService from "../services/subcontractor.service.js";
+import * as subcontractorAttendanceService from "../services/subcontractorAttendance.service.js";
 import * as supervisorService from "../services/supervisor.service.js";
 import * as deviceService from "../services/device-token.service.js";
 
@@ -844,6 +845,71 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
       limit,
       pages: 1,
     });
+  } catch (e) { next(e); }
+}
+
+// =================== BULK ATTENDANCE (mobile) ===================
+// Lightweight sub-contractor roster creation from the supervisor app.
+// We deliberately accept a MINIMAL payload (name + optional phone) —
+// the full subcontractor record (GST, custom fields, multi-project
+// assignment, etc.) is still managed from the web admin. Supervisors
+// only need a name to mark attendance for a new party on the fly.
+export async function createQuickSubcontractor(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const { subcontractorName, phone, address, projectId } = req.body || {};
+    if (!subcontractorName || !String(subcontractorName).trim()) {
+      throw new AppError(400, "subcontractorName is required");
+    }
+    // Fall back to the supervisor's currently selected project so a
+    // fresh on-site name doesn't strand the record with no project.
+    const access = await mobileService.getSupervisorAccess(userId);
+    const resolvedProjectId = projectId || access.projectIds?.[0]?.toString();
+    if (!resolvedProjectId) {
+      throw new AppError(400, "projectId is required (no project currently selected)");
+    }
+    const sub = await subcontractorService.createSubcontractor({
+      projectId: resolvedProjectId,
+      subcontractorName: String(subcontractorName).trim(),
+      phone: phone ? String(phone).trim() : "",
+      address: address ? String(address).trim() : "",
+      description: "Created from supervisor mobile app",
+    });
+    res.status(201).json({ subcontractor: sub });
+  } catch (e) { next(e); }
+}
+
+export async function markBulkAttendance(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const attendance = await subcontractorAttendanceService.markBulkAttendance(req.body, userId);
+    res.status(201).json({ attendance });
+  } catch (e) { next(e); }
+}
+
+export async function listBulkAttendanceForDate(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = requireSupervisor(req);
+    const date = String(req.query.date || "").trim();
+    if (!date) throw new AppError(400, "date query param is required");
+    const items = await subcontractorAttendanceService.listAttendanceForSupervisor(userId, date);
+    res.json({ attendances: items, total: items.length, date });
+  } catch (e) { next(e); }
+}
+
+export async function getBulkAttendance(req: Request, res: Response, next: NextFunction) {
+  try {
+    requireSupervisor(req);
+    const attendance = await subcontractorAttendanceService.getBulkAttendanceById(req.params.id);
+    res.json({ attendance });
+  } catch (e) { next(e); }
+}
+
+export async function deleteBulkAttendance(req: Request, res: Response, next: NextFunction) {
+  try {
+    requireSupervisor(req);
+    await subcontractorAttendanceService.deleteBulkAttendance(req.params.id);
+    res.json({ success: true });
   } catch (e) { next(e); }
 }
 

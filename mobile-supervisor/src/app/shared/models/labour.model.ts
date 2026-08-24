@@ -100,6 +100,55 @@ export interface Worker {
   updatedAt: string;
 }
 
+// =================== BULK SUBCONTRACTOR ATTENDANCE ===================
+// Per-(subcontractor, project, day) muster: a list of labour-type
+// counts that captures who showed up today without recording personal
+// data for each individual labour. This is the new "pure attendance"
+// shape the mobile supervisor app uses.
+export interface SubcontractorAttendanceEntry {
+  labourType: string;
+  count: number;
+}
+
+export interface SubcontractorAttendance {
+  _id: string;
+  subcontractorId: string;
+  subcontractorName: string;
+  projectId: string;
+  projectName: string;
+  siteId?: string;
+  siteName?: string;
+  attendanceDate: string; // YYYY-MM-DD
+  entries: SubcontractorAttendanceEntry[];
+  totalCount: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MarkBulkAttendanceRequest {
+  subcontractorId: string;
+  projectId?: string;
+  siteId?: string;
+  siteName?: string;
+  attendanceDate: string;
+  entries: SubcontractorAttendanceEntry[];
+  notes?: string;
+}
+
+export interface BulkAttendanceListResponse {
+  attendances: SubcontractorAttendance[];
+  total: number;
+  date: string;
+}
+
+export interface CreateQuickSubcontractorRequest {
+  subcontractorName: string;
+  phone?: string;
+  address?: string;
+  projectId?: string;
+}
+
 export interface CreateWorkerRequest {
   projectId: string;
   siteId?: string;

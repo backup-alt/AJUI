@@ -29,6 +29,10 @@ import {
   AttendanceListResponse,
   WorkerListResponse,
   LabourTypeCount,
+  SubcontractorAttendance,
+  MarkBulkAttendanceRequest,
+  BulkAttendanceListResponse,
+  CreateQuickSubcontractorRequest,
 } from '../../shared/models';
 
 export interface SiteSelection {
@@ -333,6 +337,44 @@ export class SupervisorService {
       limit?: number;
       pages?: number;
     }>('/supervisor/subcontractors', params);
+  }
+
+  /**
+   * Create a sub-contractor "on the fly" from the supervisor app. The
+   * mobile form only collects the minimum needed (name + optional
+   * phone/address) — the full admin record (GST, multi-project
+   * assignment, custom fields) is still managed from the web.
+   */
+  createQuickSubcontractor(request: CreateQuickSubcontractorRequest) {
+    return this.api.post<{ subcontractor: Subcontractor }>(
+      '/supervisor/subcontractors',
+      request
+    );
+  }
+
+  // ---------------- Bulk sub-contractor attendance ----------------
+  markBulkAttendance(request: MarkBulkAttendanceRequest) {
+    return this.api.post<{ attendance: SubcontractorAttendance }>(
+      '/supervisor/bulk-attendance',
+      request
+    );
+  }
+
+  getBulkAttendanceForDate(date: string) {
+    return this.api.get<BulkAttendanceListResponse>(
+      '/supervisor/bulk-attendance',
+      { date }
+    );
+  }
+
+  getBulkAttendanceDetail(attendanceId: string) {
+    return this.api.get<{ attendance: SubcontractorAttendance }>(
+      `/supervisor/bulk-attendance/${attendanceId}`
+    );
+  }
+
+  deleteBulkAttendance(attendanceId: string) {
+    return this.api.delete(`/supervisor/bulk-attendance/${attendanceId}`);
   }
 
   // ---------------- Supervisors (mobile) ----------------

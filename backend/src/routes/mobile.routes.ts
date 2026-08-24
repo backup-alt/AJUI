@@ -18,6 +18,8 @@ import {
   markAttendanceSchema,
   updateAttendanceSchema,
   addExistingMaterialMobileSchema,
+  markBulkAttendanceSchema,
+  createQuickSubcontractorSchema,
 } from "../schemas/mobile.schema.js";
 
 const router = Router();
@@ -77,6 +79,13 @@ router.get("/supervisor/labour-types", cache(30), ctrl.getLabourTypeCounts);
 
 // Subcontractors
 router.get("/supervisor/subcontractors", cache(30), ctrl.listSubcontractors);
+router.post("/supervisor/subcontractors", validate(createQuickSubcontractorSchema), ctrl.createQuickSubcontractor);
+
+// Bulk sub-contractor attendance
+router.post("/supervisor/bulk-attendance", validate(markBulkAttendanceSchema), ctrl.markBulkAttendance);
+router.get("/supervisor/bulk-attendance", ctrl.listBulkAttendanceForDate);
+router.get("/supervisor/bulk-attendance/:id", ctrl.getBulkAttendance);
+router.delete("/supervisor/bulk-attendance/:id", ctrl.deleteBulkAttendance);
 
 // Supervisors (mobile)
 router.get("/supervisor/supervisors", cache(30), ctrl.listSupervisorsForWorker);

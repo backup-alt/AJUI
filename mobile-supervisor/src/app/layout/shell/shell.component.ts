@@ -46,6 +46,7 @@ import {
   barChartOutline,
   fileTrayOutline,
   checkmarkCircle,
+  checkmarkCircleOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { SupervisorService } from '../../core/services/supervisor.service';
@@ -125,8 +126,8 @@ import { Project } from '../../shared/models';
             <ion-label>Inventory</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/labour" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
-            <ion-icon name="people-outline" slot="start"></ion-icon>
-            <ion-label>Labour</ion-label>
+            <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+            <ion-label>Attendance</ion-label>
           </ion-item>
           <ion-item routerLink="/tabs/expenses" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="wallet-outline" slot="start"></ion-icon>
@@ -704,7 +705,7 @@ export class ShellComponent implements OnInit {
       logOutOutline, chevronDownOutline, notificationsOutline,
       businessOutline, shieldCheckmarkOutline, locationOutline,
       gridOutline, clipboardOutline, barChartOutline,
-      fileTrayOutline, checkmarkCircle,
+      fileTrayOutline, checkmarkCircle, checkmarkCircleOutline,
     });
 
     this.currentUser.set(this.auth.currentUser());

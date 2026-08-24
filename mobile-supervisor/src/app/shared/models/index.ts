@@ -33,4 +33,9 @@ export {
   WorkerListResponse,
   LabourTypeCount,
   PaymentMode as LabourPaymentMode,
+  SubcontractorAttendance,
+  SubcontractorAttendanceEntry,
+  MarkBulkAttendanceRequest,
+  BulkAttendanceListResponse,
+  CreateQuickSubcontractorRequest,
 } from './labour.model';

@@ -37,7 +37,21 @@ export const routes: Routes = [
       {
         path: 'labour',
         loadComponent: () =>
-          import('./features/labour/labour.page').then((m) => m.LabourPage),
+          import('./features/labour/attendance.page').then((m) => m.AttendancePage),
+      },
+      {
+        path: 'labour/add-subcontractor',
+        loadComponent: () =>
+          import('./features/labour/attendance-add-subcontractor.page').then(
+            (m) => m.AttendanceAddSubcontractorPage
+          ),
+      },
+      {
+        path: 'labour/mark-bulk/:subcontractorId',
+        loadComponent: () =>
+          import('./features/labour/attendance-mark-bulk.page').then(
+            (m) => m.AttendanceMarkBulkPage
+          ),
       },
       {
         path: 'labour/create',
