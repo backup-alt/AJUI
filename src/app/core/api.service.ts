@@ -1234,6 +1234,22 @@ export class ApiService {
     return this.cachedGet<{ items: any[]; total: number }>(`${this.baseUrl}/attendance/grouped${query}`);
   }
 
+  /**
+   * Bulk subcontractor attendance (one row per (subcontractor, project, date)
+   * — what the supervisor mobile app submits). Each `entries` item carries a
+   * labour type and headcount, so a roster with 3 labour types is still a
+   * single record rather than 3 separate ones.
+   */
+  listSubcontractorAttendance(params?: { projectId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Observable<{ items: any[]; total: number; page: number; limit: number; pages: number }> {
+    let query = "";
+    if (params) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+      query = `?${q.toString()}`;
+    }
+    return this.cachedGet<{ items: any[]; total: number; page: number; limit: number; pages: number }>(`${this.baseUrl}/subcontractor-attendance${query}`);
+  }
+
   getLabourReport(params?: { projectId?: string; from?: string; to?: string }): Observable<{ items: any[]; weeklySummaries: any[]; grandTotal: any }> {
     let query = "";
     if (params) {

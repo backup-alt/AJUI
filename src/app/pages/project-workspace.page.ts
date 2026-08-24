@@ -2565,7 +2565,25 @@ export class ProjectWorkspacePage {
       rows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (row) => this.rowBelongsToProject(row));
     }
     if (section === "attendance") {
-      rows = [...rows, ...this.attendanceRows()];
+      // The bulk roster (subcontractor-attendance) is a single row per
+      // (sub, date) with all labour types embedded — that's the
+      // authoritative record the supervisor mobile app submits. The
+      // legacy /labour rows still flow into `rows` (one row per
+      // labourType); drop the legacy duplicates so the table doesn't
+      // show a fake "3 entries" badge for what's actually one muster.
+      const bulk = this.attendanceRows();
+      const bulkKeys = new Set(
+        bulk
+          .filter((row) => row["__source"] === "subcontractor-attendance")
+          .map((row) => `${String(row["subcontractorName"] || "").trim()}||${String(row["attendanceDate"] || "").trim()}`)
+      );
+      rows = rows.filter(
+        (row) =>
+          !row["subcontractorName"] ||
+          !row["attendanceDate"] ||
+          !bulkKeys.has(`${String(row["subcontractorName"] || "").trim()}||${String(row["attendanceDate"] || "").trim()}`)
+      );
+      rows = [...rows, ...bulk];
     }
     if (section === "materials") {
       rows = this.consolidateMaterialRows(rows);
@@ -5144,17 +5162,72 @@ export class ProjectWorkspacePage {
       const fromDate = thirtyDaysAgo.toISOString().slice(0, 10);
       const toDate = today.toISOString().slice(0, 10);
 
-      const result = await firstValueFrom(this.api.listGroupedAttendance({
-        projectId,
-        from: fromDate,
-        to: toDate,
-        limit: 25,
-      }));
+      // Pull both sources in parallel — the legacy worker-level
+      // attendance (older supervisor app) and the new bulk-headcount
+      // muster the mobile app writes to. They use different
+      // collections and a single merge keeps the Attendance tab
+      // honest about what's on file.
+      const [groupedResult, bulkResult] = await Promise.all([
+        firstValueFrom(this.api.listGroupedAttendance({
+          projectId,
+          from: fromDate,
+          to: toDate,
+          limit: 25,
+        })).catch(() => ({ items: [], total: 0 })),
+        firstValueFrom(this.api.listSubcontractorAttendance({
+          projectId,
+          dateFrom: fromDate,
+          dateTo: toDate,
+          limit: 200,
+        })).catch(() => ({ items: [], total: 0, page: 1, limit: 0, pages: 0 })),
+      ]);
 
-      const rows: TableRow[] = (result.items || []).flatMap((group: any) =>
+      const bulkRows: TableRow[] = (bulkResult.items || []).map((item: any) => {
+        // Each SubcontractorAttendance record is already a single row
+        // — entries is a list of {labourType, count}. Flatten it into
+        // a "Civil: 1, Mason: 1, Plumber: 1" string so the existing
+        // labour-type chip rendering and PDF export show every type.
+        const entries = Array.isArray(item.entries) ? item.entries : [];
+        const labourTypeBreakup = entries
+          .filter((e: any) => e && (Number(e.count) || 0) > 0)
+          .map((e: any) => `${e.labourType}: ${e.count}`)
+          .join(", ");
+        const totalCount = Number(item.totalCount) || entries.reduce((sum: number, e: any) => sum + (Number(e.count) || 0), 0);
+        const entryPayload = JSON.stringify(entries);
+        return {
+          __rowId: `attendance-bulk:${item._id}`,
+          __projectId: item.projectId || projectId,
+          __source: "subcontractor-attendance",
+          projectId: item.projectId || projectId,
+          projectName: item.projectName || currentProject?.name || "",
+          client: currentProject?.client || "",
+          clientId: this.clientId(),
+          site: item.siteName || "",
+          siteId: item.siteId || "",
+          subcontractorId: item.subcontractorId || "",
+          subcontractorName: item.subcontractorName || "",
+          staffName: "",
+          attendanceDate: item.attendanceDate,
+          labourTypes: labourTypeBreakup,
+          labourTypeEntries: entryPayload,
+          staffCount: totalCount,
+          attendance: totalCount > 0 ? "Present" : "Absent",
+          shift: 1,
+          overtime: "",
+          lateFine: "",
+          paymentMode: "",
+          notes: item.notes || "",
+          status: "Active",
+          submittedBy: item.submittedBy || "",
+          updatedAt: item.updatedAt || item.createdAt || "",
+        };
+      });
+
+      const groupedRows: TableRow[] = (groupedResult.items || []).flatMap((group: any) =>
         (group.workers || []).map((w: any, idx: number) => ({
           __rowId: `attendance:${group.date}:${group.shift}:${w.workerId}:${idx}`,
           __projectId: group.projectId || projectId,
+          __source: "attendance-grouped",
           projectId: group.projectId || projectId,
           client: group.clientName || currentProject?.client || "",
           clientId: group.clientId || currentClient?.id || this.clientId(),
@@ -5175,7 +5248,18 @@ export class ProjectWorkspacePage {
         }))
       );
 
-      this.attendanceRows.set(rows);
+      // Bulk records take precedence — when the same (sub, project,
+      // date) tuple is on file in both, the bulk record represents
+      // the latest muster. Legacy grouped rows for the same tuple are
+      // dropped to avoid duplicate counts.
+      const bulkKey = new Set(
+        bulkRows.map((row) => `${row.subcontractorName}||${row.attendanceDate}`)
+      );
+      const filteredGrouped = groupedRows.filter(
+        (row) => !bulkKey.has(`${row.subcontractorName}||${row.attendanceDate}`)
+      );
+
+      this.attendanceRows.set([...bulkRows, ...filteredGrouped]);
     } catch (err) {
       console.error("[ProjectWorkspace] failed to fetch attendance data", err);
       this.attendanceRows.set([]);
@@ -6118,14 +6202,25 @@ export class ProjectWorkspacePage {
       ];
     }
     if (section === "attendance") {
-      // Mirror the labour table exactly — no synthetic pay totals, no
-      // late-fine amount. Payment mode, status, notes, and staff count are
-      // dropped from the report along with the table. The PDF is an
-      // attendance report, not a payroll summary.
-      const labourTableColumns = this.columnsFor("labour");
-      return labourTableColumns.filter(
-        (column) => column.key !== "lateFine" && column.key !== "paymentMode" && column.key !== "status" && column.key !== "notes" && column.key !== "staffCount"
-      );
+      // Render every field the supervisor's bulk roster captured so the
+      // PDF / Excel mirrors what was submitted on the mobile app — site,
+      // total count, labour-type breakup, project, and notes all flow
+      // through. The legacy wage columns (lateFine, paymentMode, status)
+      // remain dropped because the bulk roster doesn't track payroll.
+      return [
+        { key: "client", label: "Client" },
+        { key: "projectName", label: "Project" },
+        { key: "site", label: "Site" },
+        { key: "attendanceDate", label: "Date", type: "date" },
+        { key: "subcontractorName", label: "Subcontractor" },
+        { key: "labourTypes", label: "Labour Types" },
+        { key: "staffCount", label: "Total Workers", type: "number" },
+        { key: "attendance", label: "Status" },
+        { key: "shift", label: "Shift", type: "number" },
+        { key: "overtime", label: "Overtime" },
+        { key: "notes", label: "Notes" },
+        { key: "updatedAt", label: "Last Updated", type: "date" },
+      ];
     }
     return this.columnsFor(section);
   }
@@ -6290,22 +6385,30 @@ export class ProjectWorkspacePage {
   }
 
   private labourSummaryHtml(rows: TableRow[]): string {
-    const staffSummary = new Map<string, { present: number; absent: number; staff: number }>();
+    const staffSummary = new Map<string, { present: number; absent: number; staff: number; sub: string }>();
     for (const row of rows) {
-      const name = String(row["staffName"] || row["labourName"] || "Unnamed");
-      const current = staffSummary.get(name) ?? { present: 0, absent: 0, staff: 0 };
+      // Bulk subcontractor attendance rows don't carry a worker name —
+      // fall back to the subcontractor so the summary aggregates the
+      // supervisor's mobile-app submissions under the right party.
+      const fallback = String(row["subcontractorName"] || "").trim() || "Unnamed";
+      const name = String(row["staffName"] || row["labourName"] || fallback);
+      const sub = String(row["subcontractorName"] || "").trim();
+      const current = staffSummary.get(name) ?? { present: 0, absent: 0, staff: 0, sub };
       const isAbsent = String(row["attendance"] || "").toLowerCase() === "absent";
       if (isAbsent) current.absent += 1;
       else current.present += 1;
       const staffCount = this.moneyNumber(row["staffCount"]) || this.staffCountFromLabourTypes(String(row["labourTypes"] || ""));
       if (!isAbsent) current.staff += staffCount;
+      if (!current.sub && sub) current.sub = sub;
       staffSummary.set(name, current);
     }
     if (!staffSummary.size) return "";
     const staffHtml = [...staffSummary.entries()]
       .map(
-        ([name, value]) =>
-          `<div><strong>${this.escapeHtml(name)}</strong><span>Present: ${value.present}</span><span>Absent: ${value.absent}</span><span>Staff: ${value.staff}</span></div>`,
+        ([name, value]) => {
+          const subLine = value.sub ? ` <span class="summary-sub">(${this.escapeHtml(value.sub)})</span>` : "";
+          return `<div><strong>${this.escapeHtml(name)}</strong>${subLine}<span>Present: ${value.present}</span><span>Absent: ${value.absent}</span><span>Staff: ${value.staff}</span></div>`;
+        },
       )
       .join("");
     return `<section class="summary"><h2>Attendance Summary</h2>${staffHtml}</section>`;

@@ -98,9 +98,13 @@ export async function markBulkAttendance(
 
   // Invalidate dashboard / list caches that key on the (date, project)
   // pair — the supervisor app hydrates attendance counts on its landing
-  // page, so the next read needs to see this new muster.
+  // page, so the next read needs to see this new muster. The web admin
+  // dashboard also reads from the same collection via
+  // /subcontractor-attendance, so bust its cache too — otherwise the
+  // project workspace will keep showing the prior muster.
   invalidateCachePrefix("/supervisor/attendance");
   invalidateCachePrefix("/supervisor/labour");
+  invalidateCachePrefix("/subcontractor-attendance");
 
   return doc;
 }
@@ -170,4 +174,5 @@ export async function deleteBulkAttendance(id: string) {
   if (result.deletedCount === 0) throw new AppError(404, "Attendance record not found");
   invalidateCachePrefix("/supervisor/attendance");
   invalidateCachePrefix("/supervisor/labour");
+  invalidateCachePrefix("/subcontractor-attendance");
 }
