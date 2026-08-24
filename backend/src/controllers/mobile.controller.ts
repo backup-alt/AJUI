@@ -790,18 +790,16 @@ export async function getLabourTypeCounts(req: Request, res: Response, next: Nex
 // =================== SUBCONTRACTORS (mobile) ===================
 export async function listSubcontractors(req: Request, res: Response, next: NextFunction) {
   try {
-    // Fetch every sub-contractor in the database (the same set the web
-    // /subcontractors page uses, paginated by 500 rows). The web admin
-    // list shows duplicates when the same party (e.g. "Sri Balaji
-    // Electricals") is registered under several projects — that's the
-    // truth in this data model. The mobile dropdown, however, picks
-    // ONE row per name (lowest _id wins) so supervisors don't see the
-    // same name listed three times when assigning a worker.
-    requireSupervisor(req);
-    const page = Math.max(parseInt(String(req.query.page ?? "1"), 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "500"), 10) || 500, 1), 500);
-    const result = await subcontractorService.listSubcontractors({ page, limit });
-    const raw = (result.items || []) as any[];
+    // Supervisor-scoped: only show sub-contractors belonging to projects
+    // the calling supervisor is assigned to. The web admin list shows
+    // duplicates when the same party (e.g. "Sri Balaji Electricals") is
+    // registered under several projects — that's the truth in this data
+    // model. The mobile view, however, picks ONE row per name (lowest
+    // _id wins) so supervisors don't see the same name listed three
+    // times when marking attendance.
+    const userId = requireSupervisor(req);
+    const rawItems = await subcontractorService.listSubcontractorsForSupervisor(userId);
+    const raw = rawItems as any[];
 
     // Sort: active first, then alphabetical. Active = status === "active"
     // OR status is missing/empty (treat the schema default as active so
@@ -841,8 +839,8 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
     res.json({
       subcontractors: items,
       total: items.length,
-      page,
-      limit,
+      page: 1,
+      limit: items.length,
       pages: 1,
     });
   } catch (e) { next(e); }
