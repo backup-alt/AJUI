@@ -20,7 +20,7 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
       <div class="ion-page" id="main-content">
         <agb-enterprise-header
           [title]="subcontractorName() || 'Sub-contractor'"
-          eyebrow="Payment and labour history across projects"
+          eyebrow="Payment history across projects"
           [showTitle]="false"
         />
 
@@ -77,12 +77,7 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
                 </article>
               </section>
 
-              <nav class="detail-tabs">
-                <button type="button" class="tab" [class.active]="activeTab() === 'payments'" (click)="activeTab.set('payments')">Payment Logs</button>
-                <button type="button" class="tab" [class.active]="activeTab() === 'labor'" (click)="activeTab.set('labor')">Labour Details</button>
-              </nav>
-
-              @if (activeTab() === 'payments') {
+              @if (true) {
               <section class="detail-pane">
               <div class="pane-head"><div><h2>Payment Logs</h2></div></div>
               <section class="filters">
@@ -139,62 +134,6 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
                   </tbody>
                 </table>
               </section>
-              </section>
-              }
-
-              @if (activeTab() === 'labor') {
-              <section class="detail-pane">
-                <div class="pane-head">
-                  <div><h2>Labour Details</h2></div>
-                  <button type="button" class="btn-primary" (click)="openLaborDialog()">
-                    <ion-icon name="add-outline"></ion-icon>
-                    Add labour
-                  </button>
-                </div>
-                <section class="filters">
-                  <label class="filter-field">
-                    <span>Project</span>
-                    <agb-searchable-select
-                      [ngModel]="laborFilterProjectId()"
-                      (ngModelChange)="onLaborFilterProjectChange($event)"
-                      [options]="projectFilterOptions('All projects')"
-                      placeholder="All projects"
-                    ></agb-searchable-select>
-                  </label>
-                </section>
-                <section class="table-wrap labor-table-wrap">
-                  <table class="labor-table">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>Role</th>
-                        <th>Address</th>
-                        <th>Project</th>
-                        <th>Notes</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (laborer of filteredLabor(); track laborer._id) {
-                        <tr>
-                          <td><strong>{{ laborer.name }}</strong></td>
-                          <td>{{ laborer.phone }}</td>
-                          <td>{{ laborer.role }}</td>
-                          <td class="wrap">{{ laborer.address || 'No address' }}</td>
-                          <td>{{ laborer.projectName || '—' }}</td>
-                          <td class="wrap">{{ laborer.notes || 'No notes' }}</td>
-                          <td class="row-actions"><button type="button" class="icon-btn" aria-label="Edit labor" title="Edit labor" (click)="editLaborer(laborer)"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="m14.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></td>
-                        </tr>
-                      }
-                      @if (filteredLabor().length === 0) {
-                        <tr>
-                          <td colspan="7" class="empty-row">No laborers linked to this sub-contractor yet.</td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </section>
               </section>
               }
             }
@@ -308,69 +247,6 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
           </form>
         </aside>
       }
-
-      @if (laborDialogOpen()) {
-        <div class="drawer-backdrop" (click)="closeLaborDialog()" aria-hidden="true"></div>
-        <aside class="drawer" role="dialog" aria-label="Add or edit labour">
-          <header class="drawer-head">
-            <h2>{{ editingLabor() ? 'Edit labour' : 'Add labour' }} — {{ subcontractorName() }}</h2>
-            <button type="button" class="icon-btn" aria-label="Close" (click)="closeLaborDialog()">
-              <ion-icon name="close-outline"></ion-icon>
-            </button>
-          </header>
-          <form class="drawer-body" (submit)="$event.preventDefault(); saveLaborer()">
-            <label>
-              <span>Name *</span>
-              <input required [ngModel]="laborDraft().name" (ngModelChange)="updateLaborDraft('name', $event)" name="laborName" placeholder="Worker name" />
-            </label>
-            <label>
-              <span>Address (optional)</span>
-              <input [ngModel]="laborDraft().address" (ngModelChange)="updateLaborDraft('address', $event)" name="laborAddress" placeholder="Optional address" />
-            </label>
-            <label>
-              <span>Number / Phone</span>
-              <input [ngModel]="laborDraft().phone" (ngModelChange)="updateLaborDraft('phone', $event)" name="laborPhone" placeholder="Optional" />
-            </label>
-            <label>
-              <span>Role *</span>
-              <agb-searchable-select
-                name="laborRole"
-                [ngModel]="laborDraft().role"
-                (ngModelChange)="updateLaborDraft('role', $event)"
-                [options]="labourTypes"
-                [allowCustom]="true"
-                placeholder="Search or enter a labour role"
-              ></agb-searchable-select>
-            </label>
-            <label>
-              <span>Project (optional)</span>
-              <agb-searchable-select
-                name="laborProjectId"
-                [ngModel]="laborDraft().projectId"
-                (ngModelChange)="onLaborProjectChange($event)"
-                [options]="optionalProjectOptions()"
-                placeholder="No specific project"
-              ></agb-searchable-select>
-              @if (laborDraft().projectId) {
-                <small class="hint">This labour will appear in the project's worker roster.</small>
-              }
-            </label>
-            <label>
-              <span>Notes (optional)</span>
-              <textarea rows="3" [ngModel]="laborDraft().notes" (ngModelChange)="updateLaborDraft('notes', $event)" name="laborNotes"></textarea>
-            </label>
-            @if (laborError()) {
-              <p class="drawer-error">{{ laborError() }}</p>
-            }
-            <footer class="drawer-foot">
-              <button type="button" class="btn-ghost" (click)="closeLaborDialog()">Cancel</button>
-              <button type="submit" class="btn-primary" [disabled]="laborSaving()">
-                {{ laborSaving() ? 'Saving…' : (editingLabor() ? 'Save changes' : 'Add labour') }}
-              </button>
-            </footer>
-          </form>
-        </aside>
-      }
     </ion-split-pane>
   `,
   styles: [`
@@ -409,13 +285,6 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
     .stat-card span { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
     .stat-card strong { font-size: 20px; color: #0f172a; }
 
-    .detail-tabs { display: flex; gap: 4px; border-bottom: 2px solid #e2e8f0; }
-    .detail-tabs .tab {
-      padding: 10px 18px; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px;
-      background: transparent; color: #64748b; font-size: 14px; font-weight: 600; cursor: pointer;
-    }
-    .detail-tabs .tab:hover { color: #1e293b; }
-    .detail-tabs .tab.active { color: #002263; border-bottom-color: #002263; }
     .detail-pane { min-width: 0; display: grid; gap: 12px; padding: 16px; border: 1px solid #dbe4f0; border-radius: 14px; background: #f8fafc; }
     .pane-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #002263; padding-bottom: 10px; }
     .pane-head span { color: #64748b; font-size: 10px; font-weight: 900; text-transform: uppercase; }
@@ -435,17 +304,6 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
     td.wrap { word-break: break-word; white-space: pre-wrap; }
     tr:last-child td { border-bottom: none; }
     .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
-    .labor-table { min-width: 760px; table-layout: fixed; }
-    .labor-table th, .labor-table td { padding: 10px 8px; overflow-wrap: anywhere; max-width: none; }
-    .labor-table th:nth-child(1), .labor-table td:nth-child(1) { width: 16%; }
-    .labor-table th:nth-child(2), .labor-table td:nth-child(2) { width: 13%; }
-    .labor-table th:nth-child(3), .labor-table td:nth-child(3) { width: 15%; }
-    .labor-table th:nth-child(4), .labor-table td:nth-child(4) { width: 18%; }
-    .labor-table th:nth-child(5), .labor-table td:nth-child(5) { width: 18%; }
-    .labor-table th:nth-child(6), .labor-table td:nth-child(6) { width: 14%; }
-    .labor-table th:nth-child(7), .labor-table td:nth-child(7) { width: 56px; padding-right: 12px; }
-    .labor-table td:last-child { text-align: right; }
-    .labor-cell-detail { display: block; margin-top: 3px; color: #64748b; font-size: 11px; font-weight: 400; }
     .icon-btn {
       width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
       border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #475569;
@@ -512,19 +370,6 @@ export class SubcontractorDetailsPage {
   readonly editingPayment = signal<SubcontractorPayment | null>(null);
   readonly paymentSaving = signal(false);
   readonly paymentError = signal<string | null>(null);
-  readonly laborRoster = signal<SubcontractorLabor[]>([]);
-  readonly laborFilterProjectId = signal<string>("");
-  readonly filteredLabor = computed(() => {
-    const projectId = this.laborFilterProjectId();
-    if (!projectId) return this.laborRoster();
-    return this.laborRoster().filter((l) => (l.projectId || "") === projectId);
-  });
-  readonly editingLabor = signal<SubcontractorLabor | null>(null);
-  readonly laborSaving = signal(false);
-  readonly laborError = signal<string | null>(null);
-  readonly laborDraft = signal(emptyLaborDraft());
-  readonly laborDialogOpen = signal(false);
-  readonly activeTab = signal<"payments" | "labor">("payments");
   readonly labourTypes = [
     "Mason", "Helper", "Carpenter", "Plumber", "Electrician", "Painter",
     "Bar bender", "Welder", "Tile mason", "Centring", "Fitter", "Maid",
@@ -612,7 +457,6 @@ export class SubcontractorDetailsPage {
         this.loading.set(false);
         this.loadError.set(null);
         this.refreshPayments();
-        this.refreshLabor();
       },
       error: (err) => {
         this.loadError.set(err?.error?.error || err?.message || "Failed to load sub-contractor.");
@@ -639,178 +483,6 @@ export class SubcontractorDetailsPage {
   // ---------- FILTERS ----------
   onProjectFilterChange(value: string) {
     this.filterProjectId.set(value);
-  }
-
-  onLaborFilterProjectChange(value: string) {
-    this.laborFilterProjectId.set(value);
-  }
-
-  updateLaborDraft<K extends keyof ReturnType<typeof emptyLaborDraft>>(key: K, value: string) {
-    this.laborDraft.set({ ...this.laborDraft(), [key]: value });
-  }
-
-  refreshLabor() {
-    const id = this.subcontractorId;
-    if (!id) return;
-    this.api.listSubcontractorLabor(id).subscribe({
-      next: (response) => this.laborRoster.set(response.items || []),
-      error: () => this.laborRoster.set([]),
-    });
-  }
-
-  editLaborer(laborer: SubcontractorLabor) {
-    this.editingLabor.set(laborer);
-    this.laborDraft.set({
-      name: laborer.name,
-      address: laborer.address || "",
-      phone: laborer.phone,
-      role: laborer.role,
-      notes: laborer.notes || "",
-      projectId: laborer.projectId || "",
-      projectName: laborer.projectName || "",
-    });
-    this.laborError.set(null);
-    this.laborDialogOpen.set(true);
-  }
-
-  /** When the labour drawer project dropdown changes, keep projectName
-   * in sync so the create/update payload carries a denormalised label. */
-  onLaborProjectChange(value: string) {
-    const project = this.allProjects().find((p) => p.id === value);
-    this.laborDraft.set({
-      ...this.laborDraft(),
-      projectId: value,
-      projectName: project?.name || "",
-    });
-  }
-
-  openLaborDialog() {
-    this.editingLabor.set(null);
-    this.laborDraft.set(emptyLaborDraft());
-    this.laborError.set(null);
-    this.laborDialogOpen.set(true);
-  }
-
-  closeLaborDialog() {
-    this.laborDialogOpen.set(false);
-    this.resetLaborDraft();
-  }
-
-  resetLaborDraft() {
-    this.editingLabor.set(null);
-    this.laborDraft.set(emptyLaborDraft());
-    this.laborError.set(null);
-  }
-
-  saveLaborer() {
-    const draft = this.laborDraft();
-    if (!draft.name.trim() || !draft.role.trim()) {
-      this.laborError.set("Name and role are required.");
-      return;
-    }
-    this.laborSaving.set(true);
-    const payload = {
-      subcontractorId: this.subcontractorId,
-      name: draft.name.trim(),
-      address: draft.address.trim(),
-      phone: draft.phone.trim(),
-      role: draft.role.trim(),
-      notes: draft.notes.trim(),
-      // Project linkage is optional — empty string means "sub-contractor
-      // scoped only", which is the historical behaviour.
-      projectId: draft.projectId?.trim() || "",
-      projectName: draft.projectName?.trim() || "",
-    };
-    const editing = this.editingLabor();
-    const request = editing
-      ? this.api.updateSubcontractorLabor(editing._id, payload)
-      : this.api.createSubcontractorLabor(payload);
-    request.subscribe({
-      next: (response) => {
-        this.laborSaving.set(false);
-        this.closeLaborDialog();
-        this.refreshLabor();
-        // Mirror into the per-project Worker roster when a project is set,
-        // so the labour shows up in the project's worker table. We don't
-        // block the labour save on this — worker mirror failures are
-        // logged and the user is notified via toast.
-        if (payload.projectId) {
-          this.mirrorLaborToWorker(payload, response?.labor, editing?._id);
-        }
-        this.presentToast(editing ? "Labor updated." : "Labor added.");
-      },
-      error: (error) => {
-        this.laborSaving.set(false);
-        this.laborError.set(error?.error?.error || error?.message || "Could not save labor.");
-      },
-    });
-  }
-
-  /**
-   * Create or update a Worker entry that mirrors a SubcontractorLabor
-   * row, so the labour shows up in the matching project's worker
-   * roster. We match by name+phone within the project — for new labour
-   * rows a fresh Worker is created; for edits we look up the existing
-   * Worker (if any) and patch it. Failures here never block the
-   * labour save (the labour already persisted to the
-   * SubcontractorLabor collection). Errors are toasted, not thrown.
-   */
-  private mirrorLaborToWorker(
-    payload: { name: string; phone: string; role: string; address: string; notes: string; projectId: string },
-    savedLabor: { _id?: string } | undefined,
-    previousLaborId?: string
-  ) {
-    if (!payload.projectId) return;
-    const userId = this.api.user()?.id || "system";
-    const projectName = this.allProjects().find((p) => p.id === payload.projectId)?.name || "";
-    const subcontractor = this.subcontractor();
-    const subName = subcontractor?.subcontractorName || "";
-
-    const workerPayload = {
-      projectId: payload.projectId,
-      name: payload.name,
-      phone: payload.phone,
-      address: payload.address,
-      notes: payload.notes,
-      labourType: payload.role,
-      isSubcontract: true,
-      subcontractorId: this.subcontractorId,
-      subcontractorName: subName,
-      createdBy: userId,
-    };
-
-    // Try to find an existing Worker (projectId + name + phone) so
-    // re-saves don't create duplicate rows.
-    this.api.listWorkers({ projectId: payload.projectId, limit: 200 }).subscribe({
-      next: (res) => {
-        const items = (res.items || []) as Array<Record<string, unknown>>;
-        const match = items.find((w) =>
-          String(w["name"] || "").trim() === payload.name.trim() &&
-          String(w["phone"] || "").trim() === payload.phone.trim(),
-        );
-        const matchId = match ? String(match["_id"] || "") : "";
-        if (matchId) {
-          this.api.patchWorker(matchId, {
-            name: payload.name,
-            phone: payload.phone,
-            address: payload.address,
-            notes: payload.notes,
-            labourType: payload.role,
-          }).subscribe({
-            error: (err) => console.warn("Worker mirror patch failed:", err?.message || err),
-          });
-        } else {
-          this.api.createWorker(workerPayload).subscribe({
-            error: (err) => console.warn("Worker mirror create failed:", err?.message || err),
-          });
-        }
-        // Touch unused params so the linter doesn't complain — they may be
-        // useful for future caching of the labour→worker mapping.
-        void previousLaborId;
-        void savedLabor;
-      },
-      error: (err) => console.warn("Worker mirror lookup failed:", err?.message || err),
-    });
   }
 
   // ---------- PAYMENT DIALOG ----------
@@ -922,17 +594,5 @@ function emptyPaymentDraft() {
     employeeCount: 1,
     amount: 0,
     notes: "",
-  };
-}
-
-function emptyLaborDraft() {
-  return {
-    name: "",
-    address: "",
-    phone: "",
-    role: "",
-    notes: "",
-    projectId: "",
-    projectName: "",
   };
 }

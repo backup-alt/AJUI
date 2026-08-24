@@ -101,20 +101,6 @@ const sectionConfigs: SectionConfig[] = [
     ],
   },
   {
-    key: "workers",
-    label: "Labour",
-    title: "Worker Roster",
-    description: "Worker roster for this project — every worker is assigned to a subcontractor and is also visible on that subcontractor's page.",
-    columns: [
-      { key: "name", label: "Name" },
-      { key: "phone", label: "Phone" },
-      { key: "labourType", label: "Role" },
-      { key: "subcontractorName", label: "Subcontractor" },
-      { key: "address", label: "Address" },
-      { key: "notes", label: "Notes" },
-    ],
-  },
-  {
     key: "expenses",
     label: "Supervisor Expense",
     title: "Supervisor Expense Ledger",
