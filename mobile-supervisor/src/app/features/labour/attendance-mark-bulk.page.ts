@@ -172,19 +172,19 @@ interface DraftEntry {
                 [(ngModel)]="shifts"
                 (input)="validateShifts($event)"
                 min="1"
-                max="3"
+                max="2"
                 inputmode="numeric"
               />
               <button
                 type="button"
                 class="step-btn"
-                [disabled]="shifts >= 3"
+                [disabled]="shifts >= 2"
                 (click)="adjustShifts(1)"
               >
                 <ion-icon name="add-outline"></ion-icon>
               </button>
             </div>
-            <div class="input-hint">1 = Half day, 2 = Full day, 3 = 1.5 days</div>
+            <div class="input-hint">1 = Half day, 2 = Full day</div>
           </div>
 
           <div class="input-card">
@@ -628,11 +628,11 @@ export class AttendanceMarkBulkPage implements OnInit {
   }
 
   adjustShifts(delta: number): void {
-    this.shifts = Math.max(1, Math.min(3, this.shifts + delta));
+    this.shifts = Math.max(1, Math.min(2, this.shifts + delta));
   }
 
   validateShifts(event: Event): void {
-    const value = Math.max(1, Math.min(3, Math.floor(Number((event.target as HTMLInputElement).value) || 1)));
+    const value = Math.max(1, Math.min(2, Math.floor(Number((event.target as HTMLInputElement).value) || 1)));
     this.shifts = value;
   }
 
