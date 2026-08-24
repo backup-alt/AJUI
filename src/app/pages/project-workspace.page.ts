@@ -4797,7 +4797,10 @@ export class ProjectWorkspacePage {
 
   exportExcel() {
     const section = this.activeSection();
-    const columns = this.columnsFor(section);
+    // Attendance export needs the bulk-roster columns (project, site,
+    // total workers, status, etc.) — not the legacy labour-table
+    // columns that the on-screen CRUD table uses.
+    const columns = section === "attendance" ? this.reportColumns(section) : this.columnsFor(section);
     const rows = this.visibleRows(section);
     const html = [
       "<table><thead><tr>",
