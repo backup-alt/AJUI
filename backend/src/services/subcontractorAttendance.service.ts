@@ -19,7 +19,6 @@ export interface MarkBulkAttendanceInput {
   attendanceDate: string; // YYYY-MM-DD
   entries: AttendanceEntryInput[];
   shifts?: number;
-  overtimeHours?: number;
   notes?: string;
 }
 
@@ -89,7 +88,6 @@ export async function markBulkAttendance(
     entries,
     totalCount,
     shifts: input.shifts ?? 2,
-    overtimeHours: input.overtimeHours ?? 0,
     notes: input.notes?.trim() || "",
     submittedBy: toObjectId(submittedBy),
   };

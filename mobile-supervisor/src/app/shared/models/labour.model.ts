@@ -122,7 +122,6 @@ export interface SubcontractorAttendance {
   entries: SubcontractorAttendanceEntry[];
   totalCount: number;
   shifts?: number; // 1 = half day, 2 = full day
-  overtimeHours?: number; // extra hours beyond regular shift (0-24)
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -136,7 +135,6 @@ export interface MarkBulkAttendanceRequest {
   attendanceDate: string;
   entries: SubcontractorAttendanceEntry[];
   shifts?: number;
-  overtimeHours?: number;
   notes?: string;
 }
 

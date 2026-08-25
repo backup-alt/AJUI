@@ -247,7 +247,6 @@ export const markBulkAttendanceSchema = z.object({
     ),
     entries: z.array(bulkAttendanceEntrySchema).default([]),
     shifts: z.number().int().min(1).max(2).optional(),
-    overtimeHours: z.number().min(0).max(24).optional(),
     notes: z.string().trim().max(1000).optional(),
   }),
 });

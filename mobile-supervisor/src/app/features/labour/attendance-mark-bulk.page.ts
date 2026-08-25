@@ -186,39 +186,6 @@ interface DraftEntry {
             </div>
             <div class="input-hint">1 = Half day, 2 = Full day</div>
           </div>
-
-          <div class="input-card">
-            <ion-label>Overtime Hours</ion-label>
-            <div class="input-stepper">
-              <button
-                type="button"
-                class="step-btn"
-                [disabled]="overtimeHours <= 0"
-                (click)="adjustOvertime(-0.5)"
-              >
-                <ion-icon name="remove-outline"></ion-icon>
-              </button>
-              <input
-                type="number"
-                class="step-input"
-                [(ngModel)]="overtimeHours"
-                (input)="validateOvertime($event)"
-                min="0"
-                max="24"
-                step="0.5"
-                inputmode="decimal"
-              />
-              <button
-                type="button"
-                class="step-btn"
-                [disabled]="overtimeHours >= 24"
-                (click)="adjustOvertime(0.5)"
-              >
-                <ion-icon name="add-outline"></ion-icon>
-              </button>
-            </div>
-            <div class="input-hint">Extra hours beyond regular shift</div>
-          </div>
         </div>
 
         <ion-list lines="none" class="form-list">
@@ -435,13 +402,8 @@ interface DraftEntry {
     }
 
     .shift-overtime-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
+      display: block;
       margin-bottom: 16px;
-    }
-    @media (min-width: 480px) {
-      .shift-overtime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     .input-card {
       background: #ffffff;
@@ -517,7 +479,6 @@ export class AttendanceMarkBulkPage implements OnInit {
   attendanceDate = new Date().toISOString().slice(0, 10);
   notes = '';
   shifts = 2;
-  overtimeHours = 0;
 
   subcontractorId = '';
 
@@ -579,7 +540,6 @@ export class AttendanceMarkBulkPage implements OnInit {
         this.existingAttendanceId.set(existing._id);
         this.notes = existing.notes || '';
         this.shifts = existing.shifts ?? 2;
-        this.overtimeHours = existing.overtimeHours ?? 0;
         this.draftEntries.set(
           existing.entries.map((e) => ({ labourType: e.labourType, count: e.count }))
         );
@@ -587,7 +547,6 @@ export class AttendanceMarkBulkPage implements OnInit {
         this.existingAttendanceId.set(null);
         this.notes = '';
         this.shifts = 2;
-        this.overtimeHours = 0;
         this.draftEntries.set([]);
       }
     } catch (err) {
@@ -634,16 +593,6 @@ export class AttendanceMarkBulkPage implements OnInit {
   validateShifts(event: Event): void {
     const value = Math.max(1, Math.min(2, Math.floor(Number((event.target as HTMLInputElement).value) || 1)));
     this.shifts = value;
-  }
-
-  adjustOvertime(delta: number): void {
-    this.overtimeHours = Math.max(0, Math.min(24, +(this.overtimeHours + delta).toFixed(1)));
-  }
-
-  validateOvertime(event: Event): void {
-    const raw = Number((event.target as HTMLInputElement).value) || 0;
-    const value = Math.max(0, Math.min(24, +(raw).toFixed(1)));
-    this.overtimeHours = value;
   }
 
   async handleRefresh(event: CustomEvent): Promise<void> {
@@ -693,7 +642,6 @@ export class AttendanceMarkBulkPage implements OnInit {
       attendanceDate: this.attendanceDate,
       entries,
       shifts: this.shifts,
-      overtimeHours: this.overtimeHours,
       notes: this.notes?.trim() || undefined,
     };
 

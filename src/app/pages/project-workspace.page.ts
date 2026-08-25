@@ -48,7 +48,6 @@ type SectionConfig = {
   key: ModuleKey;
   label: string;
   title: string;
-  description: string;
   columns: FieldSchema[];
 };
 
@@ -66,7 +65,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "materials",
     label: "Materials",
     title: "Material Requests",
-    description: "Fixed procurement fields for requests, approvals, vendors, purchase orders, and stock visibility.",
     columns: [
       { key: "materialName", label: "Material Name" },
       { key: "unit", label: "Unit" },
@@ -87,7 +85,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "attendance",
     label: "Attendance",
     title: "Attendance Register",
-    description: "Staff attendance with date, subcontractor, labour types, staff count, shift count, overtime, and notes.",
     columns: [
       { key: "client", label: "Client" },
       { key: "attendanceDate", label: "Date", type: "date" },
@@ -96,7 +93,6 @@ const sectionConfigs: SectionConfig[] = [
       { key: "staffCount", label: "Staff Count", type: "number" },
       { key: "attendance", label: "Attendance" },
       { key: "shift", label: "Shift", type: "number" },
-      { key: "overtime", label: "Overtime" },
       { key: "notes", label: "Notes" },
     ],
   },
@@ -104,7 +100,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "expenses",
     label: "Supervisor Expense",
     title: "Supervisor Expense Ledger",
-    description: "Supervisor cash ledger with receipt and approval status. The project-wide Expense tab captures admin and general entries separately.",
     columns: [
       { key: "expenseDate", label: "Expense Date", type: "date" },
       { key: "transactionType", label: "Transaction Type" },
@@ -121,7 +116,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "generalExpenses",
     label: "Expense",
     title: "Expense",
-    description: "Project-wide admin and general expenses recorded directly against this project. Sums roll up into the project's Total Expense KPI.",
     columns: [
       { key: "date", label: "Date", type: "date" },
       { key: "category", label: "Category" },
@@ -133,7 +127,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "payments",
     label: "Payments",
     title: "Payment Ledger",
-    description: "Client collection fields for dates, modes, receipts, transaction references, and approval checks.",
     columns: [
       { key: "paymentDate", label: "Payment Date", type: "date" },
       { key: "amount", label: "Amount" },
@@ -147,7 +140,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "vendors",
     label: "Vendors",
     title: "Vendor Directory",
-    description: "Vendor master fields for material type, contact, address, GST, and purchase history.",
     columns: [
       { key: "vendorName", label: "Vendor Name" },
       { key: "projects", label: "Projects" },
@@ -164,7 +156,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "subcontractorsRoster",
     label: "Subcontractors",
     title: "Sub-contractor Roster",
-    description: "Sub-contractor profiles assigned to this project. Assign an existing sub-contractor or create a new one here. Use the Subcontractor Payments tab below to record actual payments.",
     columns: [
       { key: "subcontractorName", label: "Subcontractor Name" },
       { key: "address", label: "Address" },
@@ -178,7 +169,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "subcontractors",
     label: "Subcontractor Payments",
     title: "Subcontractor Payments",
-    description: "Every payment recorded against sub-contractors for this project. Each row is a separate record and folds into the project total expense.",
     columns: [
       { key: "date", label: "Date", type: "date" },
       { key: "paymentType", label: "Payment Mode" },
@@ -193,7 +183,6 @@ const sectionConfigs: SectionConfig[] = [
     key: "inventory",
     label: "Inventory",
     title: "Project Inventory",
-    description: "All project materials with received status, purchased and consumed quantities, and remaining stock.",
     columns: [
       { key: "materialName", label: "Material Name" },
       { key: "unit", label: "Unit" },
@@ -680,7 +669,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
               <div class="module-toolbar table-first-toolbar">
                 <div>
                   <h2>{{ activeConfig().title }}</h2>
-                  <p>{{ activeConfig().description }}</p>
                 </div>
                 <div class="table-actions">
                   <label class="table-search" *ngIf="!tableViewExpanded()">
@@ -5202,7 +5190,6 @@ export class ProjectWorkspacePage {
           staffCount: totalCount,
           attendance: totalCount > 0 ? "Present" : "Absent",
           shift: item.shifts ?? 2,
-          overtime: item.overtimeHours ? `${item.overtimeHours} hrs` : "",
           lateFine: "",
           paymentMode: "",
           notes: item.notes || "",
@@ -6206,7 +6193,6 @@ export class ProjectWorkspacePage {
         { key: "staffCount", label: "Total Workers", type: "number" },
         { key: "attendance", label: "Status" },
         { key: "shift", label: "Shift", type: "number" },
-        { key: "overtime", label: "Overtime" },
         { key: "notes", label: "Notes" },
         { key: "updatedAt", label: "Last Updated", type: "date" },
       ];

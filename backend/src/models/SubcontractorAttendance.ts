@@ -28,7 +28,6 @@ export interface ISubcontractorAttendance extends Document {
   entries: ISubcontractorAttendanceEntry[];
   totalCount: number;
   shifts?: number; // 1 = half day, 2 = full day
-  overtimeHours?: number; // extra hours beyond regular shift (0-24)
   notes?: string;
   submittedBy?: Types.ObjectId;
   createdAt: Date;
@@ -60,7 +59,6 @@ const subcontractorAttendanceSchema = new Schema<ISubcontractorAttendance>(
     entries: { type: [subcontractorAttendanceEntrySchema], default: [] },
     totalCount: { type: Number, default: 0, min: 0 },
     shifts: { type: Number, default: 2, min: 1, max: 2 },
-    overtimeHours: { type: Number, default: 0, min: 0, max: 24 },
     notes: { type: String, default: "", trim: true, maxlength: 1000 },
     submittedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
