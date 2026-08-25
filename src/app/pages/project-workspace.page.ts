@@ -640,9 +640,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div>
                   <dt>Status</dt>
                   <dd>
-                    <label class="status-edit-shell" [ngClass]="statusClass(currentProject.status)">
+                    <label class="status-edit-shell" [ngClass]="statusShellClass(currentProject.status)">
                       <span class="sr-only">Project status</span>
                       <agb-searchable-select
+                        [hideSearch]="true"
                         [value]="currentProject.status"
                         [options]="projectStatusOptions"
                         (valueChange)="updateProjectStatus($any($event))"
@@ -1597,6 +1598,8 @@ export class ProjectWorkspacePage {
     input.value = formatNumber(Number.isFinite(raw) ? raw : 0);
   }
   readonly statusClass = statusClass;
+  readonly statusShellClass = (status: string) =>
+    status === "Completed" ? "danger" : statusClass(status);
   readonly showProjectForm = signal(false);
   readonly editingProject = signal<Project | null>(null);
   readonly sections = sectionConfigs;
@@ -2821,11 +2824,21 @@ export class ProjectWorkspacePage {
   }
 
   filterValues(key: string): string[] {
+    const section = this.activeSection();
     const values = new Set<string>();
-    for (const option of this.selectOptions(this.activeSection(), key)) {
+    for (const option of this.selectOptions(section, key)) {
       if (option) values.add(option);
     }
-    for (const row of this.withComputedRows(this.activeSection(), this.data.tableRowsFor(this.activeSection(), this.tableRows()[this.activeSection()] ?? [], (entry) => this.rowBelongsToProject(entry)))) {
+    const baseRows = this.data.tableRowsFor(section, this.tableRows()[section] ?? [], (entry) => this.rowBelongsToProject(entry));
+    // The Attendance tab is also fed by the dedicated subcontractor
+    // bulk-muster collection (see `fetchAttendanceData`). Merge those rows
+    // in here so the filter dropdowns see the same data the table shows —
+    // otherwise the bulk muster's subcontractor / date / staff values are
+    // invisible to the filter UI.
+    const rows = section === "attendance"
+      ? this.withComputedRows(section, [...baseRows, ...this.attendanceRows()])
+      : this.withComputedRows(section, baseRows);
+    for (const row of rows) {
       const value = row[key];
       if (value !== undefined && value !== "") values.add(String(value));
     }
@@ -5546,6 +5559,14 @@ export class ProjectWorkspacePage {
     }
     if (section === "expenses" && key === "siteMaterial") return ["No", "Yes"];
     if (section === "attendance" && key === "attendance") return ["Present", "Absent"];
+    if (section === "attendance" && key === "shift") return ["1", "2"];
+    if (section === "attendance" && key === "client") return this.data.clients().map((c) => c.name).filter(Boolean);
+    if (section === "attendance" && key === "subcontractorName") {
+      const fromData = this.data.subcontractors()
+        .map((s) => s.subcontractorName)
+        .filter((name): name is string => Boolean(name && name.trim()));
+      return [...new Set(fromData)].sort((a, b) => a.localeCompare(b));
+    }
     // Subcontractor section — dropdowns are sourced from the live
     // /api/subcontractors and the project's site list. Every
     // sub-contractor (active or not) is offered so existing records

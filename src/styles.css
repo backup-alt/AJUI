@@ -6863,6 +6863,18 @@ body {
   color: #8a620f;
 }
 
+.status-edit-shell.danger .agb-select-trigger {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.status-edit-shell.danger .agb-select.open .agb-select-trigger {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .status-edit-shell.completed .agb-select-trigger {
   border-color: rgba(76, 58, 143, 0.26);
   background: var(--ui-accent-soft);
@@ -6886,6 +6898,12 @@ body {
   border-color: rgba(76, 58, 143, 0.26);
   background: var(--ui-accent-soft);
   color: var(--ui-accent-dark);
+}
+
+.status-edit-shell.danger select {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .operations-tabs {
