@@ -1566,7 +1566,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectWorkspacePage {
-  readonly projectStatusOptions = ["Active", "On Hold", "Completed"];
+  readonly projectStatusOptions = [
+    { label: "Active", value: "Active" as ProjectStatus },
+    { label: "On-hold", value: "On Hold" as ProjectStatus },
+    { label: "Closed", value: "Completed" as ProjectStatus },
+  ];
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly materialsService = inject(MaterialsService);
@@ -4898,7 +4902,8 @@ export class ProjectWorkspacePage {
     if (!this.isProjectStatus(value)) return;
     const currentProject = this.project();
     if (!currentProject || currentProject.status === value) return;
-    if ((value === "Completed" || value === "On Hold") && !window.confirm(`Mark ${currentProject.name} as ${value}?`)) {
+    const displayLabel = this.projectStatusOptions.find((option) => option.value === value)?.label ?? value;
+    if ((value === "Completed" || value === "On Hold") && !window.confirm(`Mark ${currentProject.name} as ${displayLabel}?`)) {
       const select = event?.target instanceof HTMLSelectElement ? event.target : null;
       if (select) select.value = currentProject.status;
       return;
