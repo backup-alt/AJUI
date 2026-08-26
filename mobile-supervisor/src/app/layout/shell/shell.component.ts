@@ -5,6 +5,7 @@ import {
   signal,
   computed,
   ViewEncapsulation,
+  ViewChild,
 } from '@angular/core';
 import {
   IonContent,
@@ -663,6 +664,8 @@ export class ShellComponent implements OnInit {
   private toastCtrl = inject(ToastController);
   private menuController = inject(MenuController);
 
+  @ViewChild('projectPopover', { static: false }) projectPopover?: IonPopover;
+
   /**
    * Close the side menu after a navigation tap. Without this, the
    * overlay stays open over the destination page until the user
@@ -783,6 +786,12 @@ export class ShellComponent implements OnInit {
 
   closeProjectPopover(): void {
     this.isProjectPopoverOpen.set(false);
+    // Programmatically dismiss the Ionic popover component
+    if (this.projectPopover) {
+      this.projectPopover.dismiss().catch(() => {
+        // Popover may already be closed — safe to ignore
+      });
+    }
   }
 
   onProjectPopoverOpen(): void {
@@ -795,7 +804,15 @@ export class ShellComponent implements OnInit {
     this.selectedProjectId.set(project.id);
     this.selectedProjectName.set(project.name);
     await this.supervisor.setSelectedProject(project);
-    this.closeProjectPopover();
+
+    // Dismiss the popover immediately after selection
+    if (this.projectPopover) {
+      await this.projectPopover.dismiss().catch(() => {
+        // Popover may already be dismissed — safe to ignore
+      });
+    }
+    this.isProjectPopoverOpen.set(false);
+
     window.dispatchEvent(new CustomEvent('agb:project-changed', { detail: project.id }));
   }
 
