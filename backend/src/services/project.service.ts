@@ -7,7 +7,8 @@ import { Supervisor } from "../models/Supervisor.js";
 import { User } from "../models/User.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
-import { invalidateAccessCache } from "./supervisor-mobile.service.js";
+import { invalidateAccessCache as invalidateMobileAccessCache } from "./supervisor-mobile.service.js";
+import { invalidateAccessCache as invalidateRbacAccessCache } from "../middleware/rbac.js";
 import {
   CreateProjectInput,
   UpdateProjectInput,
@@ -15,6 +16,16 @@ import {
 import { recomputeClientTotals, recomputeProjectTotals, computeProjectLedger } from "./financial.service.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
+
+/**
+ * Invalidate both the mobile access cache and the RBAC user scope cache
+ * for a supervisor user. Both caches must be cleared to ensure the mobile
+ * app and web admin see the updated project assignments immediately.
+ */
+function invalidateAccessCache(userId: string): void {
+  invalidateMobileAccessCache(userId);
+  invalidateRbacAccessCache(userId);
+}
 
 function toObjectId(value: unknown): Types.ObjectId | null {
   if (!value) return null;
