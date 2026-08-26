@@ -1102,6 +1102,9 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         }));
         this.employees.set(items);
         this.employeesLoading.set(false);
+        // The API user list is authoritative. Supervisor profiles are linked
+        // records, not additional employees, so appending them here creates
+        // duplicate partial rows with no email or login information.
         this.mergeLocalUsers();
       },
       error: () => {
@@ -1112,8 +1115,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   }
 
   private mergeLocalUsers() {
-    const fromErp: Employee[] = [
-      ...this.erp.users().map((u): Employee => ({
+    const fromErp: Employee[] = this.erp.users().map((u): Employee => ({
         id: u.id,
         name: u.name,
         email: u.email,
@@ -1123,23 +1125,18 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         lastLoginAt: u.lastLoginAt || "",
         createdAt: u.createdAt,
         projectIds: u.projectIds || [],
-      })),
-      ...this.erp.supervisors().map((s): Employee => ({
-        id: s.id,
-        name: s.name,
-        email: "",
-        phone: s.phone,
-        role: "Supervisor" as Role,
-        status: s.status === "Active" ? "active" : s.status === "On Leave" ? "on_leave" : "inactive",
-        lastLoginAt: "",
-        createdAt: "",
-        projectIds: [],
-      })),
-    ];
+      }));
     this.employees.update((existing) => {
-      const existingIds = new Set(existing.map((e) => e.id));
-      const newItems = fromErp.filter((u) => !existingIds.has(u.id));
-      return newItems.length > 0 ? [...existing, ...newItems] : existing;
+      const merged = [...existing];
+      for (const candidate of fromErp) {
+        const duplicate = merged.some((row) =>
+          row.id === candidate.id ||
+          (!!row.email && !!candidate.email && row.email.trim().toLowerCase() === candidate.email.trim().toLowerCase()) ||
+          (!!row.phone && !!candidate.phone && row.phone.replace(/\D/g, "") === candidate.phone.replace(/\D/g, ""))
+        );
+        if (!duplicate) merged.push(candidate);
+      }
+      return merged;
     });
   }
 

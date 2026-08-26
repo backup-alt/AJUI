@@ -125,13 +125,15 @@ interface ActivityEntry {
                   <h2>Assigned Projects</h2>
                   <p>Projects that this supervisor can manage.</p>
                 </div>
-                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openProjectPicker()">
+                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openProjectPicker()" [disabled]="projectsLoading()">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                   Manage Projects
                 </button>
               </div>
               <div class="settings-w11-card-body">
-                @if (supervisorAssignedProjectNames().length > 0) {
+                @if (projectsLoading() && supervisorAssignedProjectIds().length > 0) {
+                  <p class="settings-w11-empty-hint">Loading assigned projects…</p>
+                } @else if (supervisorAssignedProjectNames().length > 0) {
                   <div class="settings-w11-site-list">
                     @for (project of supervisorAssignedProjectNames(); track project.id) {
                       <div class="settings-w11-site-chip">
@@ -191,7 +193,9 @@ interface ActivityEntry {
               </div>
             </div>
             <div class="settings-w11-card-body">
-              @if (employeeProjectNames().length > 0) {
+              @if (projectsLoading() && employee()!.projectIds.length > 0) {
+                <p class="settings-w11-empty-hint">Loading assigned projects…</p>
+              } @else if (employeeProjectNames().length > 0) {
                 <div class="settings-w11-proj-list">
                   @for (name of employeeProjectNames(); track name) {
                     <span class="settings-w11-proj-chip">{{ name }}</span>
@@ -468,31 +472,37 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   // Employee data
   readonly employee = signal<Employee | null>(null);
+  readonly projectOptions = signal<Array<{ id: string; name: string }>>([]);
+  readonly projectsLoading = signal(true);
 
   readonly employeeProjectNames = computed<string[]>(() => {
     const emp = this.employee();
-    if (!emp || !emp.projectIds.length) return [];
-    const projects = this.erp.projects();
+    if (!emp || !emp.projectIds.length || this.projectsLoading()) return [];
     return emp.projectIds
-      .map((pid) => projects.find((p) => p.id === pid || String(p.id) === pid)?.name || pid)
+      .map((pid) => this.projectOptions().find((project) => project.id === String(pid))?.name || "Project unavailable")
       .filter(Boolean);
   });
 
   readonly allProjectsForPicker = computed<Array<{ id: string; name: string }>>(() =>
-    this.erp.projects().map((project) => ({ id: String(project.id), name: project.name })),
+    this.projectOptions(),
   );
 
-  readonly supervisorAssignedProjectNames = computed<Array<{ id: string; name: string }>>(() => {
+  readonly supervisorAssignedProjectIds = computed<string[]>(() => {
     const employee = this.employee();
     if (!employee || employee.role !== "Supervisor") return [];
-    const ids = employee.assignedProjectIds || employee.projectIds || [];
-    return ids.map((id) => ({
+    return (employee.assignedProjectIds || employee.projectIds || []).map(String);
+  });
+
+  readonly supervisorAssignedProjectNames = computed<Array<{ id: string; name: string }>>(() => {
+    if (this.projectsLoading()) return [];
+    return this.supervisorAssignedProjectIds().map((id) => ({
       id: String(id),
-      name: this.erp.projects().find((project) => String(project.id) === String(id))?.name || String(id),
+      name: this.projectOptions().find((project) => project.id === String(id))?.name || "Project unavailable",
     }));
   });
 
   openProjectPicker() {
+    if (this.projectsLoading()) return;
     const employee = this.employee();
     if (!employee) return;
     this.pendingProjectIds.set(new Set(employee.assignedProjectIds || employee.projectIds || []));
@@ -621,7 +631,29 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get("id") || "";
+    this.loadProjects();
     this.loadSitesAndEmployee(id);
+  }
+
+  private loadProjects() {
+    this.projectsLoading.set(true);
+    this.api.listProjects({ limit: 200, page: 1 }).subscribe({
+      next: (res) => {
+        const unique = new Map<string, { id: string; name: string }>();
+        for (const project of res?.items || []) {
+          const id = String(project._id || project.id || "");
+          if (id && project.name) unique.set(id, { id, name: String(project.name) });
+        }
+        this.projectOptions.set([...unique.values()]);
+        this.projectsLoading.set(false);
+      },
+      error: () => {
+        this.projectOptions.set(
+          this.erp.projects().map((project) => ({ id: String(project.id), name: project.name })),
+        );
+        this.projectsLoading.set(false);
+      },
+    });
   }
 
   private loadSitesAndEmployee(id: string) {

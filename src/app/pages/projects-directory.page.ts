@@ -14,8 +14,11 @@ interface ApiProject {
   projectId: string;
   name: string;
   client: string;
+  clientId?: string;
+  mobile?: string;
   address: string;
   supervisor: string;
+  supervisorId?: string;
   siteNames: string[];
   status: "Active" | "On Hold" | "Completed";
   startDate: string;
@@ -96,6 +99,10 @@ interface ApiProject {
                 </div>
 
                 <div class="projects-directory-footer">
+                  <button type="button" class="secondary-action" (click)="openEditProject(project, $event)">
+                    <ion-icon name="create-outline"></ion-icon>
+                    Edit
+                  </button>
                   <button type="button" (click)="openProject(project); $event.stopPropagation()">
                     Open Project
                     <ion-icon name="arrow-forward-outline"></ion-icon>
@@ -107,12 +114,12 @@ interface ApiProject {
         </ion-content>
 
         <section class="form-overlay" *ngIf="showProjectForm()">
-          <form class="erp-dialog" (submit)="$event.preventDefault(); createProject()">
+          <form class="erp-dialog" (submit)="$event.preventDefault(); saveProject()">
             <div class="dialog-head">
               <div>
-                <span>Project Setup</span>
-                <h2>Add Project</h2>
-                <p>Create a project independently from the project list.</p>
+                <span>{{ editingProject() ? 'Project Edit' : 'Project Setup' }}</span>
+                <h2>{{ editingProject() ? 'Edit Project' : 'Add Project' }}</h2>
+                <p>{{ editingProject() ? 'Update the project details and assignment.' : 'Create a project independently from the project list.' }}</p>
               </div>
               <button type="button" class="icon-button" aria-label="Close project form" (click)="closeProjectForm()">
                 <ion-icon name="close-outline"></ion-icon>
@@ -150,7 +157,7 @@ interface ApiProject {
                 @if (creating()) {
                   <span class="agb-loading-spinner" aria-hidden="true"></span>
                 }
-                {{ creating() ? 'Creating…' : 'Create Project' }}
+                {{ creating() ? 'Saving…' : (editingProject() ? 'Save Project' : 'Create Project') }}
               </button>
             </div>
           </form>
@@ -187,6 +194,11 @@ interface ApiProject {
       font-size: 14px;
       line-height: 1.5;
     }
+    .projects-directory-footer .secondary-action {
+      border: 1px solid #d7dce5;
+      background: #ffffff;
+      color: #344054;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -213,6 +225,7 @@ export class ProjectsDirectoryPage implements OnInit {
   readonly loading = signal(true);
   readonly showProjectForm = signal(false);
   readonly creating = signal(false);
+  readonly editingProject = signal<ApiProject | null>(null);
   projectDraft = this.emptyProjectDraft();
 
   private readonly allProjects = computed(() => this.projects());
@@ -276,16 +289,41 @@ export class ProjectsDirectoryPage implements OnInit {
   }
 
   openProjectForm() {
+    this.editingProject.set(null);
     this.projectDraft = this.emptyProjectDraft();
     this.showProjectForm.set(true);
     if (this.projectDraft.clientId) this.applyClientDefaults(this.projectDraft.clientId);
   }
 
-  closeProjectForm() {
-    this.showProjectForm.set(false);
+  openEditProject(project: ApiProject, event?: Event) {
+    event?.stopPropagation();
+    const client = this.clients().find((item) =>
+      String(item._id || item.clientId) === String(project.clientId || "") || item.name === project.client
+    );
+    const supervisor = this.supervisors().find((item) =>
+      String(item._id || item.id) === String(project.supervisorId || "") || item.name === project.supervisor
+    );
+    this.editingProject.set(project);
+    this.projectDraft = {
+      clientId: String(client?._id || client?.clientId || project.clientId || ""),
+      name: project.name,
+      startDate: project.startDate,
+      supervisor: project.supervisor,
+      supervisorId: String(supervisor?._id || supervisor?.id || project.supervisorId || ""),
+      mobile: String(project.mobile || client?.mobile || ""),
+      address: String(project.address || client?.address || ""),
+      status: project.status,
+      totalValue: Number(project.totalValue) || 0,
+    };
+    this.showProjectForm.set(true);
   }
 
-  async createProject() {
+  closeProjectForm() {
+    this.showProjectForm.set(false);
+    this.editingProject.set(null);
+  }
+
+  async saveProject() {
     if (this.creating()) return; // double-submit guard
     if (!this.projectDraft.clientId || !this.projectDraft.name || !this.projectDraft.startDate || !this.projectDraft.supervisor) {
       await this.presentToast("Fill in client, name, start date, and supervisor.", "warning");
@@ -298,31 +336,47 @@ export class ProjectsDirectoryPage implements OnInit {
       await this.presentToast("Selected client is not persisted yet — please re-save the client before creating a project.", "warning");
       return;
     }
-    if (!this.projectDraft.mobile || !this.projectDraft.address) {
+    const editing = this.editingProject();
+    if (!editing && (!this.projectDraft.mobile || !this.projectDraft.address)) {
       await this.presentToast("Client is missing contact details — please add a mobile and address on the client first.", "warning");
       return;
     }
     this.creating.set(true);
     try {
       await new Promise<void>((resolve, reject) => {
-        this.api.createProject({
+        const payload = {
           clientId: this.projectDraft.clientId,
           name: this.projectDraft.name,
           startDate: this.projectDraft.startDate,
           supervisor: this.projectDraft.supervisor,
-          supervisorId: this.projectDraft.supervisorId,
+          supervisorId: this.projectDraft.supervisorId || undefined,
           mobile: this.projectDraft.mobile,
           address: this.projectDraft.address,
           status: this.projectDraft.status,
           totalValue: Number(this.projectDraft.totalValue) || 0,
           siteIds: [],
           sites: [],
-        }).subscribe({
+        };
+        const request = editing
+          ? this.api.updateProject(editing._id, {
+              clientId: payload.clientId,
+              name: payload.name,
+              startDate: payload.startDate,
+              supervisor: payload.supervisor,
+              supervisorId: payload.supervisorId,
+              status: payload.status,
+              totalValue: payload.totalValue,
+            })
+          : this.api.createProject(payload);
+        request.subscribe({
           next: () => resolve(),
           error: (err) => reject(err),
         });
       });
-      await this.presentToast(`Project "${this.projectDraft.name}" created.`, "success");
+      await this.presentToast(
+        `Project "${this.projectDraft.name}" ${editing ? "updated" : "created"}.`,
+        "success",
+      );
       this.closeProjectForm();
       this.loadProjects();
     } catch (err) {

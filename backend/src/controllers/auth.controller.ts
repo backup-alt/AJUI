@@ -422,28 +422,28 @@ export async function supervisorSignup(req: Request, res: Response, next: NextFu
       managedProjectIds,
     });
 
-    // Create the Supervisor profile with multi-site assignment
-    if (siteIds.length > 0 || managedProjectIds.length > 0) {
-      const supervisorProfile = await Supervisor.create({
-        supervisorId: await generateId("SUP"),
-        userId: user._id,
-        name: finalName,
-        phone: finalPhone,
-        email: finalEmail.toLowerCase(),
-        address: (invite.metadata as any)?.address || undefined,
-        role: "Project Supervisor",
-        assignedProjectId: managedProjectIds[0] || undefined,
-        assignedProjects: managedProjectIds,
-        assignedProject: undefined,
-        assignedSiteIds: siteIds,
-        assignedSites: siteIds.map((id) => id.toString()),
-        cashLimit: Number((invite.metadata as any)?.cashLimit || 0),
-        approvalAuthority: 0,
-        status: "Active",
-      });
-      user.supervisorProfileId = supervisorProfile._id;
-      await user.save();
-    }
+    // Always create the Supervisor profile. Project creation and editing link
+    // against this profile even when the invite did not include an initial
+    // project or site assignment.
+    const supervisorProfile = await Supervisor.create({
+      supervisorId: await generateId("SUP"),
+      userId: user._id,
+      name: finalName,
+      phone: finalPhone,
+      email: finalEmail.toLowerCase(),
+      address: (invite.metadata as any)?.address || undefined,
+      role: "Project Supervisor",
+      assignedProjectId: managedProjectIds[0] || undefined,
+      assignedProjects: managedProjectIds,
+      assignedProject: undefined,
+      assignedSiteIds: siteIds,
+      assignedSites: siteIds.map((id) => id.toString()),
+      cashLimit: Number((invite.metadata as any)?.cashLimit || 0),
+      approvalAuthority: 0,
+      status: "Active",
+    });
+    user.supervisorProfileId = supervisorProfile._id;
+    await user.save();
 
     // Backfill site.supervisorId so the site is discoverable from the site side
     if (siteIds.length > 0) {

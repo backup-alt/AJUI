@@ -23,6 +23,65 @@ function toObjectId(value: unknown): Types.ObjectId | null {
   return Types.ObjectId.isValid(str) ? new Types.ObjectId(str) : null;
 }
 
+function exactNamePattern(value: string): RegExp {
+  return new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+}
+
+/**
+ * Project forms historically sent a User id while Project.supervisorId points
+ * at a Supervisor profile. Resolve either representation and lazily create the
+ * profile for older supervisor accounts accepted without an initial project.
+ */
+async function resolveSupervisorProfileId(
+  value: unknown,
+  supervisorName?: string,
+): Promise<Types.ObjectId | null> {
+  const candidateId = toObjectId(value);
+  const profileQuery = candidateId
+    ? { $or: [{ _id: candidateId }, { userId: candidateId }] }
+    : supervisorName?.trim()
+      ? { name: exactNamePattern(supervisorName.trim()) }
+      : null;
+
+  if (!profileQuery) return null;
+
+  const existingProfile = await Supervisor.findOne(profileQuery).select("_id").lean();
+  if (existingProfile?._id) return existingProfile._id as Types.ObjectId;
+
+  const userQuery = candidateId
+    ? { _id: candidateId, role: "supervisor" }
+    : { name: exactNamePattern(supervisorName!.trim()), role: "supervisor" };
+  const supervisorUser = await User.findOne(userQuery)
+    .select("_id name email phone supervisorProfileId")
+    .lean();
+  if (!supervisorUser) return null;
+
+  if (supervisorUser.supervisorProfileId) {
+    const linkedProfile = await Supervisor.findById(supervisorUser.supervisorProfileId)
+      .select("_id")
+      .lean();
+    if (linkedProfile?._id) return linkedProfile._id as Types.ObjectId;
+  }
+
+  const createdProfile = await Supervisor.create({
+    supervisorId: await generateId("SUP"),
+    userId: supervisorUser._id,
+    name: supervisorUser.name,
+    phone: supervisorUser.phone,
+    email: supervisorUser.email,
+    role: "Project Supervisor",
+    assignedProjects: [],
+    assignedSiteIds: [],
+    assignedSites: [],
+    status: "Active",
+  });
+  await User.updateOne(
+    { _id: supervisorUser._id },
+    { $set: { supervisorProfileId: createdProfile._id } },
+  );
+  return createdProfile._id as Types.ObjectId;
+}
+
 function uniqueNames(values: Array<string | undefined | null>): string[] {
   const seen = new Set<string>();
   const list: string[] = [];
@@ -106,7 +165,7 @@ async function syncSupervisorAssignment(args: {
   // If the supervisor didn't change there's nothing to migrate.
   if (oldSupervisorId && oldSupervisorId.toString() === (newSupervisorId?.toString() ?? "")) {
     // Same supervisor — just make sure assignments include the project's sites/project.
-    if (newSupervisorId && projectSiteIds.length > 0) {
+    if (newSupervisorId) {
       const sup = await Supervisor.findById(newSupervisorId).select("_id userId").lean();
       if (sup) {
         await Supervisor.updateOne(
@@ -190,6 +249,14 @@ export async function createProject(input: CreateProjectInput) {
   const client = await Client.findById(input.clientId);
   if (!client) throw new AppError(404, "Client not found");
 
+  const supervisorProfileId = await resolveSupervisorProfileId(
+    input.supervisorId,
+    input.supervisor,
+  );
+  if (input.supervisorId && !supervisorProfileId) {
+    throw new AppError(400, "Selected supervisor was not found");
+  }
+
   const projectId = await generateId("AB");
 
   // 1) Create the project shell so we have a stable _id for site backrefs.
@@ -201,7 +268,7 @@ export async function createProject(input: CreateProjectInput) {
     mobile: input.mobile || client.mobile,
     address: input.address || client.address,
     supervisor: input.supervisor,
-    supervisorId: input.supervisorId ? new Types.ObjectId(input.supervisorId) : undefined,
+    supervisorId: supervisorProfileId || undefined,
     siteIds: [],
     siteNames: [],
     status: input.status,
@@ -244,7 +311,7 @@ export async function createProject(input: CreateProjectInput) {
     projectId: project._id as Types.ObjectId,
     projectSiteIds: siteIds,
     projectSiteNames: siteNames,
-    newSupervisorId: toObjectId(input.supervisorId),
+    newSupervisorId: supervisorProfileId,
     oldSupervisorId: null,
   });
 
@@ -332,7 +399,17 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
     updateData.mobile = nextClient.mobile;
     updateData.address = nextClient.address;
   }
-  if (patch.supervisorId) updateData.supervisorId = new Types.ObjectId(patch.supervisorId);
+  let patchedSupervisorProfileId: Types.ObjectId | null | undefined;
+  if (patch.supervisorId !== undefined) {
+    patchedSupervisorProfileId = await resolveSupervisorProfileId(
+      patch.supervisorId,
+      patch.supervisor,
+    );
+    if (!patchedSupervisorProfileId) {
+      throw new AppError(400, "Selected supervisor was not found");
+    }
+    updateData.supervisorId = patchedSupervisorProfileId;
+  }
   // sites (names) is handled below, not as a direct set on Project.
   delete (updateData as Record<string, unknown>).sites;
 
@@ -396,7 +473,7 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
   const oldSupervisorId = (existing.supervisorId as Types.ObjectId | undefined) ?? null;
   const newSupervisorId =
     patch.supervisorId !== undefined
-      ? toObjectId(patch.supervisorId)
+      ? patchedSupervisorProfileId ?? null
       : oldSupervisorId;
 
   const supervisorChanged = oldSupervisorId?.toString() !== (newSupervisorId?.toString() ?? "");
