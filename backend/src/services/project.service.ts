@@ -28,6 +28,46 @@ function exactNamePattern(value: string): RegExp {
 }
 
 /**
+ * Older supervisor records can be linked only from User.supervisorProfileId,
+ * leaving Supervisor.userId empty. Project assignment then updates the
+ * profile but cannot update the User document used by Roles & Employees and
+ * RBAC. Repair that reverse link whenever a project touches the profile.
+ */
+async function ensureSupervisorUserLink(
+  supervisorProfileId: Types.ObjectId,
+): Promise<Types.ObjectId | null> {
+  const profile = await Supervisor.findById(supervisorProfileId)
+    .select("_id userId email phone")
+    .lean();
+  if (!profile) return null;
+  if (profile.userId) return profile.userId as Types.ObjectId;
+
+  const identity: Record<string, unknown>[] = [
+    { supervisorProfileId: profile._id },
+  ];
+  if (profile.email) identity.push({ email: profile.email.toLowerCase() });
+  if (profile.phone) identity.push({ phone: profile.phone });
+
+  const user = await User.findOne({
+    role: "supervisor",
+    $or: identity,
+  }).select("_id").lean();
+  if (!user?._id) return null;
+
+  await Promise.all([
+    Supervisor.updateOne(
+      { _id: profile._id },
+      { $set: { userId: user._id } },
+    ),
+    User.updateOne(
+      { _id: user._id },
+      { $set: { supervisorProfileId: profile._id } },
+    ),
+  ]);
+  return user._id as Types.ObjectId;
+}
+
+/**
  * Project forms historically sent a User id while Project.supervisorId points
  * at a Supervisor profile. Resolve either representation and lazily create the
  * profile for older supervisor accounts accepted without an initial project.
@@ -46,7 +86,10 @@ async function resolveSupervisorProfileId(
   if (!profileQuery) return null;
 
   const existingProfile = await Supervisor.findOne(profileQuery).select("_id").lean();
-  if (existingProfile?._id) return existingProfile._id as Types.ObjectId;
+  if (existingProfile?._id) {
+    await ensureSupervisorUserLink(existingProfile._id as Types.ObjectId);
+    return existingProfile._id as Types.ObjectId;
+  }
 
   const userQuery = candidateId
     ? { _id: candidateId, role: "supervisor" }
@@ -60,7 +103,10 @@ async function resolveSupervisorProfileId(
     const linkedProfile = await Supervisor.findById(supervisorUser.supervisorProfileId)
       .select("_id")
       .lean();
-    if (linkedProfile?._id) return linkedProfile._id as Types.ObjectId;
+    if (linkedProfile?._id) {
+      await ensureSupervisorUserLink(linkedProfile._id as Types.ObjectId);
+      return linkedProfile._id as Types.ObjectId;
+    }
   }
 
   const createdProfile = await Supervisor.create({
@@ -166,7 +212,7 @@ async function syncSupervisorAssignment(args: {
   if (oldSupervisorId && oldSupervisorId.toString() === (newSupervisorId?.toString() ?? "")) {
     // Same supervisor — just make sure assignments include the project's sites/project.
     if (newSupervisorId) {
-      const sup = await Supervisor.findById(newSupervisorId).select("_id userId").lean();
+      const sup = await Supervisor.findById(newSupervisorId).select("_id").lean();
       if (sup) {
         await Supervisor.updateOne(
           { _id: newSupervisorId },
@@ -179,12 +225,13 @@ async function syncSupervisorAssignment(args: {
             $set: { assignedProjectId: new Types.ObjectId(projectId) },
           },
         );
-        if (sup.userId) {
+        const userId = await ensureSupervisorUserLink(newSupervisorId);
+        if (userId) {
           await User.updateOne(
-            { _id: sup.userId },
+            { _id: userId },
             { $addToSet: { managedProjectIds: projectId } },
           );
-          invalidateAccessCache(sup.userId.toString());
+          invalidateAccessCache(userId.toString());
         }
       }
     }
@@ -193,7 +240,7 @@ async function syncSupervisorAssignment(args: {
 
   // Detach from old supervisor.
   if (oldSupervisorId) {
-    const oldSup = await Supervisor.findById(oldSupervisorId).select("_id userId").lean();
+    const oldSup = await Supervisor.findById(oldSupervisorId).select("_id").lean();
     if (oldSup) {
       await Supervisor.updateOne(
         { _id: oldSupervisorId },
@@ -205,12 +252,13 @@ async function syncSupervisorAssignment(args: {
           },
         },
       );
-      if (oldSup.userId) {
+      const oldUserId = await ensureSupervisorUserLink(oldSupervisorId);
+      if (oldUserId) {
         await User.updateOne(
-          { _id: oldSup.userId },
+          { _id: oldUserId },
           { $pull: { managedProjectIds: projectId } },
         );
-        invalidateAccessCache(oldSup.userId.toString());
+        invalidateAccessCache(oldUserId.toString());
       }
     }
     // Unset Site.supervisorId for old-supervisor sites only if no other
@@ -221,7 +269,7 @@ async function syncSupervisorAssignment(args: {
 
   // Attach to new supervisor.
   if (newSupervisorId) {
-    const newSup = await Supervisor.findById(newSupervisorId).select("_id userId").lean();
+    const newSup = await Supervisor.findById(newSupervisorId).select("_id").lean();
     if (newSup) {
       await Supervisor.updateOne(
         { _id: newSupervisorId },
@@ -234,12 +282,13 @@ async function syncSupervisorAssignment(args: {
           $set: { assignedProjectId: new Types.ObjectId(projectId) },
         },
       );
-      if (newSup.userId) {
+      const newUserId = await ensureSupervisorUserLink(newSupervisorId);
+      if (newUserId) {
         await User.updateOne(
-          { _id: newSup.userId },
+          { _id: newUserId },
           { $addToSet: { managedProjectIds: projectId } },
         );
-        invalidateAccessCache(newSup.userId.toString());
+        invalidateAccessCache(newUserId.toString());
       }
     }
   }
@@ -479,7 +528,10 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
   const supervisorChanged = oldSupervisorId?.toString() !== (newSupervisorId?.toString() ?? "");
   const sitesChanged = sitesProvided || !!patch.siteIds;
 
-  if (supervisorChanged || sitesChanged) {
+  // Always reconcile an assigned supervisor. This is idempotent and repairs
+  // legacy projects whose Project.supervisorId was saved before the profile
+  // and Roles & Employees scopes were synchronized.
+  if (supervisorChanged || sitesChanged || newSupervisorId) {
     await syncSupervisorAssignment({
       projectId: project._id as Types.ObjectId,
       projectSiteIds: nextSiteIds,

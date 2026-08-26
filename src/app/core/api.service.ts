@@ -906,14 +906,20 @@ export class ApiService {
 
   createProject(payload: any): Observable<any> {
     return this.http.post(`${this.baseUrl}/projects`, payload, { headers: this.authHeaders() }).pipe(
-      tap(() => this.cache.invalidate("/projects")),
+      tap(() => {
+        this.cache.invalidate("/projects");
+        this.cache.invalidate("/admin/users");
+      }),
       catchError(this.handleError)
     );
   }
 
   updateProject(id: string, payload: any): Observable<any> {
     return this.http.patch(`${this.baseUrl}/projects/${id}`, payload, { headers: this.authHeaders() }).pipe(
-      tap(() => this.cache.invalidate("/projects")),
+      tap(() => {
+        this.cache.invalidate("/projects");
+        this.cache.invalidate("/admin/users");
+      }),
       catchError(this.handleError)
     );
   }

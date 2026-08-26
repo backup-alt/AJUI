@@ -3,7 +3,7 @@ import { Client } from "../src/models/Client";
 import { Project } from "../src/models/Project";
 import { Supervisor } from "../src/models/Supervisor";
 import { User } from "../src/models/User";
-import { createProject } from "../src/services/project.service";
+import { createProject, updateProject } from "../src/services/project.service";
 import { getAssignedProjects } from "../src/services/supervisor-mobile.service";
 import { generateId } from "../src/services/id-generator.service";
 
@@ -90,5 +90,68 @@ describe("Project supervisor assignment", () => {
     expect(profile!.assignedProjects.map(String)).toContain(String(project._id));
     expect(refreshedUser!.managedProjectIds.map(String)).toContain(String(project._id));
     expect(mobileProjects.map((row) => row.id)).toContain(String(project._id));
+  });
+
+  it("repairs a legacy supervisor link and reconciles an unchanged edit assignment", async () => {
+    if (!app) return;
+
+    const supervisorUser = await User.create({
+      name: "Assignment Supervisor",
+      email: supervisorEmail,
+      phone: "+919876509991",
+      passwordHash: "not-used-by-this-test",
+      role: "supervisor",
+      status: "active",
+      managedProjectIds: [],
+    });
+    const legacyProfile = await Supervisor.create({
+      supervisorId: `SUP-LEGACY-${supervisorUser._id.toString().slice(-8)}`,
+      name: supervisorUser.name,
+      email: supervisorUser.email,
+      phone: supervisorUser.phone,
+      role: "Project Supervisor",
+      assignedProjects: [],
+      assignedSiteIds: [],
+      assignedSites: [],
+      status: "Active",
+    });
+    supervisorUser.supervisorProfileId = legacyProfile._id;
+    await supervisorUser.save();
+
+    const client = await Client.create({
+      clientId: await generateId("CLI"),
+      name: "Supervisor Assignment Client",
+      mobile: "+919876509992",
+      address: "Chennai",
+      status: "Active",
+      projectIds: [],
+    });
+    const project = await Project.create({
+      projectId: await generateId("AB"),
+      name: "Supervisor Assignment Project",
+      client: client.name,
+      clientId: client._id,
+      mobile: client.mobile,
+      address: client.address,
+      supervisor: supervisorUser.name,
+      supervisorId: legacyProfile._id,
+      siteIds: [],
+      siteNames: [],
+      status: "Active",
+      startDate: "2026-08-26",
+      totalValue: 100_000,
+    });
+
+    await updateProject(project._id.toString(), {
+      supervisor: supervisorUser.name,
+      supervisorId: supervisorUser._id.toString(),
+    });
+
+    const repairedProfile = await Supervisor.findById(legacyProfile._id).lean();
+    const refreshedUser = await User.findById(supervisorUser._id).lean();
+
+    expect(String(repairedProfile?.userId)).toBe(String(supervisorUser._id));
+    expect(repairedProfile?.assignedProjects.map(String)).toContain(String(project._id));
+    expect(refreshedUser?.managedProjectIds.map(String)).toContain(String(project._id));
   });
 });
