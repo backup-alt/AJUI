@@ -106,7 +106,7 @@ import {
     .project-icon { width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0; display: grid; place-items: center; color: var(--m3-primary); background: var(--m3-primary-container); }
     .project-icon ion-icon { font-size: 21px; }
     .project-title { flex: 1; min-width: 0; }
-    .project-title h3 { margin: 0; font-size: 17px; font-weight: 750; color: var(--m3-on-surface); }
+    .project-title h3 { margin: 0; font-size: 17px; font-weight: 750; color: var(--m3-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .project-title p { margin: 4px 0 0; font-size: 13px; color: var(--m3-on-surface-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .active-icon { font-size: 24px; }
     .project-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
@@ -146,8 +146,9 @@ export class SitesPage implements OnInit {
       this.projects.set(response.projects || []);
     } catch (error) {
       console.error('[Projects] failed to load', error);
-      this.projects.set([]);
-      this.loadError.set(true);
+      // Keep already-rendered assignments visible if a background refresh
+      // fails. Only show the full error state when no usable data exists.
+      this.loadError.set(this.projects().length === 0);
     } finally {
       this.isLoading.set(false);
     }

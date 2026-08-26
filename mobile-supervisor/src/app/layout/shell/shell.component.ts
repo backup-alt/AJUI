@@ -102,8 +102,8 @@ import { Project } from '../../shared/models';
         <div class="user-row">
           <div class="user-avatar">{{ userInitial() }}</div>
           <div class="user-info">
-            <span class="user-name">{{ userName() }}</span>
-            <span class="user-role">Supervisor · {{ userProject() }}</span>
+            <span class="menu-user-name">{{ userName() }}</span>
+            <span class="menu-user-role">Supervisor · {{ userProject() }}</span>
           </div>
         </div>
 
@@ -175,10 +175,10 @@ import { Project } from '../../shared/models';
             <ion-menu-button color="primary"></ion-menu-button>
           </ion-buttons>
 
-          <ion-title class="project-title">
+          <ion-title class="header-project-title">
             <button class="site-selector" id="project-selector-btn">
               <span class="site-icon"><ion-icon name="business-outline"></ion-icon></span>
-              <span class="site-name">{{ selectedProjectName() || 'Select project' }}</span>
+              <span class="selector-project-name">{{ selectedProjectName() || 'Select project' }}</span>
               <span class="site-chev"><ion-icon name="chevron-down-outline"></ion-icon></span>
             </button>
           </ion-title>
@@ -342,13 +342,13 @@ import { Project } from '../../shared/models';
       flex-direction: column;
       min-width: 0;
     }
-    .user-name {
+    .menu-user-name {
       font-size: 13px;
       font-weight: 700;
       color: var(--m3-on-surface);
       line-height: 1.2;
     }
-    .user-role {
+    .menu-user-role {
       font-size: 11px;
       color: var(--m3-on-surface-muted);
       line-height: 1.3;
@@ -473,7 +473,7 @@ import { Project } from '../../shared/models';
       width: 48px;
       margin: 0;
     }
-    .project-title {
+    .header-project-title {
       position: absolute;
       inset: 0 48px;
       width: auto;
@@ -517,7 +517,7 @@ import { Project } from '../../shared/models';
       flex-shrink: 0;
     }
     .site-icon ion-icon { font-size: 16px; }
-    .site-name {
+    .selector-project-name {
       flex: 1 1 auto;
       font-weight: 700;
       font-size: 13px;
@@ -606,10 +606,10 @@ import { Project } from '../../shared/models';
     }
 
     @media (max-width: 360px) {
-      .project-title { inset-inline: 46px; padding-inline: 2px; }
+      .header-project-title { inset-inline: 46px; padding-inline: 2px; }
       .site-selector { gap: 5px; padding: 5px 8px 5px 5px; }
       .site-icon { width: 28px; height: 28px; }
-      .site-name { font-size: 12px; }
+      .selector-project-name { font-size: 12px; }
       .agb-app-header ion-buttons { min-width: 46px; }
       .agb-app-header ion-menu-button,
       .agb-app-header ion-button { width: 46px; }
