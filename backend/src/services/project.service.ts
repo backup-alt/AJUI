@@ -336,12 +336,17 @@ export async function createProject(input: CreateProjectInput) {
   const client = await Client.findById(input.clientId);
   if (!client) throw new AppError(404, "Client not found");
 
-  const supervisorProfileId = await resolveSupervisorProfileId(
-    input.supervisorId,
-    input.supervisor,
-  );
-  if (input.supervisorId && !supervisorProfileId) {
-    throw new AppError(400, "Selected supervisor was not found");
+  let supervisorProfileId: Types.ObjectId | null = null;
+
+  // Handle supervisor assignment during creation
+  if (input.supervisorId) {
+    supervisorProfileId = await resolveSupervisorProfileId(
+      input.supervisorId,
+      input.supervisor,
+    );
+    if (!supervisorProfileId) {
+      throw new AppError(400, "Selected supervisor was not found");
+    }
   }
 
   const projectId = await generateId("AB");
@@ -354,7 +359,7 @@ export async function createProject(input: CreateProjectInput) {
     clientId: client._id,
     mobile: input.mobile || client.mobile,
     address: input.address || client.address,
-    supervisor: input.supervisor,
+    supervisor: input.supervisor || "",
     supervisorId: supervisorProfileId || undefined,
     siteIds: [],
     siteNames: [],
@@ -487,15 +492,27 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
     updateData.address = nextClient.address;
   }
   let patchedSupervisorProfileId: Types.ObjectId | null | undefined;
+  // Handle supervisor assignment: undefined = no change, null = remove, string = assign
   if (patch.supervisorId !== undefined) {
-    patchedSupervisorProfileId = await resolveSupervisorProfileId(
-      patch.supervisorId,
-      patch.supervisor,
-    );
-    if (!patchedSupervisorProfileId) {
-      throw new AppError(400, "Selected supervisor was not found");
+    if (patch.supervisorId === null || patch.supervisorId === "") {
+      // Explicitly remove supervisor
+      patchedSupervisorProfileId = null;
+      updateData.supervisorId = null;
+      updateData.supervisor = "";
+    } else {
+      // Assign or change supervisor
+      patchedSupervisorProfileId = await resolveSupervisorProfileId(
+        patch.supervisorId,
+        patch.supervisor,
+      );
+      if (!patchedSupervisorProfileId) {
+        throw new AppError(400, "Selected supervisor was not found");
+      }
+      updateData.supervisorId = patchedSupervisorProfileId;
+      if (patch.supervisor) {
+        updateData.supervisor = patch.supervisor;
+      }
     }
-    updateData.supervisorId = patchedSupervisorProfileId;
   }
   // sites (names) is handled below, not as a direct set on Project.
   delete (updateData as Record<string, unknown>).sites;
@@ -566,10 +583,11 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
   const supervisorChanged = oldSupervisorId?.toString() !== (newSupervisorId?.toString() ?? "");
   const sitesChanged = sitesProvided || !!patch.siteIds;
 
-  // Always reconcile an assigned supervisor. This is idempotent and repairs
-  // legacy projects whose Project.supervisorId was saved before the profile
-  // and Roles & Employees scopes were synchronized.
-  if (supervisorChanged || sitesChanged || newSupervisorId) {
+  // Always reconcile when:
+  // - Supervisor was changed (including removal)
+  // - Sites were changed while a supervisor is/was assigned
+  // - A supervisor is currently assigned (repairs legacy data)
+  if (supervisorChanged || sitesChanged || newSupervisorId || oldSupervisorId) {
     await syncSupervisorAssignment({
       projectId: project._id as Types.ObjectId,
       projectSiteIds: nextSiteIds,

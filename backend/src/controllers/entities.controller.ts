@@ -10,6 +10,7 @@ import { invalidateCachePrefix } from "../middleware/cache.js";
 function invalidateProjectAssignmentCaches(): void {
   invalidateCachePrefix("/api/projects");
   invalidateCachePrefix("/api/admin/users");
+  invalidateCachePrefix("/api/supervisors");
   invalidateCachePrefix("/api/supervisor/projects");
   invalidateCachePrefix("/api/supervisor/sites");
   invalidateCachePrefix("/api/supervisor/dashboard");

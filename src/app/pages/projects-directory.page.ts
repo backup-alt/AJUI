@@ -366,7 +366,7 @@ export class ProjectsDirectoryPage implements OnInit {
           name: this.projectDraft.name,
           startDate: this.projectDraft.startDate,
           supervisor: this.projectDraft.supervisor,
-          supervisorId: this.projectDraft.supervisorId || undefined,
+          supervisorId: this.projectDraft.supervisorId || null,
           mobile: this.projectDraft.mobile,
           address: this.projectDraft.address,
           status: this.projectDraft.status,
