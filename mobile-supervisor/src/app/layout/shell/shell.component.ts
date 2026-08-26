@@ -490,10 +490,10 @@ import { Project } from '../../shared/models';
       padding: 6px var(--md-space-3) 6px 6px;
       border-radius: var(--md-radius-pill);
       cursor: pointer;
-      width: min(100%, 260px);
+      width: 100%;
       max-width: 100%;
       min-width: 0;
-      margin: 0 auto;
+      margin: 0;
       transition:
         background var(--md-motion-duration-short1) var(--md-motion-easing-standard),
         border-color var(--md-motion-duration-short1) var(--md-motion-easing-standard);
@@ -518,6 +518,7 @@ import { Project } from '../../shared/models';
     }
     .site-icon ion-icon { font-size: 16px; }
     .site-name {
+      flex: 1 1 auto;
       font-weight: 700;
       font-size: 13px;
       color: var(--m3-on-surface);
@@ -525,8 +526,13 @@ import { Project } from '../../shared/models';
       overflow: hidden;
       text-overflow: ellipsis;
       min-width: 0;
+      text-align: left;
     }
-    .site-chev { flex-shrink: 0; }
+    .site-chev {
+      display: flex;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
     .site-chev ion-icon { color: var(--m3-on-surface-muted); font-size: 16px; }
 
     .notification-btn { position: relative; --padding-end: var(--md-space-2); }
@@ -611,7 +617,7 @@ import { Project } from '../../shared/models';
 
     @media (max-width: 320px) {
       .site-icon { display: none; }
-      .site-selector { justify-content: center; padding-left: 10px; }
+      .site-selector { padding-left: 10px; }
       .menu-brand-name { font-size: 12px; }
       .menu-brand-sub { font-size: 9px; }
     }
@@ -722,17 +728,20 @@ export class ShellComponent implements OnInit {
     this.loadBadgeCountsDeferred();
   }
 
-  async loadProjects(): Promise<void> {
-    if (this.isLoadingProjects() || this.projects().length > 0) return;
+  async loadProjects(force = false): Promise<void> {
+    if (this.isLoadingProjects() || (!force && this.projects().length > 0)) return;
     this.isLoadingProjects.set(true);
     try {
-      const response = await new Promise<{ projects: Project[] }>((resolve) => {
-        this.supervisor.getProjects().subscribe({
+      const response = await new Promise<{ projects: Project[] } | null>((resolve) => {
+        this.supervisor.getProjects(false, force).subscribe({
           next: (data) => resolve(data as { projects: Project[] }),
-          error: () => resolve({ projects: [] }),
+          error: () => resolve(null),
         });
       });
 
+      // Preserve the last known list on a transient refresh failure. Replacing
+      // it with an empty state makes valid assignments appear to disappear.
+      if (!response) return;
       this.projects.set(response.projects);
       const savedProjectId = this.supervisor.selectedProjectId();
       const saved = response.projects.find((project) => project.id === savedProjectId);
@@ -777,9 +786,9 @@ export class ShellComponent implements OnInit {
   }
 
   onProjectPopoverOpen(): void {
-    if (this.projects().length === 0 && !this.isLoadingProjects()) {
-      void this.loadProjects();
-    }
+    // Assignments can change while the app remains open. Refresh on every
+    // selector opening so newly assigned projects are immediately available.
+    void this.loadProjects(true);
   }
 
   async selectProject(project: Project): Promise<void> {

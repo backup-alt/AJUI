@@ -141,7 +141,7 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(300_000); nex
       timestamp: new Date().toISOString(),
       https: env.NODE_ENV === "production" ? "enforced" : "disabled",
       backendUrl: env.BACKEND_PUBLIC_URL || null,
-      deploy: "add-existing-material-mobile-workflow-2026-07-30",
+      revision: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null,
     });
   });
 

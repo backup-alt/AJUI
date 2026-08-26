@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: github-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -36,6 +36,9 @@ jobs:
 
       - name: Add SPA fallback
         run: cp dist/annai-builders-dashboard/browser/index.html dist/annai-builders-dashboard/browser/404.html
+
+      - name: Add deployment revision
+        run: printf '{"commit":"%s","deployedAt":"%s"}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/annai-builders-dashboard/browser/version.json
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

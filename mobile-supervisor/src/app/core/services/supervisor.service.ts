@@ -123,7 +123,11 @@ export class SupervisorService {
    */
   getProjects(detailed = false, force = true) {
     const path = detailed ? '/supervisor/projects/detailed' : '/supervisor/projects';
-    if (force) this.api.invalidateGetCache(path);
+    if (force) {
+      this.api.invalidateGetCache(path);
+      // Project assignment changes can also change the available site list.
+      this.api.invalidateGetCache('/supervisor/sites');
+    }
     return this.api.get<ProjectsResponse>(path);
   }
 
