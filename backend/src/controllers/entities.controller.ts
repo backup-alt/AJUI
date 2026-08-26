@@ -5,6 +5,15 @@ import * as projectService from "../services/project.service.js";
 import * as supervisorService from "../services/supervisor.service.js";
 import * as customFieldService from "../services/custom-fields.service.js";
 import { getScopedClientQuery, getScopedProjectIds, getScopedProjectQuery } from "../middleware/rbac.js";
+import { invalidateCachePrefix } from "../middleware/cache.js";
+
+function invalidateProjectAssignmentCaches(): void {
+  invalidateCachePrefix("/api/projects");
+  invalidateCachePrefix("/api/admin/users");
+  invalidateCachePrefix("/api/supervisor/projects");
+  invalidateCachePrefix("/api/supervisor/sites");
+  invalidateCachePrefix("/api/supervisor/dashboard");
+}
 
 // =================== CLIENTS ===================
 export async function createClient(req: Request, res: Response, next: NextFunction) {
@@ -113,6 +122,7 @@ export async function deleteSite(req: Request, res: Response, next: NextFunction
 export async function createProject(req: Request, res: Response, next: NextFunction) {
   try {
     const project = await projectService.createProject(req.body);
+    invalidateProjectAssignmentCaches();
     res.status(201).json({ project });
   } catch (e) { next(e); }
 }
@@ -147,6 +157,7 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
   try {
     const scopeProjectIds = await getScopedProjectIds(req);
     const project = await projectService.updateProject(req.params.id, req.body, scopeProjectIds);
+    invalidateProjectAssignmentCaches();
     res.json({ project });
   } catch (e) { next(e); }
 }
@@ -155,6 +166,7 @@ export async function deleteProject(req: Request, res: Response, next: NextFunct
   try {
     const scopeProjectIds = await getScopedProjectIds(req);
     await projectService.deleteProject(req.params.id, scopeProjectIds);
+    invalidateProjectAssignmentCaches();
     res.json({ success: true });
   } catch (e) { next(e); }
 }

@@ -1,4 +1,5 @@
 import { app } from "./setup";
+import request from "supertest";
 import { Client } from "../src/models/Client";
 import { Project } from "../src/models/Project";
 import { Supervisor } from "../src/models/Supervisor";
@@ -6,15 +7,24 @@ import { User } from "../src/models/User";
 import { createProject, updateProject } from "../src/services/project.service";
 import { getAssignedProjects } from "../src/services/supervisor-mobile.service";
 import { generateId } from "../src/services/id-generator.service";
+import { hashPassword } from "../src/utils/password";
 
 const supervisorEmail = "project-assignment-supervisor@example.test";
+const secondSupervisorEmail = "project-assignment-supervisor-b@example.test";
 
 afterEach(async () => {
   if (!app) return;
-  const user = await User.findOne({ email: supervisorEmail }).lean();
-  if (user) {
-    await Supervisor.deleteMany({ userId: user._id });
-    await User.deleteOne({ _id: user._id });
+  const users = await User.find({
+    email: { $in: [supervisorEmail, secondSupervisorEmail] },
+  }).lean();
+  if (users.length) {
+    await Supervisor.deleteMany({
+      $or: [
+        { userId: { $in: users.map((user) => user._id) } },
+        { email: { $in: [supervisorEmail, secondSupervisorEmail] } },
+      ],
+    });
+    await User.deleteMany({ _id: { $in: users.map((user) => user._id) } });
   }
   await Project.deleteMany({ name: "Supervisor Assignment Project" });
   await Client.deleteMany({ name: "Supervisor Assignment Client" });
@@ -153,5 +163,159 @@ describe("Project supervisor assignment", () => {
     expect(String(repairedProfile?.userId)).toBe(String(supervisorUser._id));
     expect(repairedProfile?.assignedProjects.map(String)).toContain(String(project._id));
     expect(refreshedUser?.managedProjectIds.map(String)).toContain(String(project._id));
+  });
+
+  it("creates and reassigns through HTTP, removing old mobile access immediately", async () => {
+    if (!app) return;
+
+    const passwordHash = await hashPassword("TestPass123");
+    const [firstUser, secondUser] = await User.create([
+      {
+        name: "Assignment Supervisor A",
+        email: supervisorEmail,
+        phone: "+919876509991",
+        passwordHash,
+        role: "supervisor",
+        status: "active",
+        managedProjectIds: [],
+      },
+      {
+        name: "Assignment Supervisor B",
+        email: secondSupervisorEmail,
+        phone: "+919876509993",
+        passwordHash,
+        role: "supervisor",
+        status: "active",
+        managedProjectIds: [],
+      },
+    ]);
+    const [firstProfile, secondProfile] = await Supervisor.create([
+      {
+        supervisorId: `SUP-A-${firstUser._id.toString().slice(-8)}`,
+        userId: firstUser._id,
+        name: firstUser.name,
+        email: firstUser.email,
+        phone: firstUser.phone,
+        role: "Project Supervisor",
+        assignedProjects: [],
+        assignedSiteIds: [],
+        assignedSites: [],
+        status: "Active",
+      },
+      {
+        supervisorId: `SUP-B-${secondUser._id.toString().slice(-8)}`,
+        userId: secondUser._id,
+        name: secondUser.name,
+        email: secondUser.email,
+        phone: secondUser.phone,
+        role: "Project Supervisor",
+        assignedProjects: [],
+        assignedSiteIds: [],
+        assignedSites: [],
+        status: "Active",
+      },
+    ]);
+    firstUser.supervisorProfileId = firstProfile._id;
+    secondUser.supervisorProfileId = secondProfile._id;
+    await Promise.all([firstUser.save(), secondUser.save()]);
+
+    const client = await Client.create({
+      clientId: await generateId("CLI"),
+      name: "Supervisor Assignment Client",
+      mobile: "+919876509992",
+      address: "Chennai",
+      status: "Active",
+      projectIds: [],
+    });
+
+    const adminLogin = await request(app).post("/api/auth/login").send({
+      email: "admin@test.com",
+      password: "TestPass123",
+    });
+    expect(adminLogin.status).toBe(200);
+    const adminToken = adminLogin.body.accessToken as string;
+
+    const created = await request(app)
+      .post("/api/projects")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "Supervisor Assignment Project",
+        clientId: client._id.toString(),
+        mobile: client.mobile,
+        address: client.address,
+        supervisor: firstUser.name,
+        supervisorId: firstUser._id.toString(),
+        siteIds: [],
+        sites: [],
+        status: "Active",
+        startDate: "2026-08-26",
+        totalValue: 100_000,
+      });
+    expect(created.status).toBe(201);
+    const projectId = String(created.body.project._id);
+
+    const loginSupervisor = async (phone: string) => {
+      const response = await request(app).post("/api/auth/login").send({
+        phone,
+        password: "TestPass123",
+      });
+      expect(response.status).toBe(200);
+      return response.body.accessToken as string;
+    };
+    const [firstToken, secondToken] = await Promise.all([
+      loginSupervisor(firstUser.phone),
+      loginSupervisor(secondUser.phone),
+    ]);
+
+    const employeesAfterCreate = await request(app)
+      .get("/api/admin/users?role=supervisor&limit=100")
+      .set("Authorization", `Bearer ${adminToken}`);
+    const firstEmployee = employeesAfterCreate.body.items.find(
+      (item: { _id: string }) => item._id === firstUser._id.toString(),
+    );
+    expect(firstEmployee.managedProjectIds.map(String)).toContain(projectId);
+
+    const firstMobileBefore = await request(app)
+      .get("/api/supervisor/projects")
+      .set("Authorization", `Bearer ${firstToken}`);
+    const secondMobileBefore = await request(app)
+      .get("/api/supervisor/projects")
+      .set("Authorization", `Bearer ${secondToken}`);
+    expect(firstMobileBefore.body.projects.map((project: { id: string }) => project.id)).toContain(projectId);
+    expect(secondMobileBefore.body.projects.map((project: { id: string }) => project.id)).not.toContain(projectId);
+
+    const reassigned = await request(app)
+      .patch(`/api/projects/${projectId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        supervisor: secondUser.name,
+        supervisorId: secondUser._id.toString(),
+      });
+    expect(reassigned.status).toBe(200);
+
+    const employeesAfterEdit = await request(app)
+      .get("/api/admin/users?role=supervisor&limit=100")
+      .set("Authorization", `Bearer ${adminToken}`);
+    const refreshedFirstEmployee = employeesAfterEdit.body.items.find(
+      (item: { _id: string }) => item._id === firstUser._id.toString(),
+    );
+    const refreshedSecondEmployee = employeesAfterEdit.body.items.find(
+      (item: { _id: string }) => item._id === secondUser._id.toString(),
+    );
+    expect(refreshedFirstEmployee.managedProjectIds.map(String)).not.toContain(projectId);
+    expect(refreshedSecondEmployee.managedProjectIds.map(String)).toContain(projectId);
+
+    const firstMobileAfter = await request(app)
+      .get("/api/supervisor/projects")
+      .set("Authorization", `Bearer ${firstToken}`);
+    const secondMobileAfter = await request(app)
+      .get("/api/supervisor/projects")
+      .set("Authorization", `Bearer ${secondToken}`);
+    expect(firstMobileAfter.body.projects.map((project: { id: string }) => project.id)).not.toContain(projectId);
+    expect(secondMobileAfter.body.projects.map((project: { id: string }) => project.id)).toContain(projectId);
+
+    const oldProfile = await Supervisor.findById(firstProfile._id).lean();
+    expect(oldProfile?.assignedProjects.map(String)).not.toContain(projectId);
+    expect(String(oldProfile?.assignedProjectId || "")).not.toBe(projectId);
   });
 });

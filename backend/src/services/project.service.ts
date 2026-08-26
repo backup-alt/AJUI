@@ -242,7 +242,7 @@ async function syncSupervisorAssignment(args: {
   if (oldSupervisorId) {
     const oldSup = await Supervisor.findById(oldSupervisorId).select("_id").lean();
     if (oldSup) {
-      await Supervisor.updateOne(
+      const detached = await Supervisor.findByIdAndUpdate(
         { _id: oldSupervisorId },
         {
           $pull: {
@@ -251,7 +251,45 @@ async function syncSupervisorAssignment(args: {
             assignedSites: { $in: projectSiteNames },
           },
         },
+        { new: true },
       );
+
+      // Legacy single-assignment fields are also included in mobile access.
+      // Leaving either one pointed at the moved project/site would keep the
+      // old supervisor authorized even after the array assignments changed.
+      if (detached) {
+        const singletonUpdate: Record<string, unknown> = {};
+        const singletonUnset: Record<string, string> = {};
+        if (detached.assignedProjectId?.toString() === projectId.toString()) {
+          const fallbackProjectId = detached.assignedProjects[0];
+          if (fallbackProjectId) {
+            singletonUpdate.assignedProjectId = fallbackProjectId;
+          } else {
+            singletonUnset.assignedProjectId = "";
+            singletonUnset.assignedProject = "";
+          }
+        }
+        if (
+          detached.assignedSiteId &&
+          projectSiteIds.some((siteId) => siteId.toString() === detached.assignedSiteId?.toString())
+        ) {
+          const fallbackSiteId = detached.assignedSiteIds[0];
+          if (fallbackSiteId) {
+            singletonUpdate.assignedSiteId = fallbackSiteId;
+          } else {
+            singletonUnset.assignedSiteId = "";
+          }
+        }
+        if (Object.keys(singletonUpdate).length || Object.keys(singletonUnset).length) {
+          await Supervisor.updateOne(
+            { _id: oldSupervisorId },
+            {
+              ...(Object.keys(singletonUpdate).length ? { $set: singletonUpdate } : {}),
+              ...(Object.keys(singletonUnset).length ? { $unset: singletonUnset } : {}),
+            },
+          );
+        }
+      }
       const oldUserId = await ensureSupervisorUserLink(oldSupervisorId);
       if (oldUserId) {
         await User.updateOne(
