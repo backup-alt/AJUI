@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Supervisor } from "../models/Supervisor.js";
 import { Site } from "../models/Site.js";
+import { Project } from "../models/Project.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import {
@@ -107,6 +108,43 @@ async function backfillAssignedSites(
   );
 }
 
+/**
+ * Sync project supervisor assignments bidirectionally.
+ * - Projects removed from the supervisor's list: clear supervisorId/supervisor fields
+ * - Projects added to the supervisor's list: set supervisorId/supervisor fields
+ */
+async function syncProjectSupervisorAssignments(
+  supervisorId: Types.ObjectId,
+  supervisorName: string,
+  oldProjectIds: Types.ObjectId[],
+  newProjectIds: Types.ObjectId[]
+) {
+  const oldIds = new Set(oldProjectIds.map(id => id.toString()));
+  const newIds = new Set(newProjectIds.map(id => id.toString()));
+
+  // Projects to remove: in old but not in new
+  const toRemove = oldProjectIds.filter(id => !newIds.has(id.toString()));
+
+  // Projects to add: in new but not in old
+  const toAdd = newProjectIds.filter(id => !oldIds.has(id.toString()));
+
+  // Remove supervisor from projects that are no longer assigned
+  if (toRemove.length > 0) {
+    await Project.updateMany(
+      { _id: { $in: toRemove }, supervisorId },
+      { $unset: { supervisorId: "", supervisor: "" } }
+    );
+  }
+
+  // Add supervisor to newly assigned projects
+  if (toAdd.length > 0) {
+    await Project.updateMany(
+      { _id: { $in: toAdd } },
+      { $set: { supervisorId, supervisor: supervisorName } }
+    );
+  }
+}
+
 export async function createSupervisor(input: CreateSupervisorInput) {
   const supervisorId = await generateId("SUP");
   const siteAssignment = await normalizeSiteAssignment(input);
@@ -185,7 +223,7 @@ export async function listSupervisorsForWorker(filter: {
 }
 
 export async function updateSupervisor(id: string, patch: UpdateSupervisorInput, scopeProjectIds?: ProjectScopeIds) {
-  await getSupervisorById(id, scopeProjectIds);
+  const existingSupervisor = await getSupervisorById(id, scopeProjectIds);
   const updateData: Record<string, unknown> = { ...patch };
 
   if (patch.assignedProjectId) {
@@ -224,6 +262,17 @@ export async function updateSupervisor(id: string, patch: UpdateSupervisorInput,
       (updateData.assignedSiteIds as Types.ObjectId[] | undefined) || []
     );
   }
+
+  // Sync project assignments bidirectionally
+  if (patch.assignedProjectIds !== undefined) {
+    await syncProjectSupervisorAssignments(
+      supervisor._id,
+      supervisor.name,
+      existingSupervisor.assignedProjects || [],
+      updateData.assignedProjects as Types.ObjectId[] || []
+    );
+  }
+
   return supervisor.toObject();
 }
 
