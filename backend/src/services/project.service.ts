@@ -494,6 +494,8 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
   const existing = await getProjectById(id, scopeProjectIds);
 
   const updateData: Record<string, unknown> = { ...patch };
+  const unsetFields: Record<string, string> = {};
+
   if (patch.clientId) {
     const nextClient = await Client.findById(patch.clientId).lean();
     if (!nextClient) throw new AppError(404, "Client not found");
@@ -506,10 +508,12 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
   // Handle supervisor assignment: undefined = no change, null = remove, string = assign
   if (patch.supervisorId !== undefined) {
     if (patch.supervisorId === null || patch.supervisorId === "") {
-      // Explicitly remove supervisor
+      // Explicitly remove supervisor - use $unset to properly clear the field
       patchedSupervisorProfileId = null;
-      updateData.supervisorId = null;
-      updateData.supervisor = "";
+      unsetFields.supervisorId = "";
+      unsetFields.supervisor = "";
+      delete updateData.supervisorId;
+      delete updateData.supervisor;
     } else {
       // Assign or change supervisor
       patchedSupervisorProfileId = await resolveSupervisorProfileId(
@@ -568,7 +572,14 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
     nextSiteNames = sites.map((s) => s.name);
   }
 
-  const project = await Project.findByIdAndUpdate(id, updateData, { new: true });
+  const project = await Project.findByIdAndUpdate(
+    id,
+    {
+      $set: updateData,
+      ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
+    },
+    { new: true }
+  );
   if (!project) throw new AppError(404, "Project not found");
 
   if (patch.clientId) {
