@@ -136,11 +136,13 @@ export class SitesPage implements OnInit {
     await this.loadProjects();
   }
 
-  async loadProjects(force = false): Promise<void> {
+  async loadProjects(_force = false): Promise<void> {
     this.isLoading.set(true);
     this.loadError.set(false);
     try {
-      const response = await firstValueFrom(this.supervisor.getProjects(true, force));
+      // Assignments are managed from the web app, so this page must not reuse
+      // a previously cached project list when it becomes active.
+      const response = await firstValueFrom(this.supervisor.getProjects(true, true));
       this.projects.set(response.projects || []);
     } catch (error) {
       console.error('[Projects] failed to load', error);

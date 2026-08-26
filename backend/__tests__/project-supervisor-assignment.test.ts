@@ -1,10 +1,10 @@
 import { app } from "./setup";
 import { Client } from "../src/models/Client";
 import { Project } from "../src/models/Project";
-import { Site } from "../src/models/Site";
 import { Supervisor } from "../src/models/Supervisor";
 import { User } from "../src/models/User";
 import { createProject } from "../src/services/project.service";
+import { getAssignedProjects } from "../src/services/supervisor-mobile.service";
 import { generateId } from "../src/services/id-generator.service";
 
 const supervisorEmail = "project-assignment-supervisor@example.test";
@@ -16,7 +16,6 @@ afterEach(async () => {
     await Supervisor.deleteMany({ userId: user._id });
     await User.deleteOne({ _id: user._id });
   }
-  await Site.deleteMany({ name: "Assignment Test Site" });
   await Project.deleteMany({ name: "Supervisor Assignment Project" });
   await Client.deleteMany({ name: "Supervisor Assignment Client" });
 });
@@ -57,6 +56,10 @@ describe("Project supervisor assignment", () => {
       projectIds: [],
     });
 
+    // Reproduce an already-open mobile app that cached an empty access scope
+    // before the admin created and assigned the project.
+    expect(await getAssignedProjects(supervisorUser._id.toString())).toEqual([]);
+
     const project = await createProject({
       name: "Supervisor Assignment Project",
       clientId: client._id.toString(),
@@ -64,7 +67,7 @@ describe("Project supervisor assignment", () => {
       address: client.address,
       supervisor: supervisorUser.name,
       supervisorId: supervisorUser._id.toString(),
-      sites: ["Assignment Test Site"],
+      sites: [],
       siteIds: [],
       status: "Active",
       startDate: "2026-08-26",
@@ -80,12 +83,12 @@ describe("Project supervisor assignment", () => {
 
     const profile = await Supervisor.findOne({ userId: supervisorUser._id }).lean();
     const refreshedUser = await User.findById(supervisorUser._id).lean();
-    const site = await Site.findOne({ name: "Assignment Test Site" }).lean();
+    const mobileProjects = await getAssignedProjects(supervisorUser._id.toString());
 
     expect(profile).not.toBeNull();
     expect(String(project.supervisorId)).toBe(String(supervisorProfile._id));
     expect(profile!.assignedProjects.map(String)).toContain(String(project._id));
     expect(refreshedUser!.managedProjectIds.map(String)).toContain(String(project._id));
-    expect(String(site!.supervisorId)).toBe(String(profile!._id));
+    expect(mobileProjects.map((row) => row.id)).toContain(String(project._id));
   });
 });

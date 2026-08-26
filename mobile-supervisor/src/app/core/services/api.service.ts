@@ -130,7 +130,7 @@ export class ApiService {
   private isEmptyListResponse(data: unknown): boolean {
     if (!data || typeof data !== 'object') return false;
     const response = data as Record<string, unknown>;
-    return ['items', 'materials', 'expenses', 'labour'].some(
+    return ['items', 'projects', 'sites', 'supervisors', 'materials', 'expenses', 'labour'].some(
       (key) => Array.isArray(response[key]) && response[key].length === 0
     );
   }

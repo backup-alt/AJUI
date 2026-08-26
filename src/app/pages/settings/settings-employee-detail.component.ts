@@ -131,7 +131,7 @@ interface ActivityEntry {
                 </button>
               </div>
               <div class="settings-w11-card-body">
-                @if (projectsLoading() && supervisorAssignedProjectIds().length > 0) {
+                @if (projectsLoading() || supervisorAssignmentsLoading()) {
                   <p class="settings-w11-empty-hint">Loading assigned projects…</p>
                 } @else if (supervisorAssignedProjectNames().length > 0) {
                   <div class="settings-w11-site-list">
@@ -474,13 +474,14 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly employee = signal<Employee | null>(null);
   readonly projectOptions = signal<Array<{ id: string; name: string }>>([]);
   readonly projectsLoading = signal(true);
+  readonly supervisorAssignmentsLoading = signal(false);
 
   readonly employeeProjectNames = computed<string[]>(() => {
     const emp = this.employee();
     if (!emp || !emp.projectIds.length || this.projectsLoading()) return [];
     return emp.projectIds
-      .map((pid) => this.projectOptions().find((project) => project.id === String(pid))?.name || "Project unavailable")
-      .filter(Boolean);
+      .map((pid) => this.projectOptions().find((project) => project.id === String(pid))?.name)
+      .filter((name): name is string => !!name);
   });
 
   readonly allProjectsForPicker = computed<Array<{ id: string; name: string }>>(() =>
@@ -495,10 +496,12 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   readonly supervisorAssignedProjectNames = computed<Array<{ id: string; name: string }>>(() => {
     if (this.projectsLoading()) return [];
-    return this.supervisorAssignedProjectIds().map((id) => ({
-      id: String(id),
-      name: this.projectOptions().find((project) => project.id === String(id))?.name || "Project unavailable",
-    }));
+    return this.supervisorAssignedProjectIds()
+      .map((id) => {
+        const project = this.projectOptions().find((option) => option.id === String(id));
+        return project ? { id: String(id), name: project.name } : null;
+      })
+      .filter((project): project is { id: string; name: string } => project !== null);
   });
 
   openProjectPicker() {
@@ -699,6 +702,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
       next: (res) => {
         const row: any = res?.employee || res;
         const mappedRole = (row.role === "admin" ? "Admin" : row.role === "project_manager" ? "Project Manager" : row.role === "accountant" ? "Accountant" : row.role === "supervisor" ? "Supervisor" : "Project Manager") as Role;
+        this.supervisorAssignmentsLoading.set(mappedRole === "Supervisor");
         this.employee.set({
           id: row._id ? String(row._id) : (row.id || id),
           name: row.name || "—",
@@ -744,7 +748,10 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           const supUserId = s.userId ? String(s.userId._id || s.userId) : '';
           return supUserId === userId;
         });
-        if (!match) return;
+        if (!match) {
+          this.supervisorAssignmentsLoading.set(false);
+          return;
+        }
 
         const assignedSiteIds: string[] = match.assignedSiteIds
           ? match.assignedSiteIds.map((sid: any) => this.toStringId(sid))
@@ -762,9 +769,10 @@ export class SettingsEmployeeDetailComponent implements OnInit {
             ? match.assignedProjects.map((pid: any) => String(pid))
             : [],
         } : e);
+        this.supervisorAssignmentsLoading.set(false);
       },
       error: () => {
-        // Silently fail - sites just won't show
+        this.supervisorAssignmentsLoading.set(false);
       },
     });
   }
@@ -777,11 +785,13 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   }
 
   private loadSupervisorAfterSites(id: string) {
+    this.supervisorAssignmentsLoading.set(true);
     this.api.getSupervisor(id).subscribe({
       next: (res) => {
         const row = res?.supervisor;
         if (!row) {
           this.employee.set(null);
+          this.supervisorAssignmentsLoading.set(false);
           this.loading.set(false);
           return;
         }
@@ -830,11 +840,13 @@ export class SettingsEmployeeDetailComponent implements OnInit {
           assignedSites: resolvedAssignedSites,
           assignedProjectIds: row.assignedProjects ? row.assignedProjects.map((pid: any) => String(pid)) : [],
         });
+        this.supervisorAssignmentsLoading.set(false);
         this.loading.set(false);
         this.loadActivity(id);
       },
       error: () => {
         this.employee.set(null);
+        this.supervisorAssignmentsLoading.set(false);
         this.loading.set(false);
       },
     });

@@ -115,7 +115,13 @@ export class SupervisorService {
     return this.api.get<SitesResponse>('/supervisor/sites');
   }
 
-  getProjects(detailed = false, force = false) {
+  /**
+   * Project assignments are changed out-of-band from the admin web app, so a
+   * five-minute mobile GET cache can hide a newly assigned project. Always
+   * refresh this small, access-critical list unless a caller explicitly opts
+   * into cached behavior.
+   */
+  getProjects(detailed = false, force = true) {
     const path = detailed ? '/supervisor/projects/detailed' : '/supervisor/projects';
     if (force) this.api.invalidateGetCache(path);
     return this.api.get<ProjectsResponse>(path);

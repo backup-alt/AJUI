@@ -675,9 +675,10 @@ export class ErpDataService {
       return localProject;
     };
 
-    // Local-only fallback for demo clients that were never persisted to the
-    // backend (no Mongo _id), or when the backend rejects project creation
-    // (e.g. an older deployed backend). Keeps the project openable locally.
+    // Local-only fallback is limited to demo clients that were never persisted
+    // to MongoDB. A persisted client's project must succeed on the backend;
+    // otherwise showing a local-only project creates a false success that can
+    // never appear in the supervisor mobile app.
     if (!client._id) {
       return createLocalProject();
     }
@@ -703,8 +704,8 @@ export class ErpDataService {
         }),
       );
     } catch (err) {
-      console.error("[ErpDataService] Failed to create project on backend; creating locally:", err);
-      return createLocalProject();
+      console.error("[ErpDataService] Failed to create project on backend:", err);
+      throw err;
     }
     const created: any = res?.project ?? res;
 

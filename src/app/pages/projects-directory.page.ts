@@ -100,7 +100,10 @@ interface ApiProject {
 
                 <div class="projects-directory-footer">
                   <button type="button" class="secondary-action" (click)="openEditProject(project, $event)">
-                    <ion-icon name="create-outline"></ion-icon>
+                    <svg class="projects-directory-edit-icon" viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M4 13.8V16h2.2L15 7.2 12.8 5 4 13.8Z" />
+                      <path d="m11.8 6 2.2 2.2" />
+                    </svg>
                     Edit
                   </button>
                   <button type="button" (click)="openProject(project); $event.stopPropagation()">
@@ -195,9 +198,23 @@ interface ApiProject {
       line-height: 1.5;
     }
     .projects-directory-footer .secondary-action {
+      justify-content: center;
+      gap: 7px;
+      min-width: 88px;
       border: 1px solid #d7dce5;
       background: #ffffff;
       color: #344054;
+    }
+    .projects-directory-edit-icon {
+      display: block;
+      flex: 0 0 15px;
+      width: 15px;
+      height: 15px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
