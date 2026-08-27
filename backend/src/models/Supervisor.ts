@@ -19,6 +19,7 @@ export interface ISupervisor extends Document {
   assignedSiteIds: Types.ObjectId[];
   cashLimit: number;
   activeAdvances: number;
+  openingAmountAddedAt?: Date;
   approvalAuthority: number;
   status: SupervisorStatus;
   createdAt: Date;
@@ -42,6 +43,7 @@ const supervisorSchema = new Schema<ISupervisor>(
     assignedSiteIds: [{ type: Schema.Types.ObjectId, ref: "Site", index: true }],
     cashLimit: { type: Number, default: 0 },
     activeAdvances: { type: Number, default: 0 },
+    openingAmountAddedAt: { type: Date },
     approvalAuthority: { type: Number, default: 0 },
     status: {
       type: String,

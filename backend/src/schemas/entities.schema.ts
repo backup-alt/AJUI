@@ -135,6 +135,16 @@ export const updateSupervisorSchema = z.object({
   params: idSchema,
 });
 
+export const fundSupervisorSchema = z.object({
+  body: z.object({
+    projectId: z.string().regex(/^[a-f0-9]{24}$/i),
+    siteId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
+    amount: z.coerce.number().positive().max(100_000_000),
+    note: z.string().trim().max(500).optional(),
+  }),
+  params: idSchema,
+});
+
 export const customFieldTypeSchema = z.enum(["text", "number", "date", "boolean"]);
 
 export const createCustomFieldSchema = z.object({
@@ -196,5 +206,6 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>["body"];
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>["body"];
 export type CreateSupervisorInput = z.infer<typeof createSupervisorSchema>["body"];
 export type UpdateSupervisorInput = z.infer<typeof updateSupervisorSchema>["body"];
+export type FundSupervisorInput = z.infer<typeof fundSupervisorSchema>["body"];
 export type CreateCustomFieldInput = z.infer<typeof createCustomFieldSchema>["body"];
 export type UpdateCustomFieldInput = z.infer<typeof updateCustomFieldSchema>["body"];

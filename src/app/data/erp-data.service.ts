@@ -60,11 +60,13 @@ export type Supervisor = {
   phone: string;
   role: string;
   assignedProject: string;
+  assignedProjectIds?: string[];
   assignedSite: string;
   cashLimit: number;
   activeAdvances: number;
   approvalAuthority: string;
   status: "Active" | "On Leave" | "Inactive";
+  openingAmountAddedAt?: Date | string;
   _id?: string;
 };
 

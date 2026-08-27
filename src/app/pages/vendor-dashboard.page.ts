@@ -41,6 +41,19 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
         <ion-content class="erp-page">
           <main class="client-landing">
             @if (!selectedVendor()) {
+              <div class="page-search-bar">
+                <input
+                  type="search"
+                  class="seamless-search"
+                  placeholder="Search vendors by name, phone, material type, or GST..."
+                  [value]="search()"
+                  (input)="search.set($any($event.target).value)"
+                />
+                <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
               <section class="client-grid">
                 <article class="client-card add-client-card" role="button" tabindex="0" (click)="showVendorForm.set(true)" (keydown.enter)="showVendorForm.set(true)">
                   <div class="add-client-icon">
@@ -50,7 +63,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   <p>Create a vendor profile to track material purchases, GST, and payment history.</p>
                 </article>
 
-                @for (vendor of vendors(); track vendor.id) {
+                @for (vendor of filteredVendors(); track vendor.id) {
                   <article
                     class="client-card vendor-card"
                     role="button"
@@ -96,6 +109,12 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                       </div>
                     </div>
                   </article>
+                }
+
+                @if (filteredVendors().length === 0 && vendors().length > 0) {
+                  <div class="empty-state">
+                    <p>No vendors match your search.</p>
+                  </div>
                 }
 
                 @if (vendors().length === 0) {
@@ -376,6 +395,36 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     </ion-split-pane>
   `,
   styles: [`
+    .page-search-bar {
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto 24px;
+      padding: 0 24px;
+    }
+    .seamless-search {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #fff;
+      transition: all 0.2s ease;
+    }
+    .seamless-search:focus {
+      outline: none;
+      border-color: #002263;
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.1);
+    }
+    .search-icon {
+      position: absolute;
+      left: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: #9ca3af;
+      pointer-events: none;
+    }
     .vendor-card .card-head {
       display: flex !important;
       justify-content: space-between !important;
@@ -951,7 +1000,18 @@ export class VendorDashboardPage {
   readonly showVendorForm = signal(false);
   readonly editingVendor = signal<Vendor | null>(null);
   readonly vendorSaving = signal(false);
+  readonly search = signal("");
   readonly vendors = computed<Vendor[]>(() => this.data.vendors());
+  readonly filteredVendors = computed(() => {
+    const searchTerm = this.search().toLowerCase().trim();
+    if (!searchTerm) return this.vendors();
+    return this.vendors().filter(vendor =>
+      vendor.name.toLowerCase().includes(searchTerm) ||
+      vendor.phone.toLowerCase().includes(searchTerm) ||
+      vendor.materialType.toLowerCase().includes(searchTerm) ||
+      vendor.gst.toLowerCase().includes(searchTerm)
+    );
+  });
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
   private vendorsLoaded = false;

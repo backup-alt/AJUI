@@ -58,6 +58,20 @@ interface SubcontractorRow {
               </div>
             </section>
 
+            <div class="page-search-bar">
+              <input
+                type="search"
+                class="seamless-search"
+                placeholder="Search sub-contractors by name, phone, or note..."
+                [value]="search()"
+                (input)="search.set($any($event.target).value)"
+              />
+              <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+                <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+
             <section class="subcontractors-stats">
               <article class="stat-card">
                 <span>Sub-contractors</span>
@@ -249,6 +263,35 @@ interface SubcontractorRow {
     </ion-split-pane>
   `,
   styles: [`
+    .page-search-bar {
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto 16px;
+    }
+    .seamless-search {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #fff;
+      transition: all 0.2s ease;
+    }
+    .seamless-search:focus {
+      outline: none;
+      border-color: #002263;
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.1);
+    }
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: #9ca3af;
+      pointer-events: none;
+    }
     .subcontractors-shell { max-width: 1280px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 18px; }
     .subcontractors-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
     .subcontractors-head h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; color: #0f172a; }
@@ -367,6 +410,7 @@ export class SubcontractorDashboardPage {
 
   readonly rows = signal<SubcontractorRow[]>([]);
   readonly loading = signal(false);
+  readonly search = signal("");
   readonly selectedProjectId = signal("");
   readonly projectFilterOpen = signal(false);
 
@@ -388,9 +432,22 @@ export class SubcontractorDashboardPage {
 
   readonly filteredRows = computed(() => {
     const projectId = this.selectedProjectId();
-    return projectId
+    const searchTerm = this.search().toLowerCase().trim();
+
+    let filtered = projectId
       ? this.rows().filter((row) => row.projectId === projectId || row.projectIds.includes(projectId))
       : this.rows();
+
+    if (searchTerm) {
+      filtered = filtered.filter(row =>
+        row.subcontractorName.toLowerCase().includes(searchTerm) ||
+        row.phone.toLowerCase().includes(searchTerm) ||
+        row.note.toLowerCase().includes(searchTerm) ||
+        row.address.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    return filtered;
   });
 
   readonly selectedProjectName = computed(() => {

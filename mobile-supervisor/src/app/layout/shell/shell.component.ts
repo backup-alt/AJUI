@@ -133,16 +133,10 @@ import { Project } from '../../shared/models';
           <ion-item routerLink="/tabs/expenses" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="wallet-outline" slot="start"></ion-icon>
             <ion-label>Expenses</ion-label>
-            @if (pendingExpenses() > 0) {
-              <span class="menu-badge" slot="end">{{ pendingExpenses() }}</span>
-            }
           </ion-item>
           <ion-item routerLink="/tabs/requests" routerLinkActive="selected" button detail="false" (click)="closeMenu()">
             <ion-icon name="clipboard-outline" slot="start"></ion-icon>
             <ion-label>Requests</ion-label>
-            @if (pendingApprovals() > 0) {
-              <span class="menu-badge" slot="end">{{ pendingApprovals() }}</span>
-            }
           </ion-item>
         </ion-list>
 
@@ -400,22 +394,6 @@ import { Project } from '../../shared/models';
     }
     .menu-list ion-item.selected ion-icon {
       color: var(--m3-on-primary-container);
-    }
-
-    /* ─── Badge count ─── */
-    .menu-badge {
-      min-width: 18px;
-      height: 18px;
-      padding: 0 5px;
-      background: var(--m3-error);
-      color: var(--m3-on-error);
-      font-size: 10px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--md-radius-pill);
-      line-height: 1;
     }
 
     /* ─── Spacer & Footer ─── */
@@ -687,8 +665,6 @@ export class ShellComponent implements OnInit {
   isLoadingProjects = signal(false);
   isLoggingOut = signal(false);
   unreadCount = computed(() => this.notifications.unreadCount());
-  pendingApprovals = signal<number>(0);
-  pendingExpenses = signal<number>(0);
 
   userInitial(): string {
     const name = this.currentUser()?.name;
@@ -727,8 +703,6 @@ export class ShellComponent implements OnInit {
       this.selectedProjectName.set(sel.projectName || null);
     }
 
-    // Badge counts: derive from dashboard data if available, otherwise defer
-    this.loadBadgeCountsDeferred();
   }
 
   async loadProjects(force = false): Promise<void> {
@@ -759,21 +733,6 @@ export class ShellComponent implements OnInit {
     } finally {
       this.isLoadingProjects.set(false);
     }
-  }
-
-  private loadBadgeCountsDeferred(): void {
-    // Defer badge count loading — don't block dashboard display.
-    // Load after a short delay so the dashboard can render first.
-    setTimeout(() => {
-      this.supervisor.getApprovals().subscribe({
-        next: (res) => {
-          const pending = (res.approvals || []).filter((approval) => approval.status === 'Pending');
-          this.pendingApprovals.set(pending.length);
-          this.pendingExpenses.set(pending.filter((approval) => approval.type === 'expense').length);
-        },
-        error: () => undefined,
-      });
-    }, 2000);
   }
 
   toggleProjectPopover(event: Event): void {

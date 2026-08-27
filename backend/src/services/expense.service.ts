@@ -3,6 +3,7 @@ import { Expense } from "../models/Expense.js";
 import { Approval } from "../models/Approval.js";
 import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
+import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { CreateExpenseInput } from "../schemas/financial.schema.js";
@@ -39,8 +40,8 @@ function applyExpenseProjectScope(
 /**
  * Recompute the running balance for every approved site expense of a single
  * (projectId, site) pair in chronological order. The opening balance is the
- * earliest Cash Added record for that site (if any), otherwise 0. Each row
- * is then assigned `previous + signedAmount`, clamped at 0.
+ * admin-controlled Site opening balance, then every approved cash addition
+ * or purchase is applied in order.
  */
 export async function recomputeSiteLedger(
   projectId: Types.ObjectId,
@@ -55,16 +56,14 @@ export async function recomputeSiteLedger(
     .sort({ date: 1, createdAt: 1, _id: 1 })
     .lean();
 
-  const earliestCashAdded = expenses.find(
-    (row) => row.transactionType === "Cash Added"
-  );
-  let running = Number(earliestCashAdded?.amount ?? 0);
+  const siteRecord = await Site.findOne({ projectIds: projectId, name: site })
+    .select("openingBalance")
+    .lean();
+  let running = Number(siteRecord?.openingBalance ?? 0);
 
   for (const row of expenses) {
     const amount = Number(row.amount) || 0;
-    if (row._id.toString() === earliestCashAdded?._id.toString()) {
-      running = amount;
-    } else if (row.transactionType === "Cash Added") {
+    if (row.transactionType === "Cash Added") {
       running += amount;
     } else {
       running = Math.max(0, running - amount);
@@ -439,18 +438,18 @@ export async function getPendingExpenses(scopeProjectIds?: ProjectScopeIds) {
 }
 
 /**
- * Site-level balance summary: opening (earliest Cash Added or 0), total
+ * Site-level balance summary: admin-controlled opening amount, total
  * cash added, total spent, and current balance. Values are derived from
  * actual approved transactions only.
  */
 export async function getSiteBalanceSummary(projectId: string, site: string) {
   const pid = new Types.ObjectId(projectId);
-  const [rows, earliest] = await Promise.all([
+  const [rows, siteRecord] = await Promise.all([
     Expense.find({ projectId: pid, site, type: "site", status: "Approved" })
       .sort({ date: 1, createdAt: 1, _id: 1 })
       .lean(),
-    Expense.findOne({ projectId: pid, site, type: "site", status: "Approved", transactionType: "Cash Added" })
-      .sort({ date: 1, createdAt: 1, _id: 1 })
+    Site.findOne({ projectIds: pid, name: site })
+      .select("openingBalance")
       .lean(),
   ]);
   const cashAdded = rows
@@ -459,7 +458,7 @@ export async function getSiteBalanceSummary(projectId: string, site: string) {
   const spent = rows
     .filter((r) => r.transactionType !== "Cash Added")
     .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-  const opening = Number(earliest?.amount ?? 0);
-  const current = Math.max(0, cashAdded - spent);
+  const opening = Number(siteRecord?.openingBalance ?? 0);
+  const current = Math.max(0, opening + cashAdded - spent);
   return { opening, cashAdded, spent, current };
 }

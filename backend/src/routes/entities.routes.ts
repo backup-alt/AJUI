@@ -15,6 +15,7 @@ import {
   listProjectsSchema,
   createSupervisorSchema,
   updateSupervisorSchema,
+  fundSupervisorSchema,
   createCustomFieldSchema,
   updateCustomFieldSchema,
   getCustomFieldsSchema,
@@ -101,6 +102,7 @@ router.delete("/sites/:id", requireRole("admin"), ctrl.deleteSite);
  */
 router.post("/supervisors", validate(createSupervisorSchema), requireRole("admin"), ctrl.createSupervisor);
 router.get("/supervisors", ctrl.listSupervisors);
+router.post("/supervisors/:id/fund", validate(fundSupervisorSchema), requireRole("admin"), ctrl.fundSupervisor);
 router.get("/supervisors/:id", ctrl.getSupervisor);
 router.patch("/supervisors/:id", validate(updateSupervisorSchema), requireRole("admin"), ctrl.updateSupervisor);
 router.delete("/supervisors/:id", requireRole("admin"), ctrl.deleteSupervisor);

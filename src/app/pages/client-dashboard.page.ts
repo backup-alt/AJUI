@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { IonContent, IonIcon, IonProgressBar, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { Client, ErpDataService } from "../data/erp-data.service";
@@ -28,6 +28,19 @@ import { formatMoney } from "../shared/format";
 
         <ion-content class="erp-page">
           <main class="client-landing">
+            <div class="page-search-bar">
+              <input
+                type="search"
+                class="seamless-search"
+                placeholder="Search clients by name, mobile, or address..."
+                [value]="search()"
+                (input)="search.set($any($event.target).value)"
+              />
+              <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+                <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
             <section class="client-grid">
               <article class="client-card add-client-card" role="button" tabindex="0" (click)="showClientForm.set(true)" (keydown.enter)="showClientForm.set(true)">
                 <div class="add-client-icon">
@@ -38,7 +51,7 @@ import { formatMoney } from "../shared/format";
               </article>
 
               <article
-                *ngFor="let client of clients(); trackBy: trackClient"
+                *ngFor="let client of filteredClients(); trackBy: trackClient"
                 class="client-card"
                 role="button"
                 tabindex="0"
@@ -98,7 +111,38 @@ import { formatMoney } from "../shared/format";
       </div>
     </ion-split-pane>
   `,
-  styles: [``],
+  styles: [`
+    .page-search-bar {
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto 24px;
+      padding: 0 24px;
+    }
+    .seamless-search {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #fff;
+      transition: all 0.2s ease;
+    }
+    .seamless-search:focus {
+      outline: none;
+      border-color: #002263;
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.1);
+    }
+    .search-icon {
+      position: absolute;
+      left: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: #9ca3af;
+      pointer-events: none;
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ClientDashboardPage {
@@ -110,6 +154,15 @@ export class ClientDashboardPage {
   readonly showClientForm = signal(false);
   readonly editingClient = signal<Client | null>(null);
   readonly clients = this.data.clients;
+  readonly filteredClients = computed(() => {
+    const searchTerm = this.search().toLowerCase().trim();
+    if (!searchTerm) return this.clients();
+    return this.clients().filter(client =>
+      client.name.toLowerCase().includes(searchTerm) ||
+      client.mobile.toLowerCase().includes(searchTerm) ||
+      client.address.toLowerCase().includes(searchTerm)
+    );
+  });
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
   readonly clientSaving = signal(false);

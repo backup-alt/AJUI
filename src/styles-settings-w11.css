@@ -1117,6 +1117,18 @@
   vertical-align: middle;
 }
 
+.settings-w11-row-action {
+  width: 1%;
+  min-width: 150px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.settings-w11-row-action .settings-w11-btn {
+  min-width: 112px;
+  justify-content: center;
+}
+
 .settings-w11-table tbody tr:last-child td {
   border-bottom: none;
 }

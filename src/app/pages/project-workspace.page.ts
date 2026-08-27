@@ -750,6 +750,17 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     </svg>
                     View Details
                   </button>
+                  <button
+                    type="button"
+                    class="primary-table-action"
+                    *ngIf="!tableViewExpanded() && activeSection() === 'expenses'"
+                    (click)="openAddOpeningCash()"
+                    title="Add Opening Cash"
+                    aria-label="Add Opening Cash"
+                  >
+                    <ion-icon name="cash-outline"></ion-icon>
+                    Add Opening Cash
+                  </button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
                   <button type="button" class="view-table-action" *ngIf="!tableViewExpanded() && activeSection() !== 'inventory'" (click)="openTableView()">
@@ -863,6 +874,20 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div><span>Cash Added</span><strong>{{ expenseCashAddedLabel() }}</strong></div>
                 <div><span>Expenses</span><strong>{{ expenseSpentLabel() }}</strong></div>
                 <div><span>Current Balance</span><strong>{{ expenseCurrentBalanceLabel() }}</strong></div>
+                <div class="expense-ledger-funding-actions" *ngIf="projectSupervisors().length > 0">
+                  <span>Fund Supervisor</span>
+                  <div class="expense-funding-buttons">
+                    @for (supervisor of projectSupervisors(); track supervisor.id) {
+                      <button
+                        type="button"
+                        class="expense-funding-btn"
+                        (click)="openSupervisorFunding(supervisor.id, supervisor.name, supervisor.hasOpeningAmount)"
+                      >
+                        {{ supervisor.name }}
+                      </button>
+                    }
+                  </div>
+                </div>
               </div>
 
               <section class="inventory-card-grid" *ngIf="activeSection() === 'inventory'">
@@ -1612,6 +1637,58 @@ const siteMaterialDetailFields: FieldSchema[] = [
         </div>
       </article>
     </section>
+
+    <section class="form-overlay funding-overlay" *ngIf="fundingSupervisorId()" (click)="closeSupervisorFunding()">
+      <div class="erp-dialog operations-dialog funding-dialog" (click)="$event.stopPropagation()">
+        <div class="dialog-head">
+          <div>
+            <span>Supervisor Funding</span>
+            <h2>{{ fundingHasOpeningAmount() ? 'Add Cash' : 'Add Opening Amount' }}</h2>
+            <p>{{ fundingSupervisorName() }}</p>
+          </div>
+          <button type="button" class="icon-button" (click)="closeSupervisorFunding()">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </div>
+        <div class="erp-form funding-form">
+          <div class="erp-field" *ngIf="projectSites().length > 1">
+            <label>Site</label>
+            <select [value]="fundingSiteId()" (change)="fundingSiteId.set($any($event.target).value)">
+              @for (site of projectSites(); track site) {
+                <option [value]="site">{{ site }}</option>
+              }
+            </select>
+          </div>
+          <div class="erp-field">
+            <label>Amount (₹)</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              placeholder="Enter amount"
+              [value]="fundingAmount()"
+              (input)="fundingAmount.set($any($event.target).value)"
+            />
+          </div>
+          <div class="erp-field">
+            <label>Note <small>(optional)</small></label>
+            <textarea rows="3" placeholder="Payment reference or note" [value]="fundingNote()" (input)="fundingNote.set($any($event.target).value)"></textarea>
+          </div>
+          @if (fundingError()) {
+            <div class="erp-error-message">{{ fundingError() }}</div>
+          }
+          @if (fundingSuccess()) {
+            <div class="erp-success-message">{{ fundingSuccess() }}</div>
+          }
+        </div>
+        <div class="dialog-foot">
+          <button type="button" class="secondary" (click)="closeSupervisorFunding()">Close</button>
+          <button type="button" class="primary" (click)="submitSupervisorFunding()" [disabled]="fundingSaving()">
+            {{ fundingSaving() ? 'Saving…' : (fundingHasOpeningAmount() ? 'Add Cash' : 'Save Opening Amount') }}
+          </button>
+        </div>
+      </div>
+    </section>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -1731,6 +1808,16 @@ export class ProjectWorkspacePage {
   readonly handledEditProjectQuery = signal("");
   readonly siteMaterialDetailFields = siteMaterialDetailFields;
   readonly previewImageUrl = signal<string | null>(null);
+  // Supervisor funding
+  readonly fundingSupervisorId = signal("");
+  readonly fundingSupervisorName = signal("");
+  readonly fundingHasOpeningAmount = signal(false);
+  readonly fundingSiteId = signal("");
+  readonly fundingAmount = signal("");
+  readonly fundingNote = signal("");
+  readonly fundingSaving = signal(false);
+  readonly fundingError = signal<string | null>(null);
+  readonly fundingSuccess = signal<string | null>(null);
   readonly tableRows = computed<Record<ModuleKey, TableRow[]>>(() => this.buildInitialRows(this.projectId()));
   readonly attendanceRows = signal<TableRow[]>([]);
   readonly tableState = computed(() => ({
@@ -4997,17 +5084,36 @@ export class ProjectWorkspacePage {
     }
   }
 
-  updateProjectStatus(value: string, event?: Event) {
+  async updateProjectStatus(value: string, event?: Event) {
     if (!this.isProjectStatus(value)) return;
     const currentProject = this.project();
-    if (!currentProject || currentProject.status === value) return;
+    const projectId = this.projectId();
+    if (!currentProject || !projectId || currentProject.status === value) return;
     const displayLabel = this.projectStatusOptions.find((option) => option.value === value)?.label ?? value;
     if ((value === "Completed" || value === "On Hold") && !window.confirm(`Mark ${currentProject.name} as ${displayLabel}?`)) {
       const select = event?.target instanceof HTMLSelectElement ? event.target : null;
       if (select) select.value = currentProject.status;
       return;
     }
-    this.data.updateProject(this.projectId(), { status: value });
+
+    const previousStatus = currentProject.status;
+    this.data.updateProject(projectId, { status: value });
+    try {
+      const response = await firstValueFrom(this.api.updateProject(projectId, { status: value }));
+      const saved = mapProject((response as any)?.project || response);
+      this.data.projects.update((projects) => projects.map((project) =>
+        project.id === projectId ? { ...project, ...saved, id: project.id } : project
+      ));
+      await this.presentToast(`Project status updated to ${displayLabel}.`);
+    } catch (err: any) {
+      this.data.updateProject(projectId, { status: previousStatus });
+      const select = event?.target instanceof HTMLSelectElement ? event.target : null;
+      if (select) select.value = previousStatus;
+      await this.presentToast(
+        err?.error?.message || err?.message || "Could not update the project status.",
+        "danger",
+      );
+    }
   }
 
   updateProjectReceived(value: string) {
@@ -6314,6 +6420,114 @@ export class ProjectWorkspacePage {
     }, 0);
     return formatMoney(spent);
   }
+
+  async openAddOpeningCash() {
+    const supervisors = this.projectSupervisors();
+    if (supervisors.length === 0) {
+      const toast = await this.toastController.create({
+        message: "No supervisor assigned to this project. Please assign a supervisor first.",
+        duration: 3000,
+        position: "top",
+        color: "warning",
+      });
+      await toast.present();
+      return;
+    }
+
+    // If there's only one supervisor, open the funding dialog directly
+    if (supervisors.length === 1) {
+      const supervisor = supervisors[0];
+      this.openSupervisorFunding(supervisor.id, supervisor.name, supervisor.hasOpeningAmount);
+      return;
+    }
+
+    // If there are multiple supervisors, show a selection (for now, just use the first one)
+    // In a future enhancement, you could add a supervisor selection dropdown
+    const supervisor = supervisors[0];
+    this.openSupervisorFunding(supervisor.id, supervisor.name, supervisor.hasOpeningAmount);
+  }
+
+  openSupervisorFunding(supervisorId: string, supervisorName: string, hasOpeningAmount: boolean) {
+    this.fundingSupervisorId.set(supervisorId);
+    this.fundingSupervisorName.set(supervisorName);
+    this.fundingHasOpeningAmount.set(hasOpeningAmount);
+    this.fundingAmount.set("");
+    this.fundingNote.set("");
+    this.fundingError.set(null);
+    this.fundingSuccess.set(null);
+    const sites = this.projectSites();
+    this.fundingSiteId.set(sites[0] || "");
+  }
+
+  closeSupervisorFunding() {
+    if (this.fundingSaving()) return;
+    this.fundingSupervisorId.set("");
+    this.fundingSupervisorName.set("");
+    this.fundingAmount.set("");
+    this.fundingNote.set("");
+    this.fundingSiteId.set("");
+    this.fundingError.set(null);
+    this.fundingSuccess.set(null);
+  }
+
+  async submitSupervisorFunding() {
+    const supervisorId = this.fundingSupervisorId();
+    const projectId = this.projectId();
+    const amount = Number(this.fundingAmount());
+    if (!supervisorId || !projectId) return;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      this.fundingError.set("Enter an amount greater than zero.");
+      return;
+    }
+
+    const wasOpeningAmount = !this.fundingHasOpeningAmount();
+    this.fundingSaving.set(true);
+    this.fundingError.set(null);
+    this.fundingSuccess.set(null);
+
+    try {
+      const response = await firstValueFrom(this.api.fundSupervisor(supervisorId, {
+        projectId,
+        siteId: this.fundingSiteId() || undefined,
+        amount,
+        note: this.fundingNote().trim() || undefined,
+      }));
+
+      const hasOpeningAmount = Boolean(response?.funding?.supervisor?.openingAmountAddedAt) || wasOpeningAmount;
+      this.fundingHasOpeningAmount.set(hasOpeningAmount);
+      this.fundingAmount.set("");
+      this.fundingNote.set("");
+      this.fundingSaving.set(false);
+      this.fundingSuccess.set(
+        wasOpeningAmount
+          ? "Opening amount added successfully. Future payments will use Add Cash."
+          : "Cash added successfully and is available in the supervisor mobile ledger.",
+      );
+
+      // Refresh the expenses to show the new transaction
+      await this.hydration.loadModule("expenses");
+    } catch (error: any) {
+      this.fundingSaving.set(false);
+      this.fundingError.set(
+        error?.error?.error || error?.error?.message || error?.message || "Could not add funds to the supervisor.",
+      );
+    }
+  }
+
+  readonly projectSupervisors = computed(() => {
+    const projectId = this.projectId();
+    if (!projectId) return [];
+    return this.data.supervisors()
+      .filter(sup => {
+        const assigned = sup.assignedProjectIds || (sup.assignedProject ? [sup.assignedProject] : []);
+        return assigned.includes(projectId);
+      })
+      .map(sup => ({
+        id: sup.id,
+        name: sup.name,
+        hasOpeningAmount: Boolean(sup.openingAmountAddedAt),
+      }));
+  });
 
   private expenseGroupKey(row: TableRow): string {
     const projectId = String(row["projectId"] || row["__projectId"] || this.projectId() || "project");

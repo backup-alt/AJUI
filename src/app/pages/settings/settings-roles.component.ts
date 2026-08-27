@@ -19,6 +19,18 @@ interface Employee {
   lastLoginAt: string;
   createdAt: string;
   projectIds: string[];
+  supervisorProfileId?: string;
+  hasOpeningAmount?: boolean;
+}
+
+interface FundingProject {
+  id: string;
+  name: string;
+  client?: string;
+  address?: string;
+  status?: string;
+  siteIds: string[];
+  siteNames: string[];
 }
 
 interface PendingInvite {
@@ -161,6 +173,9 @@ type CombinedInvite = {
                 <td><span class="settings-w11-role-pill" [attr.data-role]="e.role">{{ e.role }}</span></td>
                 <td><span class="settings-w11-status-pill" [attr.data-status]="e.status">{{ e.status }}</span></td>
                 <td>{{ formatDate(e.lastLoginAt) }}</td>
+                <td class="settings-w11-row-action">
+                  <!-- Supervisor funding moved to Project Workspace -->
+                </td>
               </tr>
             } @empty {
               <tr>
@@ -922,7 +937,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly invitePhone = signal("");
   readonly inviteRole = signal<Role>("Project Manager");
   readonly inviteProjectIds = signal<string[]>([]);
-  readonly projects = signal<{ id: string; name: string; client?: string; address?: string; status?: string }[]>([]);
+  readonly projects = signal<FundingProject[]>([]);
 
   readonly activeOnHoldProjects = computed(() => {
     return this.projects().filter((p) => p.status === "Active" || p.status === "On Hold");
@@ -1130,9 +1145,11 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         // records, not additional employees, so appending them here creates
         // duplicate partial rows with no email or login information.
         this.mergeLocalUsers();
+        this.enrichSupervisorEmployees();
       },
       error: () => {
         this.mergeLocalUsers();
+        this.enrichSupervisorEmployees();
         this.employeesLoading.set(false);
       },
     });
@@ -1161,6 +1178,34 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
         if (!duplicate) merged.push(candidate);
       }
       return merged;
+    });
+  }
+
+  private enrichSupervisorEmployees() {
+    this.api.listSupervisors({ limit: 100 }).subscribe({
+      next: (response) => {
+        const profiles = response?.items || [];
+        this.employees.update((employees) => employees.map((employee) => {
+          if (employee.role !== "Supervisor") return employee;
+          const normalizedPhone = employee.phone.replace(/\D/g, "");
+          const profile = profiles.find((row: any) =>
+            String(row.userId || "") === employee.id ||
+            (!!employee.email && String(row.email || "").trim().toLowerCase() === employee.email.trim().toLowerCase()) ||
+            (!!normalizedPhone && String(row.phone || "").replace(/\D/g, "") === normalizedPhone)
+          );
+          if (!profile) return employee;
+          const assignedProjectIds = (profile.assignedProjects || [])
+            .map((id: any) => String(id))
+            .filter(Boolean);
+          return {
+            ...employee,
+            supervisorProfileId: String(profile._id || ""),
+            hasOpeningAmount: Boolean(profile.openingAmountAddedAt),
+            projectIds: assignedProjectIds.length > 0 ? assignedProjectIds : employee.projectIds,
+          };
+        }));
+      },
+      error: () => undefined,
     });
   }
 
@@ -1211,7 +1256,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   loadProjects() {
     this.api.listProjects({ limit: 100 }).subscribe({
       next: (res) => {
-        const items: { id: string; name: string; client?: string; address?: string; status?: string }[] = [];
+        const items: FundingProject[] = [];
         for (const row of res?.items || []) {
           const id = row._id || row.id;
           if (id) {
@@ -1221,6 +1266,8 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
               client: row.client || "",
               address: row.address || "",
               status: row.status || "Active",
+              siteIds: (row.siteIds || []).map((id: any) => String(id)),
+              siteNames: (row.siteNames || row.sites || []).map((name: any) => String(name)),
             });
           }
         }
@@ -1234,6 +1281,8 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
           client: p.client,
           address: p.address,
           status: p.status,
+          siteIds: ((p as any).siteIds || []).map((id: any) => String(id)),
+          siteNames: ((p as any).sites || []).map((name: any) => String(name)),
         }));
         if (fallback.length > 0) {
           this.projects.set(fallback);

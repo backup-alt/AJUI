@@ -76,6 +76,19 @@ function numberToWords(num: number): string {
                     New Invoice
                   </button>
                 </div>
+                <div class="page-search-bar">
+                  <input
+                    type="search"
+                    class="seamless-search"
+                    placeholder="Search invoices by invoice number, client, or amount..."
+                    [value]="search()"
+                    (input)="search.set($any($event.target).value)"
+                  />
+                  <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </div>
               </section>
 
               @if (data.taxInvoices().length === 0) {
@@ -97,7 +110,7 @@ function numberToWords(num: number): string {
                       </tr>
                     </thead>
                     <tbody>
-                      @for (inv of data.taxInvoices(); track inv.id) {
+                      @for (inv of filteredInvoices(); track inv.id) {
                         <tr>
                           <td><strong>{{ inv.invoiceNumber }}</strong></td>
                           <td>{{ inv.date }}</td>
@@ -457,6 +470,35 @@ function numberToWords(num: number): string {
     }
   `,
   styles: [`
+    .page-search-bar {
+      position: relative;
+      max-width: 600px;
+      margin: 16px auto 24px;
+    }
+    .seamless-search {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #fff;
+      transition: all 0.2s ease;
+    }
+    .seamless-search:focus {
+      outline: none;
+      border-color: #002263;
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.1);
+    }
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: #9ca3af;
+      pointer-events: none;
+    }
     .section-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; }
     .section-header h2 { font-size: 20px; font-weight: 700; color: #1a2540; margin: 0; }
     .quotation-header-section { border-bottom: 1px solid #e2e8f0; }
@@ -697,6 +739,20 @@ export class TaxInvoicePage {
   readonly companyProfile = this.data.companyProfile;
 
   readonly editingInvoice = signal(false);
+  readonly search = signal("");
+  readonly filteredInvoices = computed(() => {
+    const searchTerm = this.search().toLowerCase().trim();
+    if (!searchTerm) return this.data.taxInvoices();
+    return this.data.taxInvoices().filter(inv => {
+      const client = this.data.clients().find(c => c.id === inv.clientId);
+      return (
+        inv.invoiceNumber?.toLowerCase().includes(searchTerm) ||
+        inv.clientName?.toLowerCase().includes(searchTerm) ||
+        client?.name.toLowerCase().includes(searchTerm) ||
+        String(inv.totalAmount || 0).includes(searchTerm)
+      );
+    });
+  });
   readonly editingInvoiceId = signal<string | null>(null);
   readonly saving = signal(false);
   readonly savingExcel = signal(false);

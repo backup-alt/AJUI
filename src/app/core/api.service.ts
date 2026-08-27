@@ -1115,6 +1115,19 @@ export class ApiService {
     );
   }
 
+  fundSupervisor(id: string, payload: { projectId: string; siteId?: string; amount: number; note?: string }): Observable<{ funding: any }> {
+    return this.http.post<{ funding: any }>(`${this.baseUrl}/supervisors/${id}/fund`, payload, {
+      headers: this.authHeaders(),
+    }).pipe(
+      tap(() => {
+        this.cache.invalidate("/supervisors");
+        this.cache.invalidate("/sites");
+        this.cache.invalidate("/expenses");
+      }),
+      catchError(this.handleError),
+    );
+  }
+
   // =================== MATERIALS ===================
   listMaterials(params?: { projectId?: string; siteId?: string; vendorId?: string; type?: string; status?: string; search?: string; page?: number; limit?: number; cursor?: string }): Observable<PaginatedResponse<any>> {
     let query = "";

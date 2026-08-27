@@ -22,6 +22,7 @@ type ExistingMaterial = {
   issuedAmount?: number;
   isExistingMaterial?: boolean;
   poNumber?: string;
+  createdAt?: string | Date;
 };
 
 type PoDraftLine = {
@@ -42,6 +43,21 @@ type PoDraftLine = {
   template: `
     @if (view === "list") {
       <section class="po-panel">
+        @if (!loading() && orders().length > 0) {
+          <div class="page-search-bar">
+            <input
+              type="search"
+              class="seamless-search"
+              placeholder="Search purchase orders by PO number, vendor, or project..."
+              [value]="search()"
+              (input)="search.set($any($event.target).value)"
+            />
+            <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+              <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+        }
         @if (loading()) {
           <p class="po-state">Loading purchase orders…</p>
         } @else if (orders().length === 0) {
@@ -51,7 +67,7 @@ type PoDraftLine = {
             <table class="po-list">
               <thead><tr><th>PO Number</th><th>Date</th>@if (!projectId) {<th>Project</th>}<th>Vendor</th><th>Items</th><th>Subtotal</th><th>GST</th><th>Grand Total</th></tr></thead>
               <tbody>
-                @for (order of orders(); track order._id) {
+                @for (order of filteredOrders(); track order._id) {
                   <tr (click)="requestDetail.emit(order.poNumber)">
                     <td><button type="button">{{ order.poNumber }}</button></td>
                     <td>{{ order.date }}</td>@if (!projectId) {<td>{{ order.projectName }}</td>}<td>{{ order.vendorName }}</td><td>{{ order.items.length }}</td>
@@ -188,7 +204,7 @@ type PoDraftLine = {
                                 @for (material of filteredMaterials(); track material._id) {
                                   <button type="button" [class.selected]="line.materialId === material._id" (mousedown)="$event.preventDefault()" (click)="selectMaterial(index, material._id)">
                                     <span class="po-option-main">{{ material.name }}</span>
-                                    <span class="po-option-meta">{{ materialQuantityLabel(material) }}</span>
+                                    <span class="po-option-meta">{{ materialQuantityLabel(material) }} · Created {{ materialCreatedDate(material) }}</span>
                                   </button>
                                 }
                                 @if (filteredMaterials().length === 0) { <div class="po-select-empty">No matching materials</div> }
@@ -335,6 +351,37 @@ type PoDraftLine = {
   `,
   styles: [`
     :host { display: block; }
+
+    .page-search-bar {
+      position: relative;
+      max-width: 600px;
+      margin: 16px auto 24px;
+      padding: 0 24px;
+    }
+    .seamless-search {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #fff;
+      transition: all 0.2s ease;
+    }
+    .seamless-search:focus {
+      outline: none;
+      border-color: #002263;
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.1);
+    }
+    .search-icon {
+      position: absolute;
+      left: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: #9ca3af;
+      pointer-events: none;
+    }
 
     .po-panel { background: #fff; border: 1px solid #d9e2ef; border-radius: 12px; overflow: hidden; }
     .po-state { padding: 40px 24px; text-align: center; color: #64748b; font-size: 14px; }
@@ -519,6 +566,16 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   readonly error = signal("");
   readonly exporting = signal<"" | "pdf" | "excel">("");
   readonly orders = signal<PurchaseOrder[]>([]);
+  readonly search = signal("");
+  readonly filteredOrders = computed(() => {
+    const searchTerm = this.search().toLowerCase().trim();
+    if (!searchTerm) return this.orders();
+    return this.orders().filter(order =>
+      order.poNumber?.toLowerCase().includes(searchTerm) ||
+      order.vendorName?.toLowerCase().includes(searchTerm) ||
+      order.projectName?.toLowerCase().includes(searchTerm)
+    );
+  });
   readonly selectedOrder = signal<PurchaseOrder | null>(null);
   readonly editingId = signal("");
   readonly vendors = signal<any[]>([]);
@@ -693,6 +750,21 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   materialQuantityLabel(material: ExistingMaterial) {
     const approved = Number(material.approvedQuantity) || 0;
     return approved > 0 ? `Approved: ${approved} ${material.unit}` : "Set quantity in PO";
+  }
+
+  materialCreatedDate(material: ExistingMaterial) {
+    if (!material.createdAt) return "date unknown";
+    const date = new Date(material.createdAt);
+    if (isNaN(date.getTime())) return "date unknown";
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "today";
+    if (diffDays === 1) return "yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return date.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
   }
 
   setExistingLine(index: number) { this.updateLineObject(index, { source: "existing", materialId: "", description: "", unit: "", quantity: 0, amount: 0 }); }

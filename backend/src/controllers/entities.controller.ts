@@ -219,6 +219,24 @@ export async function getSupervisor(req: Request, res: Response, next: NextFunct
   } catch (e) { next(e); }
 }
 
+export async function fundSupervisor(req: Request, res: Response, next: NextFunction) {
+  try {
+    const funding = await supervisorService.fundSupervisor(
+      req.params.id,
+      req.body,
+      "Admin",
+    );
+    invalidateCachePrefix("/api/supervisors");
+    invalidateCachePrefix("/api/sites");
+    invalidateCachePrefix("/api/expenses");
+    invalidateCachePrefix("/api/supervisor/sites");
+    invalidateCachePrefix("/api/supervisor/expenses");
+    invalidateCachePrefix("/api/supervisor/dashboard");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.status(201).json({ funding });
+  } catch (e) { next(e); }
+}
+
 export async function updateSupervisor(req: Request, res: Response, next: NextFunction) {
   try {
     const scopeProjectIds = await getScopedProjectIds(req);

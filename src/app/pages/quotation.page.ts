@@ -80,6 +80,19 @@ function numberToWords(num: number): string {
                     New Quotation
                   </button>
                 </div>
+                <div class="page-search-bar">
+                  <input
+                    type="search"
+                    class="seamless-search"
+                    placeholder="Search quotations by client, quote number, or amount..."
+                    [value]="search()"
+                    (input)="search.set($any($event.target).value)"
+                  />
+                  <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </div>
               </section>
 
               @if (data.quotations().length === 0) {
@@ -101,7 +114,7 @@ function numberToWords(num: number): string {
                       </tr>
                     </thead>
                     <tbody>
-                      @for (quote of data.quotations(); track quote.id) {
+                      @for (quote of filteredQuotations(); track quote.id) {
                         <tr>
                           <td><strong>{{ quote.quotationNumber }}</strong></td>
                           <td>{{ quote.date }}</td>
@@ -460,6 +473,35 @@ function numberToWords(num: number): string {
     }
   `,
   styles: [`
+    .page-search-bar {
+      position: relative;
+      max-width: 600px;
+      margin: 16px auto 24px;
+    }
+    .seamless-search {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #fff;
+      transition: all 0.2s ease;
+    }
+    .seamless-search:focus {
+      outline: none;
+      border-color: #002263;
+      box-shadow: 0 0 0 3px rgba(0, 34, 99, 0.1);
+    }
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: #9ca3af;
+      pointer-events: none;
+    }
     .quotation-page {
       padding: 24px;
       max-width: 1200px;
@@ -1174,6 +1216,20 @@ export class QuotationPage {
   readonly states = INDIAN_STATES;
 
   readonly editingQuotation = signal(false);
+  readonly search = signal("");
+  readonly filteredQuotations = computed(() => {
+    const searchTerm = this.search().toLowerCase().trim();
+    if (!searchTerm) return this.data.quotations();
+    return this.data.quotations().filter(quote => {
+      const client = this.data.clients().find(c => c.id === quote.clientId);
+      return (
+        quote.quotationNumber?.toLowerCase().includes(searchTerm) ||
+        quote.clientName?.toLowerCase().includes(searchTerm) ||
+        client?.name.toLowerCase().includes(searchTerm) ||
+        String(quote.totalAmount || 0).includes(searchTerm)
+      );
+    });
+  });
   readonly showAddColumnInput = signal(false);
   readonly newColumnName = signal("");
 readonly savingPdf = signal(false);

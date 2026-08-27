@@ -2,14 +2,17 @@ import { Types } from "mongoose";
 import { Supervisor } from "../models/Supervisor.js";
 import { Site } from "../models/Site.js";
 import { Project } from "../models/Project.js";
+import { Expense } from "../models/Expense.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import {
   CreateSupervisorInput,
+  FundSupervisorInput,
   UpdateSupervisorInput,
 } from "../schemas/entities.schema.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
+import { recomputeSiteLedger } from "./expense.service.js";
 
 type SiteAssignmentInput = {
   assignedSite?: string;
@@ -189,6 +192,119 @@ export async function getSupervisorById(id: string, scopeProjectIds?: ProjectSco
   const supervisor = await Supervisor.findOne(query).lean();
   if (!supervisor) throw new AppError(404, "Supervisor not found");
   return supervisor;
+}
+
+export async function fundSupervisor(
+  id: string,
+  input: FundSupervisorInput,
+  adminName: string,
+) {
+  const supervisor = await Supervisor.findById(id);
+  if (!supervisor) throw new AppError(404, "Supervisor not found");
+
+  const projectId = new Types.ObjectId(input.projectId);
+  const isAssigned = [supervisor.assignedProjectId, ...(supervisor.assignedProjects || [])]
+    .filter(Boolean)
+    .some((assignedId) => String(assignedId) === projectId.toString());
+  const project = await Project.findById(projectId).lean();
+  if (!project || (!isAssigned && String(project.supervisorId || "") !== supervisor._id.toString())) {
+    throw new AppError(400, "Select a project assigned to this supervisor");
+  }
+
+  let site: { _id: Types.ObjectId; name: string } | null = null;
+  if (input.siteId) {
+    site = await Site.findOne({
+      _id: new Types.ObjectId(input.siteId),
+      projectIds: projectId,
+    }).select("_id name").lean();
+    if (!site) throw new AppError(400, "Select a site belonging to the assigned project");
+  } else if (project.siteIds?.length) {
+    site = await Site.findOne({ _id: project.siteIds[0], projectIds: projectId })
+      .select("_id name")
+      .lean();
+  }
+
+  const siteName = site?.name || project.siteNames?.[0] || "Project";
+  const amount = Number(input.amount);
+  const isOpeningAmount = !supervisor.openingAmountAddedAt;
+
+  if (isOpeningAmount) {
+    let openingExpense: Record<string, unknown> | undefined;
+    if (site) {
+      await Site.updateOne({ _id: site._id }, { $set: { openingBalance: amount } });
+    } else {
+      const expense = await Expense.create({
+        expenseId: await generateId("EXP"),
+        type: "site",
+        projectId,
+        projectName: project.name,
+        clientId: project.clientId,
+        site: siteName,
+        supervisor: supervisor.name,
+        supervisorId: supervisor._id,
+        transactionType: "Cash Added",
+        amount,
+        runningBalance: 0,
+        date: new Date().toISOString().slice(0, 10),
+        description: input.note || `Opening amount added to ${supervisor.name}`,
+        notes: input.note,
+        status: "Approved",
+        submittedBy: adminName,
+        approvedBy: adminName,
+        approvedAt: new Date(),
+      });
+      openingExpense = expense.toObject() as unknown as Record<string, unknown>;
+    }
+    supervisor.openingAmountAddedAt = new Date();
+    supervisor.activeAdvances = amount;
+    await supervisor.save();
+    await recomputeSiteLedger(projectId, siteName);
+    return {
+      kind: "opening" as const,
+      amount,
+      projectId: projectId.toString(),
+      siteId: site?._id.toString(),
+      site: siteName,
+      expense: openingExpense,
+      supervisor: supervisor.toObject(),
+    };
+  }
+
+  const expense = await Expense.create({
+    expenseId: await generateId("EXP"),
+    type: "site",
+    projectId,
+    projectName: project.name,
+    clientId: project.clientId,
+    siteId: site?._id,
+    site: siteName,
+    supervisor: supervisor.name,
+    supervisorId: supervisor._id,
+    transactionType: "Cash Added",
+    amount,
+    runningBalance: 0,
+    date: new Date().toISOString().slice(0, 10),
+    description: input.note || `Cash added to ${supervisor.name}`,
+    notes: input.note,
+    status: "Approved",
+    submittedBy: adminName,
+    approvedBy: adminName,
+    approvedAt: new Date(),
+  });
+  supervisor.activeAdvances = Number(supervisor.activeAdvances || 0) + amount;
+  await supervisor.save();
+  await recomputeSiteLedger(projectId, siteName);
+  const refreshedExpense = await Expense.findById(expense._id).lean();
+
+  return {
+    kind: "cash" as const,
+    amount,
+    projectId: projectId.toString(),
+    siteId: site?._id.toString(),
+    site: siteName,
+    expense: refreshedExpense,
+    supervisor: supervisor.toObject(),
+  };
 }
 
 /**
