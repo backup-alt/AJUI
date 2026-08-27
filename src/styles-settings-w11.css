@@ -586,6 +586,12 @@
   /* Subtle hover: slight brightness lift, no jarring color change */
   background: #2a3a6e !important;
   border-color: #2a3a6e !important;
+  color: #ffffff !important;
+}
+
+.settings-w11-btn-invite:hover:not(:disabled) svg {
+  color: #ffffff !important;
+  stroke: currentColor;
 }
 
 .settings-w11-btn-invite:disabled {
@@ -792,10 +798,10 @@
 
 .settings-w11-enable-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 20px 0 16px;
+  padding: 20px;
 }
 
 .settings-w11-enable-text {
@@ -820,7 +826,7 @@
 
 .settings-w11-switch {
   flex-shrink: 0;
-  margin-top: 2px;
+  margin: 0;
 }
 
 .settings-w11-toggle-row input[type="checkbox"] {
@@ -899,6 +905,35 @@
 
 .settings-w11-switch input:checked + .settings-w11-switch-slider::before {
   transform: translateX(20px);
+}
+
+.settings-w11-switch input:disabled + .settings-w11-switch-slider {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.settings-w11-schedule-loading {
+  display: grid;
+  gap: 10px;
+  padding: 20px 0;
+}
+
+.settings-w11-schedule-loading span {
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+  background-size: 200% 100%;
+  animation: settings-w11-schedule-shimmer 1.2s ease-in-out infinite;
+}
+
+.settings-w11-schedule-loading span:nth-child(1) { width: 38%; }
+.settings-w11-schedule-loading span:nth-child(2) { width: 72%; }
+.settings-w11-schedule-loading span:nth-child(3) { width: 55%; }
+
+@keyframes settings-w11-schedule-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 /* CALLOUT (info banner) */

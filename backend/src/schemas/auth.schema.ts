@@ -54,6 +54,17 @@ export const changePasswordSchema = z.object({
   }),
 });
 
+export const updateMeSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(2).max(100).optional(),
+    email: emailSchema.optional(),
+    phone: phoneSchema.optional(),
+  }).refine(
+    (data) => data.name !== undefined || data.email !== undefined || data.phone !== undefined,
+    { message: "At least one profile field is required" },
+  ),
+});
+
 export const verifyInviteSchema = z.object({
   params: z.object({
     token: z.string().min(1),

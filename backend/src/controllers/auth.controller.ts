@@ -10,6 +10,7 @@ import {
   verifyInviteSchema,
   supervisorSignupSchema,
   changePasswordSchema,
+  updateMeSchema,
 } from "../schemas/auth.schema.js";
 import { User } from "../models/User.js";
 import { Project } from "../models/Project.js";
@@ -244,6 +245,32 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
     if (!req.user?.sub) throw new AppError(401, "Not authenticated");
     const user = await authService.getUserById(req.user.sub);
     res.json({ user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateMe(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user?.sub) throw new AppError(401, "Not authenticated");
+    const patch = updateMeSchema.shape.body.parse(req.body);
+    const user = await User.findById(req.user.sub);
+    if (!user) throw new AppError(404, "User not found");
+
+    if (patch.email && patch.email !== user.email) {
+      const emailInUse = await User.exists({ email: patch.email, _id: { $ne: user._id } });
+      if (emailInUse) throw new AppError(409, "Email is already in use");
+      user.email = patch.email;
+    }
+    if (patch.phone && patch.phone !== user.phone) {
+      const phoneInUse = await User.exists({ phone: patch.phone, _id: { $ne: user._id } });
+      if (phoneInUse) throw new AppError(409, "Phone number is already in use");
+      user.phone = patch.phone;
+    }
+    if (patch.name) user.name = patch.name;
+    await user.save();
+
+    res.json({ user: await authService.getUserById(user._id.toString()) });
   } catch (err) {
     next(err);
   }

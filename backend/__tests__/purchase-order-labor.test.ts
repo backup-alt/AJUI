@@ -401,6 +401,7 @@ describe("Purchase order workflow", () => {
         projectId: project._id.toString(),
         vendorId: vendor._id.toString(),
         date: "2026-08-13",
+        paymentMode: "UPI",
         roundOff: -0.25,
         items: [
           { source: "existing", materialId: material._id.toString(), rate: 8, gstPercent: 5 },
@@ -415,9 +416,23 @@ describe("Purchase order workflow", () => {
 
     const allocated = await Material.findById(material._id).lean();
     expect(allocated?.poNumber).toBe(response.body.purchaseOrder.poNumber);
+    expect(allocated?.paymentType).toBe("UPI");
     const manual = await Material.findOne({ projectId: project._id, name: "PVC Pipe" }).lean();
     expect(manual?.approvedQuantity).toBe(50);
     expect(manual?.poNumber).toBe(response.body.purchaseOrder.poNumber);
+    expect(manual?.paymentType).toBe("UPI");
+
+    await Material.updateOne({ _id: material._id }, { $unset: { paymentType: "" } });
+    const legacyVendorRows = await request(app)
+      .get(`/api/materials?projectId=${project._id.toString()}&page=1&limit=25`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(legacyVendorRows.status).toBe(200);
+    expect(legacyVendorRows.body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        materialId: material.materialId,
+        paymentType: "UPI",
+      }),
+    ]));
 
     const mobileMaterials = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
       projectId: project._id.toString(),
@@ -434,6 +449,9 @@ describe("Purchase order workflow", () => {
     expect(detail.status).toBe(200);
     expect(detail.body.purchaseOrder.items).toHaveLength(2);
 
+    // A legacy material may be missing its denormalized poNumber. The PO
+    // item itself must still prevent it from appearing in another order.
+    await Material.updateOne({ _id: material._id }, { $unset: { poNumber: "" } });
     const duplicate = await request(app)
       .post("/api/purchase-orders")
       .set("Authorization", `Bearer ${token}`)
@@ -511,6 +529,7 @@ describe("Purchase order workflow", () => {
       .send({
         vendorId: vendor2._id.toString(),
         date: "2026-08-14",
+        paymentMode: "Cash",
         roundOff: 0.5,
         items: [
           { source: "existing", materialId: secondMaterial._id.toString(), rate: 310, gstPercent: 18 },
@@ -528,11 +547,14 @@ describe("Purchase order workflow", () => {
 
     const freed = await Material.findById(material._id).lean();
     expect(String(freed?.poNumber || "")).toBe("");
+    expect(freed?.paymentType).toBeUndefined();
     const newlyClaimed = await Material.findById(secondMaterial._id).lean();
     expect(newlyClaimed?.poNumber).toBe(po.poNumber);
+    expect(newlyClaimed?.paymentType).toBe("Cash");
     const renamed = await Material.findById(manualMaterial!._id).lean();
     expect(renamed?.name).toBe("PVC Pipe 4inch");
     expect(renamed?.approvedQuantity).toBe(60);
+    expect(renamed?.paymentType).toBe("Cash");
 
     const detail = await request(app)
       .get(`/api/purchase-orders/${po.poNumber}`)

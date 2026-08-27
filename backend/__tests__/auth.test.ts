@@ -66,6 +66,17 @@ describe("Auth endpoints", () => {
     const res = await request(app).get("/api/auth/me");
     expect(res.status).toBe(401);
   });
+
+  it("PATCH /api/auth/me - updates the signed-in user's profile", async () => {
+    if (!app) return;
+    const updated = await request(app)
+      .patch("/api/auth/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "AGB Admin" });
+    expect(updated.status).toBe(200);
+    expect(updated.body.user.name).toBe("AGB Admin");
+    expect(updated.body.user.phone).toBe("+919999999999");
+  });
 });
 
 describe("Client CRUD", () => {

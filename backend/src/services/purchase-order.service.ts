@@ -86,6 +86,14 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
     ? await Material.find({ _id: { $in: existingItemIds }, projectId: project._id }).lean()
     : [];
   if (existingMaterials.length !== existingItemIds.length) throw new AppError(404, "One or more project materials were not found");
+  const existingAllocation = existingItemIds.length
+    ? await PurchaseOrder.findOne({ "items.materialId": { $in: existingMaterials.map((material) => material._id) } })
+      .select("poNumber")
+      .lean()
+    : null;
+  if (existingAllocation) {
+    throw new AppError(409, `One or more selected materials are already allocated to ${existingAllocation.poNumber}`);
+  }
   const existingById = new Map(existingMaterials.map((material) => [material._id.toString(), material]));
 
   // Validate every line before creating manual materials, so a malformed
@@ -156,6 +164,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
         vendor: vendor.name,
         vendorId: vendor._id,
         poNumber,
+        paymentType: input.paymentMode,
         requestDate: input.date,
         orderedDate: input.date,
         approvalDate: input.date,
@@ -195,7 +204,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
           projectId: project._id,
           $or: [{ poNumber: { $exists: false } }, { poNumber: "" }, { poNumber: "Pending" }, { poNumber: null }],
         },
-        { $set: { poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date } },
+        { $set: { poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date, paymentType: input.paymentMode } },
       );
       if (claimed.modifiedCount !== existingIds.length) {
         throw new AppError(409, "One or more approved materials were allocated by another purchase order");
@@ -225,7 +234,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
   } catch (error) {
     await Promise.all([
       existingIds.length
-        ? Material.updateMany({ _id: { $in: existingIds }, poNumber }, { $unset: { poNumber: "" } })
+        ? Material.updateMany({ _id: { $in: existingIds }, poNumber }, { $unset: { poNumber: "", paymentType: "" } })
         : Promise.resolve(),
       existingIds.length
         ? Inventory.updateMany({ lastMaterialId: { $in: existingIds }, poNumber }, { $unset: { poNumber: "" } })
@@ -265,6 +274,15 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     ? await Material.find({ _id: { $in: newExistingIds }, projectId: project._id }).lean()
     : [];
   if (existingMaterials.length !== newExistingIds.length) throw new AppError(404, "One or more project materials were not found");
+  const conflictingAllocation = newExistingIds.length
+    ? await PurchaseOrder.findOne({
+      _id: { $ne: purchaseOrder._id },
+      "items.materialId": { $in: existingMaterials.map((material) => material._id) },
+    }).select("poNumber").lean()
+    : null;
+  if (conflictingAllocation) {
+    throw new AppError(409, `One or more selected materials are already allocated to ${conflictingAllocation.poNumber}`);
+  }
   const existingById = new Map(existingMaterials.map((material) => [material._id.toString(), material]));
 
   const toClaim = new Set<string>();
@@ -341,7 +359,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
       if (materialId && previousManualIds.includes(materialId)) {
         material = await Material.findByIdAndUpdate(
           materialId,
-          { $set: { name: description, unit, requestedQuantity: quantity, approvedQuantity: quantity, purchasedQuantity: quantity } },
+          { $set: { name: description, unit, requestedQuantity: quantity, approvedQuantity: quantity, purchasedQuantity: quantity, paymentType: input.paymentMode } },
           { new: true },
         ).lean();
       } else if (materialId) {
@@ -365,6 +383,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
           vendor: vendor.name,
           vendorId: vendor._id,
           poNumber: purchaseOrder.poNumber,
+          paymentType: input.paymentMode,
           requestDate: input.date,
           orderedDate: input.date,
           approvalDate: input.date,
@@ -405,7 +424,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
           projectId: project._id,
           $or: [{ poNumber: { $exists: false } }, { poNumber: "" }, { poNumber: "Pending" }, { poNumber: null }],
         },
-        { $set: { poNumber: purchaseOrder.poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date } },
+        { $set: { poNumber: purchaseOrder.poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date, paymentType: input.paymentMode } },
       );
       if (claimed.modifiedCount !== claimIds.length) {
         throw new AppError(409, "One or more approved materials were allocated by another purchase order");
@@ -414,7 +433,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     if (toUnclaim.length) {
       await Material.updateMany(
         { _id: { $in: toUnclaim }, poNumber: purchaseOrder.poNumber },
-        { $unset: { poNumber: "" } },
+        { $unset: { poNumber: "", paymentType: "" } },
       );
     }
     if (claimIds.length) {
@@ -430,6 +449,18 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
       );
     }
 
+    await Material.updateMany(
+      { _id: { $in: normalized.map((item) => item.materialId) } },
+      {
+        $set: {
+          vendor: vendor.name,
+          vendorId: vendor._id,
+          orderedDate: input.date,
+          paymentType: input.paymentMode,
+        },
+      },
+    );
+
     purchaseOrder.vendorId = vendor._id;
     purchaseOrder.vendorName = vendor.name;
     purchaseOrder.date = input.date;
@@ -444,10 +475,20 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
   } catch (error) {
     await Promise.all([
       claimIds.length
-        ? Material.updateMany({ _id: { $in: claimIds }, poNumber: purchaseOrder.poNumber }, { $unset: { poNumber: "" } })
+        ? Material.updateMany({ _id: { $in: claimIds }, poNumber: purchaseOrder.poNumber }, { $unset: { poNumber: "", paymentType: "" } })
         : Promise.resolve(),
       toUnclaim.length
-        ? Material.updateMany({ _id: { $in: toUnclaim } }, { $set: { poNumber: purchaseOrder.poNumber, vendor: vendor.name, vendorId: vendor._id } })
+        ? Material.updateMany(
+          { _id: { $in: toUnclaim } },
+          {
+            $set: {
+              poNumber: purchaseOrder.poNumber,
+              vendor: purchaseOrder.vendorName,
+              vendorId: purchaseOrder.vendorId,
+              paymentType: purchaseOrder.paymentMode,
+            },
+          },
+        )
         : Promise.resolve(),
       createdManualIds.length
         ? Material.deleteMany({ _id: { $in: createdManualIds }, poNumber: purchaseOrder.poNumber })

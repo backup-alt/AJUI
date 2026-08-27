@@ -3,6 +3,7 @@ import { IMaterial, Material } from "../models/Material.js";
 import { Project } from "../models/Project.js";
 import { Client } from "../models/Client.js";
 import { Vendor } from "../models/Vendor.js";
+import { PurchaseOrder } from "../models/PurchaseOrder.js";
 import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
@@ -130,6 +131,7 @@ export async function createMaterial(input: CreateMaterialInput) {
     vendor: input.vendor || vendor?.name,
     vendorId: input.vendorId ? new Types.ObjectId(input.vendorId) : vendor?.vendorId,
     poNumber: input.poNumber,
+    paymentType: input.paymentType,
     requestDate: input.requestDate,
     approvalDate: input.approvedQuantity ? new Date().toISOString().slice(0, 10) : undefined,
     status: "Not Received",
@@ -332,6 +334,30 @@ export async function listMaterials(filter: {
     }
   } catch (err) {
     console.warn("[listMaterials] site-name lookup failed (returning items anyway):", (err as Error).message);
+  }
+
+  // PurchaseOrder is the source of truth for PO payment modes. Enrich
+  // legacy material rows that predate the denormalized paymentType field,
+  // and keep the vendor view current when a purchase order is edited.
+  try {
+    const poNumbers = [...new Set(
+      items.map((item) => String(item.poNumber || "").trim()).filter(Boolean),
+    )];
+    if (poNumbers.length > 0) {
+      const purchaseOrders = await PurchaseOrder.find({ poNumber: { $in: poNumbers } })
+        .select("poNumber paymentMode")
+        .lean()
+        .maxTimeMS(10_000);
+      const paymentModeByPo = new Map(
+        purchaseOrders.map((order) => [order.poNumber, order.paymentMode]),
+      );
+      items.forEach((item) => {
+        const paymentMode = paymentModeByPo.get(String(item.poNumber || "").trim());
+        if (paymentMode) item.paymentType = paymentMode;
+      });
+    }
+  } catch (err) {
+    console.warn("[listMaterials] PO payment-mode lookup failed (returning items anyway):", (err as Error).message);
   }
 
   const typedItems = items as unknown as IMaterial[];

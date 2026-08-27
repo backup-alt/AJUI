@@ -1330,7 +1330,7 @@ export class ApiService {
   }
 
   // =================== ACCOUNT ===================
-  patchMe(payload: { name?: string; phone?: string }): Observable<{ user: ApiUser }> {
+  patchMe(payload: { name?: string; email?: string; phone?: string }): Observable<{ user: ApiUser }> {
     return this.http.patch<{ user: ApiUser }>(`${this.baseUrl}/auth/me`, payload, { headers: this.authHeaders() }).pipe(
       tap((res) => this.userSignal.set(res.user)),
       catchError(this.handleError)

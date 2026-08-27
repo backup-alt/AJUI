@@ -33,7 +33,9 @@ interface AccessWindow {
           <h1>Access Schedule</h1>
           <p>Define time windows where only admins can log in. Useful for maintenance, payroll, or sensitive data updates.</p>
         </div>
-        <button type="button" class="settings-w11-btn settings-w11-btn-primary" [class.settings-w11-btn-dirty]="dirty()" (click)="save()">Save Schedule</button>
+        <button type="button" class="settings-w11-btn settings-w11-btn-primary" [class.settings-w11-btn-dirty]="dirty()" [disabled]="loading() || saving()" (click)="save()">
+          {{ saving() ? 'Saving…' : 'Save Schedule' }}
+        </button>
       </div>
     </div>
 
@@ -52,7 +54,7 @@ interface AccessWindow {
           <small>When ON, the schedule below is enforced. When OFF, all users can access at any time.</small>
         </div>
         <label class="settings-w11-switch">
-          <input type="checkbox" [checked]="enabled()" (change)="setEnabled($any($event.target).checked)" />
+          <input type="checkbox" [checked]="enabled()" [disabled]="loading()" (change)="setEnabled($any($event.target).checked)" />
           <span class="settings-w11-switch-slider"></span>
         </label>
       </div>
@@ -74,13 +76,20 @@ interface AccessWindow {
           <h2>Restricted Windows</h2>
           <p>Define time periods when only admins can access the app.</p>
         </div>
-        <button type="button" class="settings-w11-btn settings-w11-btn-ghost" (click)="addWindow()">
+        <button type="button" class="settings-w11-btn settings-w11-btn-ghost" [disabled]="loading()" (click)="addWindow()">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10 M3 8h10" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
           Add Window
         </button>
       </div>
       <div class="settings-w11-card-body">
-        @for (w of windows(); track w.id; let i = $index) {
+        @if (loading()) {
+          <div class="settings-w11-schedule-loading" aria-live="polite" aria-label="Loading access schedule">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        } @else {
+          @for (w of windows(); track w.id; let i = $index) {
           <div class="settings-w11-window-card" [class.disabled]="!w.isActive">
             <header class="settings-w11-window-head">
               <div>
@@ -142,10 +151,11 @@ interface AccessWindow {
               </div>
             </div>
           </div>
-        } @empty {
-          <div class="settings-w11-empty">
-            <p>No restricted windows defined. All users can access at any time.</p>
-          </div>
+          } @empty {
+            <div class="settings-w11-empty">
+              <p>No restricted windows defined. All users can access at any time.</p>
+            </div>
+          }
         }
       </div>
     </section>
@@ -162,6 +172,7 @@ export class SettingsAccessScheduleComponent implements OnInit {
   readonly logAttempts = signal(true);
   readonly dirty = signal(false);
   readonly saving = signal(false);
+  readonly loading = signal(true);
 
   private markDirty() {
     this.dirty.set(true);
@@ -189,9 +200,11 @@ export class SettingsAccessScheduleComponent implements OnInit {
             createdBy: w.createdBy || "You",
           })));
         }
+        this.loading.set(false);
       },
       error: () => {
-        // Keep defaults
+        this.windows.set([]);
+        this.loading.set(false);
       },
     });
   }
@@ -213,19 +226,7 @@ export class SettingsAccessScheduleComponent implements OnInit {
 
   readonly allDays: DayOfWeek[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  readonly windows = signal<AccessWindow[]>([
-    {
-      id: "W-1",
-      startTime: "23:00",
-      endTime: "07:00",
-      days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-      appliesTo: ["project_manager", "accountant"],
-      note: "Daily maintenance window",
-      isActive: true,
-      createdAt: new Date().toISOString().slice(0, 10),
-      createdBy: "You",
-    },
-  ]);
+  readonly windows = signal<AccessWindow[]>([]);
 
   readonly isCurrentlyRestricted = computed(() => {
     if (!this.enabled()) return false;

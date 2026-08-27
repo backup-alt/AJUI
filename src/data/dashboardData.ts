@@ -59,7 +59,7 @@ export type MaterialRow = {
   givenAmount?: number;
   isExistingMaterial?: boolean;
   orderedDate?: string;
-  paymentType?: "Cash" | "NEFT" | "Bank Transfer" | "UPI" | "Cheque";
+  paymentType?: string;
   deliveredOn?: string;
   billUrl?: string;
   receiptImage?: string;

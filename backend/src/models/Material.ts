@@ -25,6 +25,7 @@ export interface IMaterial extends Document {
   vendor?: string;
   vendorId?: Types.ObjectId;
   poNumber?: string;
+  paymentType?: string;
   requestDate: string;
   receivedDate?: string;
   approvalDate?: string;
@@ -70,6 +71,7 @@ const materialSchema = new Schema<IMaterial>(
     vendor: { type: String, trim: true },
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor" },
     poNumber: { type: String, trim: true },
+    paymentType: { type: String, trim: true, maxlength: 50 },
     requestDate: { type: String, required: true, index: true },
     receivedDate: { type: String, index: true },
     approvalDate: { type: String },

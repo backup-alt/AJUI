@@ -16,6 +16,7 @@ export const createMaterialSchema = z.object({
     vendor: z.string().trim().optional(),
     vendorId: objectIdSchema.optional(),
     poNumber: z.string().trim().optional(),
+    paymentType: z.string().trim().min(1).max(50).optional(),
     requestDate: z.string().min(1),
     receivedDate: z.string().optional(),
     issuedAmount: z.coerce.number().nonnegative().optional(),

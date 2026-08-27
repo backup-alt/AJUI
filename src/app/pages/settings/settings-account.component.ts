@@ -170,7 +170,11 @@ export class SettingsAccountComponent {
     this.message.set(null);
     this.saving.set(true);
 
-    this.api.patchMe({ name: this.name().trim(), phone: this.phone().trim() }).subscribe({
+    this.api.patchMe({
+      name: this.name().trim(),
+      email: this.email().trim(),
+      phone: this.phone().trim(),
+    }).subscribe({
       next: () => {
         this.saving.set(false);
         this.message.set("Profile updated successfully.");
@@ -178,7 +182,7 @@ export class SettingsAccountComponent {
       error: (err) => {
         this.saving.set(false);
         this.isError.set(true);
-        this.message.set(err?.message || "Failed to update profile. Please try again.");
+        this.message.set(err?.error?.error || err?.message || "Failed to update profile. Please try again.");
       },
     });
   }

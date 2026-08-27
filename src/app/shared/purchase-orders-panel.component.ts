@@ -192,7 +192,6 @@ type PoDraftLine = {
                                   </button>
                                 }
                                 @if (filteredMaterials().length === 0) { <div class="po-select-empty">No matching materials</div> }
-                                <button type="button" class="po-select-create" (mousedown)="$event.preventDefault()" (click)="selectNewMaterial(index)">+ Add New Material</button>
                               </div>
                             }
                           </div>
@@ -531,7 +530,23 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   readonly menuSearch = signal("");
   readonly filteredProjects = computed(() => filterByName(this.projects(), this.menuSearch(), "name"));
   readonly filteredVendors = computed(() => filterByName(this.vendors(), this.menuSearch(), "name"));
-  readonly filteredMaterials = computed(() => filterByName(this.materials(), this.menuSearch(), "name"));
+  readonly selectableMaterials = computed(() => {
+    const editingOrder = this.editingId() ? this.selectedOrder() : null;
+    const editingMaterialIds = new Set(
+      (editingOrder?.items || []).map((item) => String(item.materialId || "")),
+    );
+    const allocatedMaterialIds = new Set(
+      this.orders()
+        .filter((order) => !editingOrder || order._id !== editingOrder._id)
+        .flatMap((order) => order.items || [])
+        .map((item) => String(item.materialId || "")),
+    );
+
+    return this.materials().filter((material) =>
+      editingMaterialIds.has(material._id) || !allocatedMaterialIds.has(material._id),
+    );
+  });
+  readonly filteredMaterials = computed(() => filterByName(this.selectableMaterials(), this.menuSearch(), "name"));
   readonly selectedProjectName = computed(() => {
     if (this.view === "edit") return this.selectedOrder()?.projectName ?? "";
     return this.projects().find((p) => p._id === this.draftProjectId())?.name ?? "";
@@ -634,7 +649,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   }
 
   selectMaterial(index: number, materialId: string) {
-    const material = this.materials().find((item) => item._id === materialId);
+    const material = this.selectableMaterials().find((item) => item._id === materialId);
     if (!material) return;
     const quantity = this.defaultQuantityFor(material);
     const knownAmount = Number(material.givenAmount ?? material.issuedAmount ?? 0);
@@ -645,7 +660,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   private applyPreselectedMaterials() {
     if (!this.preselectedMaterialIds.length) return;
     const selected = new Set(this.preselectedMaterialIds);
-    const rows = this.materials()
+    const rows = this.selectableMaterials()
       .filter((material) => selected.has(material._id))
       .map((material) => this.draftLineForMaterial(material));
     if (rows.length) this.lines.set(rows);
@@ -703,7 +718,10 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     if (!this.vendorId()) { this.error.set("Select a vendor."); return; }
     if (!this.paymentMode()) { this.error.set("Select a payment mode."); return; }
     const invalid = this.lines().some((line) => line.source === "existing"
-      ? !line.materialId || line.quantity <= 0 || (this.approvedQuantityFor(line) !== null && line.quantity > Number(this.approvedQuantityFor(line)))
+      ? !line.materialId
+        || !this.selectableMaterials().some((material) => material._id === line.materialId)
+        || line.quantity <= 0
+        || (this.approvedQuantityFor(line) !== null && line.quantity > Number(this.approvedQuantityFor(line)))
       : !line.description.trim() || !line.unit.trim() || line.quantity <= 0);
     if (invalid) { this.error.set("Complete every purchase order line."); return; }
     if (this.grandTotal() <= 0) { this.error.set("Purchase order total must be greater than ₹0. Enter an amount before saving."); return; }
@@ -728,6 +746,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       const response = editingId
         ? await firstValueFrom(this.api.updatePurchaseOrder(editingId, payload))
         : await firstValueFrom(this.api.createPurchaseOrder({ ...payload, projectId: this.draftProjectId() }));
+      this.syncSavedOrderMaterials(response.purchaseOrder);
       this.editingId.set("");
       await this.loadOrders();
       this.selectedOrder.set(response.purchaseOrder);
@@ -797,6 +816,23 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     if (local) { this.selectedOrder.set(local); return; }
     try { const response = await firstValueFrom(this.api.getPurchaseOrder(value)); this.selectedOrder.set(response.purchaseOrder); }
     catch { this.error.set("Purchase order could not be opened."); }
+  }
+
+  private syncSavedOrderMaterials(order: PurchaseOrder) {
+    const materialIds = new Set((order.items || []).map((item) => String(item.materialId || "")));
+    this.data.materials.update((rows) => rows.map((row) => {
+      const databaseId = String((row as any)._id || "");
+      if (!materialIds.has(databaseId)) return row;
+      return {
+        ...row,
+        poNumber: order.poNumber,
+        vendor: order.vendorName,
+        vendorId: order.vendorId,
+        orderedDate: order.date,
+        purchasedDate: order.date,
+        paymentType: order.paymentMode,
+      };
+    }));
   }
 
   async downloadPdf() {
@@ -954,11 +990,6 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   selectVendorFromMenu(vendorId: string) {
     this.vendorId.set(vendorId);
     this.openMenu.set("");
-  }
-
-  selectNewMaterial(index: number) {
-    this.openMenu.set("");
-    this.updateLineObject(index, { source: "manual", materialId: "", description: "", unit: "", quantity: 0, amount: 0 });
   }
 
   private resetDraft() { this.openMenu.set(""); this.editingId.set(""); this.draftProjectId.set(""); this.vendorId.set(""); this.date.set(new Date().toISOString().slice(0, 10)); this.paymentMode.set("Bank Transfer"); this.roundOff.set(0); this.lines.set([this.emptyLine()]); this.materials.set([]); this.error.set(""); }

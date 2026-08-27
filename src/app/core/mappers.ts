@@ -143,6 +143,7 @@ export function mapMaterial(m: any): any {
     vendor: m.vendor,
     vendorId: m.vendorId,
     poNumber: m.poNumber,
+    paymentType: m.paymentType,
     billUrl: billUrlFor(m),
     issuedAmount: m.issuedAmount,
     givenAmount: m.givenAmount,
