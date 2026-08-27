@@ -6422,8 +6422,10 @@ export class ProjectWorkspacePage {
   }
 
   async openAddOpeningCash() {
-    const supervisors = this.projectSupervisors();
-    if (supervisors.length === 0) {
+    const project = this.project();
+    const supervisorName = project?.supervisor?.trim();
+
+    if (!supervisorName) {
       const toast = await this.toastController.create({
         message: "No supervisor assigned to this project. Please assign a supervisor first.",
         duration: 3000,
@@ -6434,17 +6436,23 @@ export class ProjectWorkspacePage {
       return;
     }
 
-    // If there's only one supervisor, open the funding dialog directly
-    if (supervisors.length === 1) {
-      const supervisor = supervisors[0];
-      this.openSupervisorFunding(supervisor.id, supervisor.name, supervisor.hasOpeningAmount);
+    // Find the supervisor by name from the data service
+    const allSupervisors = this.data.supervisors();
+    const supervisor = allSupervisors.find(sup => sup.name?.trim() === supervisorName);
+
+    if (!supervisor) {
+      const toast = await this.toastController.create({
+        message: `Supervisor "${supervisorName}" not found in the system.`,
+        duration: 3000,
+        position: "top",
+        color: "warning",
+      });
+      await toast.present();
       return;
     }
 
-    // If there are multiple supervisors, show a selection (for now, just use the first one)
-    // In a future enhancement, you could add a supervisor selection dropdown
-    const supervisor = supervisors[0];
-    this.openSupervisorFunding(supervisor.id, supervisor.name, supervisor.hasOpeningAmount);
+    const hasOpeningAmount = Boolean(supervisor.openingAmountAddedAt);
+    this.openSupervisorFunding(supervisor.id, supervisorName, hasOpeningAmount);
   }
 
   openSupervisorFunding(supervisorId: string, supervisorName: string, hasOpeningAmount: boolean) {

@@ -1005,12 +1005,18 @@ export class VendorDashboardPage {
   readonly filteredVendors = computed(() => {
     const searchTerm = this.search().toLowerCase().trim();
     if (!searchTerm) return this.vendors();
-    return this.vendors().filter(vendor =>
-      vendor.name.toLowerCase().includes(searchTerm) ||
-      vendor.phone.toLowerCase().includes(searchTerm) ||
-      vendor.materialType.toLowerCase().includes(searchTerm) ||
-      vendor.gst.toLowerCase().includes(searchTerm)
-    );
+    return this.vendors().filter(vendor => {
+      const name = (vendor.name || '').toLowerCase();
+      const phone = (vendor.phone || '').toLowerCase();
+      const materialType = (vendor.materialType || '').toLowerCase();
+      const gst = (vendor.gst || '').toLowerCase();
+      return (
+        name.includes(searchTerm) ||
+        phone.includes(searchTerm) ||
+        materialType.includes(searchTerm) ||
+        gst.includes(searchTerm)
+      );
+    });
   });
   readonly refreshing = signal(false);
   readonly refreshMessage = signal<string | null>(null);
