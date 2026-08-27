@@ -434,11 +434,40 @@ const siteMaterialDetailFields: FieldSchema[] = [
       border-radius: 14px;
     }
     .material-details-overlay,
-    .assignment-overlay {
+    .assignment-overlay,
+    .funding-overlay {
       z-index: 2147483000;
       background: rgba(15, 23, 42, 0.48);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+    }
+    .funding-dialog {
+      width: min(520px, calc(100vw - 32px));
+    }
+    .funding-form label > span small {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 650;
+    }
+    .funding-feedback {
+      margin: 0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .funding-error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .funding-success {
+      background: #dcfce7;
+      color: #065f46;
+    }
+    .funding-dialog .dialog-actions {
+      padding: 16px 24px 20px;
+      border-top: 1px solid #e5eaf1;
+      background: #fbfcfe;
     }
     .material-details-close {
       width: 34px;
@@ -755,11 +784,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     class="primary-table-action"
                     *ngIf="!tableViewExpanded() && activeSection() === 'expenses'"
                     (click)="openAddOpeningCash()"
-                    title="Add Opening Cash"
-                    aria-label="Add Opening Cash"
+                    [attr.title]="fundingSupervisorHasOpeningAmount() ? 'Add Cash' : 'Add Opening Cash'"
+                    [attr.aria-label]="fundingSupervisorHasOpeningAmount() ? 'Add Cash' : 'Add Opening Cash'"
                   >
                     <ion-icon name="cash-outline"></ion-icon>
-                    Add Opening Cash
+                    {{ fundingSupervisorHasOpeningAmount() ? 'Add Cash' : 'Add Opening Cash' }}
                   </button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportPdf()"><ion-icon name="document-text-outline"></ion-icon>PDF Report</button>
                   <button type="button" *ngIf="!tableViewExpanded()" (click)="exportExcel()"><ion-icon name="download-outline"></ion-icon>Export Excel</button>
@@ -874,20 +903,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div><span>Cash Added</span><strong>{{ expenseCashAddedLabel() }}</strong></div>
                 <div><span>Expenses</span><strong>{{ expenseSpentLabel() }}</strong></div>
                 <div><span>Current Balance</span><strong>{{ expenseCurrentBalanceLabel() }}</strong></div>
-                <div class="expense-ledger-funding-actions" *ngIf="projectSupervisors().length > 0">
-                  <span>Fund Supervisor</span>
-                  <div class="expense-funding-buttons">
-                    @for (supervisor of projectSupervisors(); track supervisor.id) {
-                      <button
-                        type="button"
-                        class="expense-funding-btn"
-                        (click)="openSupervisorFunding(supervisor.id, supervisor.name, supervisor.hasOpeningAmount)"
-                      >
-                        {{ supervisor.name }}
-                      </button>
-                    }
-                  </div>
-                </div>
               </div>
 
               <section class="inventory-card-grid" *ngIf="activeSection() === 'inventory'">
@@ -1646,21 +1661,21 @@ const siteMaterialDetailFields: FieldSchema[] = [
             <h2>{{ fundingHasOpeningAmount() ? 'Add Cash' : 'Add Opening Amount' }}</h2>
             <p>{{ fundingSupervisorName() }}</p>
           </div>
-          <button type="button" class="icon-button" (click)="closeSupervisorFunding()">
+          <button type="button" class="icon-button" (click)="closeSupervisorFunding()" aria-label="Close">
             <ion-icon name="close-outline"></ion-icon>
           </button>
         </div>
         <div class="erp-form funding-form">
-          <div class="erp-field" *ngIf="projectSites().length > 1">
-            <label>Site</label>
+          <label class="span-2" *ngIf="projectSites().length > 1">
+            <span>Site</span>
             <select [value]="fundingSiteId()" (change)="fundingSiteId.set($any($event.target).value)">
               @for (site of projectSites(); track site) {
                 <option [value]="site">{{ site }}</option>
               }
             </select>
-          </div>
-          <div class="erp-field">
-            <label>Amount (₹)</label>
+          </label>
+          <label>
+            <span>Amount (₹)</span>
             <input
               type="number"
               min="1"
@@ -1669,21 +1684,24 @@ const siteMaterialDetailFields: FieldSchema[] = [
               [value]="fundingAmount()"
               (input)="fundingAmount.set($any($event.target).value)"
             />
-          </div>
-          <div class="erp-field">
-            <label>Note <small>(optional)</small></label>
+          </label>
+          <label>
+            <span>Note <small>(optional)</small></span>
             <textarea rows="3" placeholder="Payment reference or note" [value]="fundingNote()" (input)="fundingNote.set($any($event.target).value)"></textarea>
-          </div>
+          </label>
           @if (fundingError()) {
-            <div class="erp-error-message">{{ fundingError() }}</div>
+            <div class="funding-feedback funding-error span-2" role="alert">{{ fundingError() }}</div>
           }
           @if (fundingSuccess()) {
-            <div class="erp-success-message">{{ fundingSuccess() }}</div>
+            <div class="funding-feedback funding-success span-2" role="status">{{ fundingSuccess() }}</div>
           }
         </div>
-        <div class="dialog-foot">
-          <button type="button" class="secondary" (click)="closeSupervisorFunding()">Close</button>
-          <button type="button" class="primary" (click)="submitSupervisorFunding()" [disabled]="fundingSaving()">
+        <div class="dialog-actions">
+          <button type="button" class="secondary-action" (click)="closeSupervisorFunding()" [disabled]="fundingSaving()">Close</button>
+          <button type="button" class="primary-action" (click)="submitSupervisorFunding()" [disabled]="fundingSaving()" [attr.aria-busy]="fundingSaving() ? 'true' : null">
+            @if (fundingSaving()) {
+              <span class="agb-loading-spinner" aria-hidden="true"></span>
+            }
             {{ fundingSaving() ? 'Saving…' : (fundingHasOpeningAmount() ? 'Add Cash' : 'Save Opening Amount') }}
           </button>
         </div>
@@ -5578,7 +5596,7 @@ export class ProjectWorkspacePage {
         description: row.description,
         amount: formatMoney(-row.spent),
         siteMaterial: row.isSiteMaterial ? "Yes" : "No",
-        runningBalance: formatMoney(0),
+        runningBalance: formatMoney(row.runningBalance ?? 0),
         site: row.site,
         supervisor: row.supervisor,
         cashIssued: formatMoney(row.cashIssued || row.received || 0),
@@ -6071,14 +6089,25 @@ export class ProjectWorkspacePage {
     return String(value || "");
   }
 
+  private expenseLedgerOpeningFor(row: TableRow): number {
+    const projectId = String(row["projectId"] || row["__projectId"] || this.projectId());
+    const site = String(row["site"] || this.expenseEditableSite());
+    return this.data.expenseOpeningBalanceFor(projectId, site) ?? 0;
+  }
+
   private withExpenseBalances(rows: TableRow[]): TableRow[] {
     const balances = new Map<string, number>();
     const computedRows = this.expenseChronologicalRows(rows).map((row) => {
       const transactionType = this.normalizedExpenseTransactionType(String(row["transactionType"] || row["expenseScope"] || "Purchase"));
       const groupKey = this.expenseGroupKey(row);
-      const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row, true, true);
-      const balance = Math.max(0, previousBalance + this.expenseSignedAmount(row, transactionType));
-      balances.set(groupKey, balance);
+      if (!balances.has(groupKey)) {
+        balances.set(groupKey, this.expenseLedgerOpeningFor(row));
+      }
+      let balance = balances.get(groupKey) ?? 0;
+      if (String(row["approvalStatus"] || "Pending").toLowerCase() === "approved") {
+        balance = Math.max(0, balance + this.expenseSignedAmount(row, transactionType));
+        balances.set(groupKey, balance);
+      }
       return {
         ...row,
         transactionType,
@@ -6393,7 +6422,11 @@ export class ProjectWorkspacePage {
         latestByGroup.set(this.expenseGroupKey({ projectId: this.projectId(), site }), this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }));
       }
     }
-    for (const row of rows) latestByGroup.set(this.expenseGroupKey(row), this.moneyNumber(row["runningBalance"]));
+    for (const row of rows) {
+      if (String(row["approvalStatus"] || "").toLowerCase() === "approved") {
+        latestByGroup.set(this.expenseGroupKey(row), this.moneyNumber(row["runningBalance"]));
+      }
+    }
     if (this.activeSiteFilter() !== "All") {
       return formatMoney([...latestByGroup.values()].at(-1) ?? this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
     }
@@ -6438,9 +6471,11 @@ export class ProjectWorkspacePage {
 
     // Find the supervisor by name from the data service
     const allSupervisors = this.data.supervisors();
-    const supervisor = allSupervisors.find(sup => sup.name?.trim() === supervisorName);
+    const supervisor = allSupervisors.find(sup =>
+      sup.name?.trim().toLowerCase() === supervisorName.toLowerCase()
+    );
 
-    if (!supervisor) {
+    if (!supervisor || (!supervisor._id && !supervisor.id)) {
       const toast = await this.toastController.create({
         message: `Supervisor "${supervisorName}" not found in the system.`,
         duration: 3000,
@@ -6452,7 +6487,7 @@ export class ProjectWorkspacePage {
     }
 
     const hasOpeningAmount = Boolean(supervisor.openingAmountAddedAt);
-    this.openSupervisorFunding(supervisor.id, supervisorName, hasOpeningAmount);
+    this.openSupervisorFunding(supervisor._id || supervisor.id, supervisorName, hasOpeningAmount);
   }
 
   openSupervisorFunding(supervisorId: string, supervisorName: string, hasOpeningAmount: boolean) {
@@ -6482,7 +6517,12 @@ export class ProjectWorkspacePage {
     const supervisorId = this.fundingSupervisorId();
     const projectId = this.projectId();
     const amount = Number(this.fundingAmount());
-    if (!supervisorId || !projectId) return;
+
+    if (!supervisorId || !projectId) {
+      this.fundingError.set("Missing supervisor or project information.");
+      return;
+    }
+
     if (!Number.isFinite(amount) || amount <= 0) {
       this.fundingError.set("Enter an amount greater than zero.");
       return;
@@ -6494,31 +6534,64 @@ export class ProjectWorkspacePage {
     this.fundingSuccess.set(null);
 
     try {
-      const response = await firstValueFrom(this.api.fundSupervisor(supervisorId, {
+      // Resolve site name to site ID
+      const siteName = this.fundingSiteId();
+      const siteId = siteName ? this.data.resolveSiteNameToId(siteName) : undefined;
+
+      const payload = {
         projectId,
-        siteId: this.fundingSiteId() || undefined,
+        siteId: siteId || undefined,
         amount,
         note: this.fundingNote().trim() || undefined,
-      }));
+      };
+
+      const response = await firstValueFrom(this.api.fundSupervisor(supervisorId, payload));
 
       const hasOpeningAmount = Boolean(response?.funding?.supervisor?.openingAmountAddedAt) || wasOpeningAmount;
       this.fundingHasOpeningAmount.set(hasOpeningAmount);
+      // Keep the in-memory supervisor record in sync so "Add Opening
+      // Amount" switches to "Add Cash" without requiring a page refresh.
+      this.data.supervisors.update(current => current.map(sup =>
+        (sup._id === supervisorId || sup.id === supervisorId)
+          ? { ...sup, openingAmountAddedAt: new Date().toISOString() }
+          : sup
+      ));
       this.fundingAmount.set("");
       this.fundingNote.set("");
       this.fundingSaving.set(false);
-      this.fundingSuccess.set(
-        wasOpeningAmount
+      this.fundingSuccess.set("");
+
+      // Refresh the expenses to show the new transaction, and the sites so
+      // a freshly-created opening balance lands in the ledger opening map.
+      await this.hydration.loadModule("expenses");
+      if (wasOpeningAmount) {
+        await this.hydration.loadModule("sites");
+      }
+
+      this.closeSupervisorFunding();
+      const toast = await this.toastController.create({
+        message: wasOpeningAmount
           ? "Opening amount added successfully. Future payments will use Add Cash."
           : "Cash added successfully and is available in the supervisor mobile ledger.",
-      );
-
-      // Refresh the expenses to show the new transaction
-      await this.hydration.loadModule("expenses");
+        duration: 3000,
+        position: "top",
+        color: "success",
+      });
+      await toast.present();
     } catch (error: any) {
       this.fundingSaving.set(false);
-      this.fundingError.set(
-        error?.error?.error || error?.error?.message || error?.message || "Could not add funds to the supervisor.",
-      );
+
+      let errorMessage = "Could not add funds to the supervisor.";
+
+      if (error?.error?.error) {
+        errorMessage = error.error.error;
+      } else if (error?.error?.message) {
+        errorMessage = error.error.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      this.fundingError.set(errorMessage);
     }
   }
 
@@ -6531,10 +6604,20 @@ export class ProjectWorkspacePage {
         return assigned.includes(projectId);
       })
       .map(sup => ({
-        id: sup.id,
+        id: sup._id || sup.id,
         name: sup.name,
         hasOpeningAmount: Boolean(sup.openingAmountAddedAt),
       }));
+  });
+
+  readonly fundingSupervisorHasOpeningAmount = computed(() => {
+    const project = this.project();
+    const supervisorName = project?.supervisor?.trim();
+    if (!supervisorName) return false;
+    const supervisor = this.data.supervisors().find(sup =>
+      sup.name?.trim().toLowerCase() === supervisorName.toLowerCase()
+    );
+    return Boolean(supervisor?.openingAmountAddedAt);
   });
 
   private expenseGroupKey(row: TableRow): string {
@@ -6903,7 +6986,9 @@ export class ProjectWorkspacePage {
     const spent = ledgerRows.reduce((sum, row) => {
       const key = this.expenseGroupKey(row);
       if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row, true, true));
-      closingByGroup.set(key, this.moneyNumber(row["runningBalance"]));
+      if (String(row["approvalStatus"] || "").toLowerCase() === "approved") {
+        closingByGroup.set(key, this.moneyNumber(row["runningBalance"]));
+      }
       const amount = this.expenseSignedAmount(row);
       return amount < 0 ? sum + Math.abs(amount) : sum;
     }, 0);

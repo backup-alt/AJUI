@@ -82,6 +82,7 @@ export function mapSite(s: any): any {
     startDate: s.startDate,
     targetEndDate: s.targetEndDate,
     projectIds: s.projectIds || [],
+    openingBalance: Number(s.openingBalance) || 0,
   };
 }
 
@@ -110,6 +111,11 @@ export function mapSupervisor(s: any): Supervisor {
     phone: s.phone,
     role: s.role || "Site Supervisor",
     assignedProject: s.assignedProject || "",
+    assignedProjectIds: Array.isArray(s.assignedProjects)
+      ? s.assignedProjects.map((projectId: unknown) => String(projectId))
+      : s.assignedProjectId
+        ? [String(s.assignedProjectId)]
+        : [],
     assignedSite: s.assignedSite || "",
     cashLimit: s.cashLimit || 0,
     activeAdvances: s.activeAdvances || 0,
@@ -117,6 +123,7 @@ export function mapSupervisor(s: any): Supervisor {
       ? `₹${s.approvalAuthority}`
       : s.approvalAuthority || "₹0",
     status: s.status || "Active",
+    openingAmountAddedAt: s.openingAmountAddedAt,
   };
 }
 

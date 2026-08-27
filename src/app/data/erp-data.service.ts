@@ -123,6 +123,7 @@ export type Site = {
   name: string;
   status: "Active" | "On Hold" | "Completed";
   projectId?: string;
+  projectIds?: string[];
   openingBalance?: number;
   materialEntryCount?: number;
   materialNames?: string[];
@@ -305,6 +306,24 @@ export class ErpDataService {
       const rows = this.materials();
       if (rows && rows.length) {
         this.materialsService.materials.set(rows);
+      }
+    });
+    // Mirror the backend Site.openingBalance into the ledger opening map so
+    // the web "Current Balance" matches the mobile app (which reads the
+    // Site's openingBalance). The guard keeps a no-op write from looping.
+    effect(() => {
+      const sites = this.siteEntities();
+      if (!sites.length) return;
+      for (const site of sites) {
+        const projectId = String(site.projectId || site.projectIds?.[0] || "").trim();
+        const siteName = String(site.name || "").trim();
+        if (!projectId || !siteName) continue;
+        const opening = Number(site.openingBalance) || 0;
+        const key = this.expenseOpeningBalanceKey(projectId, siteName);
+        this.expenseOpeningBalances.update((balances) => {
+          if (balances[key] === opening) return balances;
+          return { ...balances, [key]: opening };
+        });
       }
     });
   }
