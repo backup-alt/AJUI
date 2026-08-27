@@ -30,6 +30,7 @@ export interface IMaterial extends Document {
   approvalDate?: string;
   status: MaterialStatus;
   notes?: string;
+  noteHistory?: Array<{ note: string; date: Date }>;
   billUrl?: string;
   pcloudFileId?: string;
   pcloudPublicCode?: string;
@@ -83,6 +84,14 @@ const materialSchema = new Schema<IMaterial>(
     approvedBy: { type: String },
     approvedAt: { type: Date },
     notes: { type: String, trim: true, maxlength: 2000 },
+    noteHistory: {
+      type: [{
+        note: { type: String, required: true, trim: true, maxlength: 2000 },
+        date: { type: Date, required: true, default: Date.now },
+        _id: false,
+      }],
+      default: [],
+    },
     billUrl: { type: String, trim: true },
     pcloudFileId: { type: String, trim: true, index: true },
     pcloudPublicCode: { type: String, trim: true },

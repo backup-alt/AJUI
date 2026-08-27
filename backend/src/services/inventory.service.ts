@@ -215,6 +215,77 @@ export async function syncMaterialReceivedStatus(materialId: Types.ObjectId | st
 }
 
 /**
+ * Stock that a supervisor may consume right now. A newly added purchase can
+ * remain pending without locking stock from older, already received purchases.
+ */
+export function receivedRemainingStock(inventory: Pick<
+  IInventory,
+  "purchaseHistory" | "purchasedQuantity" | "consumedQuantity" | "received"
+>): number {
+  const history = Array.isArray(inventory.purchaseHistory) ? inventory.purchaseHistory : [];
+  if (history.length === 0) {
+    return inventory.received
+      ? Math.max(0, Number(inventory.purchasedQuantity || 0) - Number(inventory.consumedQuantity || 0))
+      : 0;
+  }
+
+  const receivedQuantity = history.reduce(
+    (total, purchase) => total + (purchase.received ? Math.max(0, Number(purchase.quantity) || 0) : 0),
+    0,
+  );
+  return Math.max(0, receivedQuantity - Math.max(0, Number(inventory.consumedQuantity) || 0));
+}
+
+/** Keep Inventory totals and per-addition receipt history aligned after the
+ * web app changes the purchased quantity on an existing Material row. */
+export async function syncMaterialQuantityChange(
+  materialId: Types.ObjectId | string,
+  previousPurchasedQuantity: number,
+  updatedBy?: string,
+) {
+  const material = await Material.findById(materialId).lean();
+  if (!material?.projectId) return null;
+
+  const nextPurchased = Math.max(0, Number(material.purchasedQuantity) || 0);
+  const previousPurchased = Math.max(0, Number(previousPurchasedQuantity) || 0);
+  const delta = nextPurchased - previousPurchased;
+  if (delta === 0) return Inventory.findOne(inventoryMatchForMaterial(material)).lean();
+
+  const inventory = await Inventory.findOne(inventoryMatchForMaterial(material));
+  if (!inventory) return ensureMaterialInInventory(material._id, updatedBy);
+
+  inventory.requestedQuantity = Math.max(0, Number(inventory.requestedQuantity) || 0) + delta;
+  inventory.approvedQuantity = Math.max(0, Number(inventory.approvedQuantity) || 0) + delta;
+  inventory.purchasedQuantity = Math.max(0, Number(inventory.purchasedQuantity) || 0) + delta;
+  inventory.lastMaterialId = material._id;
+  inventory.lastUpdatedBy = updatedBy;
+  inventory.purchaseHistory = inventory.purchaseHistory || [];
+
+  if (delta > 0) {
+    inventory.purchaseHistory.push(receiptHistoryEntry(material, delta));
+    inventory.received = false;
+    inventory.receivedDate = undefined;
+  } else {
+    let reduction = Math.abs(delta);
+    for (let index = inventory.purchaseHistory.length - 1; index >= 0 && reduction > 0; index -= 1) {
+      const purchase = inventory.purchaseHistory[index];
+      if (purchase.materialId?.toString() !== material._id.toString()) continue;
+      const quantity = Math.max(0, Number(purchase.quantity) || 0);
+      const deducted = Math.min(quantity, reduction);
+      purchase.quantity = quantity - deducted;
+      reduction -= deducted;
+    }
+    inventory.purchaseHistory = inventory.purchaseHistory.filter((purchase) => Number(purchase.quantity) > 0);
+    const latestPurchase = inventory.purchaseHistory[inventory.purchaseHistory.length - 1];
+    inventory.received = Boolean(latestPurchase?.received);
+    inventory.receivedDate = inventory.received ? latestPurchase?.receivedDate : undefined;
+  }
+
+  await inventory.save();
+  return inventory.toObject();
+}
+
+/**
  * Single-shot "give me everything" endpoint.
  *
  * Strategy: try one big query first. If M0 times out (which happens

@@ -511,15 +511,30 @@ type CombinedInvite = {
 
           @if (supervisorStep() === 2) {
             <div class="settings-w11-form">
-              <p class="settings-w11-step-hint">Select the projects this supervisor will manage:</p>
+              <p class="settings-w11-step-hint">Optionally select projects this supervisor will manage. You can assign projects later.</p>
+              <label class="settings-w11-field supervisor-project-search">
+                <span>Search projects</span>
+                <div class="settings-w11-search-input">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="m13 13 4 4"/></svg>
+                  <input
+                    type="search"
+                    [value]="supervisorProjectSearch()"
+                    (input)="supervisorProjectSearch.set($any($event.target).value)"
+                    placeholder="Search by project or client"
+                  />
+                </div>
+              </label>
               @if (sitesLoading()) {
                 <div class="settings-w11-loading">Loading projects...</div>
               }
               @if (!sitesLoading() && availableSites().length === 0) {
                 <div class="settings-w11-message info">No projects available.</div>
               }
+              @if (!sitesLoading() && availableSites().length > 0 && filteredSupervisorProjects().length === 0) {
+                <div class="settings-w11-message info">No projects match your search.</div>
+              }
               <div class="settings-w11-site-list">
-                  @for (project of availableSites(); track project.id) {
+                  @for (project of filteredSupervisorProjects(); track project.id) {
                     <label class="settings-w11-site-item" [class.selected]="selectedSiteIds().has(project.id)">
                     <input
                       type="checkbox"
@@ -539,7 +554,7 @@ type CombinedInvite = {
               <button
                 type="button"
                 class="settings-w11-btn settings-w11-btn-primary"
-                [disabled]="supervisorLoading() || selectedSiteIds().size === 0"
+                [disabled]="supervisorLoading()"
                 (click)="goToInviteMethod()"
               >
                 {{ supervisorLoading() ? 'Loading…' : 'Next: Choose Invite Method' }}
@@ -1009,8 +1024,17 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
   readonly supervisorStep = signal(1);
   readonly availableSites = signal<any[]>([]);
   readonly selectedSiteIds = signal<Set<string>>(new Set());
+  readonly supervisorProjectSearch = signal("");
   readonly sitesLoading = signal(false);
   readonly inviteMethod = signal<'email' | 'qr' | null>(null);
+  readonly filteredSupervisorProjects = computed(() => {
+    const query = this.supervisorProjectSearch().trim().toLowerCase();
+    if (!query) return this.availableSites();
+    return this.availableSites().filter((project) =>
+      [project.name, project.client, project.projectId]
+        .some((value) => String(value || "").toLowerCase().includes(query)),
+    );
+  });
 
   // Pending invites table
   readonly pendingInvites = signal<PendingInvite[]>([]);
@@ -1456,6 +1480,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.supervisorPhoneDraft.set("");
     this.supervisorStep.set(1);
     this.selectedSiteIds.set(new Set());
+    this.supervisorProjectSearch.set("");
     this.loadAvailableSites();
   }
 
@@ -1495,6 +1520,7 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     this.supervisorPhoneDraft.set("");
     this.supervisorStep.set(1);
     this.selectedSiteIds.set(new Set());
+    this.supervisorProjectSearch.set("");
     this.inviteMethod.set(null);
   }
 
@@ -1550,11 +1576,6 @@ export class SettingsRolesComponent implements OnInit, OnDestroy {
     }
     if (!phone || phone.replace(/\D/g, "").length < 8) {
       this.supervisorError.set("Please enter a valid mobile number (at least 8 digits).");
-      return;
-    }
-    const siteIds = Array.from(this.selectedSiteIds());
-    if (siteIds.length === 0) {
-      this.supervisorError.set("Please select at least one project.");
       return;
     }
     this.supervisorError.set(null);

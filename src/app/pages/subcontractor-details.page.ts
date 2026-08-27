@@ -157,7 +157,7 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
                 name="projectId"
                 [ngModel]="paymentDraft().projectId"
                 (ngModelChange)="onPaymentProjectChange($event)"
-                [options]="allProjectOptions()"
+                [options]="assignedProjectOptions()"
                 placeholder="Search projects"
               ></agb-searchable-select>
             </label>
@@ -388,6 +388,10 @@ export class SubcontractorDetailsPage {
     return this.allProjects().map((project) => ({ label: project.name, value: project.id }));
   }
 
+  assignedProjectOptions() {
+    return this.availableProjects().map((project) => ({ label: project.name, value: project.id }));
+  }
+
   optionalProjectOptions() {
     return [{ label: "No specific project", value: "" }, ...this.allProjectOptions()];
   }
@@ -414,7 +418,24 @@ export class SubcontractorDetailsPage {
     return all;
   });
 
-  readonly availableProjects = computed(() => this.allProjects());
+  readonly availableProjects = computed(() => {
+    const subcontractor = this.subcontractor();
+    if (!subcontractor) return [];
+
+    const assignedIds = new Set(
+      [subcontractor.projectId, ...(subcontractor.projectIds || [])]
+        .map((project: unknown) => {
+          if (typeof project === "string") return project;
+          if (project && typeof project === "object" && "_id" in project) {
+            return String((project as { _id: unknown })._id);
+          }
+          return project ? String(project) : "";
+        })
+        .filter(Boolean),
+    );
+
+    return this.allProjects().filter((project) => assignedIds.has(project.id));
+  });
 
   readonly filteredPayments = computed(() => {
     const projectId = this.filterProjectId();
@@ -426,7 +447,7 @@ export class SubcontractorDetailsPage {
 
   readonly subcontractorName = computed(() => this.subcontractor()?.subcontractorName || "");
 
-  readonly canRecordPayment = computed(() => this.allProjects().length > 0);
+  readonly canRecordPayment = computed(() => this.availableProjects().length > 0);
 
   private get subcontractorId(): string {
     return this.route.snapshot.paramMap.get("id") || "";
@@ -529,6 +550,9 @@ export class SubcontractorDetailsPage {
     const draft = this.paymentDraft();
     const errors: string[] = [];
     if (!draft.projectId) errors.push("Project is required.");
+    if (draft.projectId && !this.availableProjects().some((project) => project.id === draft.projectId)) {
+      errors.push("Select a project assigned to this sub-contractor.");
+    }
     if (!draft.date) errors.push("Date is required.");
     if (!draft.paymentType) errors.push("Payment mode is required.");
     if (!draft.labourType.trim()) errors.push("Labour type is required.");

@@ -518,7 +518,9 @@ export class AttendanceMarkBulkPage implements OnInit {
       // page shows). Bypassing the GET cache so renames or newly-added
       // sub-contractors show up immediately.
       this.api.invalidateGetCache('/supervisor/subcontractors');
-      const res = await firstValueFrom(this.supervisor.getSubcontractors());
+      const res = await firstValueFrom(this.supervisor.getSubcontractors(
+        this.supervisor.selectedProjectId() || undefined,
+      ));
       const match = (res?.subcontractors || []).find((s) => s._id === this.subcontractorId);
       this.subcontractor.set(match || null);
     } catch (err) {

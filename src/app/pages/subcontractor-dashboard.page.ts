@@ -13,6 +13,7 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
 interface SubcontractorRow {
   id: string;
   projectId: string;
+  projectIds: string[];
   projectName: string;
   subcontractorName: string;
   description: string;
@@ -387,7 +388,9 @@ export class SubcontractorDashboardPage {
 
   readonly filteredRows = computed(() => {
     const projectId = this.selectedProjectId();
-    return projectId ? this.rows().filter((row) => row.projectId === projectId) : this.rows();
+    return projectId
+      ? this.rows().filter((row) => row.projectId === projectId || row.projectIds.includes(projectId))
+      : this.rows();
   });
 
   readonly selectedProjectName = computed(() => {
@@ -554,6 +557,7 @@ function emptyDraft(): SubcontractorRow {
   return {
     id: "",
     projectId: "",
+    projectIds: [],
     projectName: "",
     subcontractorName: "",
     description: "",
@@ -573,6 +577,9 @@ function normalizeRow(input: any): SubcontractorRow {
   return {
     id: String(input._id || input.id || ""),
     projectId: input.projectId ? String(input.projectId) : "",
+    projectIds: Array.isArray(input.projectIds)
+      ? input.projectIds.map((projectId: unknown) => String(projectId))
+      : (input.projectId ? [String(input.projectId)] : []),
     projectName: input.projectName || "",
     subcontractorName: input.subcontractorName || input.name || "",
     description: input.description || "",

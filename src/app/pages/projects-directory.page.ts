@@ -2,8 +2,9 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
-import { IonBadge, IonContent, IonIcon, IonSpinner, IonSplitPane, ToastController } from "@ionic/angular/standalone";
+import { IonBadge, IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { ApiService } from "../core/api.service";
+import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { formatMoney, statusClass } from "../shared/format";
@@ -30,7 +31,7 @@ interface ApiProject {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonBadge, IonSpinner, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule, IonContent, IonIcon, IonBadge, IonSplitPane, EnterpriseHeaderComponent, EnterpriseSidebarComponent, SearchableSelectComponent, DashboardSkeletonComponent],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
       <agb-enterprise-sidebar active="projects"></agb-enterprise-sidebar>
@@ -58,9 +59,8 @@ interface ApiProject {
               </label>
             </section>
 
-            <section *ngIf="loading()" class="projects-loading">
-              <ion-spinner></ion-spinner>
-              <p>Loading projects...</p>
+            <section *ngIf="loading()" class="projects-loading" aria-busy="true">
+              <agb-dashboard-skeleton variant="card-grid" [cardCount]="6" ariaLabel="Loading projects"></agb-dashboard-skeleton>
             </section>
 
             <section *ngIf="!loading() && filteredProjects().length === 0" class="projects-empty">
@@ -68,7 +68,7 @@ interface ApiProject {
               <p>No projects found</p>
             </section>
 
-            <section class="projects-directory-list">
+            <section class="projects-directory-list" *ngIf="!loading()">
               <article class="projects-directory-card add-client-card" role="button" tabindex="0" (click)="openProjectForm()" (keydown.enter)="openProjectForm()">
                 <div class="add-client-icon">
                   <ion-icon name="add-outline"></ion-icon>
@@ -215,6 +215,13 @@ interface ApiProject {
       stroke-width: 1.6;
       stroke-linecap: round;
       stroke-linejoin: round;
+    }
+    /* Loading states — the "skeleton cards" path fills the same grid slot
+       as the real list. The initial spinner sits centered in the empty
+       card-grid footprint so the layout doesn't shift when data arrives. */
+    .projects-loading {
+      display: block;
+      padding: 0;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -417,10 +424,16 @@ export class ProjectsDirectoryPage implements OnInit {
   }
 
   private emptyProjectDraft() {
+    const now = new Date();
+    const localDate = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-");
     return {
       clientId: "",
       name: "",
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: localDate,
       supervisor: "",
       supervisorId: "",
       mobile: "",

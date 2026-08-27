@@ -490,7 +490,7 @@ const adminCreateInviteSchema = z.object({
   supervisorEmail: z.string().email("Valid email is required"),
   supervisorPhone: z.string().min(8, "Phone must be at least 8 characters").max(20),
   projectId: z.string().optional(),
-  projectIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid project id")).min(1, "Select at least one project").optional(),
+  projectIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid project id")).optional(),
   siteIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid site id")).min(1, "Select at least one site").optional(),
   cashLimit: z.coerce.number().nonnegative().optional(),
   address: z.string().trim().max(500).optional(),

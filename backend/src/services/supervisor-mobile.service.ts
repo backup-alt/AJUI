@@ -33,6 +33,7 @@ import { withRetry } from "../utils/retry.js";
 import { applyCursor } from "../utils/cursor-pagination.js";
 import { dbMutex } from "../utils/db-mutex.js";
 import { approveRequest, rejectRequest } from "./approval.service.js";
+import { receivedRemainingStock } from "./inventory.service.js";
 import { syncMaterialReceivedStatus } from "./inventory.service.js";
 
 type SupervisorAccess = {
@@ -1020,6 +1021,7 @@ export async function listMaterialsForSupervisor(
           purchasedQuantity: m.purchasedQuantity,
           consumedQuantity: m.consumedQuantity,
           remainingStock: m.remainingStock,
+          availableStock: receivedRemainingStock(m),
           minimumQuantity: m.minimumQuantity,
           vendor: m.vendor,
           poNumber: m.poNumber,
@@ -1045,6 +1047,7 @@ export async function listMaterialsForSupervisor(
         purchasedQuantity: m.purchasedQuantity,
         consumedQuantity: m.consumedQuantity,
         remainingStock: m.remainingStock,
+        availableStock: m.status === "Received" ? m.remainingStock : 0,
         vendor: m.vendor,
         poNumber: m.poNumber,
         received: m.status === "Received",
@@ -1380,6 +1383,7 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
       purchasedQuantity: records.reduce((sum, record) => sum + (Number(record.purchasedQuantity) || 0), 0),
       consumedQuantity: records.reduce((sum, record) => sum + (Number(record.consumedQuantity) || 0), 0),
       remainingStock: records.reduce((sum, record) => sum + (Number(record.remainingStock) || 0), 0),
+      availableStock: records.reduce((sum, record) => sum + receivedRemainingStock(record), 0),
       minimumQuantity: records.reduce((sum, record) => sum + (Number(record.minimumQuantity) || 0), 0),
       purchaseHistory,
       consumptionHistory,
@@ -1460,6 +1464,13 @@ export async function updateMaterialStockForSupervisor(
     inventory.approvedQuantity = Math.max(inventory.approvedQuantity, inventory.purchasedQuantity);
   }
   if (updates.consumedQuantity !== undefined) {
+    const availableStock = receivedRemainingStock(inventory);
+    if (updates.consumedQuantity > availableStock) {
+      throw new AppError(
+        409,
+        `Only ${availableStock} ${inventory.unit} of received stock is available to consume`,
+      );
+    }
     inventory.consumedQuantity = Math.max(0, inventory.consumedQuantity + updates.consumedQuantity);
     if (updates.consumedQuantity > 0) {
       inventory.consumptionHistory = inventory.consumptionHistory || [];
@@ -1478,10 +1489,18 @@ export async function updateMaterialStockForSupervisor(
     try {
       const linkedMaterial = await Material.findById(inventory.lastMaterialId);
       if (linkedMaterial) {
-        linkedMaterial.purchasedQuantity = inventory.purchasedQuantity;
-        linkedMaterial.consumedQuantity = inventory.consumedQuantity;
-        linkedMaterial.approvedQuantity = inventory.approvedQuantity;
-        await linkedMaterial.save();
+        const linkedMaterialIds = new Set(
+          (inventory.purchaseHistory || [])
+            .map((purchase) => purchase.materialId?.toString())
+            .filter(Boolean),
+        );
+        if (linkedMaterialIds.size <= 1) {
+          linkedMaterial.consumedQuantity = Math.min(
+            linkedMaterial.purchasedQuantity,
+            inventory.consumedQuantity,
+          );
+          await linkedMaterial.save();
+        }
       }
     } catch (err) {
       console.warn("[supervisor-mobile] failed to sync linked material", err);
@@ -1504,12 +1523,11 @@ export async function updateMaterialReceivedForSupervisor(
 
   const inventory = await Inventory.findOne({ ...query, _id: materialId });
   if (inventory) {
-    const latestPurchase = [...(inventory.purchaseHistory || [])]
-      .reverse()
-      .find((purchase) => purchase.materialId?.toString() === inventory.lastMaterialId?.toString());
-    if (latestPurchase) {
-      latestPurchase.received = true;
-      latestPurchase.receivedDate = receivedDate;
+    const latestMaterialPurchases = (inventory.purchaseHistory || [])
+      .filter((purchase) => purchase.materialId?.toString() === inventory.lastMaterialId?.toString());
+    for (const purchase of latestMaterialPurchases) {
+      purchase.received = true;
+      purchase.receivedDate = receivedDate;
     }
     if (inventory.lastMaterialId) {
       await Material.updateOne(

@@ -71,6 +71,16 @@ ion-button {
   font-weight: 700;
 }
 
+button:not(:disabled),
+ion-button:not([disabled]) {
+  cursor: pointer !important;
+}
+
+button:disabled,
+ion-button[disabled] {
+  cursor: not-allowed;
+}
+
 .app-menu {
   --width: 280px;
 }
@@ -1380,6 +1390,7 @@ ion-badge.status.on-hold {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 22px;
+  align-items: stretch;
 }
 
 .project-select-card {
@@ -1390,6 +1401,8 @@ ion-badge.status.on-hold {
   border-radius: 4px;
   background: #ffffff;
   cursor: pointer;
+  align-self: stretch;
+  height: 100%;
   transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
 }
 
@@ -2589,6 +2602,46 @@ ion-menu.enterprise-sidebar::part(container) {
 .agb-loading-spinner.agb-loading-spinner--light {
   border-color: rgba(255, 255, 255, 0.32);
   border-top-color: #ffffff;
+}
+
+/* Project workspace loading state — shows during the brief window after
+   navigating to /clients/:c/projects/:p while the projects signal resolves.
+   Prevents a blank page when the project was just created or just came back
+   from a cold API round-trip. */
+.project-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(100vh - 140px);
+  padding: 32px 24px;
+  box-sizing: border-box;
+}
+.project-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 22px 32px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+}
+.project-loading-card .agb-loading-spinner {
+  width: 26px;
+  height: 26px;
+  border-width: 3px;
+}
+.project-loading-card p {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 @keyframes agb-spin {
@@ -9043,6 +9096,16 @@ body {
   border-top-color: #8ab0ff;
 }
 
+.dark-mode .project-loading-card {
+  background: #1f2937;
+  border-color: #374151;
+  color: #cbd5e1;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.dark-mode .project-loading-card p {
+  color: #cbd5e1;
+}
+
 .dark-mode .status-edit-shell.active,
 .dark-mode ion-badge.status.active {
   background: rgba(34, 197, 94, 0.16) !important;
@@ -13324,6 +13387,300 @@ ion-badge.status-completed {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* Date inputs use one consistent, clearly interactive field across the app. */
+input[type="date"] {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cfd8e6;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #172033;
+  cursor: pointer;
+  color-scheme: light;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  padding: 5px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  background: #eef4ff;
+}
+
+input[type="date"]:focus {
+  border-color: #2c5cff;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.14);
+}
+
+.dark-mode input[type="date"] {
+  border-color: #3b4c66;
+  background-color: #15243a;
+  color: #f1f5f9;
+  color-scheme: dark;
+}
+
+.supervisor-project-search {
+  display: grid;
+  gap: 7px;
+}
+
+.settings-w11-search-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid #d5dcea;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.settings-w11-search-input:focus-within {
+  border-color: #2c5cff;
+  box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.12);
+}
+
+.settings-w11-search-input svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: #667085;
+  stroke-width: 1.7;
+}
+
+.settings-w11-search-input input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+/* Project workspace loading mirrors the final summary + table layout. */
+.project-workspace-skeleton {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 1500px);
+  margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.project-workspace-skeleton .project-load-error {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Keep client project cards aligned at every project count and viewport. */
+.client-project-shell {
+  height: auto !important;
+  min-height: calc(100vh - 96px) !important;
+  overflow: visible !important;
+}
+
+.client-project-shell .project-management-panel {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+.client-project-shell .project-select-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)) !important;
+  grid-auto-rows: auto;
+  align-items: stretch;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.client-project-shell .project-select-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: auto !important;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.client-project-shell .project-select-footer {
+  margin-top: auto;
+}
+
+/* Material note history dropdown inside the consolidated material row. */
+.material-note-history {
+  position: relative;
+  min-width: 190px;
+}
+
+.material-note-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #24324a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.material-note-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-note-trigger small {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #174ea6;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.material-note-trigger .svg-icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  transition: transform 150ms ease;
+}
+
+.material-note-history.open .material-note-trigger {
+  border-color: #89a9df;
+  box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.12);
+}
+
+.material-note-history.open .material-note-trigger .svg-icon {
+  transform: rotate(180deg);
+}
+
+.material-note-panel {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 80;
+  width: min(380px, calc(100vw - 48px));
+  max-height: 330px;
+  overflow: hidden;
+  border: 1px solid #ccd6e5;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
+}
+
+.material-note-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e8edf4;
+  background: #f8faff;
+}
+
+.material-note-panel > header span {
+  color: #667085;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.material-note-list {
+  display: grid;
+  gap: 0;
+  max-height: 270px;
+  overflow-y: auto;
+}
+
+.material-note-list article {
+  position: relative;
+  padding: 12px 64px 12px 14px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.material-note-list article:last-child {
+  border-bottom: 0;
+}
+
+.material-note-list article p {
+  margin: 5px 0 0;
+  color: #25324a;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.material-note-list article > small {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.material-note-date {
+  color: #667085;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.material-note-empty {
+  margin: 0;
+  padding: 22px 14px;
+  color: #667085;
+  text-align: center;
+}
+
+.dark-mode .material-note-trigger,
+.dark-mode .material-note-panel {
+  border-color: #3a4d6a;
+  background: #15243a;
+  color: #e8eef8;
+}
+
+.dark-mode .material-note-panel > header {
+  border-color: #344760;
+  background: #1a2b43;
+}
+
+.dark-mode .material-note-list article {
+  border-color: #30435d;
+}
+
+.dark-mode .material-note-list article p {
+  color: #e8eef8;
+}
+
+.draft-select-loading {
+  display: block;
+  padding: 8px 10px;
+  color: #5b6b82;
+  font-size: 11px;
+  font-weight: 750;
 }
 
 /* QR card with countdown */

@@ -211,29 +211,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                     <button type="button" class="clear-search" (click)="materialSearchQuery.set('')">×</button>
                   }
                 </div>
-                <div class="table-actions">
-                  <button type="button" class="btn-add-row" (click)="addMaterialRow()">
-                    <svg viewBox="0 0 20 20" aria-hidden="true" class="action-svg"><path d="M10 4v12M4 10h12" /></svg>
-                    Add Row
-                  </button>
-                  <button type="button" class="btn-add-col" (click)="showAddColumnInput.set(true)">
-                    <ion-icon name="add-outline"></ion-icon>
-                    Add Field
-                  </button>
-                  @if (showAddColumnInput()) {
-                    <div class="add-col-inline">
-                      <input
-                        type="text"
-                        [value]="newColumnName()"
-                        (input)="newColumnName.set($any($event.target).value)"
-                        placeholder="Column name"
-                        class="col-name-input"
-                      />
-                      <button type="button" class="btn-confirm" (click)="addCustomColumn()">Add</button>
-                      <button type="button" class="btn-cancel" (click)="showAddColumnInput.set(false); newColumnName.set('')">Cancel</button>
-                    </div>
-                  }
-                </div>
               </div>
 
               <section class="table-wrap materials-table">

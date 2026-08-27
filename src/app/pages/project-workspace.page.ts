@@ -19,6 +19,8 @@ import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.co
 import { WorkerFormDialogComponent, type WorkerFormValue } from "../shared/worker-form-dialog.component";
 import { SubcontractorFormDialogComponent, type SubcontractorFormValue } from "../shared/subcontractor-form-dialog.component";
 import { SearchableSelectComponent } from "../shared/searchable-select.component";
+import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.component";
+import { buildReportXlsx } from "../shared/excel-export";
 
 type ModuleKey = Exclude<SharedModuleKey, "clients" | "purchaseOrders" | "settings" | "supervisors">;
 type TableRow = SharedTableRow;
@@ -191,7 +193,6 @@ const sectionConfigs: SectionConfig[] = [
       { key: "remainingStock", label: "Remaining Stock" },
       { key: "vendor", label: "Vendor" },
       { key: "poNumber", label: "PO Number" },
-      { key: "receivedStatus", label: "Status" },
     ],
   },
 ];
@@ -220,6 +221,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
     WorkerFormDialogComponent,
     SubcontractorFormDialogComponent,
     SearchableSelectComponent,
+    DashboardSkeletonComponent,
   ],
   styles: [`
     .operations-dialog:has(.draft-select-menu.open) {
@@ -589,6 +591,19 @@ const siteMaterialDetailFields: FieldSchema[] = [
         />
 
         <ion-content class="erp-page">
+          <div class="project-workspace-skeleton" *ngIf="!project()">
+            <agb-dashboard-skeleton
+              variant="kpi"
+              [kpiCount]="6"
+              ariaLabel="Loading project summary"
+            ></agb-dashboard-skeleton>
+            <agb-dashboard-skeleton
+              variant="row"
+              [rowCount]="8"
+              ariaLabel="Loading project records"
+            ></agb-dashboard-skeleton>
+            <p class="project-load-error" *ngIf="projectLoadError()">{{ projectLoadError() }}</p>
+          </div>
           <main class="workspace-shell" [class.table-view-expanded]="tableViewExpanded()" *ngIf="project() as currentProject">
             <nav class="workspace-breadcrumb" aria-label="Breadcrumb" *ngIf="!tableViewExpanded()">
               <button type="button" (click)="backToClients()">Clients</button>
@@ -935,6 +950,36 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         [class.select-cell]="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeSection(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeSection() === 'attendance' && column.key === 'labourTypes'"
                       >
+                        <ng-container *ngIf="activeSection() === 'materials' && column.key === 'notes' && !isRowEditing(row); else nonMaterialNoteCell">
+                          <div class="material-note-history" [class.open]="isMaterialNoteHistoryOpen(row)">
+                            <button
+                              type="button"
+                              class="material-note-trigger"
+                              [attr.aria-expanded]="isMaterialNoteHistoryOpen(row)"
+                              (pointerdown)="$event.stopPropagation()"
+                              (click)="toggleMaterialNoteHistory(row, $event)"
+                            >
+                              <span>{{ materialNoteHistory(row)[0]?.note || 'No notes' }}</span>
+                              <small *ngIf="materialNoteHistory(row).length > 1">{{ materialNoteHistory(row).length }} notes</small>
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+                            </button>
+                            <div class="material-note-panel" *ngIf="isMaterialNoteHistoryOpen(row)" (pointerdown)="$event.stopPropagation()">
+                              <header>
+                                <strong>Note history</strong>
+                                <span>{{ materialNoteHistory(row).length }} {{ materialNoteHistory(row).length === 1 ? 'entry' : 'entries' }}</span>
+                              </header>
+                              <div class="material-note-list" *ngIf="materialNoteHistory(row).length; else noMaterialNotes">
+                                <article *ngFor="let entry of materialNoteHistory(row); let first = first">
+                                  <span class="material-note-date">{{ formatMaterialNoteDate(entry.date) }}</span>
+                                  <p>{{ entry.note }}</p>
+                                  <small *ngIf="first">Latest</small>
+                                </article>
+                              </div>
+                              <ng-template #noMaterialNotes><p class="material-note-empty">No notes have been added.</p></ng-template>
+                            </div>
+                          </div>
+                        </ng-container>
+                        <ng-template #nonMaterialNoteCell>
                         <ng-container *ngIf="activeSection() === 'attendance' && column.key === 'labourTypes'; else standardProjectCell">
                           <div class="labour-types-cell">
                             <span class="labour-group-badge" *ngIf="isLabourGroupRow(row)">{{ labourGroupCount(row) }} entries</span>
@@ -1061,6 +1106,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </ng-template>
                           </ng-template>
                         </ng-template>
+                        </ng-template>
                       </td>
                     </tr>
                     <tr *ngIf="tableState.rows.length === 0">
@@ -1176,6 +1222,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </svg>
                           </button>
                           <div class="erp-select-panel" *ngIf="isDraftSelectOpen(column.key)">
+                            <span class="draft-select-loading" *ngIf="activeSection() === 'materials' && column.key === 'materialName' && loadingAllMaterialNames()">
+                              Loading all material names…
+                            </span>
                             <input
                               #draftSelectSearchInput
                               type="text"
@@ -1602,6 +1651,9 @@ export class ProjectWorkspacePage {
     status === "Completed" ? "danger" : statusClass(status);
   readonly showProjectForm = signal(false);
   readonly editingProject = signal<Project | null>(null);
+  readonly projectLoadError = signal("");
+  private fetchingProjectId = "";
+  readonly estimatedValueSaving = signal(false);
   readonly sections = sectionConfigs;
   readonly activeSection = signal<ModuleKey>(this.normalizeSection(this.route.snapshot.paramMap.get("section")));
   readonly selectedRowKey = signal("");
@@ -1617,6 +1669,9 @@ export class ProjectWorkspacePage {
   readonly activeFilterValueKey = signal("");
   readonly openDraftSelect = signal("");
   readonly draftSelectSearch = signal("");
+  readonly allMaterialNames = signal<string[]>([]);
+  readonly loadingAllMaterialNames = signal(false);
+  readonly openMaterialNoteHistoryKey = signal("");
   /** Full list of subcontractor names for the record-form dropdown.
    *  Populated on demand from /api/subcontractors so it always matches the
    *  /subcontractors page, not just the hydration's first page. */
@@ -1789,7 +1844,11 @@ export class ProjectWorkspacePage {
     // on every project workspace navigation.
     effect(() => {
       const projectId = this.projectId();
-      if (projectId) this.data.touchProject(projectId);
+      if (!projectId) return;
+      this.data.touchProject(projectId);
+      if (!this.data.projectById(projectId)) {
+        void this.loadMissingProject(projectId);
+      }
     });
     // Keep the active section in sync with the URL param so browser
     // back/forward or direct navigation doesn't leave the previous
@@ -2042,7 +2101,7 @@ export class ProjectWorkspacePage {
   }
 
   showRowCheckboxes(): boolean {
-    return this.activeSection() === "materials" || this.hasSelectedRows();
+    return this.hasSelectedRows();
   }
 
   isRowChecked(row: TableRow): boolean {
@@ -2480,6 +2539,9 @@ export class ProjectWorkspacePage {
     if (!target.closest(".erp-select-menu, .custom-select-entry, .filter-combo-field, .date-filter-panel")) {
       this.closeDropdowns();
     }
+    if (!target.closest(".material-note-history")) {
+      this.openMaterialNoteHistoryKey.set("");
+    }
   }
 
   private clearRowSelection() {
@@ -2626,6 +2688,7 @@ export class ProjectWorkspacePage {
         isExistingMaterial: existingCount === group.length ? "Yes" : "",
         vendor: [...new Set(group.map((row) => String(row["vendor"] || "").trim()).filter(Boolean))].join(", "),
         poNumber: [...new Set(group.map((row) => String(row["poNumber"] || "").trim()).filter(Boolean))].join(", "),
+        __noteHistoryJson: JSON.stringify(this.consolidatedMaterialNoteHistory(group)),
       };
     });
   }
@@ -3107,10 +3170,12 @@ export class ProjectWorkspacePage {
     }
     this.draftRow.set(row);
     this.recordDialogOpen.set(true);
-    // Ensure the sub-contractor dropdown lists every record from the
-    // /subcontractors page (not just the hydration's first page).
+    // Load only subcontractors assigned to this project for payments.
     if (this.activeSection() === "subcontractors") {
       void this.loadAllSubcontractorNames();
+    }
+    if (this.activeSection() === "materials") {
+      void this.loadAllMaterialNames();
     }
   }
 
@@ -4046,7 +4111,10 @@ export class ProjectWorkspacePage {
     const subcontractorName = String(draft["subcontractorName"] || "").trim();
     const subcontractor = this.data
       .subcontractors()
-      .find((s) => String(s.subcontractorName || "").trim().toLowerCase() === subcontractorName.toLowerCase());
+      .find((s) =>
+        (String(s.projectId) === this.projectId() || (s.projectIds || []).includes(this.projectId()))
+        && String(s.subcontractorName || "").trim().toLowerCase() === subcontractorName.toLowerCase()
+      );
     if (!subcontractor?._id) {
       window.alert("Please select a subcontractor.");
       return;
@@ -4225,7 +4293,7 @@ export class ProjectWorkspacePage {
           : material));
       const rowId = String(row["__rowId"] || "");
       if (rowId) this.data.updateSharedRowCell(rowId, "billUrl", billUrl);
-      await this.presentToast("Bill uploaded to pCloud.");
+      await this.presentToast("Bill uploaded successfully.");
     } catch (err: any) {
       await this.presentToast(
         err?.error?.message || err?.error?.error || err?.message || "Could not upload the bill.",
@@ -4283,7 +4351,10 @@ export class ProjectWorkspacePage {
       case "subcontractorName": {
         const match = this.data
           .subcontractors()
-          .find((s) => String(s.subcontractorName || "").trim().toLowerCase() === value.toLowerCase());
+          .find((s) =>
+            (String(s.projectId) === this.projectId() || (s.projectIds || []).includes(this.projectId()))
+            && String(s.subcontractorName || "").trim().toLowerCase() === value.toLowerCase()
+          );
         if (!match?._id) return;
         patch.subcontractorId = match._id;
         break;
@@ -4504,7 +4575,13 @@ export class ProjectWorkspacePage {
       this.data.updateSharedRowCell(rowId, key, quantity);
       this.data.materials.update((materials) => materials.map((material) =>
         String(material._id || "") === String(row["_id"] || "") || String(material.id) === String(row["materialId"] || "")
-          ? { ...material, requested: quantity, quantity, purchasedQuantity: quantity }
+          ? {
+              ...material,
+              requested: quantity,
+              quantity,
+              purchased: quantity,
+              remainingStock: Math.max(0, quantity - Number(material.consumed || 0)),
+            }
           : material));
       void this.resolveMaterialMongoId(row).then((mongoId) => {
         if (!mongoId) throw new Error("Material record could not be found.");
@@ -4517,7 +4594,22 @@ export class ProjectWorkspacePage {
           requestedQuantity: quantity,
           purchasedQuantity: quantity,
         }));
-      }).catch(() => this.refreshSectionFromBackend("materials"));
+      }).then(() => {
+        this.refreshSectionFromBackend("materials");
+        this.refreshSectionFromBackend("inventory");
+      }).catch(() => {
+        this.refreshSectionFromBackend("materials");
+        this.refreshSectionFromBackend("inventory");
+      });
+      return;
+    }
+    if (section === "materials" && key === "notes") {
+      this.data.updateSharedRowCell(rowId, key, cleanValue);
+      void this.resolveMaterialMongoId(row).then((mongoId) => {
+        if (!mongoId) throw new Error("Material record could not be found.");
+        return firstValueFrom(this.api.patchMaterial(mongoId, { notes: cleanValue }));
+      }).then(() => this.refreshSectionFromBackend("materials"))
+        .catch(() => this.refreshSectionFromBackend("materials"));
       return;
     }
     if (section === "expenses" && key === "amount") {
@@ -4786,27 +4878,20 @@ export class ProjectWorkspacePage {
     this.data.updateSharedRowCell(rowId, generatedKey, "");
   }
 
-  exportExcel() {
+  async exportExcel() {
     const section = this.activeSection();
     // Attendance export needs the bulk-roster columns (project, site,
     // total workers, status, etc.) — not the legacy labour-table
     // columns that the on-screen CRUD table uses.
     const columns = section === "attendance" ? this.reportColumns(section) : this.columnsFor(section);
     const rows = this.visibleRows(section);
-    const html = [
-      "<table><thead><tr>",
-      ...columns.map((column) => `<th>${this.escapeHtml(column.label)}</th>`),
-      "</tr></thead><tbody>",
-      ...rows.map((row) => `<tr>${columns.map((column) => `<td>${this.escapeHtml(String(row[column.key] ?? ""))}</td>`).join("")}</tr>`),
-      "</tbody></table>",
-    ].join("");
-    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `annai-${this.projectId()}-${section}-${new Date().toISOString().slice(0, 10)}.xls`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    await buildReportXlsx({
+      title: section === "attendance" ? "Labour Attendance Report" : this.activeConfig().title,
+      subtitle: this.project()?.name || this.projectId(),
+      columns,
+      rows,
+      fileName: `annai-${this.projectId()}-${section}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    });
   }
 
   exportPdf() {
@@ -4905,7 +4990,8 @@ export class ProjectWorkspacePage {
     try {
       const project = await this.data.addProject(currentClient, { ...value });
       this.showProjectForm.set(false);
-      setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]));
+      await Promise.resolve();
+      await this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]);
     } catch (err) {
       console.error("[ProjectWorkspace] Failed to create project:", (err as any)?.message ?? err);
     }
@@ -4938,10 +5024,65 @@ export class ProjectWorkspacePage {
     return this.data.projectPendingAmount(project);
   }
 
-  updateProjectEstimatedValue(value: string) {
+  async updateProjectEstimatedValue(value: string) {
     const amount = Number(String(value).replace(/[^\d.-]/g, ""));
-    if (!Number.isFinite(amount)) return;
-    this.data.updateProject(this.projectId(), { totalValue: amount });
+    const projectId = this.projectId();
+    const currentProject = this.project();
+    if (!Number.isFinite(amount) || amount < 0 || !projectId || !currentProject || this.estimatedValueSaving()) return;
+    if (amount === Number(currentProject.totalValue)) return;
+
+    const previousValue = Number(currentProject.totalValue) || 0;
+    this.data.updateProject(projectId, { totalValue: amount });
+    this.estimatedValueSaving.set(true);
+    try {
+      const response = await firstValueFrom(this.api.updateProject(projectId, { totalValue: amount }));
+      const saved = mapProject((response as any)?.project || response);
+      this.data.projects.update((projects) => projects.map((project) =>
+        project.id === projectId ? { ...project, ...saved, id: project.id } : project
+      ));
+      await this.presentToast("Estimated project value updated.");
+    } catch (err: any) {
+      this.data.updateProject(projectId, { totalValue: previousValue });
+      await this.presentToast(
+        err?.error?.message || err?.message || "Could not update the estimated project value.",
+        "danger",
+      );
+    } finally {
+      this.estimatedValueSaving.set(false);
+    }
+  }
+
+  private async loadMissingProject(projectId: string): Promise<void> {
+    if (!projectId || this.fetchingProjectId === projectId || this.data.projectById(projectId)) return;
+    this.fetchingProjectId = projectId;
+    this.projectLoadError.set("");
+    try {
+      const response = await firstValueFrom(this.api.getProject(projectId));
+      const loaded = mapProject(response.project);
+      this.data.projects.update((projects) => {
+        const withoutDuplicate = projects.filter((project) => project.id !== loaded.id);
+        return [loaded, ...withoutDuplicate];
+      });
+      const matchingClient = this.data.clients().find((client) =>
+        client.id === this.clientId() || client._id === String((loaded as any).clientId || "")
+      );
+      if (matchingClient && !matchingClient.projectIds.includes(loaded.id)) {
+        this.data.clients.update((clients) => clients.map((client) =>
+          client.id === matchingClient.id
+            ? { ...client, projectIds: [loaded.id, ...client.projectIds] }
+            : client
+        ));
+      }
+    } catch (err: any) {
+      console.error("[ProjectWorkspace] Failed to load routed project:", err);
+      this.projectLoadError.set(
+        err?.status === 404
+          ? "This project could not be found. Return to the project list and try again."
+          : "The project could not be loaded. Please try again.",
+      );
+    } finally {
+      this.fetchingProjectId = "";
+    }
   }
 
   private subcontractorSpend = signal<number>(0);
@@ -5264,7 +5405,14 @@ export class ProjectWorkspacePage {
     void this.data.vendors();
     const currentProject = this.data.projectById(projectId);
     const currentClient = this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === currentProject?.client);
-    const materials = this.data.materials().filter((row) => row.projectId === projectId).map((row) => ({
+    const inventoryRows = this.data.inventory();
+    const materials = this.data.materials().filter((row) => row.projectId === projectId).map((row) => {
+      const inventory = inventoryRows.find((item) =>
+        String(item.projectId || "") === String(row.projectId || "")
+        && String(item.name || "").trim().toLowerCase() === String(row.name || "").trim().toLowerCase()
+        && String(item.unit || "").trim().toLowerCase() === String(row.unit || "").trim().toLowerCase()
+        && String(item.site || "").trim().toLowerCase() === String(row.site || "").trim().toLowerCase());
+      return {
       __rowId: `material:${row.id}`,
       __projectId: row.projectId,
       _id: (row as any)._id,
@@ -5284,10 +5432,12 @@ export class ProjectWorkspacePage {
       vendor: row.vendor,
       poNumber: row.poNumber,
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
-      remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
+      remainingStock: `${formatNumber(inventory?.remainingStock ?? row.remainingStock)} ${row.unit}`,
       status: row.status,
       notes: row.notes,
-    }));
+      __noteHistoryJson: JSON.stringify((row as any).noteHistory || []),
+      };
+    });
 
     const labour = this.data.labourForProject(projectId).map((row) => ({
       __rowId: `labour:${row.id}`,
@@ -5411,19 +5561,29 @@ export class ProjectWorkspacePage {
 
     const subcontractors = this.subcontractorPaymentRows();
 
-    const inventory = this.data.inventory().filter((row) => String(row.projectId) === projectId).map((row) => ({
+    const inventory = this.data.inventory()
+      .map((row) => {
+        const history = row.purchaseHistory || [];
+        const receivedQuantity = history.length > 0
+          ? history
+            .filter((entry) => entry.received === true)
+            .reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0)
+          : (row.received === true ? Number(row.purchasedQuantity) || 0 : 0);
+        return { row, receivedQuantity };
+      })
+      .filter(({ row, receivedQuantity }) => String(row.projectId) === projectId && receivedQuantity > 0)
+      .map(({ row, receivedQuantity }) => ({
       __rowId: `inventory:${row.id}`,
       __projectId: row.projectId,
       projectId: row.projectId,
       site: row.site,
       materialName: row.name,
       unit: row.unit,
-      purchasedQuantity: formatNumber(row.purchasedQuantity),
+      purchasedQuantity: formatNumber(receivedQuantity),
       consumedQuantity: formatNumber(row.consumedQuantity),
-      remainingStock: `${formatNumber(row.remainingStock)} ${row.unit}`,
+      remainingStock: `${formatNumber(Math.max(0, receivedQuantity - row.consumedQuantity))} ${row.unit}`,
       vendor: row.vendor,
       poNumber: row.poNumber,
-      receivedStatus: row.received ? "Received" : "Not Received",
     }));
 
     // The Attendance tab is backed by the same labour/wage lines that the
@@ -5525,7 +5685,11 @@ export class ProjectWorkspacePage {
       let page = 1;
       let totalPages = 1;
       do {
-        const res = await firstValueFrom(this.api.listSubcontractors({ limit: pageSize, page }));
+        const res = await firstValueFrom(this.api.listSubcontractors({
+          limit: pageSize,
+          page,
+          projectId: this.projectId(),
+        }));
         const items: any[] = (res as any)?.items || [];
         for (const row of items) {
           const name = String(row?.subcontractorName || row?.name || "").trim();
@@ -5563,15 +5727,13 @@ export class ProjectWorkspacePage {
     if (section === "attendance" && key === "client") return this.data.clients().map((c) => c.name).filter(Boolean);
     if (section === "attendance" && key === "subcontractorName") {
       const fromData = this.data.subcontractors()
+        .filter((s) => String(s.projectId) === this.projectId() || (s.projectIds || []).includes(this.projectId()))
         .map((s) => s.subcontractorName)
         .filter((name): name is string => Boolean(name && name.trim()));
       return [...new Set(fromData)].sort((a, b) => a.localeCompare(b));
     }
-    // Subcontractor section — dropdowns are sourced from the live
-    // /api/subcontractors and the project's site list. Every
-    // sub-contractor (active or not) is offered so existing records
-    // can always be matched; on save we re-resolve to the matching
-    // subcontractorId to avoid matching on name alone.
+    // Supervisor payments only offer subcontractors assigned to the current
+    // project. The backend query handles both projectId and projectIds.
     if (section === "subcontractors" && (key === "subcontractorName" || key === "subcontractor")) {
       const full = this.allSubcontractorNames();
       if (full.length > 0) return full;
@@ -5580,6 +5742,7 @@ export class ProjectWorkspacePage {
       // dropdown is never empty.
       return [...new Set(
         this.data.subcontractors()
+          .filter((s) => String(s.projectId) === this.projectId() || (s.projectIds || []).includes(this.projectId()))
           .map((s) => s.subcontractorName)
           .filter((name): name is string => Boolean(name && name.trim()))
       )].sort((a, b) => a.localeCompare(b));
@@ -5903,9 +6066,105 @@ export class ProjectWorkspacePage {
     return [
       ...new Set([
         ...this.materialsService.materials().map((material) => material.name),
+        ...this.allMaterialNames(),
         ...this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row)).map((row) => String(row["materialName"] || row["name"] || "")),
       ].map((value) => value.trim()).filter(Boolean)),
     ].sort((first, second) => first.localeCompare(second));
+  }
+
+  private async loadAllMaterialNames(): Promise<void> {
+    if (this.loadingAllMaterialNames()) return;
+    this.loadingAllMaterialNames.set(true);
+    const names = new Map<string, string>();
+    try {
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const response = await firstValueFrom(this.api.listMaterials({ limit: 200, page }));
+        const items = response.items || [];
+        for (const material of items) {
+          const name = String(material?.name || "").trim();
+          if (name && !names.has(name.toLowerCase())) names.set(name.toLowerCase(), name);
+        }
+        totalPages = Math.max(1, Number(response.pages) || Math.ceil(Number(response.total || 0) / 200));
+        page += 1;
+        if (!items.length) break;
+      } while (page <= totalPages);
+      this.allMaterialNames.set([...names.values()].sort((a, b) => a.localeCompare(b)));
+    } catch {
+      // Keep the already hydrated material-name options if pagination fails.
+    } finally {
+      this.loadingAllMaterialNames.set(false);
+    }
+  }
+
+  materialNoteHistory(row: TableRow): Array<{ note: string; date: string }> {
+    try {
+      const history = JSON.parse(String(row["__noteHistoryJson"] || "[]"));
+      if (Array.isArray(history) && history.length) return history;
+    } catch {
+      // Fall through to the current note for legacy rows.
+    }
+    const note = String(row["notes"] || "").trim();
+    return note ? [{ note, date: String(row["updatedAt"] || row["requestDate"] || row["createdAt"] || "") }] : [];
+  }
+
+  toggleMaterialNoteHistory(row: TableRow, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const key = this.rowKey(row);
+    this.openMaterialNoteHistoryKey.update((current) => current === key ? "" : key);
+  }
+
+  isMaterialNoteHistoryOpen(row: TableRow): boolean {
+    return this.openMaterialNoteHistoryKey() === this.rowKey(row);
+  }
+
+  formatMaterialNoteDate(value: string): string {
+    if (!value) return "Date unavailable";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  }
+
+  private consolidatedMaterialNoteHistory(group: TableRow[]): Array<{ note: string; date: string }> {
+    const entries: Array<{ note: string; date: string }> = [];
+    for (const row of group) {
+      let storedHistory: any[] = [];
+      try {
+        const parsed = JSON.parse(String(row["__noteHistoryJson"] || "[]"));
+        if (Array.isArray(parsed)) storedHistory = parsed;
+      } catch {
+        storedHistory = [];
+      }
+      if (Array.isArray(storedHistory) && storedHistory.length) {
+        for (const entry of storedHistory) {
+          const note = String(entry?.note || "").trim();
+          if (note) entries.push({ note, date: String(entry?.date || "") });
+        }
+      } else {
+        const note = String(row["notes"] || "").trim();
+        if (note) {
+          entries.push({
+            note,
+            date: String(row["updatedAt"] || row["requestDate"] || row["createdAt"] || ""),
+          });
+        }
+      }
+    }
+    const unique = new Map<string, { note: string; date: string }>();
+    for (const entry of entries) unique.set(`${entry.date}|${entry.note}`, entry);
+    return [...unique.values()].sort((a, b) => {
+      const aTime = new Date(a.date).getTime() || 0;
+      const bTime = new Date(b.date).getTime() || 0;
+      return bTime - aTime;
+    });
   }
 
   private labourTypesFromRow(row: { category: string; notes: string; presentCount: number; dailyWage?: number }): string {
@@ -6448,7 +6707,7 @@ export class ProjectWorkspacePage {
   <style>
     * { box-sizing: border-box; }
     body { margin: 30px; color: #111827; background: #f5f7fb; font-family: Inter, Arial, sans-serif; }
-    .sheet { max-width: 1180px; margin: 0 auto; padding: 28px; border: 1px solid #cbd6e6; border-radius: 14px; background: #ffffff; }
+    .sheet { display: flex; min-height: calc(100vh - 60px); max-width: 1180px; margin: 0 auto; padding: 28px; flex-direction: column; border: 1px solid #cbd6e6; border-radius: 14px; background: #ffffff; }
     header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; padding-bottom: 20px; border-bottom: 3px solid #002263; }
     .brand { color: #002263; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
     h1 { margin: 8px 0 6px; color: #0f172a; font-size: 25px; line-height: 1.12; }
@@ -6463,10 +6722,11 @@ export class ProjectWorkspacePage {
     .summary h2 { margin: 0 0 4px; color: #0f172a; font-size: 16px; }
     .summary div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e4e9f1; padding-bottom: 6px; }
     .summary div:last-child { border-bottom: 0; padding-bottom: 0; }
-    footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 50px; color: #526070; font-size: 12px; }
-    footer div { padding-top: 38px; border-top: 1px solid #94a3b8; text-align: center; }
+    footer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; width: 100%; margin-top: auto; padding-top: 64px; color: #526070; font-size: 12px; }
+    footer div { min-height: 58px; padding-top: 12px; border-top: 1px solid #94a3b8; text-align: center; }
     .print-action { margin-top: 18px; border: 0; border-radius: 8px; background: #002263; color: #fff; padding: 11px 16px; font-weight: 900; cursor: pointer; }
-    @media print { body { margin: 0; background: #fff; } .sheet { max-width: none; border: 0; border-radius: 0; padding: 0; } button { display: none; } }
+    @page { margin: 12mm; }
+    @media print { body { margin: 0; background: #fff; } .sheet { min-height: calc(100vh - 24mm); max-width: none; border: 0; border-radius: 0; padding: 0; } footer { break-inside: avoid; } button { display: none; } }
   </style>
 </head>
 <body>

@@ -50,6 +50,111 @@ export interface BuildExportArgs {
   fileName: string;
 }
 
+export interface ReportExportColumn {
+  key: string;
+  label: string;
+}
+
+export interface BuildReportExportArgs {
+  title: string;
+  subtitle?: string;
+  columns: ReportExportColumn[];
+  rows: Array<Record<string, unknown>>;
+  fileName: string;
+}
+
+const REPORT_CURRENCY_KEY = /(amount|balance|totalPaid|payable|dailyWage|weeklyPay|cost|rate|estimatedValue|totalValue|lateFine|spend|issuedAmount)$/i;
+const REPORT_RUPEE_FORMAT = "[$₹-en-IN] #,##0.00";
+
+function reportNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const normalized = String(value ?? "").replace(/[^0-9.-]/g, "");
+  if (!normalized || normalized === "-" || normalized === ".") return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Build a genuine XLSX report for workspace and dashboard tables. */
+export async function buildReportXlsx(args: BuildReportExportArgs): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Annai Golden Builders PVT LTD";
+  workbook.created = new Date();
+  const safeSheetName = args.title.replace(/[\\/*?:\[\]]/g, " ").slice(0, 31) || "Report";
+  const sheet = workbook.addWorksheet(safeSheetName, {
+    views: [{ state: "frozen", ySplit: 5, showGridLines: false }],
+  });
+  sheet.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  const columnCount = Math.max(args.columns.length, 1);
+  const lastColumn = sheet.getColumn(columnCount).letter;
+  const fontName = "Nirmala UI";
+
+  sheet.mergeCells(`A1:${lastColumn}1`);
+  const companyCell = sheet.getCell("A1");
+  companyCell.value = "ANNAI GOLDEN BUILDERS PVT LTD";
+  companyCell.font = { name: fontName, size: 11, bold: true, color: { argb: "FF1A4A8A" } };
+
+  sheet.mergeCells(`A2:${lastColumn}2`);
+  const titleCell = sheet.getCell("A2");
+  titleCell.value = args.title;
+  titleCell.font = { name: fontName, size: 18, bold: true, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF002263" } };
+  titleCell.alignment = { vertical: "middle", horizontal: "left" };
+  sheet.getRow(2).height = 30;
+
+  sheet.mergeCells(`A3:${lastColumn}3`);
+  const contextCell = sheet.getCell("A3");
+  contextCell.value = [args.subtitle, `Generated: ${new Date().toLocaleString("en-IN")}`]
+    .filter(Boolean)
+    .join("  |  ");
+  contextCell.font = { name: fontName, size: 10, color: { argb: "FF475569" } };
+
+  const headerRowNumber = 5;
+  const headerRow = sheet.getRow(headerRowNumber);
+  args.columns.forEach((column, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = column.label;
+    cell.font = { name: fontName, size: 10, bold: true, color: { argb: "FF002263" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEAF1FB" } };
+    cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+    cell.border = { bottom: { style: "medium", color: { argb: "FF1A4A8A" } } };
+  });
+  headerRow.height = 28;
+
+  args.rows.forEach((source, rowIndex) => {
+    const row = sheet.getRow(headerRowNumber + rowIndex + 1);
+    args.columns.forEach((column, columnIndex) => {
+      const cell = row.getCell(columnIndex + 1);
+      const rawValue = source[column.key];
+      const numericValue = REPORT_CURRENCY_KEY.test(column.key) ? reportNumber(rawValue) : null;
+      cell.value = numericValue ?? String(rawValue ?? "");
+      cell.font = { name: fontName, size: 10, color: { argb: "FF1E293B" } };
+      cell.alignment = { vertical: "top", horizontal: numericValue === null ? "left" : "right", wrapText: true };
+      if (numericValue !== null) cell.numFmt = REPORT_RUPEE_FORMAT;
+      cell.border = { bottom: { style: "hair", color: { argb: "FFD9E2EC" } } };
+      if (rowIndex % 2 === 1) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+      }
+    });
+  });
+
+  if (args.columns.length > 0) {
+    (sheet as any).autoFilter = {
+      from: { row: headerRowNumber, column: 1 },
+      to: { row: Math.max(headerRowNumber, headerRowNumber + args.rows.length), column: args.columns.length },
+    };
+  }
+  args.columns.forEach((column, index) => {
+    const longest = Math.max(column.label.length, ...args.rows.slice(0, 200).map((row) => String(row[column.key] ?? "").length));
+    sheet.getColumn(index + 1).width = Math.min(Math.max(longest + 3, 12), 34);
+  });
+  sheet.headerFooter.oddFooter = "&LAnnai Golden Builders&RPage &P of &N";
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  triggerDownload(new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  }), args.fileName);
+}
+
 /**
  * Shared XLSX builder for both Quotation and Tax Invoice exports.
  * Produces a real .xlsx workbook with professional formatting:
@@ -78,7 +183,7 @@ export async function buildBusinessDocumentXlsx(args: BuildExportArgs): Promise<
   const BORDER_COLOR = "FFCFDBE6";
   const SUBTLE_BORDER = "FFE2E8F0";
 
-  const FONT_NAME = "Calibri";
+  const FONT_NAME = "Nirmala UI";
   const baseFont: Partial<Font> = { name: FONT_NAME, size: 11 };
 
   // Column setup: width hints (auto-sized after writing). The first column
@@ -297,7 +402,7 @@ export async function buildBusinessDocumentXlsx(args: BuildExportArgs): Promise<
         cell.numFmt = "#,##0.##";
       } else if (headerName === "Rate" || headerName === "Amount") {
         cell.alignment = { vertical: "middle", horizontal: "right" };
-        cell.numFmt = "#,##0.00";
+        cell.numFmt = REPORT_RUPEE_FORMAT;
       } else {
         // Custom columns: text left
         cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
@@ -354,7 +459,7 @@ export async function buildBusinessDocumentXlsx(args: BuildExportArgs): Promise<
       color: { argb: t.highlight ? "FF0F172A" : "FF1E293B" },
     };
     amountCell.alignment = { vertical: "middle", horizontal: "right" };
-    amountCell.numFmt = "#,##0.00";
+    amountCell.numFmt = REPORT_RUPEE_FORMAT;
     amountCell.fill = t.highlight
       ? { type: "pattern", pattern: "solid", fgColor: { argb: GRAND_TOTAL_FILL } }
       : { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_LABEL_FILL } };

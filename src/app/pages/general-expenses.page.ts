@@ -14,6 +14,7 @@ import { formatMoney, formatNumber, statusClass } from "../shared/format";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.component";
 import { SearchableSelectComponent } from "../shared/searchable-select.component";
+import { buildReportXlsx } from "../shared/excel-export";
 
 type DashboardModule =
   | "materials"
@@ -2938,7 +2939,7 @@ export class GeneralExpensesPage implements OnInit {
       const saved = mapGeneralExpense(response.expense);
       this.data.generalExpenses.update((items) => items.map((item) =>
         String(item._id || "") === mongoId ? saved : item));
-      await this.presentToast("Bill uploaded to pCloud.");
+      await this.presentToast("Bill uploaded successfully.");
     } catch (err: any) {
       await this.presentToast(
         err?.error?.message || err?.error?.error || err?.message || "Could not upload the bill.",
@@ -3465,6 +3466,8 @@ export class GeneralExpensesPage implements OnInit {
         // through (the backend would reject a mismatched pair).
         next["siteName"] = "";
         next["site"] = "";
+        next["subcontractorName"] = "";
+        next["subcontractor"] = "";
       }
       if (this.activeModule() === "expenses") {
         const transactionType = this.normalizedExpenseTransactionType(String(key === "transactionType" ? value : next["transactionType"] || "Purchase"));
@@ -3499,6 +3502,10 @@ export class GeneralExpensesPage implements OnInit {
       }
       return next;
     });
+    if (this.activeModule() === "subcontractors" && (key === "projectName" || key === "project")) {
+      this.allSubcontractorNames.set([]);
+      void this.loadAllSubcontractorNames();
+    }
   }
 
   private preferredUnitForMaterialName(name: string): string {
@@ -3717,7 +3724,10 @@ export class GeneralExpensesPage implements OnInit {
     const subcontractorName = String(row["subcontractorName"] || "").trim();
     const subcontractor = this.data
       .subcontractors()
-      .find((s) => String(s.subcontractorName || "").trim().toLowerCase() === subcontractorName.toLowerCase());
+      .find((s) =>
+        (String(s.projectId) === project?.id || (s.projectIds || []).includes(String(project?.id || "")))
+        && String(s.subcontractorName || "").trim().toLowerCase() === subcontractorName.toLowerCase()
+      );
     if (!project?.id || !subcontractor?._id) {
       window.alert("Project and subcontractor are required.");
       return;
@@ -4103,23 +4113,16 @@ export class GeneralExpensesPage implements OnInit {
     if (wageField) this.data.updateSharedRowCell(rowId, wageField.key, "");
   }
 
-  exportExcel() {
+  async exportExcel() {
     const columns = this.columnsForActive();
     const rows = this.visibleRows();
-    const html = [
-      "<table><thead><tr>",
-      ...columns.map((column) => `<th>${this.escapeHtml(column.label)}</th>`),
-      "</tr></thead><tbody>",
-      ...rows.map((row) => `<tr>${columns.map((column) => `<td>${this.escapeHtml(String(row[column.key] ?? ""))}</td>`).join("")}</tr>`),
-      "</tbody></table>",
-    ].join("");
-    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `annai-${this.activeModule()}-${new Date().toISOString().slice(0, 10)}.xls`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    await buildReportXlsx({
+      title: this.activeConfig().title,
+      subtitle: "Company-wide report",
+      columns,
+      rows,
+      fileName: `annai-${this.activeModule()}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    });
   }
 
   exportPdf() {
@@ -4149,7 +4152,14 @@ export class GeneralExpensesPage implements OnInit {
     const clientName = (projectId: string) => projectById(projectId)?.client ?? "";
     const clientId = (projectId: string) => this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === clientName(projectId))?.id ?? "";
 
-    const materials = this.data.materials().map((row) => ({
+    const inventoryRows = this.data.inventory();
+    const materials = this.data.materials().map((row) => {
+      const inventory = inventoryRows.find((item) =>
+        String(item.projectId || "") === String(row.projectId || "")
+        && String(item.name || "").trim().toLowerCase() === String(row.name || "").trim().toLowerCase()
+        && String(item.unit || "").trim().toLowerCase() === String(row.unit || "").trim().toLowerCase()
+        && String(item.site || "").trim().toLowerCase() === String(row.site || "").trim().toLowerCase());
+      return {
       _id: row._id,
       id: row.id,
       __rowId: `material:${row.id}`,
@@ -4168,11 +4178,12 @@ export class GeneralExpensesPage implements OnInit {
       vendor: row.vendor,
       poNumber: row.poNumber,
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
-      remainingStock: `${formatNumber(row.approved || (row.purchased - row.consumed))} ${row.unit}`,
+      remainingStock: `${formatNumber(inventory?.remainingStock ?? row.remainingStock)} ${row.unit}`,
       status: row.status,
       notes: row.notes,
       ...(row.customFields || {}),
-    }));
+      };
+    });
 
     const clients = this.data.clients().map((client) => {
       const summary = this.data.clientSummary(client);
@@ -4422,7 +4433,14 @@ export class GeneralExpensesPage implements OnInit {
       let page = 1;
       let totalPages = 1;
       do {
-        const res = await firstValueFrom(this.api.listSubcontractors({ limit: pageSize, page }));
+        const projectName = String(this.draftRow()["projectName"] || this.draftRow()["project"] || "").trim();
+        const project = this.data.projects().find((item) => item.name === projectName || item.id === projectName);
+        if (!project?.id) break;
+        const res = await firstValueFrom(this.api.listSubcontractors({
+          limit: pageSize,
+          page,
+          projectId: project.id,
+        }));
         const items: any[] = (res as any)?.items || [];
         for (const row of items) {
           const name = String(row?.subcontractorName || row?.name || "").trim();
@@ -4453,11 +4471,15 @@ export class GeneralExpensesPage implements OnInit {
     if (key === "projectId") return this.projectIdOptions();
     if (module === "subcontractors" && (key === "projectName" || key === "project")) return this.projectNameOptions();
     if (module === "subcontractors" && (key === "subcontractorName" || key === "subcontractor")) {
+      const projectName = String(this.draftRow()["projectName"] || this.draftRow()["project"] || "").trim();
+      const project = this.data.projects().find((item) => item.name === projectName || item.id === projectName);
+      if (!project) return [];
       const full = this.allSubcontractorNames();
       if (full.length > 0) return full;
       return this.sortedUnique(
         this.data
           .subcontractors()
+          .filter((s) => String(s.projectId) === project.id || (s.projectIds || []).includes(project.id))
           .map((s) => s.subcontractorName)
           .filter((name): name is string => Boolean(name && name.trim()))
       );
@@ -5236,7 +5258,7 @@ export class GeneralExpensesPage implements OnInit {
   <style>
     * { box-sizing: border-box; }
     body { margin: 30px; color: #111827; background: #f5f7fb; font-family: Inter, Arial, sans-serif; }
-    .sheet { max-width: 1180px; margin: 0 auto; padding: 28px; border: 1px solid #cbd6e6; border-radius: 14px; background: #ffffff; }
+    .sheet { display: flex; min-height: calc(100vh - 60px); max-width: 1180px; margin: 0 auto; padding: 28px; flex-direction: column; border: 1px solid #cbd6e6; border-radius: 14px; background: #ffffff; }
     header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; padding-bottom: 20px; border-bottom: 3px solid #002263; }
     .brand { color: #002263; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
     h1 { margin: 8px 0 6px; color: #0f172a; font-size: 25px; line-height: 1.12; }
@@ -5251,10 +5273,11 @@ export class GeneralExpensesPage implements OnInit {
     .summary h2 { margin: 0 0 4px; color: #0f172a; font-size: 16px; }
     .summary div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e4e9f1; padding-bottom: 6px; }
     .summary div:last-child { border-bottom: 0; padding-bottom: 0; }
-    footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 50px; color: #526070; font-size: 12px; }
-    footer div { padding-top: 38px; border-top: 1px solid #94a3b8; text-align: center; }
+    footer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; width: 100%; margin-top: auto; padding-top: 64px; color: #526070; font-size: 12px; }
+    footer div { min-height: 58px; padding-top: 12px; border-top: 1px solid #94a3b8; text-align: center; }
     .print-action { margin-top: 18px; border: 0; border-radius: 8px; background: #002263; color: #fff; padding: 11px 16px; font-weight: 900; cursor: pointer; }
-    @media print { body { margin: 0; background: #fff; } .sheet { max-width: none; border: 0; border-radius: 0; padding: 0; } button { display: none; } }
+    @page { margin: 12mm; }
+    @media print { body { margin: 0; background: #fff; } .sheet { min-height: calc(100vh - 24mm); max-width: none; border: 0; border-radius: 0; padding: 0; } footer { break-inside: avoid; } button { display: none; } }
   </style>
 </head>
 <body>

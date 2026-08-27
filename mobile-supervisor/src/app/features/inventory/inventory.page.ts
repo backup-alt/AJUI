@@ -192,8 +192,8 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                   <span class="qty-min">Min: {{ item.minimumQuantity }} {{ item.unit }}</span>
                   <button
                     class="edit-qty-btn"
-                    [disabled]="!item.received"
-                    [attr.aria-label]="item.received ? 'Update material quantity' : 'Mark material as received before updating quantity'"
+                    [disabled]="item.currentQuantity <= 0"
+                    [attr.aria-label]="item.currentQuantity > 0 ? 'Update material quantity' : 'No received stock is available to consume'"
                     (click)="openEditQuantity(item); $event.stopPropagation()"
                   >
                     <ion-icon name="pencil-outline"></ion-icon>
@@ -855,7 +855,7 @@ export class InventoryPage implements OnInit, OnDestroy {
       name: material.name,
       category: (material as any).category || 'General',
       unit: material.unit,
-      currentQuantity: material.remainingStock ?? material.approvedQuantity ?? 0,
+      currentQuantity: material.availableStock ?? material.remainingStock ?? material.approvedQuantity ?? 0,
       minimumQuantity: material.minimumQuantity || 0,
       lastUpdated: material.updatedAt || material.requestDate,
       vendor: material.vendor || '',
@@ -899,9 +899,9 @@ export class InventoryPage implements OnInit, OnDestroy {
   }
 
   async openEditQuantity(item: InventoryItem): Promise<void> {
-    if (!item.received) {
+    if (item.currentQuantity <= 0) {
       const toast = await this.toastCtrl.create({
-        message: 'Mark this material as received before updating it',
+        message: 'No received stock is available to consume',
         duration: 2200,
         color: 'warning',
         position: 'top',

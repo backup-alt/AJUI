@@ -798,7 +798,11 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
     // _id wins) so supervisors don't see the same name listed three
     // times when marking attendance.
     const userId = requireSupervisor(req);
-    const rawItems = await subcontractorService.listSubcontractorsForSupervisor(userId);
+    const selectedProjectId = String(req.query.projectId || "").trim() || undefined;
+    const rawItems = await subcontractorService.listSubcontractorsForSupervisor(
+      userId,
+      selectedProjectId,
+    );
     const raw = rawItems as any[];
 
     // Sort: active first, then alphabetical. Active = status === "active"
@@ -829,6 +833,7 @@ export async function listSubcontractors(req: Request, res: Response, next: Next
         _id: String(s._id),
         subcontractorName: name,
         projectId: s.projectId ? String(s.projectId) : "",
+        projectIds: Array.isArray(s.projectIds) ? s.projectIds.map(String) : [],
         address: s.address || "",
         phone: s.phone || "",
         note: s.note || "",

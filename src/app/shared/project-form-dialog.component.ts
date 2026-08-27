@@ -71,7 +71,7 @@ type SupervisorOption = { id: string; name: string };
           </label>
           <label>
             <span>Start Date</span>
-            <input name="startDate" type="date" required [value]="initialValue?.startDate || '2026-06-07'" />
+            <input name="startDate" type="date" required [value]="initialValue?.startDate || today" />
           </label>
           <label>
             <span>Supervisor</span>
@@ -190,6 +190,7 @@ type SupervisorOption = { id: string; name: string };
 })
 export class ProjectFormDialogComponent implements OnInit {
   readonly statusOptions = ["Active", "On Hold", "Completed"];
+  readonly today = this.localIsoDate(new Date());
   @Input() eyebrow = "Project Setup";
   @Input() title = "Create New Project";
   @Input() description = "";
@@ -338,5 +339,12 @@ export class ProjectFormDialogComponent implements OnInit {
 
   private projectStatusFor(value: string): ProjectStatus {
     return value === "On Hold" || value === "Completed" ? value : "Active";
+  }
+
+  private localIsoDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 }

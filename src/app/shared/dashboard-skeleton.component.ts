@@ -46,6 +46,32 @@ import { ChangeDetectionStrategy, Component, Input } from "@angular/core";
             </div>
           }
         </div>
+      } @else if (variant === "card-grid") {
+        <div class="skeleton-card-grid">
+          @for (i of counter(cardCount); track i) {
+            <div class="skeleton-card">
+              <div class="skeleton-card-head">
+                <span class="skeleton-line w-30 tag"></span>
+                <span class="skeleton-line w-70 large"></span>
+                <span class="skeleton-line w-50"></span>
+              </div>
+              <div class="skeleton-card-meta">
+                <span class="skeleton-line w-40"></span>
+                <span class="skeleton-line w-30"></span>
+              </div>
+              <div class="skeleton-card-ledger">
+                <div><span class="skeleton-line w-50"></span><span class="skeleton-line w-70 large"></span></div>
+                <div><span class="skeleton-line w-50"></span><span class="skeleton-line w-70 large"></span></div>
+                <div><span class="skeleton-line w-50"></span><span class="skeleton-line w-70 large"></span></div>
+                <div><span class="skeleton-line w-50"></span><span class="skeleton-line w-70 large"></span></div>
+              </div>
+              <div class="skeleton-card-footer">
+                <span class="skeleton-line w-30 pill"></span>
+                <span class="skeleton-line w-50 pill"></span>
+              </div>
+            </div>
+          }
+        </div>
       } @else {
         <div class="skeleton-block" [style.height.px]="blockHeight"></div>
       }
@@ -149,6 +175,66 @@ import { ChangeDetectionStrategy, Component, Input } from "@angular/core";
       background-size: 200% 100%;
       animation: shimmer 1.4s infinite linear;
     }
+    /* Card-grid variant — used on the projects directory, client
+       workspace project-select grid, and similar rich-card lists.
+       Mirrors the layout of .projects-directory-card /
+       .project-select-card so the transition from skeleton → real
+       cards doesn't shift the page. */
+    .skeleton-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 22px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .skeleton-card {
+      display: grid;
+      gap: 16px;
+      padding: 20px;
+      border: 1px solid var(--line, #e2e8f0);
+      border-radius: 4px;
+      background: #ffffff;
+      box-sizing: border-box;
+    }
+    .skeleton-card-head {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+    .skeleton-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .skeleton-card-meta .skeleton-line {
+      height: 12px;
+    }
+    .skeleton-card-ledger {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 16px;
+    }
+    .skeleton-card-ledger > div {
+      display: grid;
+      gap: 6px;
+    }
+    .skeleton-card-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding-top: 6px;
+    }
+    .skeleton-line.tag {
+      height: 18px;
+      width: 60px;
+      border-radius: 999px;
+    }
+    .skeleton-line.pill {
+      height: 32px;
+      width: 100px;
+      border-radius: 6px;
+    }
     @keyframes shimmer {
       0% { background-position: 200% 0; }
       100% { background-position: -200% 0; }
@@ -156,9 +242,10 @@ import { ChangeDetectionStrategy, Component, Input } from "@angular/core";
   `],
 })
 export class DashboardSkeletonComponent {
-  @Input() variant: "kpi" | "chart" | "donut" | "row" | "block" = "block";
+  @Input() variant: "kpi" | "chart" | "donut" | "row" | "block" | "card-grid" = "block";
   @Input() kpiCount = 4;
   @Input() rowCount = 4;
+  @Input() cardCount = 6;
   @Input() blockHeight = 120;
   @Input() ariaLabel = "Loading";
 

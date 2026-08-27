@@ -124,6 +124,7 @@ export class ClientDashboardPage {
         try {
           const items = (r.items || []).map((c: any) => ({
             id: c.clientId,
+            _id: c._id,
             initials: c.initials,
             name: c.name,
             mobile: c.mobile,

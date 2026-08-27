@@ -156,6 +156,7 @@ export function mapMaterial(m: any): any {
     deliveredOn: m.receivedDate,
     approvalDate: m.approvalDate,
     notes: m.notes || "",
+    noteHistory: Array.isArray(m.noteHistory) ? m.noteHistory : [],
     status: m.status,
     customFields: m.customFields || {},
   };

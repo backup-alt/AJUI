@@ -116,9 +116,13 @@ function numberToWords(num: number): string {
                             <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteInvoice(inv.id)">
                               <ion-icon name="trash"></ion-icon>
                             </button>
-                            @if (!inv.clientId && inv.clientName) {
-                              <button type="button" class="icon-action-btn client" title="Make as Client" (click)="makeAsClient(inv)">
-                                <ion-icon name="id-card-outline"></ion-icon>
+                            @if (!invoiceHasClient(inv) && inv.clientName) {
+                              <button type="button" class="icon-action-btn client" title="Make as Client" [disabled]="convertingClientId() === inv.id" (click)="makeAsClient(inv)">
+                                @if (convertingClientId() === inv.id) {
+                                  <span class="agb-loading-spinner" aria-hidden="true"></span>
+                                } @else {
+                                  <ion-icon name="id-card-outline"></ion-icon>
+                                }
                               </button>
                             }
                           </td>
@@ -139,8 +143,14 @@ function numberToWords(num: number): string {
                   <div class="editor-actions">
                     <button type="button" class="btn-outline" (click)="showInvoicePreview.set(true)">Preview Invoice</button>
                     <button type="button" class="btn-outline" (click)="exportToExcel()" [disabled]="savingExcel()">Export Excel</button>
-                    <button type="button" class="btn-secondary" (click)="saveInvoice('Draft')" [disabled]="saving()">Save as Draft</button>
-                    <button type="button" class="btn-primary" (click)="saveInvoice('Sent')" [disabled]="saving()">Save & Send</button>
+                    <button type="button" class="btn-secondary" (click)="saveInvoice('Draft')" [disabled]="saving()">
+                      @if (saving()) { <span class="agb-loading-spinner" aria-hidden="true"></span> }
+                      {{ saving() ? 'Saving…' : 'Save as Draft' }}
+                    </button>
+                    <button type="button" class="btn-primary" (click)="saveInvoice('Sent')" [disabled]="saving()">
+                      @if (saving()) { <span class="agb-loading-spinner" aria-hidden="true"></span> }
+                      {{ saving() ? 'Saving…' : 'Save & Send' }}
+                    </button>
                   </div>
                 </div>
 
@@ -440,6 +450,7 @@ function numberToWords(num: number): string {
         [title]="'Convert to Client'"
         [description]="'Create a client record from this invoice details.'"
         [submitLabel]="'Create Client'"
+        [submitting]="creatingClient()"
         (cancel)="showMakeClientDialog.set(false)"
         (create)="onMakeClientCreated($event)"
       ></agb-client-form-dialog>
@@ -482,6 +493,9 @@ function numberToWords(num: number): string {
     .icon-action-btn.delete:hover { background: #fecaca; }
     .icon-action-btn.client { background: #d1fae5; color: #059669; }
     .icon-action-btn.client:hover { background: #a7f3d0; }
+    .icon-action-btn:disabled { cursor: wait; opacity: .72; }
+    .icon-action-btn .agb-loading-spinner { width: 15px; height: 15px; border-width: 2px; }
+    .editor-actions .agb-loading-spinner { width: 15px; height: 15px; border-width: 2px; }
     .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #2c5cff; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .btn-secondary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #fff; color: #2c5cff; border: 1.5px solid #2c5cff; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .btn-outline { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; border-radius: 6px; cursor: pointer; font-size: 14px; }
@@ -686,6 +700,8 @@ export class TaxInvoicePage {
   readonly editingInvoiceId = signal<string | null>(null);
   readonly saving = signal(false);
   readonly savingExcel = signal(false);
+  readonly convertingClientId = signal<string | null>(null);
+  readonly creatingClient = signal(false);
   readonly showInvoicePreview = signal(false);
   readonly sourceQuotationNumber = signal("");
 
@@ -902,7 +918,7 @@ export class TaxInvoicePage {
     this.clientGstin = client.gstNumber || "";
     this.clientState = client.state || "Tamil Nadu";
     this.clientSearchTerm.set(client.name);
-    this.selectedClientId.set(client._id || "");
+    this.selectedClientId.set(this.mongoClientId(client));
     this.showClientDropdown.set(false);
   }
 
@@ -911,12 +927,14 @@ export class TaxInvoicePage {
       c => c.name.toLowerCase() === inv.clientName.toLowerCase()
     );
     if (existing) {
+      this.convertingClientId.set(inv.id);
       this.api.patchInvoice(inv.id, { clientId: existing._id || existing.id }).subscribe({
         next: () => {
           alert("Client already exists. Invoice linked to existing client.");
           this.loadInvoicesFromBackend();
+          this.convertingClientId.set(null);
         },
-        error: () => {},
+        error: () => this.convertingClientId.set(null),
       });
       return;
     }
@@ -932,7 +950,8 @@ export class TaxInvoicePage {
 
   onMakeClientCreated(value: ClientFormValue) {
     const data = this.makeClientData();
-    if (!data) return;
+    if (!data || this.creatingClient()) return;
+    this.creatingClient.set(true);
     this.api.createClient({
       name: value.name,
       mobile: value.mobile,
@@ -945,18 +964,25 @@ export class TaxInvoicePage {
       next: (res: any) => {
         const clientId = res?.client?.clientId || res?.clientId || res?.id;
         const mongoId = res?.client?._id || res?._id;
-        this.data.addClient({ ...value, id: clientId, gstNumber: value.gstNumber || "" } as any);
+        this.data.addClient({
+          ...value,
+          id: clientId,
+          _id: mongoId,
+          gstNumber: value.gstNumber || "",
+        } as any);
         this.api.patchInvoice(data.sourceId, { clientId: mongoId || clientId }).subscribe({
           next: () => {
             this.showMakeClientDialog.set(false);
             this.makeClientData.set(null);
             this.loadInvoicesFromBackend();
+            this.creatingClient.set(false);
           },
-          error: () => {},
+          error: () => this.creatingClient.set(false),
         });
       },
       error: (err: any) => {
         console.error("Failed to create client", err);
+        this.creatingClient.set(false);
       },
     });
   }
@@ -1134,7 +1160,9 @@ export class TaxInvoicePage {
     this.clientState = quotation.clientState || "Tamil Nadu";
     this.clientGstin = quotation.clientGstin || "";
     this.clientSearchTerm.set(quotation.clientName || "");
-    this.selectedClientId.set(quotation.clientId || this.findClientIdByName(quotation.clientName || ""));
+    this.selectedClientId.set(
+      this.validMongoObjectId(quotation.clientId) || this.findClientIdByName(quotation.clientName || ""),
+    );
     this.cgstPercent.set(Number(quotation.cgstPercent) || 0);
     this.sgstPercent.set(Number(quotation.sgstPercent) || 0);
     this.roundOff.set(Number(quotation.roundOff) || 0);
@@ -1313,7 +1341,22 @@ export class TaxInvoicePage {
 
   private findClientIdByName(name: string): string | null {
     const match = this.data.clients().find(c => c.name.toLowerCase() === name.toLowerCase());
-    return match?._id || null;
+    return match ? this.mongoClientId(match) : null;
+  }
+
+  private mongoClientId(client: Client): string | null {
+    return this.validMongoObjectId(client._id);
+  }
+
+  private validMongoObjectId(value: unknown): string | null {
+    const id = String(value || "");
+    return /^[a-f\d]{24}$/i.test(id) ? id : null;
+  }
+
+  invoiceHasClient(invoice: TaxInvoice): boolean {
+    if (invoice.clientId) return true;
+    const name = String(invoice.clientName || "").trim().toLowerCase();
+    return !!name && this.data.clients().some((client) => client.name.trim().toLowerCase() === name);
   }
 
   async exportToExcel() {
@@ -1379,8 +1422,8 @@ export class TaxInvoicePage {
   }
 
   async saveInvoice(status: "Draft" | "Sent" | "Paid") {
-    if (this.invoiceRows().length === 0 || !this.clientName.trim()) {
-      alert("Please fill in client name and at least one item.");
+    if (!this.clientName.trim()) {
+      alert("Please enter a client name.");
       return;
     }
 
@@ -1389,8 +1432,6 @@ export class TaxInvoicePage {
     )) {
       return;
     }
-
-    this.saving.set(true);
 
     const rowSno = this.rowSnoMap();
     const validItems = this.invoiceRows()
@@ -1406,7 +1447,14 @@ export class TaxInvoicePage {
         isCustom: row.isCustom ?? false,
         parentRowId: row.parentRowId || null,
       }))
-      .filter(row => row.description.length > 0 || row.isCustom);
+      .filter(row => row.description.length > 0);
+
+    if (validItems.length === 0) {
+      alert("Please add at least one item with a description.");
+      return;
+    }
+
+    this.saving.set(true);
 
     const customValues = this.invoiceRows().map((row) => {
       const values: Record<string, string> = {};
@@ -1421,7 +1469,7 @@ export class TaxInvoicePage {
       companyAddress: this.companyProfile().address,
       state: this.companyProfile().state,
       gstin: this.companyProfile().gstin,
-      clientId: this.selectedClientId() || null,
+      clientId: this.validMongoObjectId(this.selectedClientId()),
       clientName: this.clientName.trim(),
       clientAddress: this.clientAddress.trim(),
       clientState: this.clientState,

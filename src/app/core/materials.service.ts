@@ -100,6 +100,8 @@ export class MaterialsService {
             orderedDate: input.orderedDate,
             paymentType: input.paymentType,
             deliveredOn: input.deliveredOn,
+            notes: (res.material?.notes || res.notes || (input as any).notes || "") as any,
+            noteHistory: (res.material?.noteHistory || res.noteHistory || []) as any,
           };
           this.materials.update((list) => [material, ...list]);
           this.data.materials.update((list) => [material, ...list]);
@@ -164,6 +166,7 @@ export class MaterialsService {
     notes: row.notes || (Array.isArray(row.purchaseHistory) && row.purchaseHistory.length
       ? (row.purchaseHistory[row.purchaseHistory.length - 1]?.notes || "")
       : "") || "",
+    noteHistory: Array.isArray(row.noteHistory) ? row.noteHistory : [],
     status: row.status,
     requestDate: row.requestDate,
     receivedDate: row.receivedDate,

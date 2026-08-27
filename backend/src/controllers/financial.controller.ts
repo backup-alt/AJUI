@@ -247,6 +247,8 @@ export async function updateMaterial(req: Request, res: Response, next: NextFunc
 
     const material = await materialService.updateMaterial(req.params.id, body);
     invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/inventory");
+    invalidateCachePrefix("/api/supervisor/materials");
     invalidateCachePrefix("/api/dashboard/batch");
     res.json({ material });
   } catch (e) { next(e); }

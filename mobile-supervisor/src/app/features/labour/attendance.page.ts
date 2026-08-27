@@ -457,7 +457,9 @@ export class AttendancePage implements OnInit, OnDestroy {
     this.isLoading.set(true);
     try {
       const [subsRes, attRes] = await Promise.all([
-        this.supervisor.getSubcontractors().toPromise(),
+        this.supervisor.getSubcontractors(
+          this.supervisor.selectedProjectId() || undefined,
+        ).toPromise(),
         this.supervisor.getBulkAttendanceForDate(this.todayDate).toPromise(),
       ]);
       this.subcontractors.set(subsRes?.subcontractors || []);

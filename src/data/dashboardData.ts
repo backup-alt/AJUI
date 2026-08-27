@@ -278,6 +278,11 @@ export type InventoryRow = {
   poNumber?: string;
   received?: boolean;
   receivedDate?: string;
+  purchaseHistory?: Array<{
+    quantity?: number;
+    received?: boolean;
+    receivedDate?: string;
+  }>;
   customFields?: Record<string, string | number | boolean | null>;
 };
 

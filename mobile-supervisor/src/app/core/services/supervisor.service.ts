@@ -334,9 +334,8 @@ export class SupervisorService {
 
   // ---------------- Subcontractors ----------------
   getSubcontractors(projectId?: string, siteId?: string) {
-    // Mirror the web /subcontractors page: fetch every subcontractor
-    // (not just active ones) using the same 500-row window so the
-    // worker-create dropdown matches what the office sees.
+    // The backend applies supervisor access and, when supplied, the active
+    // project assignment (supporting both projectId and projectIds).
     const params: Record<string, string | number> = { limit: 500, page: 1 };
     if (projectId) params['projectId'] = projectId;
     if (siteId) params['siteId'] = siteId;

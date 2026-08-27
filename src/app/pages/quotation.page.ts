@@ -121,9 +121,13 @@ function numberToWords(num: number): string {
                             <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteQuotation(quote.id)">
                               <ion-icon name="trash"></ion-icon>
                             </button>
-                            @if (!quote.clientId && quote.clientName) {
-                              <button type="button" class="icon-action-btn client" title="Make as Client" (click)="makeAsClient(quote)">
-                                <ion-icon name="id-card-outline"></ion-icon>
+                            @if (!quotationHasClient(quote) && quote.clientName) {
+                              <button type="button" class="icon-action-btn client" title="Make as Client" [disabled]="convertingClientId() === quote.id" (click)="makeAsClient(quote)">
+                                @if (convertingClientId() === quote.id) {
+                                  <span class="agb-loading-spinner" aria-hidden="true"></span>
+                                } @else {
+                                  <ion-icon name="id-card-outline"></ion-icon>
+                                }
                               </button>
                             }
                           </td>
@@ -143,8 +147,14 @@ function numberToWords(num: number): string {
                   </button>
                   <div class="editor-actions">
                     <button type="button" class="btn-outline" (click)="exportToExcel()" [disabled]="savingExcel()">Export Excel</button>
-                    <button type="button" class="btn-secondary" (click)="saveQuotation('Draft')" [disabled]="savingQuote()">Save as Draft</button>
-                    <button type="button" class="btn-primary" (click)="saveQuotation('Sent')" [disabled]="savingQuote()">Save & Send</button>
+                    <button type="button" class="btn-secondary" (click)="saveQuotation('Draft')" [disabled]="savingQuote()">
+                      @if (savingQuote()) { <span class="agb-loading-spinner" aria-hidden="true"></span> }
+                      {{ savingQuote() ? 'Saving…' : 'Save as Draft' }}
+                    </button>
+                    <button type="button" class="btn-primary" (click)="saveQuotation('Sent')" [disabled]="savingQuote()">
+                      @if (savingQuote()) { <span class="agb-loading-spinner" aria-hidden="true"></span> }
+                      {{ savingQuote() ? 'Saving…' : 'Save & Send' }}
+                    </button>
                     <button type="button" class="btn-outline" (click)="showQuotationPreview.set(true)" [disabled]="savingQuote()">Preview</button>
                   </div>
                 </div>
@@ -443,6 +453,7 @@ function numberToWords(num: number): string {
         [title]="'Convert to Client'"
         [description]="'Create a client record from this quotation details.'"
         [submitLabel]="'Create Client'"
+        [submitting]="creatingClient()"
         (cancel)="showMakeClientDialog.set(false)"
         (create)="onMakeClientCreated($event)"
       ></agb-client-form-dialog>
@@ -570,6 +581,9 @@ function numberToWords(num: number): string {
     .icon-action-btn.delete:hover { background: #fecaca; }
     .icon-action-btn.client { background: #d1fae5; color: #059669; }
     .icon-action-btn.client:hover { background: #a7f3d0; }
+    .icon-action-btn:disabled { cursor: wait; opacity: .72; }
+    .icon-action-btn .agb-loading-spinner,
+    .editor-actions .agb-loading-spinner { width: 15px; height: 15px; border-width: 2px; }
     .invoice-action-btn { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; margin-right: 6px; padding: 0 10px; border: 0; border-radius: 999px; background: #ede9fe; color: #6d28d9; font-size: 11px; font-weight: 700; cursor: pointer; }
     .invoice-action-btn:hover { background: #ddd6fe; }
     .invoice-action-btn ion-icon { font-size: 15px; }
@@ -1165,6 +1179,8 @@ export class QuotationPage {
 readonly savingPdf = signal(false);
   readonly savingExcel = signal(false);
   readonly savingQuote = signal(false);
+  readonly convertingClientId = signal<string | null>(null);
+  readonly creatingClient = signal(false);
   readonly editingQuoteId = signal<string | null>(null);
   readonly quotationRows = signal<QuotationRow[]>([]);
   readonly customColumns = signal<string[]>([]);
@@ -1389,7 +1405,7 @@ readonly savingPdf = signal(false);
     this.clientGstin = client.gstNumber || "";
     this.clientState = client.state || "Tamil Nadu";
     this.clientSearchTerm.set(client.name);
-    this.selectedClientId.set(client._id || "");
+    this.selectedClientId.set(this.mongoClientId(client));
     this.showClientDropdown.set(false);
   }
 
@@ -1398,12 +1414,14 @@ readonly savingPdf = signal(false);
       c => c.name.toLowerCase() === quote.clientName.toLowerCase()
     );
     if (existing) {
+      this.convertingClientId.set(quote.id);
       this.api.patchQuotation(quote.id, { clientId: existing._id || existing.id }).subscribe({
         next: () => {
           alert("Client already exists. Quotation linked to existing client.");
           this.loadQuotationsFromBackend();
+          this.convertingClientId.set(null);
         },
-        error: () => {},
+        error: () => this.convertingClientId.set(null),
       });
       return;
     }
@@ -1425,7 +1443,8 @@ readonly savingPdf = signal(false);
 
   onMakeClientCreated(value: ClientFormValue) {
     const data = this.makeClientData();
-    if (!data) return;
+    if (!data || this.creatingClient()) return;
+    this.creatingClient.set(true);
     this.api.createClient({
       name: value.name,
       mobile: value.mobile,
@@ -1438,18 +1457,25 @@ readonly savingPdf = signal(false);
       next: (res: any) => {
         const clientId = res?.client?.clientId || res?.clientId || res?.id;
         const mongoId = res?.client?._id || res?._id;
-        this.data.addClient({ ...value, id: clientId, gstNumber: value.gstNumber || "" } as any);
+        this.data.addClient({
+          ...value,
+          id: clientId,
+          _id: mongoId,
+          gstNumber: value.gstNumber || "",
+        } as any);
         this.api.patchQuotation(data.sourceId, { clientId: mongoId || clientId }).subscribe({
           next: () => {
             this.showMakeClientDialog.set(false);
             this.makeClientData.set(null);
             this.loadQuotationsFromBackend();
+            this.creatingClient.set(false);
           },
-          error: () => {},
+          error: () => this.creatingClient.set(false),
         });
       },
       error: (err: any) => {
         console.error("Failed to create client", err);
+        this.creatingClient.set(false);
       },
     });
   }
@@ -1564,7 +1590,22 @@ readonly savingPdf = signal(false);
 
   private findClientIdByName(name: string): string | null {
     const match = this.data.clients().find(c => c.name.toLowerCase() === name.toLowerCase());
-    return match?._id || null;
+    return match ? this.mongoClientId(match) : null;
+  }
+
+  private mongoClientId(client: Client): string | null {
+    return this.validMongoObjectId(client._id);
+  }
+
+  private validMongoObjectId(value: unknown): string | null {
+    const id = String(value || "");
+    return /^[a-f\d]{24}$/i.test(id) ? id : null;
+  }
+
+  quotationHasClient(quotation: Quotation): boolean {
+    if (quotation.clientId) return true;
+    const name = String(quotation.clientName || "").trim().toLowerCase();
+    return !!name && this.data.clients().some((client) => client.name.trim().toLowerCase() === name);
   }
 
   addRow() {
@@ -1688,12 +1729,10 @@ readonly savingPdf = signal(false);
   }
 
   async saveQuotation(status: "Draft" | "Sent") {
-    if (this.quotationRows().length === 0) {
-      alert("Please add at least one item.");
+    if (!this.clientName.trim()) {
+      alert("Please enter a client name.");
       return;
     }
-
-    this.savingQuote.set(true);
 
     const validItems = this.quotationRows()
       .map((row) => {
@@ -1713,6 +1752,13 @@ readonly savingPdf = signal(false);
       })
       .filter((row) => row.description.length > 0);
 
+    if (validItems.length === 0) {
+      alert("Please add at least one item with a description.");
+      return;
+    }
+
+    this.savingQuote.set(true);
+
     const quotationData = {
       quotationNumber: this.currentQuoteNumber(),
       date: this.quotationDate(),
@@ -1720,8 +1766,8 @@ readonly savingPdf = signal(false);
       companyAddress: this.companyProfile().address,
       state: this.companyProfile().state,
       gstin: this.companyProfile().gstin,
-      clientId: this.selectedClientId() || null,
-      clientName: this.clientName,
+      clientId: this.validMongoObjectId(this.selectedClientId()),
+      clientName: this.clientName.trim(),
       clientAddress: this.clientAddress,
       clientState: this.clientState,
       clientGstin: this.clientGstin,

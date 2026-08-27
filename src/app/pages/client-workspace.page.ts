@@ -16,6 +16,7 @@ import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
 import { formatMoney, statusClass } from "../shared/format";
+import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.component";
 
 @Component({
   standalone: true,
@@ -29,6 +30,7 @@ import { formatMoney, statusClass } from "../shared/format";
     EnterpriseHeaderComponent,
     EnterpriseSidebarComponent,
     ProjectFormDialogComponent,
+    DashboardSkeletonComponent,
   ],
   template: `
     <ion-split-pane contentId="main-content" when="lg">
@@ -50,15 +52,15 @@ import { formatMoney, statusClass } from "../shared/format";
         />
 
         <ion-content class="erp-page">
+          <main class="workspace-shell client-project-loading" *ngIf="!client()">
+            <agb-dashboard-skeleton variant="card-grid" [cardCount]="4" ariaLabel="Loading client projects"></agb-dashboard-skeleton>
+          </main>
           <main class="workspace-shell client-project-shell" *ngIf="client() as currentClient">
-            <section class="module-panel project-management-panel">
-              <div class="module-toolbar">
-                <div>
-                  <h2>Project Management</h2>
+            <header class="project-management-heading">
+              <h2>Project Management</h2>
               <p>Select a project to open its details, activity, and settings.</p>
-                </div>
-              </div>
-
+            </header>
+            <section class="module-panel project-management-panel">
               <div class="project-select-grid">
                 <article class="project-select-card add-client-card add-project-card" role="button" tabindex="0" (click)="openCreateProject()" (keydown.enter)="openCreateProject()">
                   <div class="add-client-icon">
@@ -124,6 +126,41 @@ import { formatMoney, statusClass } from "../shared/format";
     </ion-split-pane>
   `,
   styles: [`
+    .project-management-heading {
+      margin: 0 0 14px;
+      padding: 0 2px;
+    }
+
+    .project-management-heading h2 {
+      margin: 0;
+      color: #101828;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .project-management-heading p {
+      margin: 5px 0 0;
+      color: #667085;
+      font-size: 13px;
+    }
+
+    .project-management-panel {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .project-select-grid {
+      align-items: stretch;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+
+    .project-select-grid > .project-select-card {
+      align-self: stretch;
+      height: 100%;
+    }
+
     .add-project-card {
       display: flex;
       flex-direction: column;
@@ -157,6 +194,9 @@ import { formatMoney, statusClass } from "../shared/format";
       .add-project-card {
         min-height: 210px;
         padding: 22px 18px;
+      }
+      .project-select-grid > .project-select-card {
+        height: auto;
       }
     }
   `],
@@ -265,7 +305,14 @@ export class ClientWorkspacePage {
         const project = await this.data.addProject(currentClient, { ...value });
         this.showProjectForm.set(false);
         await this.presentToast(`Project "${value.name}" created.`);
-        setTimeout(() => void this.router.navigate(["/clients", currentClient.id, "projects", project.id]));
+        // The projects signal is already updated inside addProject() before
+        // the await resolves, so the workspace signal `project = computed(() =>
+        // data.projectById(this.projectId()))` will find the new project on its
+        // next evaluation. Wrapping the navigate in a microtask defers past
+        // the toast's pending UI state and any pending change-detection cycle
+        // without the indeterminate timing of setTimeout(0).
+        await Promise.resolve();
+        await this.router.navigate(["/clients", currentClient.id, "projects", project.id]);
       } catch (err) {
         console.error("[ClientWorkspace] Failed to create project:", (err as any)?.message ?? err);
         await this.presentToast(

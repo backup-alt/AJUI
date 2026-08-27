@@ -55,11 +55,13 @@ async function resolveRefs(
   if (!sub) throw new AppError(404, "Subcontractor not found");
   const project = await Project.findById(toObjectId(projectId, "projectId"));
   if (!project) throw new AppError(404, "Project not found");
-  if (sub.projectId && String(sub.projectId) !== String(project._id)) {
-    // Sub-contractor is associated with a single project by default;
-    // the spec still allows them to supply labourers to other projects
-    // (multi-project assignment). Allow it but log a warning to make
-    // it visible in logs.
+  const assignedProjectIds = new Set(
+    [sub.projectId, ...(sub.projectIds || [])]
+      .filter(Boolean)
+      .map((assignedProjectId) => String(assignedProjectId)),
+  );
+  if (!assignedProjectIds.has(String(project._id))) {
+    throw new AppError(400, "Sub-contractor is not assigned to the selected project");
   }
   let siteDoc: { _id: Types.ObjectId; name: string } | undefined;
   if (siteId) {

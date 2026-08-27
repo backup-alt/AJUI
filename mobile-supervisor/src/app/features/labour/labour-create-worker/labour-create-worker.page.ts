@@ -310,7 +310,9 @@ export class LabourCreateWorkerPage implements OnInit {
   private async loadSubcontractors(): Promise<void> {
     this.loadingSubcontractors.set(true);
     try {
-      const res = await firstValueFrom(this.supervisor.getSubcontractors());
+      const res = await firstValueFrom(this.supervisor.getSubcontractors(
+        this.supervisor.selectedProjectId() || undefined,
+      ));
       this.subcontractors.set(res?.subcontractors ?? []);
     } catch {
       this.subcontractors.set([]);

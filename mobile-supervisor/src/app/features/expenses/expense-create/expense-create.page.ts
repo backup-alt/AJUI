@@ -26,7 +26,6 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
-  alertCircleOutline,
   cartOutline,
   cashOutline,
   checkmarkCircleOutline,
@@ -108,7 +107,7 @@ import { Vendor } from '../../../shared/models';
               </div>
               <div class="type-info">
                 <strong>Purchase</strong>
-                <span>Record a purchase expense (goes through approval, checks balance)</span>
+                <span>Record a purchase expense for admin approval</span>
               </div>
             </div>
             <div class="type-card" [class.selected]="expenseType() === 'Add Cash'" (click)="selectType('Add Cash')">
@@ -288,17 +287,10 @@ import { Vendor } from '../../../shared/models';
             }
           </ion-list>
 
-          @if (expenseType() === 'Purchase' && !isSiteMaterial && expense.amount && expense.amount > currentBalance()!) {
-            <div class="block-notice">
-              <ion-icon name="alert-circle-outline"></ion-icon>
-              Cannot submit - amount exceeds available balance
-            </div>
-          }
-
           <div class="form-actions">
             <ion-button
               expand="block"
-              [disabled]="!isValid() || isSubmitting() || (expenseType() === 'Purchase' && !isSiteMaterial && expense.amount! > currentBalance()!)"
+              [disabled]="!isValid() || isSubmitting()"
               (click)="submit()"
             >
               @if (isSubmitting()) {
@@ -343,7 +335,6 @@ import { Vendor } from '../../../shared/models';
     .balance-value { font-size: 18px; font-weight: 700; color: #002263; }
     .balance-value.negative { color: #dc2626; }
     .balance-warning { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #dc2626; font-weight: 600; }
-    .block-notice { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff5f5; border: 1px solid #fca5a5; border-radius: 8px; color: #dc2626; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
     .form-list { background: transparent; padding: 0; }
     .form-item { --background: #ffffff; --background-hover: #ffffff; --background-focused: #ffffff; --background-checked: #ffffff; --border-radius: 0 !important; --inner-border-radius: 0 !important; --padding-start: 14px; --padding-end: 14px; --min-height: 64px; border: 1px solid #e5e7eb; border-bottom: none; margin-bottom: 0; --highlight-color-checked: transparent; --highlight-color-focused: transparent; --highlight-color-valid: transparent; --highlight-color-invalid: transparent; }
     .toggle-item { background: #ffffff; border: 1px solid #e5e7eb; border-bottom: none; padding: 14px; margin-bottom: 0; min-height: 64px; box-sizing: border-box; }
@@ -430,7 +421,6 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     addIcons({
-      alertCircleOutline,
       cartOutline,
       cashOutline,
       checkmarkCircleOutline,
@@ -630,31 +620,9 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
     const siteName = this.selectedSiteName();
     const projectId = this.siteProjectId();
 
-    if (!siteId || !siteName) {
-      const toast = await this.toastCtrl.create({
-        message: 'Please select a project first',
-        duration: 2500,
-        color: 'warning',
-        position: 'top',
-      });
-      await toast.present();
-      return;
-    }
-
     if (!projectId) {
       const toast = await this.toastCtrl.create({
         message: 'This project is not configured for mobile updates. Please contact admin.',
-        duration: 3000,
-        color: 'danger',
-        position: 'top',
-      });
-      await toast.present();
-      return;
-    }
-
-    if (this.expenseType() === 'Purchase' && !this.isSiteMaterial && this.expense.amount! > this.currentBalance()!) {
-      const toast = await this.toastCtrl.create({
-        message: 'Cannot submit - amount exceeds available balance',
         duration: 3000,
         color: 'danger',
         position: 'top',
@@ -671,8 +639,8 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
     const payload: any = {
       type: 'site',
       projectId,
-      siteId,
-      site: siteName,
+      siteId: siteId || undefined,
+      site: siteName || this.selectedProjectName() || 'Project',
       transactionType: isCashAdded ? 'Cash Added' : 'Purchase',
       amount: this.expense.amount || 0,
       date: new Date().toISOString().slice(0, 10),

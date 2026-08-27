@@ -4,7 +4,10 @@ import { Project } from "../models/Project.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
-import { getSupervisorAccess } from "./supervisor-mobile.service.js";
+import {
+  ensureSupervisorSiteAccess,
+  getSupervisorAccess,
+} from "./supervisor-mobile.service.js";
 
 export interface CreateSubcontractorInput {
   projectId: string;
@@ -118,11 +121,18 @@ export async function listSubcontractorsForWorker(filter: {
  * when the supervisor has no accessible projects — the worker-create
  * UI then shows the empty-state message.
  */
-export async function listSubcontractorsForSupervisor(userId: string) {
+export async function listSubcontractorsForSupervisor(userId: string, projectId?: string) {
   const access = await getSupervisorAccess(userId);
   const query: Record<string, unknown> = { status: "active" };
 
-  if (access.projectIds.length > 0) {
+  if (projectId) {
+    await ensureSupervisorSiteAccess(userId, projectId);
+    const requestedProjectId = toObjectId(projectId);
+    query.$or = [
+      { projectId: requestedProjectId },
+      { projectIds: requestedProjectId },
+    ];
+  } else if (access.projectIds.length > 0) {
     // Match subcontractors assigned via EITHER projectId (singular) OR projectIds (array)
     query.$or = [
       { projectId: { $in: access.projectIds } },
@@ -147,7 +157,7 @@ export async function listSubcontractorsForSupervisor(userId: string) {
   }
 
   const items = await Subcontractor.find(query)
-    .select("_id subcontractorName projectId projectIds")
+    .select("_id subcontractorName projectId projectIds address phone note status")
     .sort({ subcontractorName: 1 })
     .lean();
   return items.map((s) => ({

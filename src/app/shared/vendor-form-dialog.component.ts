@@ -1,8 +1,45 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, EventEmitter, inject, Input, OnInit, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { IonIcon } from "@ionic/angular/standalone";
+import { ErpDataService } from "../data/erp-data.service";
 import { SearchableSelectComponent } from "./searchable-select.component";
+
+const COMMON_VENDOR_MATERIALS = [
+  "AAC Blocks",
+  "Adhesives",
+  "Aggregate",
+  "Aluminium",
+  "Bricks",
+  "Cement",
+  "Construction Chemicals",
+  "Doors",
+  "Electrical Materials",
+  "Fasteners",
+  "Glass",
+  "Granite",
+  "Hardware",
+  "M-Sand",
+  "Marble",
+  "Paint",
+  "P-Sand",
+  "Pipes and Fittings",
+  "Plumbing Materials",
+  "Plywood",
+  "Ready-Mix Concrete",
+  "River Sand",
+  "Roofing Sheets",
+  "Safety Equipment",
+  "Sanitary Ware",
+  "Scaffolding",
+  "Solid Blocks",
+  "Steel",
+  "Tiles",
+  "Timber",
+  "TMT Bars",
+  "Waterproofing Materials",
+  "Windows",
+];
 
 export type VendorFormValue = {
   name: string;
@@ -40,7 +77,13 @@ export type VendorFormValue = {
           </label>
           <label>
             <span>Material Type</span>
-            <input name="materialType" [(ngModel)]="materialTypeValue" placeholder="e.g. Cement, Bricks, Steel" />
+            <agb-searchable-select
+              name="materialType"
+              [(ngModel)]="materialTypeValue"
+              [options]="materialTypeOptions()"
+              [allowCustom]="true"
+              placeholder="Search or enter a material"
+            ></agb-searchable-select>
           </label>
           <label>
             <span>Phone Number</span>
@@ -75,6 +118,8 @@ export type VendorFormValue = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VendorFormDialogComponent implements OnInit {
+  private readonly data = inject(ErpDataService);
+
   @Input() eyebrow = "Vendor Setup";
   @Input() title = "Add New Vendor";
   @Input() description = "Create the vendor record to track material purchases, GST, and payment history.";
@@ -90,6 +135,21 @@ export class VendorFormDialogComponent implements OnInit {
   gstValue = "";
   gstTypeValue: "GST" | "Non-GST" = "GST";
   readonly gstTypeOptions = ["GST", "Non-GST"];
+  readonly materialTypeOptions = computed(() => {
+    const uniqueMaterials = new Map<string, string>();
+    const values = [
+      ...COMMON_VENDOR_MATERIALS,
+      ...this.data.materials().map((material) => material.name),
+      ...this.data.vendors().map((vendor) => vendor.materialType),
+    ];
+
+    for (const value of values) {
+      const materialName = String(value || "").trim();
+      if (materialName) uniqueMaterials.set(materialName.toLocaleLowerCase(), materialName);
+    }
+
+    return [...uniqueMaterials.values()].sort((left, right) => left.localeCompare(right));
+  });
   addressValue = "";
 
   ngOnInit() {

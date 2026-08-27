@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostListener, OnInit, inject } from "@angular/core";
 import { RouterOutlet } from "@angular/router";
 import { IonApp } from "@ionic/angular/standalone";
 import { ApiService } from "./core/api.service";
@@ -28,6 +28,17 @@ export class AppComponent implements OnInit {
     }
     this.startKeepAlive();
     requestAnimationFrame(() => this.removeSplash());
+  }
+
+  @HostListener("document:click", ["$event"])
+  openDatePickerFromField(event: MouseEvent): void {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.type !== "date" || target.disabled || target.readOnly) return;
+    try {
+      (target as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+    } catch {
+      // Browsers without showPicker still open their native calendar normally.
+    }
   }
 
   /** Ping /keepalive immediately, then every 10 min to prevent

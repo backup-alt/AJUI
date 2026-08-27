@@ -135,6 +135,9 @@ export async function createMaterial(input: CreateMaterialInput) {
     status: "Not Received",
     createdBy: input.createdBy,
     notes: input.notes,
+    noteHistory: input.notes?.trim()
+      ? [{ note: input.notes.trim(), date: new Date() }]
+      : [],
   });
 
   const { ensureMaterialInInventory } = await import("./inventory.service.js");
@@ -354,6 +357,9 @@ export async function updateMaterial(
   id: string,
   patch: Partial<CreateMaterialInput> & { status?: "Received" | "Not Received" },
 ) {
+  const existingMaterial = await Material.findById(id).lean();
+  if (!existingMaterial) throw new AppError(404, "Material not found");
+
   const update: Record<string, unknown> = { ...patch };
   for (const key of ["receiptImage", "receiptImageMimeType", "billUrl", "pcloudFileId", "pcloudPublicCode", "pcloudContentHash"]) {
     delete update[key];
@@ -364,12 +370,44 @@ export async function updateMaterial(
     if (site) update.site = site.name;
   }
   if (patch.vendorId) update.vendorId = new Types.ObjectId(patch.vendorId);
+  if (patch.notes !== undefined) {
+    const history = Array.isArray(existingMaterial.noteHistory)
+      ? existingMaterial.noteHistory.map((entry) => ({ note: entry.note, date: entry.date }))
+      : [];
+    const previousNote = String(existingMaterial.notes || "").trim();
+    if (previousNote && !history.some((entry) => entry.note === previousNote)) {
+      history.push({
+        note: previousNote,
+        date: existingMaterial.updatedAt || existingMaterial.createdAt || new Date(),
+      });
+    }
+    const nextNote = String(patch.notes || "").trim();
+    if (nextNote && history[history.length - 1]?.note !== nextNote) {
+      history.push({ note: nextNote, date: new Date() });
+    }
+    update.noteHistory = history;
+  }
   // Received Date is system-owned. The supervisor action only needs to
   // change the status; the API records the exact day of that transition.
   if (patch.status === "Received") {
     update.receivedDate = new Date().toISOString().slice(0, 10);
   } else if (patch.status === "Not Received") {
-    update.receivedDate = undefined;
+    update.receivedDate = null;
+  }
+
+  const previousPurchased = Math.max(0, Number(existingMaterial.purchasedQuantity) || 0);
+  const nextPurchased = patch.purchasedQuantity === undefined
+    ? previousPurchased
+    : Math.max(0, Number(patch.purchasedQuantity) || 0);
+  const nextConsumed = patch.consumedQuantity === undefined
+    ? Math.max(0, Number(existingMaterial.consumedQuantity) || 0)
+    : Math.max(0, Number(patch.consumedQuantity) || 0);
+  if (patch.purchasedQuantity !== undefined || patch.consumedQuantity !== undefined) {
+    update.remainingStock = Math.max(0, nextPurchased - nextConsumed);
+  }
+  if (nextPurchased > previousPurchased) {
+    update.status = "Not Received";
+    update.receivedDate = null;
   }
 
   const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
@@ -382,6 +420,10 @@ export async function updateMaterial(
 
   const material = await Material.findByIdAndUpdate(id, update, { new: true });
   if (!material) throw new AppError(404, "Material not found");
+  if (nextPurchased !== previousPurchased) {
+    const { syncMaterialQuantityChange } = await import("./inventory.service.js");
+    await syncMaterialQuantityChange(material._id, previousPurchased, patch.createdBy);
+  }
   if (patch.status) {
     const { syncMaterialReceivedStatus } = await import("./inventory.service.js");
     await syncMaterialReceivedStatus(material._id);
