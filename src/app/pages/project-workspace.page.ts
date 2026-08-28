@@ -6367,32 +6367,66 @@ export class ProjectWorkspacePage {
   }
 
   private materialPoHistorySources(row: any, inventory: any): Array<{ poNumber: string; date: string; quantity: number; unit: string }> {
-    const entries: Array<{ poNumber: string; date: string; quantity: number; unit: string }> = [];
-    const seen = new Set<string>();
     const unit = String(row?.unit || inventory?.unit || "").trim();
-    const add = (poNumber: unknown, date?: unknown, quantity?: unknown) => {
+    const inventoryPo = String(inventory?.poNumber || "").trim();
+    const lastMaterialId = String(inventory?.lastMaterialId || "").trim();
+    const byPo = new Map<string, { poNumber: string; date: string; quantity: number; unit: string }>();
+    const upsertPurchase = (poNumber: unknown, date?: unknown, quantity?: unknown) => {
       const po = String(poNumber || "").trim();
-      if (!po || seen.has(po)) return;
-      seen.add(po);
-      entries.push({
-        poNumber: po,
-        date: String(date || ""),
-        quantity: Number(quantity) || 0,
-        unit,
-      });
+      if (!po) return;
+      const existing = byPo.get(po);
+      if (!existing) {
+        byPo.set(po, {
+          poNumber: po,
+          date: String(date || ""),
+          quantity: Number(quantity) || 0,
+          unit,
+        });
+        return;
+      }
+      existing.quantity += Number(quantity) || 0;
+      const candidate = String(date || "");
+      if (candidate && (!existing.date || Date.parse(candidate) > Date.parse(existing.date))) {
+        existing.date = candidate;
+      }
     };
-    add(row?.poNumber, row?.requestDate || row?.createdAt || row?.updatedAt, row?.requested || row?.quantity);
+    // The ledger records each purchase with its own quantity, date and PO
+    // number, so group by PO for a per-PO figure instead of showing the
+    // material's running total against one entry.
     for (const purchase of Array.isArray(inventory?.purchaseHistory) ? inventory.purchaseHistory : []) {
-      add(
-        purchase?.poNumber,
+      const purchaseMaterialId = String(purchase?.materialId || "").trim();
+      // A PO is assigned after the material is added. Older inventory rows
+      // therefore have the PO only at the top level, while the exact purchase
+      // increment remains on the history entry linked by lastMaterialId.
+      const purchasePo = String(purchase?.poNumber || "").trim()
+        || (inventoryPo && lastMaterialId && purchaseMaterialId === lastMaterialId ? inventoryPo : "");
+      upsertPurchase(
+        purchasePo,
         purchase?.date || purchase?.createdAt || inventory?.updatedAt || inventory?.createdAt,
         purchase?.quantity,
       );
     }
-    if (inventory && String(inventory?.poNumber || "").trim()) {
-      add(inventory.poNumber, inventory?.updatedAt || inventory?.createdAt, inventory?.purchasedQuantity);
+    // Always include the material's current PO / inventory PO, but only as a
+    // fallback so a ledger-backed quantity is never overwritten by the
+    // cumulative material total.
+    const currentPo = String(row?.poNumber || "").trim();
+    if (currentPo && !byPo.has(currentPo)) {
+      byPo.set(currentPo, {
+        poNumber: currentPo,
+        date: String(row?.requestDate || row?.createdAt || row?.updatedAt || ""),
+        quantity: Number(row?.requested || row?.quantity) || 0,
+        unit,
+      });
     }
-    return entries;
+    if (inventoryPo && !byPo.has(inventoryPo)) {
+      byPo.set(inventoryPo, {
+        poNumber: inventoryPo,
+        date: String(inventory?.updatedAt || inventory?.createdAt || ""),
+        quantity: Number(inventory?.purchasedQuantity) || 0,
+        unit,
+      });
+    }
+    return [...byPo.values()];
   }
 
   private consolidatedMaterialPoHistory(group: TableRow[]): Array<{ poNumber: string; date: string; quantity: number; unit: string }> {

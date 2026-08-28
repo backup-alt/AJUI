@@ -1049,8 +1049,17 @@ export class ErpDataService {
     return this.projectActivity()[projectId] ?? 0;
   }
 
+  private projectActivityTimestamp(projectId: string): number {
+    const localActivity = this.projectActivity()[projectId] ?? 0;
+    if (localActivity) return localActivity;
+    const lastActivityAt = this.projectById(projectId)?.lastActivityAt;
+    if (!lastActivityAt) return 0;
+    const parsed = Date.parse(lastActivityAt);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
   projectLastWorkedLabel(projectId: string): string {
-    const timestamp = this.projectLastWorkedAt(projectId);
+    const timestamp = this.projectActivityTimestamp(projectId);
     if (!timestamp) return "Not worked yet";
     const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
     if (minutes < 1) return "Just now";
@@ -1065,7 +1074,7 @@ export class ErpDataService {
 
   sortProjectsByLastWorked(projectRows: Project[]): Project[] {
     return [...projectRows].sort((first, second) => {
-      const activityDelta = this.projectLastWorkedAt(second.id) - this.projectLastWorkedAt(first.id);
+      const activityDelta = this.projectActivityTimestamp(second.id) - this.projectActivityTimestamp(first.id);
       if (activityDelta) return activityDelta;
       return second.startDate.localeCompare(first.startDate);
     });

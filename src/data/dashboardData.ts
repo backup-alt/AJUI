@@ -19,6 +19,7 @@ export type Project = {
   labourPayable: number;
   expenseBalance: number;
   completion: number;
+  lastActivityAt?: string;
 };
 
 export type ApprovalStatus = "Pending" | "Approved" | "Rejected";
@@ -277,10 +278,14 @@ export type InventoryRow = {
   minimumQuantity: number;
   vendor?: string;
   poNumber?: string;
+  lastMaterialId?: string;
   received?: boolean;
   receivedDate?: string;
   purchaseHistory?: Array<{
     quantity?: number;
+    date?: string;
+    poNumber?: string;
+    materialId?: string;
     received?: boolean;
     receivedDate?: string;
   }>;
