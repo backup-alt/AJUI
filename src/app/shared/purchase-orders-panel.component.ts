@@ -77,6 +77,24 @@ type PoDraftLine = {
               </tbody>
             </table>
           </div>
+          @if (totalPages() > 1) {
+            <nav class="po-pagination" aria-label="Purchase order pagination">
+              <span>{{ pageSummary() }}</span>
+              <div class="po-pagination-actions">
+                <button
+                  type="button"
+                  [disabled]="currentPage() === 1 || loading()"
+                  (click)="changePage(currentPage() - 1)"
+                >Previous</button>
+                <span>Page {{ currentPage() }} of {{ totalPages() }}</span>
+                <button
+                  type="button"
+                  [disabled]="currentPage() === totalPages() || loading()"
+                  (click)="changePage(currentPage() + 1)"
+                >Next</button>
+              </div>
+            </nav>
+          }
         }
       </section>
     }
@@ -392,6 +410,11 @@ type PoDraftLine = {
     .po-list tr { cursor: pointer; }
     .po-list tbody tr:hover { background: #f8fbff; }
     .po-list td button { border: 0; background: none; color: #003a8c; font-weight: 800; cursor: pointer; padding: 0; text-align: left; }
+    .po-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 18px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 13px; }
+    .po-pagination-actions { display: flex; align-items: center; gap: 12px; }
+    .po-pagination-actions button { padding: 7px 12px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #2c5cff; font-weight: 700; cursor: pointer; }
+    .po-pagination-actions button:hover:not(:disabled) { background: #eef2ff; border-color: #2c5cff; }
+    .po-pagination-actions button:disabled { color: #94a3b8; background: #f8fafc; cursor: not-allowed; }
 
     .po-editor { max-width: 1100px; margin: 0 auto; }
     .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -541,6 +564,8 @@ type PoDraftLine = {
       .meta-row { justify-content: flex-start; }
       .po-totals { width: 100%; }
       .editor-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .po-pagination { align-items: flex-start; flex-direction: column; }
+      .po-pagination-actions { width: 100%; justify-content: space-between; }
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -566,6 +591,10 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   readonly error = signal("");
   readonly exporting = signal<"" | "pdf" | "excel">("");
   readonly orders = signal<PurchaseOrder[]>([]);
+  readonly currentPage = signal(1);
+  readonly totalPages = signal(1);
+  readonly totalOrders = signal(0);
+  readonly pageSize = 200;
   readonly search = signal("");
   readonly filteredOrders = computed(() => {
     const searchTerm = this.search().toLowerCase().trim();
@@ -575,6 +604,13 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       order.vendorName?.toLowerCase().includes(searchTerm) ||
       order.projectName?.toLowerCase().includes(searchTerm)
     );
+  });
+  readonly pageSummary = computed(() => {
+    const total = this.totalOrders();
+    if (!total) return "No purchase orders";
+    const first = (this.currentPage() - 1) * this.pageSize + 1;
+    const last = Math.min(first + this.orders().length - 1, total);
+    return `Showing ${first}-${last} of ${total}`;
   });
   readonly selectedOrder = signal<PurchaseOrder | null>(null);
   readonly editingId = signal("");
@@ -643,7 +679,10 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   ngOnInit() { this.loadReferenceData(); this.loadOrders(); }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes["projectId"] && !changes["projectId"].firstChange) this.loadOrders();
+    if (changes["projectId"] && !changes["projectId"].firstChange) {
+      this.currentPage.set(1);
+      this.loadOrders(1);
+    }
     if (changes["view"]?.currentValue === "create") this.resetDraft();
     if (this.view === "create" && this.projectId && (changes["projectId"] || changes["preselectedMaterialIds"] || changes["view"]?.currentValue === "create")) {
       void this.selectProject(this.projectId);
@@ -676,21 +715,38 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     } catch { this.vendors.set([]); }
   }
 
-  async loadOrders() {
+  async loadOrders(page = this.currentPage()) {
     this.loading.set(true);
     try {
       const result = await firstValueFrom(
-        this.api.listPurchaseOrders(this.projectId ? { projectId: this.projectId, limit: 200 } : { limit: 200 }),
+        this.api.listPurchaseOrders(
+          this.projectId
+            ? { projectId: this.projectId, page, limit: this.pageSize }
+            : { page, limit: this.pageSize },
+        ),
       );
       const orders = result.items || [];
+      const total = Number(result.total) || 0;
+      const pages = Math.max(1, Number(result.pages) || Math.ceil(total / this.pageSize));
       this.orders.set(orders);
-      this.countChange.emit(orders.length);
+      this.currentPage.set(page);
+      this.totalPages.set(pages);
+      this.totalOrders.set(total);
+      this.countChange.emit(total);
     } catch {
       this.orders.set([]);
+      this.totalPages.set(1);
+      this.totalOrders.set(0);
       this.countChange.emit(0);
     }
     finally { this.loading.set(false); }
     this.refreshSharedMaterials();
+  }
+
+  changePage(page: number) {
+    if (this.loading() || page < 1 || page > this.totalPages() || page === this.currentPage()) return;
+    this.search.set("");
+    void this.loadOrders(page);
   }
 
   async selectProject(projectId: string) {
