@@ -1100,9 +1100,45 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </div>
                           </div>
                           <ng-template #editableProjectCell>
-                            <ng-container *ngIf="(activeSection() === 'materials' || activeSection() === 'inventory') && column.key === 'poNumber' && isReadablePurchaseOrderNumber(row['poNumber']); else billOrEditableCell">
-                              <button type="button" class="bill-link" (click)="openPurchaseOrder(row['poNumber'], $event)">{{ row['poNumber'] }}</button>
+                            <ng-container
+                              *ngIf="(activeSection() === 'materials' || activeSection() === 'inventory') && column.key === 'poNumber' && materialPoHistory(row).length > 1; else singlePoCell"
+                            >
+                              <div class="material-po-history" [class.open]="isPoMenuOpen(row)">
+                                <button
+                                  type="button"
+                                  class="material-po-trigger"
+                                  [attr.aria-expanded]="isPoMenuOpen(row)"
+                                  (pointerdown)="$event.stopPropagation()"
+                                  (click)="togglePoMenu(row, $event)"
+                                >
+                                  <span>{{ defaultMaterialPo(row) }}</span>
+                                  <small *ngIf="materialPoHistory(row).length > 1">{{ materialPoHistory(row).length }} POs</small>
+                                  <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+                                </button>
+                                <div class="material-po-panel" *ngIf="isPoMenuOpen(row)">
+                                  <header>
+                                    <strong>Purchase orders</strong>
+                                    <span>{{ materialPoHistory(row).length }} {{ materialPoHistory(row).length === 1 ? 'PO' : 'POs' }}</span>
+                                  </header>
+                                  <div class="material-po-list" *ngIf="materialPoHistory(row).length; else noPoEntries">
+                                    <button type="button" class="material-po-option" *ngFor="let entry of materialPoHistory(row); let first = first" (pointerup)="openMaterialPo(entry.poNumber, $event)" (click)="openMaterialPo(entry.poNumber, $event)">
+                                      <span class="material-po-date">{{ formatMaterialPoDate(entry.date) }}</span>
+                                      <strong>{{ entry.poNumber }}</strong>
+                                      <small *ngIf="first">Latest</small>
+                                      <em class="material-po-qty">{{ formatNumber(entry.quantity) }} <span *ngIf="entry.unit">{{ entry.unit }}</span></em>
+                                    </button>
+                                  </div>
+                                  <ng-template #noPoEntries><p class="material-po-empty">No purchase orders yet.</p></ng-template>
+                                </div>
+                              </div>
                             </ng-container>
+                            <ng-template #singlePoCell>
+                              <ng-container
+                                *ngIf="(activeSection() === 'materials' || activeSection() === 'inventory') && column.key === 'poNumber' && isReadablePurchaseOrderNumber(defaultMaterialPo(row)); else billOrEditableCell"
+                              >
+                                <button type="button" class="bill-link" (click)="openPurchaseOrder(defaultMaterialPo(row), $event)">{{ defaultMaterialPo(row) }}</button>
+                              </ng-container>
+                            </ng-template>
                             <ng-template #billOrEditableCell>
                               <ng-container *ngIf="activeSection() === 'materials' && column.key === 'reference'; else standardBillOrEditableCell">
                                 @if (row['billUrl']) {
@@ -1767,6 +1803,7 @@ export class ProjectWorkspacePage {
   readonly allMaterialNames = signal<string[]>([]);
   readonly loadingAllMaterialNames = signal(false);
   readonly openMaterialNoteHistoryKey = signal("");
+  readonly openPoHistoryKey = signal("");
   /** Full list of subcontractor names for the record-form dropdown.
    *  Populated on demand from /api/subcontractors so it always matches the
    *  /subcontractors page, not just the hydration's first page. */
@@ -2647,6 +2684,9 @@ export class ProjectWorkspacePage {
     if (!target.closest(".material-note-history")) {
       this.openMaterialNoteHistoryKey.set("");
     }
+    if (!target.closest(".material-po-history")) {
+      this.openPoHistoryKey.set("");
+    }
   }
 
   private clearRowSelection() {
@@ -2794,6 +2834,7 @@ export class ProjectWorkspacePage {
         vendor: [...new Set(group.map((row) => String(row["vendor"] || "").trim()).filter(Boolean))].join(", "),
         poNumber: [...new Set(group.map((row) => String(row["poNumber"] || "").trim()).filter(Boolean))].join(", "),
         __noteHistoryJson: JSON.stringify(this.consolidatedMaterialNoteHistory(group)),
+        __poHistoryJson: JSON.stringify(this.consolidatedMaterialPoHistory(group)),
       };
     });
   }
@@ -5560,6 +5601,7 @@ export class ProjectWorkspacePage {
       status: row.status,
       notes: row.notes,
       __noteHistoryJson: JSON.stringify((row as any).noteHistory || []),
+      __poHistoryJson: JSON.stringify(this.materialPoHistorySources(row, inventory)),
       };
     });
 
@@ -6266,6 +6308,120 @@ export class ProjectWorkspacePage {
       hour: "2-digit",
       minute: "2-digit",
     }).format(date);
+  }
+
+  materialPoHistory(row: TableRow): Array<{ poNumber: string; date: string; quantity: number; unit: string }> {
+    try {
+      const history = JSON.parse(String(row["__poHistoryJson"] || "[]"));
+      if (Array.isArray(history)) {
+        return history
+          .filter((entry: any) => this.isReadablePurchaseOrderNumber(entry?.poNumber))
+          .sort((a: any, b: any) => Date.parse(b?.date || "") - Date.parse(a?.date || ""));
+      }
+    } catch {
+      // Fall through to the row's single PO for legacy rows.
+    }
+    const poNumber = String(row["poNumber"] || "").trim();
+    if (!this.isReadablePurchaseOrderNumber(poNumber)) return [];
+    return [{ poNumber, date: String(row["updatedAt"] || row["requestDate"] || row["createdAt"] || ""), quantity: this.moneyNumber(row["quantity"]), unit: String(row["unit"] || "") }];
+  }
+
+  defaultMaterialPo(row: TableRow): string {
+    const history = this.materialPoHistory(row);
+    return history.length ? history[0].poNumber : String(row["poNumber"] || "");
+  }
+
+  isPoMenuOpen(row: TableRow): boolean {
+    return this.openPoHistoryKey() === this.rowKey(row);
+  }
+
+  togglePoMenu(row: TableRow, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const key = this.rowKey(row);
+    this.openPoHistoryKey.update((current) => current === key ? "" : key);
+  }
+
+  private lastPoNavTime = 0;
+
+  openMaterialPo(poNumber: string, event?: Event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (event?.type === "pointerup" && (event as PointerEvent).button !== 0) return;
+    const now = Date.now();
+    if (now - this.lastPoNavTime < 600) return;
+    this.lastPoNavTime = now;
+    this.openPoHistoryKey.set("");
+    this.openPurchaseOrder(poNumber);
+  }
+
+  formatMaterialPoDate(value: string): string {
+    if (!value) return "Date unavailable";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(date);
+  }
+
+  private materialPoHistorySources(row: any, inventory: any): Array<{ poNumber: string; date: string; quantity: number; unit: string }> {
+    const entries: Array<{ poNumber: string; date: string; quantity: number; unit: string }> = [];
+    const seen = new Set<string>();
+    const unit = String(row?.unit || inventory?.unit || "").trim();
+    const add = (poNumber: unknown, date?: unknown, quantity?: unknown) => {
+      const po = String(poNumber || "").trim();
+      if (!po || seen.has(po)) return;
+      seen.add(po);
+      entries.push({
+        poNumber: po,
+        date: String(date || ""),
+        quantity: Number(quantity) || 0,
+        unit,
+      });
+    };
+    add(row?.poNumber, row?.requestDate || row?.createdAt || row?.updatedAt, row?.requested || row?.quantity);
+    for (const purchase of Array.isArray(inventory?.purchaseHistory) ? inventory.purchaseHistory : []) {
+      add(
+        purchase?.poNumber,
+        purchase?.date || purchase?.createdAt || inventory?.updatedAt || inventory?.createdAt,
+        purchase?.quantity,
+      );
+    }
+    if (inventory && String(inventory?.poNumber || "").trim()) {
+      add(inventory.poNumber, inventory?.updatedAt || inventory?.createdAt, inventory?.purchasedQuantity);
+    }
+    return entries;
+  }
+
+  private consolidatedMaterialPoHistory(group: TableRow[]): Array<{ poNumber: string; date: string; quantity: number; unit: string }> {
+    const entries: Array<{ poNumber: string; date: string; quantity: number; unit: string }> = [];
+    const seen = new Map<string, { poNumber: string; date: string; quantity: number; unit: string }>();
+    for (const row of group) {
+      let history: any[] = [];
+      try {
+        const parsed = JSON.parse(String(row["__poHistoryJson"] || "[]"));
+        if (Array.isArray(parsed)) history = parsed;
+      } catch {
+        history = [];
+      }
+      for (const entry of history) {
+        const poNumber = String(entry?.poNumber || "").trim();
+        if (!poNumber) continue;
+        const current = seen.get(poNumber);
+        if (!current || Date.parse(entry?.date || "") > Date.parse(current.date || "")) {
+          seen.set(poNumber, {
+            poNumber,
+            date: String(entry?.date || ""),
+            quantity: Number(entry?.quantity) || 0,
+            unit: String(entry?.unit || ""),
+          });
+        }
+      }
+    }
+    for (const entry of seen.values()) entries.push(entry);
+    return entries;
   }
 
   private consolidatedMaterialNoteHistory(group: TableRow[]): Array<{ note: string; date: string }> {
