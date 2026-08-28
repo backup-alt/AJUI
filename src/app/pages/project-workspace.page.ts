@@ -36,6 +36,12 @@ type MaterialDetails = {
   purchaseHistory: Array<{ quantity: number; date: string; vendor: string; poNumber: string; notes: string }>;
   consumptionHistory: Array<{ quantity: number; date: string; notes: string }>;
 };
+type MaterialBillHistoryEntry = {
+  url: string;
+  label: string;
+  date: string;
+  poNumber: string;
+};
 type AssignmentOption = { id: string; name: string };
 type InventoryMaterialCard = {
   key: string;
@@ -1141,11 +1147,50 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             </ng-template>
                             <ng-template #billOrEditableCell>
                               <ng-container *ngIf="activeSection() === 'materials' && column.key === 'reference'; else standardBillOrEditableCell">
-                                @if (row['billUrl']) {
-                                  @if (isDataUrl($any(row['billUrl']))) {
-                                    <button type="button" class="bill-link" (click)="$event.stopPropagation(); openImagePreview($any(row['billUrl']))">View Bill</button>
+                                @if (materialBillHistory(row).length > 1) {
+                                  <div class="material-po-history material-bill-history" [class.open]="isBillMenuOpen(row)">
+                                    <button
+                                      type="button"
+                                      class="material-po-trigger"
+                                      [attr.aria-expanded]="isBillMenuOpen(row)"
+                                      (pointerdown)="$event.stopPropagation()"
+                                      (click)="toggleBillMenu(row, $event)"
+                                    >
+                                      <span>View Bills</span>
+                                      <small>{{ materialBillHistory(row).length }} Bills</small>
+                                      <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+                                    </button>
+                                    <div class="material-po-panel" *ngIf="isBillMenuOpen(row)">
+                                      <header>
+                                        <strong>Uploaded bills</strong>
+                                        <span>{{ materialBillHistory(row).length }} files</span>
+                                      </header>
+                                      <div class="material-po-list">
+                                        @for (bill of materialBillHistory(row); track bill.url; let first = $first) {
+                                          @if (isDataUrl(bill.url)) {
+                                            <button type="button" class="material-po-option material-bill-option" (click)="openMaterialBill(bill.url, $event)">
+                                              <span class="material-po-date">{{ formatMaterialPoDate(bill.date) }}</span>
+                                              <strong>{{ bill.label }}</strong>
+                                              <small *ngIf="first">Latest</small>
+                                              <em class="material-po-qty">{{ bill.poNumber || 'No purchase order' }}</em>
+                                            </button>
+                                          } @else {
+                                            <a class="material-po-option material-bill-option" [href]="bill.url" target="_blank" rel="noopener noreferrer" (click)="closeBillMenu($event)">
+                                              <span class="material-po-date">{{ formatMaterialPoDate(bill.date) }}</span>
+                                              <strong>{{ bill.label }}</strong>
+                                              <small *ngIf="first">Latest</small>
+                                              <em class="material-po-qty">{{ bill.poNumber || 'No purchase order' }}</em>
+                                            </a>
+                                          }
+                                        }
+                                      </div>
+                                    </div>
+                                  </div>
+                                } @else if (materialBillHistory(row)[0]; as bill) {
+                                  @if (isDataUrl(bill.url)) {
+                                    <button type="button" class="bill-link" (click)="openMaterialBill(bill.url, $event)">View Bill</button>
                                   } @else {
-                                    <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
+                                    <a class="bill-link" [href]="bill.url" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
                                   }
                                 } @else {
                                   <input #materialBillInput type="file" hidden accept="image/*,application/pdf" (change)="uploadMaterialBill(row, $event)" />
@@ -1662,7 +1707,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <div class="material-history-item" *ngFor="let entry of details.purchaseHistory">
                     <strong>{{ formatNumber(entry.quantity) }} {{ details.unit }}</strong>
                     <span>{{ entry.date | date:'mediumDate' }} · {{ entry.vendor || 'Vendor not recorded' }}</span>
-                    <button *ngIf="entry.poNumber" type="button" class="material-history-po" (click)="openPurchaseOrder(entry.poNumber, $event)">{{ entry.poNumber }}</button>
+                    <button *ngIf="isReadablePurchaseOrderNumber(entry.poNumber)" type="button" class="material-history-po" (click)="openPurchaseOrder(entry.poNumber, $event)">{{ entry.poNumber }}</button>
                     <span *ngIf="entry.notes">{{ entry.notes }}</span>
                   </div>
                 </div>
@@ -1804,6 +1849,7 @@ export class ProjectWorkspacePage {
   readonly loadingAllMaterialNames = signal(false);
   readonly openMaterialNoteHistoryKey = signal("");
   readonly openPoHistoryKey = signal("");
+  readonly openBillHistoryKey = signal("");
   /** Full list of subcontractor names for the record-form dropdown.
    *  Populated on demand from /api/subcontractors so it always matches the
    *  /subcontractors page, not just the hydration's first page. */
@@ -2348,7 +2394,10 @@ export class ProjectWorkspacePage {
             quantity: Number(entry.quantity) || 0,
             date: String(entry.date || ""),
             vendor: String(entry.vendor || item.vendor || material.vendor || ""),
-            poNumber: String(entry.poNumber || item.poNumber || material.poNumber || ""),
+            // A top-level inventory PO belongs only to the latest linked
+            // material addition. Applying it to every ledger entry makes
+            // older purchases appear to have a PO that was never created.
+            poNumber: this.purchaseHistoryPoNumber(entry, item),
             notes: String(entry.notes || ""),
           })),
       ).sort((a: any, b: any) => Date.parse(b.date) - Date.parse(a.date));
@@ -2358,7 +2407,7 @@ export class ProjectWorkspacePage {
             quantity: Number(item.purchasedQuantity) || 0,
             date: String(item.updatedAt || item.createdAt || ""),
             vendor: String(item.vendor || ""),
-            poNumber: String(item.poNumber || ""),
+            poNumber: this.readablePurchaseOrderNumber(item.poNumber),
             notes: String(item.notes || ""),
           }))
           .filter((entry: any) => entry.quantity > 0)
@@ -2370,7 +2419,7 @@ export class ProjectWorkspacePage {
             quantity: Number(item.purchasedQuantity) || Number(item.approvedQuantity) || Number(item.requestedQuantity) || 0,
             date: String(item.orderedDate || item.requestDate || item.createdAt || ""),
             vendor: String(item.vendor || ""),
-            poNumber: String(item.poNumber || ""),
+            poNumber: this.readablePurchaseOrderNumber(item.poNumber),
             notes: String(item.notes || ""),
           }))
           .filter((entry: any) => entry.quantity > 0)
@@ -2687,6 +2736,9 @@ export class ProjectWorkspacePage {
     if (!target.closest(".material-po-history")) {
       this.openPoHistoryKey.set("");
     }
+    if (!target.closest(".material-bill-history")) {
+      this.openBillHistoryKey.set("");
+    }
   }
 
   private clearRowSelection() {
@@ -2835,6 +2887,7 @@ export class ProjectWorkspacePage {
         poNumber: [...new Set(group.map((row) => String(row["poNumber"] || "").trim()).filter(Boolean))].join(", "),
         __noteHistoryJson: JSON.stringify(this.consolidatedMaterialNoteHistory(group)),
         __poHistoryJson: JSON.stringify(this.consolidatedMaterialPoHistory(group)),
+        __billHistoryJson: JSON.stringify(this.consolidatedMaterialBillHistory(group)),
       };
     });
   }
@@ -4428,17 +4481,29 @@ export class ProjectWorkspacePage {
         fileName: file.name,
       }));
       const billUrl = String(response.material?.billUrl || "");
+      const billLabel = String(response.material?.receiptImageName || file.name || "Bill");
       const materialId = String(response.material?.materialId || row["materialId"] || "");
       this.data.materials.update((materials) => materials.map((material) =>
         String(material._id || "") === mongoId || String(material.id) === materialId
-          ? { ...material, billUrl }
+          ? { ...material, billUrl, receiptImageName: billLabel }
           : material));
       this.materialsService.materials.update((materials) => materials.map((material) =>
         String(material._id || "") === mongoId || String(material.id) === materialId
-          ? { ...material, billUrl }
+          ? { ...material, billUrl, receiptImageName: billLabel }
           : material));
       const rowId = String(row["__rowId"] || "");
       if (rowId) this.data.updateSharedRowCell(rowId, "billUrl", billUrl);
+      row["billUrl"] = billUrl;
+      row["billLabel"] = billLabel;
+      row["__billHistoryJson"] = JSON.stringify([
+        {
+          url: billUrl,
+          label: billLabel,
+          date: String(response.material?.updatedAt || new Date().toISOString()),
+          poNumber: this.readablePurchaseOrderNumber(response.material?.poNumber || row["poNumber"]),
+        },
+        ...this.materialBillHistory(row).filter((entry) => entry.url !== billUrl),
+      ]);
       await this.presentToast("Bill uploaded successfully.");
     } catch (err: any) {
       await this.presentToast(
@@ -5597,11 +5662,13 @@ export class ProjectWorkspacePage {
       vendor: row.vendor,
       poNumber: row.poNumber,
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
+      billLabel: (row as any).receiptImageName || "",
       remainingStock: `${formatNumber(inventory?.remainingStock ?? row.remainingStock)} ${row.unit}`,
       status: row.status,
       notes: row.notes,
       __noteHistoryJson: JSON.stringify((row as any).noteHistory || []),
       __poHistoryJson: JSON.stringify(this.materialPoHistorySources(row, inventory)),
+      __billHistoryJson: JSON.stringify(this.materialBillHistorySources(row)),
       };
     });
 
@@ -6326,6 +6393,54 @@ export class ProjectWorkspacePage {
     return [{ poNumber, date: String(row["updatedAt"] || row["requestDate"] || row["createdAt"] || ""), quantity: this.moneyNumber(row["quantity"]), unit: String(row["unit"] || "") }];
   }
 
+  materialBillHistory(row: TableRow): MaterialBillHistoryEntry[] {
+    try {
+      const history = JSON.parse(String(row["__billHistoryJson"] || "[]"));
+      if (Array.isArray(history)) {
+        return history
+          .map((entry: any, index: number) => ({
+            url: String(entry?.url || "").trim(),
+            label: String(entry?.label || `Bill ${index + 1}`).trim(),
+            date: String(entry?.date || ""),
+            poNumber: this.readablePurchaseOrderNumber(entry?.poNumber),
+          }))
+          .filter((entry: MaterialBillHistoryEntry) => Boolean(entry.url))
+          .sort((a: MaterialBillHistoryEntry, b: MaterialBillHistoryEntry) => Date.parse(b.date || "") - Date.parse(a.date || ""));
+      }
+    } catch {
+      // Fall through to the row's single bill for legacy rows.
+    }
+    return this.materialBillHistorySources(row);
+  }
+
+  isBillMenuOpen(row: TableRow): boolean {
+    return this.openBillHistoryKey() === this.rowKey(row);
+  }
+
+  toggleBillMenu(row: TableRow, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const key = this.rowKey(row);
+    this.openPoHistoryKey.set("");
+    this.openBillHistoryKey.update((current) => current === key ? "" : key);
+  }
+
+  closeBillMenu(event?: Event): void {
+    event?.stopPropagation();
+    this.openBillHistoryKey.set("");
+  }
+
+  openMaterialBill(url: string, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.openBillHistoryKey.set("");
+    if (/^data:image\//i.test(url)) {
+      this.openImagePreview(url);
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   defaultMaterialPo(row: TableRow): string {
     const history = this.materialPoHistory(row);
     return history.length ? history[0].poNumber : String(row["poNumber"] || "");
@@ -6339,6 +6454,7 @@ export class ProjectWorkspacePage {
     event?.preventDefault();
     event?.stopPropagation();
     const key = this.rowKey(row);
+    this.openBillHistoryKey.set("");
     this.openPoHistoryKey.update((current) => current === key ? "" : key);
   }
 
@@ -6427,6 +6543,46 @@ export class ProjectWorkspacePage {
       });
     }
     return [...byPo.values()];
+  }
+
+  private materialBillHistorySources(row: any): MaterialBillHistoryEntry[] {
+    const url = String(row?.billUrl || "").trim();
+    if (!url) return [];
+    return [{
+      url,
+      label: String(row?.billLabel || row?.receiptImageName || "View Bill").trim(),
+      date: String(row?.updatedAt || row?.receivedDate || row?.requestDate || row?.createdAt || ""),
+      poNumber: this.readablePurchaseOrderNumber(row?.poNumber),
+    }];
+  }
+
+  private consolidatedMaterialBillHistory(group: TableRow[]): MaterialBillHistoryEntry[] {
+    const unique = new Map<string, MaterialBillHistoryEntry>();
+    for (const row of group) {
+      for (const entry of this.materialBillHistory(row)) {
+        const existing = unique.get(entry.url);
+        if (!existing || Date.parse(entry.date || "") > Date.parse(existing.date || "")) {
+          unique.set(entry.url, entry);
+        }
+      }
+    }
+    return [...unique.values()].sort((a, b) => Date.parse(b.date || "") - Date.parse(a.date || ""));
+  }
+
+  private purchaseHistoryPoNumber(entry: any, inventory: any): string {
+    const direct = this.readablePurchaseOrderNumber(entry?.poNumber);
+    if (direct) return direct;
+    const entryMaterialId = String(entry?.materialId || "").trim();
+    const latestMaterialId = String(inventory?.lastMaterialId || "").trim();
+    if (entryMaterialId && latestMaterialId && entryMaterialId === latestMaterialId) {
+      return this.readablePurchaseOrderNumber(inventory?.poNumber);
+    }
+    return "";
+  }
+
+  private readablePurchaseOrderNumber(value: unknown): string {
+    const poNumber = String(value || "").trim();
+    return this.isReadablePurchaseOrderNumber(poNumber) ? poNumber : "";
   }
 
   private consolidatedMaterialPoHistory(group: TableRow[]): Array<{ poNumber: string; date: string; quantity: number; unit: string }> {

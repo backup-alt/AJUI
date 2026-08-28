@@ -182,6 +182,7 @@ export class MaterialsService {
     billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
     receiptImage: row.receiptImage,
     receiptImageMimeType: row.receiptImageMimeType,
+    receiptImageName: row.receiptImageName,
   });
 
   private mergeRowsByStableId(existing: MaterialRow[], incoming: MaterialRow[]): MaterialRow[] {

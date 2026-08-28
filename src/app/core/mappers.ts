@@ -153,6 +153,7 @@ export function mapMaterial(m: any): any {
     poNumber: m.poNumber,
     paymentType: m.paymentType,
     billUrl: billUrlFor(m),
+    receiptImageName: m.receiptImageName || "",
     issuedAmount: m.issuedAmount,
     givenAmount: m.givenAmount,
     isExistingMaterial: Boolean(m.isExistingMaterial),

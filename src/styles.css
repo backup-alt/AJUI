@@ -13786,6 +13786,11 @@ input[type="date"]:focus {
   cursor: pointer;
 }
 
+.material-bill-option {
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
 .material-po-option:last-child {
   border-bottom: 0;
 }
