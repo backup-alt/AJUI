@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, HostListener, OnInit, inject } from "@angular/core";
-import { RouterOutlet } from "@angular/router";
+import { NavigationCancel, NavigationEnd, NavigationError, Router, RouterOutlet } from "@angular/router";
 import { IonApp } from "@ionic/angular/standalone";
 import { ApiService } from "./core/api.service";
 import { WorkspaceHydrationService } from "./core/workspace-hydration.service";
 import { HttpClient } from "@angular/common/http";
 import { environment } from "../environments/environment";
+import { NavigationLoadingService } from "./core/navigation-loading.service";
 
 @Component({
   selector: "app-root",
@@ -13,16 +14,59 @@ import { environment } from "../environments/environment";
   template: `
     <ion-app>
       <router-outlet></router-outlet>
+      @if (navigationLoading.active()) {
+        <div class="page-navigation-loader" role="status" aria-live="polite" aria-label="Loading page">
+          <span class="page-navigation-spinner" aria-hidden="true"></span>
+          <span>Loading…</span>
+        </div>
+      }
     </ion-app>
   `,
+  styles: [`
+    .page-navigation-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483600;
+      display: grid;
+      place-content: center;
+      justify-items: center;
+      gap: 12px;
+      background: rgba(248, 250, 252, 0.82);
+      color: #17366f;
+      font-size: 13px;
+      font-weight: 750;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .page-navigation-spinner {
+      width: 38px;
+      height: 38px;
+      border: 4px solid #dbe7fb;
+      border-top-color: #2c5cff;
+      border-radius: 50%;
+      animation: page-navigation-spin 700ms linear infinite;
+    }
+    @keyframes page-navigation-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .page-navigation-spinner { animation-duration: 1400ms; }
+    }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly hydration = inject(WorkspaceHydrationService);
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  readonly navigationLoading = inject(NavigationLoadingService);
 
   ngOnInit(): void {
+    this.router.events.subscribe((event) => {
+      if (event instanceof NavigationEnd || event instanceof NavigationCancel || event instanceof NavigationError) {
+        this.navigationLoading.stop();
+      }
+    });
     if (this.api.isAuthenticated()) {
       void this.hydration.hydrateFromBackend();
     }

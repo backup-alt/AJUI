@@ -183,6 +183,7 @@ export class MaterialsService {
     receiptImage: row.receiptImage,
     receiptImageMimeType: row.receiptImageMimeType,
     receiptImageName: row.receiptImageName,
+    billHistory: Array.isArray(row.billHistory) ? row.billHistory : [],
   });
 
   private mergeRowsByStableId(existing: MaterialRow[], incoming: MaterialRow[]): MaterialRow[] {

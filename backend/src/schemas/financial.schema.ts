@@ -152,7 +152,9 @@ export const updateExpenseSchema = z.object({
 export const uploadExpenseReceiptSchema = z.object({
   params: z.object({ id: objectIdSchema }),
   body: z.object({
-    data: z.string().min(20, "Receipt data is required"),
+    data: z.string()
+      .min(20, "Receipt data is required")
+      .max(14 * 1024 * 1024, "Receipt data is too large"),
     mimeType: z.string().min(1).max(120),
     fileName: z.string().max(200).optional(),
   }),

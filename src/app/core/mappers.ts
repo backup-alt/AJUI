@@ -154,6 +154,7 @@ export function mapMaterial(m: any): any {
     paymentType: m.paymentType,
     billUrl: billUrlFor(m),
     receiptImageName: m.receiptImageName || "",
+    billHistory: Array.isArray(m.billHistory) ? m.billHistory : [],
     issuedAmount: m.issuedAmount,
     givenAmount: m.givenAmount,
     isExistingMaterial: Boolean(m.isExistingMaterial),

@@ -387,7 +387,7 @@ export async function updateMaterial(
   if (!existingMaterial) throw new AppError(404, "Material not found");
 
   const update: Record<string, unknown> = { ...patch };
-  for (const key of ["receiptImage", "receiptImageMimeType", "billUrl", "pcloudFileId", "pcloudPublicCode", "pcloudContentHash"]) {
+  for (const key of ["receiptImage", "receiptImageMimeType", "billUrl", "billHistory", "pcloudFileId", "pcloudPublicCode", "pcloudContentHash"]) {
     delete update[key];
   }
   if (patch.siteId) {
@@ -480,6 +480,18 @@ export async function uploadMaterialReceipt(
   const { uploadToPCloud } = await import("./pcloud.service.js");
 
   try {
+    const history = Array.isArray(material.billHistory) ? [...material.billHistory] : [];
+    if (material.billUrl && !history.some((entry) =>
+      (material.pcloudFileId && entry.pcloudFileId === material.pcloudFileId)
+      || entry.billUrl === material.billUrl)) {
+      history.push({
+        billUrl: material.billUrl,
+        fileName: material.receiptImageName,
+        pcloudFileId: material.pcloudFileId,
+        pcloudPublicCode: material.pcloudPublicCode,
+        uploadedAt: material.updatedAt || new Date(),
+      });
+    }
     const pcloudResult = await uploadToPCloud(
       payload.data,
       payload.fileName || `receipt_mat_${material.materialId}.${payload.mimeType.split("/")[1] || "jpg"}`,
@@ -489,6 +501,14 @@ export async function uploadMaterialReceipt(
     material.pcloudFileId = pcloudResult.fileId;
     material.pcloudPublicCode = pcloudResult.publicCode;
     material.receiptImageName = pcloudResult.fileName;
+    history.push({
+      billUrl: pcloudResult.mediaUrl,
+      fileName: pcloudResult.fileName,
+      pcloudFileId: pcloudResult.fileId,
+      pcloudPublicCode: pcloudResult.publicCode,
+      uploadedAt: new Date(),
+    });
+    material.billHistory = history;
     material.receiptImage = undefined;
     material.receiptImageMimeType = undefined;
   } catch (err) {

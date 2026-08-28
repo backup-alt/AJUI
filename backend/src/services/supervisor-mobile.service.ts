@@ -1148,6 +1148,11 @@ export async function listMaterialsForSupervisor(
       billUrl: (m as any).pcloudFileId
         ? buildPCloudMediaUrl(String((m as any).pcloudFileId))
         : (m as any).billUrl,
+      billHistory: (Array.isArray((m as any).billHistory) ? (m as any).billHistory : []).map((bill: any) => ({
+        billUrl: bill.pcloudFileId ? buildPCloudMediaUrl(String(bill.pcloudFileId)) : bill.billUrl,
+        fileName: bill.fileName,
+        uploadedAt: bill.uploadedAt,
+      })),
       received: (m as any).status === "Received",
       requestDate: m.requestDate,
       status: m.status,
@@ -1210,6 +1215,11 @@ export async function listMaterialBillRequestsForSupervisor(
       billUrl: (m as any).pcloudFileId
         ? buildPCloudMediaUrl(String((m as any).pcloudFileId))
         : m.billUrl,
+      billHistory: (Array.isArray((m as any).billHistory) ? (m as any).billHistory : []).map((bill: any) => ({
+        billUrl: bill.pcloudFileId ? buildPCloudMediaUrl(String(bill.pcloudFileId)) : bill.billUrl,
+        fileName: bill.fileName,
+        uploadedAt: bill.uploadedAt,
+      })),
       receiptImageName: m.receiptImageName,
       requestDate: m.requestDate,
       status: m.status,

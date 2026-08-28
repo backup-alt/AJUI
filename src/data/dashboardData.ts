@@ -66,6 +66,7 @@ export type MaterialRow = {
   receiptImage?: string;
   receiptImageMimeType?: string;
   receiptImageName?: string;
+  billHistory?: Array<{ billUrl: string; fileName?: string; uploadedAt?: string | Date }>;
   [key: string]: any;
 };
 

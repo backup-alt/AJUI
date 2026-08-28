@@ -21,6 +21,7 @@ export interface Material {
   vendorId?: string;
   poNumber?: string;
   billUrl?: string;
+  billHistory?: Array<{ billUrl: string; fileName?: string; uploadedAt?: string }>;
   receiptImageName?: string;
   received?: boolean;
   receivedDate?: string;

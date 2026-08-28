@@ -56,6 +56,7 @@ interface RequestItem {
   givenAmount?: number;
   billUrl?: string;
   billFileName?: string;
+  billHistory?: Array<{ billUrl: string; fileName?: string; uploadedAt?: string }>;
   received?: boolean;
   transactionType?: string;
   billEligible: boolean;
@@ -247,14 +248,18 @@ interface RequestItem {
                 </div>
               }
 
-              @if (item.billUrl) {
-                <div class="bill-thumb-wrap" (click)="openBill(item)">
-                  @if (isPdfBill(item)) {
-                    <ion-icon name="document-outline" class="bill-document-icon"></ion-icon>
-                  } @else {
-                    <img [src]="item.billUrl" alt="Bill" class="bill-thumb" />
+              @if (billFiles(item).length) {
+                <div class="bill-history-list">
+                  @for (bill of billFiles(item); track bill.billUrl; let index = $index) {
+                    <div class="bill-thumb-wrap" (click)="openBillFile(bill)">
+                      @if (isPdfBillFile(bill)) {
+                        <ion-icon name="document-outline" class="bill-document-icon"></ion-icon>
+                      } @else {
+                        <img [src]="bill.billUrl" alt="Bill" class="bill-thumb" />
+                      }
+                      <span class="bill-thumb-label">View Bill {{ billFiles(item).length > 1 ? index + 1 : '' }}</span>
+                    </div>
                   }
-                  <span class="bill-thumb-label">View Bill</span>
                 </div>
               }
             </div>
@@ -483,6 +488,8 @@ interface RequestItem {
       background: var(--m3-surface-container); border-radius: var(--md-radius-lg);
       cursor: pointer; border: 1px solid var(--m3-outline-variant);
     }
+    .bill-history-list { display: grid; gap: 6px; margin-top: var(--md-space-2); }
+    .bill-history-list .bill-thumb-wrap { margin-top: 0; }
     .bill-thumb {
       width: 48px; height: 48px; border-radius: var(--md-radius-md);
       object-fit: cover; flex-shrink: 0;
@@ -727,6 +734,7 @@ export class RequestsPage implements OnInit {
             issuedAmount: m.issuedAmount,
             givenAmount: (m as any).givenAmount,
             billUrl: (m as any).billUrl,
+            billHistory: Array.isArray((m as any).billHistory) ? (m as any).billHistory : [],
             billFileName: m.receiptImageName,
             received: m.status === 'Received',
             billEligible: false,
@@ -839,6 +847,7 @@ export class RequestsPage implements OnInit {
       issuedAmount: material.issuedAmount,
       givenAmount: material.givenAmount,
       billUrl: material.billUrl,
+      billHistory: Array.isArray(material.billHistory) ? material.billHistory : [],
       billFileName: material.receiptImageName,
       received: material.status === 'Received',
       billEligible: true,
@@ -865,6 +874,26 @@ export class RequestsPage implements OnInit {
       return;
     }
     this.openBillImage(item.billUrl);
+  }
+
+  billFiles(item: RequestItem): Array<{ billUrl: string; fileName?: string; uploadedAt?: string }> {
+    const files = Array.isArray(item.billHistory) ? [...item.billHistory] : [];
+    if (item.billUrl && !files.some((bill) => bill.billUrl === item.billUrl)) {
+      files.push({ billUrl: item.billUrl, fileName: item.billFileName });
+    }
+    return files.filter((bill) => Boolean(bill.billUrl));
+  }
+
+  openBillFile(bill: { billUrl: string; fileName?: string }): void {
+    if (this.isPdfBillFile(bill)) {
+      window.open(bill.billUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    this.openBillImage(bill.billUrl);
+  }
+
+  isPdfBillFile(bill: { fileName?: string }): boolean {
+    return String(bill.fileName || '').toLowerCase().endsWith('.pdf');
   }
 
   isPdfBill(item: RequestItem): boolean {

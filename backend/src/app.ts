@@ -114,7 +114,10 @@ export function createApp(): express.Application {
   });
   app.use(globalLimiter);
 
-app.use(express.json({ limit: "10mb" }));
+// A 10 MB bill becomes roughly 13.4 MB after base64 encoding. Keep the
+// transport limit above the UI's raw-file limit so valid uploads are not
+// rejected before the receipt route can validate them.
+app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 

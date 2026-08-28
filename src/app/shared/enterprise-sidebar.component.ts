@@ -6,6 +6,7 @@ import { MenuController } from "@ionic/angular/standalone";
 import { ErpDataService } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
 import type { Project, ProjectStatus } from "../../data/dashboardData";
+import { NavigationLoadingService } from "../core/navigation-loading.service";
 
 type SidebarItem = {
   key: string;
@@ -32,7 +33,7 @@ type SidebarItem = {
               *ngFor="let item of items"
               button
               [routerLink]="item.route"
-              (click)="closeMenu()"
+              (click)="navigateFromSidebar(item.route)"
               [class.selected]="active === item.key"
               [class.disabled]="item.disabled"
               [disabled]="item.disabled"
@@ -57,7 +58,7 @@ type SidebarItem = {
             </div>
             <div class="sidebar-project-scroll">
               <div *ngFor="let project of filteredSidebarProjects" class="sidebar-project-row" [class.active]="project.id === projectId">
-                <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']" (click)="closeMenu()">
+                <a [routerLink]="['/clients', projectClientId(project), 'projects', project.id, 'materials']" (click)="navigateFromSidebar(['/clients', projectClientId(project), 'projects', project.id, 'materials'])">
                   <span>{{ project.name }}</span>
                   <small>
                     <em>
@@ -79,7 +80,7 @@ type SidebarItem = {
                 </div>
               </div>
             </div>
-            <a class="sidebar-view-all-projects" [routerLink]="['/projects']" (click)="closeMenu()">
+            <a class="sidebar-view-all-projects" [routerLink]="['/projects']" (click)="navigateFromSidebar(['/projects'])">
               <span>View all projects</span>
               <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                 <path d="M5 12h14" />
@@ -98,9 +99,17 @@ export class EnterpriseSidebarComponent {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly menuController = inject(MenuController);
+  private readonly navigationLoading = inject(NavigationLoadingService);
 
   closeMenu() {
     void this.menuController.close("enterprise-sidebar");
+  }
+
+  navigateFromSidebar(route: unknown[]): void {
+    const targetUrl = this.router.serializeUrl(this.router.createUrlTree(route));
+    const currentPath = this.router.url.split("?")[0];
+    if (targetUrl.split("?")[0] !== currentPath) this.navigationLoading.start();
+    this.closeMenu();
   }
 
   @Input() active = "dashboard";
