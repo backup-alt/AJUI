@@ -1333,6 +1333,7 @@ export async function listExpensesForSupervisor(
       issuedAmount: (e as any).issuedAmount,
       givenAmount: (e as any).givenAmount,
       amount: e.amount,
+      runningBalance: e.runningBalance,
       date: e.date,
       description: e.description,
       notes: (e as any).notes,

@@ -91,7 +91,7 @@ router.delete("/supervisor/bulk-attendance/:id", ctrl.deleteBulkAttendance);
 router.get("/supervisor/supervisors", cache(30), ctrl.listSupervisorsForWorker);
 
 // Expenses
-router.get("/supervisor/expenses", cache(15), ctrl.listExpenses);
+router.get("/supervisor/expenses", ctrl.listExpenses);
 router.get("/supervisor/expenses/:id", cache(30), ctrl.getExpense);
 router.post("/supervisor/expenses", validate(createExpenseMobileSchema), ctrl.createExpense);
 router.post("/supervisor/expenses/:id/receipt", validate(uploadExpenseReceiptMobileSchema), ctrl.uploadExpenseReceipt);

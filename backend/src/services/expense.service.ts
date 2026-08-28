@@ -66,7 +66,7 @@ export async function recomputeSiteLedger(
     if (row.transactionType === "Cash Added") {
       running += amount;
     } else {
-      running = Math.max(0, running - amount);
+      running -= amount;
     }
     if (Number(row.runningBalance ?? 0) !== running) {
       await Expense.updateOne({ _id: row._id }, { $set: { runningBalance: running } });
@@ -459,6 +459,6 @@ export async function getSiteBalanceSummary(projectId: string, site: string) {
     .filter((r) => r.transactionType !== "Cash Added")
     .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
   const opening = Number(siteRecord?.openingBalance ?? 0);
-  const current = Math.max(0, opening + cashAdded - spent);
+  const current = opening + cashAdded - spent;
   return { opening, cashAdded, spent, current };
 }

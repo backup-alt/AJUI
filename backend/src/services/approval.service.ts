@@ -139,7 +139,7 @@ export async function approveRequest(
           await recomputeSiteLedger(exp.projectId, exp.site);
         }
       } else if (exp?.transactionType === "Purchase") {
-          await Expense.updateOne(
+        await Expense.updateOne(
           { _id: approval.sourceId },
           {
             status: "Approved",
@@ -150,6 +150,9 @@ export async function approveRequest(
             ...(options.givenAmount !== undefined ? { givenAmount: options.givenAmount } : {}),
           }
         );
+        if (exp.projectId && exp.site) {
+          await recomputeSiteLedger(exp.projectId, exp.site);
+        }
       } else {
         await Expense.updateOne({ _id: approval.sourceId }, sourceUpdate);
         if (exp?.projectId && exp.site) {

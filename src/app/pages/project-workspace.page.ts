@@ -924,8 +924,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
               <div class="expense-ledger-summary" *ngIf="!tableViewExpanded() && activeSection() === 'expenses'">
                 <div><span>Cash Added</span><strong>{{ expenseCashAddedLabel() }}</strong></div>
-                <div><span>Expenses</span><strong>{{ expenseSpentLabel() }}</strong></div>
-                <div><span>Current Balance</span><strong>{{ expenseCurrentBalanceLabel() }}</strong></div>
+                <div><span>Spent</span><strong>{{ expenseSpentLabel() }}</strong></div>
+                <div><span>Balance</span><strong>{{ expenseCurrentBalanceLabel() }}</strong></div>
               </div>
 
               <section class="inventory-card-grid" *ngIf="activeSection() === 'inventory'">
@@ -5728,6 +5728,7 @@ export class ProjectWorkspacePage {
 
     const expenses = this.data.expensesForProject(projectId).filter((row) => row.type === "Site Expense").map((row) => ({
         __rowId: `expense:${row.id}`,
+        _id: row._id,
         __projectId: row.projectId,
         projectId: row.projectId,
         expenseScope: row.type,
@@ -5743,6 +5744,8 @@ export class ProjectWorkspacePage {
         reference: row.reference,
         billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
         approvalStatus: row.status,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
         notes: (row as any).notes,
       }));
 
@@ -6245,7 +6248,7 @@ export class ProjectWorkspacePage {
       }
       let balance = balances.get(groupKey) ?? 0;
       if (String(row["approvalStatus"] || "Pending").toLowerCase() === "approved") {
-        balance = Math.max(0, balance + this.expenseSignedAmount(row, transactionType));
+        balance += this.expenseSignedAmount(row, transactionType);
         balances.set(groupKey, balance);
       }
       return {
@@ -6822,32 +6825,20 @@ export class ProjectWorkspacePage {
   }
 
   expenseCurrentBalanceLabel(): string {
-    const rows = this.expenseChronologicalRows(this.visibleRows("expenses"));
+    const rows = this.approvedExpenseRows();
     if (!rows.length) return this.expenseOpeningBalanceLabel();
-    const latestByGroup = new Map<string, number>();
-    if (this.activeSiteFilter() === "All") {
-      for (const site of this.expenseLedgerSites()) {
-        latestByGroup.set(this.expenseGroupKey({ projectId: this.projectId(), site }), this.expenseOpeningBalanceFor({ projectId: this.projectId(), site }));
-      }
-    }
+    const balances = new Map<string, number>();
     for (const row of rows) {
-      if (String(row["approvalStatus"] || "").toLowerCase() === "approved") {
-        latestByGroup.set(this.expenseGroupKey(row), this.moneyNumber(row["runningBalance"]));
-      }
+      const key = this.expenseGroupKey(row);
+      const previous = balances.get(key) ?? this.expenseLedgerOpeningFor(row);
+      balances.set(key, previous + this.expenseSignedAmount(row));
     }
-    if (this.activeSiteFilter() !== "All") {
-      return formatMoney([...latestByGroup.values()].at(-1) ?? this.expenseOpeningBalanceFor({ projectId: this.projectId(), site: this.activeSiteFilter() }));
-    }
-    const total = [...latestByGroup.values()].reduce((sum, balance) => sum + balance, 0);
+    const total = [...balances.values()].reduce((sum, balance) => sum + balance, 0);
     return formatMoney(total);
   }
 
   expenseCashAddedLabel(): string {
-    const rows = this.visibleRows("expenses");
-    const openingByGroup = new Map<string, number>();
-    const cashAdded = rows.reduce((sum, row) => {
-      const key = this.expenseGroupKey(row);
-      if (!openingByGroup.has(key)) openingByGroup.set(key, this.expenseOpeningBalanceFor(row, true, true));
+    const cashAdded = this.approvedExpenseRows().reduce((sum, row) => {
       const amount = this.expenseSignedAmount(row);
       return amount > 0 ? sum + amount : sum;
     }, 0);
@@ -6855,11 +6846,17 @@ export class ProjectWorkspacePage {
   }
 
   expenseSpentLabel(): string {
-    const spent = this.visibleRows("expenses").reduce((sum, row) => {
+    const spent = this.approvedExpenseRows().reduce((sum, row) => {
       const amount = this.expenseSignedAmount(row);
       return amount < 0 ? sum + Math.abs(amount) : sum;
     }, 0);
     return formatMoney(spent);
+  }
+
+  private approvedExpenseRows(): TableRow[] {
+    return this.expenseChronologicalRows(this.visibleRows("expenses")).filter(
+      (row) => String(row["approvalStatus"] || "").toLowerCase() === "approved",
+    );
   }
 
   async openAddOpeningCash() {
@@ -7030,13 +7027,27 @@ export class ProjectWorkspacePage {
 
   private expenseGroupKey(row: TableRow): string {
     const projectId = String(row["projectId"] || row["__projectId"] || this.projectId() || "project");
-    const site = String(row["site"] || "Project").trim().toLowerCase();
-    return `${projectId}::${site}`;
+    const supervisor = String(row["supervisor"] || this.project()?.supervisor || "supervisor")
+      .trim()
+      .toLowerCase();
+    return `${projectId}::${supervisor}`;
   }
 
   private expenseRowSortValue(row: TableRow): string {
     const date = String(row["expenseDate"] || row["date"] || "");
-    return `${this.expenseGroupKey(row)}::${date}::${row["__rowId"] || ""}`;
+    const timestamp = this.expenseTimestamp(row);
+    return `${String(timestamp).padStart(13, "0")}::${date}::${row["_id"] || row["__rowId"] || ""}`;
+  }
+
+  private expenseTimestamp(row: TableRow): number {
+    const explicit = Date.parse(String(row["createdAt"] || row["updatedAt"] || ""));
+    if (Number.isFinite(explicit)) return explicit;
+
+    const objectId = String(row["_id"] || "");
+    if (/^[0-9a-f]{24}$/i.test(objectId)) return Number.parseInt(objectId.slice(0, 8), 16) * 1000;
+
+    const date = Date.parse(String(row["expenseDate"] || row["date"] || ""));
+    return Number.isFinite(date) ? date : 0;
   }
 
   private expenseChronologicalRows(rows: TableRow[]): TableRow[] {

@@ -414,7 +414,8 @@ export class SupervisorService {
     page?: number;
     limit?: number;
     cursor?: string;
-  }) {
+  }, force = false) {
+    if (force) this.api.invalidateGetCache('/supervisor/expenses');
     return this.api.get<ExpenseListResponse>('/supervisor/expenses', filters);
   }
 

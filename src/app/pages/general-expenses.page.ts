@@ -4252,6 +4252,8 @@ export class GeneralExpensesPage implements OnInit {
       reference: row.reference,
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       approvalStatus: row.status,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
       notes: (row as any).notes,
       ...(row.customFields || {}),
     }));
@@ -4680,7 +4682,7 @@ export class GeneralExpensesPage implements OnInit {
       const transactionType = this.normalizedExpenseTransactionType(String(row["transactionType"] || "Purchase"));
       const groupKey = this.expenseGroupKey(row);
       const previousBalance = balances.get(groupKey) ?? this.expenseOpeningBalanceFor(row, true, true);
-      const balance = Math.max(0, previousBalance + this.expenseSignedAmount(row, transactionType));
+      const balance = previousBalance + this.expenseSignedAmount(row, transactionType);
       balances.set(groupKey, balance);
       return {
         ...row,
@@ -4897,7 +4899,19 @@ export class GeneralExpensesPage implements OnInit {
 
   private expenseRowSortValue(row: TableRow): string {
     const date = String(row["expenseDate"] || row["date"] || "");
-    return `${this.expenseGroupKey(row)}::${date}::${row["__rowId"] || ""}`;
+    const timestamp = this.expenseTimestamp(row);
+    return `${String(timestamp).padStart(13, "0")}::${date}::${row["_id"] || row["__rowId"] || ""}`;
+  }
+
+  private expenseTimestamp(row: TableRow): number {
+    const explicit = Date.parse(String(row["createdAt"] || row["updatedAt"] || ""));
+    if (Number.isFinite(explicit)) return explicit;
+
+    const objectId = String(row["_id"] || "");
+    if (/^[0-9a-f]{24}$/i.test(objectId)) return Number.parseInt(objectId.slice(0, 8), 16) * 1000;
+
+    const date = Date.parse(String(row["expenseDate"] || row["date"] || ""));
+    return Number.isFinite(date) ? date : 0;
   }
 
   private expenseChronologicalRows(rows: TableRow[]): TableRow[] {

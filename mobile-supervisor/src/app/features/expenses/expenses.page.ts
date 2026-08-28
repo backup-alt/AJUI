@@ -402,13 +402,17 @@ export class ExpensesPage implements OnInit {
     try {
       const siteId = this.supervisor.selectedSiteId();
       const projectId = this.supervisor.selectedProjectId();
+      if (force) {
+        this.nextCursor.set(null);
+        this.openingBalance.set(await this.supervisor.getSelectedSiteOpeningBalance());
+      }
       const r = await this.supervisor
         .getExpenses({
           siteId: siteId || undefined,
           projectId: projectId || undefined,
           type: 'site',
           limit: 25,
-        })
+        }, force)
         .toPromise();
       this.expenses.set((r?.expenses || []).map((expense) => ({
         ...expense,

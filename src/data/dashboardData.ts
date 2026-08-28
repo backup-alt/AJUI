@@ -215,6 +215,8 @@ export type ExpenseRow = {
   givenAmount?: number;
   approvedAmount?: number;
   runningBalance?: number;
+  createdAt?: string;
+  updatedAt?: string;
   customFields?: Record<string, string | number | boolean | null>;
 };
 

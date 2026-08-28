@@ -10,6 +10,7 @@ import { Approval } from "../src/models/Approval";
 import { createProject, updateProject } from "../src/services/project.service";
 import { getAssignedProjects } from "../src/services/supervisor-mobile.service";
 import { generateId } from "../src/services/id-generator.service";
+import { recomputeSiteLedger } from "../src/services/expense.service";
 import { hashPassword } from "../src/utils/password";
 
 const supervisorEmail = "project-assignment-supervisor@example.test";
@@ -440,5 +441,40 @@ describe("Project supervisor assignment", () => {
       .set("Authorization", `Bearer ${supervisorToken}`);
     expect(mobileExpenses.status).toBe(200);
     expect(mobileExpenses.body.expenses.some((row: { _id: string }) => row._id === cashExpense?._id.toString())).toBe(true);
+
+    const purchaseExpense = await Expense.create({
+      expenseId: await generateId("EXP"),
+      type: "site",
+      projectId: project._id,
+      projectName: project.name,
+      clientId: project.clientId,
+      siteId: site._id,
+      site: site.name,
+      supervisor: supervisorProfile.name,
+      supervisorId: supervisorProfile._id,
+      transactionType: "Purchase",
+      amount: 8_000,
+      runningBalance: 0,
+      date: "2026-08-28",
+      description: "Purchase exceeding available cash",
+      status: "Approved",
+      submittedBy: supervisorUser._id.toString(),
+      approvedBy: "Test Admin",
+      approvedAt: new Date(),
+    });
+    await recomputeSiteLedger(project._id, site.name);
+
+    expect((await Expense.findById(purchaseExpense._id).lean())?.runningBalance).toBe(-1_000);
+
+    const refreshedMobileExpenses = await request(app)
+      .get(`/api/supervisor/expenses?projectId=${project._id}&siteId=${site._id}&type=site`)
+      .set("Authorization", `Bearer ${supervisorToken}`);
+    expect(refreshedMobileExpenses.status).toBe(200);
+    expect(
+      refreshedMobileExpenses.body.expenses.some(
+        (row: { _id: string; runningBalance: number }) =>
+          row._id === purchaseExpense._id.toString() && row.runningBalance === -1_000,
+      ),
+    ).toBe(true);
   });
 });

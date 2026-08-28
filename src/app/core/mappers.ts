@@ -251,6 +251,8 @@ export function mapExpense(e: any): any {
     submittedBy: e.submittedBy,
     approvedBy: e.approvedBy,
     approvedAt: e.approvedAt,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
     customFields: e.customFields || {},
   };
 }
