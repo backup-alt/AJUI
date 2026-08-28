@@ -159,6 +159,30 @@ import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.compone
     .project-select-grid > .project-select-card {
       align-self: stretch;
       height: 100%;
+      container-type: inline-size;
+    }
+
+    .project-select-ledger > div {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .project-select-ledger span {
+      min-height: 24px;
+      line-height: 1.2;
+    }
+
+    .project-select-ledger strong {
+      margin-top: auto;
+      line-height: 1.25;
+      font-variant-numeric: tabular-nums;
+    }
+
+    @container (max-width: 420px) {
+      .project-select-ledger {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
     .add-project-card {
