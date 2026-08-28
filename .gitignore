@@ -55,3 +55,6 @@ coverage/
 *.lcov
 
 .claude/
+.png
+.jpg
+.jpeg
