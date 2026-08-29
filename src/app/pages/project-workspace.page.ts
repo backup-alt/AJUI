@@ -7,7 +7,7 @@ import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angul
 import type { MaterialRow, Project, ProjectStatus } from "../../data/dashboardData";
 import { ErpDataService, type SharedModuleKey, type SharedTableField, type SharedTableRow, type Worker } from "../data/erp-data.service";
 import { MaterialsService } from "../core/materials.service";
-import { ApiService, type PurchaseOrder } from "../core/api.service";
+import { ApiService, type ProjectExpenseOutputRollup, type PurchaseOrder } from "../core/api.service";
 import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
 import { mapProject, mapMaterial, mapLabour, mapExpense, mapGeneralExpense, mapPayment, mapVendor, mapSubcontractor, mapInventory, mapWorker } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -3431,7 +3431,12 @@ export class ProjectWorkspacePage {
   workerSubcontractorOptions(): Array<{ id: string; name: string }> {
     const projectId = this.projectId();
     return this.data.subcontractors()
-      .filter((row) => row.status !== "inactive" && (!row.projectId || String(row.projectId) === projectId))
+      .filter((row) => {
+        if (row.status === "inactive") return false;
+        const primaryProjectMatches = String(row.projectId || "") === projectId;
+        const assignedProjectsMatch = (row.projectIds || []).some((id) => String(id) === projectId);
+        return primaryProjectMatches || assignedProjectsMatch;
+      })
       .map((row) => ({
         id: String(row._id || row.id || ""),
         name: String(row.subcontractorName || "").trim(),
@@ -4215,6 +4220,7 @@ export class ProjectWorkspacePage {
         this.recordDialogOpen.set(false);
         this.clearRowSelection();
         this.refreshSectionFromBackend("materials");
+        this.loadProjectExpenseRollup(this.projectId());
         return;
       } catch (err: any) {
         console.error("[ProjectWorkspace] Failed to create material", err);
@@ -4906,6 +4912,7 @@ export class ProjectWorkspacePage {
     this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
 
     try { this.refreshFromBackend(); } catch {}
+    this.loadProjectExpenseRollup(this.projectId());
   }
 
   private async deleteRowRecord(section: ModuleKey, row: TableRow) {
@@ -5346,6 +5353,7 @@ export class ProjectWorkspacePage {
   }
 
   private subcontractorSpend = signal<number>(0);
+  private projectExpenseOutputRollup = signal<ProjectExpenseOutputRollup | null>(null);
   private subcontractorPayments = signal<any[]>([]);
   /**
    * Sub-contractor profiles (one row per sub) assigned to the current
@@ -5419,19 +5427,48 @@ export class ProjectWorkspacePage {
   private loadProjectExpenseRollup(projectId: string | null) {
     if (!projectId) {
       this.subcontractorSpend.set(0);
+      this.projectExpenseOutputRollup.set(null);
       this.subcontractorPayments.set([]);
       this.subcontractorRoster.set([]);
       this.projectPurchaseOrders.set([]);
       return;
     }
-    this.api.getSubcontractorSpendRollup(projectId).subscribe({
-      next: (res) => this.subcontractorSpend.set(Number(res?.totalPaid) || 0),
-      error: () => this.subcontractorSpend.set(0),
+    // Do not briefly show the previous project's totals while the new rollup
+    // is loading.
+    this.projectExpenseOutputRollup.set(null);
+    this.subcontractorSpend.set(0);
+    this.api.getProjectExpenseOutputRollup(projectId).subscribe({
+      next: (res) => {
+        if (this.projectId() !== projectId) return;
+        const normalized: ProjectExpenseOutputRollup = {
+          supervisorExpense: Math.max(0, Number(res?.supervisorExpense) || 0),
+          materialExpense: Math.max(0, Number(res?.materialExpense) || 0),
+          nonLabourExpense: Math.max(0, Number(res?.nonLabourExpense) || 0),
+          subcontractorPayments: Math.max(0, Number(res?.subcontractorPayments) || 0),
+          totalExpense: Math.max(0, Number(res?.totalExpense) || 0),
+        };
+        this.projectExpenseOutputRollup.set(normalized);
+        this.subcontractorSpend.set(normalized.subcontractorPayments);
+      },
+      error: () => {
+        if (this.projectId() !== projectId) return;
+        this.projectExpenseOutputRollup.set(null);
+        this.subcontractorSpend.set(0);
+      },
     });
     // Load payments so the table renders the actual records.
     this.api.listSubcontractorPayments({ projectId, limit: 500 }).subscribe({
-      next: (res) => this.subcontractorPayments.set(res.items || []),
-      error: () => this.subcontractorPayments.set([]),
+      next: (res) => {
+        if (this.projectId() !== projectId) return;
+        const items = res.items || [];
+        this.subcontractorPayments.set(items);
+        if (!this.projectExpenseOutputRollup()) {
+          this.subcontractorSpend.set(items.reduce((sum, row) => sum + (Number(row.amount) || 0), 0));
+        }
+      },
+      error: () => {
+        if (this.projectId() === projectId) this.subcontractorPayments.set([]);
+      },
     });
     // Load sub-contractor profiles for the roster tab. Backend doesn't
     // expose a project filter on /subcontractors, so we filter client-side.
@@ -5476,30 +5513,19 @@ export class ProjectWorkspacePage {
   }
 
   /**
-   * Subcontractor payments AND materials-given amounts are folded
-   * into the project total expense (per spec) so the workspace hero
-   * matches what the admin sees elsewhere on the dashboard.
-   *
-   * Composition:
-   *   - expenseRows : sum of |amount| for expense records (expense
-   *     entries are sign-flipped so debits come through as negative
-   *     in the signed-amount helper — we absolute-value here).
-   *   - labourRows  : sum of weekly pay across labour rows for the
-   *     project (covers directly-hired + subcontractor-led labour).
-   *   - subcontractorSpend : server-computed total of all
-   *     SubcontractorPayment records.
-   *   - materialsGivenTotal : sum of `givenAmount` (cash disbursed
-   *     for materials) across every material row belonging to the
-   *     project. The materials section's own totals card uses
-   *     `issuedAmount + givenAmount`; we mirror that here so the
-   *     project-wide hero stays consistent with the materials view.
-   *     Issued amounts are NOT double-counted (they already appear
-   *     inside expense rows when the material was purchased through
-   *     the expense ledger).
+   * Money-output total: Supervisor Expense + Material Expense + non-labour
+   * General Expense + Subcontractor Payments. Client Payments and labour
+   * attendance/wage estimates are deliberately excluded.
    */
   private totalProjectExpenseValue(): number {
+    const serverRollup = this.projectExpenseOutputRollup();
+    if (serverRollup) return serverRollup.totalExpense;
+
+    // Temporary fallback while the authoritative, unpaginated server rollup
+    // is loading. It follows the same four-category accounting rule.
     const expenseRows = this.data.tableRowsFor("expenses", this.tableRows().expenses, (row) => this.rowBelongsToProject(row));
     const expenseTotal = expenseRows.reduce((sum, row) => {
+      if (String(row["approvalStatus"] || row["status"] || "").toLowerCase() === "rejected") return sum;
       const amount = this.expenseSignedAmount(row);
       return amount < 0 ? sum + Math.abs(amount) : sum;
     }, 0);
@@ -5509,18 +5535,18 @@ export class ProjectWorkspacePage {
       (row) => this.rowBelongsToProject(row)
     );
     const generalExpenseTotal = generalExpenseRows.reduce(
-      (sum, row) => sum + Math.abs(this.moneyNumber(row["amount"])),
+      (sum, row) => String(row["status"] || "").toLowerCase() === "rejected"
+        ? sum
+        : sum + Math.abs(this.moneyNumber(row["amount"])),
       0
     );
-    const labourRows = this.data.tableRowsFor("labour", this.tableRows().labour, (row) => this.rowBelongsToProject(row));
-    const labourTotal = labourRows.reduce((sum, row) => sum + this.labourWeeklyPayForRow(this.withLabourPayable(row)).total, 0);
     const subcontractorTotal = this.subcontractorSpend();
     const materialRows = this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row));
     const materialsGivenTotal = materialRows.reduce(
       (sum, row) => sum + this.moneyNumber(row["givenAmount"]),
       0
     );
-    return expenseTotal + generalExpenseTotal + labourTotal + subcontractorTotal + materialsGivenTotal;
+    return expenseTotal + generalExpenseTotal + subcontractorTotal + materialsGivenTotal;
   }
 
   /**

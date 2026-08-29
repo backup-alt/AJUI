@@ -110,6 +110,7 @@ router.get("/attendance/report", attendanceCtrl.getLabourReportHandler);
 router.get("/subcontractor-attendance", cache(30), ctrl.listSubcontractorAttendance);
 
 // =================== EXPENSES ===================
+router.get("/expenses/project-rollup/:projectId", ctrl.getProjectExpenseOutputRollup);
 router.post(
   "/expenses",
   validate(createExpenseSchema),

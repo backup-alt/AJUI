@@ -104,6 +104,14 @@ export interface CreateSubcontractorPaymentPayload {
   notes?: string;
 }
 
+export interface ProjectExpenseOutputRollup {
+  supervisorExpense: number;
+  materialExpense: number;
+  nonLabourExpense: number;
+  subcontractorPayments: number;
+  totalExpense: number;
+}
+
 export interface SubcontractorLabor {
   _id: string;
   subcontractorId: string;
@@ -660,6 +668,15 @@ export class ApiService {
       .get<{ totalPaid: number; perProject: Record<string, number> }>(
         `${this.baseUrl}/subcontractors/spend-rollup${query}`,
         { headers: this.authHeaders() }
+      )
+      .pipe(catchError(this.handleError));
+  }
+
+  getProjectExpenseOutputRollup(projectId: string): Observable<ProjectExpenseOutputRollup> {
+    return this.http
+      .get<ProjectExpenseOutputRollup>(
+        `${this.baseUrl}/expenses/project-rollup/${encodeURIComponent(projectId)}`,
+        { headers: this.authHeaders() },
       )
       .pipe(catchError(this.handleError));
   }

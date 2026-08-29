@@ -13,6 +13,7 @@ import * as purchaseOrderService from "../services/purchase-order.service.js";
 import * as approvalService from "../services/approval.service.js";
 import * as inventoryService from "../services/inventory.service.js";
 import * as workerService from "../services/worker.service.js";
+import * as expenseOutputRollupService from "../services/expense-output-rollup.service.js";
 import { recomputeClientTotals, recomputeProjectTotals } from "../services/financial.service.js";
 import { getScopedProjectIds } from "../middleware/rbac.js";
 import { User } from "../models/User.js";
@@ -440,6 +441,14 @@ export async function getPendingLabour(req: Request, res: Response, next: NextFu
 }
 
 // =================== EXPENSES ===================
+export async function getProjectExpenseOutputRollup(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scopeProjectIds = await getScopedProjectIds(req);
+    const rollup = await expenseOutputRollupService.projectExpenseOutputRollup(req.params.projectId, scopeProjectIds);
+    res.json(rollup);
+  } catch (e) { next(e); }
+}
+
 export async function createExpense(req: Request, res: Response, next: NextFunction) {
   try {
     const expense = await expenseService.createExpense(req.body);
