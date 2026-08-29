@@ -455,7 +455,10 @@ describe("Project supervisor assignment", () => {
       transactionType: "Purchase",
       amount: 8_000,
       runningBalance: 0,
-      date: "2026-08-28",
+      // Keep the purchase on the same ledger day as the top-up. The ledger
+      // then uses createdAt/_id to preserve the intended cash-before-purchase
+      // sequence without making this test depend on the calendar date.
+      date: cashExpense!.date,
       description: "Purchase exceeding available cash",
       status: "Approved",
       submittedBy: supervisorUser._id.toString(),
