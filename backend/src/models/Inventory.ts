@@ -33,6 +33,7 @@ export interface IInventory extends Document {
   receiptImage?: string;
   receiptImageMimeType?: string;
   receiptImageName?: string;
+  receiptUploadedBy?: string;
   received?: boolean;
   receivedDate?: string;
   purchaseHistory?: Array<{
@@ -90,6 +91,7 @@ const inventorySchema = new Schema<IInventory>(
     receiptImage: { type: String, select: false },
     receiptImageMimeType: { type: String, select: false },
     receiptImageName: { type: String },
+    receiptUploadedBy: { type: String, index: true },
     received: { type: Boolean, default: false },
     receivedDate: { type: String },
     purchaseHistory: {

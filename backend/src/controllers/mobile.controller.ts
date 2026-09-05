@@ -566,6 +566,7 @@ export async function uploadExpenseReceipt(req: Request, res: Response, next: Ne
       data: req.body.data,
       mimeType: req.body.mimeType,
       fileName: req.body.fileName,
+      uploadedBy: userId,
     });
     console.log(`[uploadExpenseReceipt] success: billUrl=${updated.billUrl?.substring(0, 60)}`);
     invalidateCachePrefix("/api/supervisor/expenses");
@@ -590,6 +591,7 @@ export async function uploadMaterialReceipt(req: Request, res: Response, next: N
         mimeType: req.body.mimeType,
         fileName: req.body.fileName,
         received: req.body.received,
+        uploadedBy: userId,
       });
       invalidateCachePrefix("/api/supervisor/materials");
       invalidateCachePrefix("/api/supervisor/material-bill-requests");
@@ -609,6 +611,7 @@ export async function uploadMaterialReceipt(req: Request, res: Response, next: N
         mimeType: req.body.mimeType,
         fileName: req.body.fileName,
         received: req.body.received,
+        uploadedBy: userId,
       });
       invalidateCachePrefix("/api/supervisor/materials");
       invalidateCachePrefix("/api/supervisor/material-bill-requests");

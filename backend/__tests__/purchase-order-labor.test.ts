@@ -4,6 +4,7 @@ import { Client } from "../src/models/Client";
 import { Counter } from "../src/models/Counter";
 import { GstRate } from "../src/models/GstRate";
 import { Inventory } from "../src/models/Inventory";
+import { Expense } from "../src/models/Expense";
 import { Material } from "../src/models/Material";
 import { Project } from "../src/models/Project";
 import { Site } from "../src/models/Site";
@@ -17,6 +18,8 @@ import { generateId } from "../src/services/id-generator.service";
 import { ensureMaterialInInventory, listInventory, syncPurchaseOrderMaterialInventory } from "../src/services/inventory.service";
 import {
   getMaterialDetailForSupervisor,
+  getExpenseDetailForSupervisor,
+  listExpensesForSupervisor,
   listMaterialsForSupervisor,
   updateMaterialReceivedForSupervisor,
 } from "../src/services/supervisor-mobile.service";
@@ -37,6 +40,7 @@ beforeEach(async () => {
   if (!app) return;
   await Promise.all([
     PurchaseOrder.deleteMany({}),
+    Expense.deleteMany({}),
     Material.deleteMany({}),
     Inventory.deleteMany({}),
     Vendor.deleteMany({}),
@@ -126,6 +130,58 @@ async function seedProcurement() {
 }
 
 describe("Purchase order workflow", () => {
+  it("hides admin-uploaded material bills from the supervisor mobile feed", async () => {
+    if (!app) return;
+    const { project, material, supervisorUser } = await seedProcurement();
+    await Material.updateOne({ _id: material._id }, {
+      $set: { billUrl: "https://example.test/admin-bill.jpg", receiptUploadedBy: "admin-user" },
+    });
+    const hidden = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+      view: "materials",
+    });
+    expect(hidden.materials.find((row) => row.materialId === material.materialId)?.billUrl).toBeUndefined();
+
+    await Material.updateOne({ _id: material._id }, { $set: { receiptUploadedBy: supervisorUser._id.toString() } });
+    const visible = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+      view: "materials",
+    });
+    expect(visible.materials.find((row) => row.materialId === material.materialId)?.billUrl)
+      .toBe("https://example.test/admin-bill.jpg");
+  });
+
+  it("hides admin-uploaded expense bills from supervisor lists and details", async () => {
+    if (!app) return;
+    const { project, supervisorUser } = await seedProcurement();
+    const expense = await Expense.create({
+      expenseId: await generateId("EXP"),
+      type: "site",
+      projectId: project._id,
+      projectName: project.name,
+      amount: 500,
+      date: "2026-09-05",
+      description: "Admin receipt test",
+      status: "Approved",
+      submittedBy: supervisorUser._id.toString(),
+      billUrl: "https://example.test/admin-expense.jpg",
+      receiptUploadedBy: "admin-user",
+    });
+    const hidden = await listExpensesForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+    });
+    expect(hidden.expenses.find((row) => row.expenseId === expense.expenseId)?.billUrl).toBeUndefined();
+    expect((await getExpenseDetailForSupervisor(supervisorUser._id.toString(), expense._id.toString()) as any).billUrl)
+      .toBeUndefined();
+
+    await Expense.updateOne({ _id: expense._id }, { $set: { receiptUploadedBy: supervisorUser._id.toString() } });
+    const visible = await listExpensesForSupervisor(supervisorUser._id.toString(), {
+      projectId: project._id.toString(),
+    });
+    expect(visible.expenses.find((row) => row.expenseId === expense.expenseId)?.billUrl)
+      .toBe("https://example.test/admin-expense.jpg");
+  });
+
   it("returns every project material even when the app retains a hidden site selection", async () => {
     if (!app) return;
     const { client, project, supervisorUser } = await seedProcurement();

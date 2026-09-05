@@ -32,6 +32,7 @@ export interface IExpense extends Document {
   approvedBy?: string;
   approvedAt?: Date;
   receiptUploadedAt?: Date;
+  receiptUploadedBy?: string;
   isSiteMaterial?: boolean;
   materialName?: string;
   materialUnit?: string;
@@ -84,6 +85,7 @@ const expenseSchema = new Schema<IExpense>(
     approvedBy: { type: String },
     approvedAt: { type: Date },
     receiptUploadedAt: { type: Date },
+    receiptUploadedBy: { type: String, index: true },
     isSiteMaterial: { type: Boolean, default: false },
     materialName: { type: String },
     materialUnit: { type: String },

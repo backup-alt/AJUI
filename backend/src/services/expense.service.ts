@@ -314,7 +314,19 @@ export async function updateExpense(id: string, patch: Partial<CreateExpenseInpu
   }
   if (patch.siteId) update.siteId = new Types.ObjectId(patch.siteId);
   if (patch.supervisorId) update.supervisorId = new Types.ObjectId(patch.supervisorId);
-  if (patch.projectId) update.projectId = new Types.ObjectId(patch.projectId);
+  if (patch.projectId) {
+    const project = await Project.findById(patch.projectId).lean();
+    if (!project) throw new AppError(404, "Project not found");
+    update.projectId = project._id;
+    update.projectName = project.name;
+    update.clientId = project.clientId;
+    update.clientName = project.client;
+  } else if (patch.clientId) {
+    const client = await Client.findById(patch.clientId).lean();
+    if (!client) throw new AppError(404, "Client not found");
+    update.clientId = client._id;
+    update.clientName = client.name;
+  }
 
   const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
   if (customFields) {
@@ -331,7 +343,7 @@ export async function updateExpense(id: string, patch: Partial<CreateExpenseInpu
 
 export async function uploadExpenseReceipt(
   id: string,
-  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number }
+  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number; uploadedBy?: string }
 ) {
   console.log(`[uploadExpenseReceipt svc] id=${id} givenAmount=${payload.givenAmount}`);
   const expense = await Expense.findById(id);
@@ -369,6 +381,7 @@ export async function uploadExpenseReceipt(
   expense.status = "Completed";
 
   expense.receiptUploadedAt = new Date();
+  expense.receiptUploadedBy = payload.uploadedBy;
   await expense.save();
   console.log(`[uploadExpenseReceipt svc] saved`);
 

@@ -271,6 +271,7 @@ export async function uploadMaterialReceipt(req: Request, res: Response, next: N
       mimeType: req.body.mimeType,
       fileName: req.body.fileName,
       givenAmount: req.body.givenAmount,
+      uploadedBy: req.user?.sub,
     });
     invalidateCachePrefix("/api/materials");
     invalidateCachePrefix("/api/dashboard/batch");
@@ -526,6 +527,7 @@ export async function uploadExpenseReceipt(req: Request, res: Response, next: Ne
       data: req.body.data,
       mimeType: req.body.mimeType,
       fileName: req.body.fileName,
+      uploadedBy: req.user?.sub,
     });
     res.json({ expense });
   } catch (e) { next(e); }

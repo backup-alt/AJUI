@@ -198,7 +198,7 @@ type PoDraftLine = {
                     <th class="col-desc">Material / Description</th>
                     <th class="col-unit">Unit</th>
                       <th class="col-qty">Qty</th>
-                      <th class="col-amount">Amount (₹)</th>
+                      <th class="col-amount">Rate (₹)</th>
                       <th class="col-gst">GST %</th>
                       <th class="col-gstamt">GST Amt (₹)</th>
                       <th class="col-total">Total (₹)</th>
@@ -768,7 +768,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     if (!material) return;
     const quantity = this.defaultQuantityFor(material);
     const knownAmount = Number(material.givenAmount ?? material.issuedAmount ?? 0);
-    this.updateLineObject(index, { source: "existing", materialId, description: material.name, unit: material.unit, quantity, amount: knownAmount || 0 });
+    this.updateLineObject(index, { source: "existing", materialId, description: material.name, unit: material.unit, quantity, amount: knownAmount > 0 && quantity > 0 ? knownAmount / quantity : 0 });
     this.openMenu.set("");
   }
 
@@ -791,7 +791,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       description: material.name,
       unit: material.unit,
       quantity,
-      amount: knownAmount || 0,
+      amount: knownAmount > 0 && quantity > 0 ? knownAmount / quantity : 0,
       gstPercent: 18,
     };
   }
@@ -834,7 +834,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   private updateLineObject(index: number, patch: Partial<PoDraftLine>) { this.lines.update((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row)); }
   addLine() { this.lines.update((rows) => [...rows, this.emptyLine()]); }
   removeLine(index: number) { this.lines.update((rows) => rows.filter((_, rowIndex) => rowIndex !== index)); }
-  lineAmount(line: PoDraftLine) { return Math.round(line.amount * 100) / 100; }
+  lineAmount(line: PoDraftLine) { return Math.round(line.quantity * line.amount * 100) / 100; }
   lineGst(line: PoDraftLine) { return Math.round(this.lineAmount(line) * line.gstPercent) / 100; }
   lineTotal(line: PoDraftLine) { return Math.round((this.lineAmount(line) + this.lineGst(line)) * 100) / 100; }
   itemTotal(item: { itemAmount?: number; gstAmount?: number }) { return Math.round(((item.itemAmount || 0) + (item.gstAmount || 0)) * 100) / 100; }
@@ -872,7 +872,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
           description: line.source === "manual" ? line.description || undefined : undefined,
           unit: line.source === "manual" ? line.unit || undefined : undefined,
           quantity: line.quantity,
-          rate: line.quantity > 0 ? line.amount / line.quantity : 0,
+          rate: line.amount,
           gstPercent: line.gstPercent,
         })),
       };
@@ -932,7 +932,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       description: item.description || "",
       unit: item.unit || "",
       quantity: item.quantity || 0,
-      amount: item.itemAmount ?? Math.round(((item.quantity || 0) * (item.rate || 0)) * 100) / 100,
+      amount: item.rate || 0,
       gstPercent: item.gstPercent ?? 18,
     })));
     if (this.lines().length === 0) this.lines.set([this.emptyLine()]);

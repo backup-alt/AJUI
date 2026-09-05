@@ -972,10 +972,12 @@ export async function listMaterialsForSupervisor(
     let receiptMap = new Map<string, { received: boolean; receivedDate?: string }>();
     if (allMatIds.length > 0) {
       try {
-        const linkedMats = await Material.find({ _id: { $in: allMatIds } }).select("_id billUrl pcloudFileId status receivedDate").lean();
+        const linkedMats = await Material.find({ _id: { $in: allMatIds } }).select("_id billUrl pcloudFileId receiptUploadedBy status receivedDate").lean();
         billMap = new Map(linkedMats.map((m: any) => [
           m._id.toString(),
-          m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : (m.billUrl || ''),
+          String(m.receiptUploadedBy || "") === userId
+            ? (m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : (m.billUrl || ''))
+            : '',
         ]));
         receiptMap = new Map(linkedMats.map((m: any) => [
           m._id.toString(),
@@ -1025,7 +1027,9 @@ export async function listMaterialsForSupervisor(
           minimumQuantity: m.minimumQuantity,
           vendor: m.vendor,
           poNumber: m.poNumber,
-          billUrl: m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl,
+          billUrl: String((m as any).receiptUploadedBy || "") === userId
+            ? (m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl)
+            : undefined,
           received: latestPurchase?.received ?? Boolean(m.received),
           purchaseHistory,
           requestDate: m.createdAt,
@@ -1145,10 +1149,12 @@ export async function listMaterialsForSupervisor(
       poNumber: m.poNumber,
       issuedAmount: m.issuedAmount,
       givenAmount: (m as any).givenAmount,
-      billUrl: (m as any).pcloudFileId
-        ? buildPCloudMediaUrl(String((m as any).pcloudFileId))
-        : (m as any).billUrl,
-      billHistory: (Array.isArray((m as any).billHistory) ? (m as any).billHistory : []).map((bill: any) => ({
+      billUrl: String((m as any).receiptUploadedBy || "") === userId
+        ? ((m as any).pcloudFileId ? buildPCloudMediaUrl(String((m as any).pcloudFileId)) : (m as any).billUrl)
+        : undefined,
+      billHistory: (Array.isArray((m as any).billHistory) ? (m as any).billHistory : []).filter(
+        (bill: any) => String(bill.uploadedBy || "") === userId,
+      ).map((bill: any) => ({
         billUrl: bill.pcloudFileId ? buildPCloudMediaUrl(String(bill.pcloudFileId)) : bill.billUrl,
         fileName: bill.fileName,
         uploadedAt: bill.uploadedAt,
@@ -1212,10 +1218,12 @@ export async function listMaterialBillRequestsForSupervisor(
       approvedQuantity: m.approvedQuantity,
       issuedAmount: m.issuedAmount,
       givenAmount: m.givenAmount,
-      billUrl: (m as any).pcloudFileId
-        ? buildPCloudMediaUrl(String((m as any).pcloudFileId))
-        : m.billUrl,
-      billHistory: (Array.isArray((m as any).billHistory) ? (m as any).billHistory : []).map((bill: any) => ({
+      billUrl: String((m as any).receiptUploadedBy || "") === userId
+        ? ((m as any).pcloudFileId ? buildPCloudMediaUrl(String((m as any).pcloudFileId)) : m.billUrl)
+        : undefined,
+      billHistory: (Array.isArray((m as any).billHistory) ? (m as any).billHistory : []).filter(
+        (bill: any) => String(bill.uploadedBy || "") === userId,
+      ).map((bill: any) => ({
         billUrl: bill.pcloudFileId ? buildPCloudMediaUrl(String(bill.pcloudFileId)) : bill.billUrl,
         fileName: bill.fileName,
         uploadedAt: bill.uploadedAt,
@@ -1322,9 +1330,9 @@ export async function listExpensesForSupervisor(
       site: e.site,
       transactionType: e.transactionType,
       poNumber: e.poNumber,
-      billUrl: (e as any).pcloudFileId
-        ? buildPCloudMediaUrl(String((e as any).pcloudFileId))
-        : (e as any).billUrl,
+      billUrl: String((e as any).receiptUploadedBy || "") === userId
+        ? ((e as any).pcloudFileId ? buildPCloudMediaUrl(String((e as any).pcloudFileId)) : (e as any).billUrl)
+        : undefined,
       received: (e as any).received,
       isSiteMaterial: (e as any).isSiteMaterial,
       materialName: (e as any).materialName,
@@ -1400,20 +1408,27 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
       consumptionHistory,
     };
   }
-  if (result.pcloudFileId) {
+  if (String(result.receiptUploadedBy || "") !== userId) {
+    result.billUrl = undefined;
+    result.pcloudFileId = undefined;
+    result.pcloudPublicCode = undefined;
+  } else if (result.pcloudFileId) {
     result.billUrl = buildPCloudMediaUrl(String(result.pcloudFileId));
+  }
+  if (Array.isArray(result.billHistory)) {
+    result.billHistory = result.billHistory.filter((bill: any) => String(bill.uploadedBy || "") === userId);
   }
 
   const linkedId = result.lastMaterialId;
   if (linkedId) {
       try {
-        const linked = await Material.findById(linkedId).select("billUrl pcloudFileId pcloudPublicCode poNumber vendor status receivedDate").lean();
+        const linked = await Material.findById(linkedId).select("billUrl pcloudFileId pcloudPublicCode receiptUploadedBy poNumber vendor status receivedDate").lean();
         if (linked) {
-          result.billUrl = linked.pcloudFileId
+          result.billUrl = String((linked as any).receiptUploadedBy || "") === userId && linked.pcloudFileId
             ? buildPCloudMediaUrl(String(linked.pcloudFileId))
-            : (linked.billUrl || result.billUrl);
-          result.pcloudFileId = linked.pcloudFileId || result.pcloudFileId;
-          result.pcloudPublicCode = linked.pcloudPublicCode || result.pcloudPublicCode;
+            : (String((linked as any).receiptUploadedBy || "") === userId ? linked.billUrl : undefined);
+          result.pcloudFileId = String((linked as any).receiptUploadedBy || "") === userId ? linked.pcloudFileId : undefined;
+          result.pcloudPublicCode = String((linked as any).receiptUploadedBy || "") === userId ? linked.pcloudPublicCode : undefined;
           result.received = linked.status === "Received";
           result.receivedDate = linked.status === "Received" ? linked.receivedDate : undefined;
         }
@@ -1429,11 +1444,13 @@ export async function getMaterialDetailForSupervisor(userId: string, materialId:
     if (matIds.length > 0) {
       try {
         const linkedMats = await Material.find({ _id: { $in: matIds } })
-          .select("_id billUrl pcloudFileId status receivedDate")
+          .select("_id billUrl pcloudFileId receiptUploadedBy status receivedDate")
           .lean();
         const billMap = new Map(linkedMats.map((m: any) => [
           m._id.toString(),
-          m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl,
+          String(m.receiptUploadedBy || "") === userId
+            ? (m.pcloudFileId ? buildPCloudMediaUrl(String(m.pcloudFileId)) : m.billUrl)
+            : '',
         ]));
         const receivedMap = new Map(linkedMats.map((m: any) => [
           m._id.toString(),
@@ -1627,6 +1644,12 @@ export async function getExpenseDetailForSupervisor(userId: string, expenseId: s
   const { query } = await buildScopedEntityQuery(userId);
   const expense = await Expense.findOne({ ...query, _id: expenseId }).lean();
   if (!expense) throw new AppError(404, "Expense not found or not accessible");
+  if (String((expense as any).receiptUploadedBy || "") !== userId) {
+    (expense as any).billUrl = undefined;
+    (expense as any).pcloudFileId = undefined;
+    (expense as any).pcloudPublicCode = undefined;
+    (expense as any).receiptImageName = undefined;
+  }
   return expense;
 }
 

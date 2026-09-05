@@ -86,8 +86,19 @@ export async function getPaymentById(id: string) {
 
 export async function updatePayment(id: string, patch: Partial<CreatePaymentInput>) {
   const update: Record<string, unknown> = { ...patch };
-  if (patch.projectId) update.projectId = new Types.ObjectId(patch.projectId);
-  if (patch.clientId) update.clientId = new Types.ObjectId(patch.clientId);
+  if (patch.projectId) {
+    const project = await Project.findById(patch.projectId).lean();
+    if (!project) throw new AppError(404, "Project not found");
+    update.projectId = project._id;
+    update.projectName = project.name;
+    update.clientId = project.clientId;
+    update.clientName = project.client;
+  } else if (patch.clientId) {
+    const client = await Client.findById(patch.clientId).lean();
+    if (!client) throw new AppError(404, "Client not found");
+    update.clientId = client._id;
+    update.clientName = client.name;
+  }
 
   const customFields = (patch as any).customFields as Record<string, unknown> | undefined;
   if (customFields) {

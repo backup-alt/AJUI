@@ -5,6 +5,7 @@ export const objectIdSchema = z.string().regex(/^[a-f0-9]{24}$/i, "Invalid Objec
 export const createMaterialSchema = z.object({
   body: z.object({
     projectId: objectIdSchema.optional().nullable(),
+    clientId: objectIdSchema.optional().nullable(),
     siteId: objectIdSchema.optional(),
     site: z.string().trim().min(1).max(200),
     name: z.string().trim().min(1).max(200),
@@ -30,7 +31,7 @@ export const createMaterialSchema = z.object({
 
 export const updateMaterialSchema = z.object({
   body: createMaterialSchema.shape.body.partial().extend({
-    status: z.enum(["Received", "Not Received"]).optional(),
+    status: z.enum(["Pending", "Approved", "Received", "Not Received"]).optional(),
     customFields: z.record(z.unknown()).optional(),
   }),
   params: z.object({ id: objectIdSchema }),
@@ -105,6 +106,7 @@ export const listLabourSchema = z.object({
 export const expenseBaseSchema = z.object({
   type: z.enum(["site", "general"]),
   projectId: objectIdSchema.optional(),
+  clientId: objectIdSchema.optional(),
   siteId: objectIdSchema.optional(),
   site: z.string().trim().optional(),
   supervisor: z.string().trim().optional(),
@@ -245,6 +247,7 @@ export const createPaymentSchema = z.object({
 
 export const updatePaymentSchema = z.object({
   body: createPaymentSchema.shape.body.partial().extend({
+    status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
     customFields: z.record(z.unknown()).optional(),
   }),
   params: z.object({ id: objectIdSchema }),

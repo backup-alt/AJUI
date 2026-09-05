@@ -381,7 +381,7 @@ export async function getMaterialById(id: string) {
 
 export async function updateMaterial(
   id: string,
-  patch: Partial<CreateMaterialInput> & { status?: "Received" | "Not Received" },
+  patch: Partial<CreateMaterialInput> & { status?: "Pending" | "Approved" | "Received" | "Not Received" },
 ) {
   const existingMaterial = await Material.findById(id).lean();
   if (!existingMaterial) throw new AppError(404, "Material not found");
@@ -412,6 +412,19 @@ export async function updateMaterial(
       history.push({ note: nextNote, date: new Date() });
     }
     update.noteHistory = history;
+  }
+  if (patch.projectId) {
+    const project = await Project.findById(patch.projectId).lean();
+    if (!project) throw new AppError(404, "Project not found");
+    update.projectId = project._id;
+    update.projectName = project.name;
+    update.clientId = project.clientId;
+    update.clientName = project.client;
+  } else if (patch.clientId) {
+    const client = await Client.findById(patch.clientId).lean();
+    if (!client) throw new AppError(404, "Client not found");
+    update.clientId = client._id;
+    update.clientName = client.name;
   }
   // Received Date is system-owned. The supervisor action only needs to
   // change the status; the API records the exact day of that transition.
@@ -472,7 +485,7 @@ export async function getPendingMaterials(scopeProjectIds?: ProjectScopeIds) {
 
 export async function uploadMaterialReceipt(
   id: string,
-  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number; received?: boolean }
+  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number; received?: boolean; uploadedBy?: string }
 ) {
   const material = await Material.findById(id);
   if (!material) throw new AppError(404, "Material not found");
@@ -490,6 +503,7 @@ export async function uploadMaterialReceipt(
         pcloudFileId: material.pcloudFileId,
         pcloudPublicCode: material.pcloudPublicCode,
         uploadedAt: material.updatedAt || new Date(),
+        uploadedBy: material.receiptUploadedBy,
       });
     }
     const pcloudResult = await uploadToPCloud(
@@ -507,8 +521,10 @@ export async function uploadMaterialReceipt(
       pcloudFileId: pcloudResult.fileId,
       pcloudPublicCode: pcloudResult.publicCode,
       uploadedAt: new Date(),
+      uploadedBy: payload.uploadedBy,
     });
     material.billHistory = history;
+    material.receiptUploadedBy = payload.uploadedBy;
     material.receiptImage = undefined;
     material.receiptImageMimeType = undefined;
   } catch (err) {

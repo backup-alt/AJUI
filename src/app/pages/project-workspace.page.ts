@@ -4595,6 +4595,9 @@ export class ProjectWorkspacePage {
       case "date":
         patch.date = value;
         break;
+      case "paymentType":
+        patch.paymentType = value;
+        break;
       case "subcontractorName": {
         const match = this.data
           .subcontractors()
@@ -4861,11 +4864,50 @@ export class ProjectWorkspacePage {
     }
     if (section === "expenses" && key === "amount") {
       this.data.updateSharedRowCell(rowId, key, this.positiveExpenseAmountValue(cleanValue));
-      return;
+    } else {
+      this.data.updateSharedRowCell(rowId, key, cleanValue);
     }
-    this.data.updateSharedRowCell(rowId, key, cleanValue);
     if (section === "attendance" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", cleanValue);
     if (section === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: cleanValue });
+    this.persistProjectRowEdit(section, row, key, cleanValue);
+  }
+
+  private persistProjectRowEdit(section: ModuleKey, row: TableRow, key: string, value: string) {
+    const id = String(row["_id"] || "").trim();
+    if (!id) return;
+    const numeric = (input: string) => Math.max(0, this.moneyNumber(input));
+    let payload: Record<string, unknown> | null = null;
+    const isCustomField = !(sectionConfigs.find((config) => config.key === section)?.columns || []).some((column) => column.key === key);
+    if (isCustomField && ["materials", "expenses", "generalExpenses", "payments"].includes(section)) {
+      payload = { customFields: { [key]: value } };
+    } else if (section === "materials") {
+      const field = ({ materialName: "name", reference: "receiptImageName" } as Record<string, string>)[key] || key;
+      const numericFields = new Set(["issuedAmount", "givenAmount", "requestedQuantity", "approvedQuantity", "purchasedQuantity", "consumedQuantity"]);
+      payload = { [field]: numericFields.has(field) ? numeric(value) : value };
+    } else if (section === "expenses") {
+      const field = ({ expenseDate: "date", approvalStatus: "status", reference: "receiptImageName", siteMaterial: "isSiteMaterial" } as Record<string, string>)[key] || key;
+      const normalized = key === "transactionType" && value === "Add Cash" ? "Cash Added"
+        : key === "approvalStatus" && value === "Declined" ? "Rejected"
+        : value;
+      payload = { [field]: key === "amount" ? numeric(value) : key === "siteMaterial" ? value === "Yes" : normalized };
+    } else if (section === "generalExpenses") {
+      payload = { [key]: key === "amount" ? numeric(value) : value };
+    } else if (section === "payments") {
+      const field = key === "paymentDate" ? "date" : key;
+      payload = { [field]: key === "amount" ? numeric(value) : value };
+    }
+    const request = section === "materials" ? this.api.patchMaterial(id, payload)
+      : section === "expenses" ? this.api.patchExpense(id, payload)
+      : section === "generalExpenses" ? this.api.patchGeneralExpense(id, payload || {})
+      : section === "payments" ? this.api.patchPayment(id, payload)
+      : null;
+    request?.subscribe({
+      next: () => {
+        this.refreshSectionFromBackend(section);
+        if (section === "expenses" || section === "generalExpenses") this.loadProjectExpenseRollup(this.projectId());
+      },
+      error: () => this.refreshSectionFromBackend(section),
+    });
   }
 
   private updateWorkerCellRow(row: TableRow, key: string, value: string) {
@@ -5930,7 +5972,7 @@ export class ProjectWorkspacePage {
   }
 
   isReadonlyColumn(key: string): boolean {
-    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus" || key === "totalPo" || key === "totalPaid";
+    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus" || key === "remainingStock" || key === "totalPo" || key === "totalPaid";
   }
 
   /**
@@ -6042,7 +6084,7 @@ export class ProjectWorkspacePage {
     }
     if (key === "approvalStatus" || key === "status") {
       if (section === "materials") {
-        return ["Pending", "Approved", "Declined", "Completed", "Received", "Not Received"];
+        return ["Pending", "Approved", "Received", "Not Received"];
       }
       // Sub-contractor roster uses a simple Active / Inactive toggle
       // (matches the universal Sub-contractors page status field).

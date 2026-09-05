@@ -776,7 +776,7 @@ export async function adjustInventoryStock(
 
 export async function uploadInventoryReceipt(
   id: string,
-  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number; received?: boolean }
+  payload: { data: string; mimeType: string; fileName?: string; givenAmount?: number; received?: boolean; uploadedBy?: string }
 ) {
   const inventory = await Inventory.findById(id);
   if (!inventory) throw new AppError(404, "Inventory item not found");
@@ -793,6 +793,7 @@ export async function uploadInventoryReceipt(
     inventory.pcloudFileId = pcloudResult.fileId;
     inventory.pcloudPublicCode = pcloudResult.publicCode;
     inventory.receiptImageName = pcloudResult.fileName;
+    inventory.receiptUploadedBy = payload.uploadedBy;
     inventory.receiptImage = undefined;
     inventory.receiptImageMimeType = undefined;
   } catch (err) {
@@ -817,6 +818,7 @@ export async function uploadInventoryReceipt(
           billUrl: inventory.billUrl,
           pcloudFileId: inventory.pcloudFileId,
           pcloudPublicCode: inventory.pcloudPublicCode,
+          receiptUploadedBy: payload.uploadedBy,
           ...(inventory.received ? { status: "Received", receivedDate: inventory.receivedDate } : {}),
         },
         $unset: { receiptImage: "", receiptImageMimeType: "" },

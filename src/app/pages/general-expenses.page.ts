@@ -2874,7 +2874,8 @@ export class GeneralExpensesPage implements OnInit {
       key === "weeklyPayable" ||
       key === "weeklyPay" ||
       key === "staffCount" ||
-      key === "balance"
+      key === "balance" ||
+      key === "remainingStock"
     );
   }
 
@@ -3839,9 +3840,9 @@ export class GeneralExpensesPage implements OnInit {
     if (!rowId) return;
     if (module === "expenses" && key === "amount") {
       this.data.updateSharedRowCell(rowId, key, this.positiveExpenseAmountValue(trimmedValue));
-      return;
+    } else {
+      this.data.updateSharedRowCell(rowId, key, trimmedValue);
     }
-    this.data.updateSharedRowCell(rowId, key, trimmedValue);
     if (module === "labour" && key === "labourTypes") this.data.updateSharedRowCell(rowId, "notes", trimmedValue);
     if (module === "expenses" && key === "siteMaterial") this.createMaterialFromSiteExpense({ ...row, [key]: trimmedValue });
 
@@ -3875,6 +3876,29 @@ export class GeneralExpensesPage implements OnInit {
     let backendPayload: Record<string, unknown> = isCustomField
       ? { customFields: { [columnKey]: value } }
       : { [columnKey]: value };
+    const fieldAliases: Record<string, Record<string, string>> = {
+      materials: { materialName: "name" },
+      expenses: { expenseDate: "date", approvalStatus: "status", siteMaterial: "isSiteMaterial" },
+      payments: { paymentDate: "date" },
+    };
+    const backendKey = fieldAliases[module]?.[columnKey] || columnKey;
+    const numericFields = new Set(["amount", "issuedAmount", "givenAmount", "requestedQuantity", "approvedQuantity", "purchasedQuantity", "consumedQuantity", "employeeCount"]);
+    if (!isCustomField) backendPayload = { [backendKey]: numericFields.has(backendKey) ? Math.abs(this.moneyNumber(value)) : value };
+    if (module === "expenses" && columnKey === "siteMaterial") backendPayload = { isSiteMaterial: value === "Yes" };
+    if (["materials", "expenses", "payments"].includes(module) && columnKey === "project") {
+      const project = this.data.projects().find((item) => item.name === value || item.id === value);
+      if (!project?.id) return;
+      backendPayload = { projectId: project.id };
+    }
+    if (["materials", "expenses", "payments"].includes(module) && columnKey === "client") {
+      const client = this.data.clients().find((item) => item.name === value || item.id === value);
+      if (!client?._id) return;
+      backendPayload = { clientId: client._id };
+    }
+    if (module === "expenses" && columnKey === "transactionType" && value === "Add Cash") backendPayload = { transactionType: "Cash Added" };
+    if (["expenses", "payments"].includes(module) && columnKey === "approvalStatus") {
+      backendPayload = { status: value === "Declined" ? "Rejected" : value };
+    }
     if (module === "generalExpenses") {
       if (columnKey === "expenseDate") backendPayload = { date: value };
       if (columnKey === "amount") backendPayload = { amount: Math.abs(this.moneyNumber(value)) };
@@ -3959,6 +3983,10 @@ export class GeneralExpensesPage implements OnInit {
       }
       case "description":
         return { description: value };
+      case "paymentType":
+        return { paymentType: value };
+      case "labourType":
+        return { labourType: value };
       case "employeeCount":
         return { employeeCount: Math.round(Number(value) || 0) };
       case "amount":
@@ -4509,6 +4537,7 @@ export class GeneralExpensesPage implements OnInit {
     if (key === "approvalStatus") return ["Pending", "Approved", "Declined"];
     if (key === "status") {
       if (module === "clients") return ["Active", "On Hold", "Completed"];
+      if (module === "materials") return ["Pending", "Approved", "Received", "Not Received"];
       return ["Pending", "Approved", "Declined"];
     }
     if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];

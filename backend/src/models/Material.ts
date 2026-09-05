@@ -39,12 +39,14 @@ export interface IMaterial extends Document {
   receiptImage?: string;
   receiptImageMimeType?: string;
   receiptImageName?: string;
+  receiptUploadedBy?: string;
   billHistory?: Array<{
     billUrl: string;
     fileName?: string;
     pcloudFileId?: string;
     pcloudPublicCode?: string;
     uploadedAt: Date;
+    uploadedBy?: string;
   }>;
   customFields?: Record<string, string | number | boolean | null>;
   createdBy?: string;
@@ -108,6 +110,7 @@ const materialSchema = new Schema<IMaterial>(
     receiptImage: { type: String, select: false },
     receiptImageMimeType: { type: String, select: false },
     receiptImageName: { type: String },
+    receiptUploadedBy: { type: String, index: true },
     billHistory: {
       type: [{
         billUrl: { type: String, required: true },
@@ -115,6 +118,7 @@ const materialSchema = new Schema<IMaterial>(
         pcloudFileId: { type: String },
         pcloudPublicCode: { type: String },
         uploadedAt: { type: Date, required: true, default: Date.now },
+        uploadedBy: { type: String },
         _id: false,
       }],
       default: [],
