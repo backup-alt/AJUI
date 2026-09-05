@@ -65,7 +65,8 @@ const inventorySchema = new Schema<IInventory>(
     clientName: { type: String },
     siteId: { type: Schema.Types.ObjectId, ref: "Site" },
     site: { type: String, default: "" },
-    siteKey: { type: String, required: true, index: true },
+    // An empty key represents project stock that has no assigned site yet.
+    siteKey: { type: String, default: "", index: true },
     name: { type: String, required: true, trim: true },
     normalizedName: { type: String, required: true, index: true },
     unit: { type: String, required: true },

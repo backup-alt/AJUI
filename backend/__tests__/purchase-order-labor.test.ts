@@ -14,7 +14,7 @@ import { Supervisor } from "../src/models/Supervisor";
 import { User } from "../src/models/User";
 import { Vendor } from "../src/models/Vendor";
 import { generateId } from "../src/services/id-generator.service";
-import { ensureMaterialInInventory, listInventory } from "../src/services/inventory.service";
+import { ensureMaterialInInventory, listInventory, syncPurchaseOrderMaterialInventory } from "../src/services/inventory.service";
 import {
   getMaterialDetailForSupervisor,
   listMaterialsForSupervisor,
@@ -421,6 +421,15 @@ describe("Purchase order workflow", () => {
     expect(manual?.approvedQuantity).toBe(50);
     expect(manual?.poNumber).toBe(response.body.purchaseOrder.poNumber);
     expect(manual?.paymentType).toBe("UPI");
+    const stock = await Inventory.findOne({ "purchaseHistory.materialId": manual!._id }).lean();
+    expect(stock?.purchasedQuantity).toBe(50);
+    expect(stock?.remainingStock).toBe(50);
+    expect(stock?.received).toBe(false);
+    expect(stock?.siteKey).toBe("");
+    await syncPurchaseOrderMaterialInventory(manual!._id);
+    const repeated = await Inventory.findById(stock!._id).lean();
+    expect(repeated?.purchasedQuantity).toBe(50);
+    expect(repeated?.purchaseHistory).toHaveLength(1);
 
     await Material.updateOne({ _id: material._id }, { $unset: { paymentType: "" } });
     const legacyVendorRows = await request(app)
@@ -555,6 +564,11 @@ describe("Purchase order workflow", () => {
     expect(renamed?.name).toBe("PVC Pipe 4inch");
     expect(renamed?.approvedQuantity).toBe(60);
     expect(renamed?.paymentType).toBe("Cash");
+    const renamedStock = await Inventory.findOne({ "purchaseHistory.materialId": manualMaterial!._id }).lean();
+    expect(renamedStock?.name).toBe("PVC Pipe 4inch");
+    expect(renamedStock?.unit).toBe("Meters");
+    expect(renamedStock?.purchasedQuantity).toBe(60);
+    expect(renamedStock?.vendor).toBe("PO Vendor 2");
 
     const detail = await request(app)
       .get(`/api/purchase-orders/${po.poNumber}`)

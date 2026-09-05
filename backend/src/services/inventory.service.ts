@@ -178,6 +178,43 @@ export async function ensureMaterialInInventory(
   return created.toObject();
 }
 
+/** Reconcile a PO-created material using its recorded contribution, so repeated
+ * saves do not add stock twice. Pending lines may also change name or unit. */
+export async function syncPurchaseOrderMaterialInventory(materialId: Types.ObjectId | string, updatedBy?: string) {
+  const material = await Material.findById(materialId).lean();
+  if (!material?.projectId) return null;
+  const previous = await Inventory.findOne({
+    projectId: material.projectId,
+    "purchaseHistory.materialId": material._id,
+  });
+  if (!previous) return ensureMaterialInInventory(material._id, updatedBy);
+
+  const entries = (previous.purchaseHistory || []).filter((entry) => String(entry.materialId) === String(material._id));
+  const oldQuantity = entries.reduce((total, entry) => total + Number(entry.quantity || 0), 0);
+  const quantity = Math.max(0, Number(material.purchasedQuantity) || 0);
+  const sameGroup = `${previous.projectId}__${previous.siteKey}__${previous.normalizedName}__${previous.normalizedUnit}` === inventoryKeyForMaterial(material);
+  const delta = (sameGroup ? quantity : 0) - oldQuantity;
+  previous.requestedQuantity = Math.max(0, previous.requestedQuantity + delta);
+  previous.approvedQuantity = Math.max(0, previous.approvedQuantity + delta);
+  previous.purchasedQuantity = Math.max(0, previous.purchasedQuantity + delta);
+  previous.purchaseHistory = (previous.purchaseHistory || []).filter((entry) => String(entry.materialId) !== String(material._id));
+  if (sameGroup) {
+    previous.purchaseHistory.push(receiptHistoryEntry(material, quantity));
+    previous.vendor = material.vendor;
+    previous.vendorId = material.vendorId;
+    previous.poNumber = material.poNumber;
+    applyLatestReceiptState(previous, material);
+  } else if (String(previous.lastMaterialId) === String(material._id)) {
+    const latest = previous.purchaseHistory[previous.purchaseHistory.length - 1];
+    previous.lastMaterialId = latest?.materialId;
+    previous.received = Boolean(latest?.received);
+    previous.receivedDate = latest?.receivedDate;
+  }
+  previous.lastUpdatedBy = updatedBy;
+  await previous.save();
+  return sameGroup ? previous.toObject() : ensureMaterialInInventory(material._id, updatedBy);
+}
+
 export async function syncMaterialReceivedStatus(materialId: Types.ObjectId | string) {
   const material = await Material.findById(materialId).lean();
   if (!material?.projectId) return null;

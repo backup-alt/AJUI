@@ -9,6 +9,15 @@ import { Vendor } from "../models/Vendor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
+import { syncPurchaseOrderMaterialInventory } from "./inventory.service.js";
+
+async function syncManualInventory(order: any, updatedBy?: string) {
+  // Sequential saves also support two lines with the same material name/unit.
+  for (const item of order.items || []) {
+    if (item.source === "manual") await syncPurchaseOrderMaterialInventory(item.materialId, updatedBy);
+  }
+  return order;
+}
 
 type PurchaseOrderInputItem = {
   materialId?: string;
@@ -230,7 +239,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
       grandTotal,
       createdBy: input.createdBy ? new Types.ObjectId(input.createdBy) : undefined,
     });
-    return purchaseOrder.toObject();
+    return syncManualInventory(purchaseOrder.toObject(), input.createdBy);
   } catch (error) {
     await Promise.all([
       existingIds.length
@@ -263,6 +272,21 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     .filter((item) => item.source === "manual")
     .map((item) => String(item.materialId || ""))
     .filter((item) => item && Types.ObjectId.isValid(item));
+
+  // Received purchases may already have consumption history. Changing their
+  // identity or quantity here would reassign stock that has been used.
+  const previousManualMaterials = await Material.find({ _id: { $in: previousManualIds } }).lean();
+  for (const item of input.items.filter((line) => line.source === "manual")) {
+    if (item.materialId && !previousManualIds.includes(item.materialId)) {
+      throw new AppError(400, "Manual material must belong to this purchase order");
+    }
+    const material = previousManualMaterials.find((row) => String(row._id) === item.materialId);
+    if (material && (material.status === "Received" || Number(material.consumedQuantity) > 0) &&
+      (material.name !== String(item.description || "").trim() || material.unit !== String(item.unit || "").trim() ||
+        Number(material.purchasedQuantity) !== Number(item.quantity))) {
+      throw new AppError(400, "Received materials cannot change name, unit, or quantity in a purchase order");
+    }
+  }
 
   const newExistingIds = input.items
     .filter((item) => item.source === "existing")
@@ -363,7 +387,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
           { new: true },
         ).lean();
       } else if (materialId) {
-        material = await Material.findById(materialId).lean();
+        throw new AppError(400, "Manual material must belong to this purchase order");
       }
       if (!material) {
         const materialIdNew = await generateId("MAT");
@@ -471,7 +495,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     purchaseOrder.roundOff = roundOff;
     purchaseOrder.grandTotal = grandTotal;
     await purchaseOrder.save();
-    return purchaseOrder.toObject();
+    return syncManualInventory(purchaseOrder.toObject(), input.createdBy);
   } catch (error) {
     await Promise.all([
       claimIds.length

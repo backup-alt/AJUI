@@ -229,6 +229,7 @@ type PoDraftLine = {
                               </div>
                             }
                           </div>
+                          <button type="button" class="manual-material-toggle" [disabled]="!draftProjectId()" (click)="setManualLine(index)">+ Create new material</button>
                         } @else {
                           <div class="manual-material">
                             <input [ngModel]="line.description" (ngModelChange)="updateLine(index, 'description', $event)" placeholder="New material name" />
@@ -539,6 +540,7 @@ type PoDraftLine = {
     .add-line:disabled { border-color: #cbd5e1; background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
 
     .manual-material { display: flex; gap: 6px; align-items: center; }
+    .manual-material-toggle { border: 0; background: none; color: #003a8c; font-weight: 700; cursor: pointer; padding: 6px 0; font-size: 12px; }
     .manual-material input { border: 1px solid #e2e8f0 !important; background: #fff !important; }
     .manual-material button { border: 0; background: none; color: #003a8c; font-weight: 700; cursor: pointer; white-space: nowrap; font-size: 12px; }
     .custom-gst-action { border: 0; background: none; color: #003a8c; font-weight: 700; cursor: pointer; white-space: nowrap; font-size: 12px; margin-top: 2px; }
@@ -823,6 +825,10 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     return date.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
   }
 
+  setManualLine(index: number) {
+    this.openMenu.set("");
+    this.updateLineObject(index, { source: "manual", materialId: "", description: "", unit: "", quantity: 0, amount: 0 });
+  }
   setExistingLine(index: number) { this.updateLineObject(index, { source: "existing", materialId: "", description: "", unit: "", quantity: 0, amount: 0 }); }
   updateLine(index: number, key: keyof PoDraftLine, value: string | number) { this.updateLineObject(index, { [key]: value } as Partial<PoDraftLine>); }
   private updateLineObject(index: number, patch: Partial<PoDraftLine>) { this.lines.update((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row)); }

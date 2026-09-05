@@ -1057,6 +1057,7 @@ export async function updateSubcontractorLabor(req: Request, res: Response, next
 export async function createPurchaseOrder(req: Request, res: Response, next: NextFunction) {
   try {
     const purchaseOrder = await purchaseOrderService.createPurchaseOrder({ ...req.body, createdBy: req.user?.sub });
+    invalidateCachePrefix("/api/inventory");
     invalidateCachePrefix("/api/purchase-orders");
     invalidateCachePrefix("/api/materials");
     invalidateCachePrefix("/api/supervisor/materials");
@@ -1087,6 +1088,7 @@ export async function getPurchaseOrder(req: Request, res: Response, next: NextFu
 export async function updatePurchaseOrder(req: Request, res: Response, next: NextFunction) {
   try {
     const purchaseOrder = await purchaseOrderService.updatePurchaseOrder(req.params.id, { ...req.body, createdBy: req.user?.sub });
+    invalidateCachePrefix("/api/inventory");
     invalidateCachePrefix("/api/purchase-orders");
     invalidateCachePrefix("/api/materials");
     invalidateCachePrefix("/api/supervisor/materials");

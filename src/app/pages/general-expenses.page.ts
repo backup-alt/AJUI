@@ -418,7 +418,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
               <section class="inventory-cards-section" *ngIf="!tableViewExpanded() && activeModule() === 'inventory'">
                 <div class="inventory-grid">
-                  @for (card of inventoryCards(); track card.siteKey + '::' + card.materialName) {
+                  @for (card of inventoryCards(); track card.siteKey + '::' + card.materialName + '::' + card.unit) {
                     <article class="inventory-card" role="button" tabindex="0" (click)="openInventoryBreakdown(card)" (keydown.enter)="openInventoryBreakdown(card)">
                       <div class="inventory-card-head">
                         <div class="inventory-material-icon">
@@ -1770,7 +1770,8 @@ export class GeneralExpensesPage implements OnInit {
     const siteKey = card.siteKey.trim().toLowerCase();
     const matches = this.data.inventory().filter((m: any) =>
       String(m.name || "").trim().toLowerCase() === name &&
-      String(m.site || "").trim().toLowerCase() === siteKey
+      (String(m.site || "").trim() || "Unassigned").toLowerCase() === siteKey &&
+      String(m.unit || "").trim().toLowerCase() === card.unit.trim().toLowerCase()
     ) as any[];
     const rows: any[] = [];
     for (const raw of matches) {
@@ -2195,7 +2196,7 @@ export class GeneralExpensesPage implements OnInit {
     for (const m of filtered) {
       if (!m.name) continue;
       const siteName = (m.site || "").trim() || "Unassigned";
-      const key = `${siteName.toLowerCase()}::${m.name.toLowerCase()}`;
+      const key = `${siteName.toLowerCase()}::${String(m.name).trim().toLowerCase()}::${String(m.unit || "").trim().toLowerCase()}`;
       const existing = map.get(key) || {
         qty: 0,
         unit: m.unit || "",
@@ -2205,7 +2206,7 @@ export class GeneralExpensesPage implements OnInit {
         siteCount: 1,
       };
       const incomingQty = Math.max(0, Number(m.remainingStock ?? m.quantity ?? m.purchasedQuantity) || 0);
-      existing.qty = Math.max(existing.qty, incomingQty);
+      existing.qty += incomingQty;
       existing.unit = m.unit || existing.unit;
       const updatedAt = m.updatedAt || m.requestDate || m.createdAt || "";
       if (updatedAt && updatedAt > existing.lastUpdated) existing.lastUpdated = updatedAt;
