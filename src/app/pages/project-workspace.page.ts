@@ -1978,12 +1978,13 @@ export class ProjectWorkspacePage {
     }
     return [...cards.values()].sort((a, b) => a.name.localeCompare(b.name));
   });
-  readonly inventoryUniqueMaterialCount = computed(() => {
-    const projectId = this.projectId();
+  readonly inventoryItemCount = computed(() => {
     const names = new Set<string>();
-    for (const row of this.data.inventory()) {
-      if (String(row.projectId || "") !== projectId) continue;
-      const name = String(row.name || "").trim().replace(/\s+/g, " ").toLowerCase();
+    // Count the rows that actually qualify for the Project Inventory view.
+    // Raw inventory data also contains unreceived material requests, which
+    // belong in Materials and must not inflate this tab's badge.
+    for (const row of this.tableRows().inventory ?? []) {
+      const name = String(row["materialName"] || "").trim().replace(/\s+/g, " ").toLowerCase();
       if (name) names.add(name);
     }
     return names.size;
@@ -4577,7 +4578,7 @@ export class ProjectWorkspacePage {
   }
 
   sectionCount(section: ModuleKey): number {
-    if (section === "inventory") return this.inventoryUniqueMaterialCount();
+    if (section === "inventory") return this.inventoryItemCount();
     return this.visibleRows(section).length;
   }
 
