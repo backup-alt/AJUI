@@ -426,7 +426,7 @@ type CombinedInvite = {
           </div>
           <div class="settings-w11-field">
             <label>Role</label>
-            <agb-searchable-select [value]="inviteRole()" [options]="inviteRoleOptions" (valueChange)="inviteRole.set($any($event))" />
+            <agb-searchable-select [value]="inviteRole()" [options]="inviteRoleOptions" [contained]="true" (valueChange)="inviteRole.set($any($event))" />
           </div>
 
           @if (inviteError()) {

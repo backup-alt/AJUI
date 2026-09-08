@@ -34,6 +34,7 @@ import {
   searchOutline,
   walletOutline,
   warningOutline,
+  cloudUploadOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -288,11 +289,25 @@ import { Vendor } from '../../../shared/models';
           </ion-list>
 
           <ion-item><ion-label position="stacked">Payment mode *</ion-label><ion-select [(ngModel)]="paymentMode">@for (mode of paymentModes; track mode) { <ion-select-option [value]="mode">{{ mode }}</ion-select-option> }</ion-select></ion-item>
-          @if (expenseType() === 'Purchase') { <ion-item><ion-label position="stacked">Bill * (image or PDF, up to 10 MB)</ion-label><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" (change)="selectBill($event)" />@if (billError) { <p role="alert">{{ billError }}</p> }</ion-item> }
+          @if (expenseType() === 'Purchase') {
+            <section class="bill-upload" [class.has-file]="bill" [class.has-error]="billError">
+              <div class="bill-upload-copy">
+                <strong>Upload bill <span aria-hidden="true">*</span></strong>
+                <span>A bill image or PDF is required before this request can be submitted.</span>
+              </div>
+              <input #billInput class="bill-file-input" type="file" accept="image/*,application/pdf" (change)="selectBill($event)" />
+              <button type="button" class="bill-picker" (click)="billInput.click()">
+                <ion-icon name="cloud-upload-outline"></ion-icon>
+                <span>{{ bill ? 'Replace bill' : 'Choose bill image or PDF' }}</span>
+              </button>
+              @if (bill) { <p class="bill-file-name"><ion-icon name="checkmark-circle-outline"></ion-icon>{{ bill.fileName }}</p> }
+              @if (billError) { <p class="bill-error" role="alert">{{ billError }}</p> }
+            </section>
+          }
           <div class="form-actions">
             <ion-button
               expand="block"
-              [disabled]="!isValid() || isSubmitting()"
+              [disabled]="isSubmitting()"
               (click)="submit()"
             >
               @if (isSubmitting()) {
@@ -347,6 +362,19 @@ import { Vendor } from '../../../shared/models';
     .toggle-sub { font-size: 12px; color: #6b7280; }
     ion-toggle { --track-background: #e5e7eb; --track-background-checked: #002263; --handle-background: #fff; --handle-background-checked: #fff; --handle-box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
     .form-actions { padding: 20px 0; }
+    .bill-upload { margin-top: 14px; padding: 16px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; }
+    .bill-upload.has-file { border-color: #16a34a; background: #f0fdf4; }
+    .bill-upload.has-error { border-color: #dc2626; background: #fff7f7; }
+    .bill-upload-copy { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .bill-upload-copy strong { color: #111827; font-size: 14px; }
+    .bill-upload-copy strong span, .bill-error { color: #dc2626; }
+    .bill-upload-copy > span { color: #64748b; font-size: 12px; line-height: 1.4; }
+    .bill-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .bill-picker { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #002263; border-radius: 8px; background: #f0f4ff; color: #002263; font: inherit; font-size: 13px; font-weight: 700; }
+    .bill-picker ion-icon { font-size: 20px; }
+    .bill-file-name { display: flex; align-items: center; gap: 7px; margin: 10px 0 0; color: #15803d; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+    .bill-file-name ion-icon { flex: 0 0 auto; font-size: 18px; }
+    .bill-error { margin: 9px 0 0; font-size: 12px; font-weight: 600; }
     .form-group { margin: 0; padding: 10px 14px; background: #ffffff; border: 1px solid #e5e7eb; }
     .form-group:first-of-type { border-radius: 8px 8px 0 0; }
     .form-group:last-of-type { border-radius: 0 0 8px 8px; border-bottom: 1px solid #e5e7eb; }
@@ -431,6 +459,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
       searchOutline,
       walletOutline,
       warningOutline,
+      cloudUploadOutline,
     });
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
@@ -632,7 +661,17 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   }
 
   async submit(): Promise<void> {
-    if (!this.isValid()) return;
+    if (this.expenseType() === 'Purchase' && !this.bill) {
+      this.billError = 'Upload a bill image or PDF to submit this expense request.';
+      const toast = await this.toastCtrl.create({ message: this.billError, duration: 3000, color: 'danger', position: 'top' });
+      await toast.present();
+      return;
+    }
+    if (!this.isValid()) {
+      const toast = await this.toastCtrl.create({ message: 'Complete all required expense fields before submitting.', duration: 3000, color: 'danger', position: 'top' });
+      await toast.present();
+      return;
+    }
 
     const siteId = this.selectedSiteId();
     const siteName = this.selectedSiteName();

@@ -28,6 +28,7 @@ export type SearchableSelectOption = string | number | { label: string; value: s
         <div
           #panel
           class="agb-select-panel"
+          [class.contained-panel]="contained"
           [class.no-search]="hideSearch"
           role="listbox"
           [style.top.px]="panelTop()"
@@ -82,6 +83,7 @@ export type SearchableSelectOption = string | number | { label: string; value: s
     .open .agb-select-trigger svg { transform: rotate(180deg); }
     .disabled { opacity: .65; }
     .agb-select-panel { position: fixed; z-index: 9999; padding: 7px; border: 1px solid #d0d5dd; border-radius: 11px; background: #fff; box-shadow: 0 16px 36px rgba(15, 23, 42, .16), 0 3px 8px rgba(15, 23, 42, .08); }
+    .agb-select-panel.contained-panel { position: absolute; top: calc(100% + 6px) !important; left: 0 !important; width: 100% !important; box-sizing: border-box; }
     .agb-select-search { width: 100%; min-height: 38px; box-sizing: border-box; padding: 8px 10px; border: 1px solid #dbe3ee; border-radius: 7px; outline: 0; font: inherit; font-size: 13px; }
     .agb-select-search:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, .1); }
     .agb-select-options { display: grid; max-height: 230px; gap: 2px; margin-top: 6px; overflow-y: auto; }
@@ -104,6 +106,7 @@ export class SearchableSelectComponent implements ControlValueAccessor, AfterVie
   @Input() hideSearch = false;
   @Input() name = "";
   @Input() disabled = false;
+  @Input() contained = false;
   @Output() valueChange = new EventEmitter<string | number>();
 
   @ViewChild("trigger", { static: false }) trigger?: ElementRef<HTMLButtonElement>;
