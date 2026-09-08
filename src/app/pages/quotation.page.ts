@@ -143,7 +143,7 @@ function numberToWords(num: number): string {
                     </tbody>
                   </table>
                 </section>
-                @if (isAdmin() && quoteActionRow()) { <div class="cursor-action-menu" [style.left.px]="quoteActionPosition().x" [style.top.px]="quoteActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="editSelectedQuotation()"><ion-icon name="pencil-outline"></ion-icon>Edit</button><button type="button" class="danger" (click)="deleteSelectedQuotation()"><ion-icon name="trash-outline"></ion-icon>Delete</button></div> }
+                @if (canRequestOrEdit() && quoteActionRow()) { <div class="cursor-action-menu" [style.left.px]="quoteActionPosition().x" [style.top.px]="quoteActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedQuotation()"><ion-icon name="pencil-outline"></ion-icon>Edit</button><button type="button" class="danger" (click)="deleteSelectedQuotation()"><ion-icon name="trash-outline"></ion-icon>Delete</button> } @else { <button type="button" (click)="requestQuotationEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
               }
             } @else {
               <!-- Quotation Editor View -->
@@ -1208,11 +1208,18 @@ export class QuotationPage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   isAdmin() { return this.api.user()?.role === "admin"; }
+  canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
   readonly quoteActionRow = signal<Quotation | null>(null);
   readonly quoteActionPosition = signal({ x: 0, y: 0 });
-  openQuoteActionMenu(quote: Quotation, event: MouseEvent) { if (!this.isAdmin()) return; this.quoteActionRow.set(quote); this.quoteActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 150), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  openQuoteActionMenu(quote: Quotation, event: MouseEvent) { if (!this.canRequestOrEdit()) return; this.quoteActionRow.set(quote); this.quoteActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   editSelectedQuotation() { const quote = this.quoteActionRow(); if (quote) this.editQuotation(quote); this.quoteActionRow.set(null); }
   deleteSelectedQuotation() { const quote = this.quoteActionRow(); if (quote) this.deleteQuotation(quote.id); this.quoteActionRow.set(null); }
+  requestQuotationEdit() {
+    const quote = this.quoteActionRow();
+    if (!quote) return;
+    this.quoteActionRow.set(null);
+    void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit quotation ${quote.quotationNumber}.`, link: `/quotations?edit=${quote.id}` } });
+  }
   readonly router = inject(Router);
   readonly formatMoney = formatMoney;
   readonly states = INDIAN_STATES;
@@ -1574,6 +1581,12 @@ readonly savingPdf = signal(false);
           status: q.status || "Draft",
         }));
         this.data.quotations.set(items as any);
+        const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("edit") || "";
+        const requested = this.isAdmin() ? items.find((item) => item.id === requestedId) as Quotation | undefined : undefined;
+        if (requested) {
+          this.editQuotation(requested);
+          void this.router.navigate(["/quotations"], { replaceUrl: true });
+        }
       },
       error: () => {},
     });

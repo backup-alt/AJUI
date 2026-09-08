@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, EventEmitter, HostListener, Input, OnChanges, OnInit, Output, SimpleChanges, computed, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { Router } from "@angular/router";
 import { IonIcon } from "@ionic/angular/standalone";
 import { firstValueFrom } from "rxjs";
 import ExcelJS from "exceljs";
@@ -78,7 +79,7 @@ type PoDraftLine = {
               </tbody>
             </table>
           </div>
-          @if (isAdmin() && poActionRow()) { <div class="cursor-action-menu" [style.left.px]="poActionPosition().x" [style.top.px]="poActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="openSelectedPo()">Open</button><button type="button" (click)="editSelectedPo()">Edit</button><button type="button" class="danger" (click)="deleteSelectedPo()">Delete</button></div> }
+          @if (canRequestOrEdit() && poActionRow()) { <div class="cursor-action-menu" [style.left.px]="poActionPosition().x" [style.top.px]="poActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="openSelectedPo()">Open</button>@if (isAdmin()) { <button type="button" (click)="editSelectedPo()">Edit</button><button type="button" class="danger" (click)="deleteSelectedPo()">Delete</button> } @else { <button type="button" (click)="requestPoEdit()">Request edit</button> }</div> }
           @if (totalPages() > 1) {
             <nav class="po-pagination" aria-label="Purchase order pagination">
               <span>{{ pageSummary() }}</span>
@@ -296,6 +297,7 @@ type PoDraftLine = {
                 {{ exporting() === 'excel' ? 'Preparing Excel…' : 'Download Excel' }}
               </button>
               @if (isAdmin()) { <button type="button" class="btn-secondary" (click)="editRequest.emit(selectedOrder()!.poNumber)">Edit Purchase Order</button> }
+              @if (!isAdmin() && canRequestOrEdit()) { <button type="button" class="btn-secondary" (click)="requestPoEdit(selectedOrder()!)">Request edit</button> }
               @if (isAdmin()) {
                 <button type="button" class="btn-danger" [disabled]="saving()" (click)="deleteOrder()">
                   {{ saving() ? 'Deleting…' : 'Delete Purchase Order' }}
@@ -606,6 +608,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
 
   private readonly api = inject(ApiService);
   private readonly data = inject(ErpDataService);
+  private readonly router = inject(Router);
   readonly formatMoney = formatMoney;
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -723,15 +726,21 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   }
 
   isAdmin() { return this.api.user()?.role === "admin"; }
+  canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
 
   openPoActionMenu(order: PurchaseOrder, event: MouseEvent) {
-    if (!this.isAdmin()) { this.requestDetail.emit(order.poNumber); return; }
+    if (!this.canRequestOrEdit()) { this.requestDetail.emit(order.poNumber); return; }
     this.poActionRow.set(order);
     this.poActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 190), y: Math.min(event.clientY + 10, window.innerHeight - 52) });
   }
   openSelectedPo() { const order = this.poActionRow(); if (order) this.requestDetail.emit(order.poNumber); this.poActionRow.set(null); }
   editSelectedPo() { const order = this.poActionRow(); if (order) this.editRequest.emit(order.poNumber); this.poActionRow.set(null); }
   deleteSelectedPo() { const order = this.poActionRow(); if (!order) return; this.selectedOrder.set(order); this.poActionRow.set(null); void this.deleteOrder(); }
+  requestPoEdit(order = this.poActionRow()) {
+    if (!order) return;
+    this.poActionRow.set(null);
+    void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit purchase order ${order.poNumber}.`, link: `/purchase-orders?edit=${encodeURIComponent(order.poNumber)}` } });
+  }
 
   async deleteOrder() {
     const order = this.selectedOrder();

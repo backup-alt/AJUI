@@ -8,7 +8,7 @@ import { createQuotationSchema, updateQuotationSchema, listQuotationsSchema } fr
 const router = Router();
 router.use(requireAuth);
 
-router.post("/quotations", requireRole("admin", "project_manager"), validate(createQuotationSchema), ctrl.createQuotation);
+router.post("/quotations", requireRole("admin", "project_manager", "accountant"), validate(createQuotationSchema), ctrl.createQuotation);
 router.get("/quotations", validate(listQuotationsSchema, "query"), ctrl.listQuotations);
 router.get("/quotations/:id", ctrl.getQuotation);
 router.patch("/quotations/:id", requireRole("admin"), validate(updateQuotationSchema), ctrl.updateQuotation);

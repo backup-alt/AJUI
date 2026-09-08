@@ -175,12 +175,11 @@ export class ApiService {
   inboxActivity(page = 1): Observable<{items: any[]; page: number; hasMore: boolean}> {
     return this.http.get<{items: any[]; page: number; hasMore: boolean}>(`${this.baseUrl}/inbox/activity`, { headers: this.authHeaders(), params: {page} });
   }
-  saveInboxMessage(body: {text: string; ownerId?: string}, id?: string): Observable<any> {
-    return id ? this.http.patch(`${this.baseUrl}/inbox/${id}`, body, {headers: this.authHeaders()})
-      : this.http.post(`${this.baseUrl}/inbox`, body, {headers: this.authHeaders()});
+  saveInboxMessage(body: {text: string; ownerId?: string; link?: string}): Observable<any> {
+    return this.http.post(`${this.baseUrl}/inbox`, body, {headers: this.authHeaders()});
   }
-  deleteInboxMessage(id: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/inbox/${id}`, {headers: this.authHeaders()});
+  inboxRecipients(): Observable<{items: any[]}> {
+    return this.http.get<{items: any[]}>(`${this.baseUrl}/inbox/recipients`, {headers: this.authHeaders()});
   }
   private http = inject(HttpClient);
   private baseUrl = environment.apiUrl;

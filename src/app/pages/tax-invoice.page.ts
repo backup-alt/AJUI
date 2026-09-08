@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, HostListener, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { Router } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
 import { ErpDataService, type Client } from "../data/erp-data.service";
 import { ApiService } from "../core/api.service";
@@ -138,7 +139,7 @@ function numberToWords(num: number): string {
                     </tbody>
                   </table>
                 </section>
-                @if (isAdmin() && invoiceActionRow()) { <div class="cursor-action-menu" [style.left.px]="invoiceActionPosition().x" [style.top.px]="invoiceActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="editSelectedInvoice()"><ion-icon name="pencil-outline"></ion-icon>Edit</button></div> }
+                @if (canRequestOrEdit() && invoiceActionRow()) { <div class="cursor-action-menu" [style.left.px]="invoiceActionPosition().x" [style.top.px]="invoiceActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedInvoice()"><ion-icon name="pencil-outline"></ion-icon>Edit</button> } @else { <button type="button" (click)="requestInvoiceEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
               }
             } @else {
               <!-- Invoice Editor View -->
@@ -729,11 +730,19 @@ function numberToWords(num: number): string {
 export class TaxInvoicePage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
+  readonly router = inject(Router);
   isAdmin() { return this.api.user()?.role === "admin"; }
+  canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
   readonly invoiceActionRow = signal<TaxInvoice | null>(null);
   readonly invoiceActionPosition = signal({ x: 0, y: 0 });
-  openInvoiceActionMenu(invoice: TaxInvoice, event: MouseEvent) { if (!this.isAdmin()) return; this.invoiceActionRow.set(invoice); this.invoiceActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 90), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  openInvoiceActionMenu(invoice: TaxInvoice, event: MouseEvent) { if (!this.canRequestOrEdit()) return; this.invoiceActionRow.set(invoice); this.invoiceActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   editSelectedInvoice() { const invoice = this.invoiceActionRow(); if (invoice) this.editInvoice(invoice); this.invoiceActionRow.set(null); }
+  requestInvoiceEdit() {
+    const invoice = this.invoiceActionRow();
+    if (!invoice) return;
+    this.invoiceActionRow.set(null);
+    void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit invoice ${invoice.invoiceNumber}.`, link: `/tax-invoices?edit=${invoice.id}` } });
+  }
   readonly formatMoney = formatMoney;
   readonly states = INDIAN_STATES;
 
@@ -1095,6 +1104,12 @@ export class TaxInvoicePage {
           updatedAt: i.updatedAt,
         })) as TaxInvoice[];
         this.data.taxInvoices.set(items);
+        const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("edit") || "";
+        const requested = this.isAdmin() ? items.find((item) => item.id === requestedId) : undefined;
+        if (requested) {
+          this.editInvoice(requested);
+          void this.router.navigate(["/tax-invoices"], { replaceUrl: true });
+        }
       },
       error: () => {},
     });

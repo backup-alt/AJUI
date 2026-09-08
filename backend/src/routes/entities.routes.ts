@@ -49,11 +49,11 @@ router.use(requireAuth);
  *     tags: [Clients]
  *     summary: Create client (Admin + PM)
  */
-router.post("/clients", validate(createClientSchema), requireRole("admin", "project_manager"), ctrl.createClient);
+router.post("/clients", validate(createClientSchema), requireRole("admin", "project_manager", "accountant"), ctrl.createClient);
 router.get("/clients", validate(listClientsSchema, "query"), cache(20), ctrl.listClients);
 router.get("/clients/:id/summary", cache(20), ctrl.getClientSummary);
 router.get("/clients/:id", cache(30), ctrl.getClient);
-router.patch("/clients/:id", validate(updateClientSchema), requireRole("admin", "project_manager"), ctrl.updateClient);
+router.patch("/clients/:id", validate(updateClientSchema), requireRole("admin"), ctrl.updateClient);
 router.delete("/clients/:id", requireRole("admin"), ctrl.deleteClient);
 
 /**
@@ -66,12 +66,12 @@ router.delete("/clients/:id", requireRole("admin"), ctrl.deleteClient);
  *     tags: [Projects]
  *     summary: Create project (Admin + PM)
  */
-router.post("/projects", validate(createProjectSchema), requireRole("admin", "project_manager"), ctrl.createProject);
+router.post("/projects", validate(createProjectSchema), requireRole("admin", "project_manager", "accountant"), ctrl.createProject);
 router.get("/projects", validate(listProjectsSchema, "query"), cache(20), ctrl.listProjects);
 router.get("/projects/summary", cache(20), ctrl.getProjectsSummary);
 router.get("/projects/:id/ledger", cache(15), ctrl.getProjectLedger);
 router.get("/projects/:id", cache(30), ctrl.getProject);
-router.patch("/projects/:id", validate(updateProjectSchema), requireRole("admin", "project_manager"), ctrl.updateProject);
+router.patch("/projects/:id", validate(updateProjectSchema), requireRole("admin"), ctrl.updateProject);
 router.delete("/projects/:id", requireRole("admin"), ctrl.deleteProject);
 
 /**
@@ -84,10 +84,10 @@ router.delete("/projects/:id", requireRole("admin"), ctrl.deleteProject);
  *     tags: [Sites]
  *     summary: Create site (Admin + PM)
  */
-router.post("/sites", validate(createSiteSchema), requireRole("admin", "project_manager"), ctrl.createSite);
+router.post("/sites", validate(createSiteSchema), requireRole("admin", "project_manager", "accountant"), ctrl.createSite);
 router.get("/sites", cache(30), ctrl.listSites);
 router.get("/sites/:id", cache(30), ctrl.getSite);
-router.patch("/sites/:id", validate(updateSiteSchema), requireRole("admin", "project_manager"), ctrl.updateSite);
+router.patch("/sites/:id", validate(updateSiteSchema), requireRole("admin"), ctrl.updateSite);
 router.delete("/sites/:id", requireRole("admin"), ctrl.deleteSite);
 
 /**
@@ -102,7 +102,7 @@ router.delete("/sites/:id", requireRole("admin"), ctrl.deleteSite);
  */
 router.post("/supervisors", validate(createSupervisorSchema), requireRole("admin"), ctrl.createSupervisor);
 router.get("/supervisors", ctrl.listSupervisors);
-router.post("/supervisors/:id/fund", validate(fundSupervisorSchema), requireRole("admin", "project_manager"), ctrl.fundSupervisor);
+router.post("/supervisors/:id/fund", validate(fundSupervisorSchema), requireRole("admin", "project_manager", "accountant"), ctrl.fundSupervisor);
 router.get("/supervisors/:id", ctrl.getSupervisor);
 router.patch("/supervisors/:id", validate(updateSupervisorSchema), requireRole("admin"), ctrl.updateSupervisor);
 router.delete("/supervisors/:id", requireRole("admin"), ctrl.deleteSupervisor);
@@ -117,10 +117,10 @@ router.delete("/supervisors/:id", requireRole("admin"), ctrl.deleteSupervisor);
  *     tags: [Custom Fields]
  *     summary: Upsert custom field
  */
-router.post("/custom-fields", validate(createCustomFieldSchema), ctrl.createCustomField);
+router.post("/custom-fields", validate(createCustomFieldSchema), requireRole("admin"), ctrl.createCustomField);
 router.get("/custom-fields", validate(getCustomFieldsSchema, "query"), ctrl.listCustomFields);
 router.post("/custom-fields/list", ctrl.listCustomFieldsBulk);
-router.patch("/custom-fields/:id", validate(updateCustomFieldSchema), ctrl.updateCustomField);
-router.delete("/custom-fields/:id", ctrl.deleteCustomField);
+router.patch("/custom-fields/:id", validate(updateCustomFieldSchema), requireRole("admin"), ctrl.updateCustomField);
+router.delete("/custom-fields/:id", requireRole("admin"), ctrl.deleteCustomField);
 
 export default router;

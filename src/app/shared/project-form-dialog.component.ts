@@ -238,7 +238,7 @@ export class ProjectFormDialogComponent implements OnInit {
     this.supervisorsLoading.set(true);
     try {
       const res = await firstValueFrom(
-        this.api.listEmployees({ limit: 100, role: "supervisor" })
+        this.api.listSupervisors({ limit: 100 })
       );
       const items = (res?.items || []) as any[];
       const mapped: SupervisorOption[] = items

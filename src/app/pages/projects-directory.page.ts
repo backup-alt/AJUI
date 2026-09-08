@@ -106,7 +106,7 @@ interface ApiProject {
                 </div>
               </article>
             </section>
-            @if (isAdmin() && projectActionRow()) { <div class="cursor-action-menu" [style.left.px]="projectActionPosition().x" [style.top.px]="projectActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedProject()">Open</button><button (click)="editSelectedProject()">Edit</button></div> }
+            @if (canRequestOrEdit() && projectActionRow()) { <div class="cursor-action-menu" [style.left.px]="projectActionPosition().x" [style.top.px]="projectActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedProject()">Open</button>@if (isAdmin()) { <button (click)="editSelectedProject()">Edit</button> } @else { <button (click)="requestProjectEdit()">Request edit</button> }</div> }
           </main>
         </ion-content>
 
@@ -223,11 +223,13 @@ interface ApiProject {
 })
 export class ProjectsDirectoryPage implements OnInit {
   isAdmin() { return this.api.user()?.role === "admin"; }
+  canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
   readonly projectActionRow = signal<ApiProject | null>(null);
   readonly projectActionPosition = signal({ x: 0, y: 0 });
-  handleProjectCardClick(project: ApiProject, event: MouseEvent) { if (!this.isAdmin()) { this.openProject(project); return; } this.projectActionRow.set(project); this.projectActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 120), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  handleProjectCardClick(project: ApiProject, event: MouseEvent) { if (!this.canRequestOrEdit()) { this.openProject(project); return; } this.projectActionRow.set(project); this.projectActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   openSelectedProject() { const project = this.projectActionRow(); if (project) this.openProject(project); this.projectActionRow.set(null); }
   editSelectedProject() { const project = this.projectActionRow(); if (project) this.openEditProject(project, new MouseEvent("click")); this.projectActionRow.set(null); }
+  requestProjectEdit() { const project = this.projectActionRow(); if (!project) return; this.projectActionRow.set(null); void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit project ${project.name}.`, link: `/projects?edit=${project._id}` } }); }
   readonly projectStatusOptions = ["Active", "On Hold", "Completed"];
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
@@ -276,6 +278,9 @@ export class ProjectsDirectoryPage implements OnInit {
     this.api.listProjects({ limit: 25, page: 1 }).subscribe({
       next: (res) => {
         this.projects.set(res.items);
+        const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("edit") || "";
+        const requested = this.isAdmin() ? res.items.find((project: ApiProject) => project._id === requestedId) : undefined;
+        if (requested) { this.openEditProject(requested); void this.router.navigate(["/projects"], { replaceUrl: true }); }
         this.loading.set(false);
       },
       error: () => {
@@ -292,8 +297,8 @@ export class ProjectsDirectoryPage implements OnInit {
   }
 
   private loadSupervisors() {
-    this.api.listEmployees({ limit: 100, role: "supervisor" }).subscribe({
-      next: (response) => this.supervisors.set((response.items || []).filter((item: any) => String(item.role || "").toLowerCase() === "supervisor")),
+    this.api.listSupervisors({ limit: 100 }).subscribe({
+      next: (response) => this.supervisors.set(response.items || []),
       error: () => this.supervisors.set([]),
     });
   }

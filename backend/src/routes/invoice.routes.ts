@@ -10,7 +10,7 @@ router.use(requireAuth);
 
 router.get("/", validate(listInvoicesSchema, "query"), ctrl.listInvoices);
 router.get("/:id", ctrl.getInvoice);
-router.post("/", validate(createInvoiceSchema), ctrl.createInvoice);
+router.post("/", requireRole("admin", "project_manager", "accountant"), validate(createInvoiceSchema), ctrl.createInvoice);
 router.patch("/:id", requireRole("admin"), validate(updateInvoiceSchema), ctrl.updateInvoice);
 
 export default router;

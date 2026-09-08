@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, computed, effect, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
@@ -581,9 +581,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   </tbody>
                 </table>
               </div>
-              <div class="cursor-action-menu" *ngIf="api.user()?.role === 'admin' && adminActionRow()" [style.left.px]="adminActionPosition().x" [style.top.px]="adminActionPosition().y" (click)="$event.stopPropagation()">
-                <button type="button" (click)="editAdminActionRow()"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 16h3l9-9-3-3-9 9v3Z"/><path d="m11.5 5.5 3 3"/></svg>Edit</button>
-                <button type="button" class="danger" (click)="deleteAdminActionRow()"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>Delete</button>
+              <div class="cursor-action-menu" *ngIf="adminActionRow()" [style.left.px]="adminActionPosition().x" [style.top.px]="adminActionPosition().y" (click)="$event.stopPropagation()">
+                @if (api.user()?.role === 'admin') {
+                  <button type="button" (click)="editAdminActionRow()"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 16h3l9-9-3-3-9 9v3Z"/><path d="m11.5 5.5 3 3"/></svg>Edit</button>
+                  <button type="button" class="danger" (click)="deleteAdminActionRow()"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>Delete</button>
+                } @else { <button type="button" (click)="requestAdminEdit()">Request edit from Admin</button> }
               </div>
               </ng-container>
               </ng-container>
@@ -1926,14 +1928,31 @@ export class GeneralExpensesPage implements OnInit {
     return this.hydration.loadingNextPage()[module] ?? false;
   });
 
+  constructor() {
+    effect(() => this.focusRequestedRecord());
+  }
+
   ngOnInit(): void {
     void this.data.loadCustomFieldsFromBackend();
     if (this.isGeneralExpensesPage) {
-      void this.loadAllGeneralExpenses();
+      void this.loadAllGeneralExpenses().then(() => this.focusRequestedRecord());
     } else {
       void this.fetchAttendanceData();
       this.loadSubcontractorPayments();
     }
+  }
+
+  private focusRequestedRecord() {
+    if (this.api.user()?.role !== "admin" || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const module = params.get("module") as DashboardModule | null;
+    const recordId = params.get("record") || "";
+    if (module && dashboardModules.some((item) => item.key === module)) this.activeModule.set(module);
+    if (!recordId) return;
+    queueMicrotask(() => {
+      const row = this.tableState().rows.find((item) => String(item["_id"] || item["__rowId"] || "") === recordId);
+      if (row) this.startAdminEdit(row);
+    });
   }
 
   private async loadAllGeneralExpenses(): Promise<void> {
@@ -3819,7 +3838,7 @@ export class GeneralExpensesPage implements OnInit {
   readonly adminActionRow = signal<TableRow | null>(null);
   readonly adminActionPosition = signal({ x: 0, y: 0 });
   openAdminActionMenu(row: TableRow, event: MouseEvent) {
-    if (this.api.user()?.role !== "admin") return;
+    if (!this.canRequestOrEdit()) return;
     const width = 154;
     const height = 44;
     this.adminActionRow.set(row);
@@ -3827,6 +3846,18 @@ export class GeneralExpensesPage implements OnInit {
       x: Math.min(event.clientX + 10, window.innerWidth - width - 10),
       y: Math.min(event.clientY + 10, window.innerHeight - height - 10),
     });
+  }
+  private canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
+  requestAdminEdit() {
+    const row = this.adminActionRow();
+    if (!row) return;
+    const id = String(row["_id"] || row["__rowId"] || "");
+    const module = this.activeModule();
+    this.adminActionRow.set(null);
+    void this.router.navigate(["/inbox"], { queryParams: {
+      request: `Please edit the ${module} record ${id}.`,
+      link: `${this.router.url.split("?")[0]}?module=${encodeURIComponent(module)}&record=${encodeURIComponent(id)}`,
+    }});
   }
   editAdminActionRow() {
     const row = this.adminActionRow();

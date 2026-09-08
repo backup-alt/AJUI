@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
 import { IonContent, IonIcon, IonSplitPane, ToastController } from "@ionic/angular/standalone";
+import { Router } from "@angular/router";
 import { Vendor, VendorStatus, ErpDataService, Site } from "../data/erp-data.service";
 import type { MaterialRow } from "../../data/dashboardData";
 import { ApiService } from "../core/api.service";
@@ -115,7 +116,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   </div>
                 }
               </section>
-              @if (isAdmin() && vendorActionRow()) { <div class="cursor-action-menu" [style.left.px]="vendorActionPosition().x" [style.top.px]="vendorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedVendor()">Open</button><button (click)="editSelectedVendor()">Edit</button></div> }
+              @if (canRequestOrEdit() && vendorActionRow()) { <div class="cursor-action-menu" [style.left.px]="vendorActionPosition().x" [style.top.px]="vendorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedVendor()">Open</button>@if (isAdmin()) { <button (click)="editSelectedVendor()">Edit</button> } @else { <button (click)="requestVendorEdit()">Request edit</button> }</div> }
             } @else if (!selectedSite()) {
               <section class="vendor-breadcrumb">
                 <div class="vendor-breadcrumb-copy">
@@ -967,14 +968,17 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
 })
 export class VendorDashboardPage {
   isAdmin() { return this.api.user()?.role === "admin"; }
+  canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
   readonly vendorActionRow = signal<Vendor | null>(null);
   readonly vendorActionPosition = signal({ x: 0, y: 0 });
-  handleVendorCardClick(vendor: Vendor, event: MouseEvent) { if (!this.isAdmin()) { this.openVendor(vendor); return; } this.vendorActionRow.set(vendor); this.vendorActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 120), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  handleVendorCardClick(vendor: Vendor, event: MouseEvent) { if (!this.canRequestOrEdit()) { this.openVendor(vendor); return; } this.vendorActionRow.set(vendor); this.vendorActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   openSelectedVendor() { const vendor = this.vendorActionRow(); if (vendor) this.openVendor(vendor); this.vendorActionRow.set(null); }
   editSelectedVendor() { const vendor = this.vendorActionRow(); if (vendor) this.editVendor(vendor, new MouseEvent("click")); this.vendorActionRow.set(null); }
+  requestVendorEdit() { const vendor = this.vendorActionRow(); if (!vendor) return; this.vendorActionRow.set(null); void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit vendor ${vendor.name}.`, link: `/vendors?edit=${vendor._id || vendor.id}` } }); }
   readonly paymentTypeOptions = ["Cash", "NEFT", "Bank Transfer", "UPI", "Cheque"];
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
+  readonly router = inject(Router);
   readonly materialsService = inject(MaterialsService);
   readonly formatMoney = formatMoney;
   readonly toastController = inject(ToastController);
@@ -1133,6 +1137,9 @@ export class VendorDashboardPage {
         });
         // Backend is the source of truth — always overwrite, even with [].
         this.data.vendors.set(mapped);
+        const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("edit") || "";
+        const requested = this.isAdmin() ? mapped.find((vendor) => String(vendor._id || vendor.id) === requestedId) : undefined;
+        if (requested) { this.editVendor(requested, new Event("request-edit")); void this.router.navigate(["/vendors"], { replaceUrl: true }); }
         this.vendorsLoaded = true;
         this.initialLoadDone = true;
         this.refreshing.set(false);

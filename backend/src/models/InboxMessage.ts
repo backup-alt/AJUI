@@ -5,6 +5,7 @@ const inboxMessageSchema = new Schema({
   senderId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   senderName: { type: String, required: true },
   text: { type: String, required: true, trim: true, maxlength: 4000 },
+  link: { type: String, trim: true, maxlength: 1000 },
 }, { timestamps: true });
 inboxMessageSchema.index({ ownerId: 1, createdAt: -1 });
 export const InboxMessage = model("InboxMessage", inboxMessageSchema);

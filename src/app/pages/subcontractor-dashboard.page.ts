@@ -168,7 +168,7 @@ interface SubcontractorRow {
                 </tbody>
                 </table>
               </div>
-              @if (isAdmin() && subcontractorActionRow()) { <div class="cursor-action-menu" [style.left.px]="subcontractorActionPosition().x" [style.top.px]="subcontractorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedSubcontractor()">Open</button><button (click)="editSelectedSubcontractor()">Edit</button></div> }
+              @if (canRequestOrEdit() && subcontractorActionRow()) { <div class="cursor-action-menu" [style.left.px]="subcontractorActionPosition().x" [style.top.px]="subcontractorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedSubcontractor()">Open</button>@if (isAdmin()) { <button (click)="editSelectedSubcontractor()">Edit</button> } @else { <button (click)="requestSubcontractorEdit()">Request edit</button> }</div> }
             </section>
           </main>
         </ion-content>
@@ -392,11 +392,13 @@ interface SubcontractorRow {
 })
 export class SubcontractorDashboardPage {
   isAdmin() { return this.api.user()?.role === "admin"; }
+  canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
   readonly subcontractorActionRow = signal<SubcontractorRow | null>(null);
   readonly subcontractorActionPosition = signal({ x: 0, y: 0 });
-  handleSubcontractorRowClick(row: SubcontractorRow, event: MouseEvent) { if (!this.isAdmin()) { this.openDetails(row); return; } this.subcontractorActionRow.set(row); this.subcontractorActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 120), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  handleSubcontractorRowClick(row: SubcontractorRow, event: MouseEvent) { if (!this.canRequestOrEdit()) { this.openDetails(row); return; } this.subcontractorActionRow.set(row); this.subcontractorActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   openSelectedSubcontractor() { const row = this.subcontractorActionRow(); if (row) this.openDetails(row); this.subcontractorActionRow.set(null); }
   editSelectedSubcontractor() { const row = this.subcontractorActionRow(); if (row) this.openEdit(row, new MouseEvent("click")); this.subcontractorActionRow.set(null); }
+  requestSubcontractorEdit() { const row = this.subcontractorActionRow(); if (!row) return; this.subcontractorActionRow.set(null); void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit subcontractor ${row.subcontractorName}.`, link: `/subcontractors?edit=${row.id}` } }); }
   readonly statusOptions = [
     { label: "Active", value: "active" },
     { label: "Not Active", value: "inactive" },
@@ -484,6 +486,9 @@ export class SubcontractorDashboardPage {
       next: (res) => {
         const rows = (res.items || []).map((r: any) => normalizeRow(r));
         this.rows.set(rows);
+        const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("edit") || "";
+        const requested = this.isAdmin() ? rows.find((row) => row.id === requestedId) : undefined;
+        if (requested) { this.openEdit(requested); void this.router.navigate(["/subcontractors"], { replaceUrl: true }); }
         this.loading.set(false);
         this.hydrateTotals(rows);
       },

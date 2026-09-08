@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { Types } from "mongoose";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
 import { requireAdmin } from "../middleware/rbac.js";
@@ -16,8 +15,11 @@ import { Project } from "../models/Project.js";
 
 const router = Router();
 router.use(requireAuth);
-const input = z.object({ text: z.string().trim().min(1).max(4000), ownerId: z.string().regex(/^[a-f\d]{24}$/i).optional() });
-const validId = (id: string) => { if (!Types.ObjectId.isValid(id)) throw new AppError(400, "Invalid message ID"); return id; };
+const input = z.object({
+  text: z.string().trim().min(1).max(4000),
+  ownerId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
+  link: z.string().trim().max(1000).refine((value) => value.startsWith("/"), "Message links must stay inside the application").optional(),
+});
 
 router.get("/", async (req, res, next) => {
   try {
@@ -35,25 +37,14 @@ router.post("/", async (req, res, next) => {
     if (!ownerId) throw new AppError(400, "Choose a conversation to reply to");
     const [owner, sender] = await Promise.all([User.findById(ownerId).select("name"), User.findById(req.user!.sub).select("name")]);
     if (!owner || !sender) throw new AppError(404, "User not found");
-    const message = await InboxMessage.create({ ownerId, senderId: req.user!.sub, senderName: sender.name, text: parsed.data.text });
+    const message = await InboxMessage.create({ ownerId, senderId: req.user!.sub, senderName: sender.name, text: parsed.data.text, link: parsed.data.link });
     res.status(201).json({ message });
   } catch (error) { next(error); }
 });
-router.patch("/:id", async (req, res, next) => {
+router.get("/recipients", requireAdmin, async (_req, res, next) => {
   try {
-    const parsed = input.safeParse(req.body);
-    if (!parsed.success) throw new AppError(400, "Enter a message of up to 4000 characters");
-    const filter = { _id: validId(req.params.id), ...(req.user!.role === "admin" ? {} : { senderId: req.user!.sub, ownerId: req.user!.sub }) };
-    const message = await InboxMessage.findOneAndUpdate(filter, { $set: { text: parsed.data.text } }, { new: true, runValidators: true });
-    if (!message) throw new AppError(404, "Message not found");
-    res.json({ message });
-  } catch (error) { next(error); }
-});
-router.delete("/:id", requireAdmin, async (req, res, next) => {
-  try {
-    const message = await InboxMessage.findByIdAndDelete(validId(req.params.id));
-    if (!message) throw new AppError(404, "Message not found");
-    res.json({ success: true });
+    const items = await User.find({ role: { $ne: "admin" }, status: { $ne: "inactive" } }).select("_id name email role").sort({ name: 1 }).lean();
+    res.json({ items });
   } catch (error) { next(error); }
 });
 router.get("/activity", requireAdmin, async (req, res, next) => {

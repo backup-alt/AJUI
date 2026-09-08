@@ -90,7 +90,7 @@ import { formatMoney } from "../shared/format";
                 </div>
               </article>
             </section>
-            @if (isAdmin() && clientActionRow()) { <div class="cursor-action-menu" [style.left.px]="clientActionPosition().x" [style.top.px]="clientActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedClient()">Open</button><button (click)="editSelectedClient()">Edit</button><button class="danger" (click)="deleteSelectedClient()">Delete</button></div> }
+            @if (canRequestOrEdit() && clientActionRow()) { <div class="cursor-action-menu" [style.left.px]="clientActionPosition().x" [style.top.px]="clientActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedClient()">Open</button>@if (isAdmin()) { <button (click)="editSelectedClient()">Edit</button><button class="danger" (click)="deleteSelectedClient()">Delete</button> } @else { <button (click)="requestClientEdit()">Request edit</button> }</div> }
           </main>
         </ion-content>
 
@@ -145,12 +145,14 @@ import { formatMoney } from "../shared/format";
 })
 export class ClientDashboardPage {
   isAdmin() { return this.api.user()?.role === "admin"; }
+  canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
   readonly clientActionRow = signal<Client | null>(null);
   readonly clientActionPosition = signal({ x: 0, y: 0 });
-  handleClientCardClick(client: Client, event: MouseEvent) { if (!this.isAdmin()) { this.openClient(client); return; } this.clientActionRow.set(client); this.clientActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 190), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  handleClientCardClick(client: Client, event: MouseEvent) { if (!this.canRequestOrEdit()) { this.openClient(client); return; } this.clientActionRow.set(client); this.clientActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 190), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   openSelectedClient() { const client = this.clientActionRow(); if (client) this.openClient(client); this.clientActionRow.set(null); }
   editSelectedClient() { const client = this.clientActionRow(); if (client) this.editClient(client, new MouseEvent("click")); this.clientActionRow.set(null); }
   deleteSelectedClient() { const client = this.clientActionRow(); if (client) this.deleteClient(client, new MouseEvent("click")); this.clientActionRow.set(null); }
+  requestClientEdit() { const client = this.clientActionRow(); if (!client) return; this.clientActionRow.set(null); void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit client ${client.name}.`, link: `/clients?edit=${client._id || client.id}` } }); }
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly router = inject(Router);
@@ -194,6 +196,9 @@ export class ClientDashboardPage {
           // Backend is the source of truth — always overwrite, even with [].
           // No localStorage write — the dashboard no longer caches data tables.
           this.data.clients.set(items as any);
+          const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("edit") || "";
+          const requested = this.isAdmin() ? items.find((client: any) => String(client._id || client.id) === requestedId) : undefined;
+          if (requested) { this.editClient(requested as any, new Event("request-edit")); void this.router.navigate(["/clients"], { replaceUrl: true }); }
         } catch {}
         this.refreshing.set(false);
         this.refreshMessage.set(`Synced ${r.total} clients`);

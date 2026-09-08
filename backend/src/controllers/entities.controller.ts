@@ -4,7 +4,7 @@ import * as siteService from "../services/site.service.js";
 import * as projectService from "../services/project.service.js";
 import * as supervisorService from "../services/supervisor.service.js";
 import * as customFieldService from "../services/custom-fields.service.js";
-import { getScopedClientQuery, getScopedProjectIds, getScopedProjectQuery } from "../middleware/rbac.js";
+import { getScopedClientQuery, getScopedProjectIds, getScopedProjectQuery, invalidateAccessCache } from "../middleware/rbac.js";
 import { invalidateCachePrefix } from "../middleware/cache.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { User } from "../models/User.js";
@@ -125,6 +125,10 @@ export async function deleteSite(req: Request, res: Response, next: NextFunction
 export async function createProject(req: Request, res: Response, next: NextFunction) {
   try {
     const project = await projectService.createProject(req.body);
+    if ((req.user?.role === "project_manager" || req.user?.role === "accountant") && req.user.sub) {
+      await User.findByIdAndUpdate(req.user.sub, { $addToSet: { managedProjectIds: project._id } });
+      invalidateAccessCache(req.user.sub);
+    }
     invalidateProjectAssignmentCaches();
     res.status(201).json({ project });
   } catch (e) { next(e); }
@@ -200,7 +204,10 @@ export async function createSupervisor(req: Request, res: Response, next: NextFu
 
 export async function listSupervisors(req: Request, res: Response, next: NextFunction) {
   try {
-    const scopeProjectIds = await getScopedProjectIds(req);
+    // Project creators must be able to assign any active supervisor, including
+    // supervisors who do not yet have a project in the creator's current scope.
+    const canAssignSupervisor = req.user?.role === "admin" || req.user?.role === "project_manager" || req.user?.role === "accountant";
+    const scopeProjectIds = canAssignSupervisor ? null : await getScopedProjectIds(req);
     const result = await supervisorService.listSupervisors({
       status: req.query.status as string | undefined,
       search: req.query.search as string | undefined,

@@ -55,16 +55,16 @@ router.use(requireAuth);
 router.post(
   "/materials",
   validate(createMaterialSchema),
-  requireRole("admin", "project_manager", "supervisor"),
+  requireRole("admin", "project_manager", "accountant", "supervisor"),
   ctrl.createMaterial
 );
 router.get("/materials", validate(listMaterialsSchema, "query"), cache(60), ctrl.listMaterials);
-router.get("/materials/pending", requireRole("admin", "project_manager"), cache(10), ctrl.getPendingMaterials);
+router.get("/materials/pending", requireRole("admin", "project_manager", "accountant"), cache(10), ctrl.getPendingMaterials);
 router.get("/materials/diagnostic-find-one", ctrl.diagnosticFindOneMaterial);
 router.get("/materials/:id", cache(30), ctrl.getMaterial);
-router.patch("/materials/:id", validate(updateMaterialSchema), ctrl.updateMaterial);
+router.patch("/materials/:id", validate(updateMaterialSchema), requireRole("admin"), ctrl.updateMaterial);
 router.post("/materials/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadMaterialReceipt);
-router.delete("/materials/:id", requireRole("admin", "project_manager"), ctrl.deleteMaterial);
+router.delete("/materials/:id", requireRole("admin"), ctrl.deleteMaterial);
 
 // =================== INVENTORY ===================
 router.get("/inventory", validate(listInventorySchema, "query"), cache(60), ctrl.listInventory);
@@ -72,19 +72,19 @@ router.get("/inventory/diagnostic-find-one", ctrl.diagnosticFindOneInventory);
 router.get(
   "/inventory/missing",
   validate(missingMaterialsForSiteSchema, "query"),
-  requireRole("admin", "project_manager", "supervisor"),
+  requireRole("admin", "project_manager", "accountant", "supervisor"),
   ctrl.getMissingMaterials
 );
 router.post(
   "/inventory/initialize",
   validate(initializeInventorySchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.initializeInventory
 );
 router.post(
   "/inventory/material",
   validate(addInventoryMaterialSchema),
-  requireRole("admin", "project_manager", "supervisor"),
+  requireRole("admin", "project_manager", "accountant", "supervisor"),
   ctrl.addInventoryMaterial
 );
 
@@ -92,15 +92,15 @@ router.post(
 router.post(
   "/labour",
   validate(createLabourSchema),
-  requireRole("admin", "project_manager", "supervisor"),
+  requireRole("admin", "project_manager", "accountant", "supervisor"),
   ctrl.createLabour
 );
 router.get("/labour", validate(listLabourSchema, "query"), cache(30), ctrl.listLabour);
-router.get("/labour/pending", requireRole("admin", "project_manager"), cache(10), ctrl.getPendingLabour);
+router.get("/labour/pending", requireRole("admin", "project_manager", "accountant"), cache(10), ctrl.getPendingLabour);
 router.get("/labour/summary/:projectId", cache(30), ctrl.getLabourSummary);
 router.get("/labour/:id", cache(30), ctrl.getLabour);
-router.patch("/labour/:id", validate(updateLabourSchema), ctrl.updateLabour);
-router.delete("/labour/:id", requireRole("admin", "project_manager"), ctrl.deleteLabour);
+router.patch("/labour/:id", validate(updateLabourSchema), requireRole("admin"), ctrl.updateLabour);
+router.delete("/labour/:id", requireRole("admin"), ctrl.deleteLabour);
 
 // =================== ATTENDANCE (New Model) ===================
 router.get("/attendance/grouped", attendanceCtrl.getGroupedAttendance);
@@ -114,7 +114,7 @@ router.get("/expenses/project-rollup/:projectId", ctrl.getProjectExpenseOutputRo
 router.post(
   "/expenses",
   validate(createExpenseSchema),
-  requireRole("admin", "accountant", "supervisor"),
+  requireRole("admin", "accountant", "project_manager", "supervisor"),
   ctrl.createExpense
 );
 router.get("/expenses", validate(listExpensesSchema, "query"), cache(60), ctrl.listExpenses);
@@ -122,10 +122,10 @@ router.get("/expenses/diagnostic-find-one", ctrl.diagnosticFindOneExpense);
 router.get("/expenses/pending", requireRole("admin", "accountant", "project_manager"), cache(10), ctrl.getPendingExpenses);
 router.get("/expenses/ledger/:projectId/:site", cache(30), ctrl.getExpenseLedger);
 router.get("/expenses/:id", cache(30), ctrl.getExpense);
-router.patch("/expenses/:id", validate(updateExpenseSchema), ctrl.updateExpense);
+router.patch("/expenses/:id", validate(updateExpenseSchema), requireRole("admin"), ctrl.updateExpense);
 router.post("/expenses/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadExpenseReceipt);
-router.post("/expenses/:id/received", ctrl.markAsReceived);
-router.delete("/expenses/:id", requireRole("admin", "accountant"), ctrl.deleteExpense);
+router.post("/expenses/:id/received", requireRole("admin"), ctrl.markAsReceived);
+router.delete("/expenses/:id", requireRole("admin"), ctrl.deleteExpense);
 
 // =================== GENERAL EXPENSES (project-level "Expense") ===================
 router.post(
@@ -137,42 +137,42 @@ router.post(
 router.get("/general-expenses", validate(listGeneralExpensesSchema, "query"), cache(60), ctrl.listGeneralExpenses);
 router.get("/general-expenses/all", cache(60), ctrl.listAllGeneralExpenses);
 router.get("/general-expenses/:id", cache(30), ctrl.getGeneralExpense);
-router.patch("/general-expenses/:id", validate(updateGeneralExpenseSchema), ctrl.updateGeneralExpense);
+router.patch("/general-expenses/:id", validate(updateGeneralExpenseSchema), requireRole("admin"), ctrl.updateGeneralExpense);
 router.post("/general-expenses/:id/receipt", validate(uploadExpenseReceiptSchema), ctrl.uploadGeneralExpenseReceipt);
-router.delete("/general-expenses/:id", requireRole("admin", "accountant"), ctrl.deleteGeneralExpense);
+router.delete("/general-expenses/:id", requireRole("admin"), ctrl.deleteGeneralExpense);
 
 // =================== PAYMENTS ===================
 router.post(
   "/payments",
   validate(createPaymentSchema),
-  requireRole("admin", "accountant"),
+  requireRole("admin", "accountant", "project_manager"),
   ctrl.createPayment
 );
 router.get("/payments", validate(listPaymentsSchema, "query"), cache(20), ctrl.listPayments);
-router.get("/payments/pending", requireRole("admin", "accountant"), cache(10), ctrl.getPendingPayments);
-router.get("/payments/collection-summary", requireRole("admin", "accountant"), cache(30), ctrl.getPaymentCollectionSummary);
+router.get("/payments/pending", requireRole("admin", "accountant", "project_manager"), cache(10), ctrl.getPendingPayments);
+router.get("/payments/collection-summary", requireRole("admin", "accountant", "project_manager"), cache(30), ctrl.getPaymentCollectionSummary);
 router.get("/payments/:id", cache(30), ctrl.getPayment);
-router.patch("/payments/:id", validate(updatePaymentSchema), ctrl.updatePayment);
-router.delete("/payments/:id", requireRole("admin", "accountant"), ctrl.deletePayment);
+router.patch("/payments/:id", validate(updatePaymentSchema), requireRole("admin"), ctrl.updatePayment);
+router.delete("/payments/:id", requireRole("admin"), ctrl.deletePayment);
 
 // =================== VENDORS ===================
 router.post(
   "/vendors",
   validate(createVendorSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.createVendor
 );
 router.get("/vendors", validate(listVendorsSchema, "query"), cache(20), ctrl.listVendors);
 router.get("/vendors/:id/purchase-history", cache(20), ctrl.getVendorPurchaseHistory);
 router.get("/vendors/:id", cache(30), ctrl.getVendor);
-router.patch("/vendors/:id", validate(updateVendorSchema), ctrl.updateVendor);
-router.delete("/vendors/:id", requireRole("admin", "project_manager"), ctrl.deleteVendor);
+router.patch("/vendors/:id", validate(updateVendorSchema), requireRole("admin"), ctrl.updateVendor);
+router.delete("/vendors/:id", requireRole("admin"), ctrl.deleteVendor);
 
 // =================== SUBCONTRACTORS ===================
 router.post(
   "/subcontractors",
   validate(createSubcontractorSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.createSubcontractor
 );
 router.get("/subcontractors", validate(listSubcontractorsSchema, "query"), cache(20), ctrl.listSubcontractors);
@@ -180,13 +180,13 @@ router.get("/subcontractors/for-worker", cache(20), ctrl.listSubcontractorsForWo
 router.get("/subcontractors/spend-rollup", cache(10), ctrl.getSubcontractorSpendRollup);
 router.get(
   "/subcontractors/all-active",
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   cache(20),
   ctrl.listAllActiveSubcontractors
 );
 router.get("/subcontractors/:id", cache(30), ctrl.getSubcontractor);
-router.patch("/subcontractors/:id", validate(updateSubcontractorSchema), ctrl.updateSubcontractor);
-router.delete("/subcontractors/:id", requireRole("admin", "project_manager"), ctrl.deleteSubcontractor);
+router.patch("/subcontractors/:id", validate(updateSubcontractorSchema), requireRole("admin"), ctrl.updateSubcontractor);
+router.delete("/subcontractors/:id", requireRole("admin"), ctrl.deleteSubcontractor);
 
 // =================== SUBCONTRACTOR PAYMENTS ===================
 router.get(
@@ -203,18 +203,18 @@ router.get(
 router.post(
   "/subcontractor-payments",
   validate(createSubcontractorPaymentSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.createSubcontractorPayment
 );
 router.patch(
   "/subcontractor-payments/:id",
   validate(updateSubcontractorPaymentSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin"),
   ctrl.updateSubcontractorPayment
 );
 router.delete(
   "/subcontractor-payments/:id",
-  requireRole("admin", "project_manager"),
+  requireRole("admin"),
   ctrl.deleteSubcontractorPayment
 );
 
@@ -223,13 +223,13 @@ router.get("/subcontractor-labor", ctrl.listSubcontractorLabor);
 router.post(
   "/subcontractor-labor",
   validate(createSubcontractorLaborSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.createSubcontractorLabor
 );
 router.patch(
   "/subcontractor-labor/:id",
   validate(updateSubcontractorLaborSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin"),
   ctrl.updateSubcontractorLabor
 );
 
@@ -246,18 +246,18 @@ router.get(
 router.post(
   "/workers",
   validate(createWorkerSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.createWorker
 );
 router.patch(
   "/workers/:id",
   validate(updateWorkerSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin"),
   ctrl.updateWorker
 );
 router.delete(
   "/workers/:id",
-  requireRole("admin", "project_manager"),
+  requireRole("admin"),
   ctrl.deleteWorker
 );
 
@@ -266,7 +266,7 @@ router.get("/purchase-orders/gst-rates", ctrl.listPurchaseOrderGstRates);
 router.post(
   "/purchase-orders/gst-rates",
   validate(createGstRateSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.createPurchaseOrderGstRate
 );
 router.get("/purchase-orders", validate(listPurchaseOrdersSchema, "query"), cache(10), ctrl.listPurchaseOrders);
@@ -274,7 +274,7 @@ router.get("/purchase-orders/:id", cache(20), ctrl.getPurchaseOrder);
 router.post(
   "/purchase-orders",
   validate(createPurchaseOrderSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.createPurchaseOrder
 );
 router.put(
@@ -293,7 +293,7 @@ router.delete(
 router.get("/approvals", validate(listApprovalsSchema, "query"), cache(10), ctrl.listApprovals);
 router.get("/approvals/count", cache(10), ctrl.getApprovalCount);
 router.get("/approvals/:id", ctrl.getApproval);
-router.put("/approvals/:id/approve", requireRole("admin", "project_manager", "accountant"), ctrl.approveApproval);
-router.put("/approvals/:id/reject", requireRole("admin", "project_manager", "accountant"), ctrl.rejectApproval);
+router.put("/approvals/:id/approve", requireRole("admin"), ctrl.approveApproval);
+router.put("/approvals/:id/reject", requireRole("admin"), ctrl.rejectApproval);
 
 export default router;

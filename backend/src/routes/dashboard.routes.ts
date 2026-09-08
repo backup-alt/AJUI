@@ -25,10 +25,10 @@ router.get("/dashboard/universal", requireRole("admin", "accountant", "project_m
 router.get("/dashboard/batch", requireRole("admin", "accountant", "project_manager", "supervisor"), cache(15), batchCtrl.getBatchDashboard);
 
 // Reports
-router.post("/reports", validate(createReportSchema), requireRole("admin", "accountant"), ctrl.createReport);
+router.post("/reports", validate(createReportSchema), requireRole("admin", "accountant", "project_manager"), ctrl.createReport);
 router.get("/reports", validate(listReportsSchema, "query"), cache(30), ctrl.listReports);
 router.get("/reports/:id", cache(30), ctrl.getReport);
-router.patch("/reports/:id", validate(updateReportSchema), requireRole("admin", "accountant"), ctrl.updateReport);
+router.patch("/reports/:id", validate(updateReportSchema), requireRole("admin"), ctrl.updateReport);
 router.delete("/reports/:id", requireRole("admin"), ctrl.deleteReport);
 router.post("/reports/:id/generate", requireRole("admin", "accountant", "project_manager"), ctrl.generateReport);
 

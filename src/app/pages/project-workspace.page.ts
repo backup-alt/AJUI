@@ -1279,9 +1279,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   </tbody>
                 </table>
               </div>
-              <div class="cursor-action-menu" *ngIf="api.user()?.role === 'admin' && selectedActionRow() as actionRow" [style.left.px]="rowToolbarPosition().x" [style.top.px]="rowToolbarPosition().y" (click)="$event.stopPropagation()">
-                <button type="button" (click)="editAdminRow(actionRow, $event)"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 16h3l9-9-3-3-9 9v3Z"/><path d="m11.5 5.5 3 3"/></svg>Edit</button>
-                <button type="button" class="danger" (click)="$event.stopPropagation(); deleteRow(actionRow)"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>Delete</button>
+              <div class="cursor-action-menu" *ngIf="selectedActionRow() as actionRow" [style.left.px]="rowToolbarPosition().x" [style.top.px]="rowToolbarPosition().y" (click)="$event.stopPropagation()">
+                @if (api.user()?.role === 'admin') {
+                  <button type="button" (click)="editAdminRow(actionRow, $event)"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 16h3l9-9-3-3-9 9v3Z"/><path d="m11.5 5.5 3 3"/></svg>Edit</button>
+                  <button type="button" class="danger" (click)="$event.stopPropagation(); deleteRow(actionRow)"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>Delete</button>
+                } @else { <button type="button" (click)="requestAdminEdit(actionRow, $event)">Request edit from Admin</button> }
               </div>
               </ng-container>
             </section>
@@ -2128,6 +2130,13 @@ export class ProjectWorkspacePage {
       this.editingProject.set(project);
       this.showProjectForm.set(true);
     });
+    effect(() => {
+      const recordId = this.queryParamMap().get("record");
+      if (!recordId || this.api.user()?.role !== "admin") return;
+      const row = this.tableState().rows.find((item) => String(item["_id"] || item["__rowId"] || this.rowKey(item)) === recordId);
+      if (!row || this.editingRowKey() === this.rowKey(row)) return;
+      this.editAdminRow(row, new Event("request-edit"));
+    });
     // Subcontractor spend rollup — re-fetched every time the active
     // project changes. The total expense line below folds this in.
     effect(() => {
@@ -2310,8 +2319,19 @@ export class ProjectWorkspacePage {
   }
 
   selectedActionRow(): TableRow | null {
-    if (this.api.user()?.role !== "admin" || this.selectedRowCount() !== 1) return null;
+    if (!["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")) || this.selectedRowCount() !== 1) return null;
     return this.selectedRows()[0] || null;
+  }
+
+  requestAdminEdit(row: TableRow, event?: Event) {
+    event?.stopPropagation();
+    const id = String(row["_id"] || row["__rowId"] || this.rowKey(row));
+    const section = this.activeSection();
+    this.clearRowSelection();
+    void this.router.navigate(["/inbox"], { queryParams: {
+      request: `Please edit the ${section} record ${id} in ${this.project()?.name || "this project"}.`,
+      link: `${this.router.url.split("?")[0]}?record=${encodeURIComponent(id)}`,
+    }});
   }
 
   private positionRowToolbar(event?: MouseEvent) {

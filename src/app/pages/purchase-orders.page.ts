@@ -126,6 +126,7 @@ export class PurchaseOrdersPage implements OnInit {
   ngOnInit() {
     this.route.queryParams.subscribe((params) => {
       const open = params["open"];
+      const edit = params["edit"];
       const create = params["create"];
       const projectId = String(params["projectId"] || "").trim();
       const projectName = String(params["projectName"] || "").trim();
@@ -150,6 +151,10 @@ export class PurchaseOrdersPage implements OnInit {
           queryParamsHandling: "merge",
           replaceUrl: true,
         });
+      } else if (edit) {
+        this.openNumber.set(String(edit));
+        this.view.set("edit");
+        void this.router.navigate(["/purchase-orders"], { replaceUrl: true });
       }
     });
   }

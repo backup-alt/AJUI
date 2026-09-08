@@ -26,13 +26,11 @@ describe("Private inbox permissions", () => {
     expect((await request(app).get("/inbox")).status).toBe(200);
     expect(find).toHaveBeenCalledWith({ownerId: "111111111111111111111111"});
   });
-  it("does not allow a manager to edit another sender's message", async () => {
-    const update = jest.spyOn(InboxMessage, "findOneAndUpdate").mockResolvedValue(null);
+  it("does not expose message editing", async () => {
     expect((await request(app).patch("/inbox/222222222222222222222222").send({text: "changed"})).status).toBe(404);
-    expect(update.mock.calls[0][0]).toEqual({_id: "222222222222222222222222", senderId: "111111111111111111111111", ownerId: "111111111111111111111111"});
   });
-  it("denies managers deletion and the admin activity feed", async () => {
-    expect((await request(app).delete("/inbox/222222222222222222222222")).status).toBe(403);
+  it("does not expose message deletion and denies managers the admin activity feed", async () => {
+    expect((await request(app).delete("/inbox/222222222222222222222222")).status).toBe(404);
     expect((await request(app).get("/inbox/activity")).status).toBe(403);
   });
   it("allows admin access to all conversations", async () => {

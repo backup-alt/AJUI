@@ -103,12 +103,11 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
                       <th>Description</th>
                       <th>Employees</th>
                       <th>Amount</th>
-                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (p of filteredPayments(); track p._id) {
-                      <tr>
+                      <tr [class.row-selected]="paymentActionRow()?._id === p._id" (click)="openPaymentActionMenu(p, $event)">
                         <td>{{ p.date }}</td>
                         <td>{{ p.paymentType || 'Bank Transfer' }}</td>
                         <td>{{ p.projectName }}</td>
@@ -116,24 +115,17 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
                         <td class="wrap">{{ p.description || '—' }}</td>
                         <td>{{ p.employeeCount }}</td>
                         <td>{{ formatMoney(p.amount) }}</td>
-                        <td class="row-actions">
-                          <button type="button" class="icon-btn" aria-label="Edit" title="Edit payment" (click)="openEditPayment(p)">
-                            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                              <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-                              <path d="m14.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                          </button>
-                        </td>
                       </tr>
                     }
                     @if (filteredPayments().length === 0) {
                       <tr>
-                        <td colspan="8" class="empty-row">No payments recorded for this sub-contractor yet.</td>
+                        <td colspan="7" class="empty-row">No payments recorded for this sub-contractor yet.</td>
                       </tr>
                     }
                   </tbody>
                 </table>
               </section>
+              @if (paymentActionRow()) { <div class="cursor-action-menu" [style.left.px]="paymentActionPosition().x" [style.top.px]="paymentActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedPayment()"><ion-icon name="pencil-outline"></ion-icon>Edit</button> } @else { <button type="button" (click)="requestPaymentEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
               </section>
               }
             }
@@ -301,6 +293,11 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
     table { width: 100%; border-collapse: collapse; }
     th { background: #f8fafc; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 12px 14px; text-align: left; border-bottom: 2px solid #e2e8f0; }
     td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-size: 13px; vertical-align: middle; max-width: 280px; }
+    tbody tr { cursor: pointer; }
+    tbody tr.row-selected td { background: #f8fbff; }
+    .cursor-action-menu { position: fixed; z-index: 1200; display: flex; padding: 5px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; box-shadow: 0 12px 28px rgba(16,24,40,.18); }
+    .cursor-action-menu button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: #344054; font-weight: 700; cursor: pointer; }
+    .cursor-action-menu button:hover { background: #f2f4f7; }
     td.wrap { word-break: break-word; white-space: pre-wrap; }
     tr:last-child td { border-bottom: none; }
     .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
@@ -356,6 +353,12 @@ export class SubcontractorDetailsPage {
   readonly router = inject(Router);
   readonly toastController = inject(ToastController);
   readonly formatMoney = formatMoney;
+  readonly paymentActionRow = signal<SubcontractorPayment | null>(null);
+  readonly paymentActionPosition = signal({ x: 0, y: 0 });
+  isAdmin() { return this.api.user()?.role === "admin"; }
+  openPaymentActionMenu(payment: SubcontractorPayment, event: MouseEvent) { this.paymentActionRow.set(payment); this.paymentActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  editSelectedPayment() { const payment = this.paymentActionRow(); if (payment && this.isAdmin()) this.openEditPayment(payment); this.paymentActionRow.set(null); }
+  requestPaymentEdit() { const payment = this.paymentActionRow(); if (!payment) return; this.paymentActionRow.set(null); void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit the subcontractor payment dated ${payment.date}.`, link: `/subcontractors/${this.subcontractorId}?editPayment=${payment._id}` } }); }
 
   readonly subcontractor = signal<any | null>(null);
   readonly payments = signal<SubcontractorPayment[]>([]);
@@ -492,6 +495,9 @@ export class SubcontractorDetailsPage {
     this.api.listSubcontractorPayments({ subcontractorId: id, limit: 500 }).subscribe({
       next: (res) => {
         this.payments.set(res.items || []);
+        const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("editPayment") || "";
+        const requested = this.isAdmin() ? (res.items || []).find((payment: SubcontractorPayment) => payment._id === requestedId) : undefined;
+        if (requested) { this.openEditPayment(requested); void this.router.navigate(["/subcontractors", id], { replaceUrl: true }); }
         this.api.getSubcontractorPaymentSummary(id).subscribe({
           next: (s) => this.summary.set(s),
           error: () => this.summary.set({ totalPaid: 0, recordCount: 0, projectCount: 0, siteCount: 0 }),

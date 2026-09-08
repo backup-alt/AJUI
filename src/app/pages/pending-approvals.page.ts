@@ -191,7 +191,7 @@ type ToastManager = {
                         <th>Notes</th>
                         <th>Bill / Reference</th>
                         <th>Status</th>
-                        <th>Actions</th>
+                        <th *ngIf="isAdmin()">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -209,6 +209,7 @@ type ToastManager = {
                               inputmode="decimal"
                               type="number"
                               [(ngModel)]="row.approvedAmount"
+                              [readonly]="!isAdmin()"
                               aria-label="Approved amount"
                               min="0"
                             />
@@ -239,7 +240,7 @@ type ToastManager = {
                           }
                         </td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
-                        <td class="approval-actions">
+                        <td class="approval-actions" *ngIf="isAdmin()">
                           <button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">
                             @if (isRowProcessing(row.rowId)) {
                               <span class="agb-loading-spinner" aria-hidden="true"></span>
@@ -289,6 +290,7 @@ export class PendingApprovalsPage implements OnInit {
   private readonly data = inject(ErpDataService);
   private readonly approvalsService = inject(ApprovalsService);
   private readonly api = inject(ApiService);
+  isAdmin() { return this.api.user()?.role === "admin"; }
 
   // Material approvals are no longer surfaced on this page — they are
   // managed inline in the project workspace "Materials" tab (and on the
