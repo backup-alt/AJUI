@@ -104,6 +104,7 @@ export const listLabourSchema = z.object({
 });
 
 export const expenseBaseSchema = z.object({
+  paymentMode: z.string().trim().min(1).max(50).default("Cash"),
   type: z.enum(["site", "general"]),
   projectId: objectIdSchema.optional(),
   clientId: objectIdSchema.optional(),
@@ -400,6 +401,7 @@ const purchaseOrderItemSchema = z.discriminatedUnion("source", [
     // case the service allocates the material's full approved quantity.
     quantity: z.coerce.number().positive().optional(),
     rate: z.coerce.number().nonnegative(),
+    paymentMode: z.string().trim().min(1).max(50).optional(),
     gstPercent: z.coerce.number().min(0).max(100),
   }),
   z.object({
@@ -409,6 +411,7 @@ const purchaseOrderItemSchema = z.discriminatedUnion("source", [
     unit: z.string().trim().min(1).max(50),
     quantity: z.coerce.number().positive(),
     rate: z.coerce.number().nonnegative(),
+    paymentMode: z.string().trim().min(1).max(50).optional(),
     gstPercent: z.coerce.number().min(0).max(100),
   }),
 ]);
@@ -419,6 +422,7 @@ export const createPurchaseOrderSchema = z.object({
     vendorId: objectIdSchema,
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
     paymentMode: z.string().trim().min(1).max(50).optional().default("Bank Transfer"),
+    notes: z.string().trim().max(2000).optional().default(""),
     items: z.array(purchaseOrderItemSchema).min(1),
     roundOff: z.coerce.number().min(-1000).max(1000).optional().default(0),
   }),
@@ -429,6 +433,7 @@ export const updatePurchaseOrderSchema = z.object({
     vendorId: objectIdSchema,
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must be YYYY-MM-DD"),
     paymentMode: z.string().trim().min(1).max(50).optional().default("Bank Transfer"),
+    notes: z.string().trim().max(2000).optional().default(""),
     items: z.array(purchaseOrderItemSchema).min(1),
     roundOff: z.coerce.number().min(-1000).max(1000).optional().default(0),
   }),

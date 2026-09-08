@@ -58,13 +58,11 @@ const dashboardModules: ModuleConfig[] = [
       { key: "poNumber", label: "PO Number" },
       { key: "remainingStock", label: "Remaining Stock" },
       { key: "notes", label: "Notes" },
-      { key: "status", label: "Status" },
     ],
     filters: [
       { key: "client", label: "Client" },
       { key: "project", label: "Project" },
       { key: "vendor", label: "Vendor" },
-      { key: "status", label: "Status" },
     ],
   },
   {
@@ -483,12 +481,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           </button>
                         </span>
                       </th>
-                      <th *ngIf="activeModule() === 'subcontractors'">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr
                       *ngFor="let row of tableState.rows; trackBy: trackRow"
+                      [class.row-selected]="adminActionRow() === row"
+                      (click)="openAdminActionMenu(row, $event)"
                     >
                       <td
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
@@ -548,7 +547,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           >{{ row[column.key] }}</button>
                           <ng-template #standardReadonlyCell>
                           <span
-                            class="editable-cell cell-readonly"
+                            class="editable-cell" [class.cell-readonly]="!adminRowEditing(row)" [attr.contenteditable]="adminRowEditing(row) && !isReadonlyColumn(column.key) ? 'true' : null" (blur)="adminRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
                             spellcheck="false"
                           >
                             {{ displayCell(row, column.key) }}
@@ -556,16 +555,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           </ng-template>
                           </ng-template>
                         </ng-template>
-                      </td>
-                      <td class="row-actions-cell" *ngIf="activeModule() === 'subcontractors'">
-                        <div class="row-hover-toolbar actions-row">
-                          <button type="button" class="row-action-button" title="Edit payment" (click)="openEditSubcontractorPayment(row, $event)">
-                            <ion-icon name="create-outline"></ion-icon>
-                          </button>
-                          <button type="button" class="row-action-button danger" title="Delete payment" (click)="deleteSubcontractorPaymentRow(row, $event)">
-                            <ion-icon name="trash-outline"></ion-icon>
-                          </button>
-                        </div>
                       </td>
                     </tr>
                     <tr #scrollSentinel *ngIf="hasMoreRows()">
@@ -591,6 +580,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     </tr>
                   </tbody>
                 </table>
+              </div>
+              <div class="cursor-action-menu" *ngIf="api.user()?.role === 'admin' && adminActionRow()" [style.left.px]="adminActionPosition().x" [style.top.px]="adminActionPosition().y" (click)="$event.stopPropagation()">
+                <button type="button" (click)="editAdminActionRow()"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 16h3l9-9-3-3-9 9v3Z"/><path d="m11.5 5.5 3 3"/></svg>Edit</button>
+                <button type="button" class="danger" (click)="deleteAdminActionRow()"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>Delete</button>
               </div>
               </ng-container>
               </ng-container>
@@ -896,6 +889,9 @@ const siteMaterialDetailFields: FieldSchema[] = [
     </ion-split-pane>
   `,
   styles: [`
+    .cursor-action-menu { position: fixed; z-index: 1200; display: flex; gap: 4px; padding: 5px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; box-shadow: 0 12px 28px rgba(16,24,40,.18); }
+    .cursor-action-menu button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: #344054; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .cursor-action-menu button:hover { background: #f2f4f7; }.cursor-action-menu button.danger { color: #b42318; }.cursor-action-menu button.danger:hover { background: #fff1f0; }.cursor-action-menu .svg-icon { width: 15px; height: 15px; }
     .operations-dialog:has(.draft-select-menu.open) {
       overflow: visible;
     }
@@ -2565,6 +2561,7 @@ export class GeneralExpensesPage implements OnInit {
     if (!target.closest(".table-actions, .universal-filter-bar, .filter-dialog, .date-filter-panel, .site-workbench")) {
       // Row selection has been removed — no state to clear here.
     }
+    if (!target.closest(".cursor-action-menu, .operations-table tbody tr")) this.adminActionRow.set(null);
 
     if (!target.closest(".erp-select-menu, .filter-select-shell, .custom-select-entry, .filter-combo-field, .date-filter-panel")) {
       this.closeDropdowns();
@@ -3818,6 +3815,48 @@ export class GeneralExpensesPage implements OnInit {
     });
   }
 
+  readonly adminEditingRow = signal("");
+  readonly adminActionRow = signal<TableRow | null>(null);
+  readonly adminActionPosition = signal({ x: 0, y: 0 });
+  openAdminActionMenu(row: TableRow, event: MouseEvent) {
+    if (this.api.user()?.role !== "admin") return;
+    const width = 154;
+    const height = 44;
+    this.adminActionRow.set(row);
+    this.adminActionPosition.set({
+      x: Math.min(event.clientX + 10, window.innerWidth - width - 10),
+      y: Math.min(event.clientY + 10, window.innerHeight - height - 10),
+    });
+  }
+  editAdminActionRow() {
+    const row = this.adminActionRow();
+    if (!row) return;
+    this.adminActionRow.set(null);
+    if (this.activeModule() === "subcontractors") this.openEditSubcontractorPayment(row, new MouseEvent("click"));
+    else this.startAdminEdit(row);
+  }
+  deleteAdminActionRow() {
+    const row = this.adminActionRow();
+    if (!row) return;
+    this.adminActionRow.set(null);
+    if (this.activeModule() === "subcontractors") this.deleteSubcontractorPaymentRow(row, new MouseEvent("click"));
+    else void this.deleteAdminRow(row);
+  }
+  startAdminEdit(row: TableRow) { this.adminEditingRow.set(String(row["_id"] || row["__rowId"] || "")); }
+  adminRowEditing(row: TableRow): boolean { return this.api.user()?.role === "admin" && this.adminEditingRow() === String(row["_id"] || row["__rowId"]); }
+  async deleteAdminRow(row: TableRow) {
+    if (this.api.user()?.role !== "admin") return;
+    const id = String(row["_id"] || "");
+    const deleters: Record<string, (id: string) => any> = {
+      materials: id => this.api.deleteMaterial(id), labour: id => this.api.deleteLabour(id), expenses: id => this.api.deleteExpense(id),
+      generalExpenses: id => this.api.deleteGeneralExpense(id), payments: id => this.api.deletePayment(id), vendors: id => this.api.deleteVendor(id), clients: id => this.api.deleteClient(id),
+    };
+    const remove = deleters[this.activeModule()];
+    if (!remove || !id) { await this.presentToast("Open this record's project to manage it.", "warning"); return; }
+    if (!window.confirm("Delete this record?")) return;
+    try { await firstValueFrom(remove(id)); await this.hydration.loadModule(this.activeModule() as PageModule); }
+    catch { await this.presentToast("Could not delete the record. Please retry.", "danger"); }
+  }
   updateCell(visibleIndex: number, key: string, value: string) {
     if (this.isReadonlyColumn(key)) return;
     const target = this.visibleRows()[visibleIndex];

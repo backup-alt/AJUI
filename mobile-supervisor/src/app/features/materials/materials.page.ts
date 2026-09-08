@@ -449,7 +449,7 @@ export class MaterialsPage implements OnInit {
         this.supervisor.getMaterials({
           projectId: projectId || undefined,
           status: 'Approved',
-          receivedOnly: true,
+
           view: 'inventory',
           limit: 100,
           search: this.searchQuery.trim() || undefined,
@@ -482,7 +482,7 @@ export class MaterialsPage implements OnInit {
         this.supervisor.getMaterials({
           projectId: this.supervisor.selectedProjectId() || undefined,
           status: 'Approved',
-          receivedOnly: true,
+
           view: 'inventory',
           limit: 100,
           cursor,

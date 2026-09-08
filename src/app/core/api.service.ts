@@ -135,12 +135,15 @@ export interface PurchaseOrderItem {
   unit: string;
   quantity: number;
   rate: number;
+  paymentMode: string;
   itemAmount: number;
   gstPercent: number;
   gstAmount: number;
 }
 
 export interface PurchaseOrder {
+  givenAmount?: number;
+  billReferences?: Array<{url: string; label: string}>;
   _id: string;
   poNumber: string;
   projectId: string;
@@ -149,6 +152,7 @@ export interface PurchaseOrder {
   vendorName: string;
   date: string;
   paymentMode: string;
+  notes?: string;
   items: PurchaseOrderItem[];
   subtotal: number;
   totalGst: number;
@@ -165,6 +169,19 @@ const STORAGE_KEYS = {
 
 @Injectable({ providedIn: "root" })
 export class ApiService {
+  listInbox(page = 1): Observable<{items: any[]; hasMore: boolean}> {
+    return this.http.get<{items: any[]; hasMore: boolean}>(`${this.baseUrl}/inbox`, { headers: this.authHeaders(), params: {page} });
+  }
+  inboxActivity(page = 1): Observable<{items: any[]; page: number; hasMore: boolean}> {
+    return this.http.get<{items: any[]; page: number; hasMore: boolean}>(`${this.baseUrl}/inbox/activity`, { headers: this.authHeaders(), params: {page} });
+  }
+  saveInboxMessage(body: {text: string; ownerId?: string}, id?: string): Observable<any> {
+    return id ? this.http.patch(`${this.baseUrl}/inbox/${id}`, body, {headers: this.authHeaders()})
+      : this.http.post(`${this.baseUrl}/inbox`, body, {headers: this.authHeaders()});
+  }
+  deleteInboxMessage(id: string): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/inbox/${id}`, {headers: this.authHeaders()});
+  }
   private http = inject(HttpClient);
   private baseUrl = environment.apiUrl;
   private cache = new ResponseCache();
@@ -816,7 +833,8 @@ export class ApiService {
     projectId: string;
     vendorId: string;
     date: string;
-    paymentMode: string;
+    paymentMode?: string;
+    notes?: string;
     roundOff: number;
     items: Array<{
       source: "existing" | "manual";
@@ -825,6 +843,7 @@ export class ApiService {
       unit?: string;
       quantity?: number;
       rate: number;
+      paymentMode: string;
       gstPercent: number;
     }>;
   }): Observable<{ purchaseOrder: PurchaseOrder }> {
@@ -842,7 +861,8 @@ export class ApiService {
   updatePurchaseOrder(id: string, payload: {
     vendorId: string;
     date: string;
-    paymentMode: string;
+    paymentMode?: string;
+    notes?: string;
     roundOff: number;
     items: Array<{
       source: "existing" | "manual";
@@ -851,6 +871,7 @@ export class ApiService {
       unit?: string;
       quantity?: number;
       rate: number;
+      paymentMode: string;
       gstPercent: number;
     }>;
   }): Observable<{ purchaseOrder: PurchaseOrder }> {
@@ -860,6 +881,20 @@ export class ApiService {
       tap(() => {
         this.cache.invalidate("/purchase-orders");
         this.cache.invalidate("/materials");
+      }),
+      catchError(this.handleError),
+    );
+  }
+
+  deletePurchaseOrder(id: string): Observable<{ deletion: { id: string; poNumber: string; removedMaterialCount: number } }> {
+    return this.http.delete<{ deletion: { id: string; poNumber: string; removedMaterialCount: number } }>(
+      `${this.baseUrl}/purchase-orders/${encodeURIComponent(id)}`,
+      { headers: this.authHeaders() },
+    ).pipe(
+      tap(() => {
+        this.cache.invalidate("/purchase-orders");
+        this.cache.invalidate("/materials");
+        this.cache.invalidate("/inventory");
       }),
       catchError(this.handleError),
     );
@@ -1132,7 +1167,7 @@ export class ApiService {
     );
   }
 
-  fundSupervisor(id: string, payload: { projectId: string; siteId?: string; amount: number; note?: string }): Observable<{ funding: any }> {
+  fundSupervisor(id: string, payload: { projectId: string; siteId?: string; amount: number; paymentMode: string; note?: string }): Observable<{ funding: any }> {
     return this.http.post<{ funding: any }>(`${this.baseUrl}/supervisors/${id}/fund`, payload, {
       headers: this.authHeaders(),
     }).pipe(
@@ -1310,6 +1345,7 @@ export class ApiService {
   }
 
   createExpense(payload: {
+    paymentMode?: string;
     type: "site" | "general";
     projectId?: string;
     siteId?: string;

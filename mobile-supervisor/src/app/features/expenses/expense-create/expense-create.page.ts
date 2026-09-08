@@ -287,6 +287,8 @@ import { Vendor } from '../../../shared/models';
             }
           </ion-list>
 
+          <ion-item><ion-label position="stacked">Payment mode *</ion-label><ion-select [(ngModel)]="paymentMode">@for (mode of paymentModes; track mode) { <ion-select-option [value]="mode">{{ mode }}</ion-select-option> }</ion-select></ion-item>
+          @if (expenseType() === 'Purchase') { <ion-item><ion-label position="stacked">Bill * (image or PDF, up to 10 MB)</ion-label><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" (change)="selectBill($event)" />@if (billError) { <p role="alert">{{ billError }}</p> }</ion-item> }
           <div class="form-actions">
             <ion-button
               expand="block"
@@ -593,7 +595,23 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
     }
   }
 
+  paymentMode = 'Cash';
+  paymentModes = ['Cash', 'UPI', 'Bank Transfer', 'NEFT', 'RTGS', 'IMPS', 'Cheque', 'Credit Card', 'Debit Card', 'Net Banking', 'Demand Draft', 'Wallet', 'Other'];
+  bill: {data: string; mimeType: string; fileName: string} | null = null;
+  billError = '';
+  async selectBill(event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    this.bill = null;
+    this.billError = '';
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) { this.billError = 'Choose an image or PDF up to 10 MB.'; return; }
+    try {
+      const data = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); });
+      this.bill = {data, mimeType: file.type, fileName: file.name};
+    } catch { this.billError = 'Could not read the bill. Please select it again.'; }
+  }
   isValid(): boolean {
+    if (!this.paymentMode || (this.expenseType() === 'Purchase' && !this.bill)) return false;
     if (this.expenseType() === 'Purchase' && this.isSiteMaterial) {
       return !!(
         this.expense.materialName &&
@@ -638,6 +656,8 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
 
     const payload: any = {
       type: 'site',
+      paymentMode: this.paymentMode,
+      bill: isCashAdded ? undefined : this.bill,
       projectId,
       siteId: siteId || undefined,
       site: siteName || this.selectedProjectName() || 'Project',

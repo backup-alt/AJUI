@@ -504,8 +504,19 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
     const supervisorUser = await User.findById(userId).select("name").lean();
     const supervisorName = supervisorUser?.name || "";
 
+    // Upload first: a pending purchase is never exposed without its bill.
+    const { bill, ...expenseInput } = req.body;
+    let billFields = {};
+    if (bill) {
+      const { uploadToPCloud } = await import("../services/pcloud.service.js");
+      const uploaded = await uploadToPCloud(bill.data, bill.fileName, bill.mimeType);
+      billFields = { billUrl: uploaded.mediaUrl, pcloudFileId: uploaded.fileId,
+        pcloudPublicCode: uploaded.publicCode, receiptImageName: uploaded.fileName,
+        receiptUploadedAt: new Date(), receiptUploadedBy: userId };
+    }
     const expense = await Expense.create({
-      ...req.body,
+      ...expenseInput,
+      ...billFields,
       expenseId,
       projectName,
       clientId,

@@ -3,6 +3,11 @@ import { authGuard, publicOnlyGuard } from "./core/guards/auth.guard";
 
 export const routes: Routes = [
   {
+    path: "inbox",
+    loadComponent: () => import("./pages/inbox.page").then((m) => m.InboxPage),
+    canActivate: [authGuard],
+  },
+  {
     path: "",
     pathMatch: "full",
     redirectTo: "dashboard",

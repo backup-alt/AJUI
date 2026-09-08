@@ -9,6 +9,7 @@ export interface IPurchaseOrderItem {
   unit: string;
   quantity: number;
   rate: number;
+  paymentMode: string;
   itemAmount: number;
   gstPercent: number;
   gstAmount: number;
@@ -23,12 +24,14 @@ export interface IPurchaseOrder extends Document {
   vendorName: string;
   date: string;
   paymentMode: string;
+  notes?: string;
   items: IPurchaseOrderItem[];
   subtotal: number;
   totalGst: number;
   roundOff: number;
   grandTotal: number;
   createdBy?: Types.ObjectId;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,6 +44,7 @@ const purchaseOrderItemSchema = new Schema<IPurchaseOrderItem>(
     unit: { type: String, required: true, trim: true },
     quantity: { type: Number, required: true, min: 0.000001 },
     rate: { type: Number, required: true, min: 0 },
+    paymentMode: { type: String, required: true, default: "Bank Transfer", trim: true, maxlength: 50 },
     itemAmount: { type: Number, required: true, min: 0 },
     gstPercent: { type: Number, required: true, min: 0, max: 100 },
     gstAmount: { type: Number, required: true, min: 0 },
@@ -57,12 +61,14 @@ const purchaseOrderSchema = new Schema<IPurchaseOrder>(
     vendorName: { type: String, required: true, trim: true },
     date: { type: String, required: true, index: true },
     paymentMode: { type: String, required: true, default: "Bank Transfer", trim: true, maxlength: 50 },
+    notes: { type: String, trim: true, maxlength: 2000, default: "" },
     items: { type: [purchaseOrderItemSchema], required: true },
     subtotal: { type: Number, required: true, min: 0 },
     totalGst: { type: Number, required: true, min: 0 },
     roundOff: { type: Number, default: 0 },
     grandTotal: { type: Number, required: true, min: 0.01 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+    deletedAt: { type: Date, index: true },
   },
   { timestamps: true },
 );

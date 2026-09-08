@@ -199,11 +199,21 @@ export async function syncPurchaseOrderMaterialInventory(materialId: Types.Objec
   previous.purchasedQuantity = Math.max(0, previous.purchasedQuantity + delta);
   previous.purchaseHistory = (previous.purchaseHistory || []).filter((entry) => String(entry.materialId) !== String(material._id));
   if (sameGroup) {
-    previous.purchaseHistory.push(receiptHistoryEntry(material, quantity));
-    previous.vendor = material.vendor;
-    previous.vendorId = material.vendorId;
-    previous.poNumber = material.poNumber;
-    applyLatestReceiptState(previous, material);
+    if (quantity > 0) {
+      previous.purchaseHistory.push(receiptHistoryEntry(material, quantity));
+      previous.vendor = material.vendor;
+      previous.vendorId = material.vendorId;
+      previous.poNumber = material.poNumber;
+      applyLatestReceiptState(previous, material);
+    } else if (String(previous.lastMaterialId) === String(material._id)) {
+      const latest = previous.purchaseHistory[previous.purchaseHistory.length - 1];
+      previous.lastMaterialId = latest?.materialId;
+      previous.vendor = latest?.vendor;
+      previous.vendorId = latest?.vendorId;
+      previous.poNumber = latest?.poNumber;
+      previous.received = Boolean(latest?.received);
+      previous.receivedDate = latest?.receivedDate;
+    }
   } else if (String(previous.lastMaterialId) === String(material._id)) {
     const latest = previous.purchaseHistory[previous.purchaseHistory.length - 1];
     previous.lastMaterialId = latest?.materialId;
@@ -211,6 +221,10 @@ export async function syncPurchaseOrderMaterialInventory(materialId: Types.Objec
     previous.receivedDate = latest?.receivedDate;
   }
   previous.lastUpdatedBy = updatedBy;
+  if (previous.purchasedQuantity <= 0 && previous.consumedQuantity <= 0 && previous.purchaseHistory.length === 0) {
+    await Inventory.deleteOne({ _id: previous._id });
+    return sameGroup ? null : ensureMaterialInInventory(material._id, updatedBy);
+  }
   await previous.save();
   return sameGroup ? previous.toObject() : ensureMaterialInInventory(material._id, updatedBy);
 }
@@ -252,25 +266,14 @@ export async function syncMaterialReceivedStatus(materialId: Types.ObjectId | st
 }
 
 /**
- * Stock that a supervisor may consume right now. A newly added purchase can
- * remain pending without locking stock from older, already received purchases.
+ * All purchased stock is available for consumption. The legacy receipt flag
+ * remains in stored history for compatibility and does not restrict stock.
  */
 export function receivedRemainingStock(inventory: Pick<
   IInventory,
   "purchaseHistory" | "purchasedQuantity" | "consumedQuantity" | "received"
 >): number {
-  const history = Array.isArray(inventory.purchaseHistory) ? inventory.purchaseHistory : [];
-  if (history.length === 0) {
-    return inventory.received
-      ? Math.max(0, Number(inventory.purchasedQuantity || 0) - Number(inventory.consumedQuantity || 0))
-      : 0;
-  }
-
-  const receivedQuantity = history.reduce(
-    (total, purchase) => total + (purchase.received ? Math.max(0, Number(purchase.quantity) || 0) : 0),
-    0,
-  );
-  return Math.max(0, receivedQuantity - Math.max(0, Number(inventory.consumedQuantity) || 0));
+  return Math.max(0, Number(inventory.purchasedQuantity || 0) - Number(inventory.consumedQuantity || 0));
 }
 
 /** Keep Inventory totals and per-addition receipt history aligned after the

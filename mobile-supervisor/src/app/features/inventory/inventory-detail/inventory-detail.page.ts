@@ -2,8 +2,7 @@ import { Component, OnInit, signal, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
-  IonSpinner, IonIcon, IonButton, IonRefresher, IonRefresherContent,
-  IonCheckbox, ToastController,
+  IonSpinner, IonIcon, IonButton, IonRefresher, IonRefresherContent, ToastController,
 } from '@ionic/angular/standalone';
 import { firstValueFrom } from 'rxjs';
 import { addIcons } from 'ionicons';
@@ -14,7 +13,7 @@ import { DatePipe } from '@angular/common';
 @Component({
   selector: 'app-inventory-detail',
   standalone: true,
-  imports: [IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon, IonButton, IonRefresher, IonRefresherContent, IonCheckbox, DatePipe],
+  imports: [IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon, IonButton, IonRefresher, IonRefresherContent, DatePipe],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -126,15 +125,6 @@ import { DatePipe } from '@angular/common';
                           View Bill
                         </button>
                       }
-                      <label class="received-control">
-                        <ion-checkbox
-                          aria-label="Mark this purchase as received"
-                          [checked]="entry.received"
-                          [disabled]="entry.received || (!entry.purchaseId && !entry.materialId) || updatingReceived().has(entry.purchaseId || entry.materialId || '')"
-                          (ionChange)="setPurchaseReceived(entry, $event.detail.checked)"
-                        ></ion-checkbox>
-                        <span>{{ entry.received ? 'Received' : 'Mark received' }}</span>
-                      </label>
                     </div>
                   </div>
                 }

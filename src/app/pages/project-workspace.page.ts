@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, computed, effect, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
@@ -72,7 +72,7 @@ const sectionConfigs: SectionConfig[] = [
   {
     key: "materials",
     label: "Materials",
-    title: "Material Requests",
+    title: "Materials",
     columns: [
       { key: "materialName", label: "Material Name" },
       { key: "unit", label: "Unit" },
@@ -80,7 +80,6 @@ const sectionConfigs: SectionConfig[] = [
       { key: "issuedAmount", label: "Issued Amount", type: "number" },
       { key: "givenAmount", label: "Given Amount", type: "number" },
       { key: "requestDate", label: "Added Date", type: "date" },
-      { key: "receivedDate", label: "Received Date", type: "date" },
       { key: "vendor", label: "Vendor" },
       { key: "poNumber", label: "PO Number" },
       { key: "reference", label: "Bill / Reference" },
@@ -113,6 +112,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "transactionType", label: "Transaction Type" },
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
+      { key: "paymentMode", label: "Payment Mode" },
       { key: "siteMaterial", label: "Material Purchase" },
       { key: "runningBalance", label: "Balance" },
       { key: "supervisor", label: "Supervisor" },
@@ -125,6 +125,8 @@ const sectionConfigs: SectionConfig[] = [
     label: "Expense",
     title: "Expense",
     columns: [
+      { key: "paymentMode", label: "Payment Mode" },
+      { key: "reference", label: "Biller Reference" },
       { key: "date", label: "Date", type: "date" },
       { key: "category", label: "Category" },
       { key: "description", label: "Description" },
@@ -230,6 +232,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
     DashboardSkeletonComponent,
   ],
   styles: [`
+    .cursor-action-menu { position: fixed; z-index: 1200; display: flex; gap: 4px; padding: 5px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; box-shadow: 0 12px 28px rgba(16,24,40,.18); }
+    .cursor-action-menu button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: #344054; font-size: 12px; font-weight: 700; cursor: pointer; }.cursor-action-menu button:hover { background: #f2f4f7; }.cursor-action-menu button.danger { color: #b42318; }.cursor-action-menu button.danger:hover { background: #fff1f0; }.cursor-action-menu .svg-icon { width: 15px; height: 15px; }
     .operations-dialog:has(.draft-select-menu.open) {
       overflow: visible;
     }
@@ -769,12 +773,12 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     type="button"
                     class="primary-table-action add-row-action"
                     *ngIf="!tableViewExpanded() && !isNoCreateTab() && activeSection() !== 'vendors' && activeSection() !== 'subcontractors' && activeSection() !== 'subcontractorsRoster'"
-                    [title]="activeSection() === 'materials' ? 'Add materials' : 'Add row'"
-                    [attr.aria-label]="activeSection() === 'materials' ? 'Add materials' : 'Add row'"
+                    [title]="activeSection() === 'materials' ? 'Create PO' : 'Add row'"
+                    [attr.aria-label]="activeSection() === 'materials' ? 'Create PO' : 'Add row'"
                     (click)="openRecordDialog()"
                   >
                     <ion-icon name="add-outline"></ion-icon>
-                    {{ activeSection() === 'materials' ? 'Add Materials' : 'Add Row' }}
+                    {{ activeSection() === 'materials' ? 'Create PO' : 'Add Row' }}
                   </button>
                   <button
                     type="button"
@@ -913,10 +917,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
               <ng-container *ngIf="tableState() as tableState">
               <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
-                <span>{{ activeSection() === 'inventory' ? inventoryMaterialCards().length + ' unique materials' : tableState.rows.length + ' rows' }}</span>
-                <span>{{ activeSection() === 'inventory' ? 'Card view' : tableState.columns.length + ' fields' }}</span>
+                <span>{{ activeSection() === 'inventory' ? inventoryMaterialCards().length + ' unique materials' : (activeSection() === 'materials' ? materialOrderRows().length : tableState.rows.length) + ' rows' }}</span>
+                <span>{{ activeSection() === 'inventory' ? 'Card view' : (activeSection() === 'materials' ? 7 : tableState.columns.length) + ' fields' }}</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
-                <span *ngIf="activeSection() !== 'inventory'">Rows edit after selection</span>
+                <span *ngIf="activeSection() !== 'inventory' && activeSection() !== 'materials'">Rows edit after selection</span>
                 <button type="button" class="meta-reset-action" *ngIf="activeSection() !== 'inventory' && hiddenFieldCount(activeSection())" (click)="resetFields(activeSection())">
                   Reset fields
                 </button>
@@ -966,7 +970,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <p class="inventory-card-empty" *ngIf="inventoryMaterialCards().length === 0">No inventory materials match the current filters.</p>
               </section>
 
-              <div class="table-wrap operations-table" *ngIf="activeSection() !== 'inventory'">
+              <div class="table-wrap operations-table" *ngIf="activeSection() === 'materials'">
+                <table><thead><tr><th>PO Number</th><th>Bill / Reference</th><th>Vendor</th><th>Added Date</th><th>Issued Amount</th><th>Given Amount</th><th>Balance</th><th>Notes</th></tr></thead>
+                <tbody><tr *ngFor="let order of materialOrderRows()"><td><button class="bill-link" (click)="openPurchaseOrder(order.poNumber, $event)">{{ order.poNumber }}</button></td><td><span class="material-bill-actions"><a class="bill-link" *ngFor="let bill of order.bills" [href]="bill.url" target="_blank" rel="noopener noreferrer">View Bill</a><label *ngIf="!order.bills.length" class="bill-link material-bill-upload" [class.disabled]="isMaterialBillUploading(order)"><input type="file" class="material-bill-file-input" accept="image/*,application/pdf" [disabled]="isMaterialBillUploading(order)" (change)="uploadMaterialBill(order, $event)" /><span>{{ isMaterialBillUploading(order) ? 'Uploading…' : 'Upload Bill' }}</span></label></span></td><td>{{ order.vendorName }}</td><td>{{ order.date | date:'dd MMM yyyy' }}</td><td>{{ formatMoney(order.grandTotal) }}</td><td>{{ formatMoney(order.given) }}</td><td>{{ formatMoney(order.grandTotal - order.given) }}</td><td>{{ order.notes || '—' }}</td></tr><tr *ngIf="!materialOrderRows().length"><td colspan="8">No purchase orders yet. Create a PO to record a purchase.</td></tr></tbody></table>
+              </div>
+              <div class="table-wrap operations-table" *ngIf="activeSection() !== 'inventory' && activeSection() !== 'materials'">
                 <table>
                   <thead>
                     <tr>
@@ -1229,6 +1237,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                 </div>
                               </ng-container>
                               <ng-template #standardBillOrEditableCell>
+                                <label *ngIf="activeSection() === 'generalExpenses' && column.key === 'reference'"><span>Upload bill</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" (change)="uploadProjectExpenseBill(row, $event)" /></label>
                                 <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
                                   @if (isDataUrl($any(row['billUrl']))) {
                                     <button type="button" class="bill-link" (click)="openImagePreview($any(row['billUrl']))">View Bill</button>
@@ -1269,6 +1278,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     </tr>
                   </tbody>
                 </table>
+              </div>
+              <div class="cursor-action-menu" *ngIf="api.user()?.role === 'admin' && selectedActionRow() as actionRow" [style.left.px]="rowToolbarPosition().x" [style.top.px]="rowToolbarPosition().y" (click)="$event.stopPropagation()">
+                <button type="button" (click)="editAdminRow(actionRow, $event)"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 16h3l9-9-3-3-9 9v3Z"/><path d="m11.5 5.5 3 3"/></svg>Edit</button>
+                <button type="button" class="danger" (click)="$event.stopPropagation(); deleteRow(actionRow)"><svg viewBox="0 0 20 20" class="svg-icon"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>Delete</button>
               </div>
               </ng-container>
             </section>
@@ -1330,7 +1343,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <div class="dialog-head">
                   <div>
                     <span>{{ activeConfig().label }}</span>
-                    <h2>{{ activeSection() === 'materials' ? 'Add Materials' : 'Add Record' }}</h2>
+                    <h2>{{ activeSection() === 'materials' ? 'Create PO' : 'Add Record' }}</h2>
                   </div>
                   <button type="button" class="icon-button" (click)="recordDialogOpen.set(false)">
                     <ion-icon name="close-outline"></ion-icon>
@@ -1467,7 +1480,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     @if (recordSaving()) {
                       <span class="agb-loading-spinner" aria-hidden="true"></span>
                     }
-                    {{ recordSaving() ? 'Saving…' : (activeSection() === 'materials' ? 'Add Materials' : 'Add Record') }}
+                    {{ recordSaving() ? 'Saving…' : (activeSection() === 'materials' ? 'Create PO' : 'Add Record') }}
                   </button>
                 </div>
               </form>
@@ -1791,9 +1804,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
             />
           </label>
           <label>
-            <span>Note <small>(optional)</small></span>
+            <span>Description <small>(optional)</small></span>
             <textarea rows="3" placeholder="Payment reference or note" [value]="fundingNote()" (input)="fundingNote.set($any($event.target).value)"></textarea>
           </label>
+          <label><span>Payment mode *</span><select required [value]="fundingPaymentMode()" (change)="fundingPaymentMode.set($any($event.target).value)"><option *ngFor="let mode of paymentModes" [value]="mode">{{ mode }}</option></select></label>
           @if (fundingError()) {
             <div class="funding-feedback funding-error span-2" role="alert">{{ fundingError() }}</div>
           }
@@ -1940,6 +1954,8 @@ export class ProjectWorkspacePage {
   readonly fundingSiteId = signal("");
   readonly fundingAmount = signal("");
   readonly fundingNote = signal("");
+  readonly fundingPaymentMode = signal("Cash");
+  readonly paymentModes = paymentModeOptions;
   readonly fundingSaving = signal(false);
   readonly fundingError = signal<string | null>(null);
   readonly fundingSuccess = signal<string | null>(null);
@@ -2050,6 +2066,17 @@ export class ProjectWorkspacePage {
   readonly activeConfig = computed(() => sectionConfigs.find((section) => section.key === this.activeSection()) ?? sectionConfigs[0]);
 
   constructor() {
+    const refresh = () => {
+      if (document.hidden || this.recordDialogOpen() || !this.projectId()) return;
+      if (["inventory", "materials"].includes(this.activeSection())) {
+        this.refreshSectionFromBackend("inventory");
+        this.refreshSectionFromBackend("materials");
+        void this.loadProjectPurchaseOrders(this.projectId());
+      }
+    };
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    inject(DestroyRef).onDestroy(() => { window.clearInterval(timer); window.removeEventListener("focus", refresh); });
     // Custom fields have a loaded guard — won't re-fetch if already loaded.
     void this.data.loadCustomFieldsFromBackend();
     // Don't refreshFromBackend here — data is already loaded by the
@@ -2134,6 +2161,7 @@ export class ProjectWorkspacePage {
    * to have current data without waiting for the next debounce window.
    */
   private refreshSectionFromBackend(section: ModuleKey) {
+    const requestedProjectId = this.projectId();
     const apiMap: Record<string, () => any> = {
       materials: () => this.api.listMaterials({ limit: 200, projectId: this.projectId() }),
       // The "Attendance" tab is backed by the legacy /labour endpoint
@@ -2216,7 +2244,11 @@ export class ProjectWorkspacePage {
           const items = (r.items || []).map(mapper);
           // Backend is the source of truth — always overwrite, even with [].
           // No localStorage write — the dashboard no longer caches data tables.
-          dataSignal.set(items);
+          if (["materials", "inventory", "expenses", "generalExpenses", "payments", "labour", "attendance"].includes(section)) {
+            dataSignal.update((current: any[]) => [...current.filter(row => String(row.projectId || "") !== requestedProjectId), ...items]);
+          } else {
+            dataSignal.set(items);
+          }
         } catch {}
       },
       error: () => {},
@@ -2275,6 +2307,11 @@ export class ProjectWorkspacePage {
       this.editingRowKeys.set([]);
       this.openSelectKey.set("");
     }
+  }
+
+  selectedActionRow(): TableRow | null {
+    if (this.api.user()?.role !== "admin" || this.selectedRowCount() !== 1) return null;
+    return this.selectedRows()[0] || null;
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -2583,6 +2620,16 @@ export class ProjectWorkspacePage {
     this.selectedRowKey.set(keys[0] ?? "");
     this.editingRowKey.set(keys[0] ?? "");
     this.editingRowKeys.set(keys);
+  }
+
+  editAdminRow(row: TableRow, event: Event) {
+    event.stopPropagation();
+    if (this.api.user()?.role !== "admin") return;
+    const key = this.rowKey(row);
+    this.selectedRowKeys.set([key]);
+    this.selectedRowKey.set(key);
+    this.editingRowKey.set(key);
+    this.editingRowKeys.set([key]);
   }
 
   async deleteSelectedRows() {
@@ -3348,6 +3395,10 @@ export class ProjectWorkspacePage {
   }
 
   openRecordDialog() {
+    if (this.activeSection() === "materials") {
+      void this.router.navigate(["/purchase-orders"], {queryParams: {create: "1", projectId: this.projectId()}});
+      return;
+    }
     if (this.activeSection() === "vendors") {
       this.editingInlineVendor.set(null);
       this.showVendorDialog.set(true);
@@ -3962,7 +4013,7 @@ export class ProjectWorkspacePage {
       "vendor",
       "receivedDate",
     ]);
-    const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "site", "supervisor", "reference"]);
+    const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "paymentMode", "site", "supervisor", "reference"]);
     return this.columnsFor(this.activeSection()).filter((column) => {
       if (this.activeSection() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
       if (this.activeSection() === "materials" && hiddenInMaterialForm.has(column.key)) return false;
@@ -4137,6 +4188,7 @@ export class ProjectWorkspacePage {
             siteId: siteId || undefined,
             site: site || undefined,
             transactionType: "Cash Added",
+            paymentMode: String(draft["paymentMode"] || "Cash"),
             amount,
             date,
             description,
@@ -4422,6 +4474,8 @@ export class ProjectWorkspacePage {
     }
     const date = String(draft["date"] || new Date().toISOString().slice(0, 10));
     const payload: Record<string, unknown> = {
+      paymentMode: String(draft["paymentMode"] || "Cash"),
+      reference: String(draft["reference"] || ""),
       origin: String(draft["origin"] || "manual"),
       category: String(draft["category"] || "").trim() || undefined,
       amount,
@@ -4485,11 +4539,22 @@ export class ProjectWorkspacePage {
     void this.router.navigate(["/purchase-orders"], { queryParams: { open: poNumber } });
   }
 
-  isMaterialBillUploading(row: TableRow): boolean {
+  async uploadProjectExpenseBill(row: TableRow, event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) { await this.presentToast("Choose an image or PDF up to 10 MB.", "warning"); return; }
+    const id = String(row["_id"] || "");
+    try {
+      const data = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1]); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); });
+      await firstValueFrom(this.api.uploadGeneralExpenseReceipt(id, {data, mimeType: file.type, fileName: file.name}));
+      await this.refreshSectionFromBackend("generalExpenses");
+    } catch { await this.presentToast("Bill upload failed. Please retry.", "danger"); }
+  }
+  isMaterialBillUploading(row: any): boolean {
     return this.uploadingMaterialBills().includes(this.rowKey(row));
   }
 
-  async uploadMaterialBill(row: TableRow, event: Event) {
+  async uploadMaterialBill(row: any, event: Event) {
     event.stopPropagation();
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -4553,7 +4618,7 @@ export class ProjectWorkspacePage {
     }
   }
 
-  private async resolveMaterialMongoId(row: TableRow): Promise<string> {
+  private async resolveMaterialMongoId(row: any): Promise<string> {
     const directId = String(row["_id"] || "").trim();
     if (this.isMongoObjectId(directId)) return directId;
     const materialId = String(row["materialId"] || row["id"] || "").trim();
@@ -4959,6 +5024,7 @@ export class ProjectWorkspacePage {
   }
 
   private async deleteRowRecord(section: ModuleKey, row: TableRow) {
+    if (section === "attendance") section = "labour";
     // Subcontractor payments are stored in their own collection —
     // dispatch through the dedicated endpoint.
     if (section === "subcontractors") {
@@ -5405,6 +5471,17 @@ export class ProjectWorkspacePage {
    */
   private subcontractorRoster = signal<any[]>([]);
   private projectPurchaseOrders = signal<PurchaseOrder[]>([]);
+  readonly materialOrderRows = computed(() => this.projectPurchaseOrders().map(order => {
+    const ids = new Set(order.items.map(item => String(item.materialId)));
+    const materials = this.data.materials().filter(row => String(row.projectId) === this.projectId() && (ids.has(String(row._id || row.id)) || row.poNumber === order.poNumber));
+    const bills = materials.filter(row => row.billUrl).map(row => ({url: String(row.billUrl), label: String(row.receiptImageName || "View bill")}));
+    return {
+      ...order,
+      _id: String(materials[0]?._id || ""),
+      given: order.givenAmount ?? materials.reduce((sum, row) => sum + Number(row.givenAmount || 0), 0),
+      bills: order.billReferences?.length ? order.billReferences : bills,
+    };
+  }));
 
   /**
    * Map SubcontractorPayment rows to the table shape the generic
@@ -5811,6 +5888,7 @@ export class ProjectWorkspacePage {
         supervisor: row.supervisor,
         cashIssued: formatMoney(row.cashIssued || row.received || 0),
         reference: row.reference,
+        paymentMode: row.paymentMode || "Cash",
         billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
         approvalStatus: row.status,
         createdAt: row.createdAt,
@@ -5820,10 +5898,15 @@ export class ProjectWorkspacePage {
 
     const generalExpenses = this.data.generalExpensesForProject(projectId).map((row) => ({
       __rowId: `general-expense:${row.id}`,
+      _id: row._id,
+      id: row.id,
       __projectId: row.projectId || projectId,
       projectId: row.projectId || projectId,
       date: row.date,
       category: row.category || "",
+      paymentMode: row.paymentMode || "Cash",
+      reference: row.reference || row.receiptImageName || "",
+      billUrl: row.billUrl,
       description: row.description,
       amount: formatMoney(Number(row.amount) || 0),
       origin: row.origin || "manual",
@@ -5834,6 +5917,8 @@ export class ProjectWorkspacePage {
 
     const payments = this.data.paymentsForProject(projectId).map((row) => ({
       __rowId: `payment:${row.id}`,
+      _id: row._id,
+      id: row.id,
       __projectId: row.projectId,
       projectId: row.projectId,
       paymentDate: row.date,
@@ -5881,6 +5966,8 @@ export class ProjectWorkspacePage {
       ).size;
       return {
         __rowId: `vendor-po:${vendorKey}`,
+        _id: vendor?._id,
+        id: vendor?.id,
         __projectId: projectId,
         projectId,
         vendorName,
@@ -5900,11 +5987,7 @@ export class ProjectWorkspacePage {
     const inventory = this.data.inventory()
       .map((row) => {
         const history = row.purchaseHistory || [];
-        const receivedQuantity = history.length > 0
-          ? history
-            .filter((entry) => entry.received === true)
-            .reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0)
-          : (row.received === true ? Number(row.purchasedQuantity) || 0 : 0);
+        const receivedQuantity = Number(row.purchasedQuantity) || 0;
         return { row, receivedQuantity };
       })
       .filter(({ row, receivedQuantity }) => String(row.projectId) === projectId && receivedQuantity > 0)
@@ -6085,7 +6168,7 @@ export class ProjectWorkspacePage {
     }
     if (key === "approvalStatus" || key === "status") {
       if (section === "materials") {
-        return ["Pending", "Approved", "Received", "Not Received"];
+        return [];
       }
       // Sub-contractor roster uses a simple Active / Inactive toggle
       // (matches the universal Sub-contractors page status field).
@@ -6094,7 +6177,7 @@ export class ProjectWorkspacePage {
       }
       return ["Pending", "Approved", "Declined"];
     }
-    if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
+    if (key === "paymentMode") return paymentModeOptions;
     if (section === "payments" && key === "mode") {
       const custom = this.customPaymentModes().filter((mode) => !paymentModeOptions.includes(mode));
       return [...paymentModeOptions, ...custom];
@@ -7017,6 +7100,7 @@ export class ProjectWorkspacePage {
         siteId: siteId || undefined,
         amount,
         note: this.fundingNote().trim() || undefined,
+        paymentMode: this.fundingPaymentMode(),
       };
 
       const response = await firstValueFrom(this.api.fundSupervisor(supervisorId, payload));

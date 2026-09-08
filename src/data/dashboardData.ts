@@ -186,6 +186,7 @@ export type LabourRow = {
 };
 
 export type ExpenseRow = {
+  paymentMode?: string;
   _id?: string;
   id: string;
   projectId: string;

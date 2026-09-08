@@ -140,12 +140,11 @@ interface SubcontractorRow {
                     <th>Total Paid</th>
                     <th>Note</th>
                     <th>Status</th>
-                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (row of filteredRows(); track row.id) {
-                    <tr [class.inactive]="row.status === 'inactive'" (click)="openDetails(row)" style="cursor:pointer;">
+                    <tr [class.inactive]="row.status === 'inactive'" (click)="handleSubcontractorRowClick(row, $event)" style="cursor:pointer;">
                       <td>
                         <a class="name-link" [routerLink]="['/subcontractors', row.id]" (click)="$event.stopPropagation()">{{ row.subcontractorName }}</a>
                       </td>
@@ -159,24 +158,17 @@ interface SubcontractorRow {
                           {{ row.status === 'active' ? 'Active' : 'Not Active' }}
                         </span>
                       </td>
-                      <td class="row-actions">
-                        <button type="button" class="icon-btn" aria-label="Edit" title="Edit sub-contractor" (click)="openEdit(row, $event)">
-                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                            <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="m14.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-                          </svg>
-                        </button>
-                      </td>
                     </tr>
                   }
                   @if (filteredRows().length === 0) {
                     <tr>
-                      <td colspan="8" class="empty-row">{{ selectedProjectId() ? 'No sub-contractors are assigned to this project.' : 'No sub-contractors yet. Click "New Sub-contractor" to add one.' }}</td>
+                      <td colspan="7" class="empty-row">{{ selectedProjectId() ? 'No sub-contractors are assigned to this project.' : 'No sub-contractors yet. Click "New Sub-contractor" to add one.' }}</td>
                     </tr>
                   }
                 </tbody>
                 </table>
               </div>
+              @if (isAdmin() && subcontractorActionRow()) { <div class="cursor-action-menu" [style.left.px]="subcontractorActionPosition().x" [style.top.px]="subcontractorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedSubcontractor()">Open</button><button (click)="editSelectedSubcontractor()">Edit</button></div> }
             </section>
           </main>
         </ion-content>
@@ -263,6 +255,7 @@ interface SubcontractorRow {
     </ion-split-pane>
   `,
   styles: [`
+    .cursor-action-menu{position:fixed;z-index:1200;display:flex;gap:4px;padding:5px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;box-shadow:0 12px 28px rgba(16,24,40,.18)}.cursor-action-menu button{padding:7px 9px;border:0;border-radius:6px;background:transparent;color:#344054;font-weight:700;cursor:pointer}.cursor-action-menu button:hover{background:#f2f4f7}
     .page-search-bar {
       position: relative;
       max-width: 600px;
@@ -398,6 +391,12 @@ interface SubcontractorRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SubcontractorDashboardPage {
+  isAdmin() { return this.api.user()?.role === "admin"; }
+  readonly subcontractorActionRow = signal<SubcontractorRow | null>(null);
+  readonly subcontractorActionPosition = signal({ x: 0, y: 0 });
+  handleSubcontractorRowClick(row: SubcontractorRow, event: MouseEvent) { if (!this.isAdmin()) { this.openDetails(row); return; } this.subcontractorActionRow.set(row); this.subcontractorActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 120), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  openSelectedSubcontractor() { const row = this.subcontractorActionRow(); if (row) this.openDetails(row); this.subcontractorActionRow.set(null); }
+  editSelectedSubcontractor() { const row = this.subcontractorActionRow(); if (row) this.openEdit(row, new MouseEvent("click")); this.subcontractorActionRow.set(null); }
   readonly statusOptions = [
     { label: "Active", value: "active" },
     { label: "Not Active", value: "inactive" },

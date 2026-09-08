@@ -133,7 +133,7 @@ export class PurchaseOrdersPage implements OnInit {
         .split(",")
         .map((id) => id.trim())
         .filter(Boolean);
-      if (create === "1" && projectId && materialIds.length) {
+      if (create === "1" && projectId) {
         this.initialProjectId.set(projectId);
         this.initialProjectName.set(projectName);
         this.initialMaterialIds.set(materialIds);

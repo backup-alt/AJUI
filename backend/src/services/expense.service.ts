@@ -126,6 +126,7 @@ export async function createExpense(input: CreateExpenseInput) {
     date: input.date,
     description: input.description,
     notes: input.notes,
+    paymentMode: input.paymentMode,
     submittedBy: input.submittedBy,
     isSiteMaterial: input.isSiteMaterial,
     materialName: input.materialName,

@@ -51,6 +51,7 @@ type LabourApprovalRow = ApprovalBaseRow & {
 };
 
 type ExpenseApprovalRow = ApprovalBaseRow & {
+  projectManager?: string;
   expenseDate: string;
   transactionType: string;
   description: string;
@@ -185,6 +186,7 @@ type ToastManager = {
                         <th>Description</th>
                         <th>Amount</th>
                         <th>Given Amt</th>
+                        <th>Project Manager</th>
                         <th>Supervisor</th>
                         <th>Notes</th>
                         <th>Bill / Reference</th>
@@ -222,6 +224,7 @@ type ToastManager = {
                             />
                           </td>
                         }
+                        <td>{{ row.projectManager || "Unassigned" }}</td>
                         <td>{{ row.supervisor || "-" }}</td>
                         <td>{{ row.notes || "-" }}</td>
                         <td>

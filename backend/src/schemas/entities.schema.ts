@@ -137,6 +137,7 @@ export const updateSupervisorSchema = z.object({
 
 export const fundSupervisorSchema = z.object({
   body: z.object({
+    paymentMode: z.string().trim().min(1).max(50),
     projectId: z.string().regex(/^[a-f0-9]{24}$/i),
     siteId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
     amount: z.coerce.number().positive().max(100_000_000),

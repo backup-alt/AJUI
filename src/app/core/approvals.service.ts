@@ -68,6 +68,7 @@ export interface ExpenseApprovalRow {
   issuedAmount?: number;
   givenAmount?: number;
   approvedAmount?: number;
+  projectManager?: string;
   billUrl?: string;
   poNumber?: string;
   notes?: string;
@@ -179,6 +180,7 @@ interface RawApprovalItem {
   materialVendor?: string;
   issuedAmount?: number;
   givenAmount?: number;
+  projectManager?: string;
   billUrl?: string;
   notes?: string;
 }
@@ -264,6 +266,7 @@ export class ApprovalsService {
             expenseDate: a.expenseDate || "",
             transactionType: a.transactionType || "",
             description: a.description || "",
+            projectManager: a.projectManager || "",
             amount: a.amount || 0,
             supervisor: a.supervisorName || "",
             reference: a.reference || "",
@@ -282,10 +285,12 @@ export class ApprovalsService {
         return {
           ...base,
           module: "generalExpenses" as const,
+          field: "status" as const,
           expenseDate: a.expenseDate || "",
           department: "",
           category: a.transactionType || "",
           description: a.description || "",
+            projectManager: a.projectManager || "",
           amount: a.amount || 0,
           paidBy: a.paidBy || "",
           reference: a.reference || "",

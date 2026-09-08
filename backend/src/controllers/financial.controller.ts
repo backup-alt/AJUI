@@ -1099,6 +1099,18 @@ export async function updatePurchaseOrder(req: Request, res: Response, next: Nex
   } catch (e) { next(e); }
 }
 
+export async function deletePurchaseOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const deletion = await purchaseOrderService.deletePurchaseOrder(req.params.id, req.user?.sub);
+    invalidateCachePrefix("/api/inventory");
+    invalidateCachePrefix("/api/purchase-orders");
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/supervisor/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.json({ deletion });
+  } catch (e) { next(e); }
+}
+
 export async function listPurchaseOrderGstRates(_req: Request, res: Response, next: NextFunction) {
   try {
     res.json({ rates: await purchaseOrderService.listGstRates() });

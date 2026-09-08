@@ -869,11 +869,7 @@ export async function listMaterialsForSupervisor(
     const invQuery: Record<string, any> = { ...query };
     delete invQuery.status;
     const andConditions: Record<string, unknown>[] = [];
-    if (filters.receivedOnly) {
-      // Inventory visibility follows the latest purchase only. An older
-      // received purchase must not expose stock from a newer pending purchase.
-      andConditions.push({ received: true });
-    }
+
     const search = String(filters.search || "").trim();
     if (search) {
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -953,7 +949,7 @@ export async function listMaterialsForSupervisor(
       poNumber: { $regex: /^PO-\d{4}-\d{4,}$/ },
       notes: "Created from purchase order",
     };
-    if (filters.receivedOnly) poMaterialQuery.status = "Received";
+
     if (query.projectId) poMaterialQuery.projectId = query.projectId;
     else poMaterialQuery._id = { $exists: false };
     const poMaterials = await Material.find(poMaterialQuery)
@@ -1051,7 +1047,7 @@ export async function listMaterialsForSupervisor(
         purchasedQuantity: m.purchasedQuantity,
         consumedQuantity: m.consumedQuantity,
         remainingStock: m.remainingStock,
-        availableStock: m.status === "Received" ? m.remainingStock : 0,
+        availableStock: m.remainingStock,
         vendor: m.vendor,
         poNumber: m.poNumber,
         received: m.status === "Received",
@@ -1496,7 +1492,7 @@ export async function updateMaterialStockForSupervisor(
     if (updates.consumedQuantity > availableStock) {
       throw new AppError(
         409,
-        `Only ${availableStock} ${inventory.unit} of received stock is available to consume`,
+        `Only ${availableStock} ${inventory.unit} of stock is available to consume`,
       );
     }
     inventory.consumedQuantity = Math.max(0, inventory.consumedQuantity + updates.consumedQuantity);

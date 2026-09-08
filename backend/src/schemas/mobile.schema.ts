@@ -77,6 +77,12 @@ export const createLabourMobileSchema = z.object({
 
 export const createExpenseMobileSchema = z.object({
   body: z.object({
+    paymentMode: z.string().trim().min(1).max(50),
+    bill: z.object({
+      data: z.string().min(20).max(14 * 1024 * 1024),
+      mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
+      fileName: z.string().trim().min(1).max(200),
+    }).optional(),
     type: z.enum(["site", "general"]).default("site"),
     projectId: objectIdSchema.optional(),
     siteId: objectIdSchema.optional(),
@@ -94,7 +100,7 @@ export const createExpenseMobileSchema = z.object({
     materialVendorId: objectIdSchema.optional(),
     issuedAmount: z.coerce.number().nonnegative().optional(),
     customFields: z.record(z.unknown()).optional(),
-  }),
+  }).refine(data => data.transactionType === "Cash Added" || !!data.bill, { message: "Attach a bill before submitting an expense", path: ["bill"] }),
 });
 
 export const uploadExpenseReceiptMobileSchema = z.object({

@@ -4,6 +4,7 @@ import { Client } from "../src/models/Client";
 import { Counter } from "../src/models/Counter";
 import { GstRate } from "../src/models/GstRate";
 import { Inventory } from "../src/models/Inventory";
+import { InboxMessage } from "../src/models/InboxMessage";
 import { Expense } from "../src/models/Expense";
 import { Material } from "../src/models/Material";
 import { Project } from "../src/models/Project";
@@ -43,6 +44,7 @@ beforeEach(async () => {
     Expense.deleteMany({}),
     Material.deleteMany({}),
     Inventory.deleteMany({}),
+    InboxMessage.deleteMany({}),
     Vendor.deleteMany({}),
     Project.deleteMany({}),
     Site.deleteMany({}),
@@ -130,6 +132,175 @@ async function seedProcurement() {
 }
 
 describe("Purchase order workflow", () => {
+  it("persists purchase-order notes for the project materials table", async () => {
+    if (!app) return;
+    const { project, vendor } = await seedProcurement();
+    const response = await request(app)
+      .post("/api/purchase-orders")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        projectId: String(project._id),
+        vendorId: String(vendor._id),
+        date: "2026-09-08",
+        notes: "Deliver near the north storage gate",
+        items: [
+          { source: "manual", description: "River sand", unit: "Ton", quantity: 2, rate: 1000, paymentMode: "Cash", gstPercent: 0 },
+          { source: "manual", description: "Blue metal", unit: "Ton", quantity: 1, rate: 1200, paymentMode: "NEFT", gstPercent: 0 },
+        ],
+      });
+    expect(response.status).toBe(201);
+    expect(response.body.purchaseOrder.notes).toBe("Deliver near the north storage gate");
+    expect(response.body.purchaseOrder.paymentMode).toBe("Multiple");
+    expect(response.body.purchaseOrder.items.map((item: any) => item.paymentMode)).toEqual(["Cash", "NEFT"]);
+    const savedMaterials = await Material.find({ _id: { $in: response.body.purchaseOrder.items.map((item: any) => item.materialId) } }).sort({ name: 1 }).lean();
+    expect(savedMaterials.map((item) => item.paymentType).sort()).toEqual(["Cash", "NEFT"]);
+    const detail = await request(app)
+      .get(`/api/purchase-orders/${response.body.purchaseOrder._id}`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(detail.body.purchaseOrder.notes).toBe("Deliver near the north storage gate");
+  });
+
+  it("paginates inbox messages and project activity at ten records", async () => {
+    if (!app) return;
+    const admin = await User.findOne({ role: "admin" }).lean();
+    expect(admin).toBeTruthy();
+    await InboxMessage.insertMany(Array.from({ length: 12 }, (_, index) => ({
+      ownerId: admin!._id,
+      senderId: admin!._id,
+      senderName: "Admin",
+      text: `Message ${index + 1}`,
+    })));
+    const firstMessages = await request(app).get("/api/inbox?page=1").set("Authorization", `Bearer ${token}`);
+    const secondMessages = await request(app).get("/api/inbox?page=2").set("Authorization", `Bearer ${token}`);
+    expect(firstMessages.body.items).toHaveLength(10);
+    expect(firstMessages.body.hasMore).toBe(true);
+    expect(secondMessages.body.items).toHaveLength(2);
+    expect(secondMessages.body.hasMore).toBe(false);
+
+    const { project, vendor } = await seedProcurement();
+    await PurchaseOrder.insertMany(Array.from({ length: 12 }, (_, index) => ({
+      poNumber: `PO-PAGE-${index + 1}`,
+      projectId: project._id,
+      projectName: project.name,
+      vendorId: vendor._id,
+      vendorName: vendor.name,
+      date: "2026-09-08",
+      paymentMode: "Cash",
+      items: [],
+      subtotal: 100,
+      totalGst: 0,
+      roundOff: 0,
+      grandTotal: 100,
+      createdBy: admin!._id,
+    })));
+    const firstActivity = await request(app).get("/api/inbox/activity?page=1").set("Authorization", `Bearer ${token}`);
+    const secondActivity = await request(app).get("/api/inbox/activity?page=2").set("Authorization", `Bearer ${token}`);
+    expect(firstActivity.body.items).toHaveLength(10);
+    expect(firstActivity.body.hasMore).toBe(true);
+    expect(secondActivity.body.items).toHaveLength(2);
+    expect(secondActivity.body.hasMore).toBe(false);
+  });
+
+  it("confirms PO deletion semantics by retiring its materials and inventory contribution", async () => {
+    if (!app) return;
+    const { project, vendor } = await seedProcurement();
+    const created = await request(app)
+      .post("/api/purchase-orders")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        projectId: String(project._id),
+        vendorId: String(vendor._id),
+        date: "2026-09-08",
+        paymentMode: "Cash",
+        items: [{ source: "manual", description: "Deletion test sand", unit: "Ton", quantity: 12, rate: 100, gstPercent: 0 }],
+      });
+    expect(created.status).toBe(201);
+    const order = created.body.purchaseOrder;
+    const materialId = order.items[0].materialId;
+    expect(await Inventory.findOne({ "purchaseHistory.materialId": materialId })).toBeTruthy();
+
+    const deleted = await request(app)
+      .delete(`/api/purchase-orders/${order._id}`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.deletion).toEqual(expect.objectContaining({
+      poNumber: order.poNumber,
+      removedMaterialCount: 1,
+    }));
+    expect(await Inventory.findOne({ "purchaseHistory.materialId": materialId })).toBeNull();
+    expect(await Material.findById(materialId).lean()).toEqual(expect.objectContaining({
+      requestedQuantity: 0,
+      approvedQuantity: 0,
+      purchasedQuantity: 0,
+    }));
+    expect((await PurchaseOrder.findById(order._id).lean())?.deletedAt).toBeTruthy();
+
+    const list = await request(app)
+      .get(`/api/purchase-orders?projectId=${project._id}`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(list.body.items).toHaveLength(0);
+    expect((await request(app)
+      .get(`/api/purchase-orders/${order.poNumber}`)
+      .set("Authorization", `Bearer ${token}`)).status).toBe(404);
+  });
+
+  it("blocks PO deletion when its inventory has already been consumed", async () => {
+    if (!app) return;
+    const { project, vendor } = await seedProcurement();
+    const created = await request(app)
+      .post("/api/purchase-orders")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        projectId: String(project._id),
+        vendorId: String(vendor._id),
+        date: "2026-09-08",
+        paymentMode: "Cash",
+        items: [{ source: "manual", description: "Used cement", unit: "Bag", quantity: 10, rate: 50, gstPercent: 0 }],
+      });
+    expect(created.status).toBe(201);
+    const order = created.body.purchaseOrder;
+    const materialId = order.items[0].materialId;
+    await Inventory.updateOne(
+      { "purchaseHistory.materialId": materialId },
+      { $set: { consumedQuantity: 1 } },
+    );
+
+    const blocked = await request(app)
+      .delete(`/api/purchase-orders/${order._id}`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error).toMatch(/already consumed/i);
+    expect((await PurchaseOrder.findById(order._id).lean())?.deletedAt).toBeUndefined();
+    expect((await Inventory.findOne({ "purchaseHistory.materialId": materialId }).lean())?.purchasedQuantity).toBe(10);
+  });
+
+  it("reconciles edited PO quantities without losing consumption or duplicating purchases", async () => {
+    if (!app) return;
+    const { project, vendor } = await seedProcurement();
+    const payload = { projectId: String(project._id), vendorId: String(vendor._id), date: "2026-09-07", paymentMode: "Cash",
+      items: [{ source: "manual", description: "Test steel", unit: "Kg", quantity: 20, rate: 10, gstPercent: 0 }] };
+    const created = await request(app).post("/api/purchase-orders").set("Authorization", `Bearer ${token}`).send(payload);
+    expect(created.status).toBe(201);
+    const order = created.body.purchaseOrder;
+    const materialId = order.items[0].materialId;
+    const stock = await Inventory.findOne({"purchaseHistory.materialId": materialId});
+    expect(stock?.purchasedQuantity).toBe(20);
+    stock!.consumedQuantity = 8;
+    stock!.consumptionHistory = [{quantity: 8, date: new Date(), updatedBy: "test"}];
+    await stock!.save();
+    const changed = {...payload, items: [{...payload.items[0], materialId, quantity: 30}]};
+    expect((await request(app).put(`/api/purchase-orders/${order._id}`).set("Authorization", `Bearer ${token}`).send(changed)).status).toBe(200);
+    expect((await request(app).put(`/api/purchase-orders/${order._id}`).set("Authorization", `Bearer ${token}`).send(changed)).status).toBe(200);
+    const refreshed = await Inventory.findById(stock!._id).lean();
+    expect(refreshed?.purchasedQuantity).toBe(30);
+    expect(refreshed?.consumedQuantity).toBe(8);
+    expect(refreshed?.remainingStock).toBe(22);
+    expect(refreshed?.purchaseHistory).toHaveLength(1);
+    expect(refreshed?.consumptionHistory).toHaveLength(1);
+    const invalid = {...changed, items: [{...changed.items[0], quantity: 5}]};
+    expect((await request(app).put(`/api/purchase-orders/${order._id}`).set("Authorization", `Bearer ${token}`).send(invalid)).status).toBe(409);
+    expect((await Material.findById(materialId).lean())?.purchasedQuantity).toBe(30);
+  });
   it("hides admin-uploaded material bills from the supervisor mobile feed", async () => {
     if (!app) return;
     const { project, material, supervisorUser } = await seedProcurement();
@@ -315,7 +486,7 @@ describe("Purchase order workflow", () => {
     expect((await Material.findById(material._id).lean())?.status).toBe("Received");
   });
 
-  it("keeps purchase receipts independent and summarizes only the latest web addition", async () => {
+  it("preserves legacy receipt history without gating purchased stock", async () => {
     if (!app) return;
     const { project, supervisorUser } = await seedProcurement();
     const createWebMaterial = async (requestDate: string) => {
@@ -357,7 +528,7 @@ describe("Purchase order workflow", () => {
       receivedOnly: true,
       view: "inventory",
     });
-    expect(hiddenBeforeLatestReceipt.materials.find((item) => item.name === "Cement")).toBeUndefined();
+    expect(hiddenBeforeLatestReceipt.materials.find((item) => item.name === "Cement")?.availableStock).toBe(50);
 
     await updateMaterialReceivedForSupervisor(supervisorUser._id.toString(), older._id.toString(), true);
 
@@ -381,7 +552,7 @@ describe("Purchase order workflow", () => {
       receivedOnly: true,
       view: "inventory",
     });
-    expect(hiddenAfterOlderReceipt.materials.find((item) => item.name === "Cement")).toBeUndefined();
+    expect(hiddenAfterOlderReceipt.materials.find((item) => item.name === "Cement")?.availableStock).toBe(50);
 
     const webInventory = await listInventory({
       projectId: project._id.toString(),

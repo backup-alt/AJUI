@@ -106,12 +106,12 @@ function numberToWords(num: number): string {
                         <th>Client</th>
                         <th>Amount</th>
                         <th>Status</th>
-                        <th>Actions</th>
+                        <th>Options</th>
                       </tr>
                     </thead>
                     <tbody>
                       @for (inv of filteredInvoices(); track inv.id) {
-                        <tr>
+                        <tr [class.row-selected]="invoiceActionRow()?.id === inv.id" (click)="openInvoiceActionMenu(inv, $event)">
                           <td><strong>{{ inv.invoiceNumber }}</strong></td>
                           <td>{{ inv.date }}</td>
                           <td>{{ inv.clientName || '-' }}</td>
@@ -120,17 +120,11 @@ function numberToWords(num: number): string {
                             <span class="status-pill" [class]="inv.status.toLowerCase()">{{ inv.status }}</span>
                           </td>
                           <td>
-                            <button type="button" class="icon-action-btn edit" title="Edit" (click)="editInvoice(inv)">
-                              <ion-icon name="pencil-outline"></ion-icon>
-                            </button>
-                            <button type="button" class="icon-action-btn preview" title="Preview" (click)="previewInvoice(inv)">
+                            <button type="button" class="icon-action-btn preview" title="Preview" (click)="$event.stopPropagation(); previewInvoice(inv)">
                               <ion-icon name="document-text-outline"></ion-icon>
                             </button>
-                            <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteInvoice(inv.id)">
-                              <ion-icon name="trash"></ion-icon>
-                            </button>
                             @if (!invoiceHasClient(inv) && inv.clientName) {
-                              <button type="button" class="icon-action-btn client" title="Make as Client" [disabled]="convertingClientId() === inv.id" (click)="makeAsClient(inv)">
+                              <button type="button" class="icon-action-btn client" title="Make as Client" [disabled]="convertingClientId() === inv.id" (click)="$event.stopPropagation(); makeAsClient(inv)">
                                 @if (convertingClientId() === inv.id) {
                                   <span class="agb-loading-spinner" aria-hidden="true"></span>
                                 } @else {
@@ -144,6 +138,7 @@ function numberToWords(num: number): string {
                     </tbody>
                   </table>
                 </section>
+                @if (isAdmin() && invoiceActionRow()) { <div class="cursor-action-menu" [style.left.px]="invoiceActionPosition().x" [style.top.px]="invoiceActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="editSelectedInvoice()"><ion-icon name="pencil-outline"></ion-icon>Edit</button></div> }
               }
             } @else {
               <!-- Invoice Editor View -->
@@ -470,6 +465,7 @@ function numberToWords(num: number): string {
     }
   `,
   styles: [`
+    .cursor-action-menu { position:fixed;z-index:1200;display:flex;padding:5px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;box-shadow:0 12px 28px rgba(16,24,40,.18) }.cursor-action-menu button{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border:0;border-radius:6px;background:transparent;color:#344054;font-weight:700;cursor:pointer}.cursor-action-menu button:hover{background:#f2f4f7}.quotation-table tr.row-selected td{background:#f8fbff}
     .page-search-bar {
       position: relative;
       max-width: 600px;
@@ -733,6 +729,11 @@ function numberToWords(num: number): string {
 export class TaxInvoicePage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
+  isAdmin() { return this.api.user()?.role === "admin"; }
+  readonly invoiceActionRow = signal<TaxInvoice | null>(null);
+  readonly invoiceActionPosition = signal({ x: 0, y: 0 });
+  openInvoiceActionMenu(invoice: TaxInvoice, event: MouseEvent) { if (!this.isAdmin()) return; this.invoiceActionRow.set(invoice); this.invoiceActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 90), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  editSelectedInvoice() { const invoice = this.invoiceActionRow(); if (invoice) this.editInvoice(invoice); this.invoiceActionRow.set(null); }
   readonly formatMoney = formatMoney;
   readonly states = INDIAN_STATES;
 

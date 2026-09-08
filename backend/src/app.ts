@@ -22,6 +22,7 @@ import quotationRoutes from "./routes/quotation.routes.js";
 import invoiceRoutes from "./routes/invoice.routes.js";
 import companyProfileRoutes from "./routes/company-profile.routes.js";
 import mediaRoutes from "./routes/media.routes.js";
+import inboxRoutes from "./routes/inbox.routes.js";
 import { ensureDefaultPermissions } from "./models/RolePermission.js";
 import { RESET_PASSWORD_HTML, SIGNUP_HTML } from "./config/pages.js";
 
@@ -192,6 +193,7 @@ app.use("/api/invoices/all", (_req, res, next) => { res.setTimeout(300_000); nex
   setupSwagger(app);
 
   app.use("/api", mediaRoutes);
+  app.use("/api/inbox", inboxRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api", entitiesRoutes);

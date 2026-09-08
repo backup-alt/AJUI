@@ -388,7 +388,11 @@ export async function listApprovals(filter: {
   }, null, 30_000);
 
   const enriched = await Promise.all(result.items.map((item) => enrichApprovalWithSource(item as unknown as Record<string, unknown>)));
-  return { items: enriched, total: result.total, page: result.page, limit: result.limit, pages: result.pages, nextCursor: result.nextCursor };
+  const { User } = await import("../models/User.js");
+  const projectIds = enriched.map(item => item.projectId).filter(Boolean);
+  const managers = projectIds.length ? await User.find({ role: "project_manager", managedProjectIds: { $in: projectIds } }).select("name managedProjectIds").lean() : [];
+  const items = enriched.map(item => ({ ...item, projectManager: managers.filter(manager => manager.managedProjectIds?.some(id => String(id) === String(item.projectId))).map(manager => manager.name).join(", ") }));
+  return { items, total: result.total, page: result.page, limit: result.limit, pages: result.pages, nextCursor: result.nextCursor };
 }
 
 async function enrichApprovalWithSource(approval: Record<string, unknown>): Promise<Record<string, unknown>> {

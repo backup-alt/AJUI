@@ -68,7 +68,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                     class="client-card vendor-card"
                     role="button"
                     tabindex="0"
-                    (click)="openVendor(vendor)"
+                    (click)="handleVendorCardClick(vendor, $event)"
                     (keydown.enter)="openVendor(vendor)"
                   >
                     <div class="client-card-body">
@@ -98,15 +98,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
 
                     <div class="client-card-footer">
             <span class="footer-label">View Purchases</span>
-                      <div class="client-card-footer-actions">
-                        <button type="button" class="client-edit-action" aria-label="Edit vendor" title="Edit Vendor" (click)="editVendor(vendor, $event)">
-                          <svg class="vendor-edit-icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
-                            <path d="m14.8 7.2 3 3" />
-                          </svg>
-                          <strong>Edit Vendor</strong>
-                        </button>
-                      </div>
+                      <span>Click to open</span>
                     </div>
                   </article>
                 }
@@ -123,13 +115,14 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   </div>
                 }
               </section>
+              @if (isAdmin() && vendorActionRow()) { <div class="cursor-action-menu" [style.left.px]="vendorActionPosition().x" [style.top.px]="vendorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedVendor()">Open</button><button (click)="editSelectedVendor()">Edit</button></div> }
             } @else if (!selectedSite()) {
               <section class="vendor-breadcrumb">
                 <div class="vendor-breadcrumb-copy">
                   <button type="button" class="back-btn" (click)="backToVendors()">&larr; Vendors</button>
                   <h2>{{ selectedVendor()!.name }} – Purchases</h2>
                 </div>
-                <button
+                <button *ngIf="isAdmin()"
                   type="button"
                   class="vendor-header-edit"
                   aria-label="Edit vendor"
@@ -244,7 +237,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                       <th class="col-amount">Issued Amt</th>
                       <th class="col-amount">Given Amt</th>
                       <th class="col-payment">Payment Type</th>
-                      <th class="col-date">Delivered On</th>
                       <th class="col-bill">Bill / Reference</th>
                       @for (col of customColumns(); track col) {
                         <th class="col-custom">
@@ -252,7 +244,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                           <button type="button" class="remove-col-btn" (click)="removeCustomColumn(col)">×</button>
                         </th>
                       }
-                      <th class="col-status">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -311,9 +302,6 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                             {{ row.paymentType || '-' }}
                           }
                         </td>
-                        <td class="col-date">
-                          {{ receivedDateFor(row) || '-' }}
-                        </td>
                         <td class="col-bill">
                           @if (row.billUrl) {
                             @if (isDataUrl(row.billUrl)) {
@@ -354,14 +342,11 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                             }
                           </td>
                         }
-                        <td class="col-status">
-                          <span class="status-badge" [ngClass]="statusBadgeClass(normalizedReceivedStatus(row.status))">{{ normalizedReceivedStatus(row.status) }}</span>
-                        </td>
                       </tr>
                     }
                     @if (filteredSiteMaterials().length === 0 && !loadingMaterials()) {
                       <tr>
-                        <td class="empty-row" [attr.colspan]="11 + customColumns().length">
+                        <td class="empty-row" [attr.colspan]="9 + customColumns().length">
                 <span>{{ materialSearchQuery() ? 'No materials match your search.' : 'No material purchases recorded.' }}</span>
                         </td>
                       </tr>
@@ -395,6 +380,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
     </ion-split-pane>
   `,
   styles: [`
+    .cursor-action-menu{position:fixed;z-index:1200;display:flex;gap:4px;padding:5px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;box-shadow:0 12px 28px rgba(16,24,40,.18)}.cursor-action-menu button{padding:7px 9px;border:0;border-radius:6px;background:transparent;color:#344054;font-weight:700;cursor:pointer}.cursor-action-menu button:hover{background:#f2f4f7}
     .page-search-bar {
       position: relative;
       max-width: 600px;
@@ -980,6 +966,12 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VendorDashboardPage {
+  isAdmin() { return this.api.user()?.role === "admin"; }
+  readonly vendorActionRow = signal<Vendor | null>(null);
+  readonly vendorActionPosition = signal({ x: 0, y: 0 });
+  handleVendorCardClick(vendor: Vendor, event: MouseEvent) { if (!this.isAdmin()) { this.openVendor(vendor); return; } this.vendorActionRow.set(vendor); this.vendorActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 120), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  openSelectedVendor() { const vendor = this.vendorActionRow(); if (vendor) this.openVendor(vendor); this.vendorActionRow.set(null); }
+  editSelectedVendor() { const vendor = this.vendorActionRow(); if (vendor) this.editVendor(vendor, new MouseEvent("click")); this.vendorActionRow.set(null); }
   readonly paymentTypeOptions = ["Cash", "NEFT", "Bank Transfer", "UPI", "Cheque"];
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);

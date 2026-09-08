@@ -17,7 +17,7 @@ export function validate(schema: ZodSchema, source: Source = "body") {
       console.error('[Validation Middleware] Validation failed:', {
         path: req.path,
         method: req.method,
-        body: req.body,
+        bodyFields: Object.keys(req.body || {}),
         params: req.params,
         query: req.query,
         fieldErrors: flattened.fieldErrors,

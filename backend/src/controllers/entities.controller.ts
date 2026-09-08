@@ -6,6 +6,8 @@ import * as supervisorService from "../services/supervisor.service.js";
 import * as customFieldService from "../services/custom-fields.service.js";
 import { getScopedClientQuery, getScopedProjectIds, getScopedProjectQuery } from "../middleware/rbac.js";
 import { invalidateCachePrefix } from "../middleware/cache.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { User } from "../models/User.js";
 
 function invalidateProjectAssignmentCaches(): void {
   invalidateCachePrefix("/api/projects");
@@ -221,10 +223,15 @@ export async function getSupervisor(req: Request, res: Response, next: NextFunct
 
 export async function fundSupervisor(req: Request, res: Response, next: NextFunction) {
   try {
+    const scope = await getScopedProjectIds(req);
+    if (scope !== null && !scope.some(id => String(id) === String(req.body.projectId))) {
+      throw new AppError(403, "This project is not assigned to you");
+    }
+    const sender = await User.findById(req.user?.sub).select("name").lean();
     const funding = await supervisorService.fundSupervisor(
       req.params.id,
       req.body,
-      "Admin",
+      sender?.name || "Office",
     );
     invalidateCachePrefix("/api/supervisors");
     invalidateCachePrefix("/api/sites");

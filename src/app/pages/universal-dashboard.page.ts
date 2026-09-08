@@ -66,6 +66,23 @@ interface DashboardKpis {
                 <p>Here's what's happening with your business today.</p>
               </div>
               <div class="header-controls">
+                <div class="project-picker" (click)="$event.stopPropagation()">
+                  <button type="button" class="project-control" aria-haspopup="listbox" [attr.aria-expanded]="projectMenuOpen()" (click)="toggleProjectMenu()">
+                    <svg viewBox="0 0 24 24"><path d="M4 20V8l8-5 8 5v12H4Z"/><path d="M9 20v-6h6v6"/></svg>
+                    <span><small>Project</small><strong>{{ selectedProjectName() }}</strong></span>
+                    <svg class="chevron" [class.open]="projectMenuOpen()" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+                  </button>
+                  @if (projectMenuOpen()) {
+                    <div class="project-menu" role="listbox" aria-label="Filter dashboard by project">
+                      <label class="project-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" placeholder="Search projects" [value]="projectSearch()" (input)="projectSearch.set($any($event.target).value)" /></label>
+                      <button type="button" class="project-option" [class.active]="!selectedProjectId()" (click)="selectDashboardProject('')"><span class="project-option-icon">A</span><span><strong>All projects</strong><small>Complete business overview</small></span>@if (!selectedProjectId()) { <svg class="option-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg> }</button>
+                      @for (project of filteredProjectOptions(); track project.id) {
+                        <button type="button" class="project-option" [class.active]="selectedProjectId() === project.id" (click)="selectDashboardProject(project.id)"><span class="project-option-icon">{{ projectInitial(project) }}</span><span><strong>{{ project.name }}</strong><small>{{ projectContext(project) }}</small></span>@if (selectedProjectId() === project.id) { <svg class="option-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg> }</button>
+                      } @empty { <p class="project-empty">No matching projects</p> }
+                    </div>
+                  }
+                </div>
+                <a class="inbox-button" routerLink="/inbox" aria-label="Open inbox" title="Inbox"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg><span>Inbox</span></a>
                 <div class="date-picker" (click)="$event.stopPropagation()">
                   <button type="button" class="date-control" aria-haspopup="dialog" [attr.aria-expanded]="dateMenuOpen()" (click)="toggleDateMenu()">
                     <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
@@ -117,7 +134,7 @@ interface DashboardKpis {
             <section class="kpi-grid" aria-label="Key financial metrics">
               <article class="kpi-card green">
                 <span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M4 7h14a2 2 0 0 1 2 2v10H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11"/><path d="M16 12h6v4h-6a2 2 0 0 1 0-4Z"/></svg></span>
-                <div class="kpi-content"><span>Amount Received</span><strong>{{ money(totalReceived()) }}</strong><small>Across all recorded payments</small></div>
+                <div class="kpi-content"><span>Amount Received</span><strong>{{ money(totalReceived()) }}</strong><small>{{ selectedProjectId() ? "Project recorded payments" : "Across all recorded payments" }}</small></div>
                 <span class="kpi-fact"><small>Payment activity</small><strong>{{ payments().length }} {{ payments().length === 1 ? 'payment' : 'payments' }}</strong></span>
               </article>
               <article class="kpi-card orange">
@@ -127,7 +144,7 @@ interface DashboardKpis {
               </article>
               <article class="kpi-card purple">
                 <span class="kpi-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/></svg></span>
-                <div class="kpi-content"><span>Active Portfolio Value</span><strong>{{ money(financials().portfolio) }}</strong><small>{{ activeProjectCount() }} active {{ activeProjectCount() === 1 ? 'project' : 'projects' }}</small></div>
+                <div class="kpi-content"><span>{{ selectedProjectId() ? "Project Current Value" : "Active Portfolio Value" }}</span><strong>{{ money(financials().portfolio) }}</strong><small>{{ activeProjectCount() }} active {{ activeProjectCount() === 1 ? 'project' : 'projects' }}</small></div>
                 <span class="kpi-fact"><small>Average active value</small><strong>{{ money(averageActiveProjectValue()) }}</strong><em>Estimated value</em></span>
               </article>
             </section>
@@ -144,7 +161,7 @@ interface DashboardKpis {
                     <div class="chart-empty"><span>No cash movement in this period</span></div>
                   }
                 </div>
-                <div class="cash-totals"><div><span>Total Received</span><strong>{{ money(financials().received) }}</strong></div><div><span>Total Spent</span><strong>{{ money(financials().spent) }}</strong></div></div>
+                <div class="cash-totals"><div><span>Total Received</span><strong>{{ money(financials().received) }}</strong>@for (mode of paymentModes(scopedPayments()); track mode.name) { <small>{{ mode.name }}: {{ money(mode.amount) }}</small> }</div><div><span>Total Spent</span><strong>{{ money(financials().spent) }}</strong>@for (mode of paymentModes(scopedExpenses()); track mode.name) { <small>{{ mode.name }}: {{ money(mode.amount) }}</small> }</div></div>
               </article>
 
               <article class="panel spend-panel">
@@ -159,7 +176,10 @@ interface DashboardKpis {
               </article>
 
               <article class="panel projects-panel">
-                <div class="panel-heading"><h2>Recent Projects</h2><a routerLink="/projects">View All</a></div>
+                <div class="panel-heading"><h2>{{ selectedProjectId() ? "Vendor Payments" : "Recent Projects" }}</h2><a routerLink="/projects">View All</a></div>
+                @if (selectedProjectId()) {
+                  <div class="payment-breakdown">@for (vendor of partnerPayments("Material Expense"); track vendor.name) { <article><strong>{{ vendor.name }}</strong><b>{{ money(vendor.total) }}</b><small>@for (mode of vendor.modes; track mode.name) { <span>{{ mode.name }}: {{ money(mode.amount) }} </span> }</small></article> } @empty { <p>No vendor payments in this period.</p> }</div>
+                } @else {
                 <div class="recent-project-list">
                   @for (project of recentProjects(); track project.id) {
                     <a [routerLink]="projectRoute(project)" class="recent-project-row">
@@ -172,6 +192,7 @@ interface DashboardKpis {
                     <div class="simple-empty">No projects available.</div>
                   }
                 </div>
+                }
               </article>
             </section>
 
@@ -191,6 +212,7 @@ interface DashboardKpis {
                 </div>
               </article>
 
+              @if (selectedProjectId()) { <article class="panel summary-panel"><div class="panel-heading"><h2>Subcontractor Payments</h2></div><div class="payment-breakdown">@for (partner of partnerPayments("Subcontractor Payment"); track partner.name) { <article><strong>{{ partner.name }}</strong><b>{{ money(partner.total) }}</b><small>@for (mode of partner.modes; track mode.name) { <span>{{ mode.name }}: {{ money(mode.amount) }} </span> }</small></article> } @empty { <p>No subcontractor payments in this period.</p> }</div></article> } @else {
               <article class="panel summary-panel">
                 <div class="panel-heading"><h2>Workforce &amp; Partners</h2></div>
                 <div class="summary-grid">
@@ -211,6 +233,7 @@ interface DashboardKpis {
                   <div class="expenditure-total"><strong>Total</strong><strong>{{ money(financials().spent) }}</strong><strong>100%</strong></div>
                 </div>
               </article>
+              }
             </section>
 
             <section class="insights-panel">
@@ -242,6 +265,7 @@ interface DashboardKpis {
   `,
   styles: [`
     :host { display: block; }
+    .cash-totals small { display:block; margin-top:6px; color:#475467; } .payment-breakdown { padding: 0 20px 20px; } .payment-breakdown article { padding:12px 0; border-bottom:1px solid #eaecf0; display:grid; grid-template-columns:1fr auto; gap:8px; } .payment-breakdown small { grid-column:1 / -1; color:#475467; } .payment-breakdown small span { display:inline-block; margin-right:12px; }
     * { box-sizing: border-box; }
     .dashboard-page { --background: #f8fafc; }
     .dashboard-shell { width: 100%; max-width: none; min-height: 100%; margin: 0; padding: 24px clamp(18px, 2vw, 32px) 44px; color: #101828; font-family: var(--ion-font-family, Inter, ui-sans-serif, system-ui, sans-serif); font-size: 14px; line-height: 1.5; }
@@ -251,6 +275,13 @@ interface DashboardKpis {
     .dashboard-header h1 { margin: 0; color: #101828; font-size: clamp(25px, 2vw, 31px); font-weight: 750; line-height: 1.2; letter-spacing: -.03em; }
     .dashboard-header p { margin: 8px 0 0; color: #667085; font-size: 14px; line-height: 1.5; }
     .header-controls { display: flex; align-items: center; gap: 12px; }
+    .project-picker { position: relative; z-index: 70; }
+    .project-control { display:flex; align-items:center; gap:10px; width:220px; height:44px; padding:0 12px; border:1px solid #d0d5dd; border-radius:9px; background:#fff; color:#344054; cursor:pointer; box-shadow:0 1px 2px rgba(16,24,40,.04); }
+    .project-control > span { display:grid; flex:1; min-width:0; text-align:left; }.project-control small { color:#667085; font-size:10px; line-height:1.1; text-transform:uppercase; letter-spacing:.05em; }.project-control strong { overflow:hidden; color:#101828; font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+    .project-menu { position:absolute; top:calc(100% + 8px); left:0; width:320px; max-height:390px; overflow:auto; padding:7px; border:1px solid #d0d5dd; border-radius:12px; background:#fff; box-shadow:0 18px 40px rgba(16,24,40,.18); }
+    .project-search { position:sticky; top:-7px; z-index:2; display:flex; align-items:center; gap:8px; padding:7px; background:#fff; }.project-search svg { width:16px; color:#667085; }.project-search input { width:100%; height:36px; padding:0 10px; border:1px solid #d0d5dd; border-radius:8px; outline:none; }.project-search input:focus { border-color:#2f6bff; box-shadow:0 0 0 3px rgba(47,107,255,.12); }
+    .project-option { display:grid; grid-template-columns:34px minmax(0,1fr) 18px; align-items:center; gap:10px; width:100%; min-height:54px; padding:8px 9px; border:0; border-radius:8px; background:transparent; color:#344054; text-align:left; cursor:pointer; }.project-option:hover { background:#f2f4f7; }.project-option.active { background:#eef4ff; color:#175cd3; }.project-option > span:nth-child(2) { display:grid; min-width:0; }.project-option strong,.project-option small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.project-option strong { font-size:13px; }.project-option small { color:#667085; font-size:11px; }.project-option-icon { display:flex; width:32px; height:32px; align-items:center; justify-content:center; border-radius:8px; background:#e8eef8; color:#175cd3; font-size:12px; font-weight:800; }.option-check { width:16px; color:#175cd3; stroke-width:2.4; }.project-empty { margin:8px; color:#667085; font-size:12px; text-align:center; }
+    .inbox-button { display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 13px; border:1px solid #d0d5dd; border-radius:9px; background:#fff; color:#344054; font-size:13px; font-weight:700; box-shadow:0 1px 2px rgba(16,24,40,.04); }.inbox-button:hover { border-color:#98a2b3; background:#f9fafb; }
     .date-control, .period-control, .new-project-button { position: relative; display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 14px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; color: #1d2939; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
     .date-picker { position: relative; z-index: 60; }.date-control { min-width: 176px; cursor: pointer; }.date-control strong { flex: 1; font-size: 14px; text-align: left; white-space: nowrap; }.date-control:hover { border-color: #98a2b3; background: #f9fafb; }.date-control:focus-visible { outline: 3px solid rgba(47,107,255,.18); outline-offset: 1px; }
     .date-menu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; z-index: 80; display: grid; width: max-content; max-width: min(640px, calc(100vw - 32px)); gap: 14px; padding: 16px; border: 1px solid #d0d5dd; border-radius: 14px; background: #fff; box-shadow: 0 18px 40px rgba(16,24,40,.17), 0 4px 10px rgba(16,24,40,.08); }.date-menu-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }.date-menu-heading > span { display: grid; gap: 3px; }.date-menu-heading strong { color: #101828; font-size: 15px; }.date-menu-heading small { color: #667085; font-size: 12px; }.date-menu-heading > button { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; padding: 0; border: 1px solid #e4e7ec; border-radius: 7px; background: #fff; color: #667085; cursor: pointer; }.date-menu-heading > button:hover { background: #f2f4f7; color: #101828; }.date-menu-heading > button svg { width: 15px; height: 15px; }
@@ -318,7 +349,17 @@ export class UniversalDashboardPage implements OnInit {
   ];
   readonly chartPeriodOptions = this.periodOptions.filter((option) => option.value !== "today");
 
-  readonly projects = computed(() => this.loadedProjects() ?? (this.data.projects() as any[]));
+  readonly selectedProjectId = signal("");
+  readonly projectMenuOpen = signal(false);
+  readonly projectSearch = signal("");
+  readonly allProjects = computed(() => this.loadedProjects() ?? (this.data.projects() as any[]));
+  readonly selectedProjectName = computed(() => this.allProjects().find(project => String(project.id || project._id) === this.selectedProjectId())?.name || "All projects");
+  readonly filteredProjectOptions = computed(() => {
+    const query = this.projectSearch().trim().toLowerCase();
+    return this.allProjects().filter(project => !query || `${project.name} ${project.client || project.clientName || ""} ${project.projectId || ""}`.toLowerCase().includes(query));
+  });
+  readonly projects = computed(() => this.allProjects().filter(row => !this.selectedProjectId() || String(row.id || row._id) === this.selectedProjectId()));
+  private inProject(row: any): boolean { return !this.selectedProjectId() || String(row.projectId || row.__projectId || "") === this.selectedProjectId(); }
   readonly dashboardClients = computed(() => this.data.clients() as any[]);
   readonly activeProjects = computed(() => this.projects().filter((row) => String(row.status || "").trim().toLowerCase() === "active"));
   readonly legacyPayments = computed<any[]>(() => this.data.tableRowsFor("payments", [])
@@ -332,7 +373,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly payments = computed(() => {
     const backendRows = this.loadedPayments() ?? (this.data.payments() as any[]);
     const rows = [...backendRows, ...this.legacyPayments()];
-    return this.dedupeRows(rows).filter((row) => this.isPostedPayment(row));
+    return this.dedupeRows(rows).filter((row) => this.isPostedPayment(row) && this.inProject(row));
   });
   readonly expenses = computed(() => {
     const legacyRows = this.loadedExpenses() ?? (this.data.expenses() as any[]);
@@ -384,12 +425,12 @@ export class UniversalDashboardPage implements OnInit {
   })[this.periodKey()]);
 
   readonly scopedPayments = computed(() => this.payments().filter((row) => this.inCurrentPeriod(row)));
-  readonly scopedExpenses = computed(() => this.expenses().filter((row) => this.inCurrentPeriod(row)));
+  readonly scopedExpenses = computed(() => this.expenses().filter((row) => this.inProject(row) && this.inCurrentPeriod(row)));
   readonly totalReceived = computed(() => this.payments().reduce((sum, row) => sum + this.amountOf(row), 0));
   readonly financials = computed(() => {
     const received = this.scopedPayments().reduce((sum, row) => sum + this.amountOf(row), 0);
     const spent = this.scopedExpenses().reduce((sum, row) => sum + Math.abs(Number(row.amount || 0)), 0);
-    const portfolio = this.activeProjects().reduce((sum, row) => sum + Math.max(0, Number(row.totalValue || row.estimatedValue || 0)), 0);
+    const portfolio = (this.selectedProjectId() ? this.projects() : this.activeProjects()).reduce((sum, row) => sum + Math.max(0, Number(row.totalValue || row.estimatedValue || 0)), 0);
     return { received, spent, portfolio };
   });
 
@@ -451,6 +492,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly topExpense = computed(() => this.expenditureRows()[0] || null);
 
   readonly pendingExpenseApprovals = computed(() => this.approvalRows().filter((row) => {
+    if (!this.inProject(row)) return false;
     const module = String(row.module || "").replace(/[_\s-]/g, "").toLowerCase();
     return module === "expenses" || module === "expense" || module === "generalexpenses";
   }));
@@ -467,6 +509,27 @@ export class UniversalDashboardPage implements OnInit {
     return `₹${Math.round(value)}`;
   };
 
+  paymentModes(rows: any[]): Array<{name: string; amount: number}> {
+    const totals = new Map<string, number>([["Cash", 0], ["NEFT", 0]]);
+    for (const row of rows) {
+      const raw = String(row.paymentMode || row.mode || row.paymentType || "Unspecified").trim();
+      const mode = /^cash$/i.test(raw) ? "Cash" : /^neft$/i.test(raw) ? "NEFT" : "Others";
+      totals.set(mode, (totals.get(mode) || 0) + this.amountOf(row));
+    }
+    return [...totals].filter(([name, amount]) => name !== "Others" || amount > 0).map(([name, amount]) => ({name, amount}));
+  }
+  toggleProjectMenu(): void { this.projectMenuOpen.update(open => !open); this.projectSearch.set(""); this.openPeriodMenu.set(null); this.dateMenuOpen.set(false); }
+  selectDashboardProject(projectId: string): void { this.selectedProjectId.set(projectId); this.projectMenuOpen.set(false); this.projectSearch.set(""); }
+  projectInitial(project: any): string { return String(project.name || "P").trim().charAt(0).toUpperCase(); }
+  projectContext(project: any): string { return String(project.client || project.clientName || project.projectId || "Project"); }
+  partnerPayments(source: string) {
+    const groups = new Map<string, any[]>();
+    for (const row of this.scopedExpenses().filter(row => row.dashboardSource === source)) {
+      const name = String(row.vendorName || row.vendor || row.materialVendor || row.subcontractorName || row.subcontractor || "Unspecified");
+      groups.set(name, [...(groups.get(name) || []), row]);
+    }
+    return [...groups].map(([name, rows]) => ({name, total: rows.reduce((sum, row) => sum + this.amountOf(row), 0), modes: this.paymentModes(rows)}));
+  }
   ngOnInit(): void { void this.refreshAll(); }
   async refreshAll(): Promise<void> {
     if (this.refreshing()) return;
@@ -557,11 +620,13 @@ export class UniversalDashboardPage implements OnInit {
   closePeriodMenu(): void {
     this.openPeriodMenu.set(null);
     this.dateMenuOpen.set(false);
+    this.projectMenuOpen.set(false);
   }
   @HostListener("document:keydown.escape")
   closePeriodMenuOnEscape(): void {
     this.openPeriodMenu.set(null);
     this.dateMenuOpen.set(false);
+    this.projectMenuOpen.set(false);
   }
   openClientDialog(): void { this.showClientDialog.set(true); }
   closeClientDialog(): void { this.showClientDialog.set(false); }

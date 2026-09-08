@@ -110,12 +110,12 @@ function numberToWords(num: number): string {
                         <th>Client</th>
                         <th>Amount</th>
                         <th>Status</th>
-                        <th>Actions</th>
+                        <th>Options</th>
                       </tr>
                     </thead>
                     <tbody>
                       @for (quote of filteredQuotations(); track quote.id) {
-                        <tr>
+                        <tr [class.row-selected]="quoteActionRow()?.id === quote.id" (click)="openQuoteActionMenu(quote, $event)">
                           <td><strong>{{ quote.quotationNumber }}</strong></td>
                           <td>{{ quote.date }}</td>
                           <td>{{ quote.clientName || '-' }}</td>
@@ -124,18 +124,12 @@ function numberToWords(num: number): string {
                             <span class="status-pill" [class]="quote.status.toLowerCase()">{{ quote.status }}</span>
                           </td>
                           <td>
-                            <button type="button" class="invoice-action-btn" title="Make Invoice" aria-label="Make invoice from quotation" (click)="makeInvoice(quote)">
+                            <button type="button" class="invoice-action-btn" title="Make Invoice" aria-label="Make invoice from quotation" (click)="$event.stopPropagation(); makeInvoice(quote)">
                               <ion-icon name="receipt-outline"></ion-icon>
                               Make Invoice
                             </button>
-                            <button type="button" class="icon-action-btn edit" title="Edit" (click)="editQuotation(quote)">
-                              <ion-icon name="pencil-outline"></ion-icon>
-                            </button>
-                            <button type="button" class="icon-action-btn delete" title="Delete" (click)="deleteQuotation(quote.id)">
-                              <ion-icon name="trash"></ion-icon>
-                            </button>
                             @if (!quotationHasClient(quote) && quote.clientName) {
-                              <button type="button" class="icon-action-btn client" title="Make as Client" [disabled]="convertingClientId() === quote.id" (click)="makeAsClient(quote)">
+                              <button type="button" class="icon-action-btn client" title="Make as Client" [disabled]="convertingClientId() === quote.id" (click)="$event.stopPropagation(); makeAsClient(quote)">
                                 @if (convertingClientId() === quote.id) {
                                   <span class="agb-loading-spinner" aria-hidden="true"></span>
                                 } @else {
@@ -149,6 +143,7 @@ function numberToWords(num: number): string {
                     </tbody>
                   </table>
                 </section>
+                @if (isAdmin() && quoteActionRow()) { <div class="cursor-action-menu" [style.left.px]="quoteActionPosition().x" [style.top.px]="quoteActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="editSelectedQuotation()"><ion-icon name="pencil-outline"></ion-icon>Edit</button><button type="button" class="danger" (click)="deleteSelectedQuotation()"><ion-icon name="trash-outline"></ion-icon>Delete</button></div> }
               }
             } @else {
               <!-- Quotation Editor View -->
@@ -473,6 +468,7 @@ function numberToWords(num: number): string {
     }
   `,
   styles: [`
+    .cursor-action-menu { position: fixed; z-index: 1200; display:flex; gap:4px; padding:5px; border:1px solid #d0d5dd; border-radius:9px; background:#fff; box-shadow:0 12px 28px rgba(16,24,40,.18); }.cursor-action-menu button{display:inline-flex;align-items:center;gap:5px;padding:7px 9px;border:0;border-radius:6px;background:transparent;color:#344054;font-weight:700;cursor:pointer}.cursor-action-menu button:hover{background:#f2f4f7}.cursor-action-menu button.danger{color:#b42318}.cursor-action-menu button.danger:hover{background:#fff1f0}.quotation-table tr.row-selected td{background:#f8fbff}
     .page-search-bar {
       position: relative;
       max-width: 600px;
@@ -1211,6 +1207,12 @@ function numberToWords(num: number): string {
 export class QuotationPage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
+  isAdmin() { return this.api.user()?.role === "admin"; }
+  readonly quoteActionRow = signal<Quotation | null>(null);
+  readonly quoteActionPosition = signal({ x: 0, y: 0 });
+  openQuoteActionMenu(quote: Quotation, event: MouseEvent) { if (!this.isAdmin()) return; this.quoteActionRow.set(quote); this.quoteActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 150), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  editSelectedQuotation() { const quote = this.quoteActionRow(); if (quote) this.editQuotation(quote); this.quoteActionRow.set(null); }
+  deleteSelectedQuotation() { const quote = this.quoteActionRow(); if (quote) this.deleteQuotation(quote.id); this.quoteActionRow.set(null); }
   readonly router = inject(Router);
   readonly formatMoney = formatMoney;
   readonly states = INDIAN_STATES;

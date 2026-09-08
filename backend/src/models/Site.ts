@@ -13,6 +13,11 @@ export interface ISite extends Document {
   targetEndDate?: string;
   projectIds: Types.ObjectId[];
   openingBalance: number;
+  openingPaymentMode?: string;
+  openingDescription?: string;
+  openingProjectId?: Types.ObjectId;
+  openingFundedBy?: string;
+  openingFundedAt?: Date;
   vendorIds: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +38,11 @@ const siteSchema = new Schema<ISite>(
     targetEndDate: { type: String },
     projectIds: [{ type: Schema.Types.ObjectId, ref: "Project", index: true }],
     openingBalance: { type: Number, default: 0 },
+    openingPaymentMode: { type: String, trim: true, maxlength: 50 },
+    openingDescription: { type: String, trim: true, maxlength: 2000 },
+    openingProjectId: { type: Schema.Types.ObjectId, ref: "Project" },
+    openingFundedBy: { type: String },
+    openingFundedAt: { type: Date },
     vendorIds: [{ type: Schema.Types.ObjectId, ref: "Vendor", index: true }],
   },
   { timestamps: true }

@@ -280,8 +280,13 @@ router.post(
 router.put(
   "/purchase-orders/:id",
   validate(updatePurchaseOrderSchema),
-  requireRole("admin", "project_manager"),
+  requireRole("admin"),
   ctrl.updatePurchaseOrder
+);
+router.delete(
+  "/purchase-orders/:id",
+  requireRole("admin"),
+  ctrl.deletePurchaseOrder
 );
 
 // =================== APPROVALS ===================

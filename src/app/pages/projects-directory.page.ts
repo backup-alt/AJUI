@@ -77,7 +77,7 @@ interface ApiProject {
                 <p>Create a project independently and link it to a client.</p>
               </article>
 
-              <article *ngFor="let project of filteredProjects(); trackBy: trackProject" class="projects-directory-card" role="button" tabindex="0" (click)="openProject(project)" (keydown.enter)="openProject(project)">
+              <article *ngFor="let project of filteredProjects(); trackBy: trackProject" class="projects-directory-card" role="button" tabindex="0" (click)="handleProjectCardClick(project, $event)" (keydown.enter)="openProject(project)">
                 <div class="projects-directory-title">
                   <div class="title-stack">
                     <ion-badge class="status" [ngClass]="statusClass(project.status)">{{ project.status }}</ion-badge>
@@ -99,13 +99,6 @@ interface ApiProject {
                 </div>
 
                 <div class="projects-directory-footer">
-                  <button type="button" class="secondary-action" (click)="openEditProject(project, $event)">
-                    <svg class="projects-directory-edit-icon" viewBox="0 0 20 20" aria-hidden="true">
-                      <path d="M4 13.8V16h2.2L15 7.2 12.8 5 4 13.8Z" />
-                      <path d="m11.8 6 2.2 2.2" />
-                    </svg>
-                    Edit
-                  </button>
                   <button type="button" (click)="openProject(project); $event.stopPropagation()">
                     Open Project
                     <ion-icon name="arrow-forward-outline"></ion-icon>
@@ -113,6 +106,7 @@ interface ApiProject {
                 </div>
               </article>
             </section>
+            @if (isAdmin() && projectActionRow()) { <div class="cursor-action-menu" [style.left.px]="projectActionPosition().x" [style.top.px]="projectActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedProject()">Open</button><button (click)="editSelectedProject()">Edit</button></div> }
           </main>
         </ion-content>
 
@@ -169,6 +163,7 @@ interface ApiProject {
     </ion-split-pane>
   `,
   styles: [`
+    .cursor-action-menu{position:fixed;z-index:1200;display:flex;gap:4px;padding:5px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;box-shadow:0 12px 28px rgba(16,24,40,.18)}.cursor-action-menu button{padding:7px 9px;border:0;border-radius:6px;background:transparent;color:#344054;font-weight:700;cursor:pointer}.cursor-action-menu button:hover{background:#f2f4f7}
     .projects-directory-card.add-client-card {
       display: flex;
       flex-direction: column;
@@ -227,6 +222,12 @@ interface ApiProject {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectsDirectoryPage implements OnInit {
+  isAdmin() { return this.api.user()?.role === "admin"; }
+  readonly projectActionRow = signal<ApiProject | null>(null);
+  readonly projectActionPosition = signal({ x: 0, y: 0 });
+  handleProjectCardClick(project: ApiProject, event: MouseEvent) { if (!this.isAdmin()) { this.openProject(project); return; } this.projectActionRow.set(project); this.projectActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 120), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  openSelectedProject() { const project = this.projectActionRow(); if (project) this.openProject(project); this.projectActionRow.set(null); }
+  editSelectedProject() { const project = this.projectActionRow(); if (project) this.openEditProject(project, new MouseEvent("click")); this.projectActionRow.set(null); }
   readonly projectStatusOptions = ["Active", "On Hold", "Completed"];
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);

@@ -414,10 +414,11 @@ describe("Project supervisor assignment", () => {
     const opening = await request(app)
       .post(`/api/supervisors/${supervisorProfile._id}/fund`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ projectId: project._id.toString(), siteId: site._id.toString(), amount: 5_000 });
+      .send({ projectId: project._id.toString(), siteId: site._id.toString(), amount: 5_000, paymentMode: "NEFT" });
     expect(opening.status).toBe(201);
     expect(opening.body.funding.kind).toBe("opening");
     expect((await Site.findById(site._id).lean())?.openingBalance).toBe(5_000);
+    expect((await Site.findById(site._id).lean())?.openingPaymentMode).toBe("NEFT");
     expect(await Expense.countDocuments({ projectId: project._id })).toBe(0);
 
     const mobileSites = await request(app)
@@ -428,11 +429,12 @@ describe("Project supervisor assignment", () => {
     const cash = await request(app)
       .post(`/api/supervisors/${supervisorProfile._id}/fund`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ projectId: project._id.toString(), siteId: site._id.toString(), amount: 2_000, note: "Admin top-up" });
+      .send({ projectId: project._id.toString(), siteId: site._id.toString(), amount: 2_000, note: "Admin top-up", paymentMode: "Cash" });
     expect(cash.status).toBe(201);
     expect(cash.body.funding.kind).toBe("cash");
     const cashExpense = await Expense.findById(cash.body.funding.expense._id).lean();
     expect(cashExpense?.status).toBe("Approved");
+    expect(cashExpense?.paymentMode).toBe("Cash");
     expect(cashExpense?.runningBalance).toBe(7_000);
     expect(await Approval.countDocuments({ sourceId: cashExpense?._id })).toBe(0);
 
@@ -479,5 +481,17 @@ describe("Project supervisor assignment", () => {
           row._id === purchaseExpense._id.toString() && row.runningBalance === -1_000,
       ),
     ).toBe(true);
+    const managers = await User.create([
+      { name: "Funding Manager", email: "funding-manager@example.test", phone: "+919876507001", passwordHash: supervisorUser.passwordHash, role: "project_manager", status: "active", managedProjectIds: [project._id] },
+      { name: "Unassigned Manager", email: "funding-outsider@example.test", phone: "+919876507002", passwordHash: supervisorUser.passwordHash, role: "project_manager", status: "active", managedProjectIds: [] },
+    ]);
+    for (const [index, manager] of managers.entries()) {
+      const login = await request(app).post("/api/auth/login").send({email: manager.email, password: "TestPass123"});
+      expect(login.status).toBe(200);
+      const funding = await request(app).post(`/api/supervisors/${supervisorProfile._id}/fund`)
+        .set("Authorization", `Bearer ${login.body.accessToken}`)
+        .send({projectId: String(project._id), siteId: String(site._id), amount: 100, paymentMode: "NEFT", note: "Manager funding"});
+      expect(funding.status).toBe(index === 0 ? 201 : 403);
+    }
   });
 });

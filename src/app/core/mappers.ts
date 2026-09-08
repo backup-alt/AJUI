@@ -226,6 +226,7 @@ export function mapExpense(e: any): any {
     site: e.site,
     supervisor: e.supervisor,
     transactionType: e.transactionType,
+    paymentMode: e.paymentMode || "Cash",
     amount,
     spent: amount,
     cashIssued: isCashAdded ? amount : 0,

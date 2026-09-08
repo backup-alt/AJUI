@@ -10,7 +10,6 @@ import {
   IonRefresherContent,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
-  IonCheckbox,
   IonSelect,
   IonSelectOption,
   ModalController,
@@ -80,7 +79,6 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
     FormsModule,
     IonContent,
     IonSearchbar,
-    IonCheckbox,
     IonSelect,
     IonSelectOption,
     IonIcon,
@@ -193,7 +191,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                   <button
                     class="edit-qty-btn"
                     [disabled]="item.currentQuantity <= 0"
-                    [attr.aria-label]="item.currentQuantity > 0 ? 'Update material quantity' : 'No received stock is available to consume'"
+                    [attr.aria-label]="item.currentQuantity > 0 ? 'Update material quantity' : 'No stock is available to consume'"
                     (click)="openEditQuantity(item); $event.stopPropagation()"
                   >
                     <ion-icon name="pencil-outline"></ion-icon>
@@ -238,15 +236,6 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
               }
 
               <footer class="card-footer">
-                <label class="received-control" (click)="$event.stopPropagation()">
-                  <ion-checkbox
-                    aria-label="Mark material as received"
-                    [checked]="item.received"
-                    [disabled]="item.received || updatingReceived().has(item._id)"
-                    (ionChange)="setReceived(item, $event.detail.checked)"
-                  ></ion-checkbox>
-                  <span>{{ item.received ? 'Received' : 'Mark received' }}</span>
-                </label>
               </footer>
             </div>
           }
@@ -901,7 +890,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   async openEditQuantity(item: InventoryItem): Promise<void> {
     if (item.currentQuantity <= 0) {
       const toast = await this.toastCtrl.create({
-        message: 'No received stock is available to consume',
+        message: 'No stock is available to consume',
         duration: 2200,
         color: 'warning',
         position: 'top',

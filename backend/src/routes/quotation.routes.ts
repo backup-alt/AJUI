@@ -11,7 +11,7 @@ router.use(requireAuth);
 router.post("/quotations", requireRole("admin", "project_manager"), validate(createQuotationSchema), ctrl.createQuotation);
 router.get("/quotations", validate(listQuotationsSchema, "query"), ctrl.listQuotations);
 router.get("/quotations/:id", ctrl.getQuotation);
-router.patch("/quotations/:id", requireRole("admin", "project_manager"), validate(updateQuotationSchema), ctrl.updateQuotation);
+router.patch("/quotations/:id", requireRole("admin"), validate(updateQuotationSchema), ctrl.updateQuotation);
 router.delete("/quotations/:id", requireRole("admin"), ctrl.deleteQuotation);
 
 export default router;

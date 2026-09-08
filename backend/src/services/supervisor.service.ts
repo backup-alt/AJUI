@@ -231,7 +231,7 @@ export async function fundSupervisor(
   if (isOpeningAmount) {
     let openingExpense: Record<string, unknown> | undefined;
     if (site) {
-      await Site.updateOne({ _id: site._id }, { $set: { openingBalance: amount } });
+      await Site.updateOne({ _id: site._id }, { $set: { openingBalance: amount, openingPaymentMode: input.paymentMode, openingDescription: input.note, openingProjectId: projectId, openingFundedBy: adminName, openingFundedAt: new Date() } });
     } else {
       const expense = await Expense.create({
         expenseId: await generateId("EXP"),
@@ -248,6 +248,7 @@ export async function fundSupervisor(
         date: new Date().toISOString().slice(0, 10),
         description: input.note || `Opening amount added to ${supervisor.name}`,
         notes: input.note,
+        paymentMode: input.paymentMode,
         status: "Approved",
         submittedBy: adminName,
         approvedBy: adminName,
@@ -286,6 +287,7 @@ export async function fundSupervisor(
     date: new Date().toISOString().slice(0, 10),
     description: input.note || `Cash added to ${supervisor.name}`,
     notes: input.note,
+        paymentMode: input.paymentMode,
     status: "Approved",
     submittedBy: adminName,
     approvedBy: adminName,

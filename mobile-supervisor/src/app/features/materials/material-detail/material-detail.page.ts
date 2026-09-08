@@ -11,7 +11,6 @@ import { cubeOutline, timeOutline, businessOutline, checkmarkCircleOutline, grid
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { Material, Vendor } from '../../../shared/models';
 import { DatePipe } from '@angular/common';
-import { StatusPillComponent } from '../../../shared/components';
 
 @Component({
   selector: 'app-material-detail',
@@ -20,7 +19,6 @@ import { StatusPillComponent } from '../../../shared/components';
     FormsModule, DatePipe, RouterLink,
     IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
     IonSpinner, IonIcon, IonRefresher, IonRefresherContent,
-    StatusPillComponent,
   ],
   template: `
     <ion-header class="agb-header">
@@ -50,7 +48,6 @@ import { StatusPillComponent } from '../../../shared/components';
                 {{ material()!.projectName }}
               </p>
             </div>
-            <app-status-pill [tone]="getStatusTone(material()!.status)">{{ material()!.status }}</app-status-pill>
           </div>
 
           <div class="card">

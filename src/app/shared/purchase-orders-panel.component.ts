@@ -33,6 +33,7 @@ type PoDraftLine = {
   unit: string;
   quantity: number;
   amount: number;
+  paymentMode: string;
   gstPercent: number;
 };
 
@@ -68,7 +69,7 @@ type PoDraftLine = {
               <thead><tr><th>PO Number</th><th>Date</th>@if (!projectId) {<th>Project</th>}<th>Vendor</th><th>Items</th><th>Subtotal</th><th>GST</th><th>Grand Total</th></tr></thead>
               <tbody>
                 @for (order of filteredOrders(); track order._id) {
-                  <tr (click)="requestDetail.emit(order.poNumber)">
+                  <tr [class.row-selected]="poActionRow()?._id === order._id" (click)="openPoActionMenu(order, $event)">
                     <td><button type="button">{{ order.poNumber }}</button></td>
                     <td>{{ order.date }}</td>@if (!projectId) {<td>{{ order.projectName }}</td>}<td>{{ order.vendorName }}</td><td>{{ order.items.length }}</td>
                     <td>{{ formatMoney(order.subtotal) }}</td><td>{{ formatMoney(order.totalGst) }}</td><td>{{ formatMoney(order.grandTotal) }}</td>
@@ -77,6 +78,7 @@ type PoDraftLine = {
               </tbody>
             </table>
           </div>
+          @if (isAdmin() && poActionRow()) { <div class="cursor-action-menu" [style.left.px]="poActionPosition().x" [style.top.px]="poActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="openSelectedPo()">Open</button><button type="button" (click)="editSelectedPo()">Edit</button><button type="button" class="danger" (click)="deleteSelectedPo()">Delete</button></div> }
           @if (totalPages() > 1) {
             <nav class="po-pagination" aria-label="Purchase order pagination">
               <span>{{ pageSummary() }}</span>
@@ -170,9 +172,9 @@ type PoDraftLine = {
                 <label>PO Date *</label>
                 <input type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" />
               </div>
-              <div class="form-field">
-                <label>Payment Mode *</label>
-                <agb-searchable-select [ngModel]="paymentMode()" (ngModelChange)="paymentMode.set($any($event))" [options]="paymentModes" [allowCustom]="true" />
+              <div class="form-field po-notes-field">
+                <label>Notes</label>
+                <textarea rows="3" maxlength="2000" [ngModel]="notes()" (ngModelChange)="notes.set($event)" placeholder="Add notes for this purchase order"></textarea>
               </div>
             </div>
           </div>
@@ -187,6 +189,7 @@ type PoDraftLine = {
                   <col class="col-col-unit" />
                   <col class="col-col-qty" />
                   <col class="col-col-amount" />
+                  <col class="col-col-payment" />
                   <col class="col-col-gst" />
                   <col class="col-col-gstamt" />
                   <col class="col-col-total" />
@@ -199,6 +202,7 @@ type PoDraftLine = {
                     <th class="col-unit">Unit</th>
                       <th class="col-qty">Qty</th>
                       <th class="col-amount">Rate (₹)</th>
+                      <th class="col-payment">Payment Mode</th>
                       <th class="col-gst">GST %</th>
                       <th class="col-gstamt">GST Amt (₹)</th>
                       <th class="col-total">Total (₹)</th>
@@ -240,6 +244,7 @@ type PoDraftLine = {
                       <td class="col-unit"><input [readonly]="line.source === 'existing'" [ngModel]="line.unit" (ngModelChange)="updateLine(index, 'unit', $event)" /></td>
                       <td class="col-qty"><input type="number" min="0" [attr.max]="line.source === 'existing' ? approvedQuantityFor(line) : null" [ngModel]="line.quantity" (ngModelChange)="updateLine(index, 'quantity', +$event || 0)" /></td>
                       <td class="col-amount"><input type="number" min="0" step="0.01" [ngModel]="line.amount" (ngModelChange)="updateLine(index, 'amount', +$event || 0)" /></td>
+                      <td class="col-payment"><agb-searchable-select [ngModel]="line.paymentMode" (ngModelChange)="updateLine(index, 'paymentMode', $any($event))" [options]="paymentModes" [allowCustom]="true" /></td>
                       <td class="col-gst">
                         <agb-searchable-select
                           [ngModel]="line.gstPercent"
@@ -290,10 +295,16 @@ type PoDraftLine = {
               <button type="button" class="btn-secondary" [disabled]="exporting()" (click)="downloadExcel()">
                 {{ exporting() === 'excel' ? 'Preparing Excel…' : 'Download Excel' }}
               </button>
-              <button type="button" class="btn-secondary" (click)="editRequest.emit(selectedOrder()!.poNumber)">Edit Purchase Order</button>
+              @if (isAdmin()) { <button type="button" class="btn-secondary" (click)="editRequest.emit(selectedOrder()!.poNumber)">Edit Purchase Order</button> }
+              @if (isAdmin()) {
+                <button type="button" class="btn-danger" [disabled]="saving()" (click)="deleteOrder()">
+                  {{ saving() ? 'Deleting…' : 'Delete Purchase Order' }}
+                </button>
+              }
             </div>
           }
         </div>
+        @if (error()) { <p class="po-error">{{ error() }}</p> }
         @if (selectedOrder(); as order) {
           <div class="quotation-document po-doc po-detail-document">
             <div class="doc-header">
@@ -316,7 +327,7 @@ type PoDraftLine = {
               <div class="client-form-grid po-fields">
                 <div class="form-field"><label>Project</label><div class="po-readonly">{{ order.projectName }}</div></div>
                 <div class="form-field"><label>Vendor</label><div class="po-readonly">{{ order.vendorName }}</div></div>
-                <div class="form-field"><label>Payment Mode</label><div class="po-readonly">{{ order.paymentMode || 'Bank Transfer' }}</div></div>
+                <div class="form-field po-notes-field"><label>Notes</label><div class="po-readonly">{{ order.notes || '—' }}</div></div>
               </div>
             </div>
 
@@ -331,6 +342,7 @@ type PoDraftLine = {
                       <th class="col-unit">Unit</th>
                       <th class="col-qty">Qty</th>
                       <th class="col-amount">Amount (₹)</th>
+                      <th class="col-payment">Payment Mode</th>
                       <th class="col-gst">GST %</th>
                       <th class="col-gstamt">GST Amt (₹)</th>
                       <th class="col-total">Total (₹)</th>
@@ -344,6 +356,7 @@ type PoDraftLine = {
                         <td class="col-unit">{{ item.unit }}</td>
                         <td class="col-qty cell-right">{{ item.quantity }}</td>
                         <td class="col-amount amount-cell">{{ formatMoney(item.itemAmount) }}</td>
+                        <td class="col-payment">{{ item.paymentMode || order.paymentMode || 'Bank Transfer' }}</td>
                         <td class="col-gst cell-center">{{ item.gstPercent }}%</td>
                         <td class="col-gstamt amount-cell">{{ formatMoney(item.gstAmount) }}</td>
                         <td class="col-total amount-cell">{{ formatMoney(itemTotal(item)) }}</td>
@@ -410,6 +423,8 @@ type PoDraftLine = {
     .po-list th { background: #f4f7fb; color: #334155; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
     .po-list tr { cursor: pointer; }
     .po-list tbody tr:hover { background: #f8fbff; }
+    .po-list tbody tr.row-selected { background: #f0f6ff; }
+    .cursor-action-menu { position:fixed;z-index:1200;display:flex;gap:4px;padding:5px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;box-shadow:0 12px 28px rgba(16,24,40,.18) }.cursor-action-menu button{padding:7px 9px;border:0;border-radius:6px;background:transparent;color:#344054;font-weight:700;cursor:pointer}.cursor-action-menu button:hover{background:#f2f4f7}.cursor-action-menu button.danger{color:#b42318}.cursor-action-menu button.danger:hover{background:#fff1f0}
     .po-list td button { border: 0; background: none; color: #003a8c; font-weight: 800; cursor: pointer; padding: 0; text-align: left; }
     .po-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 18px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 13px; }
     .po-pagination-actions { display: flex; align-items: center; gap: 12px; }
@@ -427,6 +442,9 @@ type PoDraftLine = {
     .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
     .btn-secondary { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; background: #eef2ff; color: #2c5cff; border: 1px solid #c7d7fe; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; line-height: 1; }
     .btn-secondary:hover { background: #e0e7ff; border-color: #2c5cff; }
+    .btn-danger { display: inline-flex; align-items: center; padding: 10px 18px; background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; line-height: 1; }
+    .btn-danger:hover:not(:disabled) { background: #ffe4e6; border-color: #fb7185; }
+    .btn-danger:disabled { opacity: 0.65; cursor: not-allowed; }
 
     .quotation-document { background: #fff; border: 1px solid #cbd6e6; border-radius: 14px; padding: 32px; }
     .doc-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 3px solid #002263; margin-bottom: 24px; }
@@ -442,6 +460,7 @@ type PoDraftLine = {
     .section-label { font-size: 11px; font-weight: 700; color: #002263; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 12px; }
     .client-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     .po-fields { grid-template-columns: 2fr 2fr 1fr; }
+    .po-notes-field { grid-column: 1 / -1; }
     .form-field { display: flex; flex-direction: column; gap: 4px; }
     .form-field label { font-size: 11px; font-weight: 600; color: #64748b; }
     .form-field input, .form-field select, .form-field textarea { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #1e293b; background: #fff; }
@@ -615,6 +634,8 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     return `Showing ${first}-${last} of ${total}`;
   });
   readonly selectedOrder = signal<PurchaseOrder | null>(null);
+  readonly poActionRow = signal<PurchaseOrder | null>(null);
+  readonly poActionPosition = signal({ x: 0, y: 0 });
   readonly editingId = signal("");
   readonly vendors = signal<any[]>([]);
   readonly projects = signal<any[]>([]);
@@ -650,7 +671,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   readonly draftProjectId = signal("");
   readonly vendorId = signal("");
   readonly date = signal(new Date().toISOString().slice(0, 10));
-  readonly paymentMode = signal("Bank Transfer");
+  readonly notes = signal("");
   readonly paymentModes = ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS", "IMPS", "Credit Card", "Debit Card", "Net Banking", "Other"];
 
   gstRateOptions() {
@@ -699,6 +720,38 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   closeDetailView() {
     this.selectedOrder.set(null);
     this.closeDetail.emit();
+  }
+
+  isAdmin() { return this.api.user()?.role === "admin"; }
+
+  openPoActionMenu(order: PurchaseOrder, event: MouseEvent) {
+    if (!this.isAdmin()) { this.requestDetail.emit(order.poNumber); return; }
+    this.poActionRow.set(order);
+    this.poActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 190), y: Math.min(event.clientY + 10, window.innerHeight - 52) });
+  }
+  openSelectedPo() { const order = this.poActionRow(); if (order) this.requestDetail.emit(order.poNumber); this.poActionRow.set(null); }
+  editSelectedPo() { const order = this.poActionRow(); if (order) this.editRequest.emit(order.poNumber); this.poActionRow.set(null); }
+  deleteSelectedPo() { const order = this.poActionRow(); if (!order) return; this.selectedOrder.set(order); this.poActionRow.set(null); void this.deleteOrder(); }
+
+  async deleteOrder() {
+    const order = this.selectedOrder();
+    if (!order || !this.isAdmin()) return;
+    const confirmed = window.confirm(
+      `Delete PO ${order.poNumber}? All materials and quantities recorded by this PO will also be removed from inventory.`,
+    );
+    if (!confirmed) return;
+    this.error.set("");
+    this.saving.set(true);
+    try {
+      await firstValueFrom(this.api.deletePurchaseOrder(order._id));
+      await this.loadOrders(1);
+      this.refreshSharedMaterials();
+      this.closeDetailView();
+    } catch (error: any) {
+      this.error.set(error?.error?.error || error?.error?.message || error?.message || "Could not delete purchase order.");
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   private async loadReferenceData() {
@@ -792,6 +845,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       unit: material.unit,
       quantity,
       amount: knownAmount > 0 && quantity > 0 ? knownAmount / quantity : 0,
+      paymentMode: "Bank Transfer",
       gstPercent: 18,
     };
   }
@@ -850,7 +904,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     this.error.set("");
     if (!this.draftProjectId()) { this.error.set("Select the project first."); return; }
     if (!this.vendorId()) { this.error.set("Select a vendor."); return; }
-    if (!this.paymentMode()) { this.error.set("Select a payment mode."); return; }
+    if (this.lines().some((line) => !line.paymentMode.trim())) { this.error.set("Select a payment mode for every row."); return; }
     const invalid = this.lines().some((line) => line.source === "existing"
       ? !line.materialId
         || !this.selectableMaterials().some((material) => material._id === line.materialId)
@@ -864,7 +918,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       const payload = {
         vendorId: this.vendorId(),
         date: this.date(),
-        paymentMode: this.paymentMode(),
+        notes: this.notes().trim(),
         roundOff: this.roundOff(),
         items: this.lines().map((line) => ({
           source: line.source,
@@ -873,6 +927,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
           unit: line.source === "manual" ? line.unit || undefined : undefined,
           quantity: line.quantity,
           rate: line.amount,
+          paymentMode: line.paymentMode,
           gstPercent: line.gstPercent,
         })),
       };
@@ -923,7 +978,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     this.draftProjectId.set(order.projectId);
     this.vendorId.set(order.vendorId);
     this.date.set(order.date);
-    this.paymentMode.set(order.paymentMode || "Bank Transfer");
+    this.notes.set(order.notes || "");
     this.roundOff.set(order.roundOff || 0);
     this.lines.set(order.items.map((item) => ({
       key: crypto.randomUUID(),
@@ -933,6 +988,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       unit: item.unit || "",
       quantity: item.quantity || 0,
       amount: item.rate || 0,
+      paymentMode: item.paymentMode || order.paymentMode || "Bank Transfer",
       gstPercent: item.gstPercent ?? 18,
     })));
     if (this.lines().length === 0) this.lines.set([this.emptyLine()]);
@@ -964,7 +1020,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
         vendorId: order.vendorId,
         orderedDate: order.date,
         purchasedDate: order.date,
-        paymentType: order.paymentMode,
+        paymentType: order.items.find((item) => String(item.materialId || "") === databaseId)?.paymentMode || order.paymentMode,
       };
     }));
   }
@@ -1022,25 +1078,24 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       const sheet = workbook.addWorksheet("Purchase Order", {
         views: [{ showGridLines: false }],
       });
-      [8, 40, 12, 12, 16, 12, 16, 16].forEach((width, index) => {
+      [8, 36, 12, 12, 16, 18, 12, 16, 16].forEach((width, index) => {
         sheet.getColumn(index + 1).width = width;
       });
-      sheet.mergeCells("A1:H1");
+      sheet.mergeCells("A1:I1");
       sheet.getCell("A1").value = this.companyName;
       sheet.getCell("A1").font = { bold: true, size: 16 };
-      sheet.mergeCells("A2:H2");
+      sheet.mergeCells("A2:I2");
       sheet.getCell("A2").value = this.companyAddress;
-      sheet.mergeCells("A3:H3");
+      sheet.mergeCells("A3:I3");
       sheet.getCell("A3").value = `${this.companyState}${this.companyGstin ? ` | GSTIN: ${this.companyGstin}` : ""}`;
-      sheet.mergeCells("A5:H5");
+      sheet.mergeCells("A5:I5");
       sheet.getCell("A5").value = "PURCHASE ORDER";
       sheet.getCell("A5").font = { bold: true, size: 18, color: { argb: "FFFFFFFF" } };
       sheet.getCell("A5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A4A8A" } };
       sheet.getCell("A5").alignment = { horizontal: "center" };
       sheet.addRow(["PO Number", order.poNumber, "Date", order.date, "Project", order.projectName, "Vendor", order.vendorName]);
-      sheet.addRow(["Payment Mode", order.paymentMode || "Bank Transfer"]);
       sheet.addRow([]);
-      const header = sheet.addRow(["S.No", "Description", "Unit", "Qty", "Amount", "GST %", "GST Amount", "Total"]);
+      const header = sheet.addRow(["S.No", "Description", "Unit", "Qty", "Amount", "Payment Mode", "GST %", "GST Amount", "Total"]);
       header.eachCell((cell) => {
         cell.font = { bold: true, color: { argb: "FF002263" } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEAF1FB" } };
@@ -1052,20 +1107,21 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
           item.unit,
           item.quantity,
           item.itemAmount,
+          item.paymentMode || order.paymentMode || "Bank Transfer",
           item.gstPercent,
           item.gstAmount,
           this.itemTotal(item),
         ]);
-        for (let column = 4; column <= 8; column += 1) row.getCell(column).numFmt = "#,##0.00";
+        for (const column of [4, 5, 7, 8, 9]) row.getCell(column).numFmt = "#,##0.00";
       });
       sheet.addRow([]);
-      sheet.addRow(["", "", "", "", "", "", "Subtotal", order.subtotal]);
-      sheet.addRow(["", "", "", "", "", "", "Total GST", order.totalGst]);
-      sheet.addRow(["", "", "", "", "", "", "Round Off", order.roundOff]);
-      const grandTotalRow = sheet.addRow(["", "", "", "", "", "", "Grand Total", order.grandTotal]);
+      sheet.addRow(["", "", "", "", "", "", "", "Subtotal", order.subtotal]);
+      sheet.addRow(["", "", "", "", "", "", "", "Total GST", order.totalGst]);
+      sheet.addRow(["", "", "", "", "", "", "", "Round Off", order.roundOff]);
+      const grandTotalRow = sheet.addRow(["", "", "", "", "", "", "", "Grand Total", order.grandTotal]);
       grandTotalRow.font = { bold: true };
       for (let rowNumber = sheet.rowCount - 3; rowNumber <= sheet.rowCount; rowNumber += 1) {
-        sheet.getRow(rowNumber).getCell(8).numFmt = "#,##0.00";
+        sheet.getRow(rowNumber).getCell(9).numFmt = "#,##0.00";
       }
       sheet.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
       const buffer = await workbook.xlsx.writeBuffer();
@@ -1093,6 +1149,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   onDocumentClick(event: PointerEvent) {
     const target = event.target instanceof Element ? event.target : null;
     if (target && !target.closest(".erp-select-menu")) this.openMenu.set("");
+    if (target && !target.closest(".cursor-action-menu, .po-list tbody tr")) this.poActionRow.set(null);
   }
 
   private async loadAllMaterials(projectId: string): Promise<ExistingMaterial[]> {
@@ -1126,8 +1183,8 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     this.openMenu.set("");
   }
 
-  private resetDraft() { this.openMenu.set(""); this.editingId.set(""); this.draftProjectId.set(""); this.vendorId.set(""); this.date.set(new Date().toISOString().slice(0, 10)); this.paymentMode.set("Bank Transfer"); this.roundOff.set(0); this.lines.set([this.emptyLine()]); this.materials.set([]); this.error.set(""); }
-  private emptyLine(): PoDraftLine { return { key: crypto.randomUUID(), source: "existing", materialId: "", description: "", unit: "", quantity: 0, amount: 0, gstPercent: 18 }; }
+  private resetDraft() { this.openMenu.set(""); this.editingId.set(""); this.draftProjectId.set(""); this.vendorId.set(""); this.date.set(new Date().toISOString().slice(0, 10)); this.notes.set(""); this.roundOff.set(0); this.lines.set([this.emptyLine()]); this.materials.set([]); this.error.set(""); }
+  private emptyLine(): PoDraftLine { return { key: crypto.randomUUID(), source: "existing", materialId: "", description: "", unit: "", quantity: 0, amount: 0, paymentMode: "Bank Transfer", gstPercent: 18 }; }
 }
 
 function filterByName<T>(list: T[], search: string, field: string): T[] {

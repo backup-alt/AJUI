@@ -55,7 +55,7 @@ import { formatMoney } from "../shared/format";
                 class="client-card"
                 role="button"
                 tabindex="0"
-                (click)="openClient(client)"
+                (click)="handleClientCardClick(client, $event)"
                 (keydown.enter)="openClient(client)"
               >
                 <div class="client-card-body">
@@ -86,14 +86,11 @@ import { formatMoney } from "../shared/format";
 
                 <div class="client-card-footer">
                   <span>Open Client</span>
-                  <div class="client-card-footer-actions">
-                    <button type="button" class="client-edit-action" aria-label="Edit client" title="Edit Client" (click)="editClient(client, $event)">
-                      <strong>Edit Client</strong>
-                    </button>
-                  </div>
+                  <span>Click to open</span>
                 </div>
               </article>
             </section>
+            @if (isAdmin() && clientActionRow()) { <div class="cursor-action-menu" [style.left.px]="clientActionPosition().x" [style.top.px]="clientActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedClient()">Open</button><button (click)="editSelectedClient()">Edit</button><button class="danger" (click)="deleteSelectedClient()">Delete</button></div> }
           </main>
         </ion-content>
 
@@ -112,6 +109,7 @@ import { formatMoney } from "../shared/format";
     </ion-split-pane>
   `,
   styles: [`
+    .cursor-action-menu{position:fixed;z-index:1200;display:flex;gap:4px;padding:5px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;box-shadow:0 12px 28px rgba(16,24,40,.18)}.cursor-action-menu button{padding:7px 9px;border:0;border-radius:6px;background:transparent;color:#344054;font-weight:700;cursor:pointer}.cursor-action-menu button:hover{background:#f2f4f7}.cursor-action-menu button.danger{color:#b42318}.cursor-action-menu button.danger:hover{background:#fff1f0}
     .page-search-bar {
       position: relative;
       max-width: 600px;
@@ -146,6 +144,13 @@ import { formatMoney } from "../shared/format";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ClientDashboardPage {
+  isAdmin() { return this.api.user()?.role === "admin"; }
+  readonly clientActionRow = signal<Client | null>(null);
+  readonly clientActionPosition = signal({ x: 0, y: 0 });
+  handleClientCardClick(client: Client, event: MouseEvent) { if (!this.isAdmin()) { this.openClient(client); return; } this.clientActionRow.set(client); this.clientActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 190), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
+  openSelectedClient() { const client = this.clientActionRow(); if (client) this.openClient(client); this.clientActionRow.set(null); }
+  editSelectedClient() { const client = this.clientActionRow(); if (client) this.editClient(client, new MouseEvent("click")); this.clientActionRow.set(null); }
+  deleteSelectedClient() { const client = this.clientActionRow(); if (client) this.deleteClient(client, new MouseEvent("click")); this.clientActionRow.set(null); }
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly router = inject(Router);

@@ -25,6 +25,7 @@ export interface IExpense extends Document {
   runningBalance: number;
   date: string;
   description: string;
+  paymentMode?: string;
   notes?: string;
   status: ExpenseStatus;
   poNumber?: string;
@@ -73,6 +74,7 @@ const expenseSchema = new Schema<IExpense>(
     runningBalance: { type: Number, default: 0 },
     date: { type: String, required: true, index: true },
     description: { type: String, required: true },
+    paymentMode: { type: String, trim: true, default: "Cash", maxlength: 50 },
     notes: { type: String, trim: true, maxlength: 2000 },
     status: {
       type: String,
