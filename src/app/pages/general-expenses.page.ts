@@ -528,7 +528,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             @if (row['billUrl']) {
                               <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
                             } @else {
-                              <span>{{ row['reference'] || '—' }}</span>
                               <label class="bill-link material-bill-upload" [class.disabled]="isGeneralExpenseBillUploading(row)" (click)="$event.stopPropagation()">
                                 <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isGeneralExpenseBillUploading(row)" (change)="uploadGeneralExpenseBill(row, $event)" />
                                 <span>{{ isGeneralExpenseBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
@@ -3871,7 +3870,7 @@ export class GeneralExpensesPage implements OnInit {
   readonly adminActionRow = signal<TableRow | null>(null);
   readonly adminActionPosition = signal({ x: 0, y: 0 });
   openAdminActionMenu(row: TableRow, event: MouseEvent) {
-    if (!this.canRequestOrEdit()) return;
+    if (!this.canRequestOrEdit() || this.activeModule() !== "generalExpenses") return;
     const width = 154;
     const height = 44;
     this.adminActionRow.set(row);

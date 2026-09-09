@@ -1210,7 +1210,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                       <a class="bill-link" [href]="bill.url" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
                                     }
                                   } @else {
-                                    <span>{{ row['reference'] || '—' }}</span>
                                     <label
                                       class="bill-link material-bill-upload"
                                       [class.disabled]="isMaterialBillUploading(row)"
@@ -1239,7 +1238,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                         <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
                                       }
                                     } @else {
-                                      <span>{{ displayCell(row, column.key) || '—' }}</span>
                                       <label class="bill-link material-bill-upload" [class.disabled]="isRowBillUploading(row)">
                                         <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isRowBillUploading(row)" (change)="uploadProjectRowBill(row, $event)" />
                                         <span>{{ isRowBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
@@ -2329,6 +2327,14 @@ export class ProjectWorkspacePage {
   selectRow(row: TableRow, event?: MouseEvent) {
     this.positionRowToolbar(event);
     const key = this.rowKey(row);
+    // Keep edit mode active while the admin interacts with a field or
+    // dropdown inside the selected row. Previously the row click bubbled
+    // after the field click and immediately cleared the edit state.
+    if (this.isRowEditing(row)) {
+      this.selectedRowKeys.set([key]);
+      this.selectedRowKey.set(key);
+      return;
+    }
     const wasSelected = this.selectedRowKeys().includes(key);
     if (wasSelected && this.selectedRowKey() === key) {
       this.clearRowSelection();
@@ -2344,8 +2350,12 @@ export class ProjectWorkspacePage {
   }
 
   selectedActionRow(): TableRow | null {
-    if (!["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")) || this.selectedRowCount() !== 1) return null;
+    if (!this.isManagedWorkspaceSection() || !["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")) || this.selectedRowCount() !== 1) return null;
     return this.selectedRows()[0] || null;
+  }
+
+  private isManagedWorkspaceSection(): boolean {
+    return (["materials", "generalExpenses", "payments", "subcontractors"] as ModuleKey[]).includes(this.activeSection());
   }
 
   async requestAdminEdit(row: TableRow, event?: Event) {
@@ -2677,7 +2687,7 @@ export class ProjectWorkspacePage {
 
   editAdminRow(row: TableRow, event: Event) {
     event.stopPropagation();
-    if (this.api.user()?.role !== "admin") return;
+    if (this.api.user()?.role !== "admin" || !this.isManagedWorkspaceSection()) return;
     const key = this.rowKey(row);
     this.selectedRowKeys.set([key]);
     this.selectedRowKey.set(key);
@@ -5081,6 +5091,7 @@ export class ProjectWorkspacePage {
   }
 
   async deleteRow(row: TableRow) {
+    if (this.api.user()?.role !== "admin" || !this.isManagedWorkspaceSection()) return;
     const key = this.rowKey(row);
     const section = this.activeSection();
     const group = (row as TableRow & { __labourGroup?: TableRow[] })["__labourGroup"];
@@ -5110,6 +5121,7 @@ export class ProjectWorkspacePage {
 
     this.refreshSectionFromBackend(section);
     this.loadProjectExpenseRollup(this.projectId());
+    await this.presentToast("Record deleted successfully.");
   }
 
   private async deleteRowRecord(section: ModuleKey, row: TableRow) {
