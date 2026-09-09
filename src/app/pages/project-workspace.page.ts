@@ -1078,7 +1078,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         </ng-container>
                         <ng-template #standardProjectCell>
                           <div
-                            *ngIf="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeSection(), column.key).length > 0; else editableProjectCell"
+                            *ngIf="isRowEditing(row) && !isReadonlyColumn(column.key) && isControlledEditSelect(activeSection(), column.key); else editableProjectCell"
                             class="erp-select-menu"
                             [class.open]="isSelectMenuOpen(row, column.key)"
                           >
@@ -2414,7 +2414,7 @@ export class ProjectWorkspacePage {
   }
 
   showRowCheckboxes(): boolean {
-    return this.hasSelectedRows();
+    return this.activeSection() !== "materials" && this.hasSelectedRows();
   }
 
   isRowChecked(row: TableRow): boolean {
@@ -2624,54 +2624,6 @@ export class ProjectWorkspacePage {
     this.selectedMaterialDetails.set(null);
   }
 
-  async createPurchaseOrderFromSelection() {
-    const rows = this.selectedRows();
-    if (!rows.length) return;
-    let backendMaterials: any[] = [];
-    try {
-      const response = await firstValueFrom(this.api.listMaterials({ projectId: this.projectId(), limit: 200 }));
-      backendMaterials = response.items || [];
-    } catch {
-      await this.presentToast("Could not verify the selected materials. Please try again.", "danger");
-      return;
-    }
-    const resolved = rows.map((row) => {
-      const mongoId = String(row["_id"] || "").trim();
-      const materialId = String(row["materialId"] || row["id"] || "").trim();
-      return backendMaterials.find((material) =>
-        (mongoId && String(material._id) === mongoId)
-        || (materialId && String(material.materialId) === materialId));
-    });
-    const unavailable = resolved.filter((material) => {
-      if (!material?._id) return true;
-      const poNumber = String(material.poNumber || "").trim();
-      return poNumber !== "" && poNumber !== "Pending";
-    });
-    if (resolved.some((material) => Boolean(material?.isExistingMaterial))) {
-      await this.presentToast(
-        "Existing inventory materials cannot be added to a purchase order. Select only materials that still need to be ordered.",
-        "warning",
-      );
-      return;
-    }
-    if (unavailable.length || resolved.some((material) => !material)) {
-      await this.presentToast(
-        "One or more selected materials are already assigned to a purchase order or could not be found.",
-        "danger",
-      );
-      return;
-    }
-    const materialIds = resolved.map((material) => String(material._id));
-    void this.router.navigate(["/purchase-orders"], {
-      queryParams: {
-        create: "1",
-        projectId: this.projectId(),
-        projectName: this.project()?.name || "",
-        materials: materialIds.join(","),
-      },
-    });
-  }
-
   editSelectedRows() {
     const rows = this.selectedRows();
     if (!rows.length) {
@@ -2863,7 +2815,7 @@ export class ProjectWorkspacePage {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    if (!target.closest(".selectable-data-row, .row-hover-toolbar, .table-actions, .universal-filter-bar, .filter-dialog, .date-filter-panel, .site-workbench")) {
+    if (!target.closest(".selectable-data-row, .cursor-action-menu, .row-hover-toolbar, .table-actions, .universal-filter-bar, .filter-dialog, .date-filter-panel, .site-workbench")) {
       this.clearRowSelection();
     }
 
@@ -5225,11 +5177,19 @@ export class ProjectWorkspacePage {
   }
 
   allowsCustomOption(section: ModuleKey, key: string): boolean {
-    if (key === "site" || key === "siteMaterial" || key === "transactionType" || key === "approvalStatus" || key === "status" || key === "paymentStatus" || key === "attendance") return false;
+    if (key === "site" || key === "siteName" || key === "vendor" || key === "vendorName" || key === "client" || key === "project" || key === "projectName" || key === "siteMaterial" || key === "transactionType" || key === "approvalStatus" || key === "status" || key === "paymentStatus" || key === "attendance") return false;
     // Subcontractor payments must reference an existing sub-contractor
     // and a real site — the backend resolves ids by name, so free-text
     // entries would be rejected. Selection only.
     if (section === "subcontractors" && (key === "subcontractorName" || key === "subcontractor" || key === "siteName")) return false;
+    return this.selectOptions(section, key).length > 0;
+  }
+
+  isControlledEditSelect(section: ModuleKey, key: string): boolean {
+    if (["site", "siteName", "vendor", "vendorName", "client", "project", "projectName"].includes(key)) return true;
+    if (section === "subcontractors" && ["subcontractorName", "subcontractor", "labourType", "paymentType"].includes(key)) return true;
+    if (section === "payments" && key === "mode") return true;
+    if (section === "generalExpenses" && key === "paymentMode") return true;
     return this.selectOptions(section, key).length > 0;
   }
 
