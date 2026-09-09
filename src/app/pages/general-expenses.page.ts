@@ -1974,7 +1974,6 @@ export class GeneralExpensesPage implements OnInit {
       if (row) {
         const key = String(row["_id"] || row["__rowId"] || "");
         this.requestedRowId.set(key);
-        this.startAdminEdit(row);
         window.setTimeout(() => document.querySelector(".requested-row-glow")?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
         window.setTimeout(() => {
           if (this.requestedRowId() === key) this.requestedRowId.set("");
@@ -3880,26 +3879,21 @@ export class GeneralExpensesPage implements OnInit {
     });
   }
   private canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
-  async requestAdminEdit() {
+  requestAdminEdit() {
+    if (!["project_manager", "accountant"].includes(String(this.api.user()?.role || ""))) return;
     const row = this.adminActionRow();
     if (!row) return;
     const id = String(row["_id"] || row["__rowId"] || "");
     const module = this.activeModule();
-    const text = `Please edit the ${module} record ${id}.`;
     const link = `${this.router.url.split("?")[0]}?module=${encodeURIComponent(module)}&record=${encodeURIComponent(id)}`;
     this.adminActionRow.set(null);
-    try {
-      await firstValueFrom(this.api.saveInboxMessage({ text, link }));
-      await this.presentToast("Edit request sent to Admin.");
-      await this.router.navigate(["/inbox"]);
-    } catch (error: any) {
-      await this.presentToast(
-        error?.error?.message || error?.message || "Could not send the edit request. Please retry.",
-        "danger",
-      );
-    }
+    void this.router.navigate(["/inbox"], { queryParams: {
+      request: "General Expense row",
+      link,
+    }});
   }
   editAdminActionRow() {
+    if (this.api.user()?.role !== "admin") return;
     const row = this.adminActionRow();
     if (!row) return;
     this.adminActionRow.set(null);
@@ -3907,6 +3901,7 @@ export class GeneralExpensesPage implements OnInit {
     else this.startAdminEdit(row);
   }
   deleteAdminActionRow() {
+    if (this.api.user()?.role !== "admin") return;
     const row = this.adminActionRow();
     if (!row) return;
     this.adminActionRow.set(null);

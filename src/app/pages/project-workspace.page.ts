@@ -789,20 +789,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action"
-                    *ngIf="!tableViewExpanded() && activeSection() === 'materials' && selectedRowCount() === 1"
-                    title="View selected material details"
-                    aria-label="View selected material details"
-                    (click)="openSelectedMaterialDetails()"
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
-                      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-                      <circle cx="12" cy="12" r="2.75" />
-                    </svg>
-                    View Details
-                  </button>
-                  <button
-                    type="button"
-                    class="primary-table-action"
                     *ngIf="!tableViewExpanded() && activeSection() === 'expenses'"
                     (click)="openAddOpeningCash()"
                     [attr.title]="fundingSupervisorHasOpeningAmount() ? 'Add Cash' : 'Add Opening Cash'"
@@ -2142,7 +2128,6 @@ export class ProjectWorkspacePage {
       const key = this.rowKey(row);
       this.handledRequestedRecord.set(requestKey);
       this.requestedRowKey.set(key);
-      this.editAdminRow(row, new Event("request-edit"));
       window.setTimeout(() => document.querySelector(".requested-row-glow")?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
       window.setTimeout(() => {
         if (this.requestedRowKey() === key) this.requestedRowKey.set("");
@@ -2358,23 +2343,17 @@ export class ProjectWorkspacePage {
     return (["materials", "generalExpenses", "payments", "subcontractors"] as ModuleKey[]).includes(this.activeSection());
   }
 
-  async requestAdminEdit(row: TableRow, event?: Event) {
+  requestAdminEdit(row: TableRow, event?: Event) {
     event?.stopPropagation();
+    if (!["project_manager", "accountant"].includes(String(this.api.user()?.role || "")) || !this.isManagedWorkspaceSection()) return;
     const id = String(row["_id"] || row["__rowId"] || this.rowKey(row));
     const section = this.activeSection();
-    const text = `Please edit the ${section} record ${id} in ${this.project()?.name || "this project"}.`;
     const link = `${this.router.url.split("?")[0]}?record=${encodeURIComponent(id)}`;
     this.clearRowSelection();
-    try {
-      await firstValueFrom(this.api.saveInboxMessage({ text, link }));
-      await this.presentToast("Edit request sent to Admin.");
-      await this.router.navigate(["/inbox"]);
-    } catch (error: any) {
-      await this.presentToast(
-        error?.error?.message || error?.message || "Could not send the edit request. Please retry.",
-        "danger",
-      );
-    }
+    void this.router.navigate(["/inbox"], { queryParams: {
+      request: `${this.activeConfig().label} row in ${this.project()?.name || "this project"}`,
+      link,
+    }});
   }
 
   private positionRowToolbar(event?: MouseEvent) {
