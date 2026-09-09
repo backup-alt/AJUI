@@ -230,11 +230,13 @@ export async function getSupervisor(req: Request, res: Response, next: NextFunct
 
 export async function fundSupervisor(req: Request, res: Response, next: NextFunction) {
   try {
-    const scope = await getScopedProjectIds(req);
-    if (scope !== null && !scope.some(id => String(id) === String(req.body.projectId))) {
+    const sender = await User.findById(req.user?.sub).select("name managedProjectIds").lean();
+    const canFundProject = req.user?.role === "admin" || sender?.managedProjectIds?.some(
+      (id) => String(id) === String(req.body.projectId),
+    );
+    if (!canFundProject) {
       throw new AppError(403, "This project is not assigned to you");
     }
-    const sender = await User.findById(req.user?.sub).select("name").lean();
     const funding = await supervisorService.fundSupervisor(
       req.params.id,
       req.body,
