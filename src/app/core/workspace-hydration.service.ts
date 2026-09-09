@@ -460,14 +460,12 @@ export class WorkspaceHydrationService {
     label: string
   ): void {
     if (!Array.isArray(newRows)) return;
-    const existing = target();
-    if (existing.length === 0 || newRows.length >= existing.length) {
-      target.set(newRows);
-    } else {
-      console.warn(
-        `[hydrate] ${label}: existing has ${existing.length} rows, new fetch returned only ${newRows.length} — keeping existing`
-      );
-    }
+    // A smaller result is valid for role-scoped users. Keeping a larger
+    // previous result made Project Manager and Accountant sessions render
+    // stale rows (or no matching rows at all) even though the API succeeded.
+    // Failed requests are already represented by `null` in safeList, so a
+    // successful response must always become the source of truth.
+    target.set(newRows);
   }
 
   private appendUniqueRows<T extends Record<string, any>>(existing: T[], next: T[]): T[] {

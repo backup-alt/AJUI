@@ -667,8 +667,11 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   });
   readonly filteredMaterials = computed(() => filterByName(this.selectableMaterials(), this.menuSearch(), "name"));
   readonly selectedProjectName = computed(() => {
-    if (this.view === "edit") return this.selectedOrder()?.projectName ?? "";
-    return this.projects().find((p) => p._id === this.draftProjectId())?.name ?? "";
+    const projectId = this.draftProjectId();
+    const currentProjectName = this.projects().find((project) => project._id === projectId)?.name;
+    if (currentProjectName) return currentProjectName;
+    if (this.selectedOrder()?.projectId === projectId) return this.selectedOrder()?.projectName ?? "";
+    return this.projectId === projectId ? this.projectName : "";
   });
   readonly selectedVendorName = computed(() => this.vendors().find((v) => v._id === this.vendorId())?.name ?? "");
   readonly draftProjectId = signal("");
@@ -765,16 +768,17 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
 
   private async loadReferenceData() {
     try {
+      const projectItems = this.projectId
+        ? firstValueFrom(this.api.getProject(this.projectId)).then((result) => result.project ? [result.project] : [])
+        : firstValueFrom(this.api.listProjects({ limit: 200, page: 1 })).then((result) => result.items || []);
       const [vendors, rates, projects] = await Promise.all([
         firstValueFrom(this.api.listVendors({ limit: 200, page: 1 })),
         firstValueFrom(this.api.listPurchaseOrderGstRates()),
-        this.projectId
-          ? Promise.resolve<{ items: any[] }>({ items: [] })
-          : firstValueFrom(this.api.listProjects({ limit: 200, page: 1 })),
+        projectItems,
       ]);
       this.vendors.set(vendors.items || []);
       this.gstRates.set(rates.rates || [0, 5, 12, 18, 28]);
-      this.projects.set(this.projectId ? [{ _id: this.projectId, name: this.projectName }] : (projects.items || []));
+      this.projects.set(projects.length ? projects : (this.projectId ? [{ _id: this.projectId, name: this.projectName }] : []));
       if (this.projectId && !this.draftProjectId()) await this.selectProject(this.projectId);
     } catch { this.vendors.set([]); }
   }

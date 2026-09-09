@@ -530,6 +530,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
 
     purchaseOrder.vendorId = vendor._id;
     purchaseOrder.vendorName = vendor.name;
+    purchaseOrder.projectName = project.name;
     purchaseOrder.date = input.date;
     purchaseOrder.paymentMode = purchaseOrderPaymentMode(normalized);
     purchaseOrder.notes = String(input.notes || "").trim();
@@ -585,8 +586,15 @@ export async function listPurchaseOrders(filter: { projectId?: string; page?: nu
 
 async function summarizePurchaseOrders(orders: any[]) {
   const ids = orders.flatMap(order => order.items.map((item: any) => item.materialId));
-  const materials = ids.length ? await Material.find({ _id: { $in: ids } }).select("givenAmount billUrl receiptImageName billHistory").lean() : [];
-  const byId = new Map(materials.map(material => [String(material._id), material]));
+  const projectIds = [...new Set<string>(orders.map(order => String(order.projectId || "")).filter(Boolean))];
+  const [materialResults, projectResults] = await Promise.all([
+    ids.length ? Material.find({ _id: { $in: ids } }).select("givenAmount billUrl receiptImageName billHistory").lean() : [],
+    projectIds.length ? Project.find({ _id: { $in: projectIds } }).select("name").lean() : [],
+  ]);
+  const materials = materialResults as any[];
+  const projects = projectResults as any[];
+  const byId = new Map<string, any>(materials.map((material): [string, any] => [String(material._id), material]));
+  const projectNamesById = new Map<string, string>(projects.map((project): [string, string] => [String(project._id), project.name]));
   return orders.map(order => {
     const linked = [...new Set<string>(order.items.map((item: any) => String(item.materialId)))].map(id => byId.get(id)).filter(Boolean);
     const billReferences = linked.flatMap(material => {
@@ -594,7 +602,12 @@ async function summarizePurchaseOrders(orders: any[]) {
       if (material?.billUrl && !bills.some(bill => bill.url === material.billUrl)) bills.push({ url: material.billUrl, label: material.receiptImageName || "View bill" });
       return bills;
     });
-    return { ...order, givenAmount: linked.reduce((sum, material) => sum + Number(material?.givenAmount || 0), 0), billReferences };
+    return {
+      ...order,
+      projectName: projectNamesById.get(String(order.projectId || "")) || order.projectName,
+      givenAmount: linked.reduce((sum, material) => sum + Number(material?.givenAmount || 0), 0),
+      billReferences,
+    };
   });
 }
 

@@ -166,6 +166,26 @@ type ToastManager = {
             </section>
 
             <div class="approvals-stack">
+              @if (showMaterial()) {
+                <section class="operations-workbench approvals-workbench approval-section">
+                  <div class="module-toolbar table-first-toolbar"><div><h2>Materials</h2><p>Pending material requests for the projects available to this account.</p></div><span class="approval-count-pill">{{ materialApprovals().length }} pending</span></div>
+                  <div class="table-wrap operations-table approvals-table"><table><thead><tr><th>Client</th><th>Project</th><th>Site</th><th>Material</th><th>Requested</th><th>Vendor</th><th>Date</th><th>Status</th><th *ngIf="isAdmin()">Actions</th></tr></thead><tbody>
+                    <tr *ngFor="let row of materialApprovals()"><td>{{ row.client || '-' }}</td><td>{{ row.project || '-' }}</td><td>{{ row.site || '-' }}</td><td><strong>{{ row.materialName || '-' }}</strong></td><td>{{ row.requestedQuantity || 0 }} {{ row.unit }}</td><td>{{ row.vendor || 'Unassigned' }}</td><td>{{ row.requestDate || '-' }}</td><td><span class="approval-status-pill">{{ row.status }}</span></td><td class="approval-actions" *ngIf="isAdmin()"><button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">Approve</button><button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)">Decline</button></td></tr>
+                    <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" [attr.colspan]="isAdmin() ? 9 : 8"><span>No pending material approvals.</span></td></tr>
+                  </tbody></table></div>
+                </section>
+              }
+
+              @if (showLabour()) {
+                <section class="operations-workbench approvals-workbench approval-section">
+                  <div class="module-toolbar table-first-toolbar"><div><h2>Attendance &amp; Labour</h2><p>Pending labour entries for the projects available to this account.</p></div><span class="approval-count-pill">{{ labourApprovals().length }} pending</span></div>
+                  <div class="table-wrap operations-table approvals-table"><table><thead><tr><th>Client</th><th>Project</th><th>Site</th><th>Date</th><th>Staff / Subcontractor</th><th>Labour Types</th><th>Count</th><th>Status</th><th *ngIf="isAdmin()">Actions</th></tr></thead><tbody>
+                    <tr *ngFor="let row of labourApprovals()"><td>{{ row.client || '-' }}</td><td>{{ row.project || '-' }}</td><td>{{ row.site || '-' }}</td><td>{{ row.attendanceDate || '-' }}</td><td><strong>{{ row.staffName || '-' }}</strong></td><td>{{ row.labourTypes || '-' }}</td><td>{{ row.staffCount || 0 }}</td><td><span class="approval-status-pill">{{ row.status }}</span></td><td class="approval-actions" *ngIf="isAdmin()"><button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">Approve</button><button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)">Decline</button></td></tr>
+                    <tr *ngIf="labourApprovals().length === 0"><td class="empty-row" [attr.colspan]="isAdmin() ? 9 : 8"><span>No pending labour approvals.</span></td></tr>
+                  </tbody></table></div>
+                </section>
+              }
+
               @if (showSiteExpense()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
@@ -266,6 +286,15 @@ type ToastManager = {
               </section>
               }
 
+              @if (otherApprovals().length) {
+                <section class="operations-workbench approvals-workbench approval-section">
+                  <div class="module-toolbar table-first-toolbar"><div><h2>Other Requests</h2><p>Pending expense, payment, and subcontractor requests in your project scope.</p></div><span class="approval-count-pill">{{ otherApprovals().length }} pending</span></div>
+                  <div class="table-wrap operations-table approvals-table"><table><thead><tr><th>Type</th><th>Project</th><th>Site</th><th>Description</th><th>Amount</th><th>Status</th><th *ngIf="isAdmin()">Actions</th></tr></thead><tbody>
+                    <tr *ngFor="let row of otherApprovals()"><td>{{ approvalModuleLabel(row.module) }}</td><td>{{ row.project || '-' }}</td><td>{{ row.site || '-' }}</td><td><strong>{{ $any(row).description || $any(row).subcontractorName || '-' }}</strong></td><td>{{ $any(row).amount || $any(row).contractValue || '-' }}</td><td><span class="approval-status-pill">{{ row.status }}</span></td><td class="approval-actions" *ngIf="isAdmin()"><button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">Approve</button><button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)">Decline</button></td></tr>
+                  </tbody></table></div>
+                </section>
+              }
+
 
 
 
@@ -292,12 +321,8 @@ export class PendingApprovalsPage implements OnInit {
   private readonly api = inject(ApiService);
   isAdmin() { return this.api.user()?.role === "admin"; }
 
-  // Material approvals are no longer surfaced on this page — they are
-  // managed inline in the project workspace "Materials" tab (and on the
-  // universal dashboard). Keep the signal for legacy callers that might
-  // still toggle it; the section is always hidden.
-  readonly showMaterial = signal(false);
-  readonly showLabour = signal(false);
+  readonly showMaterial = signal(true);
+  readonly showLabour = signal(true);
   readonly showSiteExpense = signal(false);
   readonly isLoading = signal(false);
   readonly loadError = signal(false);
@@ -319,6 +344,7 @@ export class PendingApprovalsPage implements OnInit {
   private _materialRows = signal<MaterialApprovalRow[]>([]);
   private _labourRows = signal<LabourApprovalRow[]>([]);
   private _siteExpenseRows = signal<ExpenseApprovalRow[]>([]);
+  private _otherRows = signal<ApprovalBaseRow[]>([]);
 
   async ngOnInit() {
     this.showSiteExpense.set(true);
@@ -330,13 +356,10 @@ export class PendingApprovalsPage implements OnInit {
     this.loadError.set(false);
     try {
       const all = await this.approvalsService.fetchApprovals({ status: "Pending", limit: 25 });
-      // Material rows are filtered out of the queue (the project workspace
-      // "Materials" tab is now the single source of truth for material
-      // approvals). We still split them so any caller that peeks the signal
-      // sees the original layout.
       this._materialRows.set(all.filter((r) => r.module === "materials") as MaterialApprovalRow[]);
       this._labourRows.set(all.filter((r) => r.module === "labour") as LabourApprovalRow[]);
       this._siteExpenseRows.set(all.filter((r) => r.module === "expenses") as ExpenseApprovalRow[]);
+      this._otherRows.set(all.filter((r) => !["materials", "labour", "expenses"].includes(r.module)) as ApprovalBaseRow[]);
     } catch {
       this.loadError.set(true);
     } finally {
@@ -344,13 +367,23 @@ export class PendingApprovalsPage implements OnInit {
     }
   }
 
-  readonly materialApprovals = computed(() => [] as MaterialApprovalRow[]);
+  readonly materialApprovals = computed(() =>
+    this.showMaterial() ? this._materialRows().filter((row) => this.isPending(row.status)) : []
+  );
   readonly labourApprovals = computed(() =>
     this.showLabour() ? this._labourRows().filter((row) => this.isPending(row.status)) : []
   );
   readonly siteExpenseApprovals = computed<ExpenseApprovalRow[]>(() =>
     this.showSiteExpense() ? this._siteExpenseRows().filter((row) => this.isPending(row.status)) : ([] as ExpenseApprovalRow[])
   );
+  readonly otherApprovals = computed(() => this._otherRows().filter((row) => this.isPending(row.status)));
+
+  approvalModuleLabel(module: SharedModuleKey): string {
+    if (module === "generalExpenses") return "Expense";
+    if (module === "payments") return "Payment";
+    if (module === "subcontractors") return "Subcontractor";
+    return module;
+  }
 
   pendingTotal(): number {
     return this.allPendingRows().length;
@@ -366,7 +399,7 @@ export class PendingApprovalsPage implements OnInit {
 
   toggleFilter(type: string) {
     switch (type) {
-      case "material": /* no-op — material approvals hidden */ break;
+      case "material": this.showMaterial.update(v => !v); break;
       case "labour": this.showLabour.update(v => !v); break;
       case "site_expense": this.showSiteExpense.update(v => !v); break;
     }
@@ -374,7 +407,7 @@ export class PendingApprovalsPage implements OnInit {
 
   isFilterActive(type: string): boolean {
     switch (type) {
-      case "material": return false;
+      case "material": return this.showMaterial();
       case "labour": return this.showLabour();
       case "site_expense": return this.showSiteExpense();
       default: return true;
@@ -492,6 +525,7 @@ export class PendingApprovalsPage implements OnInit {
       ...this._materialRows(),
       ...this._labourRows(),
       ...this._siteExpenseRows(),
+      ...this._otherRows(),
     ];
     return all.find((r) => r.rowId === rowId) ?? null;
   }
@@ -510,6 +544,8 @@ export class PendingApprovalsPage implements OnInit {
       this._siteExpenseRows.update((rows) =>
         rows.some((r) => r.rowId === rowId) ? rows : [...rows, row as ExpenseApprovalRow]
       );
+    } else {
+      this._otherRows.update((rows) => rows.some((r) => r.rowId === rowId) ? rows : [...rows, row]);
     }
   }
 
@@ -535,6 +571,7 @@ export class PendingApprovalsPage implements OnInit {
     this._materialRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
     this._labourRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
     this._siteExpenseRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
+    this._otherRows.update((rows) => rows.filter((r) => r.rowId !== rowId));
   }
 
   private allPendingRows(): ApprovalBaseRow[] {
@@ -542,6 +579,7 @@ export class PendingApprovalsPage implements OnInit {
       ...this.materialApprovals(),
       ...this.labourApprovals(),
       ...this.siteExpenseApprovals(),
+      ...this.otherApprovals(),
     ];
   }
 

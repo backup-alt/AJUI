@@ -487,6 +487,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                     <tr
                       *ngFor="let row of tableState.rows; trackBy: trackRow"
                       [class.row-selected]="adminActionRow() === row"
+                      [class.requested-row-glow]="isRequestedRow(row)"
                       (click)="openAdminActionMenu(row, $event)"
                     >
                       <td
@@ -526,17 +527,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           <ng-container *ngIf="activeModule() === 'generalExpenses' && column.key === 'reference'; else standardNonReceiptCell">
                             @if (row['billUrl']) {
                               <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
-                            } @else {
-                              <input #generalExpenseBillInput type="file" hidden accept="image/*,application/pdf" (change)="uploadGeneralExpenseBill(row, $event)" />
-                              <button
-                                type="button"
-                                class="bill-link material-bill-upload"
-                                [disabled]="isGeneralExpenseBillUploading(row)"
-                                (click)="$event.stopPropagation(); generalExpenseBillInput.click()"
-                              >
-                                {{ isGeneralExpenseBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}
-                              </button>
-                            }
+                            } @else if (!adminRowEditing(row)) { <span>{{ row['reference'] || '—' }}</span> }
+                            <label *ngIf="adminRowEditing(row)" class="bill-link material-bill-upload" [class.disabled]="isGeneralExpenseBillUploading(row)" (click)="$event.stopPropagation()">
+                              <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isGeneralExpenseBillUploading(row)" (change)="uploadGeneralExpenseBill(row, $event)" />
+                              <span>{{ isGeneralExpenseBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
+                            </label>
                           </ng-container>
                           <ng-template #standardNonReceiptCell>
                           <button
@@ -546,12 +541,27 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             (click)="openMaterialPurchaseOrder(row, $event)"
                           >{{ row[column.key] }}</button>
                           <ng-template #standardReadonlyCell>
+                          <div
+                            *ngIf="adminRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeModule(), column.key).length > 0; else universalEditableTextCell"
+                            class="erp-select-menu"
+                            [class.open]="isSelectMenuOpen(row, column.key)"
+                          >
+                            <button type="button" class="erp-select-trigger" (click)="toggleSelectMenu(row, column.key)">
+                              <span>{{ displayCell(row, column.key) || 'Select' }}</span>
+                              <svg viewBox="0 0 20 20" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+                            </button>
+                            <div class="erp-select-panel" *ngIf="isSelectMenuOpen(row, column.key)">
+                              <button *ngFor="let option of selectOptions(activeModule(), column.key)" type="button" [class.selected]="option === row[column.key]" (click)="selectCellOptionForRow(row, column.key, option)">{{ option }}</button>
+                            </div>
+                          </div>
+                          <ng-template #universalEditableTextCell>
                           <span
                             class="editable-cell" [class.cell-readonly]="!adminRowEditing(row)" [attr.contenteditable]="adminRowEditing(row) && !isReadonlyColumn(column.key) ? 'true' : null" (blur)="adminRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(row, column.key, $any($event.target).textContent || '')"
                             spellcheck="false"
                           >
                             {{ displayCell(row, column.key) }}
                           </span>
+                          </ng-template>
                           </ng-template>
                           </ng-template>
                         </ng-template>
@@ -1684,6 +1694,15 @@ const siteMaterialDetailFields: FieldSchema[] = [
     .general-expense-total-strip .general-expense-total-primary strong { color: #0b3b85; font-size: 22px; }
     .material-bill-upload { border: 0; cursor: pointer; }
     .material-bill-upload:disabled { cursor: wait; opacity: 0.65; }
+    .material-bill-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+    tr.requested-row-glow > td {
+      background: #f8fbff;
+      box-shadow: inset 0 2px 0 #84adff, inset 0 -2px 0 #84adff;
+      animation: requested-record-glow 1.15s ease-in-out 3;
+    }
+    tr.requested-row-glow > td:first-child { box-shadow: inset 2px 0 0 #84adff, inset 0 2px 0 #84adff, inset 0 -2px 0 #84adff; }
+    tr.requested-row-glow > td:last-child { box-shadow: inset -2px 0 0 #84adff, inset 0 2px 0 #84adff, inset 0 -2px 0 #84adff; }
+    @keyframes requested-record-glow { 50% { background: #edf4ff; filter: drop-shadow(0 0 5px rgba(23, 92, 211, .22)); } }
     @media (max-width: 760px) {
       .general-expense-total-strip { grid-template-columns: 1fr; }
     }
@@ -1951,7 +1970,15 @@ export class GeneralExpensesPage implements OnInit {
     if (!recordId) return;
     queueMicrotask(() => {
       const row = this.tableState().rows.find((item) => String(item["_id"] || item["__rowId"] || "") === recordId);
-      if (row) this.startAdminEdit(row);
+      if (row) {
+        const key = String(row["_id"] || row["__rowId"] || "");
+        this.requestedRowId.set(key);
+        this.startAdminEdit(row);
+        window.setTimeout(() => document.querySelector(".requested-row-glow")?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+        window.setTimeout(() => {
+          if (this.requestedRowId() === key) this.requestedRowId.set("");
+        }, 4200);
+      }
     });
   }
 
@@ -3835,6 +3862,10 @@ export class GeneralExpensesPage implements OnInit {
   }
 
   readonly adminEditingRow = signal("");
+  readonly requestedRowId = signal("");
+  isRequestedRow(row: TableRow): boolean {
+    return this.requestedRowId() === String(row["_id"] || row["__rowId"] || "");
+  }
   readonly adminActionRow = signal<TableRow | null>(null);
   readonly adminActionPosition = signal({ x: 0, y: 0 });
   openAdminActionMenu(row: TableRow, event: MouseEvent) {
@@ -4565,7 +4596,6 @@ export class GeneralExpensesPage implements OnInit {
   }
 
   selectOptions(module: DashboardModule, key: string): string[] {
-    if (module === "generalExpenses" && key === "paidBy") return [];
     if (key === "site" || key === "assignedSite") return this.siteOptionsForModule(module);
     if (key === "vendor" || key === "vendorName") return this.vendorNameOptions();
     if (key === "project") return this.projectNameOptions();
@@ -4610,7 +4640,7 @@ export class GeneralExpensesPage implements OnInit {
       if (module === "materials") return ["Pending", "Approved", "Received", "Not Received"];
       return ["Pending", "Approved", "Declined"];
     }
-    if (key === "paymentMode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
+    if (key === "paymentMode" || key === "mode") return ["Cash", "NEFT", "UPI", "Bank Transfer", "Cheque"];
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
     if (key === "paymentType") return ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS"];
     if (module === "subcontractors" && key === "labourType") {

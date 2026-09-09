@@ -126,13 +126,14 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   const now = Date.now();
   const cached = userScopeCache.get(req.user.sub);
   let user: { managedProjectIds?: Types.ObjectId[] } | null = null;
+  let scopeLookupFailed = false;
   if (cached && cached.expiresAt > now) {
     user = { managedProjectIds: cached.managedProjectIds.map((id) => new Types.ObjectId(id)) };
   } else {
     try {
       user = await withRetry(
-        () => User.findById(userId).select("managedProjectIds").lean().maxTimeMS(2000),
-        { label: "rbac.userLookup", maxAttempts: 1 }
+        () => User.findById(userId).select("managedProjectIds").lean().maxTimeMS(8000),
+        { label: "rbac.userLookup", maxAttempts: 3 }
       );
       if (user) {
         userScopeCache.set(req.user.sub, {
@@ -141,12 +142,25 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
         });
       }
     } catch (err) {
-      console.warn("[rbac] User lookup failed:", (err as Error).message);
+      scopeLookupFailed = true;
+      console.warn("[rbac] User lookup failed after retries:", (err as Error).message);
     }
   }
-  const managedProjectIds: Types.ObjectId[] = (user?.managedProjectIds || []).map(
-    (id) => new Types.ObjectId(String(id))
-  );
+  const tokenProjectIds = (req.user.managedProjectIds || [])
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
+  const managedProjectIds: Types.ObjectId[] = user
+    ? (user.managedProjectIds || []).map((id) => new Types.ObjectId(String(id)))
+    : scopeLookupFailed && tokenProjectIds.length
+      ? tokenProjectIds
+      : [];
+
+  // A failed database lookup must not masquerade as a valid empty assignment.
+  // New access tokens carry the last verified scope as a resilience fallback;
+  // older tokens cannot do that safely, so return an actionable error instead.
+  if (scopeLookupFailed && !tokenProjectIds.length && (role === "project_manager" || role === "accountant")) {
+    throw new AppError(503, "Could not load your assigned projects. Please retry.");
+  }
 
   // For PM/accountant, ALWAYS scope to their assigned projects.
   // Empty managedProjectIds means they see nothing (not everything).

@@ -23,6 +23,31 @@
   --app-font-scale: 1;
 }
 
+/* Inbox conversation list and page-loading states. */
+.inbox-content .conversation-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 390px; }
+.inbox-content .conversation-layout.single { grid-template-columns: 1fr; }
+.inbox-content .conversation-list { border-right: 1px solid #eaecf0; background: #fbfcfe; }
+.inbox-content .conversation-list > button { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 11px; width: 100%; padding: 14px 16px; border: 0; border-bottom: 1px solid #eaecf0; border-radius: 0; background: transparent; text-align: left; }
+.inbox-content .conversation-list > button:hover { background: #f2f6fc; }
+.inbox-content .conversation-list > button.active { background: #eef4ff; box-shadow: inset 3px 0 #175cd3; }
+.inbox-content .conversation-copy { display: grid; min-width: 0; gap: 2px; }
+.inbox-content .conversation-copy strong,
+.inbox-content .conversation-copy small,
+.inbox-content .conversation-copy em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-content .conversation-copy em { margin-top: 3px; color: #98a2b3; font-size: 11px; font-style: normal; }
+.inbox-content .unread { display: flex; min-width: 20px; height: 20px; align-items: center; justify-content: center; padding: 0 6px; border-radius: 999px; background: #d92d20; color: #fff; font-size: 10px; font-weight: 800; }
+.inbox-content .conversation-panel { min-width: 0; }
+.inbox-content .conversation-empty { min-height: 390px !important; }
+.inbox-content .loader-block { display: flex; min-height: 260px; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #667085; }
+.inbox-content .activity-loader { min-height: 300px; }
+.inbox-content .spinner { width: 30px; height: 30px; border: 3px solid #dbe7fb; border-top-color: #175cd3; border-radius: 50%; animation: inbox-spin .75s linear infinite; }
+.inbox-content .composer textarea { height: 96px !important; min-height: 96px !important; max-height: 96px !important; resize: none !important; overflow-y: auto !important; }
+@keyframes inbox-spin { to { transform: rotate(360deg); } }
+@media (max-width: 800px) {
+  .inbox-content .conversation-layout { grid-template-columns: 1fr; }
+  .inbox-content .conversation-list { max-height: 260px; overflow: auto; border-right: 0; border-bottom: 1px solid #eaecf0; }
+}
+
 :root[data-font-size="sm"] { --app-font-scale: 0.85; }
 :root[data-font-size="md"] { --app-font-scale: 1.00; }
 :root[data-font-size="lg"] { --app-font-scale: 1.15; }

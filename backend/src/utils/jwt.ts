@@ -4,6 +4,7 @@ import { env } from "../config/env.js";
 export interface AccessTokenPayload extends JwtPayload {
   sub: string;
   role: string;
+  managedProjectIds?: string[];
 }
 
 export interface RefreshTokenPayload extends JwtPayload {
@@ -11,8 +12,8 @@ export interface RefreshTokenPayload extends JwtPayload {
   jti: string;
 }
 
-export function signAccessToken(userId: string, role: string): string {
-  const payload: AccessTokenPayload = { sub: userId, role };
+export function signAccessToken(userId: string, role: string, managedProjectIds: string[] = []): string {
+  const payload: AccessTokenPayload = { sub: userId, role, managedProjectIds };
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, {
     expiresIn: env.JWT_ACCESS_EXPIRY,
   } as SignOptions);

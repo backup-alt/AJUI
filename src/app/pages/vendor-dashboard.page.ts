@@ -116,7 +116,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                   </div>
                 }
               </section>
-              @if (canRequestOrEdit() && vendorActionRow()) { <div class="cursor-action-menu" [style.left.px]="vendorActionPosition().x" [style.top.px]="vendorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedVendor()">Open</button>@if (isAdmin()) { <button (click)="editSelectedVendor()">Edit</button> } @else { <button (click)="requestVendorEdit()">Request edit</button> }</div> }
+              @if (canRequestOrEdit() && vendorActionRow()) { <div class="cursor-action-menu" [style.left.px]="vendorActionPosition().x" [style.top.px]="vendorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedVendor()">Open</button>@if (isAdmin()) { <button (click)="editSelectedVendor()">Edit</button><button class="danger" (click)="deleteSelectedVendor()">Delete</button> } @else { <button (click)="requestVendorEdit()">Request edit</button> }</div> }
             } @else if (!selectedSite()) {
               <section class="vendor-breadcrumb">
                 <div class="vendor-breadcrumb-copy">
@@ -974,6 +974,7 @@ export class VendorDashboardPage {
   handleVendorCardClick(vendor: Vendor, event: MouseEvent) { if (!this.canRequestOrEdit()) { this.openVendor(vendor); return; } this.vendorActionRow.set(vendor); this.vendorActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   openSelectedVendor() { const vendor = this.vendorActionRow(); if (vendor) this.openVendor(vendor); this.vendorActionRow.set(null); }
   editSelectedVendor() { const vendor = this.vendorActionRow(); if (vendor) this.editVendor(vendor, new MouseEvent("click")); this.vendorActionRow.set(null); }
+  deleteSelectedVendor() { const vendor = this.vendorActionRow(); this.vendorActionRow.set(null); if (vendor && this.isAdmin()) this.deleteVendor(vendor.id); }
   requestVendorEdit() { const vendor = this.vendorActionRow(); if (!vendor) return; this.vendorActionRow.set(null); void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit vendor ${vendor.name}.`, link: `/vendors?edit=${vendor._id || vendor.id}` } }); }
   readonly paymentTypeOptions = ["Cash", "NEFT", "Bank Transfer", "UPI", "Cheque"];
   readonly data = inject(ErpDataService);

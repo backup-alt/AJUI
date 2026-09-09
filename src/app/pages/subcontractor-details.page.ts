@@ -125,7 +125,7 @@ import { SearchableSelectComponent } from "../shared/searchable-select.component
                   </tbody>
                 </table>
               </section>
-              @if (paymentActionRow()) { <div class="cursor-action-menu" [style.left.px]="paymentActionPosition().x" [style.top.px]="paymentActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedPayment()"><ion-icon name="pencil-outline"></ion-icon>Edit</button> } @else { <button type="button" (click)="requestPaymentEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
+              @if (paymentActionRow()) { <div class="cursor-action-menu" [style.left.px]="paymentActionPosition().x" [style.top.px]="paymentActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedPayment()"><ion-icon name="pencil-outline"></ion-icon>Edit</button><button type="button" class="danger" (click)="deleteSelectedPayment()"><ion-icon name="trash-outline"></ion-icon>Delete</button> } @else { <button type="button" (click)="requestPaymentEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
               </section>
               }
             }
@@ -358,6 +358,7 @@ export class SubcontractorDetailsPage {
   isAdmin() { return this.api.user()?.role === "admin"; }
   openPaymentActionMenu(payment: SubcontractorPayment, event: MouseEvent) { this.paymentActionRow.set(payment); this.paymentActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   editSelectedPayment() { const payment = this.paymentActionRow(); if (payment && this.isAdmin()) this.openEditPayment(payment); this.paymentActionRow.set(null); }
+  deleteSelectedPayment() { const payment = this.paymentActionRow(); this.paymentActionRow.set(null); if (!payment || !this.isAdmin() || !confirm("Delete this payment?")) return; this.api.deleteSubcontractorPayment(payment._id).subscribe({ next: () => this.load() }); }
   requestPaymentEdit() { const payment = this.paymentActionRow(); if (!payment) return; this.paymentActionRow.set(null); void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit the subcontractor payment dated ${payment.date}.`, link: `/subcontractors/${this.subcontractorId}?editPayment=${payment._id}` } }); }
 
   readonly subcontractor = signal<any | null>(null);

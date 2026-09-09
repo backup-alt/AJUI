@@ -169,11 +169,13 @@ const STORAGE_KEYS = {
 
 @Injectable({ providedIn: "root" })
 export class ApiService {
-  listInbox(page = 1): Observable<{items: any[]; hasMore: boolean}> {
-    return this.http.get<{items: any[]; hasMore: boolean}>(`${this.baseUrl}/inbox`, { headers: this.authHeaders(), params: {page} });
+  listInbox(page = 1, ownerId?: string): Observable<{items: any[]; page: number; total: number; totalPages: number; hasMore: boolean}> {
+    const params: Record<string, string | number> = { page };
+    if (ownerId) params["ownerId"] = ownerId;
+    return this.http.get<{items: any[]; page: number; total: number; totalPages: number; hasMore: boolean}>(`${this.baseUrl}/inbox`, { headers: this.authHeaders(), params });
   }
-  inboxActivity(page = 1): Observable<{items: any[]; page: number; hasMore: boolean}> {
-    return this.http.get<{items: any[]; page: number; hasMore: boolean}>(`${this.baseUrl}/inbox/activity`, { headers: this.authHeaders(), params: {page} });
+  inboxActivity(page = 1): Observable<{items: any[]; page: number; total: number; totalPages: number; hasMore: boolean}> {
+    return this.http.get<{items: any[]; page: number; total: number; totalPages: number; hasMore: boolean}>(`${this.baseUrl}/inbox/activity`, { headers: this.authHeaders(), params: {page} });
   }
   saveInboxMessage(body: {text: string; ownerId?: string; link?: string}): Observable<any> {
     return this.http.post(`${this.baseUrl}/inbox`, body, {headers: this.authHeaders()});
@@ -688,6 +690,17 @@ export class ApiService {
       .pipe(catchError(this.handleError));
   }
 
+  uploadExpenseReceipt(id: string, payload: { data: string; mimeType: string; fileName?: string }): Observable<{ expense: any }> {
+    return this.http.post<{ expense: any }>(`${this.baseUrl}/expenses/${id}/receipt`, payload, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.cache.invalidate("/expenses");
+        this.cache.invalidate("/approvals");
+        this.cache.invalidate("/dashboard");
+      }),
+      catchError(this.handleError)
+    );
+  }
+
   getProjectExpenseOutputRollup(projectId: string): Observable<ProjectExpenseOutputRollup> {
     return this.http
       .get<ProjectExpenseOutputRollup>(
@@ -975,6 +988,13 @@ export class ApiService {
     );
   }
 
+  deleteProject(id: string): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/projects/${id}`, { headers: this.authHeaders() }).pipe(
+      tap(() => this.cache.invalidate("/projects")),
+      catchError(this.handleError),
+    );
+  }
+
   getProject(id: string): Observable<{ project: any }> {
     return this.http.get<{ project: any }>(`${this.baseUrl}/projects/${id}`, { headers: this.authHeaders() }).pipe(
       catchError(this.handleError)
@@ -1007,7 +1027,7 @@ export class ApiService {
   }
 
   // =================== APPROVALS ===================
-  listApprovals(params?: { type?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
+  listApprovals(params?: { type?: string; projectId?: string; status?: string; page?: number; limit?: number }): Observable<PaginatedResponse<any>> {
     let query = "";
     if (params) {
       const q = new URLSearchParams();

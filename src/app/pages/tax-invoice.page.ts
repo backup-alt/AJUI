@@ -139,7 +139,7 @@ function numberToWords(num: number): string {
                     </tbody>
                   </table>
                 </section>
-                @if (canRequestOrEdit() && invoiceActionRow()) { <div class="cursor-action-menu" [style.left.px]="invoiceActionPosition().x" [style.top.px]="invoiceActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedInvoice()"><ion-icon name="pencil-outline"></ion-icon>Edit</button> } @else { <button type="button" (click)="requestInvoiceEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
+                @if (canRequestOrEdit() && invoiceActionRow()) { <div class="cursor-action-menu" [style.left.px]="invoiceActionPosition().x" [style.top.px]="invoiceActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedInvoice()"><ion-icon name="pencil-outline"></ion-icon>Edit</button><button type="button" class="danger" (click)="deleteSelectedInvoice()"><ion-icon name="trash-outline"></ion-icon>Delete</button> } @else { <button type="button" (click)="requestInvoiceEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
               }
             } @else {
               <!-- Invoice Editor View -->
@@ -737,6 +737,7 @@ export class TaxInvoicePage {
   readonly invoiceActionPosition = signal({ x: 0, y: 0 });
   openInvoiceActionMenu(invoice: TaxInvoice, event: MouseEvent) { if (!this.canRequestOrEdit()) return; this.invoiceActionRow.set(invoice); this.invoiceActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   editSelectedInvoice() { const invoice = this.invoiceActionRow(); if (invoice) this.editInvoice(invoice); this.invoiceActionRow.set(null); }
+  deleteSelectedInvoice() { const invoice = this.invoiceActionRow(); this.invoiceActionRow.set(null); if (invoice && this.isAdmin()) this.deleteInvoice(invoice.id); }
   requestInvoiceEdit() {
     const invoice = this.invoiceActionRow();
     if (!invoice) return;

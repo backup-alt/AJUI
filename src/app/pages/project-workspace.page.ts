@@ -234,6 +234,16 @@ const siteMaterialDetailFields: FieldSchema[] = [
   styles: [`
     .cursor-action-menu { position: fixed; z-index: 1200; display: flex; gap: 4px; padding: 5px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; box-shadow: 0 12px 28px rgba(16,24,40,.18); }
     .cursor-action-menu button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: #344054; font-size: 12px; font-weight: 700; cursor: pointer; }.cursor-action-menu button:hover { background: #f2f4f7; }.cursor-action-menu button.danger { color: #b42318; }.cursor-action-menu button.danger:hover { background: #fff1f0; }.cursor-action-menu .svg-icon { width: 15px; height: 15px; }
+    .selectable-data-row.requested-row-glow > td {
+      position: relative;
+      z-index: 1;
+      background: #f8fbff;
+      box-shadow: inset 0 2px 0 #84adff, inset 0 -2px 0 #84adff;
+      animation: requested-record-glow 1.15s ease-in-out 3;
+    }
+    .selectable-data-row.requested-row-glow > td:first-child { box-shadow: inset 2px 0 0 #84adff, inset 0 2px 0 #84adff, inset 0 -2px 0 #84adff; }
+    .selectable-data-row.requested-row-glow > td:last-child { box-shadow: inset -2px 0 0 #84adff, inset 0 2px 0 #84adff, inset 0 -2px 0 #84adff; }
+    @keyframes requested-record-glow { 50% { background: #edf4ff; filter: drop-shadow(0 0 5px rgba(23, 92, 211, .22)); } }
     .operations-dialog:has(.draft-select-menu.open) {
       overflow: visible;
     }
@@ -917,10 +927,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
 
               <ng-container *ngIf="tableState() as tableState">
               <div class="table-meta-strip" *ngIf="!tableViewExpanded()">
-                <span>{{ activeSection() === 'inventory' ? inventoryMaterialCards().length + ' unique materials' : (activeSection() === 'materials' ? materialOrderRows().length : tableState.rows.length) + ' rows' }}</span>
-                <span>{{ activeSection() === 'inventory' ? 'Card view' : (activeSection() === 'materials' ? 7 : tableState.columns.length) + ' fields' }}</span>
+                <span>{{ activeSection() === 'inventory' ? inventoryMaterialCards().length + ' unique materials' : tableState.rows.length + ' rows' }}</span>
+                <span>{{ activeSection() === 'inventory' ? 'Card view' : tableState.columns.length + ' fields' }}</span>
                 <span>{{ selectedFilterCount() }} active filters</span>
-                <span *ngIf="activeSection() !== 'inventory' && activeSection() !== 'materials'">Rows edit after selection</span>
+                <span *ngIf="activeSection() !== 'inventory'">Rows edit after selection</span>
                 <button type="button" class="meta-reset-action" *ngIf="activeSection() !== 'inventory' && hiddenFieldCount(activeSection())" (click)="resetFields(activeSection())">
                   Reset fields
                 </button>
@@ -970,11 +980,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                 <p class="inventory-card-empty" *ngIf="inventoryMaterialCards().length === 0">No inventory materials match the current filters.</p>
               </section>
 
-              <div class="table-wrap operations-table" *ngIf="activeSection() === 'materials'">
-                <table><thead><tr><th>PO Number</th><th>Bill / Reference</th><th>Vendor</th><th>Added Date</th><th>Issued Amount</th><th>Given Amount</th><th>Balance</th><th>Notes</th></tr></thead>
-                <tbody><tr *ngFor="let order of materialOrderRows()"><td><button class="bill-link" (click)="openPurchaseOrder(order.poNumber, $event)">{{ order.poNumber }}</button></td><td><span class="material-bill-actions"><a class="bill-link" *ngFor="let bill of order.bills" [href]="bill.url" target="_blank" rel="noopener noreferrer">View Bill</a><label *ngIf="!order.bills.length" class="bill-link material-bill-upload" [class.disabled]="isMaterialBillUploading(order)"><input type="file" class="material-bill-file-input" accept="image/*,application/pdf" [disabled]="isMaterialBillUploading(order)" (change)="uploadMaterialBill(order, $event)" /><span>{{ isMaterialBillUploading(order) ? 'Uploading…' : 'Upload Bill' }}</span></label></span></td><td>{{ order.vendorName }}</td><td>{{ order.date | date:'dd MMM yyyy' }}</td><td>{{ formatMoney(order.grandTotal) }}</td><td>{{ formatMoney(order.given) }}</td><td>{{ formatMoney(order.grandTotal - order.given) }}</td><td>{{ order.notes || '—' }}</td></tr><tr *ngIf="!materialOrderRows().length"><td colspan="8">No purchase orders yet. Create a PO to record a purchase.</td></tr></tbody></table>
-              </div>
-              <div class="table-wrap operations-table" *ngIf="activeSection() !== 'inventory' && activeSection() !== 'materials'">
+              <div class="table-wrap operations-table" *ngIf="activeSection() !== 'inventory'">
                 <table>
                   <thead>
                     <tr>
@@ -1005,6 +1011,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       class="selectable-data-row"
                       [class.row-selected]="isRowSelected(row)"
                       [class.row-editing]="isRowEditing(row)"
+                      [class.requested-row-glow]="isRequestedRow(row)"
                       (click)="selectRow(row, $event)"
                     >
                       <td *ngIf="showRowCheckboxes()" class="row-check-column">
@@ -1220,6 +1227,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                     }
                                   }
                                   <label
+                                    *ngIf="isRowEditing(row)"
                                     class="bill-link material-bill-upload"
                                     [class.disabled]="isMaterialBillUploading(row)"
                                     (click)="$event.stopPropagation()"
@@ -1237,13 +1245,22 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                 </div>
                               </ng-container>
                               <ng-template #standardBillOrEditableCell>
-                                <label *ngIf="activeSection() === 'generalExpenses' && column.key === 'reference'"><span>Upload bill</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" (change)="uploadProjectExpenseBill(row, $event)" /></label>
-                                <ng-container *ngIf="column.key === 'reference' && row['billUrl'] && !isRowEditing(row); else normalEditableCell">
-                                  @if (isDataUrl($any(row['billUrl']))) {
-                                    <button type="button" class="bill-link" (click)="openImagePreview($any(row['billUrl']))">View Bill</button>
-                                  } @else {
-                                    <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
-                                  }
+                                <ng-container *ngIf="isBillReferenceColumn(activeSection(), column.key); else normalEditableCell">
+                                  <div class="material-bill-actions">
+                                    @if (row['billUrl']) {
+                                      @if (isDataUrl($any(row['billUrl']))) {
+                                        <button type="button" class="bill-link" (click)="openImagePreview($any(row['billUrl']))">View Bill</button>
+                                      } @else {
+                                        <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
+                                      }
+                                    } @else if (!isRowEditing(row)) {
+                                      <span>{{ displayCell(row, column.key) || '—' }}</span>
+                                    }
+                                    <label *ngIf="isRowEditing(row)" class="bill-link material-bill-upload" [class.disabled]="isRowBillUploading(row)">
+                                      <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isRowBillUploading(row)" (change)="uploadProjectRowBill(row, $event)" />
+                                      <span>{{ isRowBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
+                                    </label>
+                                  </div>
                                 </ng-container>
                               </ng-template>
                             </ng-template>
@@ -1904,6 +1921,8 @@ export class ProjectWorkspacePage {
   readonly recordDialogOpen = signal(false);
   readonly recordSaving = signal(false);
   readonly uploadingMaterialBills = signal<string[]>([]);
+  readonly requestedRowKey = signal("");
+  readonly handledRequestedRecord = signal("");
   readonly materialDetailsOpen = signal(false);
   readonly materialDetailsLoading = signal(false);
   readonly materialDetailsError = signal("");
@@ -2091,6 +2110,7 @@ export class ProjectWorkspacePage {
       if (!this.data.projectById(projectId)) {
         void this.loadMissingProject(projectId);
       }
+      this.refreshSectionFromBackend(this.activeSection());
     });
     // Keep the active section in sync with the URL param so browser
     // back/forward or direct navigation doesn't leave the previous
@@ -2133,9 +2153,17 @@ export class ProjectWorkspacePage {
     effect(() => {
       const recordId = this.queryParamMap().get("record");
       if (!recordId || this.api.user()?.role !== "admin") return;
-      const row = this.tableState().rows.find((item) => String(item["_id"] || item["__rowId"] || this.rowKey(item)) === recordId);
-      if (!row || this.editingRowKey() === this.rowKey(row)) return;
+      const row = this.tableState().rows.find((item) => this.rowMatchesRequest(item, recordId));
+      const requestKey = `${this.activeSection()}:${recordId}`;
+      if (!row || this.handledRequestedRecord() === requestKey) return;
+      const key = this.rowKey(row);
+      this.handledRequestedRecord.set(requestKey);
+      this.requestedRowKey.set(key);
       this.editAdminRow(row, new Event("request-edit"));
+      window.setTimeout(() => document.querySelector(".requested-row-glow")?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+      window.setTimeout(() => {
+        if (this.requestedRowKey() === key) this.requestedRowKey.set("");
+      }, 4200);
     });
     // Subcontractor spend rollup — re-fetched every time the active
     // project changes. The total expense line below folds this in.
@@ -2266,6 +2294,18 @@ export class ProjectWorkspacePage {
 
   rowKey(row: TableRow): string {
     return `${this.activeSection()}:${this.rowIdentity(row)}`;
+  }
+
+  isRequestedRow(row: TableRow): boolean {
+    return this.requestedRowKey() === this.rowKey(row);
+  }
+
+  private rowMatchesRequest(row: TableRow, recordId: string): boolean {
+    const requested = decodeURIComponent(String(recordId || "")).trim();
+    const candidates = [row["_id"], row["id"], row["__rowId"], this.rowIdentity(row)]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    return candidates.some((candidate) => candidate === requested || candidate.endsWith(`:${requested}`));
   }
 
   private rowIdentity(row: TableRow): string {
@@ -2922,9 +2962,8 @@ export class ProjectWorkspacePage {
       );
       rows = [...rows, ...bulk];
     }
-    if (section === "materials") {
-      rows = this.consolidateMaterialRows(rows);
-    }
+    // Keep material records one-to-one with MongoDB rows. Grouping by name
+    // made Edit/Delete target only the newest record in a visual aggregate.
     const site = this.activeSiteFilter();
     if (this.isSiteAware(section) && site !== "All") {
       const siteKey = section === "subcontractors" ? "siteName" : "site";
@@ -4559,16 +4598,45 @@ export class ProjectWorkspacePage {
     void this.router.navigate(["/purchase-orders"], { queryParams: { open: poNumber } });
   }
 
-  async uploadProjectExpenseBill(row: TableRow, event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
+  isBillReferenceColumn(section: ModuleKey, key: string): boolean {
+    return key === "reference" && (section === "expenses" || section === "generalExpenses");
+  }
+
+  isRowBillUploading(row: TableRow): boolean {
+    return this.uploadingMaterialBills().includes(this.rowKey(row));
+  }
+
+  async uploadProjectRowBill(row: TableRow, event: Event) {
+    event.stopPropagation();
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) { await this.presentToast("Choose an image or PDF up to 10 MB.", "warning"); return; }
-    const id = String(row["_id"] || "");
+    if (file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) {
+      await this.presentToast("Choose an image or PDF up to 10 MB.", "warning");
+      input.value = "";
+      return;
+    }
+    const section = this.activeSection();
+    const id = String(row["_id"] || "").trim();
+    if (!id || (section !== "expenses" && section !== "generalExpenses")) return;
+    const uploadKey = this.rowKey(row);
+    this.uploadingMaterialBills.update((keys) => [...new Set([...keys, uploadKey])]);
     try {
-      const data = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1]); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); });
-      await firstValueFrom(this.api.uploadGeneralExpenseReceipt(id, {data, mimeType: file.type, fileName: file.name}));
-      await this.refreshSectionFromBackend("generalExpenses");
-    } catch { await this.presentToast("Bill upload failed. Please retry.", "danger"); }
+      const data = await this.fileAsBase64(file);
+      const payload = { data, mimeType: file.type, fileName: file.name };
+      const response = section === "expenses"
+        ? await firstValueFrom(this.api.uploadExpenseReceipt(id, payload))
+        : await firstValueFrom(this.api.uploadGeneralExpenseReceipt(id, payload));
+      row["billUrl"] = String(response.expense?.billUrl || "");
+      row["reference"] = String(response.expense?.receiptImageName || file.name);
+      this.refreshSectionFromBackend(section);
+      await this.presentToast("Bill uploaded successfully.");
+    } catch {
+      await this.presentToast("Bill upload failed. Please retry.", "danger");
+    } finally {
+      this.uploadingMaterialBills.update((keys) => keys.filter((key) => key !== uploadKey));
+      input.value = "";
+    }
   }
   isMaterialBillUploading(row: any): boolean {
     return this.uploadingMaterialBills().includes(this.rowKey(row));
@@ -5030,8 +5098,16 @@ export class ProjectWorkspacePage {
       : "Delete this row? This will permanently delete it from the backend.";
     if (!window.confirm(confirmMessage)) return;
 
-    for (const target of targets) {
-      await this.deleteRowRecord(section, target);
+    try {
+      for (const target of targets) {
+        await this.deleteRowRecord(section, target);
+      }
+    } catch (error: any) {
+      await this.presentToast(
+        error?.error?.message || error?.message || "Could not delete this row. Please retry.",
+        "danger",
+      );
+      return;
     }
 
     this.selectedRowKeys.update((keys) => keys.filter((item) => item !== key));
@@ -5049,12 +5125,10 @@ export class ProjectWorkspacePage {
     // dispatch through the dedicated endpoint.
     if (section === "subcontractors") {
       const id = String(row["_id"] || "").trim();
-      if (!id) return;
-      try {
-        await firstValueFrom(this.api.deleteSubcontractorPayment(id));
-        this.subcontractorPayments.update((list) => list.filter((p) => String(p._id) !== id));
-        this.subcontractorSpend.update((total) => Math.max(0, total - Number(row["amount"] || 0)));
-      } catch {}
+      if (!id) throw new Error("The subcontractor payment record could not be identified.");
+      await firstValueFrom(this.api.deleteSubcontractorPayment(id));
+      this.subcontractorPayments.update((list) => list.filter((p) => String(p._id) !== id));
+      this.subcontractorSpend.update((total) => Math.max(0, total - this.moneyNumber(row["amount"])));
       return;
     }
 
@@ -5096,12 +5170,12 @@ export class ProjectWorkspacePage {
       } catch {}
     }
 
-    try {
-      if (apiDelete && mongoId) await firstValueFrom(apiDelete(mongoId));
-      if (dataSignal && bizId) {
-        dataSignal.update((arr: any[]) => arr.filter((r: any) => String(r[idField] || "") !== bizId));
-      }
-    } catch {}
+    if (!apiDelete || !mongoId) throw new Error("The selected backend record could not be identified.");
+    await firstValueFrom(apiDelete(mongoId));
+    if (dataSignal) {
+      dataSignal.update((arr: any[]) => arr.filter((r: any) =>
+        String(r["_id"] || "") !== mongoId && (!bizId || String(r[idField] || "") !== bizId)));
+    }
   }
 
   selectCellKey(row: TableRow, key: string): string {
@@ -5699,10 +5773,17 @@ export class ProjectWorkspacePage {
     return materials.reduce((sum, row) => sum + this.moneyNumber(row["issuedAmount"]) + this.moneyNumber(row["givenAmount"]), 0);
   }
 
-  deleteProject(project: Project) {
+  async deleteProject(project: Project) {
+    if (this.api.user()?.role !== "admin") return;
     const confirmed = window.confirm(`Delete ${project.name}? This removes the project from this client.`);
     if (!confirmed) return;
     const deletingCurrent = project.id === this.projectId();
+    try {
+      await firstValueFrom(this.api.deleteProject(project.id));
+    } catch {
+      await this.presentToast("Could not delete the project. Please retry.", "danger");
+      return;
+    }
     this.data.deleteProject(project.id);
     if (deletingCurrent) {
       const nextProject = this.data.firstProjectForClient(this.client());
@@ -6197,11 +6278,11 @@ export class ProjectWorkspacePage {
       }
       return ["Pending", "Approved", "Declined"];
     }
-    if (key === "paymentMode") return paymentModeOptions;
     if (section === "payments" && key === "mode") {
       const custom = this.customPaymentModes().filter((mode) => !paymentModeOptions.includes(mode));
       return [...paymentModeOptions, ...custom];
     }
+    if (key === "paymentMode" || key === "mode") return paymentModeOptions;
     if (key === "paymentStatus") return ["Not Started", "Part Paid", "Paid"];
     if (key === "paymentType") return ["Bank Transfer", "Cash", "UPI", "Cheque", "NEFT", "RTGS"];
     if (section === "subcontractors" && key === "labourType") {

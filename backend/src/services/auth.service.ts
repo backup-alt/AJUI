@@ -87,7 +87,11 @@ export async function issueTokens(
   meta: { userAgent?: string; ip?: string } = {}
 ): Promise<AuthTokens> {
   const jti = generateTokenId();
-  const accessToken = signAccessToken(user._id.toString(), user.role);
+  const accessToken = signAccessToken(
+    user._id.toString(),
+    user.role,
+    (user.managedProjectIds || []).map((id) => id.toString()),
+  );
   const refreshToken = signRefreshToken(user._id.toString(), jti);
   const expiresAt = refreshTokenExpiryDate();
 

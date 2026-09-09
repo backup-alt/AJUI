@@ -175,6 +175,10 @@ export class ClientDashboardPage {
   readonly clientSaving = signal(false);
   readonly formatMoney = formatMoney;
 
+  ngOnInit(): void {
+    this.refreshFromBackend();
+  }
+
   refreshFromBackend() {
     if (this.refreshing()) return;
     this.refreshing.set(true);

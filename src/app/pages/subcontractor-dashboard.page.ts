@@ -168,7 +168,7 @@ interface SubcontractorRow {
                 </tbody>
                 </table>
               </div>
-              @if (canRequestOrEdit() && subcontractorActionRow()) { <div class="cursor-action-menu" [style.left.px]="subcontractorActionPosition().x" [style.top.px]="subcontractorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedSubcontractor()">Open</button>@if (isAdmin()) { <button (click)="editSelectedSubcontractor()">Edit</button> } @else { <button (click)="requestSubcontractorEdit()">Request edit</button> }</div> }
+              @if (canRequestOrEdit() && subcontractorActionRow()) { <div class="cursor-action-menu" [style.left.px]="subcontractorActionPosition().x" [style.top.px]="subcontractorActionPosition().y" (click)="$event.stopPropagation()"><button (click)="openSelectedSubcontractor()">Open</button>@if (isAdmin()) { <button (click)="editSelectedSubcontractor()">Edit</button><button class="danger" (click)="deleteSelectedSubcontractor()">Delete</button> } @else { <button (click)="requestSubcontractorEdit()">Request edit</button> }</div> }
             </section>
           </main>
         </ion-content>
@@ -398,6 +398,7 @@ export class SubcontractorDashboardPage {
   handleSubcontractorRowClick(row: SubcontractorRow, event: MouseEvent) { if (!this.canRequestOrEdit()) { this.openDetails(row); return; } this.subcontractorActionRow.set(row); this.subcontractorActionPosition.set({ x: Math.min(event.clientX + 10, window.innerWidth - 170), y: Math.min(event.clientY + 10, window.innerHeight - 52) }); }
   openSelectedSubcontractor() { const row = this.subcontractorActionRow(); if (row) this.openDetails(row); this.subcontractorActionRow.set(null); }
   editSelectedSubcontractor() { const row = this.subcontractorActionRow(); if (row) this.openEdit(row, new MouseEvent("click")); this.subcontractorActionRow.set(null); }
+  deleteSelectedSubcontractor() { const row = this.subcontractorActionRow(); this.subcontractorActionRow.set(null); if (!row || !this.isAdmin() || !confirm(`Delete ${row.subcontractorName}?`)) return; this.api.deleteSubcontractor(row.id).subscribe({ next: () => this.rows.update(items => items.filter(item => item.id !== row.id)) }); }
   requestSubcontractorEdit() { const row = this.subcontractorActionRow(); if (!row) return; this.subcontractorActionRow.set(null); void this.router.navigate(["/inbox"], { queryParams: { request: `Please edit subcontractor ${row.subcontractorName}.`, link: `/subcontractors?edit=${row.id}` } }); }
   readonly statusOptions = [
     { label: "Active", value: "active" },

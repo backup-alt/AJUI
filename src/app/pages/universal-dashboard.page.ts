@@ -11,6 +11,7 @@ import { ClientFormDialogComponent } from "../shared/client-form-dialog.componen
 import { DashboardBarChartComponent, type BarChartSeries } from "../shared/dashboard-bar-chart.component";
 import { DashboardDonutChartComponent, type DonutSegment } from "../shared/dashboard-donut-chart.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
+import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { ProjectFormDialogComponent } from "../shared/project-form-dialog.component";
 import { VendorFormDialogComponent } from "../shared/vendor-form-dialog.component";
 import { formatMoney } from "../shared/format";
@@ -45,6 +46,7 @@ interface DashboardKpis {
     IonContent,
     IonSplitPane,
     EnterpriseSidebarComponent,
+    EnterpriseHeaderComponent,
     ClientFormDialogComponent,
     ProjectFormDialogComponent,
     VendorFormDialogComponent,
@@ -58,6 +60,7 @@ interface DashboardKpis {
       <agb-enterprise-sidebar active="dashboard"></agb-enterprise-sidebar>
 
       <div class="ion-page" id="main-content">
+        <agb-enterprise-header title="Dashboard" [showTitle]="false" />
         <ion-content class="dashboard-page">
           <main class="dashboard-shell">
             <header class="dashboard-header">
@@ -130,6 +133,7 @@ interface DashboardKpis {
                 </button>
               </div>
             </header>
+            @if (projectSelectionLoading()) { <div class="project-selection-loader" role="status"><span></span>Loading project details…</div> }
 
             <section class="kpi-grid" aria-label="Key financial metrics">
               <article class="kpi-card green">
@@ -176,9 +180,9 @@ interface DashboardKpis {
               </article>
 
               <article class="panel projects-panel">
-                <div class="panel-heading"><h2>{{ selectedProjectId() ? "Vendor Payments" : "Recent Projects" }}</h2><a routerLink="/projects">View All</a></div>
+                <div class="panel-heading"><h2>{{ selectedProjectId() ? "Vendor Payments" : "Recent Projects" }}</h2>@if (selectedProjectId()) { <strong class="panel-total">Total {{ money(vendorPaymentTotal()) }}</strong> } @else { <a routerLink="/projects">View All</a> }</div>
                 @if (selectedProjectId()) {
-                  <div class="payment-breakdown">@for (vendor of partnerPayments("Material Expense"); track vendor.name) { <article><strong>{{ vendor.name }}</strong><b>{{ money(vendor.total) }}</b><small>@for (mode of vendor.modes; track mode.name) { <span>{{ mode.name }}: {{ money(mode.amount) }} </span> }</small></article> } @empty { <p>No vendor payments in this period.</p> }</div>
+                  <div class="payment-breakdown">@for (vendor of vendorPayments(); track vendor.name) { <article><strong>{{ vendor.name }}</strong><b>{{ money(vendor.total) }}</b><small>@for (mode of vendor.modes; track mode.name) { <span>{{ mode.name }}: {{ money(mode.amount) }} </span> }</small></article> } @empty { <p>No vendor payments in this period.</p> }</div>
                 } @else {
                 <div class="recent-project-list">
                   @for (project of recentProjects(); track project.id) {
@@ -207,7 +211,7 @@ interface DashboardKpis {
                       <span class="approval-amount"><strong>{{ money(item.amount) }}</strong><small>Pending expense</small></span>
                     </a>
                   } @empty {
-                    <div class="simple-empty">No expense approvals waiting.</div>
+                    <div class="simple-empty">No approvals waiting for this project.</div>
                   }
                 </div>
               </article>
@@ -242,7 +246,7 @@ interface DashboardKpis {
                 <article><span class="insight-icon green"><svg viewBox="0 0 24 24"><path d="M4 17 10 11l4 4 6-8M16 7h4v4"/></svg></span><span><small>{{ periodLabel() }} expenditure</small><strong>{{ money(financials().spent) }}</strong><em>{{ scopedExpenses().length }} recorded {{ scopedExpenses().length === 1 ? 'expense' : 'expenses' }}</em></span></article>
                 <article><span class="insight-icon orange"><svg viewBox="0 0 24 24"><path d="M3 5h2l2 11h11l2-7H7M10 21h.01M18 21h.01"/></svg></span><span><small>Largest expense category</small><strong>{{ topExpense() ? topExpense()!.label : 'No expenses' }}</strong><em>{{ topExpense() ? money(topExpense()!.value) : money(0) }}</em></span></article>
                 <article><span class="insight-icon blue"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2M17 11a4 4 0 0 1 4 4v2"/></svg></span><span><small>Active projects</small><strong>{{ activeProjectCount() }}</strong><em>{{ money(financials().portfolio) }} estimated value</em></span></article>
-                <article><span class="insight-icon purple"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6V3ZM9 8h6M9 12h6"/><circle cx="17" cy="18" r="3"/></svg></span><span><small>Pending expense approvals</small><strong>{{ money(pendingApprovalTotal()) }}</strong><em>{{ pendingApprovalCount() }} {{ pendingApprovalCount() === 1 ? 'request' : 'requests' }}</em></span></article>
+                <article><span class="insight-icon purple"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6V3ZM9 8h6M9 12h6"/><circle cx="17" cy="18" r="3"/></svg></span><span><small>Pending approvals</small><strong>{{ money(pendingApprovalTotal()) }}</strong><em>{{ pendingApprovalCount() }} {{ pendingApprovalCount() === 1 ? 'request' : 'requests' }}</em></span></article>
                 <article><span class="insight-icon blue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 17h.01"/></svg></span><span><small>{{ periodLabel() }} cash inflow</small><strong>{{ money(financials().received) }}</strong><em>{{ scopedPayments().length }} recorded {{ scopedPayments().length === 1 ? 'payment' : 'payments' }}</em></span></article>
               </div>
             </section>
@@ -274,6 +278,7 @@ interface DashboardKpis {
     .dashboard-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; margin-bottom: 26px; }
     .dashboard-header h1 { margin: 0; color: #101828; font-size: clamp(25px, 2vw, 31px); font-weight: 750; line-height: 1.2; letter-spacing: -.03em; }
     .dashboard-header p { margin: 8px 0 0; color: #667085; font-size: 14px; line-height: 1.5; }
+    .project-selection-loader { display:flex; align-items:center; gap:9px; margin:-12px 0 16px; padding:10px 13px; border:1px solid #cfe0ff; border-radius:9px; background:#f5f9ff; color:#175cd3; font-size:12px; font-weight:700; }.project-selection-loader span { width:17px; height:17px; border:2px solid #bfd3f7; border-top-color:#175cd3; border-radius:50%; animation:dashboard-spin .7s linear infinite; }@keyframes dashboard-spin{to{transform:rotate(360deg)}}
     .header-controls { display: flex; align-items: center; gap: 12px; }
     .project-picker { position: relative; z-index: 70; }
     .project-control { display:flex; align-items:center; gap:10px; width:220px; height:44px; padding:0 12px; border:1px solid #d0d5dd; border-radius:9px; background:#fff; color:#344054; cursor:pointer; box-shadow:0 1px 2px rgba(16,24,40,.04); }
@@ -297,6 +302,7 @@ interface DashboardKpis {
     .main-panels, .lower-panels { display: grid; gap: 16px; margin-bottom: 16px; }.main-panels { grid-template-columns: minmax(0, 1.28fr) minmax(0, 1fr) minmax(0, .96fr); }.lower-panels { grid-template-columns: minmax(0, .95fr) minmax(0, .9fr) minmax(0, 1.22fr); }
     .panel, .insights-panel { overflow: hidden; border: 1px solid #e4e7ec; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.035); }.main-panels .panel { min-height: 430px; }.lower-panels .panel { min-height: 270px; }
     .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 66px; padding: 18px 20px; }.cash-panel .panel-heading { position: relative; z-index: 10; }.panel-heading h2, .insights-panel h2 { margin: 0; color: #101828; font-size: 17px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }.panel-heading > a { color: #175cd3; font-size: 13px; font-weight: 700; }
+    .panel-total { color:#027a48; font-size:13px; }
     .chart-wrap { min-height: 270px; padding: 4px 20px 0; }.chart-wrap agb-bar-chart { display: block; }.cash-panel ::ng-deep .bar-chart-x-label, .cash-panel ::ng-deep .bar-chart-tick, .cash-panel ::ng-deep .bar-chart-legend li { font-size: 12px; }.chart-empty, .simple-empty { display: flex; align-items: center; justify-content: center; min-height: 170px; color: #98a2b3; font-size: 14px; }
     .cash-totals { display: grid; grid-template-columns: 1fr 1fr; margin: 0 20px 18px; overflow: hidden; border: 1px solid #e4e7ec; border-radius: 9px; }.cash-totals div { display: grid; gap: 6px; padding: 13px 18px; }.cash-totals div:first-child { background: #f0faf5; }.cash-totals div:last-child { border-left: 1px solid #e4e7ec; background: #fff8f2; }.cash-totals span { color: #039855; font-size: 12px; font-weight: 700; }.cash-totals div:last-child span { color: #e04f16; }.cash-totals strong { color: #101828; font-size: 19px; }
     .donut-wrap { display: flex; min-height: 340px; min-width: 0; align-items: center; padding: 20px clamp(16px, 2vw, 24px); }.donut-wrap agb-donut-chart { width: 100%; min-width: 0; }.spend-panel { min-width: 0; }.spend-panel ::ng-deep .donut-chart { justify-content: center; gap: clamp(16px, 2vw, 24px); }.spend-panel ::ng-deep .donut-canvas { width: clamp(145px, 11vw, 170px); height: clamp(145px, 11vw, 170px); }.spend-panel ::ng-deep .donut-legend-label, .spend-panel ::ng-deep .donut-legend-meta strong { font-size: 14px; }.spend-panel ::ng-deep .donut-legend-meta small { font-size: 12px; }
@@ -324,6 +330,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly loadedGeneralExpenses = signal<any[] | null>(null);
   readonly loadedMaterials = signal<any[] | null>(null);
   readonly loadedSubcontractorPayments = signal<any[] | null>(null);
+  readonly loadedPurchaseOrders = signal<any[]>([]);
   readonly refreshing = signal(false);
   readonly periodKey = signal<PeriodKey>("month");
   readonly openPeriodMenu = signal<"header" | "chart" | null>(null);
@@ -350,6 +357,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly chartPeriodOptions = this.periodOptions.filter((option) => option.value !== "today");
 
   readonly selectedProjectId = signal("");
+  readonly projectSelectionLoading = signal(false);
   readonly projectMenuOpen = signal(false);
   readonly projectSearch = signal("");
   readonly allProjects = computed(() => this.loadedProjects() ?? (this.data.projects() as any[]));
@@ -482,7 +490,7 @@ export class UniversalDashboardPage implements OnInit {
     }
     return categories
       .map((category) => ({ ...category, value: values.get(category.label) || 0 }))
-      .filter((category) => category.value > 0)
+      .filter((category) => Boolean(this.selectedProjectId()) || category.value > 0)
       .sort((a, b) => b.value - a.value);
   });
   readonly expenditureRows = computed(() => {
@@ -493,8 +501,7 @@ export class UniversalDashboardPage implements OnInit {
 
   readonly pendingExpenseApprovals = computed(() => this.approvalRows().filter((row) => {
     if (!this.inProject(row)) return false;
-    const module = String(row.module || "").replace(/[_\s-]/g, "").toLowerCase();
-    return module === "expenses" || module === "expense" || module === "generalexpenses";
+    return String(row.status || "Pending").toLowerCase() === "pending";
   }));
   readonly pendingExpenseRows = computed(() => this.pendingExpenseApprovals().slice(0, 3));
   readonly pendingApprovalCount = computed(() => this.pendingExpenseApprovals().length);
@@ -519,7 +526,39 @@ export class UniversalDashboardPage implements OnInit {
     return [...totals].filter(([name, amount]) => name !== "Others" || amount > 0).map(([name, amount]) => ({name, amount}));
   }
   toggleProjectMenu(): void { this.projectMenuOpen.update(open => !open); this.projectSearch.set(""); this.openPeriodMenu.set(null); this.dateMenuOpen.set(false); }
-  selectDashboardProject(projectId: string): void { this.selectedProjectId.set(projectId); this.projectMenuOpen.set(false); this.projectSearch.set(""); }
+  async selectDashboardProject(projectId: string): Promise<void> {
+    this.selectedProjectId.set(projectId);
+    this.projectMenuOpen.set(false);
+    this.projectSearch.set("");
+    this.projectSelectionLoading.set(true);
+    try {
+      if (!projectId) {
+        await this.refreshAll();
+        return;
+      }
+      const range = this.currentRange();
+      const dateParams = { projectId, from: this.dateInputValue(range.from), to: this.dateInputValue(range.to) };
+      const [result, approvals, purchaseOrders, generalExpenses, subcontractorPayments] = await Promise.all([
+        firstValueFrom(this.api.getUniversalDashboard(dateParams)),
+        this.approvals.fetchApprovals({ status: "Pending", projectId, limit: 100 }),
+        firstValueFrom(this.api.listPurchaseOrders({ projectId, page: 1, limit: 200 })),
+        firstValueFrom(this.api.listAllGeneralExpenses({ ...dateParams, limit: 500 })),
+        firstValueFrom(this.api.listSubcontractorPayments({ ...dateParams, page: 1, limit: 200 })),
+      ]);
+      if (this.selectedProjectId() !== projectId) return;
+      this.loadedPayments.set((result?.payments || []) as any[]);
+      this.loadedExpenses.set((result?.expenses || []) as any[]);
+      this.loadedMaterials.set((result?.materials || []) as any[]);
+      this.approvalRows.set((approvals || []) as any[]);
+      this.loadedPurchaseOrders.set(((purchaseOrders as any)?.items || []) as any[]);
+      this.loadedGeneralExpenses.set(((generalExpenses as any)?.items || []) as any[]);
+      this.loadedSubcontractorPayments.set(((subcontractorPayments as any)?.items || []) as any[]);
+    } catch (error) {
+      console.error("[UniversalDashboard] Failed to load selected project details:", error);
+    } finally {
+      if (this.selectedProjectId() === projectId) this.projectSelectionLoading.set(false);
+    }
+  }
   projectInitial(project: any): string { return String(project.name || "P").trim().charAt(0).toUpperCase(); }
   projectContext(project: any): string { return String(project.client || project.clientName || project.projectId || "Project"); }
   partnerPayments(source: string) {
@@ -530,6 +569,19 @@ export class UniversalDashboardPage implements OnInit {
     }
     return [...groups].map(([name, rows]) => ({name, total: rows.reduce((sum, row) => sum + this.amountOf(row), 0), modes: this.paymentModes(rows)}));
   }
+  readonly vendorPayments = computed(() => {
+    const orders = this.loadedPurchaseOrders()
+      .filter(order => Number(order.givenAmount || 0) > 0 && this.inCurrentPeriod(order))
+      .map(order => ({ ...order, amount: Number(order.givenAmount || 0), vendor: order.vendorName }));
+    if (!orders.length) return this.partnerPayments("Material Expense");
+    const groups = new Map<string, any[]>();
+    for (const row of orders) {
+      const name = String(row.vendorName || row.vendor || "Unspecified");
+      groups.set(name, [...(groups.get(name) || []), row]);
+    }
+    return [...groups].map(([name, rows]) => ({ name, total: rows.reduce((sum, row) => sum + this.amountOf(row), 0), modes: this.paymentModes(rows) }));
+  });
+  readonly vendorPaymentTotal = computed(() => this.vendorPayments().reduce((sum, vendor) => sum + vendor.total, 0));
   ngOnInit(): void { void this.refreshAll(); }
   async refreshAll(): Promise<void> {
     if (this.refreshing()) return;

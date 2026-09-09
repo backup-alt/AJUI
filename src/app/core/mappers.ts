@@ -235,6 +235,7 @@ export function mapExpense(e: any): any {
     siteMaterialBalance: e.siteMaterialBalance,
     poNumber: e.poNumber,
     billUrl: billUrlFor(e),
+    reference: e.reference || e.receiptImageName || "",
     receiptImage: e.receiptImage,
     receiptImageMimeType: e.receiptImageMimeType,
     receiptImageName: e.receiptImageName,
