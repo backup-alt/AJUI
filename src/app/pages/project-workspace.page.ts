@@ -74,18 +74,14 @@ const sectionConfigs: SectionConfig[] = [
     label: "Materials",
     title: "Materials",
     columns: [
-      { key: "materialName", label: "Material Name" },
-      { key: "unit", label: "Unit" },
-      { key: "quantity", label: "Quantity", type: "number" },
+      { key: "poNumber", label: "PO Number" },
+      { key: "reference", label: "Biller Reference" },
+      { key: "vendor", label: "Vendor" },
+      { key: "requestDate", label: "Added Date", type: "date" },
       { key: "issuedAmount", label: "Issued Amount", type: "number" },
       { key: "givenAmount", label: "Given Amount", type: "number" },
-      { key: "requestDate", label: "Added Date", type: "date" },
-      { key: "vendor", label: "Vendor" },
-      { key: "poNumber", label: "PO Number" },
-      { key: "reference", label: "Bill / Reference" },
-      { key: "remainingStock", label: "Remaining Stock" },
+      { key: "remainingAmount", label: "Remaining Amount", type: "number" },
       { key: "notes", label: "Notes" },
-      { key: "status", label: "Status" },
     ],
   },
   {
@@ -1225,9 +1221,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                     } @else {
                                       <a class="bill-link" [href]="bill.url" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
                                     }
+                                  } @else {
+                                    <span>{{ row['reference'] || '—' }}</span>
                                   }
                                   <label
-                                    *ngIf="isRowEditing(row)"
                                     class="bill-link material-bill-upload"
                                     [class.disabled]="isMaterialBillUploading(row)"
                                     (click)="$event.stopPropagation()"
@@ -1253,10 +1250,10 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                       } @else {
                                         <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
                                       }
-                                    } @else if (!isRowEditing(row)) {
+                                    } @else {
                                       <span>{{ displayCell(row, column.key) || '—' }}</span>
                                     }
-                                    <label *ngIf="isRowEditing(row)" class="bill-link material-bill-upload" [class.disabled]="isRowBillUploading(row)">
+                                    <label class="bill-link material-bill-upload" [class.disabled]="isRowBillUploading(row)">
                                       <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isRowBillUploading(row)" (change)="uploadProjectRowBill(row, $event)" />
                                       <span>{{ isRowBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
                                     </label>
@@ -5934,10 +5931,12 @@ export class ProjectWorkspacePage {
       isExistingMaterial: row.isExistingMaterial ? "Yes" : "",
       issuedAmount: row.isExistingMaterial ? "Existing material" : (row.issuedAmount ?? ""),
       givenAmount: row.isExistingMaterial ? "Existing material" : (row.givenAmount ?? ""),
+      remainingAmount: row.isExistingMaterial ? "Existing material" : Math.max(0, Number(row.issuedAmount || 0) - Number(row.givenAmount || 0)),
       requestDate: row.requestDate || (row as any).createdAt || "",
       receivedDate: this.dateOnly(row.receivedDate || (String(row.status).toLowerCase() === "received" ? ((row as any).updatedAt || "") : "")),
       vendor: row.vendor,
       poNumber: row.poNumber,
+      reference: row.reference || (row as any).receiptImageName || "",
       billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),
       billLabel: (row as any).receiptImageName || "",
       billHistory: Array.isArray((row as any).billHistory) ? (row as any).billHistory : [],

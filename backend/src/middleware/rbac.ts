@@ -113,8 +113,9 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   const role = req.user.role;
   const userId = new Types.ObjectId(req.user.sub);
 
-  // Admin short-circuit — don't even hit the DB, admins see everything.
-  if (role === "admin") {
+  // Admin, project managers and accountants have global project access.
+  // These roles are intentionally not assignment-scoped.
+  if (role === "admin" || role === "project_manager" || role === "accountant") {
     req._cachedScopedProjectIds = null;
     return null;
   }
@@ -160,14 +161,6 @@ export async function getScopedProjectIds(req: Request): Promise<ProjectScopeIds
   // older tokens cannot do that safely, so return an actionable error instead.
   if (scopeLookupFailed && !tokenProjectIds.length && (role === "project_manager" || role === "accountant")) {
     throw new AppError(503, "Could not load your assigned projects. Please retry.");
-  }
-
-  // For PM/accountant, ALWAYS scope to their assigned projects.
-  // Empty managedProjectIds means they see nothing (not everything).
-  if (role === "project_manager" || role === "accountant") {
-    const result = uniqueObjectIds(managedProjectIds);
-    req._cachedScopedProjectIds = result;
-    return req._cachedScopedProjectIds;
   }
 
   if (role === "supervisor") {

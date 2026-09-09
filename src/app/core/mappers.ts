@@ -151,6 +151,7 @@ export function mapMaterial(m: any): any {
     vendor: m.vendor,
     vendorId: m.vendorId,
     poNumber: m.poNumber,
+    reference: m.reference || m.receiptImageName || "",
     paymentType: m.paymentType,
     billUrl: billUrlFor(m),
     receiptImageName: m.receiptImageName || "",

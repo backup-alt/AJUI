@@ -414,11 +414,6 @@ export class SubcontractorDetailsPage {
     const user = this.api.user();
     const all = this.erp.projects();
     if (!user) return all;
-    if (user.role === "project_manager" || user.role === "accountant") {
-      const managed = user.managedProjectIds || [];
-      if (managed.length === 0) return all.filter((p) => false);
-      return all.filter((p) => managed.includes(p.id));
-    }
     return all;
   });
 

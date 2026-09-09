@@ -527,8 +527,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           <ng-container *ngIf="activeModule() === 'generalExpenses' && column.key === 'reference'; else standardNonReceiptCell">
                             @if (row['billUrl']) {
                               <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
-                            } @else if (!adminRowEditing(row)) { <span>{{ row['reference'] || '—' }}</span> }
-                            <label *ngIf="adminRowEditing(row)" class="bill-link material-bill-upload" [class.disabled]="isGeneralExpenseBillUploading(row)" (click)="$event.stopPropagation()">
+                            } @else { <span>{{ row['reference'] || '—' }}</span> }
+                            <label class="bill-link material-bill-upload" [class.disabled]="isGeneralExpenseBillUploading(row)" (click)="$event.stopPropagation()">
                               <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isGeneralExpenseBillUploading(row)" (change)="uploadGeneralExpenseBill(row, $event)" />
                               <span>{{ isGeneralExpenseBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
                             </label>

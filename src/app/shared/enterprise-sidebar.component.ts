@@ -139,7 +139,7 @@ export class EnterpriseSidebarComponent {
       return this.data.sortProjectsByLastWorked(allProjects);
     }
 
-    if (user.role === "project_manager" || user.role === "supervisor") {
+    if (user.role === "supervisor") {
       const managedIds = user.managedProjectIds || [];
       if (managedIds.length === 0) {
         return [];
