@@ -2607,7 +2607,10 @@ export class GeneralExpensesPage implements OnInit {
     if (!target.closest(".table-actions, .universal-filter-bar, .filter-dialog, .date-filter-panel, .site-workbench")) {
       // Row selection has been removed — no state to clear here.
     }
-    if (!target.closest(".cursor-action-menu, .operations-table tbody tr")) this.adminActionRow.set(null);
+    if (!target.closest(".cursor-action-menu, .operations-table tbody tr")) {
+      this.adminActionRow.set(null);
+      this.adminEditingRow.set("");
+    }
 
     if (!target.closest(".erp-select-menu, .filter-select-shell, .custom-select-entry, .filter-combo-field, .date-filter-panel")) {
       this.closeDropdowns();
@@ -3870,6 +3873,8 @@ export class GeneralExpensesPage implements OnInit {
   readonly adminActionPosition = signal({ x: 0, y: 0 });
   openAdminActionMenu(row: TableRow, event: MouseEvent) {
     if (!this.canRequestOrEdit() || this.activeModule() !== "generalExpenses") return;
+    const clickedRowId = String(row["_id"] || row["__rowId"] || "");
+    if (this.adminEditingRow() && this.adminEditingRow() !== clickedRowId) this.adminEditingRow.set("");
     const width = 154;
     const height = 44;
     this.adminActionRow.set(row);

@@ -2325,13 +2325,13 @@ export class ProjectWorkspacePage {
       this.clearRowSelection();
       return;
     }
-    this.selectedRowKeys.set([key]);
-    this.selectedRowKey.set(key);
-    if (this.selectedRowKey() !== key || !wasSelected) {
+    if (!wasSelected) {
       this.editingRowKey.set("");
       this.editingRowKeys.set([]);
       this.openSelectKey.set("");
     }
+    this.selectedRowKeys.set([key]);
+    this.selectedRowKey.set(key);
   }
 
   selectedActionRow(): TableRow | null {
@@ -2620,10 +2620,10 @@ export class ProjectWorkspacePage {
     event.stopPropagation();
     if (this.api.user()?.role !== "admin" || !this.isManagedWorkspaceSection()) return;
     const key = this.rowKey(row);
-    this.selectedRowKeys.set([key]);
-    this.selectedRowKey.set(key);
     this.editingRowKey.set(key);
     this.editingRowKeys.set([key]);
+    this.selectedRowKeys.set([]);
+    this.selectedRowKey.set("");
   }
 
   async deleteSelectedRows() {
