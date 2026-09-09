@@ -93,7 +93,7 @@ const permissionGroups: PermissionGroup[] = [
       { key: "siteMaterial", label: "Site Material" },
       { key: "runningBalance", label: "Balance" },
       { key: "supervisor", label: "Supervisor" },
-      { key: "reference", label: "Bill / Reference" },
+      { key: "reference", label: "Bill/Reference" },
       { key: "notes", label: "Notes" },
       { key: "approvalStatus", label: "Approval Status" },
     ],

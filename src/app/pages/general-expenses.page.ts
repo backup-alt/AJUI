@@ -136,7 +136,7 @@ const dashboardModules: ModuleConfig[] = [
       { key: "description", label: "Description" },
       { key: "amount", label: "Amount" },
       { key: "paymentMode", label: "Payment Mode" },
-      { key: "reference", label: "Bill / Reference" },
+      { key: "reference", label: "Bill/Reference" },
       { key: "paidBy", label: "Paid By" },
     ],
     filters: [
@@ -527,11 +527,13 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           <ng-container *ngIf="activeModule() === 'generalExpenses' && column.key === 'reference'; else standardNonReceiptCell">
                             @if (row['billUrl']) {
                               <a class="bill-link" [href]="row['billUrl']" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">View Bill</a>
-                            } @else { <span>{{ row['reference'] || '—' }}</span> }
-                            <label class="bill-link material-bill-upload" [class.disabled]="isGeneralExpenseBillUploading(row)" (click)="$event.stopPropagation()">
-                              <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isGeneralExpenseBillUploading(row)" (change)="uploadGeneralExpenseBill(row, $event)" />
-                              <span>{{ isGeneralExpenseBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
-                            </label>
+                            } @else {
+                              <span>{{ row['reference'] || '—' }}</span>
+                              <label class="bill-link material-bill-upload" [class.disabled]="isGeneralExpenseBillUploading(row)" (click)="$event.stopPropagation()">
+                                <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isGeneralExpenseBillUploading(row)" (change)="uploadGeneralExpenseBill(row, $event)" />
+                                <span>{{ isGeneralExpenseBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
+                              </label>
+                            }
                           </ng-container>
                           <ng-template #standardNonReceiptCell>
                           <button

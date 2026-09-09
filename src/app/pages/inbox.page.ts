@@ -11,9 +11,21 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
   standalone: true,
   imports: [CommonModule, FormsModule, IonContent, IonSplitPane, EnterpriseSidebarComponent],
   template: `<ion-split-pane contentId="main-content" when="lg"><agb-enterprise-sidebar /><div class="ion-page" id="main-content"><ion-content class="inbox-content"><main>
+    <style>
+      .conversation-layout{display:grid;grid-template-columns:280px minmax(0,1fr)}
+      .conversation-layout.single{grid-template-columns:minmax(0,1fr)}
+      .conversation-list{min-height:0;overflow-y:auto}
+      .conversation-panel{display:grid;grid-template-rows:minmax(0,1fr) auto auto;min-width:0;min-height:0;overflow:hidden}
+      .message-list{min-height:0;overflow-y:auto;overflow-x:hidden}
+      .message-list article>div{min-width:0}
+      .message{overflow-wrap:anywhere}
+      .composer{min-height:0}
+      .composer textarea{height:92px;max-height:92px;resize:none;overflow-y:auto}
+      @media(max-width:720px){.conversation-layout{grid-template-columns:1fr;height:min(720px,calc(100vh - 160px))!important;min-height:420px!important}.conversation-list{max-height:150px}}
+    </style>
     <header class="page-head"><div><span>Communication centre</span><h1>Inbox</h1><p>{{ isAdmin() ? 'Private conversations and project activity' : 'Your private conversation with the office admin' }}</p></div><button class="refresh" (click)="refresh()" [disabled]="busy()">↻ Refresh</button></header><p class="error" role="alert" *ngIf="error()">{{ error() }}</p>
     <section><div class="section-head"><div><h2>Messages</h2><p>{{ isAdmin() ? 'Project managers and accountants' : 'Private messages with the office.' }}</p></div>@if (!isAdmin() || selectedRecipient()) { <b>Page {{ messagePage() }} of {{ messageTotalPages() || 1 }}</b> }</div>
-      <div class="conversation-layout" [class.single]="!isAdmin()">
+      <div class="conversation-layout" [class.single]="!isAdmin()" style="height:min(650px,calc(100vh - 220px));min-height:480px;overflow:hidden">
         @if (isAdmin()) { <aside class="conversation-list" aria-label="Employee conversations">@for (employee of recipients(); track employee._id) { <button type="button" [class.active]="replyTo() === employee._id" (click)="openConversation(employee)"><span class="avatar">{{ senderInitial(employee.name) }}</span><span class="conversation-copy"><strong>{{ employee.name }}</strong><small>{{ roleLabel(employee.role) }}</small>@if (employee.lastMessage) { <em>{{ employee.lastMessage }}</em> }</span>@if (employee.unreadCount > 0) { <span class="unread">{{ employee.unreadCount > 99 ? '99+' : employee.unreadCount }}</span> }</button> } @empty { <div class="empty"><strong>No employees available</strong><span>Active project managers and accountants will appear here.</span></div> }</aside> }
         <div class="conversation-panel">@if (isAdmin() && !selectedRecipient()) { <div class="empty conversation-empty"><strong>Select a conversation</strong><span>Choose a project manager or accountant to view private messages.</span></div> } @else { @if (messageLoading()) { <div class="loader-block" role="status"><span class="spinner"></span><strong>Loading conversation…</strong></div> } @else { <div class="message-list">@for (message of messages(); track message._id) { <article><span class="avatar">{{ senderInitial(message.senderName) }}</span><div><header><strong>{{ message.senderName }}</strong><time>{{ message.createdAt | date:'medium' }}</time></header><p class="message">{{ message.text }}</p><div class="actions">@if (message.link) { <button type="button" class="request-link" (click)="openRequestedRecord(message.link)">Open requested record</button> }</div></div></article> } @empty { <div class="empty"><strong>No messages yet</strong><span>Start this private conversation below.</span></div> }</div>
         <nav class="pagination"><button [disabled]="messagePage() === 1 || messageLoading()" (click)="loadMessages(messagePage() - 1)">Previous</button><span>Page {{ messagePage() }} of {{ messageTotalPages() || 1 }} · {{ messageTotal() }} messages</span><button [disabled]="!messageHasMore() || messageLoading()" (click)="loadMessages(messagePage() + 1)">Next</button></nav>

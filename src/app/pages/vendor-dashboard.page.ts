@@ -238,7 +238,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                       <th class="col-amount">Issued Amt</th>
                       <th class="col-amount">Given Amt</th>
                       <th class="col-payment">Payment Type</th>
-                      <th class="col-bill">Bill / Reference</th>
+                      <th class="col-bill">Bill/Reference</th>
                       @for (col of customColumns(); track col) {
                         <th class="col-custom">
                           {{ col }}

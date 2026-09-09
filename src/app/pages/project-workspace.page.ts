@@ -75,7 +75,7 @@ const sectionConfigs: SectionConfig[] = [
     title: "Materials",
     columns: [
       { key: "poNumber", label: "PO Number" },
-      { key: "reference", label: "Biller Reference" },
+      { key: "reference", label: "Bill/Reference" },
       { key: "vendor", label: "Vendor" },
       { key: "requestDate", label: "Added Date", type: "date" },
       { key: "issuedAmount", label: "Issued Amount", type: "number" },
@@ -112,7 +112,7 @@ const sectionConfigs: SectionConfig[] = [
       { key: "siteMaterial", label: "Material Purchase" },
       { key: "runningBalance", label: "Balance" },
       { key: "supervisor", label: "Supervisor" },
-      { key: "reference", label: "Bill / Reference" },
+      { key: "reference", label: "Bill/Reference" },
       { key: "approvalStatus", label: "Approval Status" },
     ],
   },
@@ -122,7 +122,7 @@ const sectionConfigs: SectionConfig[] = [
     title: "Expense",
     columns: [
       { key: "paymentMode", label: "Payment Mode" },
-      { key: "reference", label: "Biller Reference" },
+      { key: "reference", label: "Bill/Reference" },
       { key: "date", label: "Date", type: "date" },
       { key: "category", label: "Category" },
       { key: "description", label: "Description" },
@@ -789,18 +789,6 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   <button
                     type="button"
                     class="primary-table-action"
-                    *ngIf="!tableViewExpanded() && activeSection() === 'materials' && selectedRowCount() > 0"
-                    [title]="selectedContainsExistingMaterial() ? 'Existing inventory materials cannot be ordered again' : 'Create a purchase order from selected materials'"
-                    aria-label="Create purchase order from selected materials"
-                    [disabled]="selectedContainsExistingMaterial()"
-                    (click)="createPurchaseOrderFromSelection()"
-                  >
-                    <ion-icon name="document-text-outline"></ion-icon>
-                    {{ selectedContainsExistingMaterial() ? 'Existing Material — PO unavailable' : 'Create PO (' + selectedRowCount() + ')' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="primary-table-action"
                     *ngIf="!tableViewExpanded() && activeSection() === 'materials' && selectedRowCount() === 1"
                     title="View selected material details"
                     aria-label="View selected material details"
@@ -1223,22 +1211,22 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                     }
                                   } @else {
                                     <span>{{ row['reference'] || '—' }}</span>
-                                  }
-                                  <label
-                                    class="bill-link material-bill-upload"
-                                    [class.disabled]="isMaterialBillUploading(row)"
-                                    (click)="$event.stopPropagation()"
-                                  >
-                                    <input
-                                      type="file"
-                                      class="material-bill-file-input"
-                                      accept="image/*,application/pdf"
-                                      [disabled]="isMaterialBillUploading(row)"
+                                    <label
+                                      class="bill-link material-bill-upload"
+                                      [class.disabled]="isMaterialBillUploading(row)"
                                       (click)="$event.stopPropagation()"
-                                      (change)="uploadMaterialBill(row, $event)"
-                                    />
-                                    <span>{{ isMaterialBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
-                                  </label>
+                                    >
+                                      <input
+                                        type="file"
+                                        class="material-bill-file-input"
+                                        accept="image/*,application/pdf"
+                                        [disabled]="isMaterialBillUploading(row)"
+                                        (click)="$event.stopPropagation()"
+                                        (change)="uploadMaterialBill(row, $event)"
+                                      />
+                                      <span>{{ isMaterialBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
+                                    </label>
+                                  }
                                 </div>
                               </ng-container>
                               <ng-template #standardBillOrEditableCell>
@@ -1252,11 +1240,11 @@ const siteMaterialDetailFields: FieldSchema[] = [
                                       }
                                     } @else {
                                       <span>{{ displayCell(row, column.key) || '—' }}</span>
+                                      <label class="bill-link material-bill-upload" [class.disabled]="isRowBillUploading(row)">
+                                        <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isRowBillUploading(row)" (change)="uploadProjectRowBill(row, $event)" />
+                                        <span>{{ isRowBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
+                                      </label>
                                     }
-                                    <label class="bill-link material-bill-upload" [class.disabled]="isRowBillUploading(row)">
-                                      <input type="file" class="material-bill-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" [disabled]="isRowBillUploading(row)" (change)="uploadProjectRowBill(row, $event)" />
-                                      <span>{{ isRowBillUploading(row) ? 'Uploading…' : 'Upload Bill' }}</span>
-                                    </label>
                                   </div>
                                 </ng-container>
                               </ng-template>

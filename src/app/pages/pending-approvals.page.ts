@@ -209,7 +209,7 @@ type ToastManager = {
                         <th>Project Manager</th>
                         <th>Supervisor</th>
                         <th>Notes</th>
-                        <th>Bill / Reference</th>
+                        <th>Bill/Reference</th>
                         <th>Status</th>
                         <th *ngIf="isAdmin()">Actions</th>
                       </tr>
