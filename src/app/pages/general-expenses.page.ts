@@ -3881,16 +3881,24 @@ export class GeneralExpensesPage implements OnInit {
     });
   }
   private canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
-  requestAdminEdit() {
+  async requestAdminEdit() {
     const row = this.adminActionRow();
     if (!row) return;
     const id = String(row["_id"] || row["__rowId"] || "");
     const module = this.activeModule();
+    const text = `Please edit the ${module} record ${id}.`;
+    const link = `${this.router.url.split("?")[0]}?module=${encodeURIComponent(module)}&record=${encodeURIComponent(id)}`;
     this.adminActionRow.set(null);
-    void this.router.navigate(["/inbox"], { queryParams: {
-      request: `Please edit the ${module} record ${id}.`,
-      link: `${this.router.url.split("?")[0]}?module=${encodeURIComponent(module)}&record=${encodeURIComponent(id)}`,
-    }});
+    try {
+      await firstValueFrom(this.api.saveInboxMessage({ text, link }));
+      await this.presentToast("Edit request sent to Admin.");
+      await this.router.navigate(["/inbox"]);
+    } catch (error: any) {
+      await this.presentToast(
+        error?.error?.message || error?.message || "Could not send the edit request. Please retry.",
+        "danger",
+      );
+    }
   }
   editAdminActionRow() {
     const row = this.adminActionRow();
@@ -3918,8 +3926,25 @@ export class GeneralExpensesPage implements OnInit {
     const remove = deleters[this.activeModule()];
     if (!remove || !id) { await this.presentToast("Open this record's project to manage it.", "warning"); return; }
     if (!window.confirm("Delete this record?")) return;
-    try { await firstValueFrom(remove(id)); await this.hydration.loadModule(this.activeModule() as PageModule); }
-    catch { await this.presentToast("Could not delete the record. Please retry.", "danger"); }
+    try {
+      await firstValueFrom(remove(id));
+      const module = this.activeModule();
+      const signalByModule: Partial<Record<DashboardModule, any>> = {
+        materials: this.data.materials,
+        expenses: this.data.expenses,
+        generalExpenses: this.data.generalExpenses,
+        payments: this.data.payments,
+      };
+      signalByModule[module]?.update((items: any[]) => items.filter((item) => String(item._id || "") !== id));
+      this.hydration.invalidateCache();
+      await this.hydration.loadModule(module as PageModule);
+      await this.presentToast("Record deleted successfully.");
+    } catch (error: any) {
+      await this.presentToast(
+        error?.error?.message || error?.message || "Could not delete the record. Please retry.",
+        "danger",
+      );
+    }
   }
   updateCell(visibleIndex: number, key: string, value: string) {
     if (this.isReadonlyColumn(key)) return;

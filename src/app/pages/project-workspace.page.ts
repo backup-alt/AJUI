@@ -2348,15 +2348,23 @@ export class ProjectWorkspacePage {
     return this.selectedRows()[0] || null;
   }
 
-  requestAdminEdit(row: TableRow, event?: Event) {
+  async requestAdminEdit(row: TableRow, event?: Event) {
     event?.stopPropagation();
     const id = String(row["_id"] || row["__rowId"] || this.rowKey(row));
     const section = this.activeSection();
+    const text = `Please edit the ${section} record ${id} in ${this.project()?.name || "this project"}.`;
+    const link = `${this.router.url.split("?")[0]}?record=${encodeURIComponent(id)}`;
     this.clearRowSelection();
-    void this.router.navigate(["/inbox"], { queryParams: {
-      request: `Please edit the ${section} record ${id} in ${this.project()?.name || "this project"}.`,
-      link: `${this.router.url.split("?")[0]}?record=${encodeURIComponent(id)}`,
-    }});
+    try {
+      await firstValueFrom(this.api.saveInboxMessage({ text, link }));
+      await this.presentToast("Edit request sent to Admin.");
+      await this.router.navigate(["/inbox"]);
+    } catch (error: any) {
+      await this.presentToast(
+        error?.error?.message || error?.message || "Could not send the edit request. Please retry.",
+        "danger",
+      );
+    }
   }
 
   private positionRowToolbar(event?: MouseEvent) {
@@ -5100,7 +5108,7 @@ export class ProjectWorkspacePage {
     if (this.editingRowKey() === key) this.editingRowKey.set("");
     this.editingRowKeys.update((keys) => keys.filter((item) => item !== key));
 
-    try { this.refreshFromBackend(); } catch {}
+    this.refreshSectionFromBackend(section);
     this.loadProjectExpenseRollup(this.projectId());
   }
 
@@ -6144,7 +6152,7 @@ export class ProjectWorkspacePage {
   }
 
   isReadonlyColumn(key: string): boolean {
-    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus" || key === "remainingStock" || key === "totalPo" || key === "totalPaid";
+    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus" || key === "remainingStock" || key === "remainingAmount" || key === "totalPo" || key === "totalPaid";
   }
 
   /**
