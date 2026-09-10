@@ -1588,7 +1588,13 @@ readonly savingPdf = signal(false);
           void this.router.navigate(["/quotations"], { replaceUrl: true });
         }
       },
-      error: () => {},
+      error: (err) => {
+        console.error("Failed to load quotations:", err);
+        // If 403, user doesn't have permission - show empty state
+        if (err?.status === 403) {
+          this.data.quotations.set([]);
+        }
+      },
     });
   }
 

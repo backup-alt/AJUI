@@ -9,8 +9,8 @@ const router = Router();
 router.use(requireAuth);
 
 router.post("/quotations", requireRole("admin", "project_manager", "accountant"), validate(createQuotationSchema), ctrl.createQuotation);
-router.get("/quotations", requireRole("admin", "project_manager", "accountant"), validate(listQuotationsSchema, "query"), ctrl.listQuotations);
-router.get("/quotations/:id", requireRole("admin", "project_manager", "accountant"), ctrl.getQuotation);
+router.get("/quotations", requireAuth, validate(listQuotationsSchema, "query"), ctrl.listQuotations);
+router.get("/quotations/:id", requireAuth, ctrl.getQuotation);
 router.patch("/quotations/:id", requireRole("admin"), validate(updateQuotationSchema), ctrl.updateQuotation);
 router.delete("/quotations/:id", requireRole("admin"), ctrl.deleteQuotation);
 
