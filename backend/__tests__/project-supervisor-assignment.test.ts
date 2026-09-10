@@ -491,7 +491,10 @@ describe("Project supervisor assignment", () => {
       const funding = await request(app).post(`/api/supervisors/${supervisorProfile._id}/fund`)
         .set("Authorization", `Bearer ${login.body.accessToken}`)
         .send({projectId: String(project._id), siteId: String(site._id), amount: 100, paymentMode: "NEFT", note: "Manager funding"});
-      if (funding.status !== 201) throw new Error(JSON.stringify({ status: funding.status, body: funding.body }));
+      // After "Restrict supervisor funding to assigned projects" commit, only managers
+      // with the project in their managedProjectIds can fund supervisors for that project.
+      const expectedStatus = index === 0 ? 201 : 403;
+      if (funding.status !== expectedStatus) throw new Error(JSON.stringify({ status: funding.status, body: funding.body, expected: expectedStatus }));
     }
   });
 });
