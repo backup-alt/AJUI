@@ -2111,7 +2111,7 @@ export class ProjectWorkspacePage {
       if (projectId) this.fetchAttendanceData(projectId);
     });
     effect(() => {
-      if (this.queryParamMap().get("editProject") !== "1") return;
+      if (this.queryParamMap().get("editProject") !== "1" || this.api.user()?.role !== "admin") return;
       const project = this.project();
       if (!project || this.showProjectForm()) return;
       if (this.handledEditProjectQuery() === project.id) return;
@@ -4008,6 +4008,7 @@ export class ProjectWorkspacePage {
     ]);
     const cashAddedFields = new Set(["expenseDate", "transactionType", "description", "amount", "paymentMode", "site", "supervisor", "reference"]);
     return this.columnsFor(this.activeSection()).filter((column) => {
+      if (this.activeSection() === "generalExpenses" && column.key === "reference") return false;
       if (this.activeSection() === "expenses" && hiddenInExpenseForm.has(column.key)) return false;
       if (this.activeSection() === "materials" && hiddenInMaterialForm.has(column.key)) return false;
       const isCashAdded = this.normalizedExpenseTransactionType(String(this.draftRow()["transactionType"] || "Cash Added")) === "Cash Added";
@@ -5319,6 +5320,7 @@ export class ProjectWorkspacePage {
   }
 
   openEditProject(project: Project) {
+    if (this.api.user()?.role !== "admin") return;
     this.editingProject.set(project);
     this.showProjectForm.set(true);
   }
@@ -5615,7 +5617,7 @@ export class ProjectWorkspacePage {
       },
     });
     // Load payments so the table renders the actual records.
-    this.api.listSubcontractorPayments({ projectId, limit: 500 }).subscribe({
+    this.api.listSubcontractorPayments({ projectId, limit: 200 }).subscribe({
       next: (res) => {
         if (this.projectId() !== projectId) return;
         const items = res.items || [];
@@ -5624,8 +5626,11 @@ export class ProjectWorkspacePage {
           this.subcontractorSpend.set(items.reduce((sum, row) => sum + (Number(row.amount) || 0), 0));
         }
       },
-      error: () => {
-        if (this.projectId() === projectId) this.subcontractorPayments.set([]);
+      error: (err) => {
+        if (this.projectId() === projectId) {
+          this.subcontractorPayments.set([]);
+          console.error("Failed to load subcontractor payments:", err?.error?.error || err?.message);
+        }
       },
     });
     // Load sub-contractor profiles for the roster tab. Backend doesn't

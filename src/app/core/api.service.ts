@@ -656,6 +656,10 @@ export class ApiService {
     return this.cachedGet<PaginatedResponse<any>>(`${this.baseUrl}/subcontractors${query}`);
   }
 
+  getSubcontractor(id: string): Observable<{ subcontractor: any }> {
+    return this.cachedGet<{ subcontractor: any }>(`${this.baseUrl}/subcontractors/${encodeURIComponent(id)}`);
+  }
+
   createSubcontractor(payload: {
     projectId: string;
     subcontractorName: string;

@@ -3,7 +3,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@a
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { IonContent, IonIcon, IonSplitPane, IonSpinner, ToastController } from "@ionic/angular/standalone";
+import { firstValueFrom } from "rxjs";
 import { ApiService, SubcontractorLabor, SubcontractorPayment } from "../core/api.service";
+import { mapProject, mapSubcontractor } from "../core/mappers";
 import { ErpDataService } from "../data/erp-data.service";
 import { formatMoney } from "../shared/format";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
@@ -453,10 +455,10 @@ export class SubcontractorDetailsPage {
   }
 
   constructor() {
-    this.load();
+    void this.load();
   }
 
-  load() {
+  async load() {
     const id = this.subcontractorId;
     if (!id) {
       this.loading.set(false);
@@ -464,33 +466,44 @@ export class SubcontractorDetailsPage {
       return;
     }
     this.loading.set(true);
-    this.api.listSubcontractors({ limit: 500, page: 1 }).subscribe({
-      next: (res) => {
-        const found = (res.items || []).find((r: any) => String(r._id) === id);
-        if (!found) {
-          this.subcontractor.set(null);
-          this.loading.set(false);
-          this.loadError.set(null);
-          return;
+    try {
+      const response = await firstValueFrom(this.api.getSubcontractor(id));
+      const found = mapSubcontractor(response.subcontractor);
+      const assignedIds = [...new Set([found.projectId, ...(found.projectIds || [])].filter(Boolean))];
+      const projects = await Promise.all(assignedIds.map(async (projectId) => {
+        try {
+          const projectResponse = await firstValueFrom(this.api.getProject(projectId));
+          return projectResponse.project ? mapProject(projectResponse.project) : null;
+        } catch {
+          return null;
         }
-        this.subcontractor.set(found);
-        this.loading.set(false);
-        this.loadError.set(null);
-        this.refreshPayments();
-      },
-      error: (err) => {
-        this.loadError.set(err?.error?.error || err?.message || "Failed to load sub-contractor.");
-        this.loading.set(false);
-      },
-    });
+      }));
+      const loadedProjects = projects.filter((project): project is NonNullable<typeof project> => Boolean(project));
+      if (loadedProjects.length) {
+        const loadedIds = new Set(loadedProjects.map((project) => project.id));
+        this.erp.projects.update((current) => [
+          ...loadedProjects,
+          ...current.filter((project) => !loadedIds.has(project.id)),
+        ]);
+      }
+      this.subcontractor.set(found);
+      this.loadError.set(null);
+      this.refreshPayments();
+    } catch (err: any) {
+      this.subcontractor.set(null);
+      this.loadError.set(err?.error?.error || err?.message || "Failed to load sub-contractor.");
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   refreshPayments() {
     const id = this.subcontractorId;
     if (!id) return;
-    this.api.listSubcontractorPayments({ subcontractorId: id, limit: 500 }).subscribe({
+    this.api.listSubcontractorPayments({ subcontractorId: id, limit: 200 }).subscribe({
       next: (res) => {
         this.payments.set(res.items || []);
+        this.loadError.set(null);
         const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("editPayment") || "";
         const requested = this.isAdmin() ? (res.items || []).find((payment: SubcontractorPayment) => payment._id === requestedId) : undefined;
         if (requested) { this.openEditPayment(requested); void this.router.navigate(["/subcontractors", id], { replaceUrl: true }); }
@@ -499,7 +512,10 @@ export class SubcontractorDetailsPage {
           error: () => this.summary.set({ totalPaid: 0, recordCount: 0, projectCount: 0, siteCount: 0 }),
         });
       },
-      error: () => this.payments.set([]),
+      error: (err) => {
+        this.payments.set([]);
+        this.loadError.set(err?.error?.error || err?.message || "Failed to load payment records.");
+      },
     });
   }
 

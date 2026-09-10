@@ -1993,9 +1993,12 @@ export class GeneralExpensesPage implements OnInit {
   }
 
   private loadSubcontractorPayments() {
-    this.api.listSubcontractorPayments({ limit: 500 }).subscribe({
+    this.api.listSubcontractorPayments({ limit: 200 }).subscribe({
       next: (res) => this.subcontractorPaymentRows.set(res.items || []),
-      error: () => this.subcontractorPaymentRows.set([]),
+      error: (err) => {
+        this.subcontractorPaymentRows.set([]);
+        console.error("Failed to load subcontractor payments:", err?.error?.error || err?.message);
+      },
     });
   }
 
@@ -4651,7 +4654,7 @@ export class GeneralExpensesPage implements OnInit {
     }
     if (key === "client" || key === "clientName") return this.clientNameOptions();
     if (key === "address") return this.clientAddressOptions();
-    if (key === "supervisor" || key === "supervisorName" || key === "collectedBy" || key === "paidBy") return this.supervisorNameOptions();
+    if (key === "supervisor" || key === "supervisorName" || key === "collectedBy") return this.supervisorNameOptions();
     if (module === "labour" && key === "supervisorName") return this.supervisorOptions();
     if (module === "materials" && key === "materialName") return this.materialNameOptions();
     if (module === "materials" && key === "unit") return ["Bag", "Nos", "Kg", "Load", "Piece", "Item"];
