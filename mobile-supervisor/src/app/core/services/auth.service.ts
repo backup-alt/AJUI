@@ -290,7 +290,7 @@ export class AuthService {
     // on the login screen. It will be restarted by AppComponent.ngOnInit
     // after the next successful login.
     try {
-      this.notifications.stopPolling();
+      this.notifications.resetForAccountChange();
     } catch {
       // best-effort
     }

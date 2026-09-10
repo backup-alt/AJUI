@@ -545,6 +545,14 @@ export class NotificationService {
     this.unreadCount.set(this.notifications().filter((n) => !n.read).length);
   }
 
+  /** Remove the previous account's in-memory notification feed on logout. */
+  resetForAccountChange(): void {
+    this.stopPolling();
+    this.notifications.set([]);
+    this.unreadCount.set(0);
+    this.clearedAt = 0;
+  }
+
   private isMaterialApprovalNotification(notification: InAppNotification): boolean {
     const type = String(notification.data?.['type'] || '').toLowerCase();
     const status = String(notification.data?.['status'] || '').toLowerCase();

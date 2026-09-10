@@ -667,8 +667,12 @@ describe("Purchase order workflow", () => {
       expect.objectContaining({
         materialId: material.materialId,
         paymentType: "UPI",
+        issuedAmount: 83999.75,
       }),
+      expect.objectContaining({ name: "PVC Pipe", issuedAmount: 29500 }),
     ]));
+    expect(legacyVendorRows.body.items.reduce((sum: number, item: any) => sum + Number(item.issuedAmount || 0), 0))
+      .toBe(response.body.purchaseOrder.grandTotal);
 
     const mobileMaterials = await listMaterialsForSupervisor(supervisorUser._id.toString(), {
       projectId: project._id.toString(),

@@ -89,8 +89,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       ip: req.ip,
     });
 
-    if (result.user.role !== "supervisor" && result.user.role !== "admin"
-        && result.user.role !== "project_manager" && result.user.role !== "accountant") {
+    if (result.user.role !== "admin") {
       const accessStatus = await checkAccessRestriction(result.user.role);
       if (accessStatus.isRestricted) {
         throw new AppError(403, `Access restricted until ${accessStatus.currentWindow?.endTime || "scheduled end"}. Contact admin if you need access.`);
@@ -305,21 +304,26 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       return;
     }
 
+    const tokenId = crypto.randomBytes(8).toString("hex");
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = await hashToken(rawToken);
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     await PasswordResetToken.create({
+      tokenId,
       userId: user._id,
       tokenHash,
       expiresAt,
     });
 
+    // Combine tokenId:rawToken so we can look up by tokenId
+    const resetToken = `${tokenId}:${rawToken}`;
+
     const backendUrl = resolveBackendBaseUrl(req);
     // Deep link for mobile app
-    const deepLink = `agb-supervisor://reset-password?token=${rawToken}`;
+    const deepLink = `agb-supervisor://reset-password?token=${resetToken}`;
     // Web fallback (served from backend)
-    const webResetUrl = `${backendUrl}/reset-password.html?token=${rawToken}`;
+    const webResetUrl = `${backendUrl}/reset-password.html?token=${resetToken}`;
 
     const { subject, html, text } = buildResetPasswordEmail({
       name: user.name,
@@ -345,26 +349,37 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
   try {
     const { token, password } = req.body as { token: string; password: string };
 
-    const tokens = await PasswordResetToken.find({ usedAt: { $exists: false } });
-    let matched: (typeof tokens)[number] | undefined;
-    for (const t of tokens) {
-      const ok = await compareToken(token, t.tokenHash);
-      if (ok && t.expiresAt > new Date()) {
-        matched = t;
-        break;
-      }
+    if (!token || !token.includes(":")) {
+      throw new AppError(400, "Invalid reset token format");
     }
 
-    if (!matched) throw new AppError(400, "Invalid or expired reset token");
+    const [tokenId, rawToken] = token.split(":");
+    if (!tokenId || !rawToken) {
+      throw new AppError(400, "Invalid reset token format");
+    }
 
-    const user = await User.findById(matched.userId);
+    const stored = await PasswordResetToken.findOne({
+      tokenId,
+      usedAt: { $exists: false },
+    });
+
+    if (!stored || stored.expiresAt < new Date()) {
+      throw new AppError(400, "Invalid or expired reset token");
+    }
+
+    const valid = await compareToken(rawToken, stored.tokenHash);
+    if (!valid) {
+      throw new AppError(400, "Invalid or expired reset token");
+    }
+
+    const user = await User.findById(stored.userId);
     if (!user) throw new AppError(404, "User not found");
 
     user.passwordHash = await hashPassword(password);
     await user.save();
 
-    matched.usedAt = new Date();
-    await matched.save();
+    stored.usedAt = new Date();
+    await stored.save();
 
     res.json({ success: true, message: "Password reset successfully" });
   } catch (err) {

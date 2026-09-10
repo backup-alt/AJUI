@@ -1175,7 +1175,7 @@ export async function approveApproval(req: Request, res: Response, next: NextFun
     }
 
     const { issuedAmount, givenAmount, approvedAmount, poNumber, approvedQuantity, vendor } = req.body;
-    const updated = await approvalService.approveRequest(req.params.id, reviewer, {
+    const updated = await approvalService.approveRequest(req.params.id, reviewer, req.user?.role || "admin", {
       issuedAmount,
       givenAmount,
       approvedAmount,
@@ -1223,7 +1223,7 @@ export async function rejectApproval(req: Request, res: Response, next: NextFunc
       }
     }
 
-    const updated = await approvalService.rejectRequest(req.params.id, reviewer);
+    const updated = await approvalService.rejectRequest(req.params.id, reviewer, req.user?.role || "admin");
     if (approval.type === "payment") invalidatePaymentCaches();
 
     if (req.user?.sub) {

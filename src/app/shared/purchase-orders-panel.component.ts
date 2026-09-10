@@ -132,6 +132,7 @@ type PoDraftLine = {
 
           <div class="client-section">
             <h3 class="section-label">Purchase Order Details</h3>
+            @if (referenceLoading()) { <p role="status">Loading projects and vendors…</p> }
             <div class="client-form-grid po-fields">
               <div class="form-field">
                 <label>Project *</label>
@@ -199,7 +200,7 @@ type PoDraftLine = {
                 <thead>
                   <tr>
                     <th class="col-sno">S.No</th>
-                    <th class="col-desc">Material / Description</th>
+                    <th class="col-desc">Material Name</th>
                     <th class="col-unit">Unit</th>
                       <th class="col-qty">Qty</th>
                       <th class="col-amount">Rate (₹)</th>
@@ -217,32 +218,34 @@ type PoDraftLine = {
                       <td class="col-desc">
                         @if (line.source === 'existing') {
                           <div class="erp-select-menu" [class.open]="openMenu() === materialKey(index)">
-                            <button type="button" class="erp-select-trigger po-material-trigger" [class.trigger-disabled]="!draftProjectId()" (click)="toggleMenu(materialKey(index))">
-                              <span class="po-trigger-value" [class.placeholder]="!materialName(line)">{{ materialName(line) || 'Select approved material' }}</span>
+                            <button type="button" class="erp-select-trigger po-material-trigger" [class.trigger-disabled]="!draftProjectId() || !vendorId()" (click)="toggleMenu(materialKey(index))">
+                              <span class="po-trigger-value" [class.placeholder]="!materialName(line)">{{ materialName(line) || 'Select material from inventory' }}</span>
                               <svg class="svg-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
                             </button>
                             @if (openMenu() === materialKey(index)) {
-                              <div class="erp-select-panel po-select-panel">
+                              <div class="erp-select-panel po-select-panel po-material-panel">
                                 <input type="text" class="po-select-search" placeholder="Search material…" autocomplete="off" [value]="menuSearch()" (input)="menuSearch.set($any($event.target).value)" />
-                                @for (material of filteredMaterials(); track material._id) {
-                                  <button type="button" [class.selected]="line.materialId === material._id" (mousedown)="$event.preventDefault()" (click)="selectMaterial(index, material._id)">
-                                    <span class="po-option-main">{{ material.name }}</span>
-                                    <span class="po-option-meta">{{ materialQuantityLabel(material) }} · Created {{ materialCreatedDate(material) }}</span>
-                                  </button>
-                                }
-                                @if (filteredMaterials().length === 0) { <div class="po-select-empty">No matching materials</div> }
+                                <div class="po-material-options">
+                                  @for (material of filteredMaterials(); track material._id) {
+                                    <button type="button" [class.selected]="line.materialId === material._id" (mousedown)="$event.preventDefault()" (click)="selectMaterial(index, material._id)">
+                                      <span class="po-option-main" [title]="material.name">{{ material.name }}</span>
+                                      <span class="po-option-meta">{{ material.unit }}</span>
+                                    </button>
+                                  }
+                                  @if (filteredMaterials().length === 0) { <div class="po-select-empty">No matching materials</div> }
+                                </div>
                               </div>
                             }
                           </div>
-                          <button type="button" class="manual-material-toggle" [disabled]="!draftProjectId()" (click)="setManualLine(index)">+ Create new material</button>
+                          <button type="button" class="manual-material-toggle" [disabled]="!draftProjectId() || !vendorId()" (click)="setManualLine(index)">+ Add custom material</button>
                         } @else {
                           <div class="manual-material">
-                            <input [ngModel]="line.description" (ngModelChange)="updateLine(index, 'description', $event)" placeholder="New material name" />
-                            <button type="button" (click)="setExistingLine(index)">Use existing</button>
+                            <input [ngModel]="line.description" (ngModelChange)="updateLine(index, 'description', $event)" placeholder="Enter material name" />
+                            <button type="button" (click)="setExistingLine(index)">Use inventory</button>
                           </div>
                         }
                       </td>
-                      <td class="col-unit"><input [readonly]="line.source === 'existing'" [ngModel]="line.unit" (ngModelChange)="updateLine(index, 'unit', $event)" /></td>
+                      <td class="col-unit"><agb-searchable-select [options]="unitOptions" [allowCustom]="true" [disabled]="line.source === 'existing' && !!line.materialId" placeholder="Unit" [ngModel]="line.unit" (ngModelChange)="updateLine(index, 'unit', $event)" /></td>
                       <td class="col-qty"><input type="number" min="0" [attr.max]="line.source === 'existing' ? approvedQuantityFor(line) : null" [ngModel]="line.quantity" (ngModelChange)="updateLine(index, 'quantity', +$event || 0)" /></td>
                       <td class="col-amount"><input type="number" min="0" step="0.01" [ngModel]="line.amount" (ngModelChange)="updateLine(index, 'amount', +$event || 0)" /></td>
                       <td class="col-payment"><agb-searchable-select [ngModel]="line.paymentMode" (ngModelChange)="updateLine(index, 'paymentMode', $any($event))" [options]="paymentModes" [allowCustom]="true" /></td>
@@ -266,7 +269,7 @@ type PoDraftLine = {
               </table>
             </div>
             <div class="items-actions">
-              <button type="button" class="add-line" [disabled]="!draftProjectId()" (click)="addLine()">+ Add Row</button>
+              <button type="button" class="add-line" [disabled]="!draftProjectId() || !vendorId()" (click)="addLine()">+ Add Row</button>
             </div>
           </div>
 
@@ -497,22 +500,58 @@ type PoDraftLine = {
     .po-trigger-value.placeholder { color: #94a3b8; }
     .po-material-trigger { padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 12px; }
     .po-material-trigger .svg-icon { width: 14px; height: 14px; }
-    .erp-select-panel { position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 100%; max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 12px 30px rgba(2, 22, 60, 0.18); z-index: 300; }
-    .erp-select-panel button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: none; text-align: left; font-size: 12px; color: #1e293b; cursor: pointer; box-sizing: border-box; }
-    .erp-select-panel button:hover { background: #f0f6ff; }
-    .erp-select-panel button.selected { background: #e0ecff; color: #003a8c; font-weight: 600; }
+    .po-material-panel { min-width: 320px; max-width: 450px; max-height: 320px; padding: 8px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #d5deea; border-radius: 10px; background: #fff; box-shadow: 0 16px 36px rgba(15, 23, 42, .18), 0 3px 8px rgba(15, 23, 42, .08); }
+    .po-material-panel .po-select-search { position: relative; z-index: 2; min-height: 38px; padding: 8px 10px; border: 1px solid #dbe3ee; border-radius: 7px; background: #fff; flex: 0 0 auto; }
+    .po-material-panel .po-select-search:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, .1); }
+    .po-material-options { min-height: 0; margin-top: 6px; overflow-y: auto; overscroll-behavior: contain; flex: 1 1 auto; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+    .po-material-panel button {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #334155;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .po-material-panel button:hover { background: #f1f5f9; color: #0f172a; }
+    .po-material-panel button.selected { background: #eff6ff; color: #1d4ed8; }
+    .po-material-panel .po-option-main {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
+    }
+    .po-material-panel .po-option-meta {
+      flex-shrink: 0;
+      white-space: nowrap;
+      text-align: right;
+      min-width: 50px;
+    }
+    .erp-select-panel { position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 100%; max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 12px 30px rgba(2, 22, 60, 0.18); z-index: 300; display: flex; flex-direction: column; overflow: hidden; }
+    .erp-select-panel > button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: none; text-align: left; font-size: 12px; color: #1e293b; cursor: pointer; box-sizing: border-box; flex-shrink: 0; }
+    .erp-select-panel > button:hover { background: #f0f6ff; }
+    .erp-select-panel > button.selected { background: #e0ecff; color: #003a8c; font-weight: 600; }
     .po-option-main { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .po-option-meta { flex-shrink: 0; font-size: 11px; color: #64748b; font-weight: 400; }
-    .po-select-search { width: 100%; padding: 8px 10px; border: none; border-bottom: 1px solid #e2e8f0; font-size: 12px; outline: none; box-sizing: border-box; position: sticky; top: 0; background: #fff; z-index: 1; }
+    .po-select-search { width: 100%; padding: 8px 10px; border: none; border-bottom: 1px solid #e2e8f0; font-size: 12px; outline: none; box-sizing: border-box; position: sticky; top: 0; background: #fff; z-index: 10; flex-shrink: 0; }
     .po-select-empty { padding: 14px 10px; text-align: center; color: #94a3b8; font-size: 12px; }
     .po-select-create { justify-content: flex-start !important; color: #2c5cff !important; font-weight: 700; border-top: 1px solid #e2e8f0 !important; background: #f8fafc !important; position: sticky; bottom: 0; z-index: 1; }
     .po-select-create:hover { background: #eef2ff !important; }
-    .po-table-wrap:has(.erp-select-menu.open) { overflow: visible !important; }
-    .items-table:has(.erp-select-menu.open) { overflow: visible !important; }
-    .items-table tr:has(.erp-select-menu.open) { position: relative; z-index: 30; }
-    .items-section { margin-bottom: 24px; }
-    .po-table-wrap { overflow: auto; }
-    .items-table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cfd8e6; border-radius: 8px; overflow: hidden; min-width: 856px; }
+    .items-section { margin-bottom: 24px; overflow: visible; }
+    .items-section .po-table-wrap { position: relative; }
+    .items-table tbody tr { position: relative; }
+    .items-table tbody td { position: relative; }
+    .items-table tbody td .erp-select-menu { position: static; }
+    .items-table tbody td .erp-select-panel { position: absolute; top: 100%; left: 0; z-index: 9999; margin-top: 4px; }
+    .po-table-wrap { overflow: visible; }
+    .items-table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cfd8e6; border-radius: 8px; overflow: visible; min-width: 856px; }
     .items-table col.col-col-sno { width: 44px; }
     .items-table col.col-col-desc { width: auto; }
     .items-table col.col-col-unit { width: 76px; }
@@ -650,22 +689,27 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   readonly filteredProjects = computed(() => filterByName(this.projects(), this.menuSearch(), "name"));
   readonly filteredVendors = computed(() => filterByName(this.vendors(), this.menuSearch(), "name"));
   readonly selectableMaterials = computed(() => {
-    const editingOrder = this.editingId() ? this.selectedOrder() : null;
-    const editingMaterialIds = new Set(
-      (editingOrder?.items || []).map((item) => String(item.materialId || "")),
-    );
-    const allocatedMaterialIds = new Set(
-      this.orders()
-        .filter((order) => !editingOrder || order._id !== editingOrder._id)
-        .flatMap((order) => order.items || [])
-        .map((item) => String(item.materialId || "")),
-    );
-
-    return this.materials().filter((material) =>
-      editingMaterialIds.has(material._id) || !allocatedMaterialIds.has(material._id),
+    const unique = new Map<string, ExistingMaterial>();
+    const selectedIds = new Set([
+      ...this.lines().map((line) => line.materialId),
+      ...this.preselectedMaterialIds,
+    ].filter(Boolean));
+    for (const material of this.materials()) {
+      const key = `${this.normalizedMaterialValue(material.name)}::${this.normalizedMaterialValue(material.unit)}`;
+      const current = unique.get(key);
+      if (!current || (selectedIds.has(material._id) && !selectedIds.has(current._id))) {
+        unique.set(key, material);
+      }
+    }
+    return Array.from(unique.values());
+  });
+  readonly filteredMaterials = computed(() => {
+    const query = this.normalizedMaterialValue(this.menuSearch());
+    if (!query) return this.selectableMaterials();
+    return this.selectableMaterials().filter((material) =>
+      `${material.name} ${material.unit}`.toLocaleLowerCase().includes(query),
     );
   });
-  readonly filteredMaterials = computed(() => filterByName(this.selectableMaterials(), this.menuSearch(), "name"));
   readonly selectedProjectName = computed(() => {
     const projectId = this.draftProjectId();
     const currentProjectName = this.projects().find((project) => project._id === projectId)?.name;
@@ -766,21 +810,34 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     }
   }
 
+  readonly referenceLoading = signal(false);
+  readonly unitOptions = ["Nos", "Pcs", "Bags", "Kg", "Ton", "Litre", "Meter", "Feet", "Sq.ft", "Sq.m", "Cu.ft", "Cu.m", "Load", "Box", "Set"];
+
   private async loadReferenceData() {
-    try {
-      const projectItems = this.projectId
-        ? firstValueFrom(this.api.getProject(this.projectId)).then((result) => result.project ? [result.project] : [])
-        : firstValueFrom(this.api.listProjects({ limit: 200, page: 1 })).then((result) => result.items || []);
-      const [vendors, rates, projects] = await Promise.all([
-        firstValueFrom(this.api.listVendors({ limit: 200, page: 1 })),
-        firstValueFrom(this.api.listPurchaseOrderGstRates()),
-        projectItems,
-      ]);
-      this.vendors.set(vendors.items || []);
-      this.gstRates.set(rates.rates || [0, 5, 12, 18, 28]);
-      this.projects.set(projects.length ? projects : (this.projectId ? [{ _id: this.projectId, name: this.projectName }] : []));
-      if (this.projectId && !this.draftProjectId()) await this.selectProject(this.projectId);
-    } catch { this.vendors.set([]); }
+    this.referenceLoading.set(true);
+    const results = await Promise.allSettled([
+      this.loadReferencePages((page) => firstValueFrom(this.api.listVendors({ limit: 25, page })))
+        .then((items) => this.vendors.set(items)),
+      firstValueFrom(this.api.listPurchaseOrderGstRates())
+        .then((result) => this.gstRates.set(result.rates || [0, 5, 12, 18, 28])),
+      this.loadReferencePages((page) => firstValueFrom(this.api.listProjects({ limit: 25, page })))
+        .then((items) => this.projects.set(items)),
+    ]);
+    this.referenceLoading.set(false);
+    if (results.some((result) => result.status === "rejected")) {
+      this.error.set("Some purchase order options could not be loaded. Please reload to retry.");
+    }
+    if (this.projectId && !this.draftProjectId()) await this.selectProject(this.projectId);
+  }
+
+  private async loadReferencePages(fetchPage: (page: number) => Promise<{ items: any[]; total?: number }>) {
+    const items: any[] = [];
+    for (let page = 1; ; page += 1) {
+      const result = await fetchPage(page);
+      const rows = result.items || [];
+      items.push(...rows);
+      if (rows.length < 25 || (result.total !== undefined && items.length >= result.total)) return items;
+    }
   }
 
   async loadOrders(page = this.currentPage()) {
@@ -823,18 +880,19 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     this.lines.set([this.emptyLine()]);
     if (!projectId) return;
     try {
-      const items = await this.loadAllMaterials(projectId);
-      this.materials.set(items.filter((item) => !item.isExistingMaterial && (!String(item.poNumber || "").trim() || item.poNumber === "Pending")));
+      const items = await this.loadAllMaterialsAcrossProjects();
+      if (this.draftProjectId() !== projectId) return;
+      this.materials.set(items);
       this.applyPreselectedMaterials();
-    } catch { this.error.set("Could not load project materials."); }
+    } catch { this.error.set("Could not load materials from inventory."); }
   }
 
   selectMaterial(index: number, materialId: string) {
     const material = this.selectableMaterials().find((item) => item._id === materialId);
     if (!material) return;
-    const quantity = this.defaultQuantityFor(material);
     const knownAmount = Number(material.givenAmount ?? material.issuedAmount ?? 0);
-    this.updateLineObject(index, { source: "existing", materialId, description: material.name, unit: material.unit, quantity, amount: knownAmount > 0 && quantity > 0 ? knownAmount / quantity : 0 });
+    const quantity = this.defaultQuantityFor(material);
+    this.updateLineObject(index, { source: "existing", materialId, description: material.name, unit: material.unit, quantity: 0, amount: knownAmount > 0 && quantity > 0 ? knownAmount / quantity : 0 });
     this.openMenu.set("");
   }
 
@@ -848,15 +906,15 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   }
 
   private draftLineForMaterial(material: ExistingMaterial): PoDraftLine {
-    const quantity = this.defaultQuantityFor(material);
     const knownAmount = Number(material.givenAmount ?? material.issuedAmount ?? 0);
+    const quantity = this.defaultQuantityFor(material);
     return {
       key: crypto.randomUUID(),
       source: "existing",
       materialId: material._id,
       description: material.name,
       unit: material.unit,
-      quantity,
+      quantity: 0,
       amount: knownAmount > 0 && quantity > 0 ? knownAmount / quantity : 0,
       paymentMode: "Bank Transfer",
       gstPercent: 18,
@@ -872,25 +930,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     return Number(material.approvedQuantity) || Number(material.requestedQuantity) || 1;
   }
 
-  materialQuantityLabel(material: ExistingMaterial) {
-    const approved = Number(material.approvedQuantity) || 0;
-    return approved > 0 ? `Approved: ${approved} ${material.unit}` : "Set quantity in PO";
-  }
 
-  materialCreatedDate(material: ExistingMaterial) {
-    if (!material.createdAt) return "date unknown";
-    const date = new Date(material.createdAt);
-    if (isNaN(date.getTime())) return "date unknown";
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return "today";
-    if (diffDays === 1) return "yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return date.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
-  }
 
   setManualLine(index: number) {
     this.openMenu.set("");
@@ -922,7 +962,6 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       ? !line.materialId
         || !this.selectableMaterials().some((material) => material._id === line.materialId)
         || line.quantity <= 0
-        || (this.approvedQuantityFor(line) !== null && line.quantity > Number(this.approvedQuantityFor(line)))
       : !line.description.trim() || !line.unit.trim() || line.quantity <= 0);
     if (invalid) { this.error.set("Complete every purchase order line."); return; }
     if (this.grandTotal() <= 0) { this.error.set("Purchase order total must be greater than ₹0. Enter an amount before saving."); return; }
@@ -951,31 +990,32 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       this.syncSavedOrderMaterials(response.purchaseOrder);
       this.editingId.set("");
       await this.loadOrders();
+      await this.refreshSharedMaterials(response.purchaseOrder.projectId);
       this.selectedOrder.set(response.purchaseOrder);
       this.saved.emit(response.purchaseOrder);
     } catch (error: any) { this.error.set(error?.error?.error || error?.error?.message || error?.message || "Could not save purchase order."); }
     finally { this.saving.set(false); }
   }
 
-  private refreshSharedMaterials() {
-    this.api.listMaterials({ limit: 200 }).subscribe({
-      next: (r) => {
-        try {
-          const fresh = ((r as any).items || []).map((item: any) => mapMaterial(item));
-          const byId = new Map<string, any>();
-          for (const row of this.data.materials()) {
-            const key = String((row as any)._id ?? (row as any).id ?? "");
-            if (key) byId.set(key, row);
-          }
-          for (const item of fresh) {
-            const key = String(item._id ?? item.id ?? "");
-            if (key) byId.set(key, item);
-          }
-          this.data.materials.set(Array.from(byId.values()));
-        } catch {}
-      },
-      error: () => {},
-    });
+  private async refreshSharedMaterials(projectId = this.projectId) {
+    try {
+      const items = projectId
+        ? await this.loadAllMaterials(projectId)
+        : (await firstValueFrom(this.api.listMaterials({ limit: 25 }))).items;
+      const fresh = (items || []).map((item: any) => mapMaterial(item));
+      const byId = new Map<string, any>();
+      for (const row of this.data.materials()) {
+        const key = String((row as any)._id ?? (row as any).id ?? "");
+        if (key) byId.set(key, row);
+      }
+      for (const item of fresh) {
+        const key = String(item._id ?? item.id ?? "");
+        if (key) byId.set(key, item);
+      }
+      this.data.materials.set(Array.from(byId.values()));
+    } catch {
+      this.error.set("Purchase orders loaded, but material totals could not be refreshed. Please reload.");
+    }
   }
 
   private async startEdit(value: string) {
@@ -1007,9 +1047,8 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     if (this.lines().length === 0) this.lines.set([this.emptyLine()]);
     this.materials.set([]);
     try {
-      const items = await this.loadAllMaterials(order.projectId);
-      this.materials.set(items.filter((item) =>
-        !String(item.poNumber || "").trim() || item.poNumber === "Pending" || item.poNumber === order.poNumber));
+      const items = await this.loadAllMaterialsAcrossProjects();
+      this.materials.set(items);
     } catch {}
   }
 
@@ -1169,19 +1208,51 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     const all: ExistingMaterial[] = [];
     let cursor: string | undefined;
     do {
-      const result = await firstValueFrom(this.api.listMaterials({ projectId, limit: 200, cursor }));
+      const result = await firstValueFrom(this.api.listMaterials({ projectId, limit: 100, cursor }));
       all.push(...((result.items || []) as ExistingMaterial[]));
       cursor = result.nextCursor || undefined;
     } while (cursor);
     return all;
   }
 
+  private async loadAllMaterialsAcrossProjects(): Promise<ExistingMaterial[]> {
+    const all: ExistingMaterial[] = [];
+    let cursor: string | undefined;
+    do {
+      const result = await firstValueFrom(this.api.listMaterials({ limit: 100, cursor }));
+      all.push(...((result.items || []) as ExistingMaterial[]));
+      cursor = result.nextCursor || undefined;
+    } while (cursor);
+
+    // Remove duplicates: keep only the first occurrence of each (name, unit) pair
+    const seen = new Set<string>();
+    const unique: ExistingMaterial[] = [];
+
+    for (const material of all) {
+      const normalizedName = material.name.trim().toLowerCase().replace(/\s+/g, " ");
+      const normalizedUnit = material.unit.trim().toLowerCase().replace(/\s+/g, " ");
+      const key = `${normalizedName}|||${normalizedUnit}`;
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(material);
+      }
+    }
+
+    return unique.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   materialKey(index: number) { return `material-${index}`; }
   materialName(line: PoDraftLine) { return line.description || ""; }
 
+  private normalizedMaterialValue(value: string) {
+    return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  }
+
   toggleMenu(key: string) {
     if (key === "project" && this.view === "edit") return;
-    if ((key === "vendor" || key.startsWith("material-")) && !this.draftProjectId()) return;
+    if (key === "vendor" && !this.draftProjectId()) return;
+    if (key.startsWith("material-") && (!this.draftProjectId() || !this.vendorId())) return;
     this.menuSearch.set("");
     this.openMenu.set(this.openMenu() === key ? "" : key);
   }

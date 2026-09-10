@@ -336,24 +336,30 @@ export async function listMaterials(filter: {
     console.warn("[listMaterials] site-name lookup failed (returning items anyway):", (err as Error).message);
   }
 
-  // PurchaseOrder is the source of truth for PO payment modes. Enrich
-  // legacy material rows that predate the denormalized paymentType field,
-  // and keep the vendor view current when a purchase order is edited.
+  // Derive PO amounts and payment modes from the order, including legacy
+  // materials without amounts. Assign rounding once so vendor totals match
+  // the PO grand total, while retaining the separately recorded payments.
   try {
     const poNumbers = [...new Set(
       items.map((item) => String(item.poNumber || "").trim()).filter(Boolean),
     )];
     if (poNumbers.length > 0) {
-      const purchaseOrders = await PurchaseOrder.find({ poNumber: { $in: poNumbers } })
-        .select("poNumber paymentMode")
+      const purchaseOrders = await PurchaseOrder.find({ poNumber: { $in: poNumbers }, deletedAt: { $exists: false } })
+        .select("poNumber paymentMode items roundOff")
         .lean()
         .maxTimeMS(10_000);
-      const paymentModeByPo = new Map(
-        purchaseOrders.map((order) => [order.poNumber, order.paymentMode]),
+      const orderByPo = new Map(
+        purchaseOrders.map((order) => [order.poNumber, order]),
       );
       items.forEach((item) => {
-        const paymentMode = paymentModeByPo.get(String(item.poNumber || "").trim());
-        if (paymentMode) item.paymentType = paymentMode;
+        const order = orderByPo.get(String(item.poNumber || "").trim());
+        if (!order) return;
+        const lines = order.items.filter((line) => String(line.materialId) === String(item._id));
+        item.paymentType = lines[0]?.paymentMode || order.paymentMode;
+        if (lines.length) {
+          const rounding = String(order.items[0]?.materialId) === String(item._id) ? Number(order.roundOff || 0) : 0;
+          item.issuedAmount = Math.round((lines.reduce((sum, line) => sum + Number(line.itemAmount || 0) + Number(line.gstAmount || 0), 0) + rounding) * 100) / 100;
+        }
       });
     }
   } catch (err) {

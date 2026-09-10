@@ -696,7 +696,12 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
           } else {
             var errBody = await r2.json().catch(function () { return {}; });
             setLoading(false);
-            document.getElementById('form-view').innerHTML = '<div class="login-error">' + (errBody.error || errBody.message || 'This invite link is invalid or has expired.') + '</div>';
+            var errorView = document.getElementById('form-view');
+            errorView.replaceChildren();
+            var errorMessage = document.createElement('div');
+            errorMessage.className = 'login-error';
+            errorMessage.textContent = errBody.error || errBody.message || 'This invite link is invalid or has expired.';
+            errorView.appendChild(errorMessage);
           }
         } catch (e) {
           setLoading(false);

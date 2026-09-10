@@ -99,6 +99,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const payload = verifyAccessToken(token);
     req.user = payload;
 
+    // HIGH-3 fix: Real-time access schedule check on every request
+    // This prevents token replay after hours end. Users must re-authenticate
+    // when they come back during permitted hours.
     if (req.user.role !== "admin") {
       const schedule = await getCachedSchedule();
       if (schedule && schedule.enabled) {

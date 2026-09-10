@@ -12,6 +12,8 @@ import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { recomputeSiteLedger } from "./expense.service.js";
 import { addApprovedMaterialToInventory } from "./inventory.service.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
+import { notifyUserOfApproval } from "./device-token.service.js";
+import { logApprovalAction } from "../utils/audit-logger.js";
 
 function isMaterialApproval(sourceCollection: string): boolean {
   return ["materials", "material"].includes(sourceCollection.toLowerCase());
@@ -53,6 +55,7 @@ export async function createApproval(params: CreateApprovalParams): Promise<IApp
 export async function approveRequest(
   approvalId: string,
   reviewer: string,
+  reviewerRole: string = "admin",
   options: {
     issuedAmount?: number;
     givenAmount?: number;
@@ -62,10 +65,19 @@ export async function approveRequest(
     vendor?: string;
   } = {}
 ): Promise<IApproval> {
-  const approval = await Approval.findOne({ approvalId });
-  if (!approval) throw new AppError(404, "Approval not found");
-  if (approval.status !== "Pending") {
-    throw new AppError(409, `Approval already ${approval.status.toLowerCase()}`);
+  // Use atomic findOneAndUpdate to prevent race conditions (CRITICAL-3 fix)
+  const approval = await Approval.findOneAndUpdate(
+    { approvalId, status: "Pending" },
+    {
+      status: "Approved",
+      reviewedBy: reviewer,
+      reviewedAt: new Date(),
+    },
+    { new: true }
+  );
+
+  if (!approval) {
+    throw new AppError(409, "Approval not found or already processed");
   }
 
   const sourceUpdate: Record<string, unknown> = {
@@ -217,48 +229,54 @@ export async function approveRequest(
       throw new AppError(400, `Unknown source collection: ${approval.sourceCollection}`);
   }
 
-  approval.status = "Approved";
-  approval.reviewedBy = reviewer;
-  approval.reviewedAt = new Date();
+  // Status and reviewer already set by findOneAndUpdate above
   if (generatedPoNumber) {
     approval.poNumber = generatedPoNumber;
+    await approval.save();
   }
-  await approval.save();
 
   if (projectId) {
     await recomputeProjectTotals(projectId);
   }
 
+  // MEDIUM-3 fix: Audit log for approval action
+  logApprovalAction(
+    "approved",
+    approval.approvalId,
+    approval.type,
+    reviewer,
+    reviewerRole,
+    approval.projectId?.toString(),
+    approval.amount,
+    {
+      sourceCollection: approval.sourceCollection,
+      sourceId: approval.sourceId.toString(),
+      issuedAmount: options.issuedAmount,
+      givenAmount: options.givenAmount,
+      approvedAmount: options.approvedAmount,
+      approvedQuantity: options.approvedQuantity,
+    }
+  );
+
   // Material approvals are intentionally silent in the mobile app.
   if (!isMaterialApproval(approval.sourceCollection)) {
     try {
-      const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
-    const notifDetail = approval.detail ? ` - ${approval.detail}` : '';
-    const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString('en-IN')})` : '';
-    const approvalBody = `Approved${notifDetail}${notifAmount}`;
-    const notificationData = {
-      approvalId: approval.approvalId,
-      type: approval.type,
-      status: "Approved",
-      projectId: approval.projectId?.toString() || "",
-    };
-    if (projectId) {
-      await notifyProjectSupervisors(
-        projectId,
-        `${approval.title} - Approved`,
-        approvalBody,
-        notificationData
-      );
-    }
-    // Notify the owner who submitted the request
-    if (approval.owner) {
-      await notifyUserOfApproval(
-        approval.owner,
-        `${approval.title} - Approved`,
-        approvalBody,
-        notificationData
-      );
-    }
+      const notifDetail = approval.detail ? ` - ${approval.detail}` : "";
+      const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString("en-IN")})` : "";
+      const approvalBody = `Approved${notifDetail}${notifAmount}`;
+      if (approval.owner && Types.ObjectId.isValid(approval.owner)) {
+        await notifyUserOfApproval(
+          approval.owner,
+          `${approval.title} - Approved`,
+          approvalBody,
+          {
+            approvalId: approval.approvalId,
+            type: approval.type,
+            status: "Approved",
+            projectId: approval.projectId?.toString() || "",
+          },
+        );
+      }
     } catch (err) {
       console.warn("[Notification] Failed to send approval notification:", err);
     }
@@ -267,12 +285,23 @@ export async function approveRequest(
   return approval.toObject();
 }
 
-export async function rejectRequest(approvalId: string, reviewer: string): Promise<IApproval> {
-  const approval = await Approval.findOne({ approvalId });
-  if (!approval) throw new AppError(404, "Approval not found");
-  if (approval.status !== "Pending") {
-    throw new AppError(409, `Approval already ${approval.status.toLowerCase()}`);
+export async function rejectRequest(approvalId: string, reviewer: string, reviewerRole: string = "admin"): Promise<IApproval> {
+  // Use atomic findOneAndUpdate to prevent race conditions
+  const approval = await Approval.findOneAndUpdate(
+    { approvalId, status: "Pending" },
+    {
+      status: "Rejected",
+      reviewedBy: reviewer,
+      reviewedAt: new Date(),
+    },
+    { new: true }
+  );
+
+  if (!approval) {
+    throw new AppError(409, "Approval not found or already processed");
   }
+
+  // Status and reviewer already set by findOneAndUpdate above
 
   const sourceUpdate: Record<string, unknown> = {
     status: "Rejected",
@@ -313,46 +342,45 @@ export async function rejectRequest(approvalId: string, reviewer: string): Promi
     }
   }
 
-  approval.status = "Rejected";
-  approval.reviewedBy = reviewer;
-  approval.reviewedAt = new Date();
-  await approval.save();
+  // Status and reviewer already set by findOneAndUpdate above
 
   if (paymentProjectId) await recomputeProjectTotals(paymentProjectId);
   if (paymentClientId) await recomputeClientTotals(paymentClientId);
 
+  // MEDIUM-3 fix: Audit log for rejection action
+  logApprovalAction(
+    "rejected",
+    approval.approvalId,
+    approval.type,
+    reviewer,
+    reviewerRole,
+    approval.projectId?.toString(),
+    approval.amount,
+    {
+      sourceCollection: approval.sourceCollection,
+      sourceId: approval.sourceId.toString(),
+    }
+  );
+
   // Material approvals are intentionally silent in the mobile app.
   if (!isMaterialApproval(approval.sourceCollection)) {
     try {
-      const { notifyProjectSupervisors, notifyUserOfApproval } = await import("./device-token.service.js");
-    const notifDetail = approval.detail ? ` - ${approval.detail}` : '';
-    const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString('en-IN')})` : '';
-    const rejectBody = `Rejected${notifDetail}${notifAmount}`;
-    await notifyProjectSupervisors(
-      approval.projectId || "",
-      `${approval.title} - Rejected`,
-      rejectBody,
-      {
-        approvalId: approval.approvalId,
-        type: approval.type,
-        status: "Rejected",
-        projectId: approval.projectId?.toString() || "",
+      const notifDetail = approval.detail ? ` - ${approval.detail}` : "";
+      const notifAmount = approval.amount ? ` (₹${Number(approval.amount).toLocaleString("en-IN")})` : "";
+      const rejectBody = `Rejected${notifDetail}${notifAmount}`;
+      if (approval.owner && Types.ObjectId.isValid(approval.owner)) {
+        await notifyUserOfApproval(
+          approval.owner,
+          `${approval.title} - Rejected`,
+          rejectBody,
+          {
+            approvalId: approval.approvalId,
+            type: approval.type,
+            status: "Rejected",
+            projectId: approval.projectId?.toString() || "",
+          },
+        );
       }
-    );
-    // Notify the owner who submitted the request
-    if (approval.owner) {
-      await notifyUserOfApproval(
-        approval.owner,
-        `${approval.title} - Rejected`,
-        rejectBody,
-        {
-          approvalId: approval.approvalId,
-          type: approval.type,
-          status: "Rejected",
-          projectId: approval.projectId?.toString() || "",
-        }
-      );
-    }
     } catch (err) {
       console.warn("[Notification] Failed to send rejection notification:", err);
     }

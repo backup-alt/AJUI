@@ -6,11 +6,11 @@ services:
     region: oregon
     branch: main
     rootDir: backend
-    # Faster install: omit dev deps, skip audit + funding noise, prefer
-    # the npm cache (Render caches node_modules between builds when
-    # package-lock.json hasn't changed). Combined this typically brings
-    # the install step from ~3-5 min to ~30-60 s on the starter plan.
-    buildCommand: npm ci --omit=dev --no-audit --no-fund --prefer-offline && npm run build
+    # Use the npm cache and skip audit/funding noise. Dev dependencies must
+    # remain available because the build command runs the TypeScript compiler.
+    # TypeScript and its Node typings are build-time devDependencies, so a
+    # production-only install cannot run the required type-check on a clean host.
+    buildCommand: npm ci --no-audit --no-fund --prefer-offline && npm run build
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
@@ -40,7 +40,7 @@ services:
       - key: FRONTEND_URL
         sync: false
       - key: MOBILE_APP_URL
-        value: "*"
+        value: "https://localhost,http://localhost,capacitor://localhost"
       - key: BACKEND_PUBLIC_URL
         sync: false
       - key: QR_BASE_URL

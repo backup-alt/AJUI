@@ -23,3 +23,11 @@ export const publicOnlyGuard: CanActivateFn = (_route, _state) => {
 
   return true;
 };
+
+export const adminGuard: CanActivateFn = () => {
+  const api = inject(ApiService);
+  const router = inject(Router);
+  return api.user()?.role === "admin"
+    ? true
+    : router.createUrlTree(["/settings/account"]);
+};

@@ -338,6 +338,8 @@ export class ApiService {
         'sitesCache:',
         'profileCache:',
         'notificationsCache:',
+        'notifications',
+        'notificationsClearedAt',
       ];
       for (const key of allKeys) {
         if (userKeyPrefixes.some((prefix) => key === prefix || key.startsWith(prefix))) {

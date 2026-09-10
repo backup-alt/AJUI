@@ -4,6 +4,8 @@ import { generateId } from "../src/services/id-generator.service";
 import { Client } from "../src/models/Client";
 import { Project } from "../src/models/Project";
 import { Counter } from "../src/models/Counter";
+import { Types } from "mongoose";
+import { signAccessToken } from "../src/utils/jwt";
 
 let token = "";
 
@@ -195,6 +197,31 @@ describe("RBAC", () => {
     const res = await request(app).get("/api/permissions").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.permissions.length).toBeGreaterThan(0);
+  });
+
+  it("rejects project managers from organization-wide settings mutations", async () => {
+    if (!app) return;
+    const employeeToken = signAccessToken(new Types.ObjectId().toString(), "project_manager");
+
+    const companyProfile = await request(app)
+      .post("/api/company-profile")
+      .set("Authorization", `Bearer ${employeeToken}`)
+      .send({ name: "Unauthorized change" });
+    expect(companyProfile.status).toBe(403);
+
+    const permissionDefaults = await request(app)
+      .get("/api/permissions/defaults")
+      .set("Authorization", `Bearer ${employeeToken}`);
+    expect(permissionDefaults.status).toBe(403);
+  });
+
+  it("rejects unsupported bill file types before upload", async () => {
+    if (!app) return;
+    const response = await request(app)
+      .post(`/api/materials/${new Types.ObjectId()}/receipt`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ data: "a".repeat(24), mimeType: "text/html", fileName: "bill.html" });
+    expect(response.status).toBe(400);
   });
 });
 

@@ -407,7 +407,7 @@ export class SetupAccountComponent implements OnInit {
         this.busy.set(false);
         if (res?.success && res?.accessToken && res?.user) {
           this.api.setEmployeeSession(res.user, res.accessToken, res.expiresAt || "");
-          this.hydration.hydrateFromBackend();
+          // Do NOT hydrate here - AppComponent.ngOnInit() handles it after navigation
           void this.router.navigate(["/clients"]);
         } else if (res?.success) {
           this.step.set("success");

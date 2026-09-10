@@ -731,6 +731,7 @@ export class TaxInvoicePage {
   readonly data = inject(ErpDataService);
   readonly api = inject(ApiService);
   readonly router = inject(Router);
+  private readonly toastController = inject(ToastController);
   isAdmin() { return this.api.user()?.role === "admin"; }
   canRequestOrEdit() { return ["admin", "project_manager", "accountant"].includes(String(this.api.user()?.role || "")); }
   readonly invoiceActionRow = signal<TaxInvoice | null>(null);
@@ -1031,20 +1032,33 @@ export class TaxInvoicePage {
       next: (res: any) => {
         const clientId = res?.client?.clientId || res?.clientId || res?.id;
         const mongoId = res?.client?._id || res?._id;
-        this.data.addClient({
+        const createdClient = this.data.addClient({
           ...value,
           id: clientId,
           _id: mongoId,
           gstNumber: value.gstNumber || "",
         } as any);
-        this.api.patchInvoice(data.sourceId, { clientId: mongoId || clientId }).subscribe({
-          next: () => {
+        const openCreatedClient = async (linkFailed = false) => {
+          try {
+            if (linkFailed) {
+              const toast = await this.toastController.create({
+                message: "Client created, but the invoice could not be linked. Please link it from the invoice editor.",
+                duration: 6000,
+                color: "warning",
+              });
+              await toast.present();
+            }
+            this.loadInvoicesFromBackend();
+            await this.router.navigate(["/clients", createdClient.id]);
+          } finally {
             this.showMakeClientDialog.set(false);
             this.makeClientData.set(null);
-            this.loadInvoicesFromBackend();
             this.creatingClient.set(false);
-          },
-          error: () => this.creatingClient.set(false),
+          }
+        };
+        this.api.patchInvoice(data.sourceId, { clientId: mongoId || clientId }).subscribe({
+          next: () => void openCreatedClient(),
+          error: () => void openCreatedClient(true),
         });
       },
       error: (err: any) => {

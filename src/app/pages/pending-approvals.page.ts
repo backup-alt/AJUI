@@ -166,26 +166,6 @@ type ToastManager = {
             </section>
 
             <div class="approvals-stack">
-              @if (showMaterial()) {
-                <section class="operations-workbench approvals-workbench approval-section">
-                  <div class="module-toolbar table-first-toolbar"><div><h2>Materials</h2><p>Pending material requests for the projects available to this account.</p></div><span class="approval-count-pill">{{ materialApprovals().length }} pending</span></div>
-                  <div class="table-wrap operations-table approvals-table"><table><thead><tr><th>Client</th><th>Project</th><th>Site</th><th>Material</th><th>Requested</th><th>Vendor</th><th>Date</th><th>Status</th><th *ngIf="isAdmin()">Actions</th></tr></thead><tbody>
-                    <tr *ngFor="let row of materialApprovals()"><td>{{ row.client || '-' }}</td><td>{{ row.project || '-' }}</td><td>{{ row.site || '-' }}</td><td><strong>{{ row.materialName || '-' }}</strong></td><td>{{ row.requestedQuantity || 0 }} {{ row.unit }}</td><td>{{ row.vendor || 'Unassigned' }}</td><td>{{ row.requestDate || '-' }}</td><td><span class="approval-status-pill">{{ row.status }}</span></td><td class="approval-actions" *ngIf="isAdmin()"><button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">Approve</button><button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)">Decline</button></td></tr>
-                    <tr *ngIf="materialApprovals().length === 0"><td class="empty-row" [attr.colspan]="isAdmin() ? 9 : 8"><span>No pending material approvals.</span></td></tr>
-                  </tbody></table></div>
-                </section>
-              }
-
-              @if (showLabour()) {
-                <section class="operations-workbench approvals-workbench approval-section">
-                  <div class="module-toolbar table-first-toolbar"><div><h2>Attendance &amp; Labour</h2><p>Pending labour entries for the projects available to this account.</p></div><span class="approval-count-pill">{{ labourApprovals().length }} pending</span></div>
-                  <div class="table-wrap operations-table approvals-table"><table><thead><tr><th>Client</th><th>Project</th><th>Site</th><th>Date</th><th>Staff / Subcontractor</th><th>Labour Types</th><th>Count</th><th>Status</th><th *ngIf="isAdmin()">Actions</th></tr></thead><tbody>
-                    <tr *ngFor="let row of labourApprovals()"><td>{{ row.client || '-' }}</td><td>{{ row.project || '-' }}</td><td>{{ row.site || '-' }}</td><td>{{ row.attendanceDate || '-' }}</td><td><strong>{{ row.staffName || '-' }}</strong></td><td>{{ row.labourTypes || '-' }}</td><td>{{ row.staffCount || 0 }}</td><td><span class="approval-status-pill">{{ row.status }}</span></td><td class="approval-actions" *ngIf="isAdmin()"><button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">Approve</button><button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)">Decline</button></td></tr>
-                    <tr *ngIf="labourApprovals().length === 0"><td class="empty-row" [attr.colspan]="isAdmin() ? 9 : 8"><span>No pending labour approvals.</span></td></tr>
-                  </tbody></table></div>
-                </section>
-              }
-
               @if (showSiteExpense()) {
               <section class="operations-workbench approvals-workbench approval-section">
                 <div class="module-toolbar table-first-toolbar">
@@ -286,14 +266,7 @@ type ToastManager = {
               </section>
               }
 
-              @if (otherApprovals().length) {
-                <section class="operations-workbench approvals-workbench approval-section">
-                  <div class="module-toolbar table-first-toolbar"><div><h2>Other Requests</h2><p>Pending expense, payment, and subcontractor requests in your project scope.</p></div><span class="approval-count-pill">{{ otherApprovals().length }} pending</span></div>
-                  <div class="table-wrap operations-table approvals-table"><table><thead><tr><th>Type</th><th>Project</th><th>Site</th><th>Description</th><th>Amount</th><th>Status</th><th *ngIf="isAdmin()">Actions</th></tr></thead><tbody>
-                    <tr *ngFor="let row of otherApprovals()"><td>{{ approvalModuleLabel(row.module) }}</td><td>{{ row.project || '-' }}</td><td>{{ row.site || '-' }}</td><td><strong>{{ $any(row).description || $any(row).subcontractorName || '-' }}</strong></td><td>{{ $any(row).amount || $any(row).contractValue || '-' }}</td><td><span class="approval-status-pill">{{ row.status }}</span></td><td class="approval-actions" *ngIf="isAdmin()"><button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">Approve</button><button type="button" class="decline-action" (click)="decline(row)" [disabled]="isRowProcessing(row.rowId)">Decline</button></td></tr>
-                  </tbody></table></div>
-                </section>
-              }
+
 
 
 
@@ -355,11 +328,13 @@ export class PendingApprovalsPage implements OnInit {
     this.isLoading.set(true);
     this.loadError.set(false);
     try {
-      const all = await this.approvalsService.fetchApprovals({ status: "Pending", limit: 25 });
-      this._materialRows.set(all.filter((r) => r.module === "materials") as MaterialApprovalRow[]);
-      this._labourRows.set(all.filter((r) => r.module === "labour") as LabourApprovalRow[]);
-      this._siteExpenseRows.set(all.filter((r) => r.module === "expenses") as ExpenseApprovalRow[]);
-      this._otherRows.set(all.filter((r) => !["materials", "labour", "expenses"].includes(r.module)) as ApprovalBaseRow[]);
+      const supervisorExpenses: ExpenseApprovalRow[] = [];
+      for (let page = 1; ; page += 1) {
+        const rows = await this.approvalsService.fetchApprovals({ type: "expense", status: "Pending", limit: 25, page });
+        supervisorExpenses.push(...rows.filter((row) => row.module === "expenses") as ExpenseApprovalRow[]);
+        if (rows.length < 25) break;
+      }
+      this._siteExpenseRows.set(supervisorExpenses);
     } catch {
       this.loadError.set(true);
     } finally {
@@ -575,12 +550,7 @@ export class PendingApprovalsPage implements OnInit {
   }
 
   private allPendingRows(): ApprovalBaseRow[] {
-    return [
-      ...this.materialApprovals(),
-      ...this.labourApprovals(),
-      ...this.siteExpenseApprovals(),
-      ...this.otherApprovals(),
-    ];
+    return this.siteExpenseApprovals();
   }
 
   private isPending(value: string): boolean {

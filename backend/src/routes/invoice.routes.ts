@@ -8,8 +8,8 @@ import { requireRole } from "../middleware/rbac.js";
 const router = Router();
 router.use(requireAuth);
 
-router.get("/", validate(listInvoicesSchema, "query"), ctrl.listInvoices);
-router.get("/:id", ctrl.getInvoice);
+router.get("/", requireRole("admin", "project_manager", "accountant"), validate(listInvoicesSchema, "query"), ctrl.listInvoices);
+router.get("/:id", requireRole("admin", "project_manager", "accountant"), ctrl.getInvoice);
 router.post("/", requireRole("admin", "project_manager", "accountant"), validate(createInvoiceSchema), ctrl.createInvoice);
 router.patch("/:id", requireRole("admin"), validate(updateInvoiceSchema), ctrl.updateInvoice);
 

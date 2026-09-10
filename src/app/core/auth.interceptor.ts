@@ -21,7 +21,13 @@ function getLoginUrl(): string {
   const basePath = pathParts.length > 0 && pathParts[0] !== 'index.html'
     ? '/' + pathParts[0]
     : '';
-  return window.location.origin + basePath + '/#/login';
+  const currentRoute = window.location.hash.startsWith("#/")
+    ? window.location.hash.slice(1)
+    : "/dashboard";
+  const returnQuery = currentRoute !== "/login"
+    ? `?returnUrl=${encodeURIComponent(currentRoute)}`
+    : "";
+  return window.location.origin + basePath + '/#/login' + returnQuery;
 }
 
 export const authInterceptor: HttpInterceptorFn = (

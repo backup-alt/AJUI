@@ -71,7 +71,7 @@ type SidebarItem = {
                   </small>
                 </a>
                 <div class="sidebar-project-actions">
-                  <button type="button" aria-label="Edit project" (click)="requestEditProject(project, $event)">
+                  <button *ngIf="isAdmin()" type="button" aria-label="Edit project" (click)="requestEditProject(project, $event)">
                     <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                       <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
                       <path d="m14.8 7.2 3 3" />
@@ -121,6 +121,10 @@ export class EnterpriseSidebarComponent {
 
   readonly logoPath = "assets/logo.png";
 
+  isAdmin(): boolean {
+    return this.api.user()?.role === "admin";
+  }
+
   get clientProjects(): Project[] {
     return this.data.projectsForClient(this.data.clientById(this.clientId));
   }
@@ -168,6 +172,7 @@ export class EnterpriseSidebarComponent {
   requestEditProject(project: Project, event: Event) {
     event.preventDefault();
     event.stopPropagation();
+    if (!this.isAdmin()) return;
     if (this.hasOutputObservers(this.editProject)) {
       this.editProject.emit(project);
       return;

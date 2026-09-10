@@ -406,7 +406,7 @@ export async function createProject(input: CreateProjectInput) {
     );
   }
 
-  await Client.findByIdAndUpdate(client._id, { $addToSet: { projectIds: project.projectId } });
+  await Client.findByIdAndUpdate(client._id, { $addToSet: { projectIds: project._id } });
 
   // 3) Sync supervisor assignment (assignedProjects/sites, Site.supervisorId,
   //    user.managedProjectIds, access-cache invalidation).
@@ -589,9 +589,9 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
     // previous client when it is reassigned, otherwise it would appear
     // under both clients.
     if (oldClientId && oldClientId !== newClientId) {
-      await Client.findByIdAndUpdate(oldClientId, { $pull: { projectIds: project.projectId } });
+      await Client.findByIdAndUpdate(oldClientId, { $pull: { projectIds: project._id } });
     }
-    await Client.findByIdAndUpdate(newClientId, { $addToSet: { projectIds: project.projectId } });
+    await Client.findByIdAndUpdate(newClientId, { $addToSet: { projectIds: project._id } });
   }
 
   // Sync supervisor↔project↔sites if the supervisor changed OR if sites
@@ -632,7 +632,7 @@ export async function deleteProject(id: string, scopeProjectIds?: ProjectScopeId
   const projectSiteNames = [...(project.siteNames || [])];
 
   await Client.findByIdAndUpdate(project.clientId, {
-    $pull: { projectIds: project.projectId },
+    $pull: { projectIds: project._id },
   });
 
   if (projectSiteIds.length > 0) {

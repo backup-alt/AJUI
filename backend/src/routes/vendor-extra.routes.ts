@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/vendor-extra.controller.js";
 import { validate } from "../middleware/validation.js";
 import { requireAuth } from "../middleware/auth.js";
+import { requireRole } from "../middleware/rbac.js";
 import {
   createVendorCustomColumnSchema,
   deleteVendorCustomColumnSchema,
@@ -16,12 +17,12 @@ router.use(requireAuth);
 
 // Custom columns for vendor site purchase details
 router.get("/vendor-custom-columns", validate(listVendorCustomColumnsSchema, "query"), ctrl.listCustomColumns);
-router.post("/vendor-custom-columns", validate(createVendorCustomColumnSchema), ctrl.addCustomColumn);
-router.delete("/vendor-custom-columns", validate(deleteVendorCustomColumnSchema, "query"), ctrl.removeCustomColumn);
+router.post("/vendor-custom-columns", validate(createVendorCustomColumnSchema), requireRole("admin"), ctrl.addCustomColumn);
+router.delete("/vendor-custom-columns", validate(deleteVendorCustomColumnSchema, "query"), requireRole("admin"), ctrl.removeCustomColumn);
 
 // Bill/Reference links for material purchase rows
 router.get("/material-bill-links", validate(listMaterialBillLinksSchema, "query"), ctrl.listBillLinks);
 router.post("/material-bill-links", validate(upsertMaterialBillLinkSchema), ctrl.upsertBillLink);
-router.delete("/material-bill-links", validate(deleteMaterialBillLinkSchema, "query"), ctrl.removeBillLink);
+router.delete("/material-bill-links", validate(deleteMaterialBillLinkSchema, "query"), requireRole("admin"), ctrl.removeBillLink);
 
 export default router;

@@ -412,10 +412,8 @@ export class LoginPage {
           this.sessionRole.set(this.formatRole(role));
         } catch {}
 
-        // Hydrate critical data (clients, projects, vendors, supervisors)
-        // in the background — do NOT block navigation. The dashboard
-        // shows a loading skeleton until hydration completes.
-        this.hydration.hydrateFromBackend().catch(() => {});
+        // Do NOT hydrate here - AppComponent.ngOnInit() handles it after navigation
+        // Duplicate hydration was causing 100+ simultaneous requests
         await this.router.navigateByUrl(this.safeReturnUrl());
       },
       error: (err) => {

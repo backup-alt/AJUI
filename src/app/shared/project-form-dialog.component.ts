@@ -237,15 +237,14 @@ export class ProjectFormDialogComponent implements OnInit {
   private async loadSupervisors() {
     this.supervisorsLoading.set(true);
     try {
-      const res = await firstValueFrom(
-        this.api.listSupervisors({ limit: 100 })
-      );
-      const items = (res?.items || []) as any[];
+      const items: any[] = [];
+      for (let page = 1; ; page += 1) {
+        const res = await firstValueFrom(this.api.listSupervisors({ limit: 25, page }));
+        const rows = res.items || [];
+        items.push(...rows);
+        if (rows.length < 25 || (res.total !== undefined && items.length >= res.total)) break;
+      }
       const mapped: SupervisorOption[] = items
-        .filter((row) => {
-          const r = String(row?.role || "").toLowerCase();
-          return r === "supervisor";
-        })
         .map((row) => ({
           id: row._id ? String(row._id) : String(row.id || ""),
           name: String(row.name || "").trim(),
@@ -278,18 +277,19 @@ export class ProjectFormDialogComponent implements OnInit {
       this.selectedSupervisorName.set(match.name);
     } else {
       this.selectedSupervisorName.set(initialName);
-      this.supervisorSearch.set(initialName);
+      this.supervisorSearch.set("");
     }
   }
 
   supervisorDisplayValue(): string {
     if (this.selectedSupervisorId()) return this.selectedSupervisorName();
-    return this.supervisorSearch();
+    return this.supervisorSearch() || this.selectedSupervisorName();
   }
 
   onSupervisorSearchInput(event: Event) {
     const value = (event.target as HTMLInputElement).value;
     this.supervisorSearch.set(value);
+    this.selectedSupervisorName.set("");
     if (this.selectedSupervisorId()) {
       this.selectedSupervisorId.set(null);
       this.selectedSupervisorName.set("");

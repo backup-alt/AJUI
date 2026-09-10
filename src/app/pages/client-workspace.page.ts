@@ -17,6 +17,7 @@ import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.compone
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
 import { formatMoney, statusClass } from "../shared/format";
 import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.component";
+import { ApiService } from "../core/api.service";
 
 @Component({
   standalone: true,
@@ -71,7 +72,7 @@ import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.compone
                 </article>
 
                 <article *ngFor="let project of projects()" class="project-select-card" role="button" tabindex="0" (click)="openProject(project)" (keydown.enter)="openProject(project)">
-                  <div class="project-hover-actions" aria-label="Project actions">
+                  <div *ngIf="isAdmin()" class="project-hover-actions" aria-label="Project actions">
                     <button type="button" aria-label="Edit project" (click)="openEditProject(project, $event)">
                       <svg viewBox="0 0 24 24" aria-hidden="true" class="svg-icon">
                         <path d="M4 20h4.2l11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
@@ -227,7 +228,11 @@ import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.compone
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ClientWorkspacePage {
+  isAdmin(): boolean {
+    return this.api.user()?.role === "admin";
+  }
   readonly data = inject(ErpDataService);
+  private readonly api = inject(ApiService);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
   private readonly toastController = inject(ToastController);
@@ -258,6 +263,7 @@ export class ClientWorkspacePage {
 
   openEditProject(project: Project, event?: Event) {
     event?.stopPropagation();
+    if (!this.isAdmin()) return;
     this.editingProject.set(project);
     this.showProjectForm.set(true);
   }
@@ -366,6 +372,7 @@ export class ClientWorkspacePage {
 
   deleteProject(project: Project, event?: Event) {
     event?.stopPropagation();
+    if (!this.isAdmin()) return;
     const confirmed = window.confirm(`Delete ${project.name}? This removes the project from this client.`);
     if (!confirmed) return;
     this.data.deleteProject(project.id);

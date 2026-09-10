@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import * as ctrl from "../controllers/financial.controller.js";
 import * as attendanceCtrl from "../controllers/attendance.controller.js";
 import { validate } from "../middleware/validation.js";
@@ -47,6 +48,16 @@ import {
   updateWorkerSchema,
   listWorkersSchema,
 } from "../schemas/financial.schema.js";
+import { approveRequestSchema, rejectRequestSchema } from "../schemas/approval.schema.js";
+
+// HIGH-1 fix: Rate limiter for approval endpoints to prevent spam/DoS
+const approvalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute
+  message: { error: "Too many approval requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
 router.use(requireAuth);
@@ -293,7 +304,19 @@ router.delete(
 router.get("/approvals", validate(listApprovalsSchema, "query"), cache(10), ctrl.listApprovals);
 router.get("/approvals/count", cache(10), ctrl.getApprovalCount);
 router.get("/approvals/:id", ctrl.getApproval);
-router.put("/approvals/:id/approve", requireRole("admin"), ctrl.approveApproval);
-router.put("/approvals/:id/reject", requireRole("admin"), ctrl.rejectApproval);
+router.put(
+  "/approvals/:id/approve",
+  approvalLimiter,
+  validate(approveRequestSchema),
+  requireRole("admin"),
+  ctrl.approveApproval
+);
+router.put(
+  "/approvals/:id/reject",
+  approvalLimiter,
+  validate(rejectRequestSchema),
+  requireRole("admin"),
+  ctrl.rejectApproval
+);
 
 export default router;

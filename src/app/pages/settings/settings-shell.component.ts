@@ -211,13 +211,7 @@ export class SettingsShellComponent {
   });
 
   readonly userEmail = computed(() => {
-    const raw = sessionStorage.getItem("ajui_user");
-    if (!raw) return "";
-    try {
-      return JSON.parse(raw)?.email || "";
-    } catch {
-      return "";
-    }
+    return this.currentUser()?.email || "";
   });
 
   readonly avatarColor = computed(() => {
@@ -287,7 +281,11 @@ export class SettingsShellComponent {
       groups = groups.map((g) => ({
         ...g,
         items: g.items.filter((item) => {
-          // These sections are admin-only
+          // Company Profile is admin-only
+          if (item.id === "company") {
+            return false;
+          }
+          // Roles, access-schedule, and sessions are admin-only
           if (item.id === "roles" || item.id === "access-schedule" || item.id === "sessions") {
             return false;
           }

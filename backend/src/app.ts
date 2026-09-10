@@ -9,6 +9,7 @@ import { connectDatabase } from "./config/db.js";
 import { initEmail, verifyEmailConnection } from "./config/email.js";
 import { initFirebase } from "./config/firebase.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
+import { requestIdMiddleware } from "./middleware/request-id.js";
 import { setupSwagger } from "./config/swagger.js";
 import authRoutes from "./routes/auth.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
@@ -30,6 +31,9 @@ export function createApp(): express.Application {
   const app = express();
 
   app.set("trust proxy", 1);
+
+  // LOW-5 fix: Request ID tracing for all requests
+  app.use(requestIdMiddleware);
 
   if (env.NODE_ENV === "production") {
     app.use((req, res, next) => {
@@ -70,21 +74,37 @@ export function createApp(): express.Application {
     })
   );
 
+  // MEDIUM-4 fix: Restrict CORS to known origins
   app.use(
     cors({
       origin: (origin, callback) => {
         const normalize = (url: string) => url.replace(/\/+$/, "");
+        const configuredMobileOrigins = env.MOBILE_APP_URL
+          .split(",")
+          .map((value) => value.trim())
+          .filter((value) => value && value !== "*");
+
+        // Known trusted origins
         const allowedOrigins = [
           env.FRONTEND_URL,
-          ...(env.MOBILE_APP_URL !== "*" ? [env.MOBILE_APP_URL] : []),
+          ...configuredMobileOrigins,
+          // Capacitor mobile app origins
+          "capacitor://localhost",
+          "ionic://localhost",
+          "http://localhost",
         ]
           .filter(Boolean)
           .map(normalize);
+
         const requestOrigin = origin ? normalize(origin) : null;
+
+        // Allow requests with no origin (e.g., mobile apps, Postman)
+        // Allow configured origins
+        // Allow wildcard (*) only in development
         if (
           !origin ||
           (requestOrigin && allowedOrigins.includes(requestOrigin)) ||
-          env.MOBILE_APP_URL === "*"
+          (env.NODE_ENV !== "production" && env.MOBILE_APP_URL === "*")
         ) {
           callback(null, true);
         } else {
@@ -246,7 +266,9 @@ export async function bootstrap(): Promise<void> {
   }
   try {
     initEmail();
+    // LOW-3 fix: Health check for email service
     await verifyEmailConnection();
+    console.log("[Bootstrap] Email service verified successfully");
   } catch (err) {
     console.warn("[Bootstrap] Email init failed (non-fatal):", (err as Error).message);
   }
@@ -294,6 +316,25 @@ export async function bootstrap(): Promise<void> {
     await ensureWorkersCollection();
   } catch (err) {
     console.warn("[Bootstrap] ensureWorkersCollection failed (non-fatal):", (err as Error).message);
+  }
+
+  // MEDIUM-2 fix: Cleanup old consumed and expired invites
+  try {
+    const { cleanupOldInvites, cleanupExpiredInvites } = await import("./services/invite-cleanup.service.js");
+    await cleanupOldInvites();
+    await cleanupExpiredInvites();
+
+    // Schedule daily cleanup (24 hours)
+    setInterval(async () => {
+      try {
+        await cleanupOldInvites();
+        await cleanupExpiredInvites();
+      } catch (err) {
+        console.warn("[InviteCleanup] Scheduled cleanup failed:", (err as Error).message);
+      }
+    }, 24 * 60 * 60 * 1000);
+  } catch (err) {
+    console.warn("[Bootstrap] Invite cleanup failed (non-fatal):", (err as Error).message);
   }
 
   // Migrate the legacy `subcontractId_1` (unique) index off the

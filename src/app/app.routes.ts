@@ -1,5 +1,5 @@
 import { Routes } from "@angular/router";
-import { authGuard, publicOnlyGuard } from "./core/guards/auth.guard";
+import { adminGuard, authGuard, publicOnlyGuard } from "./core/guards/auth.guard";
 
 export const routes: Routes = [
   {
@@ -99,12 +99,12 @@ export const routes: Routes = [
     children: [
       { path: "", pathMatch: "full", redirectTo: "account" },
       { path: "account", loadComponent: () => import("./pages/settings/settings-account.component").then((m) => m.SettingsAccountComponent) },
-      { path: "company", loadComponent: () => import("./pages/settings/settings-company.component").then((m) => m.SettingsCompanyComponent) },
+      { path: "company", loadComponent: () => import("./pages/settings/settings-company.component").then((m) => m.SettingsCompanyComponent), canActivate: [adminGuard] },
       { path: "notifications", pathMatch: "full", redirectTo: "account" },
-      { path: "roles", loadComponent: () => import("./pages/settings/settings-roles.component").then((m) => m.SettingsRolesComponent) },
-      { path: "roles/employee/:id", loadComponent: () => import("./pages/settings/settings-employee-detail.component").then((m) => m.SettingsEmployeeDetailComponent) },
-      { path: "access-schedule", loadComponent: () => import("./pages/settings/settings-access-schedule.component").then((m) => m.SettingsAccessScheduleComponent) },
-      { path: "sessions", loadComponent: () => import("./pages/settings/settings-sessions.component").then((m) => m.SettingsSessionsComponent) },
+      { path: "roles", loadComponent: () => import("./pages/settings/settings-roles.component").then((m) => m.SettingsRolesComponent), canActivate: [adminGuard] },
+      { path: "roles/employee/:id", loadComponent: () => import("./pages/settings/settings-employee-detail.component").then((m) => m.SettingsEmployeeDetailComponent), canActivate: [adminGuard] },
+      { path: "access-schedule", loadComponent: () => import("./pages/settings/settings-access-schedule.component").then((m) => m.SettingsAccessScheduleComponent), canActivate: [adminGuard] },
+      { path: "sessions", loadComponent: () => import("./pages/settings/settings-sessions.component").then((m) => m.SettingsSessionsComponent), canActivate: [adminGuard] },
     ],
   },
   {
