@@ -84,14 +84,22 @@ export function createApp(): express.Application {
           .map((value) => value.trim())
           .filter((value) => value && value !== "*");
 
+        // Parse FRONTEND_URL to support multiple comma-separated origins
+        const configuredFrontendOrigins = env.FRONTEND_URL
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+
         // Known trusted origins
         const allowedOrigins = [
-          env.FRONTEND_URL,
+          ...configuredFrontendOrigins,
           ...configuredMobileOrigins,
           // Capacitor mobile app origins
           "capacitor://localhost",
           "ionic://localhost",
           "http://localhost",
+          // GitHub Pages deployment
+          "https://backup-alt.github.io",
         ]
           .filter(Boolean)
           .map(normalize);
