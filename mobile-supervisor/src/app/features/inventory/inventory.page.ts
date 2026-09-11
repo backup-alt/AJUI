@@ -219,7 +219,7 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                     <ion-icon name="time-outline"></ion-icon>
                     <span>Vendor History</span>
                   </div>
-                  @for (entry of item.purchaseHistory; track $index) {
+                  @for (entry of visiblePurchaseHistory(item); track $index) {
                     <div class="vendor-history-entry">
                       <span class="vh-vendor">{{ entry.vendor || 'Unknown' }}</span>
                       <span class="vh-qty">{{ entry.quantity }} {{ item.unit }}</span>
@@ -231,6 +231,15 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
                         </button>
                       }
                     </div>
+                  }
+                  @if (hiddenPurchaseHistoryCount(item) > 0) {
+                    <button class="vendor-history-toggle" type="button" (click)="toggleVendorHistory(item._id); $event.stopPropagation()">
+                      View all {{ item.purchaseHistory.length }} entries
+                    </button>
+                  } @else if ((item.purchaseHistory?.length || 0) > 5) {
+                    <button class="vendor-history-toggle" type="button" (click)="toggleVendorHistory(item._id); $event.stopPropagation()">
+                      Show less
+                    </button>
                   }
                 </div>
               }
@@ -527,6 +536,20 @@ type InventoryStockFilter = 'all' | 'available' | 'low' | 'out';
       border-bottom: 1px solid var(--m3-outline-variant);
     }
     .vendor-history-entry:last-child { border-bottom: none; }
+    .vendor-history-toggle {
+      width: 100%;
+      margin-top: var(--md-space-2);
+      padding: 8px 10px;
+      border: 1px solid rgba(0, 34, 99, 0.15);
+      border-radius: var(--md-radius-lg);
+      background: rgba(0, 34, 99, 0.05);
+      color: var(--m3-primary);
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .vendor-history-toggle:active { background: rgba(0, 34, 99, 0.10); }
     .vh-vendor {
       font-size: 13px;
       font-weight: 600;
@@ -636,6 +659,7 @@ export class InventoryPage implements OnInit, OnDestroy {
   stockFilter = signal<InventoryStockFilter>('all');
   sortField = signal<SortField>('lastUpdated');
   sortDir = signal<SortDir>('desc');
+  expandedVendorHistory = signal<Set<string>>(new Set());
   private loadGeneration = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -724,6 +748,26 @@ export class InventoryPage implements OnInit, OnDestroy {
     }
 
     return Array.from(grouped.values());
+  }
+
+  visiblePurchaseHistory(item: InventoryItem): NonNullable<InventoryItem['purchaseHistory']> {
+    const history = item.purchaseHistory || [];
+    return this.expandedVendorHistory().has(item._id) ? history : history.slice(0, 5);
+  }
+
+  hiddenPurchaseHistoryCount(item: InventoryItem): number {
+    const total = item.purchaseHistory?.length || 0;
+    if (this.expandedVendorHistory().has(item._id)) return 0;
+    return Math.max(0, total - 5);
+  }
+
+  toggleVendorHistory(itemId: string): void {
+    this.expandedVendorHistory.update((current) => {
+      const next = new Set(current);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
   }
 
   sortLabel = computed(() => {

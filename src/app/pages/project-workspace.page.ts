@@ -1982,7 +1982,12 @@ export class ProjectWorkspacePage {
         sourceRow: row,
       });
     }
-    return [...cards.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return [...cards.values()]
+      .map((card) => ({
+        ...card,
+        remainingStock: Math.max(0, card.purchasedQuantity - card.consumedQuantity),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   });
   readonly inventoryItemCount = computed(() => {
     const names = new Set<string>();
