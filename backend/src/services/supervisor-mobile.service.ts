@@ -21,6 +21,7 @@ import { Project } from "../models/Project.js";
 import { Site } from "../models/Site.js";
 import { Material } from "../models/Material.js";
 import { Inventory } from "../models/Inventory.js";
+import { PurchaseOrder } from "../models/PurchaseOrder.js";
 import { Labour } from "../models/Labour.js";
 import { Worker } from "../models/Worker.js";
 import { Expense } from "../models/Expense.js";
@@ -79,6 +80,10 @@ function uniqueStrings(values: Array<string | undefined | null>): string[] {
     }
   }
   return list;
+}
+
+function normalizeInventoryKey(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
 }
 
 function hasObjectId(ids: Types.ObjectId[], value: Types.ObjectId): boolean {
@@ -836,6 +841,121 @@ async function getProjectIdStrings(userId: string): Promise<string[]> {
   return projects.map((p) => p.id);
 }
 
+async function ensurePurchaseOrdersInInventory(
+  access: SupervisorAccess,
+  userId: string,
+  selectedProjectId?: string
+): Promise<void> {
+  const selectedObjectId = selectedProjectId ? toObjectId(selectedProjectId) : null;
+  const projectIds = selectedObjectId
+    ? access.projectIds.filter((projectId) => projectId.toString() === selectedObjectId.toString())
+    : access.projectIds;
+  if (projectIds.length === 0) return;
+
+  const purchaseOrders = await PurchaseOrder.find({
+    projectId: { $in: projectIds },
+    deletedAt: { $exists: false },
+  })
+    .select("_id poNumber projectId projectName vendorId vendorName date notes items createdAt updatedAt")
+    .sort({ updatedAt: -1, _id: -1 })
+    .limit(500)
+    .lean()
+    .maxTimeMS(20_000);
+
+  if (purchaseOrders.length === 0) return;
+
+  const materialIds = uniqueObjectIds(
+    purchaseOrders.flatMap((po) => (po.items || []).map((item) => item.materialId))
+  );
+  const linkedMaterials = materialIds.length > 0
+    ? await Material.find({ _id: { $in: materialIds } })
+        .select("_id materialId name unit projectId projectName clientId clientName vendor vendorId poNumber notes status receivedDate")
+        .lean()
+        .maxTimeMS(20_000)
+    : [];
+  const materialById = new Map(linkedMaterials.map((material) => [material._id.toString(), material]));
+
+  for (const po of purchaseOrders) {
+    for (const item of po.items || []) {
+      const qty = Math.max(0, Number(item.quantity) || 0);
+      const name = String(item.description || "").trim();
+      const unit = String(item.unit || "").trim();
+      if (!name || !unit || qty <= 0) continue;
+
+      const linkedMaterial = item.materialId ? materialById.get(item.materialId.toString()) : undefined;
+      const normalizedName = normalizeInventoryKey(name);
+      const normalizedUnit = normalizeInventoryKey(unit);
+      const query = {
+        projectId: po.projectId,
+        siteKey: "",
+        normalizedName,
+        normalizedUnit,
+      };
+
+      const existing = await Inventory.findOne(query);
+      const purchaseAlreadySynced = existing?.purchaseHistory?.some((entry) =>
+        entry.poNumber === po.poNumber &&
+        entry.materialId?.toString() === item.materialId?.toString()
+      );
+      if (existing && purchaseAlreadySynced) continue;
+
+      const purchaseEntry = {
+        vendor: po.vendorName || linkedMaterial?.vendor || "",
+        vendorId: po.vendorId || linkedMaterial?.vendorId,
+        quantity: qty,
+        date: po.date ? new Date(po.date) : po.createdAt || new Date(),
+        poNumber: po.poNumber,
+        materialId: item.materialId,
+        received: linkedMaterial ? linkedMaterial.status === "Received" : false,
+        receivedDate: linkedMaterial?.receivedDate,
+        notes: po.notes || undefined,
+      };
+
+      if (existing) {
+        existing.requestedQuantity = Math.max(Number(existing.requestedQuantity) || 0, qty);
+        existing.purchasedQuantity = (Number(existing.purchasedQuantity) || 0) + qty;
+        existing.approvedQuantity = Math.max(Number(existing.approvedQuantity) || 0, existing.purchasedQuantity);
+        existing.vendor = po.vendorName || existing.vendor;
+        existing.vendorId = po.vendorId || existing.vendorId;
+        existing.poNumber = po.poNumber || existing.poNumber;
+        existing.lastMaterialId = item.materialId || existing.lastMaterialId;
+        existing.lastUpdatedBy = userId;
+        existing.purchaseHistory = existing.purchaseHistory || [];
+        existing.purchaseHistory.push(purchaseEntry);
+        await existing.save();
+        continue;
+      }
+
+      await Inventory.create({
+        projectId: po.projectId,
+        projectName: po.projectName,
+        clientId: linkedMaterial?.clientId,
+        clientName: linkedMaterial?.clientName,
+        site: "",
+        siteKey: "",
+        name,
+        normalizedName,
+        unit,
+        normalizedUnit,
+        requestedQuantity: qty,
+        approvedQuantity: qty,
+        purchasedQuantity: qty,
+        consumedQuantity: 0,
+        remainingStock: qty,
+        minimumQuantity: 0,
+        vendor: po.vendorName || linkedMaterial?.vendor,
+        vendorId: po.vendorId || linkedMaterial?.vendorId,
+        poNumber: po.poNumber,
+        lastMaterialId: item.materialId,
+        lastUpdatedBy: userId,
+        received: linkedMaterial ? linkedMaterial.status === "Received" : false,
+        receivedDate: linkedMaterial?.receivedDate,
+        purchaseHistory: [purchaseEntry],
+      });
+    }
+  }
+}
+
 export async function listMaterialsForSupervisor(
   userId: string,
   filters: {
@@ -866,6 +986,8 @@ export async function listMaterialsForSupervisor(
   const limit = Math.min(Math.max(filters.limit ?? 25, 1), maxLimit);
 
   if (filters.status === "Approved" && filters.view !== "materials") {
+    await ensurePurchaseOrdersInInventory(access, userId, filters.projectId);
+
     const invQuery: Record<string, any> = { ...query };
     delete invQuery.status;
     const andConditions: Record<string, unknown>[] = [];

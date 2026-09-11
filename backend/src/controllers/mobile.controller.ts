@@ -302,6 +302,7 @@ export async function updateMaterialStock(req: Request, res: Response, next: Nex
     );
 
     invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/inventory");
     invalidateCachePrefix("/api/supervisor/materials");
     invalidateCachePrefix("/api/supervisor/dashboard");
     invalidateCachePrefix("/api/dashboard/batch");
