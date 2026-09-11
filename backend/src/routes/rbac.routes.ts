@@ -12,7 +12,7 @@ router.use(requireAuth);
 router.get("/me/permissions", ctrl.getMyPermissions);
 
 // Admin-only: configure permissions
-router.use(requireRole("admin"));
+router.use("/permissions", requireRole("admin"));
 router.get("/permissions/defaults", ctrl.getDefaults);
 router.get("/permissions", ctrl.getAllPermissions);
 router.get("/permissions/:role", validate(getPermissionsSchema, "params"), ctrl.getPermissionsForRole);

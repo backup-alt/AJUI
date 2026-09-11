@@ -173,7 +173,7 @@ const TEST_QR_PAYLOAD: QrPayload = {
             expand="block"
             class="agb-primary"
             (click)="loginExisting()"
-            [disabled]="loading || !loginPhone || !loginPassword || !network.isOnline()"
+            [disabled]="loading || !loginPhone || !loginPassword"
           >
             <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
             <span *ngIf="!loading">Log In</span>
@@ -263,11 +263,6 @@ const TEST_QR_PAYLOAD: QrPayload = {
             <span *ngIf="!loading">Verify & Continue</span>
             <ion-spinner *ngIf="loading" name="dots"></ion-spinner>
           </ion-button>
-
-          <div *ngIf="!network.isOnline()" class="offline-note">
-            <ion-icon name="cloud-offline-outline"></ion-icon>
-            You appear offline · code was sent to your email
-          </div>
 
           <button class="resend-btn" (click)="resendOtp()" [disabled]="resendCooldown() > 0">
             <ion-icon name="refresh-outline"></ion-icon>

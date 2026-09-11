@@ -3,7 +3,7 @@ import { IInventory, Inventory } from "../models/Inventory.js";
 import { IMaterial, Material } from "../models/Material.js";
 import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { applyProjectScope, resolveProjectObjectId, ProjectScopeIds } from "../utils/scope.js";
 import { withRetry } from "../utils/retry.js";
 import { dbMutex } from "../utils/db-mutex.js";
 
@@ -180,24 +180,78 @@ export async function ensureMaterialInInventory(
 
 /** Reconcile a PO-created material using its recorded contribution, so repeated
  * saves do not add stock twice. Pending lines may also change name or unit. */
-export async function syncPurchaseOrderMaterialInventory(materialId: Types.ObjectId | string, updatedBy?: string) {
+export async function syncPurchaseOrderMaterialInventory(
+  materialId: Types.ObjectId | string,
+  updatedBy?: string,
+  quantityOverride?: number,
+  poNumberOverride?: string,
+) {
   const material = await Material.findById(materialId).lean();
   if (!material?.projectId) return null;
   const previous = await Inventory.findOne({
     projectId: material.projectId,
     "purchaseHistory.materialId": material._id,
   });
-  if (!previous) return ensureMaterialInInventory(material._id, updatedBy);
+  const quantity = Math.max(0, Number(quantityOverride ?? material.purchasedQuantity) || 0);
+  if (!previous) {
+    if (quantityOverride === undefined) return ensureMaterialInInventory(material._id, updatedBy);
+    const match = inventoryMatchForMaterial(material);
+    const inventory = await Inventory.findOne(match);
+    if (inventory) {
+      inventory.requestedQuantity = Math.max(0, Number(inventory.requestedQuantity) || 0) + quantity;
+      inventory.approvedQuantity = Math.max(0, Number(inventory.approvedQuantity) || 0) + quantity;
+      inventory.purchasedQuantity = Math.max(0, Number(inventory.purchasedQuantity) || 0) + quantity;
+      inventory.vendor = material.vendor;
+      inventory.vendorId = material.vendorId;
+      inventory.poNumber = material.poNumber;
+      inventory.lastMaterialId = material._id;
+      inventory.lastUpdatedBy = updatedBy;
+      inventory.purchaseHistory = inventory.purchaseHistory || [];
+      if (quantity > 0) inventory.purchaseHistory.push(receiptHistoryEntry(material, quantity));
+      applyLatestReceiptState(inventory, material);
+      await inventory.save();
+      return inventory.toObject();
+    }
+    return Inventory.create({
+      ...match,
+      projectName: material.projectName || "Project",
+      clientId: material.clientId,
+      clientName: material.clientName,
+      siteId: material.siteId,
+      site: material.site || "",
+      name: material.name,
+      unit: material.unit,
+      requestedQuantity: quantity,
+      approvedQuantity: quantity,
+      purchasedQuantity: quantity,
+      consumedQuantity: Math.max(0, Number(material.consumedQuantity) || 0),
+      minimumQuantity: 0,
+      vendor: material.vendor,
+      vendorId: material.vendorId,
+      poNumber: material.poNumber,
+      lastMaterialId: material._id,
+      lastUpdatedBy: updatedBy,
+      received: material.status === "Received",
+      receivedDate: material.status === "Received" ? material.receivedDate : undefined,
+      purchaseHistory: quantity > 0 ? [receiptHistoryEntry(material, quantity)] : [],
+    });
+  }
 
-  const entries = (previous.purchaseHistory || []).filter((entry) => String(entry.materialId) === String(material._id));
+  const materialPoNumber = String(poNumberOverride ?? material.poNumber ?? "").trim();
+  const entries = (previous.purchaseHistory || []).filter((entry) =>
+    String(entry.materialId) === String(material._id)
+    && String(entry.poNumber || "").trim() === materialPoNumber
+  );
   const oldQuantity = entries.reduce((total, entry) => total + Number(entry.quantity || 0), 0);
-  const quantity = Math.max(0, Number(material.purchasedQuantity) || 0);
   const sameGroup = `${previous.projectId}__${previous.siteKey}__${previous.normalizedName}__${previous.normalizedUnit}` === inventoryKeyForMaterial(material);
   const delta = (sameGroup ? quantity : 0) - oldQuantity;
   previous.requestedQuantity = Math.max(0, previous.requestedQuantity + delta);
   previous.approvedQuantity = Math.max(0, previous.approvedQuantity + delta);
   previous.purchasedQuantity = Math.max(0, previous.purchasedQuantity + delta);
-  previous.purchaseHistory = (previous.purchaseHistory || []).filter((entry) => String(entry.materialId) !== String(material._id));
+  previous.purchaseHistory = (previous.purchaseHistory || []).filter((entry) =>
+    String(entry.materialId) !== String(material._id)
+    || String(entry.poNumber || "").trim() !== materialPoNumber
+  );
   if (sameGroup) {
     if (quantity > 0) {
       previous.purchaseHistory.push(receiptHistoryEntry(material, quantity));
@@ -350,7 +404,7 @@ export async function listInventory(filter: {
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
-  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
+  if (filter.projectId) query.projectId = await resolveProjectObjectId(filter.projectId);
   if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
   if (filter.search) query.name = { $regex: filter.search, $options: "i" };
   applyProjectScope(query, "projectId", filter.scopeProjectIds);

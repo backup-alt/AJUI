@@ -15,6 +15,12 @@ const KEYS = {
   USER: 'agb_user',
 } as const;
 
+function normalizeLoginIdentifier(identifier: string): string {
+  const trimmed = identifier.trim();
+  if (trimmed.includes('@')) return trimmed.toLowerCase();
+  return trimmed.replace(/[^\d+]/g, '');
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly currentUser = signal<User | null>(null);
@@ -209,7 +215,7 @@ export class AuthService {
   async loginWithPassword(phone: string, password: string): Promise<AuthTokens> {
     const data = await this.api('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ phone, password }),
+      body: JSON.stringify({ identifier: normalizeLoginIdentifier(phone), password }),
     });
     await this.storeSession(data);
     return data;

@@ -88,11 +88,17 @@ export function mapSite(s: any): any {
 }
 
 export function mapVendor(v: any): Vendor {
+  const rawMaterialType = v.materialType;
+  const materialType = Array.isArray(rawMaterialType)
+    ? rawMaterialType.map((item: any) => String(item))
+    : rawMaterialType
+      ? [String(rawMaterialType)]
+      : [];
   return {
     _id: v._id,
     id: v.vendorId,
     name: v.name,
-    materialType: v.materialType,
+    materialType,
     phone: v.phone,
     address: v.address,
       gst: v.gstNumber || "",

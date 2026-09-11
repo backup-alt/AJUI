@@ -689,8 +689,8 @@ describe("Purchase order workflow", () => {
     expect(detail.status).toBe(200);
     expect(detail.body.purchaseOrder.items).toHaveLength(2);
 
-    // A legacy material may be missing its denormalized poNumber. The PO
-    // item itself must still prevent it from appearing in another order.
+    // A material can be purchased again on a later PO even when it is already
+    // linked to a purchase order; each PO adds its quantity to the material.
     await Material.updateOne({ _id: material._id }, { $unset: { poNumber: "" } });
     const duplicate = await request(app)
       .post("/api/purchase-orders")
@@ -701,7 +701,9 @@ describe("Purchase order workflow", () => {
         date: "2026-08-13",
         items: [{ source: "existing", materialId: material._id.toString(), rate: 8, gstPercent: 5 }],
       });
-    expect(duplicate.status).toBe(409);
+    expect(duplicate.status).toBe(201);
+    const replenished = await Material.findById(material._id).lean();
+    expect(Number(replenished?.purchasedQuantity || 0)).toBeGreaterThan(10000);
   });
 
   it("persists custom GST rates", async () => {

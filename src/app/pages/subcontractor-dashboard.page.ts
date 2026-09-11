@@ -195,6 +195,16 @@ interface SubcontractorRow {
               />
             </label>
             <label>
+              <span>Assign to project <em>(optional)</em></span>
+              <agb-searchable-select
+                [value]="draft().projectId"
+                [options]="projectSelectOptions()"
+                name="projectId"
+                placeholder="No project assigned"
+                (valueChange)="patchDraft('projectId', $any($event))"
+              />
+            </label>
+            <label>
               <span>Address</span>
               <textarea
                 rows="2"
@@ -432,6 +442,11 @@ export class SubcontractorDashboardPage {
       .sort((a, b) => a.name.localeCompare(b.name));
   });
 
+  readonly projectSelectOptions = computed(() => [
+    { label: "No project (unassigned)", value: "" },
+    ...this.projectOptions().map((project) => ({ label: project.name, value: project.id })),
+  ]);
+
   readonly filteredRows = computed(() => {
     const projectId = this.selectedProjectId();
     const searchTerm = this.search().toLowerCase().trim();
@@ -527,10 +542,9 @@ export class SubcontractorDashboardPage {
   // ---------- DRAWER (create/edit) ----------
   openCreate() {
     this.editing.set(null);
-    const firstProject = this.erp.projects()[0]?.id ?? "";
     this.draft.set({
       ...emptyDraft(),
-      projectId: firstProject,
+      projectId: this.selectedProjectId(),
     });
     this.drawerError.set(null);
     this.drawerOpen.set(true);
@@ -567,10 +581,6 @@ export class SubcontractorDashboardPage {
       this.drawerError.set("Subcontractor's name is required.");
       return;
     }
-    if (!d.projectId) {
-      this.drawerError.set("Pick a project for this sub-contractor.");
-      return;
-    }
     const gstNumber = d.gstNumber.trim().toUpperCase();
     if (d.gstType === "GST" && !gstNumber) {
       this.drawerError.set("GST number is required when GST is selected.");
@@ -578,8 +588,18 @@ export class SubcontractorDashboardPage {
     }
     this.saving.set(true);
     this.drawerError.set(null);
-    const payload = {
-      projectId: d.projectId,
+    const payload: {
+      projectId?: string;
+      subcontractorName: string;
+      description?: string;
+      employeeCount?: number;
+      note?: string;
+      address?: string;
+      phone?: string;
+      gstType?: "GST" | "Non-GST";
+      gstNumber?: string;
+      status?: "active" | "inactive";
+    } = {
       subcontractorName: d.subcontractorName.trim(),
       description: d.description,
       employeeCount: d.employeeCount,
@@ -590,6 +610,7 @@ export class SubcontractorDashboardPage {
       gstNumber: d.gstType === "GST" ? gstNumber : "",
       status: d.status,
     };
+    if (d.projectId) payload.projectId = d.projectId;
     const editing = this.editing();
     const req = editing
       ? this.api.patchSubcontractor(editing.id, payload)

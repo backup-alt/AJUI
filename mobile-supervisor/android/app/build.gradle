@@ -3,6 +3,13 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.annaibuilders.agb.supervisor"
     compileSdk = rootProject.ext.compileSdkVersion
+    if (project.hasProperty('agbAssetsDir')) {
+        sourceSets {
+            main {
+                assets.srcDirs = [project.property('agbAssetsDir')]
+            }
+        }
+    }
     defaultConfig {
         applicationId "com.annaibuilders.agb.supervisor"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -45,7 +52,10 @@ dependencies {
 apply from: 'capacitor.build.gradle'
 
 def servicesJSON = file('google-services.json')
-def pushConfigMarker = file('src/main/assets/public/push-configured.json')
+def generatedAssetsDir = project.hasProperty('agbAssetsDir')
+        ? file("${project.property('agbAssetsDir')}/public")
+        : file('src/main/assets/public')
+def pushConfigMarker = file("${generatedAssetsDir}/push-configured.json")
 if (servicesJSON.exists() && servicesJSON.length() > 0) {
     apply plugin: 'com.google.gms.google-services'
     pushConfigMarker.parentFile.mkdirs()

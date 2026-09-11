@@ -3381,7 +3381,7 @@ export class GeneralExpensesPage implements OnInit {
     if (!v) return null;
     return {
       name: v.vendorName,
-      materialType: v.materialType,
+      materialType: v.materialType ? [v.materialType] : [],
       phone: v.phoneNumber,
       address: v.address,
       gst: v.gstNumber,
@@ -3393,7 +3393,7 @@ export class GeneralExpensesPage implements OnInit {
 
   async createInlineVendor(value: VendorFormValue) {
     if (this.inlineVendorSaving()) return; // guard against double-submit
-    if (!value.name || !value.materialType || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) return;
+    if (!value.name || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) return;
     const payload = {
       name: value.name,
       materialType: value.materialType,
@@ -4455,7 +4455,7 @@ export class GeneralExpensesPage implements OnInit {
       __rowId: `vendor:${vendor.id}`,
       vendorId: vendor.id,
       vendorName: vendor.name,
-      materialType: vendor.materialType,
+      materialType: Array.isArray(vendor.materialType) ? vendor.materialType.join(", ") : vendor.materialType,
       materialsBought: this.materialPurchaseSummaryForVendor(vendor.name),
       phoneNumber: vendor.phone,
       address: vendor.address,

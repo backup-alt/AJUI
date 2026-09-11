@@ -24,6 +24,26 @@ import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
 import { buildResetPasswordEmail } from "../services/email-templates/index.js";
 
+function normalizePhoneIdentifier(value: string): string {
+  return value.replace(/[^\d+]/g, "");
+}
+
+function supervisorIdentifierQuery(identifier: string) {
+  const trimmed = identifier.trim();
+  const lower = trimmed.toLowerCase();
+  const normalizedPhone = normalizePhoneIdentifier(trimmed);
+  const phoneCandidates = Array.from(
+    new Set([trimmed, normalizedPhone].filter((value) => value.length >= 3))
+  );
+
+  return {
+    $or: [
+      { email: lower },
+      ...phoneCandidates.map((phone) => ({ phone })),
+    ],
+  };
+}
+
 async function checkAccessRestriction(userRole: string): Promise<{ isRestricted: boolean; currentWindow?: { startTime: string; endTime: string; reason: string } }> {
   try {
     const schedule = await AccessSchedule.findOne().lean();
@@ -255,6 +275,9 @@ export async function updateMe(req: Request, res: Response, next: NextFunction):
     const patch = updateMeSchema.shape.body.parse(req.body);
     const user = await User.findById(req.user.sub);
     if (!user) throw new AppError(404, "User not found");
+    if (user.role === "project_manager" || user.role === "accountant") {
+      throw new AppError(403, "Project managers and accountants can only reset their password from account settings.");
+    }
 
     if (patch.email && patch.email !== user.email) {
       const emailInUse = await User.exists({ email: patch.email, _id: { $ne: user._id } });
@@ -1137,9 +1160,7 @@ export async function requestSupervisorLoginOtp(
       .object({ identifier: z.string().trim().min(3) })
       .parse(req.body);
 
-    const user = await User.findOne({
-      $or: [{ email: identifier.toLowerCase() }, { phone: identifier }],
-    });
+    const user = await User.findOne(supervisorIdentifierQuery(identifier));
     if (!user) throw new AppError(404, "No supervisor account found with this email or phone");
     if (user.role !== "supervisor") {
       throw new AppError(403, "Only supervisor accounts can use OTP login");
@@ -1183,9 +1204,7 @@ export async function verifySupervisorLoginOtp(
       })
       .parse(req.body);
 
-    const user = await User.findOne({
-      $or: [{ email: identifier.toLowerCase() }, { phone: identifier }],
-    });
+    const user = await User.findOne(supervisorIdentifierQuery(identifier));
     if (!user) throw new AppError(404, "No supervisor account found with this email or phone");
     if (user.role !== "supervisor") {
       throw new AppError(403, "Only supervisor accounts can use OTP login");

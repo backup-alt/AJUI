@@ -271,7 +271,7 @@ export const listPaymentsSchema = z.object({
 export const createVendorSchema = z.object({
   body: z.object({
     name: z.string().trim().min(1).max(200),
-    materialType: z.string().trim().min(1).max(100),
+    materialType: z.array(z.string().trim().min(1).max(100)).max(50).or(z.string().trim().min(1).max(100)).transform((value) => (typeof value === "string" ? [value] : value)).optional(),
     materialBoard: z.string().trim().optional(),
     phone: z.string().trim().min(8).max(20),
     email: z.string().email().optional(),
@@ -307,7 +307,7 @@ export const listVendorsSchema = z.object({
 
 export const createSubcontractorSchema = z.object({
   body: z.object({
-    projectId: objectIdSchema,
+    projectId: objectIdSchema.optional(),
     projectIds: z.array(objectIdSchema).min(0).optional(),
     subcontractorName: z.string().trim().min(1).max(200),
     description: z.string().trim().max(500).optional().default(""),

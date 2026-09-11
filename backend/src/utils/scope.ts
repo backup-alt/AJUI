@@ -55,3 +55,39 @@ export function projectScopeMatch(
   if (scopeProjectIds === undefined || scopeProjectIds === null) return {};
   return { [field]: { $in: scopeProjectIds } };
 }
+
+/**
+ * Resolve a `projectId` query-string value to a Mongo ObjectId.
+ *
+ * The frontend may pass either:
+ *  - a 24-hex-char Mongo `_id`  (e.g. `"665abc…"`)
+ *  - a human-readable `projectId` (e.g. `"AB-1024"`)
+ *
+ * When the value is already a valid ObjectId whose string round-trips, we
+ * return it directly. Otherwise we look up `Project.projectId` and return
+ * the matching document's `_id`. If no document matches, we return a
+ * freshly-minted ObjectId that will never collide with real data so the
+ * caller's query safely returns zero rows instead of throwing.
+ */
+export async function resolveProjectObjectId(
+  raw: string,
+): Promise<Types.ObjectId> {
+  // Fast path – value IS a 24-hex Mongo ObjectId
+  if (
+    Types.ObjectId.isValid(raw) &&
+    String(new Types.ObjectId(raw)) === raw
+  ) {
+    return new Types.ObjectId(raw);
+  }
+
+  // Slow path – look up the human-readable projectId
+  const { Project } = await import("../models/Project.js");
+  const project = await Project.findOne({ projectId: raw })
+    .select("_id")
+    .lean();
+  if (project) return project._id;
+
+  // No match → return a dummy ObjectId so the query returns [] instead of
+  // crashing on an invalid cast.
+  return new Types.ObjectId();
+}

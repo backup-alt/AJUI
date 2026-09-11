@@ -2250,7 +2250,11 @@ export class ProjectWorkspacePage {
           // Backend is the source of truth — always overwrite, even with [].
           // No localStorage write — the dashboard no longer caches data tables.
           if (["materials", "inventory", "expenses", "generalExpenses", "payments", "labour", "attendance"].includes(section)) {
-            dataSignal.update((current: any[]) => [...current.filter(row => String(row.projectId || "") !== requestedProjectId), ...items]);
+            const projectAliases = this.projectIdAliases(requestedProjectId);
+            dataSignal.update((current: any[]) => [...current.filter(row => {
+              const rId = String(row.projectId || "");
+              return !projectAliases.has(rId);
+            }), ...items]);
           } else {
             dataSignal.set(items);
           }
@@ -2376,6 +2380,7 @@ export class ProjectWorkspacePage {
   }
 
   isRowEditing(row: TableRow): boolean {
+    if (row["__poSummary"] === "1") return false;
     const key = this.rowKey(row);
     return this.editingRowKey() === key || this.editingRowKeys().includes(key);
   }
@@ -2896,8 +2901,6 @@ export class ProjectWorkspacePage {
       );
       rows = [...rows, ...bulk];
     }
-    // Keep material records one-to-one with MongoDB rows. Grouping by name
-    // made Edit/Delete target only the newest record in a visual aggregate.
     const site = this.activeSiteFilter();
     if (this.isSiteAware(section) && site !== "All") {
       const siteKey = section === "subcontractors" ? "siteName" : "site";
@@ -3731,7 +3734,7 @@ export class ProjectWorkspacePage {
 
   pendingVendorValue(): VendorFormValue | null {
     const name = this.pendingVendorName();
-    return name ? { name, materialType: "", phone: "", address: "", gst: "", gstType: "Non-GST" } : null;
+    return name ? { name, materialType: [], phone: "", address: "", gst: "", gstType: "Non-GST" } : null;
   }
 
   pendingSubcontractorValue(): SubcontractorFormValue | null {
@@ -3809,7 +3812,7 @@ export class ProjectWorkspacePage {
     if (!v) return null;
     return {
       name: v.vendorName,
-      materialType: v.materialType,
+      materialType: v.materialType ? [v.materialType] : [],
       phone: v.phoneNumber,
       address: v.address,
       gst: v.gstNumber,
@@ -3820,13 +3823,13 @@ export class ProjectWorkspacePage {
   createInlineVendor(value: VendorFormValue) {
     if (this.vendorDialogSaving()) return;
     const name = value.name?.trim() || "";
-    const materialType = value.materialType?.trim() || "";
+    const materialType = (value.materialType || []).map((item) => String(item).trim()).filter(Boolean);
     const phone = value.phone?.trim() || "";
     const gst = value.gst?.trim() || "";
     const address = value.address?.trim() || "";
-    if (!name || !materialType || !phone || !address) {
+    if (!name || !phone || !address) {
       this.presentToast(
-        "Fill the vendor name, material type, phone, and address before saving. GST is optional.",
+        "Fill the vendor name, phone, and address before saving. Material type and GST are optional.",
         "warning",
       );
       return;
@@ -4231,7 +4234,7 @@ export class ProjectWorkspacePage {
       const quantity = Number(draft["quantity"]);
       const materialInput: Partial<MaterialRow> = {
         projectId: this.projectId() || undefined,
-        site: String(draft["site"] || selectedSite || ""),
+        site: String(draft["site"] || ""),
         name: String(draft["materialName"] || draft["description"] || ""),
         unit: String(draft["unit"] || ""),
         requested: quantity,
@@ -4827,7 +4830,7 @@ export class ProjectWorkspacePage {
   }
 
   isSiteAware(section: ModuleKey): boolean {
-    return section === "materials" || section === "attendance" || section === "expenses" || section === "subcontractors";
+    return section === "attendance" || section === "expenses" || section === "subcontractors";
   }
 
   isNoCreateTab(): boolean {
@@ -4962,6 +4965,7 @@ export class ProjectWorkspacePage {
   }
 
   private persistProjectRowEdit(section: ModuleKey, row: TableRow, key: string, value: string) {
+    if (row["__poSummary"] === "1") return;
     const id = String(row["_id"] || "").trim();
     if (!id) return;
     const numeric = (input: string) => Math.max(0, this.moneyNumber(input));
@@ -5513,7 +5517,7 @@ export class ProjectWorkspacePage {
   private projectPurchaseOrders = signal<PurchaseOrder[]>([]);
   readonly materialOrderRows = computed(() => this.projectPurchaseOrders().map(order => {
     const ids = new Set(order.items.map(item => String(item.materialId)));
-    const materials = this.data.materials().filter(row => String(row.projectId) === this.projectId() && (ids.has(String(row._id || row.id)) || row.poNumber === order.poNumber));
+    const materials = this.data.materials().filter(row => this.projectIdMatches(row.projectId) && (ids.has(String(row._id || row.id)) || row.poNumber === order.poNumber));
     const bills = materials.filter(row => row.billUrl).map(row => ({url: String(row.billUrl), label: String(row.receiptImageName || "View bill")}));
     return {
       ...order,
@@ -5862,7 +5866,12 @@ export class ProjectWorkspacePage {
     const currentProject = this.data.projectById(projectId);
     const currentClient = this.data.clients().find((client) => client.projectIds.includes(projectId) || client.name === currentProject?.client);
     const inventoryRows = this.data.inventory();
-    const materials = this.data.materials().filter((row) => row.projectId === projectId).map((row) => {
+    const poNumbers = new Set(this.projectPurchaseOrders().map((order) => String(order.poNumber || "").trim()).filter(Boolean));
+    const materials = this.data.materials().filter((row) => {
+      if (!this.projectIdMatches(row.projectId, projectId)) return false;
+      const poNumber = String(row.poNumber || "").trim();
+      return !poNumber || !poNumbers.has(poNumber);
+    }).map((row) => {
       const inventory = inventoryRows.find((item) =>
         String(item.projectId || "") === String(row.projectId || "")
         && String(item.name || "").trim().toLowerCase() === String(row.name || "").trim().toLowerCase()
@@ -5900,6 +5909,54 @@ export class ProjectWorkspacePage {
       __billHistoryJson: JSON.stringify(this.materialBillHistorySources(row)),
       };
     });
+    const purchaseOrderRows = this.projectPurchaseOrders()
+      .filter((order) => this.projectIdMatches(order.projectId, projectId))
+      .map((order) => {
+        const itemIds = new Set((order.items || []).map((item) => String(item.materialId || "")).filter(Boolean));
+        const linkedMaterials = this.data.materials().filter((material) =>
+          this.projectIdMatches(material.projectId, projectId)
+          && (itemIds.has(String((material as any)._id || material.id || "")) || String(material.poNumber || "") === String(order.poNumber || ""))
+        );
+        const firstMaterial = linkedMaterials[0];
+        const givenAmount = Number(order.givenAmount ?? linkedMaterials.reduce((sum, material) => sum + Number(material.givenAmount || 0), 0)) || 0;
+        const grandTotal = Number(order.grandTotal) || linkedMaterials.reduce((sum, material) => sum + Number(material.issuedAmount || 0), 0);
+        const billReferences = Array.isArray(order.billReferences) ? order.billReferences : [];
+        const firstBill = billReferences[0];
+        return {
+          __rowId: `material-po:${order._id || order.poNumber}`,
+          __projectId: order.projectId || projectId,
+          __poSummary: "1",
+          _id: firstMaterial?._id,
+          materialId: firstMaterial?.id || "",
+          projectId: order.projectId || projectId,
+          site: "",
+          materialName: (order.items || []).map((item) => item.description).filter(Boolean).join(", "),
+          unit: "",
+          quantity: formatNumber((order.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)),
+          isExistingMaterial: "",
+          issuedAmount: grandTotal,
+          givenAmount,
+          remainingAmount: Math.max(0, grandTotal - givenAmount),
+          requestDate: order.date,
+          receivedDate: "",
+          vendor: order.vendorName,
+          poNumber: order.poNumber,
+          reference: firstBill?.label || "",
+          billUrl: firstBill?.url,
+          billLabel: firstBill?.label || "",
+          remainingStock: "",
+          status: "Approved",
+          notes: order.notes || "",
+          __noteHistoryJson: JSON.stringify([]),
+          __poHistoryJson: JSON.stringify([{ poNumber: order.poNumber, date: order.date, quantity: 0, unit: "" }]),
+          __billHistoryJson: JSON.stringify(billReferences.map((bill) => ({
+            url: bill.url,
+            label: bill.label,
+            date: order.date,
+            poNumber: order.poNumber,
+          }))),
+        };
+      });
 
     const labour = this.data.labourForProject(projectId).map((row) => ({
       __rowId: `labour:${row.id}`,
@@ -5981,7 +6038,7 @@ export class ProjectWorkspacePage {
       collectedBy: row.collectedBy,
     }));
 
-    const projectMaterials = this.data.materials().filter((row) => row.projectId === projectId);
+    const projectMaterials = this.data.materials().filter((row) => this.projectIdMatches(row.projectId, projectId));
     const ordersByVendor = new Map<string, PurchaseOrder[]>();
     for (const order of this.projectPurchaseOrders()) {
       const vendorId = String(order.vendorId || "").trim();
@@ -6024,7 +6081,9 @@ export class ProjectWorkspacePage {
         projectId,
         vendorName,
         projects: this.project()?.name || "",
-        materialType: vendor?.materialType || "",
+        materialType: Array.isArray(vendor?.materialType)
+          ? vendor.materialType.join(", ")
+          : (vendor?.materialType || ""),
         materialsBought: this.materialPurchaseSummaryForVendor(vendorName, projectId),
         totalPo: poCount,
         totalPaid: formatMoney(totalPaid),
@@ -6036,13 +6095,50 @@ export class ProjectWorkspacePage {
 
     const subcontractors = this.subcontractorPaymentRows();
 
+    const purchaseOrderInventoryKeys = new Set<string>();
+    const purchaseOrderInventoryRows = this.projectPurchaseOrders()
+      .filter((order) => this.projectIdMatches(order.projectId, projectId))
+      .flatMap((order) => (order.items || []).map((item, index) => {
+        const normalizedName = String(item.description || "").trim().toLowerCase();
+        const normalizedUnit = String(item.unit || "").trim().toLowerCase();
+        purchaseOrderInventoryKeys.add(`${String(order.poNumber || "").trim()}::${normalizedName}::${normalizedUnit}`);
+        const purchasedQuantity = Number(item.quantity) || 0;
+        const linkedInventory = this.data.inventory().find((row) =>
+          this.projectIdMatches(row.projectId, projectId)
+          && String(row.poNumber || "").trim() === String(order.poNumber || "").trim()
+          && String(row.name || "").trim().toLowerCase() === normalizedName
+          && String(row.unit || "").trim().toLowerCase() === normalizedUnit
+        );
+        const consumedQuantity = Number(linkedInventory?.consumedQuantity) || 0;
+        return {
+          __rowId: `inventory-po:${order._id || order.poNumber}:${index}`,
+          __projectId: order.projectId || projectId,
+          projectId: order.projectId || projectId,
+          site: "",
+          materialName: item.description,
+          unit: item.unit,
+          purchasedQuantity: formatNumber(purchasedQuantity),
+          consumedQuantity: formatNumber(consumedQuantity),
+          remainingStock: `${formatNumber(Math.max(0, purchasedQuantity - consumedQuantity))} ${item.unit}`,
+          vendor: order.vendorName,
+          poNumber: order.poNumber,
+        };
+      }));
+
     const inventory = this.data.inventory()
       .map((row) => {
         const history = row.purchaseHistory || [];
         const receivedQuantity = Number(row.purchasedQuantity) || 0;
         return { row, receivedQuantity };
       })
-      .filter(({ row, receivedQuantity }) => String(row.projectId) === projectId && receivedQuantity > 0)
+      // Inventory also contains requested/approved material rows before the
+      // first receipt. Keep those rows visible in the project workspace so a
+      // PO-created material is not hidden until stock is received.
+      .filter(({ row }) => this.projectIdMatches(row.projectId, projectId))
+      .filter(({ row }) => {
+        const key = `${String(row.poNumber || "").trim()}::${String(row.name || "").trim().toLowerCase()}::${String(row.unit || "").trim().toLowerCase()}`;
+        return !purchaseOrderInventoryKeys.has(key);
+      })
       .map(({ row, receivedQuantity }) => ({
       __rowId: `inventory:${row.id}`,
       __projectId: row.projectId,
@@ -6080,7 +6176,7 @@ export class ProjectWorkspacePage {
     }));
 
     return {
-      materials,
+      materials: [...purchaseOrderRows, ...materials],
       labour,
       attendance,
       expenses,
@@ -6089,7 +6185,7 @@ export class ProjectWorkspacePage {
       vendors,
       subcontractors,
       subcontractorsRoster: this.subcontractorRosterRows(),
-      inventory,
+      inventory: [...purchaseOrderInventoryRows, ...inventory],
       workers,
     };
   }
@@ -6098,9 +6194,35 @@ export class ProjectWorkspacePage {
     return sectionConfigs.some((section) => section.key === value) ? (value as ModuleKey) : "materials";
   }
 
+  private projectIdAliases(projectId: string | null | undefined = this.projectId()): Set<string> {
+    const aliases = new Set<string>();
+    const add = (value: unknown) => {
+      const normalized = String(value || "").trim();
+      if (normalized) aliases.add(normalized);
+    };
+
+    add(projectId);
+    const routeProject = this.project();
+    add(routeProject?.id);
+    add((routeProject as any)?.projectId);
+
+    for (const project of this.data.projects()) {
+      if (!aliases.has(String(project.id || "")) && !aliases.has(String((project as any).projectId || ""))) continue;
+      add(project.id);
+      add((project as any).projectId);
+    }
+
+    return aliases;
+  }
+
+  private projectIdMatches(value: unknown, projectId: string | null | undefined = this.projectId()): boolean {
+    const normalized = String(value || "").trim();
+    return normalized !== "" && this.projectIdAliases(projectId).has(normalized);
+  }
+
   private rowBelongsToProject(row: TableRow): boolean {
     const rowProjectId = row["__projectId"];
-    return rowProjectId === undefined || rowProjectId === "" || String(rowProjectId) === this.projectId();
+    return rowProjectId === undefined || rowProjectId === "" || this.projectIdMatches(rowProjectId);
   }
 
   private isProjectStatus(value: string): value is ProjectStatus {
@@ -6507,7 +6629,7 @@ export class ProjectWorkspacePage {
   private materialPurchaseSummaryForVendor(vendorName: string, projectId: string): string {
     const rows = this.materialsService
       .materials()
-      .filter((row) => row.projectId === projectId)
+      .filter((row) => this.projectIdMatches(row.projectId, projectId))
       .filter((row) => (row.vendor || "").toLowerCase() === vendorName.toLowerCase());
     const purchased = rows.reduce((sum, row) => sum + row.purchased, 0);
     return rows.length ? `${formatNumber(rows.length)} records / ${formatNumber(purchased)} purchased` : "0 records";
@@ -6530,7 +6652,7 @@ export class ProjectWorkspacePage {
     const projectId = this.projectId();
     if (!projectId) return [];
 
-    const projectMaterials = this.materialsService.materials().filter((m) => m.projectId === projectId);
+    const projectMaterials = this.materialsService.materials().filter((m) => this.projectIdMatches(m.projectId, projectId));
     const vendorNamesInProject = new Set(projectMaterials.map((m) => m.vendor).filter(Boolean));
 
     const projectTableMaterials = this.data.tableRowsFor("materials", this.tableRows().materials, (row) => this.rowBelongsToProject(row));

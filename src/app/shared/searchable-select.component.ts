@@ -51,12 +51,12 @@ export type SearchableSelectOption = string | number | { label: string; value: s
               <button
                 type="button"
                 role="option"
-                [class.selected]="sameValue(option.value, currentValue)"
-                [attr.aria-selected]="sameValue(option.value, currentValue)"
+                [class.selected]="isSelected(option.value)"
+                [attr.aria-selected]="isSelected(option.value)"
                 (click)="choose(option.value)"
               >
                 <span>{{ option.label }}</span>
-                @if (sameValue(option.value, currentValue)) { <span class="check">✓</span> }
+                @if (isSelected(option.value)) { <span class="check">✓</span> }
               </button>
             }
             @if (allowCustom && customCandidate(); as custom) {
@@ -107,7 +107,8 @@ export class SearchableSelectComponent implements ControlValueAccessor, AfterVie
   @Input() name = "";
   @Input() disabled = false;
   @Input() contained = false;
-  @Output() valueChange = new EventEmitter<string | number>();
+  @Input() multiple = false;
+  @Output() valueChange = new EventEmitter<string | number | Array<string | number>>();
 
   @ViewChild("trigger", { static: false }) trigger?: ElementRef<HTMLButtonElement>;
 
@@ -116,12 +117,12 @@ export class SearchableSelectComponent implements ControlValueAccessor, AfterVie
   readonly panelTop = signal<number>(0);
   readonly panelLeft = signal<number>(0);
   readonly panelWidth = signal<number>(0);
-  currentValue: string | number = "";
-  private onChange: (value: string | number) => void = () => {};
+  currentValue: string | number | Array<string | number> = "";
+  private onChange: (value: string | number | Array<string | number>) => void = () => {};
   private onTouched: () => void = () => {};
 
   @Input()
-  set value(value: string | number | null | undefined) {
+  set value(value: string | number | Array<string | number> | null | undefined) {
     this.currentValue = value ?? "";
   }
 
@@ -155,11 +156,6 @@ export class SearchableSelectComponent implements ControlValueAccessor, AfterVie
     return this.normalizedOptions().filter((option) => !query || option.label.toLowerCase().includes(query));
   }
 
-  selectedLabel() {
-    return this.normalizedOptions().find((option) => this.sameValue(option.value, this.currentValue))?.label
-      || (this.currentValue !== "" ? String(this.currentValue) : "");
-  }
-
   customCandidate() {
     const value = this.search().trim();
     if (!this.allowCustom || !value) return "";
@@ -168,6 +164,14 @@ export class SearchableSelectComponent implements ControlValueAccessor, AfterVie
 
   sameValue(left: string | number, right: string | number) {
     return String(left) === String(right);
+  }
+
+  isSelected(value: string | number) {
+    if (this.multiple) {
+      const selected = Array.isArray(this.currentValue) ? this.currentValue : [];
+      return selected.some((item) => String(item) === String(value));
+    }
+    return this.sameValue(value, this.currentValue as string | number);
   }
 
   toggle() {
@@ -182,7 +186,35 @@ export class SearchableSelectComponent implements ControlValueAccessor, AfterVie
     }
   }
 
+  selectedLabel() {
+    if (this.multiple) {
+      const selected = Array.isArray(this.currentValue) ? this.currentValue.map(String) : [];
+      const labels = this.normalizedOptions()
+        .filter((option) => selected.includes(String(option.value)))
+        .map((option) => option.label);
+      labels.push(...selected.filter((item) => !labels.includes(item)));
+      return labels.join(", ");
+    }
+    return this.normalizedOptions().find((option) => this.sameValue(option.value, this.currentValue as string | number))?.label
+      || (this.currentValue !== "" ? String(this.currentValue) : "");
+  }
+
   choose(value: string | number) {
+    if (this.multiple) {
+      const selected = Array.isArray(this.currentValue) ? [...this.currentValue] : [];
+      const index = selected.findIndex((item) => String(item) === String(value));
+      if (index >= 0) {
+        selected.splice(index, 1);
+      } else {
+        selected.push(value);
+      }
+      this.currentValue = selected;
+      this.onChange(selected);
+      this.onTouched();
+      this.valueChange.emit(selected);
+      this.search.set("");
+      return;
+    }
     this.currentValue = value;
     this.onChange(value);
     this.onTouched();
@@ -197,8 +229,10 @@ export class SearchableSelectComponent implements ControlValueAccessor, AfterVie
     if (custom) this.choose(custom);
   }
 
-  writeValue(value: string | number | null | undefined): void { this.currentValue = value ?? ""; }
-  registerOnChange(fn: (value: string | number) => void): void { this.onChange = fn; }
+  writeValue(value: string | number | Array<string | number> | null | undefined): void {
+    this.currentValue = value ?? (this.multiple ? [] : "");
+  }
+  registerOnChange(fn: (value: string | number | Array<string | number>) => void): void { this.onChange = fn; }
   registerOnTouched(fn: () => void): void { this.onTouched = fn; }
   setDisabledState(disabled: boolean): void { this.disabled = disabled; }
 

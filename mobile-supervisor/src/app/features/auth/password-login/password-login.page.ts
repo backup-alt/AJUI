@@ -19,6 +19,7 @@ import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
   mailOutline,
+  callOutline,
   lockClosedOutline,
   eyeOutline,
   eyeOffOutline,
@@ -66,19 +67,19 @@ import { AuthService } from '../../../core/services/auth.service';
           <ion-icon name="shield-checkmark-outline"></ion-icon>
         </div>
         <h1 class="title">Welcome back</h1>
-        <p class="subtitle">Sign in with the email and password you set up.</p>
+        <p class="subtitle">Sign in with your registered email or mobile number.</p>
 
         <div class="form">
           <div class="form-field">
-            <label class="form-label">Email</label>
+            <label class="form-label">Email or mobile number</label>
             <div class="input-wrap">
-              <ion-icon name="mail-outline" class="input-icon"></ion-icon>
+              <ion-icon [name]="isPhone() ? 'call-outline' : 'mail-outline'" class="input-icon"></ion-icon>
               <ion-input
-                type="email"
-                inputmode="email"
-                placeholder="you@agb.co"
+                [type]="isPhone() ? 'tel' : 'email'"
+                [inputmode]="isPhone() ? 'tel' : 'email'"
+                placeholder="you@agb.co or 9876543210"
                 [(ngModel)]="email"
-                autocomplete="email"
+                autocomplete="username"
                 [clearInput]="true"
               ></ion-input>
             </div>
@@ -299,6 +300,7 @@ export class PasswordLoginPage implements OnInit {
   async ngOnInit(): Promise<void> {
     addIcons({
       mailOutline,
+      callOutline,
       lockClosedOutline,
       eyeOutline,
       eyeOffOutline,
@@ -314,7 +316,13 @@ export class PasswordLoginPage implements OnInit {
   }
 
   isFormValid(): boolean {
-    return this.email.trim().includes('@') && this.password.length >= 6;
+    const identifier = this.email.trim();
+    const phoneDigits = identifier.replace(/\D/g, '');
+    return this.password.length >= 6 && (identifier.includes('@') || phoneDigits.length >= 8);
+  }
+
+  isPhone(): boolean {
+    return /^\+?[\d\s\-()]{8,}$/.test(this.email.trim());
   }
 
   async submit(): Promise<void> {

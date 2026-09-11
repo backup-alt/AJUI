@@ -42,7 +42,7 @@ export type VendorStatus = "Active" | "Not Active";
 export type Vendor = {
   id: string;
   name: string;
-  materialType: string;
+  materialType: string[];
   phone: string;
   address: string;
   gst: string;
@@ -561,7 +561,7 @@ export class ErpDataService {
     this.workers.update((rows) => rows.filter((row) => !projectIdSet.has(row.projectId)));
   }
 
-  addVendor(input: { name: string; materialType: string; phone: string; address: string; gst: string; gstType?: "GST" | "Non-GST"; status?: VendorStatus; siteIds?: string[]; id?: string; _id?: string }): Vendor {
+  addVendor(input: { name: string; materialType: string[]; phone: string; address: string; gst: string; gstType?: "GST" | "Non-GST"; status?: VendorStatus; siteIds?: string[]; id?: string; _id?: string }): Vendor {
     const backendId = input.id;
     const backendMongoId = input._id;
     let vendorId = backendId;
@@ -579,7 +579,7 @@ export class ErpDataService {
       id: vendorId,
       _id: backendMongoId,
       name: input.name,
-      materialType: input.materialType,
+      materialType: input.materialType || [],
       phone: input.phone,
       address: input.address,
       gst: input.gst,

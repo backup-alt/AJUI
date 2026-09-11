@@ -26,7 +26,7 @@ export async function listVendors(filter: {
   cursor?: string;
 }) {
   const query: Record<string, unknown> = {};
-  if (filter.materialType) query.materialType = filter.materialType;
+  if (filter.materialType) query.materialType = { $in: [String(filter.materialType)] };
   if (filter.status) query.status = filter.status;
   if (filter.search) {
     query.$or = [

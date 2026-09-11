@@ -21,6 +21,12 @@ export interface QrScanResult {
   error?: string;
 }
 
+function normalizeLoginIdentifier(identifier: string): string {
+  const trimmed = identifier.trim();
+  if (trimmed.includes('@')) return trimmed.toLowerCase();
+  return trimmed.replace(/[^\d+]/g, '');
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private api = inject(ApiService);
@@ -149,7 +155,10 @@ export class AuthService {
    * This method is kept for non-supervisor accounts (admin, accountant etc.)
    */
   loginWithPassword(email: string, password: string) {
-    return this.api.post<LoginResponse>('/auth/login', { identifier: email, password }).pipe(
+    return this.api.post<LoginResponse>('/auth/login', {
+      identifier: normalizeLoginIdentifier(email),
+      password,
+    }).pipe(
       switchMap((response) => from(this.completeLogin(response)))
     );
   }
@@ -161,7 +170,7 @@ export class AuthService {
   requestLoginOtp(identifier: string) {
     return this.api.post<{ success: boolean; message?: string }>(
       '/auth/supervisor/request-otp',
-      { identifier }
+      { identifier: normalizeLoginIdentifier(identifier) }
     );
   }
 
@@ -171,7 +180,7 @@ export class AuthService {
    */
   verifyLoginOtp(identifier: string, otp: string) {
     return this.api.post<LoginResponse>('/auth/supervisor/verify-otp-login', {
-      identifier,
+      identifier: normalizeLoginIdentifier(identifier),
       otp,
     }).pipe(
       switchMap((response) => from(this.completeLogin(response)))

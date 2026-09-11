@@ -43,7 +43,7 @@ const COMMON_VENDOR_MATERIALS = [
 
 export type VendorFormValue = {
   name: string;
-  materialType: string;
+  materialType: string[];
   phone: string;
   address: string;
   gst: string;
@@ -76,13 +76,14 @@ export type VendorFormValue = {
             <input name="name" [(ngModel)]="nameValue" placeholder="Enter vendor or company name" />
           </label>
           <label>
-            <span>Material Type</span>
+            <span>Material Type <em>Optional</em> · select multiple</span>
             <agb-searchable-select
               name="materialType"
               [(ngModel)]="materialTypeValue"
               [options]="materialTypeOptions()"
               [allowCustom]="true"
-              placeholder="Search or enter a material"
+              [multiple]="true"
+              placeholder="Search or add materials"
             ></agb-searchable-select>
           </label>
           <label>
@@ -130,7 +131,7 @@ export class VendorFormDialogComponent implements OnInit {
   @Output() create = new EventEmitter<VendorFormValue>();
 
   nameValue = "";
-  materialTypeValue = "";
+  materialTypeValue: string[] = [];
   phoneValue = "";
   gstValue = "";
   gstTypeValue: "GST" | "Non-GST" = "GST";
@@ -140,7 +141,7 @@ export class VendorFormDialogComponent implements OnInit {
     const values = [
       ...COMMON_VENDOR_MATERIALS,
       ...this.data.materials().map((material) => material.name),
-      ...this.data.vendors().map((vendor) => vendor.materialType),
+      ...this.data.vendors().flatMap((vendor) => vendor.materialType || []),
     ];
 
     for (const value of values) {
@@ -154,7 +155,7 @@ export class VendorFormDialogComponent implements OnInit {
 
   ngOnInit() {
     this.nameValue = this.initialValue?.name ?? "";
-    this.materialTypeValue = this.initialValue?.materialType ?? "";
+    this.materialTypeValue = [...(this.initialValue?.materialType ?? [])];
     this.phoneValue = this.initialValue?.phone ?? "";
     this.gstValue = this.initialValue?.gst ?? "";
     this.gstTypeValue = this.initialValue?.gstType ?? (this.gstValue ? "GST" : "Non-GST");
@@ -163,9 +164,12 @@ export class VendorFormDialogComponent implements OnInit {
 
   submit(event: Event) {
     event.preventDefault();
+    const materialType = [
+      ...new Set((this.materialTypeValue || []).map((value) => String(value).trim()).filter(Boolean)),
+    ];
     this.create.emit({
       name: this.nameValue.trim(),
-      materialType: this.materialTypeValue.trim(),
+      materialType,
       phone: this.phoneValue.trim(),
       address: this.addressValue.trim(),
       gst: this.gstTypeValue === "GST" ? this.gstValue.trim() : "",

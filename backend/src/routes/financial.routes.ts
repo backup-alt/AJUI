@@ -196,7 +196,7 @@ router.get(
   ctrl.listAllActiveSubcontractors
 );
 router.get("/subcontractors/:id", cache(30), ctrl.getSubcontractor);
-router.patch("/subcontractors/:id", validate(updateSubcontractorSchema), requireRole("admin"), ctrl.updateSubcontractor);
+router.patch("/subcontractors/:id", validate(updateSubcontractorSchema), requireRole("admin", "project_manager", "accountant"), ctrl.updateSubcontractor);
 router.delete("/subcontractors/:id", requireRole("admin"), ctrl.deleteSubcontractor);
 
 // =================== SUBCONTRACTOR PAYMENTS ===================

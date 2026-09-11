@@ -246,7 +246,7 @@ type PoDraftLine = {
                         }
                       </td>
                       <td class="col-unit"><agb-searchable-select [options]="unitOptions" [allowCustom]="true" [disabled]="line.source === 'existing' && !!line.materialId" placeholder="Unit" [ngModel]="line.unit" (ngModelChange)="updateLine(index, 'unit', $event)" /></td>
-                      <td class="col-qty"><input type="number" min="0" [attr.max]="line.source === 'existing' ? approvedQuantityFor(line) : null" [ngModel]="line.quantity" (ngModelChange)="updateLine(index, 'quantity', +$event || 0)" /></td>
+                      <td class="col-qty"><input type="number" min="0" [ngModel]="line.quantity" (ngModelChange)="updateLine(index, 'quantity', +$event || 0)" /></td>
                       <td class="col-amount"><input type="number" min="0" step="0.01" [ngModel]="line.amount" (ngModelChange)="updateLine(index, 'amount', +$event || 0)" /></td>
                       <td class="col-payment"><agb-searchable-select [ngModel]="line.paymentMode" (ngModelChange)="updateLine(index, 'paymentMode', $any($event))" [options]="paymentModes" [allowCustom]="true" /></td>
                       <td class="col-gst">
@@ -535,6 +535,7 @@ type PoDraftLine = {
       min-width: 50px;
     }
     .erp-select-panel { position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 100%; max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 12px 30px rgba(2, 22, 60, 0.18); z-index: 300; display: flex; flex-direction: column; overflow: hidden; }
+    .erp-select-panel.po-select-panel:not(.po-material-panel) { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
     .erp-select-panel > button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: none; text-align: left; font-size: 12px; color: #1e293b; cursor: pointer; box-sizing: border-box; flex-shrink: 0; }
     .erp-select-panel > button:hover { background: #f0f6ff; }
     .erp-select-panel > button.selected { background: #e0ecff; color: #003a8c; font-weight: 600; }
@@ -919,11 +920,6 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       paymentMode: "Bank Transfer",
       gstPercent: 18,
     };
-  }
-
-  approvedQuantityFor(line: PoDraftLine) {
-    const approved = Number(this.materials().find((material) => material._id === line.materialId)?.approvedQuantity) || 0;
-    return approved > 0 ? approved : null;
   }
 
   private defaultQuantityFor(material: ExistingMaterial) {

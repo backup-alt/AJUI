@@ -72,10 +72,12 @@ function numberToWords(num: number): string {
               <section class="quotation-header-section">
                 <div class="section-header">
                   <h2>Saved Invoices</h2>
-                  <button type="button" class="btn-primary" (click)="startNewInvoice()">
-                    <ion-icon name="add-outline"></ion-icon>
-                    New Invoice
-                  </button>
+                  @if (canRequestOrEdit()) {
+                    <button type="button" class="btn-primary" (click)="startNewInvoice()">
+                      <ion-icon name="add-outline"></ion-icon>
+                      New Invoice
+                    </button>
+                  }
                 </div>
                 <div class="page-search-bar">
                   <input
@@ -139,7 +141,7 @@ function numberToWords(num: number): string {
                     </tbody>
                   </table>
                 </section>
-                @if (canRequestOrEdit() && invoiceActionRow()) { <div class="cursor-action-menu" [style.left.px]="invoiceActionPosition().x" [style.top.px]="invoiceActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedInvoice()"><ion-icon name="pencil-outline"></ion-icon>Edit</button><button type="button" class="danger" (click)="deleteSelectedInvoice()"><ion-icon name="trash-outline"></ion-icon>Delete</button> } @else { <button type="button" (click)="requestInvoiceEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
+                @if (canRequestOrEdit() && invoiceActionRow()) { <div class="cursor-action-menu" [style.left.px]="invoiceActionPosition().x" [style.top.px]="invoiceActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="editSelectedInvoice()"><ion-icon name="pencil-outline"></ion-icon>Edit</button>@if (isAdmin()) { <button type="button" class="danger" (click)="deleteSelectedInvoice()"><ion-icon name="trash-outline"></ion-icon>Delete</button> }</div> }
               }
             } @else {
               <!-- Invoice Editor View -->
@@ -1120,7 +1122,7 @@ export class TaxInvoicePage {
         })) as TaxInvoice[];
         this.data.taxInvoices.set(items);
         const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("edit") || "";
-        const requested = this.isAdmin() ? items.find((item) => item.id === requestedId) : undefined;
+        const requested = this.canRequestOrEdit() ? items.find((item) => item.id === requestedId) : undefined;
         if (requested) {
           this.editInvoice(requested);
           void this.router.navigate(["/tax-invoices"], { replaceUrl: true });

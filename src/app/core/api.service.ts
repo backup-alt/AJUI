@@ -661,7 +661,7 @@ export class ApiService {
   }
 
   createSubcontractor(payload: {
-    projectId: string;
+    projectId?: string;
     subcontractorName: string;
     description?: string;
     employeeCount?: number;
@@ -869,6 +869,7 @@ export class ApiService {
       tap(() => {
         this.cache.invalidate("/purchase-orders");
         this.cache.invalidate("/materials");
+        this.cache.invalidate("/inventory");
       }),
       catchError(this.handleError),
     );
@@ -897,6 +898,7 @@ export class ApiService {
       tap(() => {
         this.cache.invalidate("/purchase-orders");
         this.cache.invalidate("/materials");
+        this.cache.invalidate("/inventory");
       }),
       catchError(this.handleError),
     );

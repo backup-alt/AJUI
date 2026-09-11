@@ -7,7 +7,7 @@ export interface IVendor extends Document {
   _id: Types.ObjectId;
   vendorId: string;
   name: string;
-  materialType: string;
+  materialType: string[];
   materialBoard?: string;
   phone: string;
   email?: string;
@@ -29,7 +29,7 @@ const vendorSchema = new Schema<IVendor>(
   {
     vendorId: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: true, trim: true, index: true },
-    materialType: { type: String, required: true, trim: true, index: true },
+    materialType: { type: [String], default: [], index: true },
     materialBoard: { type: String, trim: true },
     phone: { type: String, required: true, trim: true },
     email: { type: String, trim: true, lowercase: true },

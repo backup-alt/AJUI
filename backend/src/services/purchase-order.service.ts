@@ -9,12 +9,13 @@ import { Vendor } from "../models/Vendor.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
+import { resolveProjectObjectId } from "../utils/scope.js";
 import { syncPurchaseOrderMaterialInventory } from "./inventory.service.js";
 
 async function syncManualInventory(order: any, updatedBy?: string) {
   // Sequential saves also support two lines with the same material name/unit.
   for (const item of order.items || []) {
-    await syncPurchaseOrderMaterialInventory(item.materialId, updatedBy);
+    await syncPurchaseOrderMaterialInventory(item.materialId, updatedBy, Number(item.quantity) || 0);
   }
   return order;
 }
@@ -76,8 +77,9 @@ async function nextPoNumber(): Promise<string> {
 }
 
 export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
+  const projectObjectId = await resolveProjectObjectId(input.projectId);
   const [project, vendor] = await Promise.all([
-    Project.findById(input.projectId).lean(),
+    Project.findById(projectObjectId).lean(),
     Vendor.findById(input.vendorId).lean(),
   ]);
   if (!project) throw new AppError(404, "Project not found");
@@ -105,17 +107,9 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
     throw new AppError(400, "The same approved material cannot appear twice in one purchase order");
   }
   const existingMaterials = existingItemIds.length
-    ? await Material.find({ _id: { $in: existingItemIds }, projectId: project._id }).lean()
+    ? await Material.find({ _id: { $in: existingItemIds } }).lean()
     : [];
   if (existingMaterials.length !== existingItemIds.length) throw new AppError(404, "One or more project materials were not found");
-  const existingAllocation = existingItemIds.length
-    ? await PurchaseOrder.findOne({ deletedAt: { $exists: false }, "items.materialId": { $in: existingMaterials.map((material) => material._id) } })
-      .select("poNumber")
-      .lean()
-    : null;
-  if (existingAllocation) {
-    throw new AppError(409, `One or more selected materials are already allocated to ${existingAllocation.poNumber}`);
-  }
   const existingById = new Map(existingMaterials.map((material) => [material._id.toString(), material]));
 
   // Validate every line before creating manual materials, so a malformed
@@ -124,15 +118,9 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
     if (inputItem.source === "existing") {
       const material = existingById.get(String(inputItem.materialId || ""));
       if (!material) throw new AppError(404, "Project material not found");
-      if (material.isExistingMaterial) throw new AppError(400, `${material.name} is existing inventory and cannot be added to a purchase order`);
-      const currentPo = String(material.poNumber || "").trim();
-      if (currentPo && currentPo !== "Pending") throw new AppError(409, `${material.name} is already allocated to ${currentPo}`);
       const approvedQuantity = Number(material.approvedQuantity) || 0;
       const quantity = Number(inputItem.quantity) || approvedQuantity;
-      if (quantity <= 0 || (approvedQuantity > 0 && quantity > approvedQuantity)) {
-        const range = approvedQuantity > 0 ? `between 0 and ${approvedQuantity}` : "greater than 0";
-        throw new AppError(400, `${material.name} quantity must be ${range}`);
-      }
+      if (quantity <= 0) throw new AppError(400, `${material.name} quantity must be greater than 0`);
     } else {
       const manual = inputItem as PurchaseOrderInputItem & { quantity?: number };
       if (!String(manual.description || "").trim() || !String(manual.unit || "").trim() || (Number(manual.quantity) || 0) <= 0) {
@@ -220,18 +208,17 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
   if (grandTotal <= 0) throw new AppError(400, "Purchase order total must be greater than ₹0");
 
   const existingIds = normalized.filter((item) => item.source === "existing").map((item) => item.materialId);
+  const existingItems = normalized.filter((item) => item.source === "existing");
   try {
     if (existingIds.length) {
-      const claimed = await Material.updateMany(
-        {
-          _id: { $in: existingIds },
-          projectId: project._id,
-          $or: [{ poNumber: { $exists: false } }, { poNumber: "" }, { poNumber: "Pending" }, { poNumber: null }],
-        },
-        { $set: { poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date } },
-      );
-      if (claimed.modifiedCount !== existingIds.length) {
-        throw new AppError(409, "One or more approved materials were allocated by another purchase order");
+      for (const item of existingItems) {
+        await Material.updateOne(
+          { _id: item.materialId },
+          {
+            $set: { poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date },
+            $inc: { purchasedQuantity: item.quantity },
+          },
+        );
       }
       await Inventory.updateMany(
         { lastMaterialId: { $in: existingIds } },
@@ -262,7 +249,12 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
   } catch (error) {
     await Promise.all([
       existingIds.length
-        ? Material.updateMany({ _id: { $in: existingIds }, poNumber }, { $unset: { poNumber: "", paymentType: "" } })
+        ? Promise.all(existingItems.map((item) =>
+          Material.updateOne(
+            { _id: item.materialId, poNumber },
+            { $unset: { poNumber: "", paymentType: "" }, $inc: { purchasedQuantity: -item.quantity } },
+          ),
+        ))
         : Promise.resolve(),
       existingIds.length
         ? Inventory.updateMany({ lastMaterialId: { $in: existingIds }, poNumber }, { $unset: { poNumber: "" } })
@@ -332,19 +324,9 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     throw new AppError(400, "The same approved material cannot appear twice in one purchase order");
   }
   const existingMaterials = newExistingIds.length
-    ? await Material.find({ _id: { $in: newExistingIds }, projectId: project._id }).lean()
+    ? await Material.find({ _id: { $in: newExistingIds } }).lean()
     : [];
   if (existingMaterials.length !== newExistingIds.length) throw new AppError(404, "One or more project materials were not found");
-  const conflictingAllocation = newExistingIds.length
-    ? await PurchaseOrder.findOne({
-      _id: { $ne: purchaseOrder._id },
-      deletedAt: { $exists: false },
-      "items.materialId": { $in: existingMaterials.map((material) => material._id) },
-    }).select("poNumber").lean()
-    : null;
-  if (conflictingAllocation) {
-    throw new AppError(409, `One or more selected materials are already allocated to ${conflictingAllocation.poNumber}`);
-  }
   const existingById = new Map(existingMaterials.map((material) => [material._id.toString(), material]));
 
   const toClaim = new Set<string>();
@@ -352,8 +334,6 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     const material = existingById.get(id);
     if (!material) throw new AppError(404, "Project material not found");
     if (previousExistingIds.includes(id)) continue;
-    const currentPo = String(material.poNumber || "").trim();
-    if (currentPo && currentPo !== "Pending") throw new AppError(409, `${material.name} is already allocated to ${currentPo}`);
     toClaim.add(id);
   }
   const toUnclaim = previousExistingIds.filter((id) => !newExistingIds.includes(id));
@@ -362,13 +342,9 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     if (inputItem.source === "existing") {
       const material = existingById.get(String(inputItem.materialId || ""));
       if (!material) throw new AppError(404, "Project material not found");
-      if (material.isExistingMaterial) throw new AppError(400, `${material.name} is existing inventory and cannot be added to a purchase order`);
       const approvedQuantity = Number(material.approvedQuantity) || 0;
       const quantity = Number(inputItem.quantity) || approvedQuantity;
-      if (quantity <= 0 || (approvedQuantity > 0 && quantity > approvedQuantity)) {
-        const range = approvedQuantity > 0 ? `between 0 and ${approvedQuantity}` : "greater than 0";
-        throw new AppError(400, `${material.name} quantity must be ${range}`);
-      }
+      if (quantity <= 0) throw new AppError(400, `${material.name} quantity must be greater than 0`);
     } else {
       const manual = inputItem as PurchaseOrderInputItem & { quantity?: number };
       if (!String(manual.description || "").trim() || !String(manual.unit || "").trim() || (Number(manual.quantity) || 0) <= 0) {
@@ -486,8 +462,6 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
       const claimed = await Material.updateMany(
         {
           _id: { $in: claimIds },
-          projectId: project._id,
-          $or: [{ poNumber: { $exists: false } }, { poNumber: "" }, { poNumber: "Pending" }, { poNumber: null }],
         },
         { $set: { poNumber: purchaseOrder.poNumber, vendor: vendor.name, vendorId: vendor._id, orderedDate: input.date } },
       );
@@ -543,7 +517,10 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     // Keep removed source records for audit; reconcile their contribution to zero.
     for (const materialId of removedManualIds) {
       await Material.updateOne({ _id: materialId }, { $set: { requestedQuantity: 0, approvedQuantity: 0, purchasedQuantity: 0 } });
-      await syncPurchaseOrderMaterialInventory(materialId, input.createdBy);
+      await syncPurchaseOrderMaterialInventory(materialId, input.createdBy, 0, purchaseOrder.poNumber);
+    }
+    for (const materialId of toUnclaim) {
+      await syncPurchaseOrderMaterialInventory(materialId, input.createdBy, 0, purchaseOrder.poNumber);
     }
     return syncManualInventory(purchaseOrder.toObject(), input.createdBy);
   } catch (error) {
@@ -574,7 +551,7 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
 
 export async function listPurchaseOrders(filter: { projectId?: string; page?: number; limit?: number; cursor?: string }) {
   const query: Record<string, unknown> = { deletedAt: { $exists: false } };
-  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
+  if (filter.projectId) query.projectId = await resolveProjectObjectId(filter.projectId);
   const result = await paginateByCursor(PurchaseOrder, query, {
     page: filter.page,
     limit: filter.limit,
@@ -636,7 +613,10 @@ export async function deletePurchaseOrder(id: string, deletedBy?: string) {
     : [];
   for (const inventory of inventories) {
     const contribution = (inventory.purchaseHistory || [])
-      .filter((entry) => materialIds.includes(String(entry.materialId)))
+      .filter((entry) =>
+        materialIds.includes(String(entry.materialId))
+        && String(entry.poNumber || "").trim() === purchaseOrder.poNumber
+      )
       .reduce((total, entry) => total + Number(entry.quantity || 0), 0);
     if (Number(inventory.purchasedQuantity || 0) - contribution < Number(inventory.consumedQuantity || 0)) {
       throw new AppError(409, "This PO has material that is already consumed. Correct the consumed quantity before deleting it");
@@ -646,15 +626,19 @@ export async function deletePurchaseOrder(id: string, deletedBy?: string) {
   const manualIds = new Set(
     (purchaseOrder.items || []).filter((item) => item.source === "manual").map((item) => String(item.materialId || "")),
   );
+  const quantityByMaterialId = new Map(
+    (purchaseOrder.items || []).map((item) => [String(item.materialId || ""), Number(item.quantity) || 0]),
+  );
   for (const material of materials) {
+    const itemQuantity = quantityByMaterialId.get(String(material._id)) || 0;
     const update = manualIds.has(String(material._id))
       ? { $set: { requestedQuantity: 0, approvedQuantity: 0, purchasedQuantity: 0 } }
       : {
-        $set: { purchasedQuantity: 0 },
+        $set: { purchasedQuantity: Math.max(0, Number(material.purchasedQuantity || 0) - itemQuantity) },
         $unset: { poNumber: "", paymentType: "", vendor: "", vendorId: "", orderedDate: "" },
       };
     await Material.updateOne({ _id: material._id }, update);
-    await syncPurchaseOrderMaterialInventory(material._id, deletedBy);
+    await syncPurchaseOrderMaterialInventory(material._id, deletedBy, 0, purchaseOrder.poNumber);
   }
 
   purchaseOrder.deletedAt = new Date();

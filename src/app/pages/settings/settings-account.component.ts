@@ -26,6 +26,11 @@ import { ApiService } from "../../core/api.service";
         </div>
       </div>
       <div class="settings-w11-card-body">
+        @if (profileLocked()) {
+          <div class="settings-w11-message settings-w11-message-info">
+            Project managers and accountants can reset their password here, but profile details are managed by an admin.
+          </div>
+        }
         <div class="settings-w11-field">
           <label for="account-name">Full name</label>
           <input
@@ -34,6 +39,8 @@ import { ApiService } from "../../core/api.service";
             [value]="name()"
             (input)="name.set($any($event.target).value)"
             placeholder="Your full name"
+            [readonly]="profileLocked()"
+            [class.settings-w11-readonly-input]="profileLocked()"
           />
         </div>
         <div class="settings-w11-field-row">
@@ -45,6 +52,8 @@ import { ApiService } from "../../core/api.service";
               [value]="email()"
               (input)="email.set($any($event.target).value)"
               placeholder="you@agbuilders.com"
+              [readonly]="profileLocked()"
+              [class.settings-w11-readonly-input]="profileLocked()"
             />
           </div>
           <div class="settings-w11-field">
@@ -55,6 +64,8 @@ import { ApiService } from "../../core/api.service";
               [value]="phone()"
               (input)="phone.set($any($event.target).value)"
               placeholder="+91 98765 43210"
+              [readonly]="profileLocked()"
+              [class.settings-w11-readonly-input]="profileLocked()"
             />
           </div>
         </div>
@@ -65,11 +76,13 @@ import { ApiService } from "../../core/api.service";
             <small>Role is set by the admin. Contact them to change it.</small>
           </div>
         </div>
+        @if (!profileLocked()) {
         <div class="settings-w11-actions">
           <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="saveProfile()">
             {{ saving() ? 'Saving…' : 'Save changes' }}
           </button>
         </div>
+        }
         @if (message()) {
           <div class="settings-w11-message" [class.error]="isError()">{{ message() }}</div>
         }
@@ -128,6 +141,7 @@ import { ApiService } from "../../core/api.service";
     :host .settings-w11-role-pill { color: #3730a3; background: #eef2ff; }
     :host .settings-w11-message { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
     :host .settings-w11-message.error { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+    :host .settings-w11-message-info { color: #1e3a8a; background: #eff6ff; border-color: #bfdbfe; margin-bottom: 16px; }
     @media (prefers-color-scheme: dark) {
       :host, :host .settings-w11-header, :host .settings-w11-card, :host .settings-w11-card-body {
         color: #0f172a !important;
@@ -165,7 +179,17 @@ export class SettingsAccountComponent {
   readonly passwordMessage = signal<string | null>(null);
   readonly passwordError = signal(false);
 
+  profileLocked(): boolean {
+    const role = String(this.api.user()?.role || "").toLowerCase().replace(/\s+/g, "_");
+    return role === "project_manager" || role === "accountant";
+  }
+
   saveProfile() {
+    if (this.profileLocked()) {
+      this.isError.set(true);
+      this.message.set("Project managers and accountants can only reset their password from account settings.");
+      return;
+    }
     this.isError.set(false);
     this.message.set(null);
     this.saving.set(true);

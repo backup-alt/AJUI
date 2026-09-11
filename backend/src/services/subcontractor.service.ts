@@ -10,7 +10,7 @@ import {
 } from "./supervisor-mobile.service.js";
 
 export interface CreateSubcontractorInput {
-  projectId: string;
+  projectId?: string;
   projectIds?: string[];
   subcontractorName: string;
   description?: string;
@@ -32,16 +32,16 @@ function toObjectId(id: string | undefined | null): Types.ObjectId | undefined {
 export async function createSubcontractor(input: CreateSubcontractorInput) {
   const projectId = toObjectId(input.projectId);
   const project = projectId ? await Project.findById(projectId) : null;
-  if (!project) throw new AppError(404, "Project not found");
+  if (input.projectId && !project) throw new AppError(404, "Project not found");
   const gstType = input.gstType || "Non-GST";
   const gstNumber = input.gstNumber?.trim().toUpperCase() || "";
   if (gstType === "GST" && !gstNumber) throw new AppError(400, "GST number is required for GST subcontractors");
 
   const sub = await Subcontractor.create({
-    projectId: project._id,
-    projectIds: input.projectIds?.length ? input.projectIds : [project._id],
-    projectName: project.name,
-    clientId: project.clientId,
+    projectId: project?._id,
+    projectIds: input.projectIds?.length ? input.projectIds : (project ? [project._id] : []),
+    projectName: project?.name || "",
+    clientId: project?.clientId,
     subcontractorName: input.subcontractorName,
     description: input.description || "",
     employeeCount: input.employeeCount,

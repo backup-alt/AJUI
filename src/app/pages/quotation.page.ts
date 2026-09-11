@@ -75,10 +75,12 @@ function numberToWords(num: number): string {
               <section class="quotation-header-section">
                 <div class="section-header">
                   <h2>Saved Quotations</h2>
-                  <button type="button" class="btn-primary" (click)="startNewQuotation()">
-                    <ion-icon name="add-outline"></ion-icon>
-                    New Quotation
-                  </button>
+                  @if (canRequestOrEdit()) {
+                    <button type="button" class="btn-primary" (click)="startNewQuotation()">
+                      <ion-icon name="add-outline"></ion-icon>
+                      New Quotation
+                    </button>
+                  }
                 </div>
                 <div class="page-search-bar">
                   <input
@@ -143,7 +145,7 @@ function numberToWords(num: number): string {
                     </tbody>
                   </table>
                 </section>
-                @if (canRequestOrEdit() && quoteActionRow()) { <div class="cursor-action-menu" [style.left.px]="quoteActionPosition().x" [style.top.px]="quoteActionPosition().y" (click)="$event.stopPropagation()">@if (isAdmin()) { <button type="button" (click)="editSelectedQuotation()"><ion-icon name="pencil-outline"></ion-icon>Edit</button><button type="button" class="danger" (click)="deleteSelectedQuotation()"><ion-icon name="trash-outline"></ion-icon>Delete</button> } @else { <button type="button" (click)="requestQuotationEdit()"><ion-icon name="mail-outline"></ion-icon>Request edit</button> }</div> }
+                @if (canRequestOrEdit() && quoteActionRow()) { <div class="cursor-action-menu" [style.left.px]="quoteActionPosition().x" [style.top.px]="quoteActionPosition().y" (click)="$event.stopPropagation()"><button type="button" (click)="editSelectedQuotation()"><ion-icon name="pencil-outline"></ion-icon>Edit</button>@if (isAdmin()) { <button type="button" class="danger" (click)="deleteSelectedQuotation()"><ion-icon name="trash-outline"></ion-icon>Delete</button> }</div> }
               }
             } @else {
               <!-- Quotation Editor View -->
@@ -1582,7 +1584,7 @@ readonly savingPdf = signal(false);
         }));
         this.data.quotations.set(items as any);
         const requestedId = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("edit") || "";
-        const requested = this.isAdmin() ? items.find((item) => item.id === requestedId) as Quotation | undefined : undefined;
+        const requested = this.canRequestOrEdit() ? items.find((item) => item.id === requestedId) as Quotation | undefined : undefined;
         if (requested) {
           this.editQuotation(requested);
           void this.router.navigate(["/quotations"], { replaceUrl: true });

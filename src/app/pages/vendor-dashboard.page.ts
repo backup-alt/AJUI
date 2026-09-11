@@ -88,7 +88,7 @@ type BillLinkEntry = { materialId: string; billUrl: string; billLabel?: string }
                       <div class="ledger-box">
                         <div class="ledger-row strong">
                           <span>Material Type</span>
-                          <strong>{{ vendor.materialType }}</strong>
+                          <strong>{{ (vendor.materialType || []).join(", ") || "—" }}</strong>
                         </div>
                         <div class="ledger-row">
                           <span>GST Number</span>
@@ -1005,7 +1005,7 @@ export class VendorDashboardPage {
     return this.vendors().filter(vendor => {
       const name = (vendor.name || '').toLowerCase();
       const phone = (vendor.phone || '').toLowerCase();
-      const materialType = (vendor.materialType || '').toLowerCase();
+      const materialType = (vendor.materialType || []).join(" ").toLowerCase();
       const gst = (vendor.gst || '').toLowerCase();
       return (
         name.includes(searchTerm) ||
@@ -1123,10 +1123,16 @@ export class VendorDashboardPage {
       next: (r) => {
         const mapped = (r.items || []).map((v: any) => {
           const status: VendorStatus = v.status === "Not Active" ? "Not Active" : "Active";
+          const rawMaterialType = v.materialType;
+          const materialType = Array.isArray(rawMaterialType)
+            ? rawMaterialType.map((item: any) => String(item))
+            : rawMaterialType
+              ? [String(rawMaterialType)]
+              : [];
           return {
             id: v.vendorId || v._id,
             name: v.name || v.vendorName,
-            materialType: v.materialType,
+            materialType,
             phone: v.phone || v.phoneNumber,
             address: v.address,
             gst: v.gstNumber || v.gst,
@@ -1427,7 +1433,7 @@ export class VendorDashboardPage {
 
   async createVendor(value: VendorFormValue) {
     if (this.vendorSaving()) return; // guard against double-submit
-    if (!value.name || !value.materialType || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) {
+    if (!value.name || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) {
       const toast = await this.toastController.create({
         message: "Please fill all required fields before saving",
         duration: 3000,
@@ -1539,7 +1545,7 @@ export class VendorDashboardPage {
   vendorEditValue(vendor: Vendor): VendorFormValue {
     return {
       name: vendor.name,
-      materialType: vendor.materialType,
+      materialType: vendor.materialType || [],
       phone: vendor.phone,
       address: vendor.address,
       gst: vendor.gst,
@@ -1549,7 +1555,7 @@ export class VendorDashboardPage {
 
   async updateVendor(value: VendorFormValue) {
     const vendor = this.editingVendor();
-    if (!vendor || !value.name || !value.materialType || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) {
+    if (!vendor || !value.name || !value.phone || !value.address || (value.gstType === "GST" && !value.gst)) {
       if (!vendor) return;
       const toast = await this.toastController.create({
         message: "Please fill all required fields before saving",

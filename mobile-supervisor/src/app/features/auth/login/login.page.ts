@@ -10,6 +10,7 @@ import { addIcons } from 'ionicons';
 import {
   qrCodeOutline,
   mailOutline,
+  keypadOutline,
   shieldCheckmarkOutline,
   chevronForwardOutline,
   mailUnreadOutline,
@@ -63,6 +64,22 @@ import { AuthService } from '../../../core/services/auth.service';
               <span class="tile-body">
                 <span class="tile-title">Sign in with Email & Password</span>
                 <span class="tile-sub">Use the password set during onboarding</span>
+             </span>
+              <span class="tile-chev"><ion-icon name="chevron-forward-outline"></ion-icon></span>
+           </button>
+
+            <button
+              class="action-tile"
+              type="button"
+              (click)="goToOtp()"
+              [disabled]="isLoading"
+            >
+              <span class="tile-icon tile-icon-soft">
+                <ion-icon name="keypad-outline"></ion-icon>
+             </span>
+              <span class="tile-body">
+                <span class="tile-title">Log in with OTP</span>
+                <span class="tile-sub">Get a code on your registered email or phone</span>
              </span>
               <span class="tile-chev"><ion-icon name="chevron-forward-outline"></ion-icon></span>
            </button>
@@ -284,6 +301,7 @@ export class LoginPage implements OnInit {
     addIcons({
       qrCodeOutline,
       mailOutline,
+      keypadOutline,
       shieldCheckmarkOutline,
       chevronForwardOutline,
       mailUnreadOutline,
@@ -305,6 +323,10 @@ export class LoginPage implements OnInit {
 
   goToPassword(): void {
     void this.router.navigate(['/auth/password-login']);
+  }
+
+  goToOtp(): void {
+    void this.router.navigate(['/auth/login-with-otp']);
   }
 
   handleRefresh(event: CustomEvent): void {

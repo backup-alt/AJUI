@@ -8,7 +8,7 @@ import { Site } from "../models/Site.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { generateId } from "./id-generator.service.js";
 import { CreateMaterialInput } from "../schemas/financial.schema.js";
-import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
+import { applyProjectScope, resolveProjectObjectId, ProjectScopeIds } from "../utils/scope.js";
 import { withRetry } from "../utils/retry.js";
 import { dbMutex } from "../utils/db-mutex.js";
 
@@ -183,7 +183,9 @@ export async function listMaterials(filter: {
   scopeProjectIds?: ProjectScopeIds;
 }) {
   const query: Record<string, unknown> = {};
-  if (filter.projectId) query.projectId = new Types.ObjectId(filter.projectId);
+  if (filter.projectId) {
+    query.projectId = await resolveProjectObjectId(filter.projectId);
+  }
   if (filter.siteId) query.siteId = new Types.ObjectId(filter.siteId);
   if (filter.site) query.site = filter.site;
   if (filter.vendorId) query.vendorId = new Types.ObjectId(filter.vendorId);
