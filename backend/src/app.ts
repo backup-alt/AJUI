@@ -98,6 +98,9 @@ export function createApp(): express.Application {
           "capacitor://localhost",
           "ionic://localhost",
           "http://localhost",
+          "https://localhost",
+          "http://localhost:8100",
+          "https://localhost:8100",
           // GitHub Pages deployment
           "https://backup-alt.github.io",
         ]
