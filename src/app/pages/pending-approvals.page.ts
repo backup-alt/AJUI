@@ -186,7 +186,7 @@ type ToastManager = {
                         <th>Description</th>
                         <th>Amount</th>
                         <th>Given Amt</th>
-                        <th>Project Manager</th>
+                        <th>Site Material</th>
                         <th>Supervisor</th>
                         <th>Notes</th>
                         <th>Bill/Reference</th>
@@ -224,7 +224,7 @@ type ToastManager = {
                             />
                           </td>
                         }
-                        <td>{{ row.projectManager || "Unassigned" }}</td>
+                        <td>{{ row.isSiteMaterial ? "Yes" : "No" }}</td>
                         <td>{{ row.supervisor || "-" }}</td>
                         <td>{{ row.notes || "-" }}</td>
                         <td>

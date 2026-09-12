@@ -240,7 +240,7 @@ router.post(
 router.patch(
   "/subcontractor-labor/:id",
   validate(updateSubcontractorLaborSchema),
-  requireRole("admin"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.updateSubcontractorLabor
 );
 
@@ -263,7 +263,7 @@ router.post(
 router.patch(
   "/workers/:id",
   validate(updateWorkerSchema),
-  requireRole("admin"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.updateWorker
 );
 router.delete(
