@@ -308,14 +308,14 @@ router.put(
   "/approvals/:id/approve",
   approvalLimiter,
   validate(approveRequestSchema),
-  requireRole("admin"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.approveApproval
 );
 router.put(
   "/approvals/:id/reject",
   approvalLimiter,
   validate(rejectRequestSchema),
-  requireRole("admin"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.rejectApproval
 );
 
