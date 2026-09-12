@@ -191,7 +191,7 @@ type ToastManager = {
                         <th>Notes</th>
                         <th>Bill/Reference</th>
                         <th>Status</th>
-                        <th *ngIf="isAdmin()">Actions</th>
+                        <th *ngIf="canReviewApprovals()">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -209,7 +209,7 @@ type ToastManager = {
                               inputmode="decimal"
                               type="number"
                               [(ngModel)]="row.approvedAmount"
-                              [readonly]="!isAdmin()"
+                              [readonly]="!canReviewApprovals()"
                               aria-label="Approved amount"
                               min="0"
                             />
@@ -240,7 +240,7 @@ type ToastManager = {
                           }
                         </td>
                         <td><span class="approval-status-pill">{{ row.status }}</span></td>
-                        <td class="approval-actions" *ngIf="isAdmin()">
+                        <td class="approval-actions" *ngIf="canReviewApprovals()">
                           <button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">
                             @if (isRowProcessing(row.rowId)) {
                               <span class="agb-loading-spinner" aria-hidden="true"></span>
@@ -293,6 +293,10 @@ export class PendingApprovalsPage implements OnInit {
   private readonly approvalsService = inject(ApprovalsService);
   private readonly api = inject(ApiService);
   isAdmin() { return this.api.user()?.role === "admin"; }
+  canReviewApprovals() {
+    const role = this.api.user()?.role;
+    return role === "admin" || role === "project_manager" || role === "accountant";
+  }
 
   readonly showMaterial = signal(true);
   readonly showLabour = signal(true);

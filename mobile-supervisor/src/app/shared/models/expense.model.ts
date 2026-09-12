@@ -40,6 +40,7 @@ export interface Expense {
 
 export interface CreateExpenseRequest {
   type: 'site' | 'general';
+  mobileRequestId?: string;
   projectId: string;
   siteId: string;
   transactionType?: string;

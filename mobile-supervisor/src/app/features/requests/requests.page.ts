@@ -10,11 +10,6 @@ import {
   IonSkeletonText,
   IonRefresher,
   IonRefresherContent,
-  IonInfiniteScroll,
-  IonInfiniteScrollContent,
-  IonSpinner,
-  IonButton,
-  IonCheckbox,
   ToastController,
 } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
@@ -75,11 +70,6 @@ interface RequestItem {
     IonSkeletonText,
     IonRefresher,
     IonRefresherContent,
-    IonInfiniteScroll,
-    IonInfiniteScrollContent,
-    IonSpinner,
-    IonButton,
-    IonCheckbox,
     FormsModule,
     DatePipe,
     CurrencyPipe,
@@ -109,9 +99,6 @@ interface RequestItem {
             </ion-segment-button>
             <ion-segment-button value="declined">
               <ion-label>Declined</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="upload">
-              <ion-label>Upload</ion-label>
             </ion-segment-button>
           </ion-segment>
         </div>
@@ -144,7 +131,7 @@ interface RequestItem {
           ></app-empty-state>
         } @else {
           @for (item of filteredItems; track item._id) {
-            <div class="request-card" [class.upload-mode]="activeTab === 'upload'">
+            <div class="request-card">
               <header class="request-head">
                 <div class="type-pill" [class.material]="item.type === 'material'" [class.expense]="item.type === 'expense' || item.type === 'labour'">
                   <ion-icon [name]="item.type === 'material' ? 'cube-outline' : (item.type === 'labour' ? 'cash-outline' : 'cart-outline')"></ion-icon>
@@ -180,74 +167,6 @@ interface RequestItem {
                 </div>
               }
 
-              @if (activeTab === 'upload' && item.needsUpload) {
-                @if (uploadingItemId() === item._id) {
-                  <div class="upload-section">
-                    @if (selectedFileName()) {
-                      <div class="file-preview">
-                        <ion-icon name="document-outline"></ion-icon>
-                        <span>{{ selectedFileName() }}</span>
-                      </div>
-                    }
-
-                    @if (item.type === 'material') {
-                      <div class="upload-field checkbox-field">
-                        <ion-checkbox
-                          [(ngModel)]="isReceivedInput"
-                          [disabled]="isUploading()"
-                          class="received-checkbox"
-                  aria-label="Received materials reached the project"
-                        ></ion-checkbox>
-                  <span class="received-label">Received (materials delivered)</span>
-                      </div>
-                    }
-
-                    <div class="upload-actions">
-                      <ion-button
-                        expand="block"
-                        fill="outline"
-                        size="small"
-                        (click)="cancelUpload()"
-                      >
-                        Cancel
-                      </ion-button>
-                      <ion-button
-                        expand="block"
-                        size="small"
-                        [disabled]="!canSubmitUpload(item)"
-                        (click)="submitUpload(item)"
-                      >
-                        @if (isUploading()) {
-                          <ion-spinner name="crescent" slot="start"></ion-spinner>
-                          Uploading...
-                        } @else {
-                          Submit
-                        }
-                      </ion-button>
-                    </div>
-                  </div>
-                } @else {
-                  <div class="upload-cta">
-                    <ion-button
-                      expand="block"
-                      fill="outline"
-                      size="small"
-                      (click)="startUpload(item)"
-                    >
-                      <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
-                      Upload Bill
-                    </ion-button>
-                  </div>
-                }
-              }
-
-              @if (activeTab === 'upload' && !item.needsUpload) {
-                <div class="completed-notice">
-                  <ion-icon name="checkmark-circle-outline"></ion-icon>
-                  Bill uploaded
-                </div>
-              }
-
               @if (billFiles(item).length) {
                 <div class="bill-history-list">
                   @for (bill of billFiles(item); track bill.billUrl; let index = $index) {
@@ -266,12 +185,6 @@ interface RequestItem {
           }
         }
       </div>
-
-      @if (activeTab === 'upload' && materialBillNextCursor()) {
-        <ion-infinite-scroll threshold="120px" (ionInfinite)="loadMoreMaterialBills($event)">
-          <ion-infinite-scroll-content loadingSpinner="crescent"></ion-infinite-scroll-content>
-        </ion-infinite-scroll>
-      }
 
       @if (viewImageUrl()) {
         <div class="bill-viewer-overlay" (click)="closeBillViewer($event)">
@@ -569,7 +482,7 @@ export class RequestsPage implements OnInit {
   private toastCtrl = inject(ToastController);
   private notifications = inject(NotificationService);
 
-  activeTab: 'pending' | 'approved' | 'declined' | 'upload' = 'pending';
+  activeTab: 'pending' | 'approved' | 'declined' = 'pending';
   isLoading = signal(true);
   errorMessage = signal<string>('');
 
@@ -590,8 +503,7 @@ export class RequestsPage implements OnInit {
     if (this.activeTab === 'declined') {
       return items.filter(i => i.status === 'Rejected' || i.status === 'Declined');
     }
-    // Keep completed uploads visible so the bill can be opened again.
-    return items.filter(i => i.billEligible);
+    return items;
   }
 
   uploadingItemId = signal<string | null>(null);
@@ -617,21 +529,21 @@ export class RequestsPage implements OnInit {
     if (this.activeTab === 'approved') return 'checkmark-circle-outline';
     if (this.activeTab === 'declined') return 'close-circle-outline';
     if (this.activeTab === 'pending') return 'time-outline';
-    return 'cloud-upload-outline';
+    return 'time-outline';
   }
 
   get emptyTitle() {
     if (this.activeTab === 'pending') return 'No pending requests';
     if (this.activeTab === 'approved') return 'No approved requests';
     if (this.activeTab === 'declined') return 'No declined requests';
-    return 'No bill requests';
+    return 'No requests';
   }
 
   get emptyMessage() {
     if (this.activeTab === 'pending') return 'Pending material and expense requests will appear here.';
     if (this.activeTab === 'approved') return 'Approved material and purchase requests will appear here.';
     if (this.activeTab === 'declined') return 'Declined requests will appear here.';
-    return 'Approved material and purchase bills will appear here.';
+    return 'Submitted requests will appear here.';
   }
 
   async ngOnInit(): Promise<void> {

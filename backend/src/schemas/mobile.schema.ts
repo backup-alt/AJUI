@@ -78,6 +78,7 @@ export const createLabourMobileSchema = z.object({
 export const createExpenseMobileSchema = z.object({
   body: z.object({
     paymentMode: z.string().trim().min(1).max(50),
+    mobileRequestId: z.string().trim().min(8).max(120).optional(),
     bill: z.object({
       data: z.string().min(20).max(14 * 1024 * 1024),
       mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),

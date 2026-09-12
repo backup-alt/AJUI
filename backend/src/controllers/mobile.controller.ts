@@ -482,6 +482,14 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
 
     await mobileService.ensureSupervisorSiteAccess(userId, req.body.projectId, req.body.siteId);
 
+    const mobileRequestId = typeof req.body.mobileRequestId === "string" ? req.body.mobileRequestId.trim() : "";
+    if (mobileRequestId) {
+      const existing = await Expense.findOne({ submittedBy: userId, mobileRequestId }).lean();
+      if (existing) {
+        return res.status(200).json({ expense: existing, duplicate: true });
+      }
+    }
+
     let projectName: string | undefined;
     let clientId: Types.ObjectId | undefined;
     let clientName: string | undefined;
@@ -518,6 +526,7 @@ export async function createExpense(req: Request, res: Response, next: NextFunct
     const expense = await Expense.create({
       ...expenseInput,
       ...billFields,
+      ...(mobileRequestId ? { mobileRequestId } : {}),
       expenseId,
       projectName,
       clientId,

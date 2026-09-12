@@ -48,6 +48,7 @@ export interface IExpense extends Document {
   pcloudFileId?: string;
   pcloudPublicCode?: string;
   pcloudContentHash?: string;
+  mobileRequestId?: string;
   customFields?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -102,6 +103,7 @@ const expenseSchema = new Schema<IExpense>(
     pcloudFileId: { type: String, trim: true, index: true },
     pcloudPublicCode: { type: String, trim: true },
     pcloudContentHash: { type: String, trim: true },
+    mobileRequestId: { type: String, trim: true, index: true },
     customFields: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
@@ -118,5 +120,6 @@ expenseSchema.index({ projectId: 1, type: 1, _id: -1 });
 expenseSchema.index({ siteId: 1, type: 1, _id: -1 });
 expenseSchema.index({ projectId: 1, status: 1, _id: -1 });
 expenseSchema.index({ siteId: 1, status: 1, _id: -1 });
+expenseSchema.index({ submittedBy: 1, mobileRequestId: 1 }, { unique: true, sparse: true });
 
 export const Expense = model<IExpense>("Expense", expenseSchema);

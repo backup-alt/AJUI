@@ -628,6 +628,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   paymentModes = ['Cash', 'UPI', 'Bank Transfer', 'NEFT', 'RTGS', 'IMPS', 'Cheque', 'Credit Card', 'Debit Card', 'Net Banking', 'Demand Draft', 'Wallet', 'Other'];
   bill: {data: string; mimeType: string; fileName: string} | null = null;
   billError = '';
+  private pendingMobileRequestId: string | null = null;
   async selectBill(event: Event): Promise<void> {
     const file = (event.target as HTMLInputElement).files?.[0];
     this.bill = null;
@@ -661,6 +662,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   }
 
   async submit(): Promise<void> {
+    if (this.isSubmitting()) return;
     if (this.expenseType() === 'Purchase' && !this.bill) {
       this.billError = 'Upload a bill image or PDF to submit this expense request.';
       const toast = await this.toastCtrl.create({ message: this.billError, duration: 3000, color: 'danger', position: 'top' });
@@ -695,6 +697,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
 
     const payload: any = {
       type: 'site',
+      mobileRequestId: this.currentMobileRequestId(),
       paymentMode: this.paymentMode,
       bill: isCashAdded ? undefined : this.bill,
       projectId,
@@ -749,6 +752,13 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
         await toast.present();
       },
     });
+  }
+
+  private currentMobileRequestId(): string {
+    if (!this.pendingMobileRequestId) {
+      this.pendingMobileRequestId = `expense-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+    return this.pendingMobileRequestId;
   }
 
   handleRefresh(event: CustomEvent): void {
