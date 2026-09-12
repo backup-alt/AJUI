@@ -1157,7 +1157,7 @@ export async function approveApproval(req: Request, res: Response, next: NextFun
     const approval = await approvalService.getApprovalById(req.params.id);
     if (!approval) throw new AppError(404, "Approval not found");
 
-    if (req.user?.role !== "admin") {
+    if (req.user?.role !== "admin" && req.user?.role !== "project_manager" && req.user?.role !== "accountant") {
       const user = await User.findById(req.user?.sub).select("requestPermissions").lean();
       const perms = user?.requestPermissions;
 
@@ -1206,7 +1206,7 @@ export async function rejectApproval(req: Request, res: Response, next: NextFunc
     const approval = await approvalService.getApprovalById(req.params.id);
     if (!approval) throw new AppError(404, "Approval not found");
 
-    if (req.user?.role !== "admin") {
+    if (req.user?.role !== "admin" && req.user?.role !== "project_manager" && req.user?.role !== "accountant") {
       const user = await User.findById(req.user?.sub).select("requestPermissions").lean();
       const perms = user?.requestPermissions;
 

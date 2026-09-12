@@ -220,12 +220,12 @@ router.post(
 router.patch(
   "/subcontractor-payments/:id",
   validate(updateSubcontractorPaymentSchema),
-  requireRole("admin"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.updateSubcontractorPayment
 );
 router.delete(
   "/subcontractor-payments/:id",
-  requireRole("admin"),
+  requireRole("admin", "project_manager", "accountant"),
   ctrl.deleteSubcontractorPayment
 );
 

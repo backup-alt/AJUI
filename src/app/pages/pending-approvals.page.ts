@@ -190,7 +190,6 @@ type ToastManager = {
                         <th>Supervisor</th>
                         <th>Notes</th>
                         <th>Bill/Reference</th>
-                        <th>Status</th>
                         <th *ngIf="canReviewApprovals()">Actions</th>
                       </tr>
                     </thead>
@@ -239,7 +238,6 @@ type ToastManager = {
                             {{ row.reference || "-" }}
                           }
                         </td>
-                        <td><span class="approval-status-pill">{{ row.status }}</span></td>
                         <td class="approval-actions" *ngIf="canReviewApprovals()">
                           <button type="button" class="approve-action" (click)="approve(row)" [disabled]="isRowProcessing(row.rowId)">
                             @if (isRowProcessing(row.rowId)) {
