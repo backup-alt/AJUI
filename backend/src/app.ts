@@ -94,6 +94,8 @@ export function createApp(): express.Application {
         const allowedOrigins = [
           ...configuredFrontendOrigins,
           ...(env.WEB_APP_URL ? [env.WEB_APP_URL] : []),
+          ...(env.BACKEND_PUBLIC_URL ? [env.BACKEND_PUBLIC_URL] : []),
+          ...(env.RENDER_EXTERNAL_URL ? [env.RENDER_EXTERNAL_URL] : []),
           ...configuredMobileOrigins,
           // Capacitor mobile app origins
           "capacitor://localhost",
