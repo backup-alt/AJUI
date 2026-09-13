@@ -942,7 +942,7 @@ export async function verifyEmployeeOtp(
         input.phone ||
         (invite.inviteePhone && invite.inviteePhone.length > 0
           ? invite.inviteePhone
-          : `+910000000000`);
+          : finalEmail);
 
       if (!finalEmail) {
         throw new AppError(400, "Email is required to complete signup");
@@ -1113,15 +1113,6 @@ export async function employeeSignup(
     const invite = await inviteService.verifyInvite(input.token);
     if (invite.role === "supervisor") {
       throw new AppError(400, "This invite is not an employee invite");
-    }
-
-    if (invite.otpHash) {
-      if (invite.otpExpiresAt && invite.otpExpiresAt < new Date()) {
-        throw new AppError(410, "OTP has expired. Please request a new code.");
-      }
-      if (!input.otp) throw new AppError(400, "Verification code is required for this invite");
-      const valid = await compareToken(input.otp, invite.otpHash);
-      if (!valid) throw new AppError(400, "Invalid verification code");
     }
 
     const fallbackEmail = invite.inviteeEmail || "";
