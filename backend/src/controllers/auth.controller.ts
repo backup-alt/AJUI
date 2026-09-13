@@ -1161,15 +1161,6 @@ export async function employeeSignup(
       throw err;
     }
 
-    const tokens = await authService.issueTokens(user);
-    const cookieOptions = {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none" as const,
-      expires: tokens.expiresAt,
-      path: "/api/auth",
-    };
-
     res.status(201).json({
       success: true,
       user: {
@@ -1181,9 +1172,7 @@ export async function employeeSignup(
         status: user.status,
         managedProjectIds: (user.managedProjectIds || []).map((id) => id.toString()),
       },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresAt: tokens.expiresAt,
+      message: "Account created successfully. Please sign in.",
     });
   } catch (err) {
     next(err);
