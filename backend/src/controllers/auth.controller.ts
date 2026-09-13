@@ -770,11 +770,19 @@ async function resolveProjectObjectIds(projectIds: string[]): Promise<string[]> 
 function allocatedProjectObjectIds(invite: { metadata?: unknown }): Types.ObjectId[] {
   const meta = (invite.metadata as Record<string, unknown>) || {};
   const allocatedProjectIds = Array.isArray(meta.allocatedProjectIds)
-    ? (meta.allocatedProjectIds as string[])
+    ? meta.allocatedProjectIds
     : [];
   const ids = allocatedProjectIds
-    .filter((id) => typeof id === "string" && Types.ObjectId.isValid(id))
-    .map((id) => new Types.ObjectId(id));
+    .map((id) => {
+      if (id instanceof Types.ObjectId) return id;
+      if (typeof id === "string" && Types.ObjectId.isValid(id)) return new Types.ObjectId(id);
+      if (id && typeof id === "object" && typeof (id as { toString?: () => string }).toString === "function") {
+        const value = (id as { toString: () => string }).toString();
+        if (Types.ObjectId.isValid(value)) return new Types.ObjectId(value);
+      }
+      return null;
+    })
+    .filter((id): id is Types.ObjectId => !!id);
 
   // Returns empty array if no projects assigned — callers handle the empty case.
   // PM/accountant with no projects simply have no project scope until
@@ -944,19 +952,30 @@ export async function verifyEmployeeOtp(
       });
       if (existing) throw new AppError(409, "User with this email or phone already exists");
 
-      const passwordHash = await hashPassword(input.password);
-const user = await User.create({
-        name: finalName,
-        email: finalEmail,
-        phone: finalPhone,
-        passwordHash,
-        role: invite.role,
-        status: "active",
-        createdBy: invite.createdByAdmin,
-        managedProjectIds: invite.role === "admin" ? [] : allocatedProjectObjectIds(invite),
-      });
+      let user;
+      try {
+        const passwordHash = await hashPassword(input.password);
+        user = await User.create({
+          name: finalName,
+          email: finalEmail,
+          phone: finalPhone,
+          passwordHash,
+          role: invite.role,
+          status: "active",
+          createdBy: invite.createdByAdmin,
+          managedProjectIds: invite.role === "admin" ? [] : allocatedProjectObjectIds(invite),
+        });
 
-      await inviteService.consumeInvite(input.token, user._id.toString());
+        await inviteService.consumeInvite(input.token, user._id.toString());
+      } catch (err) {
+        if (user?._id && !isMongoDuplicateKeyError(err)) {
+          await User.deleteOne({ _id: user._id, createdBy: invite.createdByAdmin }).catch(() => undefined);
+        }
+        if (isMongoDuplicateKeyError(err)) {
+          throw new AppError(409, duplicateKeyMessage(err));
+        }
+        throw err;
+      }
 
       const tokens = await authService.issueTokens(user);
       const cookieOptions = {
@@ -1071,6 +1090,17 @@ This code expires when your invite expires.
   }
 }
 
+function isMongoDuplicateKeyError(err: unknown): boolean {
+  return !!err && typeof err === "object" && (err as { code?: number }).code === 11000;
+}
+
+function duplicateKeyMessage(err: unknown): string {
+  const keyPattern = (err as { keyPattern?: Record<string, unknown> } | undefined)?.keyPattern || {};
+  if ("email" in keyPattern) return "A user with this email already exists. Please sign in instead.";
+  if ("phone" in keyPattern) return "A user with this phone number already exists. Please use a different phone number or sign in.";
+  return "A user with these details already exists. Please sign in instead.";
+}
+
 export async function employeeSignup(
   req: Request,
   res: Response,
@@ -1106,19 +1136,30 @@ export async function employeeSignup(
     const existing = await User.findOne({ $or: [{ email: finalEmail }, { phone: finalPhone }] });
     if (existing) throw new AppError(409, "User with this email or phone already exists");
 
-    const passwordHash = await hashPassword(input.password);
-    const user = await User.create({
-      name: finalName,
-      email: finalEmail,
-      phone: finalPhone,
-      passwordHash,
-      role: invite.role,
-      status: "active",
-      createdBy: invite.createdByAdmin,
-      managedProjectIds: allocatedProjectObjectIds(invite),
-    });
+    let user;
+    try {
+      const passwordHash = await hashPassword(input.password);
+      user = await User.create({
+        name: finalName,
+        email: finalEmail,
+        phone: finalPhone,
+        passwordHash,
+        role: invite.role,
+        status: "active",
+        createdBy: invite.createdByAdmin,
+        managedProjectIds: invite.role === "admin" ? [] : allocatedProjectObjectIds(invite),
+      });
 
-    await inviteService.consumeInvite(input.token, user._id.toString());
+      await inviteService.consumeInvite(input.token, user._id.toString());
+    } catch (err) {
+      if (user?._id && !isMongoDuplicateKeyError(err)) {
+        await User.deleteOne({ _id: user._id, createdBy: invite.createdByAdmin }).catch(() => undefined);
+      }
+      if (isMongoDuplicateKeyError(err)) {
+        throw new AppError(409, duplicateKeyMessage(err));
+      }
+      throw err;
+    }
 
     const tokens = await authService.issueTokens(user);
     const cookieOptions = {

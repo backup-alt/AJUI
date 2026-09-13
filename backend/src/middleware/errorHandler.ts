@@ -34,6 +34,14 @@ export function errorHandler(
     return;
   }
 
+  if ((err as any).code === 11000) {
+    const keyPattern = (err as any).keyPattern || {};
+    const fields = Object.keys(keyPattern);
+    const fieldLabel = fields.length > 0 ? fields.join(", ") : "record";
+    res.status(409).json({ error: `A ${fieldLabel} with this value already exists` });
+    return;
+  }
+
   console.error("[ERROR]", err);
 
   res.status(500).json({
