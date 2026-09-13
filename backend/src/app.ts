@@ -93,6 +93,7 @@ export function createApp(): express.Application {
         // Known trusted origins
         const allowedOrigins = [
           ...configuredFrontendOrigins,
+          ...(env.WEB_APP_URL ? [env.WEB_APP_URL] : []),
           ...configuredMobileOrigins,
           // Capacitor mobile app origins
           "capacitor://localhost",

@@ -619,6 +619,9 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
     <div id="success-view" style="display:none">
       <div class="login-success"><strong>Account created</strong></div>
       <p style="margin-top:12px;color:#475467;font-size:14px;line-height:1.5;" id="success-message">You can now sign in to the AGB app.</p>
+      <p style="margin-top:16px">
+        <a id="login-link" href="/" style="display:inline-block;background:#002263;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:700">Go to login</a>
+      </p>
     </div>
 
     <p class="footer-note">
@@ -803,27 +806,16 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
             document.getElementById('success-view').style.display = 'block';
             document.getElementById('copy-signup').style.display = 'none';
             if (inviteType === 'employee') {
-              document.getElementById('success-message').textContent = 'Account created! Redirecting you to the login page...';
-              // Redirect to the web admin login page after a short delay
-              var loginUrl = '${env.FRONTEND_URL.replace(/\/+$/, "")}/#/login';
-              // Hardcoded fallback in case FRONTEND_URL env var is misconfigured.
-              // The web admin is always deployed at backup-alt.github.io/AJUI/.
-              // After the redirect, if the URL doesn't work, the user can still
-              // navigate manually to https://backup-alt.github.io/AJUI/#/login
+              var loginUrl = d.loginUrl || (inviteData && inviteData.loginUrl) || 'https://backup-alt.github.io/AJUI/#/login';
+              document.getElementById('success-message').textContent = 'Account created! Redirecting you to the login page. If it does not redirect, use the button below.';
+              document.getElementById('login-link').href = loginUrl;
               setTimeout(function () {
                 try {
-                  window.location.href = loginUrl;
-                  // Safety net: if the redirect doesn't work within 3 seconds,
-                  // try the hardcoded correct URL as a last resort.
-                  setTimeout(function () {
-                    if (window.location.href.indexOf('login') === -1) {
-                      window.location.href = 'https://backup-alt.github.io/AJUI/#/login';
-                    }
-                  }, 3000);
+                  window.location.assign(loginUrl);
                 } catch (e) {
-                  window.location.href = 'https://backup-alt.github.io/AJUI/#/login';
+                  window.location.href = loginUrl;
                 }
-              }, 2500);
+              }, 1200);
             } else {
               document.getElementById('success-message').textContent = 'You can now sign in to the AGB Supervisor app with your phone number and password.';
             }

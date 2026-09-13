@@ -22,6 +22,7 @@ const envSchema = z.object({
   GMAIL_APP_PASSWORD: z.string().min(16, "GMAIL_APP_PASSWORD must be at least 16 chars").optional(),
 
   FRONTEND_URL: z.string().url().default("http://localhost:4200"),
+  WEB_APP_URL: z.string().url().optional(),
   MOBILE_APP_URL: z.string().default("*"),
   QR_BASE_URL: z.string().default("agb-supervisor://invite"),
   BACKEND_PUBLIC_URL: z.string().url().optional(),
@@ -73,4 +74,30 @@ export function resolveBackendBaseUrl(req?: { protocol?: string; get?: (h: strin
     return env.BACKEND_PUBLIC_URL.replace(/\/+$/, "");
   }
   return env.FRONTEND_URL.replace(/\/+$/, "");
+}
+
+export function resolveWebLoginUrl(): string {
+  const deployedWebAppUrl = "https://backup-alt.github.io/AJUI";
+  const candidate = (env.WEB_APP_URL || env.FRONTEND_URL || deployedWebAppUrl).replace(/\/+$/, "");
+  const backendUrl = (env.BACKEND_PUBLIC_URL || env.RENDER_EXTERNAL_URL || "").replace(/\/+$/, "");
+
+  let candidateUrl: URL;
+  try {
+    candidateUrl = new URL(candidate);
+  } catch {
+    return `${deployedWebAppUrl}/#/login`;
+  }
+
+  const isLocalhost = /^(localhost|127\.0\.0\.1)$/i.test(candidateUrl.hostname);
+  const pointsToBackend = backendUrl ? candidate === backendUrl : false;
+
+  if (isLocalhost || pointsToBackend) {
+    return `${deployedWebAppUrl}/#/login`;
+  }
+
+  if (candidateUrl.hash.startsWith("#/")) {
+    return candidate;
+  }
+
+  return `${candidate}/#/login`;
 }

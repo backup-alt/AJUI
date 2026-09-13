@@ -18,7 +18,7 @@ import { hashPassword, verifyPassword, compareToken } from "../utils/password.js
 import { AppError } from "../middleware/errorHandler.js";
 import { generateQRDataURL } from "../utils/qr-code.js";
 import { sendEmail } from "../config/email.js";
-import { resolveBackendBaseUrl } from "../config/env.js";
+import { resolveBackendBaseUrl, resolveWebLoginUrl } from "../config/env.js";
 import { PasswordResetToken } from "../models/PasswordResetToken.js";
 import { hashToken } from "../utils/password.js";
 import crypto from "crypto";
@@ -887,6 +887,7 @@ export async function verifyEmployeeInvite(
       email: invite.inviteeEmail || "",
       phone: invite.inviteePhone || "",
       expiresAt: invite.expiresAt,
+      loginUrl: resolveWebLoginUrl(),
     });
   } catch (err) {
     next(err);
@@ -1172,6 +1173,7 @@ export async function employeeSignup(
         status: user.status,
         managedProjectIds: (user.managedProjectIds || []).map((id) => id.toString()),
       },
+      loginUrl: resolveWebLoginUrl(),
       message: "Account created successfully. Please sign in.",
     });
   } catch (err) {
