@@ -900,7 +900,7 @@ const employeeSignupSchema = z.object({
   // The endpoint only validates OTP if the invite has an otpHash stored.
   otp: z.string().length(6, "OTP must be 6 digits").optional(),
   name: z.string().trim().min(2).max(100),
-  phone: z.string().trim().min(8).max(20),
+  phone: z.string().trim().max(20).optional(),
   password: z.string().min(6).max(128),
 });
 
@@ -1128,7 +1128,7 @@ export async function employeeSignup(
     const fallbackName = inviteService.extractInviteeName(invite);
     const finalEmail = fallbackEmail;
     const finalName = input.name && input.name.length > 0 ? input.name : fallbackName;
-    const finalPhone = input.phone;
+    const finalPhone = input.phone && input.phone.length >= 8 ? input.phone : finalEmail;
 
     if (!finalEmail) {
       throw new AppError(400, "Email is required to complete signup");

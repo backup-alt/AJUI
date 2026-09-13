@@ -761,7 +761,11 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
         if (inviteType === 'supervisor') {
           byId('email-field').style.display = 'flex';
           byId('email').required = true;
+          byId('phone').required = true;
           if (emailText) byId('email').value = emailText;
+        } else {
+          byId('phone').required = false;
+          byId('phone').placeholder = 'Optional';
         }
 
         // Employee invites (admin/PM/accountant) don't require a verification code
@@ -793,7 +797,8 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
         var cf = byId('confirm').value;
 
         if (!n || n.length < 2) { showErr('Please enter your full name.'); return; }
-        if (!ph || ph.length < 8) { showErr('Please enter a valid phone number (at least 8 digits).'); return; }
+        if (inviteType === 'supervisor' && (!ph || ph.length < 8)) { showErr('Please enter a valid phone number (at least 8 digits).'); return; }
+        if (inviteType === 'employee' && ph && ph.length < 8) { showErr('Please enter a valid phone number (at least 8 digits), or leave it blank.'); return; }
         if (inviteType === 'supervisor' && (!otp || otp.length !== 6)) { showErr('Please enter the 6-digit verification code from your email.'); return; }
         if (!pw || pw.length < 6) { showErr('Password must be at least 6 characters.'); return; }
         if (pw !== cf) { showErr('Passwords do not match.'); return; }
