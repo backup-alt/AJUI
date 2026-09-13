@@ -575,7 +575,7 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
         <span id="invite-email" style="display:block;margin-top:4px;"></span>
       </div>
 
-      <form class="auth-form" id="signup-form">
+      <form class="auth-form" id="signup-form" novalidate>
         <label class="form-field">
           <span>Full name</span>
           <input type="text" id="name" placeholder="Enter your full name" autocomplete="name" required />
@@ -583,7 +583,7 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
 
         <label class="form-field">
           <span>Phone number</span>
-          <input type="tel" id="phone" placeholder="+91 XXXXXXXXXX" autocomplete="tel" required />
+          <input type="tel" id="phone" placeholder="+91 XXXXXXXXXX" autocomplete="tel" />
         </label>
 
         <label class="form-field" id="email-field" style="display:none">

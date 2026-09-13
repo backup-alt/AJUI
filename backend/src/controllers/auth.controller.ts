@@ -900,7 +900,7 @@ const employeeSignupSchema = z.object({
   // The endpoint only validates OTP if the invite has an otpHash stored.
   otp: z.string().length(6, "OTP must be 6 digits").optional(),
   name: z.string().trim().min(2).max(100),
-  phone: z.string().trim().max(20).optional(),
+  phone: z.string().trim().max(20).optional().transform((value) => value || undefined),
   password: z.string().min(6).max(128),
 });
 
