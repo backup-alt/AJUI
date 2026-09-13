@@ -639,8 +639,29 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
       var inviteType = null; // 'supervisor' | 'employee'
       var inviteData = null;
 
+      function byId(id) {
+        return document.getElementById(id);
+      }
+
+      function removeSubmitLoading() {
+        var loading = byId('submit-loading');
+        if (loading && loading.parentNode) loading.parentNode.removeChild(loading);
+      }
+
+      function setSubmitDisabled(disabled) {
+        var btn = byId('submit-btn');
+        if (btn) btn.disabled = !!disabled;
+      }
+
       function showErr(m) {
-        var formView = document.getElementById('form-view');
+        removeSubmitLoading();
+        setSubmitDisabled(false);
+        var formView = byId('form-view');
+        if (!formView) {
+          alert(m || 'Signup failed. Please try again.');
+          return;
+        }
+        formView.style.display = 'block';
         var existing = formView.querySelector('.login-error');
         if (existing) existing.remove();
         var inline = document.createElement('div');
@@ -651,27 +672,27 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
       }
 
       function setLoading(loading) {
-        document.getElementById('loading-init').style.display = loading ? 'flex' : 'none';
-        document.getElementById('form-view').style.display = loading ? 'none' : 'block';
+        byId('loading-init').style.display = loading ? 'flex' : 'none';
+        byId('form-view').style.display = loading ? 'none' : 'block';
       }
 
       function togglePw(inputId, btn) {
-        var el = document.getElementById(inputId);
+        var el = byId(inputId);
         if (el.type === 'password') { el.type = 'text'; btn.textContent = 'Hide'; }
         else { el.type = 'password'; btn.textContent = 'Show'; }
       }
 
-      document.getElementById('pw-toggle').addEventListener('click', function () {
+      byId('pw-toggle').addEventListener('click', function () {
         togglePw('password', this);
       });
-      document.getElementById('cf-toggle').addEventListener('click', function () {
+      byId('cf-toggle').addEventListener('click', function () {
         togglePw('confirm', this);
       });
 
       async function loadInvite() {
         if (!token) {
           setLoading(false);
-          document.getElementById('form-view').innerHTML = '<div class="login-error">Invalid or missing invite link. Please contact your administrator.</div>';
+          byId('form-view').innerHTML = '<div class="login-error">Invalid or missing invite link. Please contact your administrator.</div>';
           return;
         }
 
@@ -699,7 +720,7 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
           } else {
             var errBody = await r2.json().catch(function () { return {}; });
             setLoading(false);
-            var errorView = document.getElementById('form-view');
+            var errorView = byId('form-view');
             errorView.replaceChildren();
             var errorMessage = document.createElement('div');
             errorMessage.className = 'login-error';
@@ -708,7 +729,7 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
           }
         } catch (e) {
           setLoading(false);
-          document.getElementById('form-view').innerHTML = '<div class="login-error">Network error. Please check your connection and try again.</div>';
+          byId('form-view').innerHTML = '<div class="login-error">Network error. Please check your connection and try again.</div>';
         }
       }
 
@@ -721,54 +742,55 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
           : role === 'accountant' ? 'Accountant'
           : 'Team Member';
 
-        document.getElementById('invite-role-label').textContent = roleLabel + ' account';
+        byId('invite-role-label').textContent = roleLabel + ' account';
         var emailText = (d.email || d.supervisorEmail || '');
         if (emailText) {
-          document.getElementById('invite-email').textContent = 'Invited: ' + emailText;
+          byId('invite-email').textContent = 'Invited: ' + emailText;
         } else {
-          document.getElementById('invite-email').style.display = 'none';
+          byId('invite-email').style.display = 'none';
         }
-        document.getElementById('invite-info').style.display = 'block';
+        byId('invite-info').style.display = 'block';
 
         // Pre-fill name and phone (editable)
         var name = d.name || d.supervisorName || '';
         var phone = d.phone || d.supervisorPhone || '';
-        document.getElementById('name').value = name;
-        document.getElementById('phone').value = phone;
+        byId('name').value = name;
+        byId('phone').value = phone;
 
         // For supervisor invites, email field is also required
         if (inviteType === 'supervisor') {
-          document.getElementById('email-field').style.display = 'flex';
-          document.getElementById('email').required = true;
-          if (emailText) document.getElementById('email').value = emailText;
+          byId('email-field').style.display = 'flex';
+          byId('email').required = true;
+          if (emailText) byId('email').value = emailText;
         }
 
         // Employee invites (admin/PM/accountant) don't require a verification code
         if (inviteType === 'employee') {
-          document.getElementById('otp-field').style.display = 'none';
-          document.getElementById('otp').required = false;
+          byId('otp-field').style.display = 'none';
+          byId('otp').required = false;
         } else {
-          document.getElementById('otp-field').style.display = 'flex';
-          document.getElementById('otp').required = true;
+          byId('otp-field').style.display = 'flex';
+          byId('otp').required = true;
         }
 
-        document.getElementById('signup-title').textContent = 'Welcome, ' + (name || 'there');
+        byId('signup-title').textContent = 'Welcome, ' + (name || 'there');
         if (inviteType === 'employee') {
-          document.getElementById('signup-subtitle').textContent = 'Review your details and choose a password to activate your account.';
+          byId('signup-subtitle').textContent = 'Review your details and choose a password to activate your account.';
         } else {
-          document.getElementById('signup-subtitle').textContent = 'Review your details, enter the verification code from your email, and choose a password.';
+          byId('signup-subtitle').textContent = 'Review your details, enter the verification code from your email, and choose a password.';
         }
 
         setLoading(false);
       }
 
-      document.getElementById('signup-form').addEventListener('submit', async function (e) {
+      byId('signup-form').addEventListener('submit', async function (e) {
         e.preventDefault();
-        var n = document.getElementById('name').value.trim();
-        var ph = document.getElementById('phone').value.trim();
-        var otp = document.getElementById('otp').value.trim();
-        var pw = document.getElementById('password').value;
-        var cf = document.getElementById('confirm').value;
+        removeSubmitLoading();
+        var n = byId('name').value.trim();
+        var ph = byId('phone').value.trim();
+        var otp = byId('otp').value.trim();
+        var pw = byId('password').value;
+        var cf = byId('confirm').value;
 
         if (!n || n.length < 2) { showErr('Please enter your full name.'); return; }
         if (!ph || ph.length < 8) { showErr('Please enter a valid phone number (at least 8 digits).'); return; }
@@ -779,19 +801,20 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
         var payload = { token: token, name: n, phone: ph, password: pw };
         if (inviteType === 'supervisor') {
           payload.otp = otp;
-          var em = document.getElementById('email').value.trim();
+          var em = byId('email').value.trim();
           if (!em) { showErr('Email is required.'); return; }
           payload.email = em;
         }
 
-        document.getElementById('form-view').style.display = 'none';
-        var loadingDiv = document.createElement('div');
-        loadingDiv.className = 'login-loading';
-        loadingDiv.id = 'submit-loading';
-        loadingDiv.innerHTML = '<span class="spinner"></span><span>Creating your account...</span>';
-        document.getElementById('signup-form').parentNode.insertBefore(loadingDiv, document.getElementById('signup-form'));
-
         try {
+          setSubmitDisabled(true);
+          byId('form-view').style.display = 'none';
+          var loadingDiv = document.createElement('div');
+          loadingDiv.className = 'login-loading';
+          loadingDiv.id = 'submit-loading';
+          loadingDiv.innerHTML = '<span class="spinner"></span><span>Creating your account...</span>';
+          byId('signup-form').parentNode.insertBefore(loadingDiv, byId('signup-form'));
+
           var endpoint = inviteType === 'supervisor'
             ? API + '/auth/supervisor/signup'
             : API + '/auth/employee/signup';
@@ -800,15 +823,15 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
-          var d = await r.json();
+          var d = await r.json().catch(function () { return {}; });
           if (r.ok && d.success) {
-            document.getElementById('submit-loading').remove();
-            document.getElementById('success-view').style.display = 'block';
-            document.getElementById('copy-signup').style.display = 'none';
+            removeSubmitLoading();
+            byId('success-view').style.display = 'block';
+            byId('copy-signup').style.display = 'none';
             if (inviteType === 'employee') {
               var loginUrl = d.loginUrl || (inviteData && inviteData.loginUrl) || 'https://backup-alt.github.io/AJUI/#/login';
-              document.getElementById('success-message').textContent = 'Account created! Redirecting you to the login page. If it does not redirect, use the button below.';
-              document.getElementById('login-link').href = loginUrl;
+              byId('success-message').textContent = 'Account created! Redirecting you to the login page. If it does not redirect, use the button below.';
+              byId('login-link').href = loginUrl;
               setTimeout(function () {
                 try {
                   window.location.assign(loginUrl);
@@ -817,17 +840,13 @@ export const SIGNUP_HTML = `<!DOCTYPE html>
                 }
               }, 1200);
             } else {
-              document.getElementById('success-message').textContent = 'You can now sign in to the AGB Supervisor app with your phone number and password.';
+              byId('success-message').textContent = 'You can now sign in to the AGB Supervisor app with your phone number and password.';
             }
           } else {
-            document.getElementById('submit-loading').remove();
-            document.getElementById('form-view').style.display = 'block';
-            showErr(d.error || d.message || 'Signup failed. The invite may have expired.');
+            showErr(d.error || d.message || 'Signup failed. The invite may have expired. Please ask your administrator for a fresh invite link.');
           }
         } catch (err) {
-          document.getElementById('submit-loading').remove();
-          document.getElementById('form-view').style.display = 'block';
-          showErr('Network error. Please try again.');
+          showErr('Unable to submit signup. Please refresh this page and try again, or ask your administrator for a fresh invite link.');
         }
       });
 
