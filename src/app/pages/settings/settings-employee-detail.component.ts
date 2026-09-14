@@ -125,13 +125,18 @@ interface ActivityEntry {
                   <h2>Assigned Projects</h2>
                   <p>Projects that this supervisor can manage.</p>
                 </div>
-                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openProjectPicker()" [disabled]="projectsLoading()">
+                <button type="button" class="settings-w11-btn settings-w11-btn-primary" (click)="openProjectPicker()" [disabled]="projectsLoading() || removingProjectId() !== null">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                   Manage Projects
                 </button>
               </div>
               <div class="settings-w11-card-body">
-                @if (projectsLoading() || supervisorAssignmentsLoading()) {
+                @if (removingProjectId() !== null) {
+                  <div class="settings-w11-unassign-loader" role="status" aria-live="polite">
+                    <span class="settings-w11-unassign-spinner" aria-hidden="true"></span>
+                    <span>Unassigning project…</span>
+                  </div>
+                } @else if (projectsLoading() || supervisorAssignmentsLoading()) {
                   <p class="settings-w11-empty-hint">Loading assigned projects…</p>
                 } @else if (supervisorAssignedProjectNames().length > 0) {
                   <div class="settings-w11-site-list">
@@ -314,6 +319,26 @@ interface ActivityEntry {
       width: 14px;
       height: 14px;
     }
+    .settings-w11-unassign-loader {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 48px;
+      color: #374151;
+      font-size: 13px;
+    }
+    .settings-w11-unassign-spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #c7d2fe;
+      border-top-color: #1e3a8a;
+      border-radius: 50%;
+      animation: settings-w11-unassign-spin 0.7s linear infinite;
+    }
+    @keyframes settings-w11-unassign-spin {
+      to { transform: rotate(360deg); }
+    }
     .settings-w11-saving {
       font-size: 12px;
       font-weight: 500;
@@ -466,6 +491,7 @@ export class SettingsEmployeeDetailComponent implements OnInit {
   readonly showProjectPicker = signal(false);
   readonly pendingProjectIds = signal<Set<string>>(new Set());
   readonly projectSaving = signal(false);
+  readonly removingProjectId = signal<string | null>(null);
 
   // Activity
   readonly activity = signal<ActivityEntry[]>([]);
@@ -540,11 +566,18 @@ export class SettingsEmployeeDetailComponent implements OnInit {
 
   removeSupervisorProject(projectId: string) {
     const employee = this.employee();
-    if (!employee?.supervisorId) return;
+    if (!employee?.supervisorId || this.removingProjectId() !== null || this.projectSaving()) return;
     const assignedProjectIds = (employee.assignedProjectIds || []).filter((id) => String(id) !== projectId);
+    this.removingProjectId.set(projectId);
     this.api.updateSupervisor(employee.supervisorId, { assignedProjectIds }).subscribe({
-      next: () => this.employee.update((row) => row ? { ...row, assignedProjectIds, projectIds: assignedProjectIds } : row),
-      error: () => alert("Failed to update project assignments."),
+      next: () => {
+        this.employee.update((row) => row ? { ...row, assignedProjectIds, projectIds: assignedProjectIds } : row);
+        this.removingProjectId.set(null);
+      },
+      error: () => {
+        this.removingProjectId.set(null);
+        alert("Failed to update project assignments.");
+      },
     });
   }
 
