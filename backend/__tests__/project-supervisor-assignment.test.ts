@@ -9,7 +9,7 @@ import { Expense } from "../src/models/Expense";
 import { Approval } from "../src/models/Approval";
 import { createProject, updateProject } from "../src/services/project.service";
 import { updateSupervisor } from "../src/services/supervisor.service";
-import { getAssignedProjects } from "../src/services/supervisor-mobile.service";
+import { getAssignedProjects, invalidateAccessCache } from "../src/services/supervisor-mobile.service";
 import { generateId } from "../src/services/id-generator.service";
 import { recomputeSiteLedger } from "../src/services/expense.service";
 import { hashPassword } from "../src/utils/password";
@@ -110,6 +110,40 @@ describe("Project supervisor assignment", () => {
     expect(profile!.assignedProjects.map(String)).toContain(String(project._id));
     expect(refreshedUser!.managedProjectIds.map(String)).toContain(String(project._id));
     expect(mobileProjects.map((row) => row.id)).toContain(String(project._id));
+
+    // A shared site and a stale auth-user assignment must not add projects
+    // that are absent from the supervisor profile edited on the web.
+    const otherProject = await Project.create({
+      projectId: await generateId("AB"),
+      name: "Supervisor Assignment Project",
+      client: client.name,
+      clientId: client._id,
+      mobile: client.mobile,
+      address: client.address,
+      siteIds: [],
+      siteNames: [],
+      status: "Active",
+      startDate: "2026-08-26",
+      totalValue: 100_000,
+    });
+    const sharedSite = await Site.create({
+      siteId: await generateId("SITE"),
+      name: "Supervisor Assignment Site",
+      projectIds: [project._id, otherProject._id],
+      openingBalance: 0,
+      status: "Active",
+    });
+    await Supervisor.updateOne(
+      { _id: supervisorProfile._id },
+      { $set: { assignedSiteIds: [sharedSite._id] } }
+    );
+    await User.updateOne(
+      { _id: supervisorUser._id },
+      { $addToSet: { managedProjectIds: otherProject._id } }
+    );
+    invalidateAccessCache(supervisorUser._id.toString());
+    expect((await getAssignedProjects(supervisorUser._id.toString())).map((row) => row.id))
+      .toEqual([String(project._id)]);
   });
 
   it("repairs a legacy supervisor link and reconciles an unchanged edit assignment", async () => {

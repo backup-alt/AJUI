@@ -257,6 +257,7 @@ export async function updateSupervisor(req: Request, res: Response, next: NextFu
   try {
     const scopeProjectIds = await getScopedProjectIds(req);
     const supervisor = await supervisorService.updateSupervisor(req.params.id, req.body, scopeProjectIds);
+    if (req.body.assignedProjectIds !== undefined) invalidateProjectAssignmentCaches();
     res.json({ supervisor });
   } catch (e) { next(e); }
 }

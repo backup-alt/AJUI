@@ -150,11 +150,12 @@ export async function getSupervisorAccess(userId: string): Promise<SupervisorAcc
     }
   }
 
-  const projectIds = uniqueObjectIds([
-    ...(user.managedProjectIds || []).map(toObjectId),
-    toObjectId(profileRecord?.assignedProjectId),
-    ...((profileRecord?.assignedProjects || []) as unknown[]).map(toObjectId),
-  ]);
+  // The supervisor profile is the assignment edited in the web workspace.
+  // User and site links can retain older projects, so use them only for
+  // accounts without a linked profile.
+  const projectIds = profileRecord
+    ? uniqueObjectIds(((profileRecord.assignedProjects || []) as unknown[]).map(toObjectId))
+    : uniqueObjectIds((user.managedProjectIds || []).map(toObjectId));
 
   const assignedSiteValues = ((profileRecord?.assignedSites || []) as unknown[]).map((value) =>
     String(value)
@@ -194,9 +195,11 @@ export async function getSupervisorAccess(userId: string): Promise<SupervisorAcc
   const scopedSiteIds = scopedSites.map((site) => toObjectId(site._id));
   const scopedSiteNames = scopedSites.map((site) => site.name);
 
-  for (const site of scopedSites) {
-    for (const pid of site.projectIds || []) {
-      projectIds.push(new Types.ObjectId(pid));
+  if (!profileRecord) {
+    for (const site of scopedSites) {
+      for (const pid of site.projectIds || []) {
+        projectIds.push(new Types.ObjectId(pid));
+      }
     }
   }
 
