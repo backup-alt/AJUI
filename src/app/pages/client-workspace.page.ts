@@ -298,7 +298,7 @@ export class ClientWorkspacePage {
 
   async saveProject(value: ProjectFormValue) {
     const currentClient = this.client();
-    if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
+    if (!currentClient || !value.name || !value.startDate || (!value.supervisor && value.supervisorId !== null) || !value.totalValue) return;
     if (this.projectSaving()) return; // guard against double-submit
     const editing = this.editingProject();
     this.projectSaving.set(true);
@@ -313,7 +313,7 @@ export class ClientWorkspacePage {
           sites: value.sites,
           startDate: value.startDate,
           supervisor: value.supervisor,
-          supervisorId: value.supervisorId,
+          supervisorId: value.supervisorId === null && !editing.supervisor ? undefined : value.supervisorId,
           status: value.status,
           totalValue: value.totalValue,
         });
@@ -333,7 +333,7 @@ export class ClientWorkspacePage {
         return;
       }
       try {
-        const project = await this.data.addProject(currentClient, { ...value });
+        const project = await this.data.addProject(currentClient, { ...value, supervisorId: value.supervisorId || undefined });
         this.showProjectForm.set(false);
         await this.presentToast(`Project "${value.name}" created.`);
         // The projects signal is already updated inside addProject() before

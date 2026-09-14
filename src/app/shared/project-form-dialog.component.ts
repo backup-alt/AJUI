@@ -25,7 +25,7 @@ export type ProjectFormValue = {
   sites: string[];
   startDate: string;
   supervisor: string;
-  supervisorId?: string;
+  supervisorId?: string | null;
   status: ProjectStatus;
   totalValue: number;
 };
@@ -95,9 +95,16 @@ type SupervisorOption = { id: string; name: string };
                 <ul id="supervisor-options" class="supervisor-options" role="listbox">
                   @if (supervisorsLoading()) {
                     <li class="supervisor-empty">Loading supervisors…</li>
-                  } @else if (filteredSupervisors().length === 0) {
-                    <li class="supervisor-empty">No supervisors available</li>
                   } @else {
+                    <li
+                      role="option"
+                      class="supervisor-option"
+                      [class.selected]="selectedSupervisorName() === 'None'"
+                      (mousedown)="selectNoSupervisor($event)"
+                    >None</li>
+                    @if (filteredSupervisors().length === 0) {
+                      <li class="supervisor-empty">No supervisors available</li>
+                    }
                     @for (s of filteredSupervisors(); track s.id) {
                       <li
                         role="option"
@@ -265,10 +272,14 @@ export class ProjectFormDialogComponent implements OnInit {
   private prefillSupervisor() {
     if (this.initialSupervisorHandled) return;
     this.initialSupervisorHandled = true;
-    const initialName =
-      String(this.initialValue?.supervisor || "").trim() ||
-      String(this.defaultSupervisor || "").trim();
+    const initialName = this.initialValue
+      ? String(this.initialValue.supervisor || "").trim() || "None"
+      : String(this.defaultSupervisor || "").trim();
     if (!initialName) return;
+    if (initialName === "None") {
+      this.selectedSupervisorName.set("None");
+      return;
+    }
     const match = this.supervisors().find(
       (s) => s.name.toLowerCase() === initialName.toLowerCase()
     );
@@ -310,6 +321,15 @@ export class ProjectFormDialogComponent implements OnInit {
     this.showSupervisorPanel.set(false);
   }
 
+  selectNoSupervisor(event?: Event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.selectedSupervisorId.set(null);
+    this.selectedSupervisorName.set("None");
+    this.supervisorSearch.set("");
+    this.showSupervisorPanel.set(false);
+  }
+
   @HostListener("document:mousedown", ["$event"])
   handleOutsideClick(event: MouseEvent) {
     if (!this.showSupervisorPanel()) return;
@@ -323,14 +343,15 @@ export class ProjectFormDialogComponent implements OnInit {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
-    const supervisor = String(formData.get("supervisor") ?? "").trim();
+    const selectedName = String(formData.get("supervisor") ?? "").trim();
+    const supervisor = selectedName === "None" ? "" : selectedName;
 
     this.create.emit({
       clientId: String(formData.get("clientId") ?? this.currentClientId).trim() || undefined,
       name: String(formData.get("name") ?? "").trim(),
       startDate: String(formData.get("startDate") ?? "").trim(),
       supervisor,
-      supervisorId: this.selectedSupervisorId() || undefined,
+      supervisorId: selectedName === "None" ? null : this.selectedSupervisorId() || undefined,
       status: this.projectStatusFor(String(formData.get("status") ?? "Active")),
       sites: [],
       totalValue: Number(formData.get("totalValue") ?? 0),

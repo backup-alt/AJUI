@@ -5366,7 +5366,7 @@ export class ProjectWorkspacePage {
 
   async saveProject(value: ProjectFormValue) {
     const currentClient = this.client();
-    if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
+    if (!currentClient || !value.name || !value.startDate || (!value.supervisor && value.supervisorId !== null) || !value.totalValue) return;
     this.projectFormSaving.set(true);
     try {
       const editing = this.editingProject();
@@ -5380,7 +5380,7 @@ export class ProjectWorkspacePage {
           sites: value.sites,
           startDate: value.startDate,
           supervisor: value.supervisor,
-          supervisorId: value.supervisorId,
+          supervisorId: value.supervisorId === null && !editing.supervisor ? undefined : value.supervisorId,
           status: value.status,
           totalValue: value.totalValue,
         });
@@ -5398,7 +5398,7 @@ export class ProjectWorkspacePage {
         }
         return;
       }
-      const project = await this.data.addProject(currentClient, { ...value });
+      const project = await this.data.addProject(currentClient, { ...value, supervisorId: value.supervisorId || undefined });
       this.showProjectForm.set(false);
       await Promise.resolve();
       await this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]);

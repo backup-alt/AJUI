@@ -1000,7 +1000,7 @@ export class ErpDataService {
       sites?: string[];
       startDate?: string;
       supervisor?: string;
-      supervisorId?: string;
+      supervisorId?: string | null;
       status?: ProjectStatus;
       totalValue?: number;
       expenseBalance?: number;
