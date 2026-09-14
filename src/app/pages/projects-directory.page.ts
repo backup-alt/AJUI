@@ -7,7 +7,7 @@ import { ApiService } from "../core/api.service";
 import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.component";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { formatMoney, statusClass } from "../shared/format";
+import { formatMoney, projectSupervisorLabel, statusClass } from "../shared/format";
 import { SearchableSelectComponent } from "../shared/searchable-select.component";
 
 interface ApiProject {
@@ -95,7 +95,7 @@ interface ApiProject {
                   <div><span>Estimated Value</span><strong>{{ formatMoney(project.totalValue) }}</strong></div>
                   <div><span>Received</span><strong>{{ formatMoney(project.receivedAmount) }}</strong></div>
                   <div><span>Pending</span><strong>{{ formatMoney(project.pendingBalance) }}</strong></div>
-                  <div><span>Supervisor</span><strong>{{ project.supervisor }}</strong></div>
+                  <div><span>Supervisor</span><strong>{{ projectSupervisorLabel(project) }}</strong></div>
                 </div>
 
                 <div class="projects-directory-footer">
@@ -236,6 +236,7 @@ export class ProjectsDirectoryPage implements OnInit {
   private readonly router = inject(Router);
   private readonly toastController = inject(ToastController);
   readonly formatMoney = formatMoney;
+  readonly projectSupervisorLabel = projectSupervisorLabel;
   readonly statusClass = statusClass;
 
   readonly searchQuery = signal("");

@@ -9,6 +9,7 @@ export type Project = {
   mobile: string;
   address: string;
   supervisor: string;
+  lastAssignedSupervisor?: string;
   sites: string[];
   status: ProjectStatus;
   startDate: string;

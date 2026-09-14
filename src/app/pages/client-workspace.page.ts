@@ -15,7 +15,7 @@ import { ErpDataService } from "../data/erp-data.service";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
-import { formatMoney, statusClass } from "../shared/format";
+import { formatMoney, projectSupervisorLabel, statusClass } from "../shared/format";
 import { DashboardSkeletonComponent } from "../shared/dashboard-skeleton.component";
 import { ApiService } from "../core/api.service";
 
@@ -95,7 +95,7 @@ import { ApiService } from "../core/api.service";
                     <div><span>Project Value</span><strong>{{ formatMoney(project.totalValue) }}</strong></div>
                     <div><span>Received</span><strong>{{ formatMoney(projectReceivedAmount(project)) }}</strong></div>
                     <div><span>Balance</span><strong>{{ formatMoney(projectPendingAmount(project)) }}</strong></div>
-                    <div><span>Supervisor</span><strong>{{ project.supervisor }}</strong></div>
+                    <div><span>Supervisor</span><strong>{{ projectSupervisorLabel(project) }}</strong></div>
                   </div>
                   <ion-progress-bar [value]="project.completion / 100"></ion-progress-bar>
                   <div class="project-select-footer">
@@ -243,6 +243,7 @@ export class ClientWorkspacePage {
   readonly projectSaving = signal(false);
   readonly formatMoney = formatMoney;
   readonly statusClass = statusClass;
+  readonly projectSupervisorLabel = projectSupervisorLabel;
 
   readonly client = computed(() => this.data.clientById(this.clientId()));
   readonly projects = computed(() => this.data.projectsForClient(this.client()));

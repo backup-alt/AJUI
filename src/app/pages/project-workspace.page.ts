@@ -12,7 +12,7 @@ import { WorkspaceHydrationService } from "../core/workspace-hydration.service";
 import { mapProject, mapMaterial, mapLabour, mapExpense, mapGeneralExpense, mapPayment, mapVendor, mapSubcontractor, mapInventory, mapWorker } from "../core/mappers";
 import { EnterpriseHeaderComponent } from "../shared/enterprise-header.component";
 import { EnterpriseSidebarComponent } from "../shared/enterprise-sidebar.component";
-import { formatMoney, formatNumber, statusClass } from "../shared/format";
+import { formatMoney, formatNumber, projectSupervisorLabel, statusClass } from "../shared/format";
 import { ProjectFormDialogComponent, type ProjectFormValue } from "../shared/project-form-dialog.component";
 import { VendorFormDialogComponent, type VendorFormValue } from "../shared/vendor-form-dialog.component";
 import { InventoryInitDialogComponent } from "../shared/inventory-init-dialog.component";
@@ -713,7 +713,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                   </dd>
                 </div>
                 <div><dt>Pending</dt><dd>{{ formatMoney(projectPendingAmount(currentProject)) }}</dd></div>
-                <div><dt>Supervisor</dt><dd>{{ currentProject.supervisor }}</dd></div>
+                <div><dt>Supervisor</dt><dd>{{ projectSupervisorLabel(currentProject) }}</dd></div>
                 <div>
                   <dt>Status</dt>
                   <dd>
@@ -1553,6 +1553,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
               [eyebrow]="editingProject() ? 'Project Edit' : 'Project Setup'"
               [title]="editingProject() ? 'Edit Project' : 'Create New Project'"
               [submitLabel]="editingProject() ? 'Save Project' : 'Create Project'"
+              [submitting]="projectFormSaving()"
               (cancel)="closeProjectForm()"
               (create)="saveProject($event)"
             ></agb-project-form-dialog>
@@ -1834,6 +1835,7 @@ export class ProjectWorkspacePage {
   readonly queryParamMap = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
   readonly formatMoney = formatMoney;
   readonly formatNumber = formatNumber;
+  readonly projectSupervisorLabel = projectSupervisorLabel;
 
   onMetricFocus(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -1852,6 +1854,7 @@ export class ProjectWorkspacePage {
   readonly statusShellClass = (status: string) =>
     status === "Completed" ? "danger" : statusClass(status);
   readonly showProjectForm = signal(false);
+  readonly projectFormSaving = signal(false);
   readonly editingProject = signal<Project | null>(null);
   readonly projectLoadError = signal("");
   private fetchingProjectId = "";
@@ -5364,42 +5367,45 @@ export class ProjectWorkspacePage {
   async saveProject(value: ProjectFormValue) {
     const currentClient = this.client();
     if (!currentClient || !value.name || !value.startDate || !value.supervisor || !value.totalValue) return;
-    const editing = this.editingProject();
-    if (editing) {
-      const updated = this.data.updateProject(editing.id, { ...value });
-      // Persist supervisor/site changes to the backend so the supervisor mobile
-      // app receives the updated site assignments.
-      await this.data.persistProjectEdit(editing.id, {
-        clientId: value.clientId,
-        name: value.name,
-        sites: value.sites,
-        startDate: value.startDate,
-        supervisor: value.supervisor,
-        supervisorId: value.supervisorId,
-        status: value.status,
-        totalValue: value.totalValue,
-      });
-      this.editingProject.set(null);
-      this.showProjectForm.set(false);
-      const targetClient = value.clientId
-        ? this.data.clients().find((client) => client._id === value.clientId || client.id === value.clientId)
-        : undefined;
-      if (targetClient && targetClient.id !== currentClient.id) {
-        void this.router.navigate(["/clients", targetClient.id, "projects", editing.id, this.activeSection()]);
+    this.projectFormSaving.set(true);
+    try {
+      const editing = this.editingProject();
+      if (editing) {
+        const updated = this.data.updateProject(editing.id, { ...value });
+        // Persist supervisor/site changes to the backend so the supervisor mobile
+        // app receives the updated site assignments.
+        await this.data.persistProjectEdit(editing.id, {
+          clientId: value.clientId,
+          name: value.name,
+          sites: value.sites,
+          startDate: value.startDate,
+          supervisor: value.supervisor,
+          supervisorId: value.supervisorId,
+          status: value.status,
+          totalValue: value.totalValue,
+        });
+        this.editingProject.set(null);
+        this.showProjectForm.set(false);
+        const targetClient = value.clientId
+          ? this.data.clients().find((client) => client._id === value.clientId || client.id === value.clientId)
+          : undefined;
+        if (targetClient && targetClient.id !== currentClient.id) {
+          void this.router.navigate(["/clients", targetClient.id, "projects", editing.id, this.activeSection()]);
+          return;
+        }
+        if (updated && editing.id === this.projectId()) {
+          void this.router.navigate(["/clients", currentClient.id, "projects", updated.id, this.activeSection()]);
+        }
         return;
       }
-      if (updated && editing.id === this.projectId()) {
-        void this.router.navigate(["/clients", currentClient.id, "projects", updated.id, this.activeSection()]);
-      }
-      return;
-    }
-    try {
       const project = await this.data.addProject(currentClient, { ...value });
       this.showProjectForm.set(false);
       await Promise.resolve();
       await this.router.navigate(["/clients", currentClient.id, "projects", project.id, "materials"]);
     } catch (err) {
       console.error("[ProjectWorkspace] Failed to create project:", (err as any)?.message ?? err);
+    } finally {
+      this.projectFormSaving.set(false);
     }
   }
 

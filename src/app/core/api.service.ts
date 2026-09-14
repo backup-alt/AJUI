@@ -1188,6 +1188,10 @@ export class ApiService {
 
   updateSupervisor(id: string, patch: any): Observable<{ supervisor: any }> {
     return this.http.patch<{ supervisor: any }>(`${this.baseUrl}/supervisors/${id}`, patch, { headers: this.authHeaders() }).pipe(
+      tap(() => {
+        this.cache.invalidate("/supervisors");
+        this.cache.invalidate("/projects");
+      }),
       catchError(this.handleError)
     );
   }

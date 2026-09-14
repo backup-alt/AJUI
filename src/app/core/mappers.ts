@@ -54,6 +54,7 @@ export function mapProject(p: any): any {
     address: p.address,
     supervisor: p.supervisor,
     supervisorId: p.supervisorId,
+    lastAssignedSupervisor: p.lastAssignedSupervisor,
     sites: p.siteNames || p.sites || [],
     siteIds: p.siteIds || [],
     siteNames: p.siteNames || [],

@@ -2,8 +2,10 @@ import { Types } from "mongoose";
 import { Supervisor } from "../models/Supervisor.js";
 import { Site } from "../models/Site.js";
 import { Project } from "../models/Project.js";
+import { User } from "../models/User.js";
 import { Expense } from "../models/Expense.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { invalidateAccessCache as invalidateRbacAccessCache } from "../middleware/rbac.js";
 import { generateId } from "./id-generator.service.js";
 import {
   CreateSupervisorInput,
@@ -13,6 +15,7 @@ import {
 import { applyProjectScope, ProjectScopeIds } from "../utils/scope.js";
 import { paginateByCursor } from "../utils/cursor-pagination.js";
 import { recomputeSiteLedger } from "./expense.service.js";
+import { invalidateAccessCache as invalidateMobileAccessCache } from "./supervisor-mobile.service.js";
 
 type SiteAssignmentInput = {
   assignedSite?: string;
@@ -131,21 +134,114 @@ async function syncProjectSupervisorAssignments(
   // Projects to add: in new but not in old
   const toAdd = newProjectIds.filter(id => !oldIds.has(id.toString()));
 
-  // Remove supervisor from projects that are no longer assigned
+  // Remove supervisor from projects that are no longer assigned. Keep the
+  // last assigned supervisor name so the web workspace can show who was
+  // unassigned instead of displaying an empty Supervisor field. Also pull
+  // the removed projects' sites so those sites cannot re-grant the project
+  // back into the supervisor's mobile scope (getSupervisorAccess re-derives
+  // site access from assignedSiteIds/assignedSites).
   if (toRemove.length > 0) {
     await Project.updateMany(
-      { _id: { $in: toRemove }, supervisorId },
-      { $unset: { supervisorId: "", supervisor: "" } }
+      {
+        _id: { $in: toRemove },
+        $or: [{ supervisorId }, { supervisor: supervisorName }, { lastAssignedSupervisor: supervisorName }],
+      },
+      {
+        $set: { lastAssignedSupervisor: supervisorName },
+        $unset: { supervisorId: "", supervisor: "" },
+      }
     );
+
+    const removedProjects = await Project.find({ _id: { $in: toRemove } })
+      .select("siteIds siteNames")
+      .lean();
+    const removedSiteIds = removedProjects.flatMap(
+      (project) => (project.siteIds || []) as Types.ObjectId[]
+    );
+    const removedSiteNames = removedProjects.flatMap(
+      (project) => (project.siteNames || []) as string[]
+    );
+    if (removedSiteIds.length > 0 || removedSiteNames.length > 0) {
+      await Supervisor.updateOne(
+        { _id: supervisorId },
+        {
+          $pull: {
+            assignedSiteIds: { $in: removedSiteIds },
+            assignedSites: { $in: removedSiteNames },
+          },
+        }
+      );
+      // Drop the Site.supervisorId pointer so the mobile "stale sites" lookup
+      // (Site.find({ supervisorId })) cannot resurrect the removed project's
+      // sites (and the project itself) into the supervisor's scope. Site
+      // access is instead re-derived from the supervisor's remaining projects.
+      if (removedSiteIds.length > 0) {
+        await Site.updateMany(
+          { _id: { $in: removedSiteIds }, supervisorId },
+          { $unset: { supervisorId: "" } }
+        );
+      }
+    }
   }
 
   // Add supervisor to newly assigned projects
   if (toAdd.length > 0) {
+    const addedProjects = await Project.find({ _id: { $in: toAdd } })
+      .select("siteIds siteNames")
+      .lean();
     await Project.updateMany(
       { _id: { $in: toAdd } },
-      { $set: { supervisorId, supervisor: supervisorName } }
+      { $set: { supervisorId, supervisor: supervisorName, lastAssignedSupervisor: "" } }
+    );
+    await Supervisor.updateOne(
+      { _id: supervisorId },
+      {
+        $addToSet: {
+          assignedSiteIds: {
+            $each: addedProjects.flatMap(
+              (project) => (project.siteIds || []) as Types.ObjectId[]
+            ),
+          },
+          assignedSites: {
+            $each: addedProjects.flatMap(
+              (project) => (project.siteNames || []) as string[]
+            ),
+          },
+        },
+      }
     );
   }
+}
+
+/**
+ * Older supervisor records can be linked only from User.supervisorProfileId,
+ * leaving Supervisor.userId empty. Resolve the auth user so assignments can
+ * be mirrored onto User.managedProjectIds and the access caches invalidated.
+ */
+async function ensureSupervisorUserLink(
+  supervisorProfileId: Types.ObjectId
+): Promise<Types.ObjectId | null> {
+  const profile = await Supervisor.findById(supervisorProfileId)
+    .select("_id userId email phone")
+    .lean();
+  if (!profile) return null;
+  if (profile.userId) return profile.userId as Types.ObjectId;
+
+  const identity: Record<string, unknown>[] = [{ supervisorProfileId: profile._id }];
+  if (profile.email) identity.push({ email: profile.email.toLowerCase() });
+  if (profile.phone) identity.push({ phone: profile.phone });
+
+  const user = await User.findOne({
+    role: "supervisor",
+    $or: identity,
+  }).select("_id").lean();
+  if (!user?._id) return null;
+
+  await Promise.all([
+    Supervisor.updateOne({ _id: profile._id }, { $set: { userId: user._id } }),
+    User.updateOne({ _id: user._id }, { $set: { supervisorProfileId: profile._id } }),
+  ]);
+  return user._id as Types.ObjectId;
 }
 
 export async function createSupervisor(input: CreateSupervisorInput) {
@@ -343,6 +439,7 @@ export async function listSupervisorsForWorker(filter: {
 export async function updateSupervisor(id: string, patch: UpdateSupervisorInput, scopeProjectIds?: ProjectScopeIds) {
   const existingSupervisor = await getSupervisorById(id, scopeProjectIds);
   const updateData: Record<string, unknown> = { ...patch };
+  const unsetFields: Record<string, string> = {};
 
   if (patch.assignedProjectId) {
     updateData.assignedProjectId = new Types.ObjectId(patch.assignedProjectId);
@@ -352,8 +449,16 @@ export async function updateSupervisor(id: string, patch: UpdateSupervisorInput,
       .map((pid) => toObjectId(pid))
       .filter((id): id is Types.ObjectId => id !== undefined);
     updateData.assignedProjects = projectIds;
-    if (projectIds.length > 0 && !patch.assignedProjectId) {
+    if (patch.assignedProjectId) {
+      updateData.assignedProjectId = new Types.ObjectId(patch.assignedProjectId);
+    } else if (projectIds.length > 0) {
       updateData.assignedProjectId = projectIds[0];
+    } else {
+      // Unassigning every project must not leave the legacy singleton
+      // field pointing at a removed project, or mobile access would keep
+      // granting the old project.
+      delete updateData.assignedProjectId;
+      unsetFields.assignedProjectId = "";
     }
   }
 
@@ -368,7 +473,10 @@ export async function updateSupervisor(id: string, patch: UpdateSupervisorInput,
   const update: Record<string, unknown> = { $set: updateData };
   if (shouldNormalizeSites && !updateData.assignedSiteId) {
     delete updateData.assignedSiteId;
-    update.$unset = { assignedSiteId: "" };
+    unsetFields.assignedSiteId = "";
+  }
+  if (Object.keys(unsetFields).length > 0) {
+    update.$unset = unsetFields;
   }
 
   const supervisor = await Supervisor.findByIdAndUpdate(id, update, { new: true });
@@ -389,6 +497,22 @@ export async function updateSupervisor(id: string, patch: UpdateSupervisorInput,
       existingSupervisor.assignedProjects || [],
       updateData.assignedProjects as Types.ObjectId[] || []
     );
+
+    // Mirror the assignment onto the linked auth user and drop cached scopes
+    // so the supervisor's mobile app loses access to removed projects (and
+    // their sites) on the very next request instead of after the 60s TTL or
+    // never.
+    const linkedUserId = await ensureSupervisorUserLink(supervisor._id);
+    if (linkedUserId) {
+      const projectIds = ((updateData.assignedProjects as Types.ObjectId[] | undefined) || [])
+        .map((projectId) => new Types.ObjectId(projectId.toString()));
+      await User.updateOne(
+        { _id: linkedUserId },
+        { $set: { managedProjectIds: projectIds } }
+      );
+      invalidateMobileAccessCache(linkedUserId.toString());
+      invalidateRbacAccessCache(linkedUserId.toString());
+    }
   }
 
   return supervisor.toObject();

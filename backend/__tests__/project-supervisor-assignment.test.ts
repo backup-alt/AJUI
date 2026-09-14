@@ -8,6 +8,7 @@ import { Site } from "../src/models/Site";
 import { Expense } from "../src/models/Expense";
 import { Approval } from "../src/models/Approval";
 import { createProject, updateProject } from "../src/services/project.service";
+import { updateSupervisor } from "../src/services/supervisor.service";
 import { getAssignedProjects } from "../src/services/supervisor-mobile.service";
 import { generateId } from "../src/services/id-generator.service";
 import { recomputeSiteLedger } from "../src/services/expense.service";
@@ -326,6 +327,143 @@ describe("Project supervisor assignment", () => {
     const oldProfile = await Supervisor.findById(firstProfile._id).lean();
     expect(oldProfile?.assignedProjects.map(String)).not.toContain(projectId);
     expect(String(oldProfile?.assignedProjectId || "")).not.toBe(projectId);
+  });
+
+  it("keeps the last assigned supervisor name after a web deassignment", async () => {
+    if (!app) return;
+
+    const supervisorUser = await User.create({
+      name: "Assignment Supervisor",
+      email: supervisorEmail,
+      phone: "+919876509991",
+      passwordHash: "not-used-by-this-test",
+      role: "supervisor",
+      status: "active",
+      managedProjectIds: [],
+    });
+    const supervisorProfile = await Supervisor.create({
+      supervisorId: `SUP-UNASSIGN-${supervisorUser._id.toString().slice(-8)}`,
+      userId: supervisorUser._id,
+      name: supervisorUser.name,
+      email: supervisorUser.email,
+      phone: supervisorUser.phone,
+      role: "Project Supervisor",
+      assignedProjects: [],
+      assignedSiteIds: [],
+      assignedSites: [],
+      status: "Active",
+    });
+    supervisorUser.supervisorProfileId = supervisorProfile._id;
+    await supervisorUser.save();
+    const client = await Client.create({
+      clientId: await generateId("CLI"),
+      name: "Supervisor Assignment Client",
+      mobile: "+919876509992",
+      address: "Chennai",
+      status: "Active",
+      projectIds: [],
+    });
+    const project = await createProject({
+      name: "Supervisor Assignment Project",
+      clientId: client._id.toString(),
+      mobile: client.mobile,
+      address: client.address,
+      supervisor: supervisorUser.name,
+      supervisorId: supervisorUser._id.toString(),
+      sites: [],
+      siteIds: [],
+      status: "Active",
+      startDate: "2026-08-28",
+      totalValue: 100_000,
+      estimatedValue: 0,
+      advanceAmount: 0,
+      receivedAmount: 0,
+      materialSpend: 0,
+      labourPayable: 0,
+      expenseBalance: 0,
+      completion: 0,
+    });
+
+    expect((await Project.findById(project._id).lean())?.supervisor).toBe(supervisorUser.name);
+
+    // Simulate the Settings -> Roles & Employees "Assigned Projects" remove flow.
+    await updateSupervisor(supervisorProfile._id.toString(), {
+      assignedProjectIds: [],
+    });
+
+    const refreshed = await Project.findById(project._id).lean();
+    expect(refreshed?.supervisorId).toBeFalsy();
+    expect(refreshed?.supervisor).toBeFalsy();
+    expect(refreshed?.lastAssignedSupervisor).toBe(supervisorUser.name);
+
+    // The deassignment must revoke mobile access immediately: the auth
+    // user's managedProjectIds and the supervisor profile's singleton
+    // pointer no longer grant the project, and the mobile projects list
+    // drops it on the very next read.
+    const refreshedUser = await User.findById(supervisorUser._id).lean();
+    expect(refreshedUser?.managedProjectIds.map(String)).not.toContain(String(project._id));
+    expect((await Supervisor.findById(supervisorProfile._id).lean())?.assignedProjectId).toBeFalsy();
+    expect((await getAssignedProjects(supervisorUser._id.toString())).map((row: { id: string }) => row.id))
+      .not.toContain(String(project._id));
+  });
+
+  it("clears the last assigned supervisor when a new one is assigned", async () => {
+    if (!app) return;
+
+    const supervisorUser = await User.create({
+      name: "Assignment Supervisor",
+      email: supervisorEmail,
+      phone: "+919876509991",
+      passwordHash: "not-used-by-this-test",
+      role: "supervisor",
+      status: "active",
+      managedProjectIds: [],
+    });
+    const supervisorProfile = await Supervisor.create({
+      supervisorId: `SUP-RESET-${supervisorUser._id.toString().slice(-8)}`,
+      name: supervisorUser.name,
+      email: supervisorUser.email,
+      phone: supervisorUser.phone,
+      role: "Project Supervisor",
+      assignedProjects: [],
+      assignedSiteIds: [],
+      assignedSites: [],
+      status: "Active",
+    });
+    supervisorUser.supervisorProfileId = supervisorProfile._id;
+    await supervisorUser.save();
+    const client = await Client.create({
+      clientId: await generateId("CLI"),
+      name: "Supervisor Assignment Client",
+      mobile: "+919876509992",
+      address: "Chennai",
+      status: "Active",
+      projectIds: [],
+    });
+    const project = await Project.create({
+      projectId: await generateId("AB"),
+      name: "Supervisor Assignment Project",
+      client: client.name,
+      clientId: client._id,
+      mobile: client.mobile,
+      address: client.address,
+      supervisor: "",
+      lastAssignedSupervisor: supervisorUser.name,
+      siteIds: [],
+      siteNames: [],
+      status: "Active",
+      startDate: "2026-08-28",
+      totalValue: 100_000,
+    });
+
+    await updateProject(project._id.toString(), {
+      supervisor: supervisorUser.name,
+      supervisorId: supervisorUser._id.toString(),
+    });
+
+    const refreshed = await Project.findById(project._id).lean();
+    expect(refreshed?.lastAssignedSupervisor).toBe("");
+    expect(refreshed?.supervisor).toBe(supervisorUser.name);
   });
 
   it("lets an admin add an opening amount and later cash directly to the mobile ledger", async () => {

@@ -260,6 +260,7 @@ interface DashboardKpis {
           [currentClientId]="''"
           [clients]="dashboardClients()"
           [initialValue]="null"
+          [submitting]="projectDialogSaving()"
           (cancel)="closeProjectDialog()"
           (create)="onProjectCreated($event)"
         ></agb-project-form-dialog>
@@ -346,6 +347,7 @@ export class UniversalDashboardPage implements OnInit {
   readonly showClientDialog = signal(false);
   readonly showProjectDialog = signal(false);
   readonly showVendorDialog = signal(false);
+  readonly projectDialogSaving = signal(false);
   readonly periodOptions: ReadonlyArray<{ value: PeriodKey; label: string }> = [
     { value: "today", label: "Today" },
     { value: "week", label: "Last 7 Days" },
@@ -702,6 +704,7 @@ export class UniversalDashboardPage implements OnInit {
       void this.refreshAll();
       return;
     }
+    this.projectDialogSaving.set(true);
     try {
       await this.data.addProject(client, {
         name: String(value.name || "").trim(),
@@ -715,6 +718,7 @@ export class UniversalDashboardPage implements OnInit {
     } catch (err) {
       console.error("[UniversalDashboard] Failed to create project:", (err as any)?.message ?? err);
     } finally {
+      this.projectDialogSaving.set(false);
       this.closeProjectDialog();
       void this.refreshAll();
     }

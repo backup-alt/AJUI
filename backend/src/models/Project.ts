@@ -12,6 +12,7 @@ export interface IProject extends Document {
   address: string;
   supervisor: string;
   supervisorId?: Types.ObjectId;
+  lastAssignedSupervisor?: string;
   siteIds: Types.ObjectId[];
   siteNames: string[];
   status: ProjectStatus;
@@ -42,6 +43,7 @@ const projectSchema = new Schema<IProject>(
     address: { type: String, required: true },
     supervisor: { type: String, trim: true },
     supervisorId: { type: Schema.Types.ObjectId, ref: "Supervisor" },
+    lastAssignedSupervisor: { type: String, trim: true },
     siteIds: [{ type: Schema.Types.ObjectId, ref: "Site" }],
     siteNames: { type: [String], default: [] },
     status: {

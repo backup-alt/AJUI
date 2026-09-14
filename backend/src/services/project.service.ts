@@ -372,6 +372,7 @@ export async function createProject(input: CreateProjectInput) {
     address: input.address || client.address,
     supervisor: input.supervisor || "",
     supervisorId: supervisorProfileId || undefined,
+    lastAssignedSupervisor: "",
     siteIds: [],
     siteNames: [],
     status: input.status,
@@ -512,6 +513,7 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
       patchedSupervisorProfileId = null;
       unsetFields.supervisorId = "";
       unsetFields.supervisor = "";
+      updateData.lastAssignedSupervisor = existing.supervisor || "";
       delete updateData.supervisorId;
       delete updateData.supervisor;
     } else {
@@ -524,6 +526,7 @@ export async function updateProject(id: string, patch: UpdateProjectInput, scope
         throw new AppError(400, "Selected supervisor was not found");
       }
       updateData.supervisorId = patchedSupervisorProfileId;
+      updateData.lastAssignedSupervisor = "";
       if (patch.supervisor) {
         updateData.supervisor = patch.supervisor;
       }

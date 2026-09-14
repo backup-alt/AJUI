@@ -13,3 +13,14 @@ export const formatNumber = (value: number | null | undefined) => {
 };
 
 export const statusClass = (status: string) => status.toLowerCase().replace(/\s+/g, "-");
+
+export const projectSupervisorLabel = (project: {
+  supervisor?: string;
+  lastAssignedSupervisor?: string;
+}): string => {
+  const supervisor = String(project?.supervisor || "").trim();
+  if (supervisor) return supervisor;
+  const lastAssigned = String(project?.lastAssignedSupervisor || "").trim();
+  if (lastAssigned) return `${lastAssigned} has been unassigned for this project`;
+  return "—";
+};
