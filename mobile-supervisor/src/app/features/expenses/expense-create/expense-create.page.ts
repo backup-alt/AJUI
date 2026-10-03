@@ -37,7 +37,7 @@ import {
   cloudUploadOutline,
   cameraOutline,
   imagesOutline,
-  documentOutline,
+  documentTextOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -310,7 +310,7 @@ import { Vendor } from '../../../shared/models';
                   <span>Gallery</span>
                 </button>
                 <button type="button" class="bill-picker bill-picker-secondary" (click)="billPdfInput.click()">
-                  <ion-icon name="document-outline"></ion-icon>
+                  <ion-icon name="document-text-outline"></ion-icon>
                   <span>Choose PDF</span>
                 </button>
               </div>
@@ -481,7 +481,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
       cloudUploadOutline,
       cameraOutline,
       imagesOutline,
-      documentOutline,
+      documentTextOutline,
     });
   }
 

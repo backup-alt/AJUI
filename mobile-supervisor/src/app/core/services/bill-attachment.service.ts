@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+﻿import { Injectable } from "@angular/core";
 import {
   Camera,
   CameraDirection,
@@ -6,6 +6,7 @@ import {
   CameraSource,
 } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
+import { Directory, Filesystem } from "@capacitor/filesystem";
 import { FileViewer } from "@capacitor/file-viewer";
 
 export interface BillAttachment {
@@ -27,46 +28,49 @@ export class BillAttachmentService {
   async openPdf(url: string): Promise<void> {
     if (!url || url === "#") return;
 
-    // Handle native platform with both HTTP URLs and base64 data URIs
+    // Handle native platform
     if (Capacitor.isNativePlatform()) {
-      // HTTP/HTTPS URLs - use FileViewer for native preview
+      // HTTP/HTTPS URLs - use FileViewer directly
       if (/^https?:\/\//i.test(url)) {
         await FileViewer.openDocumentFromUrl({ url });
         return;
       }
 
-      // Base64 data URIs - convert to blob and use FileViewer
+      // Base64 data URIs - write to temporary file and open via local path
       if (/^data:application\/pdf;base64,/.test(url)) {
-        const base64Data = url.split(',')[1];
-        const blob = this.base64ToBlob(base64Data, 'application/pdf');
-        const blobUrl = URL.createObjectURL(blob);
-
         try {
-          // Try opening with FileViewer using blob URL
-          await FileViewer.openDocumentFromUrl({ url: blobUrl });
+          const base64Data = url.split(",")[1];
+          const fileName = `temp-pdf-${Date.now()}.pdf`;
+
+          const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: Directory.Cache,
+          });
+
+          await FileViewer.openDocumentFromLocalPath({ path: result.uri });
+
+          // Clean up temp file after 5 seconds
+          setTimeout(async () => {
+            try {
+              await Filesystem.deleteFile({
+                path: fileName,
+                directory: Directory.Cache,
+              });
+            } catch {
+              // Ignore cleanup error
+            }
+          }, 5000);
+
+          return;
         } catch (error) {
-          // Fallback: open in new window/tab
-          window.open(url, "_blank", "noopener,noreferrer");
-        } finally {
-          // Clean up blob URL after a delay
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+          console.error("Failed to write temp PDF for native preview:", error);
         }
-        return;
       }
     }
 
     // Web fallback - open in new tab
     window.open(url, "_blank", "noopener,noreferrer");
-  }
-
-  private base64ToBlob(base64: string, mimeType: string): Blob {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: mimeType });
   }
 
   isPdf(fileName?: string | null, url?: string | null, mimeType?: string | null): boolean {
