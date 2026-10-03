@@ -603,7 +603,7 @@ type PoDraftLine = {
     .po-select-create { justify-content: flex-start !important; color: #2c5cff !important; font-weight: 700; border-top: 1px solid #e2e8f0 !important; background: #f8fafc !important; position: sticky; bottom: 0; z-index: 1; }
     .po-select-create:hover { background: #eef2ff !important; }
     .items-section { margin-bottom: 24px; overflow: visible; }
-    .payment-history-section { width: min(520px, 100%); margin: 0 0 24px; }
+    .payment-history-section { width: min(520px, 100%); margin: 0 auto 24px; }
     .payment-history-table { width: 100%; border-collapse: collapse; border: 1px solid #cfd8e6; font-size: 12px; }
     .payment-history-table th { padding: 9px 12px; background: #eef4ff; color: #002263; text-align: left; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; }
     .payment-history-table td { padding: 9px 12px; border-top: 1px solid #e8edf4; color: #334155; }
