@@ -35,9 +35,13 @@ import {
   walletOutline,
   warningOutline,
   cloudUploadOutline,
+  cameraOutline,
+  imagesOutline,
+  documentOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BillAttachmentService } from '../../../core/services/bill-attachment.service';
 import { Vendor } from '../../../shared/models';
 
 @Component({
@@ -295,15 +299,18 @@ import { Vendor } from '../../../shared/models';
                 <strong>Upload bill <span aria-hidden="true">*</span></strong>
                 <span>A bill image or PDF is required before this request can be submitted.</span>
               </div>
-              <input #billImageInput class="bill-file-input" type="file" accept="image/*" (change)="selectBill($event)" />
               <input #billPdfInput class="bill-file-input" type="file" accept="application/pdf" (change)="selectBill($event)" />
               <div class="bill-picker-actions">
-                <button type="button" class="bill-picker" (click)="billImageInput.click()">
-                  <ion-icon name="cloud-upload-outline"></ion-icon>
-                  <span>{{ bill ? 'Replace with photo' : 'Camera or gallery' }}</span>
+                <button type="button" class="bill-picker bill-picker-primary" (click)="takeBillPhoto()">
+                  <ion-icon name="camera-outline"></ion-icon>
+                  <span>{{ bill ? 'Retake photo' : 'Take photo' }}</span>
+                </button>
+                <button type="button" class="bill-picker" (click)="chooseBillFromGallery()">
+                  <ion-icon name="images-outline"></ion-icon>
+                  <span>Gallery</span>
                 </button>
                 <button type="button" class="bill-picker bill-picker-secondary" (click)="billPdfInput.click()">
-                  <ion-icon name="cloud-upload-outline"></ion-icon>
+                  <ion-icon name="document-outline"></ion-icon>
                   <span>Choose PDF</span>
                 </button>
               </div>
@@ -378,7 +385,8 @@ import { Vendor } from '../../../shared/models';
     .bill-upload-copy > span { color: #64748b; font-size: 12px; line-height: 1.4; }
     .bill-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     .bill-picker { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #002263; border-radius: 8px; background: #f0f4ff; color: #002263; font: inherit; font-size: 13px; font-weight: 700; }
-    .bill-picker-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .72fr); gap: 10px; }
+    .bill-picker-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .bill-picker-primary { border-style: solid; background: #002263; color: #fff; }
     .bill-picker-secondary { border-color: #94a3b8; background: #f8fafc; color: #334155; }
     .bill-picker ion-icon { font-size: 20px; }
     .bill-file-name { display: flex; align-items: center; gap: 7px; margin: 10px 0 0; color: #15803d; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
@@ -424,6 +432,7 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   private router = inject(Router);
   private toastCtrl = inject(ToastController);
   private notifications = inject(NotificationService);
+  private billAttachments = inject(BillAttachmentService);
 
   expense = {
     description: '',
@@ -469,6 +478,9 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
       walletOutline,
       warningOutline,
       cloudUploadOutline,
+      cameraOutline,
+      imagesOutline,
+      documentOutline,
     });
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
@@ -638,6 +650,26 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
   bill: {data: string; mimeType: string; fileName: string} | null = null;
   billError = '';
   private pendingMobileRequestId: string | null = null;
+  async takeBillPhoto(): Promise<void> {
+    await this.selectBillPhoto(() => this.billAttachments.takePhoto());
+  }
+
+  async chooseBillFromGallery(): Promise<void> {
+    await this.selectBillPhoto(() => this.billAttachments.chooseFromGallery());
+  }
+
+  private async selectBillPhoto(
+    picker: () => Promise<{ data: string; mimeType: string; fileName: string } | null>,
+  ): Promise<void> {
+    this.billError = '';
+    try {
+      const attachment = await picker();
+      if (attachment) this.bill = attachment;
+    } catch {
+      this.billError = 'Could not open the camera or gallery. Check app permissions and try again.';
+    }
+  }
+
   async selectBill(event: Event): Promise<void> {
     const file = (event.target as HTMLInputElement).files?.[0];
     this.bill = null;

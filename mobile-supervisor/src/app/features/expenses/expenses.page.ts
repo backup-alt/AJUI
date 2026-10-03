@@ -15,6 +15,7 @@ import {
   close, documentTextOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
+import { BillAttachmentService } from '../../core/services/bill-attachment.service';
 import { Expense, ExpenseStatus } from '../../shared/models';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import {
@@ -134,11 +135,15 @@ import {
               </div>
 
               @if (expense.billUrl) {
-                <div class="expense-bill-thumb" (click)="openBillViewer(expense.billUrl!); $event.stopPropagation(); $event.preventDefault()">
-                  <img [src]="expense.billUrl" alt="Bill" class="expense-bill-img" />
+                <div class="expense-bill-thumb" (click)="openBillViewer(expense); $event.stopPropagation(); $event.preventDefault()">
+                  @if (isPdfBill(expense)) {
+                    <ion-icon name="document-text-outline" class="expense-bill-pdf"></ion-icon>
+                  } @else {
+                    <img [src]="expense.billUrl" alt="Bill" class="expense-bill-img" />
+                  }
                   <span class="expense-bill-label">
                     <ion-icon name="document-text-outline"></ion-icon>
-                    View Bill
+                    {{ isPdfBill(expense) ? 'Preview PDF' : 'View Bill' }}
                   </span>
                 </div>
               }
@@ -294,6 +299,7 @@ import {
       width: 44px; height: 44px; border-radius: 8px;
       object-fit: cover; flex-shrink: 0;
     }
+    .expense-bill-pdf { width: 44px; height: 44px; padding: 9px; box-sizing: border-box; border-radius: 8px; background: #eef4ff; color: #002263; flex-shrink: 0; }
     .expense-bill-label {
       display: inline-flex; align-items: center; gap: 4px;
       font-size: 12px; font-weight: 600; color: #002263;
@@ -335,6 +341,7 @@ export class ExpensesPage implements OnInit {
   private destroyRef = inject(DestroyRef);
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
+  private billAttachments = inject(BillAttachmentService);
 
   expenses = signal<Expense[]>([]);
   filteredExpenses = signal<Expense[]>([]);
@@ -482,8 +489,25 @@ export class ExpensesPage implements OnInit {
     return status === 'Pending' ? 'warning' : status === 'Approved' ? 'success' : status === 'Rejected' ? 'danger' : 'neutral';
   }
 
-  openBillViewer(url: string): void {
-    this.viewerUrl.set(url);
+  isPdfBill(expense: Expense): boolean {
+    return this.billAttachments.isPdf(
+      expense.receiptImageName,
+      expense.billUrl,
+      expense.receiptImageMimeType,
+    );
+  }
+
+  async openBillViewer(expense: Expense): Promise<void> {
+    if (!expense.billUrl) return;
+    if (this.isPdfBill(expense)) {
+      try {
+        await this.billAttachments.openPdf(expense.billUrl);
+      } catch (error) {
+        console.error('[Expenses] Could not open PDF bill', error);
+      }
+      return;
+    }
+    this.viewerUrl.set(expense.billUrl);
     this.resetZoom();
   }
 

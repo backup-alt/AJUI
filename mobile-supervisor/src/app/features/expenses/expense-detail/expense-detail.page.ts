@@ -20,9 +20,8 @@ import {
   IonRefresher,
   IonRefresherContent,
   ToastController,
-  ActionSheetController,
 } from '@ionic/angular/standalone';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
 import { addIcons } from 'ionicons';
 import {
@@ -36,8 +35,11 @@ import {
   cardOutline,
   cloudUploadOutline,
   checkmarkCircleOutline,
+  cameraOutline,
+  imagesOutline,
 } from 'ionicons/icons';
 import { SupervisorService } from '../../../core/services/supervisor.service';
+import { BillAttachmentService } from '../../../core/services/bill-attachment.service';
 import { Expense } from '../../../shared/models';
 
 @Component({
@@ -131,14 +133,24 @@ import { Expense } from '../../../shared/models';
                   <div class="upload-sub">Upload the bill/receipt to complete this purchase</div>
                 </div>
               </div>
-              <ion-button size="small" (click)="triggerFileInput()">
-                <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
-                Upload Receipt
-              </ion-button>
+              <div class="receipt-actions">
+                <ion-button size="small" [disabled]="uploading()" (click)="takeReceiptPhoto()">
+                  <ion-icon slot="start" name="camera-outline"></ion-icon>
+                  Camera
+                </ion-button>
+                <ion-button size="small" fill="outline" [disabled]="uploading()" (click)="chooseReceiptFromGallery()">
+                  <ion-icon slot="start" name="images-outline"></ion-icon>
+                  Gallery
+                </ion-button>
+                <ion-button size="small" fill="outline" [disabled]="uploading()" (click)="pdfInput.click()">
+                  <ion-icon slot="start" name="document-text-outline"></ion-icon>
+                  PDF
+                </ion-button>
+              </div>
               <input
-                #fileInput
+                #pdfInput
                 type="file"
-                accept="image/*,.pdf"
+                accept="application/pdf"
                 style="display: none"
                 (change)="onFileSelected($event)"
               />
@@ -160,11 +172,9 @@ import { Expense } from '../../../shared/models';
                     <ion-icon name="document-text-outline" slot="start" color="primary"></ion-icon>
                     <ion-label>
                       <p>Receipt / Bill</p>
-                      <h3>
-                        <a [href]="receiptDataUrl()" target="_blank" rel="noopener">
-                          {{ expense()!.receiptImageName || 'Receipt' }}
-                        </a>
-                      </h3>
+                      <ion-button class="view-receipt-button" fill="clear" size="small" (click)="openReceipt()">
+                        {{ isPdfReceipt() ? 'Preview PDF' : 'View image' }}
+                      </ion-button>
                     </ion-label>
                   </ion-item>
                 }
@@ -322,14 +332,20 @@ import { Expense } from '../../../shared/models';
     .upload-receipt-info ion-icon { font-size: 24px; }
     .upload-title { font-size: 14px; font-weight: 600; color: #111827; }
     .upload-sub { font-size: 12px; color: #6b7280; }
+    .receipt-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .receipt-actions ion-button { margin: 0; }
+    .view-receipt-button { margin: 0; min-height: 32px; --padding-start: 0; --padding-end: 0; }
+    @media (max-width: 520px) {
+      .upload-receipt-card { align-items: stretch; flex-direction: column; }
+      .receipt-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
   `],
 })
 export class ExpenseDetailPage implements OnInit {
   private route = inject(ActivatedRoute);
-  private router = inject(Router);
   private supervisor = inject(SupervisorService);
   private toastCtrl = inject(ToastController);
-  private actionSheetCtrl = inject(ActionSheetController);
+  private billAttachments = inject(BillAttachmentService);
 
   expense = signal<Expense | null>(null);
   loading = signal(true);
@@ -365,6 +381,15 @@ export class ExpenseDetailPage implements OnInit {
     return `data:${mimeType};base64,${exp.receiptImage}`;
   });
 
+  isPdfReceipt = computed(() => {
+    const exp = this.expense();
+    return this.billAttachments.isPdf(
+      exp?.receiptImageName,
+      exp?.billUrl,
+      exp?.receiptImageMimeType,
+    );
+  });
+
   async ngOnInit(): Promise<void> {
     addIcons({
       locationOutline,
@@ -377,19 +402,55 @@ export class ExpenseDetailPage implements OnInit {
       cardOutline,
       cloudUploadOutline,
       checkmarkCircleOutline,
+      cameraOutline,
+      imagesOutline,
     });
     await this.load();
   }
 
-  triggerFileInput(): void {
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    fileInput?.click();
+  async takeReceiptPhoto(): Promise<void> {
+    await this.pickReceiptPhoto(() => this.billAttachments.takePhoto());
+  }
+
+  async chooseReceiptFromGallery(): Promise<void> {
+    await this.pickReceiptPhoto(() => this.billAttachments.chooseFromGallery());
+  }
+
+  async openReceipt(): Promise<void> {
+    const url = this.receiptDataUrl();
+    try {
+      if (this.isPdfReceipt()) {
+        await this.billAttachments.openPdf(url);
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    } catch {
+      await this.showToast('No PDF viewer is available on this device.', 'danger');
+    }
+  }
+
+  private async pickReceiptPhoto(
+    picker: () => Promise<{ data: string; mimeType: string; fileName: string } | null>,
+  ): Promise<void> {
+    try {
+      const attachment = await picker();
+      if (!attachment) return;
+      await this.uploadReceipt(attachment.mimeType, attachment.fileName, attachment.data);
+    } catch {
+      await this.showToast('Could not open the camera or gallery. Check app permissions and try again.', 'danger');
+    }
   }
 
   async onFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input?.files?.[0];
     if (!file) return;
+
+    if (file.type !== 'application/pdf' || file.size > 10 * 1024 * 1024) {
+      input.value = '';
+      await this.showToast('Choose a PDF up to 10 MB.', 'danger');
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async () => {
