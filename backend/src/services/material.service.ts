@@ -389,12 +389,16 @@ export async function getMaterialById(id: string) {
 
 export async function updateMaterial(
   id: string,
-  patch: Partial<CreateMaterialInput> & { status?: "Pending" | "Approved" | "Received" | "Not Received" },
+  patch: Partial<CreateMaterialInput> & {
+    status?: "Pending" | "Approved" | "Received" | "Not Received";
+    remainingAmount?: number;
+  },
 ) {
   const existingMaterial = await Material.findById(id).lean();
   if (!existingMaterial) throw new AppError(404, "Material not found");
 
   const update: Record<string, unknown> = { ...patch };
+  delete update.remainingAmount;
   for (const key of ["receiptImage", "receiptImageMimeType", "billUrl", "billHistory", "pcloudFileId", "pcloudPublicCode", "pcloudContentHash"]) {
     delete update[key];
   }
@@ -420,6 +424,48 @@ export async function updateMaterial(
       history.push({ note: nextNote, date: new Date() });
     }
     update.noteHistory = history;
+  }
+  const amountWasEdited = patch.issuedAmount !== undefined
+    || patch.givenAmount !== undefined
+    || patch.remainingAmount !== undefined;
+  if (amountWasEdited) {
+    const previousIssued = Math.max(0, Number(existingMaterial.issuedAmount) || 0);
+    const previousGiven = Math.max(0, Number(existingMaterial.givenAmount) || 0);
+    const nextIssued = patch.issuedAmount === undefined
+      ? previousIssued
+      : Math.max(0, Number(patch.issuedAmount) || 0);
+    const requestedGiven = patch.remainingAmount === undefined
+      ? (patch.givenAmount === undefined ? previousGiven : Math.max(0, Number(patch.givenAmount) || 0))
+      : Math.max(0, nextIssued - Math.max(0, Number(patch.remainingAmount) || 0));
+    const nextGiven = Math.min(nextIssued, requestedGiven);
+    const nextRemaining = Math.max(0, nextIssued - nextGiven);
+    update.issuedAmount = nextIssued;
+    update.givenAmount = nextGiven;
+
+    const amountHistory = Array.isArray(existingMaterial.amountHistory)
+      ? existingMaterial.amountHistory.map((entry) => ({
+          date: entry.date,
+          issuedAmount: entry.issuedAmount,
+          givenAmount: entry.givenAmount,
+          remainingAmount: entry.remainingAmount,
+        }))
+      : [];
+    amountHistory.push({
+      date: new Date(),
+      issuedAmount: nextIssued,
+      givenAmount: nextGiven,
+      remainingAmount: nextRemaining,
+    });
+    update.amountHistory = amountHistory;
+
+    const paymentDelta = Math.round((nextGiven - previousGiven) * 100) / 100;
+    if (paymentDelta !== 0) {
+      const paymentHistory = Array.isArray(existingMaterial.paymentHistory)
+        ? existingMaterial.paymentHistory.map((entry) => ({ date: entry.date, amount: entry.amount }))
+        : [];
+      paymentHistory.push({ date: new Date(), amount: paymentDelta });
+      update.paymentHistory = paymentHistory;
+    }
   }
   if (patch.projectId) {
     const project = await Project.findById(patch.projectId).lean();

@@ -20,6 +20,13 @@ export interface IMaterial extends Document {
   remainingStock: number;
   issuedAmount?: number;
   givenAmount?: number;
+  paymentHistory?: Array<{ date: Date; amount: number }>;
+  amountHistory?: Array<{
+    date: Date;
+    issuedAmount: number;
+    givenAmount: number;
+    remainingAmount: number;
+  }>;
   isExistingMaterial?: boolean;
   orderedDate?: string;
   vendor?: string;
@@ -75,6 +82,24 @@ const materialSchema = new Schema<IMaterial>(
     remainingStock: { type: Number, default: 0 },
     issuedAmount: { type: Number },
     givenAmount: { type: Number },
+    paymentHistory: {
+      type: [{
+        date: { type: Date, required: true, default: Date.now },
+        amount: { type: Number, required: true },
+        _id: false,
+      }],
+      default: [],
+    },
+    amountHistory: {
+      type: [{
+        date: { type: Date, required: true, default: Date.now },
+        issuedAmount: { type: Number, required: true, min: 0 },
+        givenAmount: { type: Number, required: true, min: 0 },
+        remainingAmount: { type: Number, required: true, min: 0 },
+        _id: false,
+      }],
+      default: [],
+    },
     isExistingMaterial: { type: Boolean, default: false, index: true },
     orderedDate: { type: String, index: true },
     vendor: { type: String, trim: true },

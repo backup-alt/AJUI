@@ -56,6 +56,58 @@ function money(value: number): number {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+async function writeMaterialAmounts(
+  materialId: Types.ObjectId,
+  issuedAmount: number,
+  givenAmount: number,
+  changedAt = new Date(),
+) {
+  const material = await Material.findById(materialId);
+  if (!material) return;
+  const previousGiven = Math.max(0, Number(material.givenAmount) || 0);
+  const issued = money(Math.max(0, issuedAmount));
+  const given = money(Math.min(issued, Math.max(0, givenAmount)));
+  material.issuedAmount = issued;
+  material.givenAmount = given;
+  material.amountHistory = material.amountHistory || [];
+  material.amountHistory.push({
+    date: changedAt,
+    issuedAmount: issued,
+    givenAmount: given,
+    remainingAmount: money(issued - given),
+  });
+  const paymentDelta = money(given - previousGiven);
+  if (paymentDelta !== 0) {
+    material.paymentHistory = material.paymentHistory || [];
+    material.paymentHistory.push({ date: changedAt, amount: paymentDelta });
+  }
+  await material.save();
+}
+
+async function distributeOrderAmounts(
+  order: any,
+  issuedAmount: number,
+  givenAmount: number,
+) {
+  const changedAt = new Date();
+  const lines = order.items || [];
+  const weights = lines.map((line: any, index: number) =>
+    Math.max(0, Number(line.itemAmount || 0) + Number(line.gstAmount || 0) + (index === 0 ? Number(order.roundOff || 0) : 0)),
+  );
+  const weightTotal = weights.reduce((sum: number, value: number) => sum + value, 0) || lines.length || 1;
+  let issuedAllocated = 0;
+  let givenAllocated = 0;
+  for (let index = 0; index < lines.length; index += 1) {
+    const isLast = index === lines.length - 1;
+    const ratio = weights[index] / weightTotal;
+    const lineIssued = isLast ? money(issuedAmount - issuedAllocated) : money(issuedAmount * ratio);
+    const lineGiven = isLast ? money(givenAmount - givenAllocated) : money(givenAmount * ratio);
+    issuedAllocated = money(issuedAllocated + lineIssued);
+    givenAllocated = money(givenAllocated + lineGiven);
+    await writeMaterialAmounts(lines[index].materialId, lineIssued, lineGiven, changedAt);
+  }
+}
+
 function itemPaymentMode(item: PurchaseOrderInputItem, fallback?: string): string {
   return String(item.paymentMode || fallback || "Bank Transfer").trim() || "Bank Transfer";
 }
@@ -245,6 +297,11 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
       grandTotal,
       createdBy: input.createdBy ? new Types.ObjectId(input.createdBy) : undefined,
     });
+    const linkedMaterials = await Material.find({ _id: { $in: normalized.map((item) => item.materialId) } })
+      .select("givenAmount")
+      .lean();
+    const existingGiven = linkedMaterials.reduce((sum, material) => sum + Number(material.givenAmount || 0), 0);
+    await distributeOrderAmounts(purchaseOrder, grandTotal, Math.min(grandTotal, existingGiven));
     return syncManualInventory(purchaseOrder.toObject(), input.createdBy);
   } catch (error) {
     await Promise.all([
@@ -514,6 +571,11 @@ export async function updatePurchaseOrder(id: string, input: UpdatePurchaseOrder
     purchaseOrder.roundOff = roundOff;
     purchaseOrder.grandTotal = grandTotal;
     await purchaseOrder.save();
+    const retainedMaterials = await Material.find({ _id: { $in: normalized.map((item) => item.materialId) } })
+      .select("givenAmount")
+      .lean();
+    const retainedGiven = retainedMaterials.reduce((sum, material) => sum + Number(material.givenAmount || 0), 0);
+    await distributeOrderAmounts(purchaseOrder, grandTotal, Math.min(grandTotal, retainedGiven));
     // Keep removed source records for audit; reconcile their contribution to zero.
     for (const materialId of removedManualIds) {
       await Material.updateOne({ _id: materialId }, { $set: { requestedQuantity: 0, approvedQuantity: 0, purchasedQuantity: 0 } });
@@ -565,13 +627,14 @@ async function summarizePurchaseOrders(orders: any[]) {
   const ids = orders.flatMap(order => order.items.map((item: any) => item.materialId));
   const projectIds = [...new Set<string>(orders.map(order => String(order.projectId || "")).filter(Boolean))];
   const [materialResults, projectResults] = await Promise.all([
-    ids.length ? Material.find({ _id: { $in: ids } }).select("givenAmount billUrl receiptImageName billHistory").lean() : [],
-    projectIds.length ? Project.find({ _id: { $in: projectIds } }).select("name").lean() : [],
+    ids.length ? Material.find({ _id: { $in: ids } }).select("issuedAmount givenAmount paymentHistory amountHistory billUrl receiptImageName billHistory").lean() : [],
+    projectIds.length ? Project.find({ _id: { $in: projectIds } }).select("name clientId").lean() : [],
   ]);
   const materials = materialResults as any[];
   const projects = projectResults as any[];
   const byId = new Map<string, any>(materials.map((material): [string, any] => [String(material._id), material]));
   const projectNamesById = new Map<string, string>(projects.map((project): [string, string] => [String(project._id), project.name]));
+  const projectClientIdsById = new Map<string, string>(projects.map((project): [string, string] => [String(project._id), String(project.clientId || "")]));
   return orders.map(order => {
     const linked = [...new Set<string>(order.items.map((item: any) => String(item.materialId)))].map(id => byId.get(id)).filter(Boolean);
     const billReferences = linked.flatMap(material => {
@@ -579,13 +642,59 @@ async function summarizePurchaseOrders(orders: any[]) {
       if (material?.billUrl && !bills.some(bill => bill.url === material.billUrl)) bills.push({ url: material.billUrl, label: material.receiptImageName || "View bill" });
       return bills;
     });
+    const issuedAmount = money(order.items.reduce((sum: number, item: any, index: number) => {
+      const material = byId.get(String(item.materialId));
+      const fallback = Number(item.itemAmount || 0) + Number(item.gstAmount || 0) + (index === 0 ? Number(order.roundOff || 0) : 0);
+      return sum + (material?.issuedAmount === undefined ? fallback : Number(material.issuedAmount || 0));
+    }, 0));
+    const givenAmount = money(linked.reduce((sum, material) => sum + Number(material?.givenAmount || 0), 0));
+    const paymentHistory = linked
+      .flatMap((material) => material?.paymentHistory || [])
+      .map((entry) => ({ date: entry.date, amount: Number(entry.amount || 0) }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const amountHistoryByDate = new Map<string, { date: Date; issuedAmount: number; givenAmount: number; remainingAmount: number }>();
+    linked.flatMap((material) => material?.amountHistory || []).forEach((entry) => {
+      const key = new Date(entry.date).toISOString();
+      const aggregate = amountHistoryByDate.get(key) || { date: new Date(entry.date), issuedAmount: 0, givenAmount: 0, remainingAmount: 0 };
+      aggregate.issuedAmount = money(aggregate.issuedAmount + Number(entry.issuedAmount || 0));
+      aggregate.givenAmount = money(aggregate.givenAmount + Number(entry.givenAmount || 0));
+      aggregate.remainingAmount = money(aggregate.remainingAmount + Number(entry.remainingAmount || 0));
+      amountHistoryByDate.set(key, aggregate);
+    });
+    const amountHistory = [...amountHistoryByDate.values()]
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
     return {
       ...order,
       projectName: projectNamesById.get(String(order.projectId || "")) || order.projectName,
-      givenAmount: linked.reduce((sum, material) => sum + Number(material?.givenAmount || 0), 0),
+      clientId: projectClientIdsById.get(String(order.projectId || "")) || "",
+      issuedAmount,
+      givenAmount,
+      remainingAmount: money(Math.max(0, issuedAmount - givenAmount)),
+      paymentHistory,
+      amountHistory,
       billReferences,
     };
   });
+}
+
+export async function updatePurchaseOrderAmounts(
+  id: string,
+  patch: { issuedAmount?: number; givenAmount?: number; remainingAmount?: number },
+) {
+  const query = Types.ObjectId.isValid(id) ? { _id: id } : { poNumber: id };
+  const order = await PurchaseOrder.findOne({ ...query, deletedAt: { $exists: false } });
+  if (!order) throw new AppError(404, "Purchase order not found");
+  const current = await summarizePurchaseOrders([order.toObject()]);
+  const currentSummary = current[0];
+  const issuedAmount = patch.issuedAmount === undefined
+    ? Number(currentSummary.issuedAmount || 0)
+    : money(Math.max(0, Number(patch.issuedAmount) || 0));
+  const requestedGiven = patch.remainingAmount === undefined
+    ? (patch.givenAmount === undefined ? Number(currentSummary.givenAmount || 0) : Number(patch.givenAmount) || 0)
+    : issuedAmount - Math.max(0, Number(patch.remainingAmount) || 0);
+  const givenAmount = money(Math.min(issuedAmount, Math.max(0, requestedGiven)));
+  await distributeOrderAmounts(order, issuedAmount, givenAmount);
+  return (await summarizePurchaseOrders([order.toObject()]))[0];
 }
 
 export async function getPurchaseOrder(id: string) {

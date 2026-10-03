@@ -177,6 +177,8 @@ export class MaterialsService {
     isExistingMaterial: Boolean(row.isExistingMaterial),
     issuedAmount: row.issuedAmount,
     givenAmount: row.givenAmount,
+    paymentHistory: Array.isArray(row.paymentHistory) ? row.paymentHistory : [],
+    amountHistory: Array.isArray(row.amountHistory) ? row.amountHistory : [],
     paymentType: row.paymentType,
     deliveredOn: row.receivedDate || row.deliveredOn,
     billUrl: row.billUrl || (row.receiptImage ? `data:${row.receiptImageMimeType || 'image/jpeg'};base64,${row.receiptImage}` : undefined),

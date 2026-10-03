@@ -32,6 +32,7 @@ export const createMaterialSchema = z.object({
 export const updateMaterialSchema = z.object({
   body: createMaterialSchema.shape.body.partial().extend({
     status: z.enum(["Pending", "Approved", "Received", "Not Received"]).optional(),
+    remainingAmount: z.coerce.number().nonnegative().optional(),
     customFields: z.record(z.unknown()).optional(),
   }),
   params: z.object({ id: objectIdSchema }),
@@ -438,6 +439,18 @@ export const updatePurchaseOrderSchema = z.object({
     roundOff: z.coerce.number().min(-1000).max(1000).optional().default(0),
   }),
   params: z.object({ id: objectIdSchema }),
+});
+
+export const updatePurchaseOrderAmountsSchema = z.object({
+  body: z.object({
+    issuedAmount: z.coerce.number().nonnegative().optional(),
+    givenAmount: z.coerce.number().nonnegative().optional(),
+    remainingAmount: z.coerce.number().nonnegative().optional(),
+  }).refine(
+    (value) => value.issuedAmount !== undefined || value.givenAmount !== undefined || value.remainingAmount !== undefined,
+    "At least one amount is required",
+  ),
+  params: z.object({ id: z.string().trim().min(1) }),
 });
 
 export const listPurchaseOrdersSchema = z.object({

@@ -720,6 +720,41 @@ describe("Purchase order workflow", () => {
     expect(list.body.rates).toContain(7.5);
   });
 
+  it("keeps PO and material payment amounts synchronized with dated history", async () => {
+    if (!app) return;
+    const { project, vendor, material } = await seedProcurement();
+    const created = await request(app)
+      .post("/api/purchase-orders")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        projectId: project._id.toString(),
+        vendorId: vendor._id.toString(),
+        date: "2026-08-13",
+        items: [{ source: "existing", materialId: material._id.toString(), rate: 100, gstPercent: 0 }],
+      });
+    expect(created.status).toBe(201);
+
+    const changed = await request(app)
+      .patch(`/api/purchase-orders/${created.body.purchaseOrder._id}/amounts`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ givenAmount: 500 });
+    expect(changed.status).toBe(200);
+    expect(changed.body.purchaseOrder.givenAmount).toBe(500);
+    expect(changed.body.purchaseOrder.remainingAmount).toBe(
+      changed.body.purchaseOrder.issuedAmount - 500,
+    );
+    expect(changed.body.purchaseOrder.paymentHistory).toEqual(
+      expect.arrayContaining([expect.objectContaining({ amount: 500 })]),
+    );
+
+    const stored = await Material.findById(material._id).lean();
+    expect(stored?.givenAmount).toBe(500);
+    expect(stored?.paymentHistory?.at(-1)?.amount).toBe(500);
+    expect(stored?.amountHistory?.at(-1)?.remainingAmount).toBe(
+      Number(stored?.issuedAmount || 0) - 500,
+    );
+  });
+
   it("edits a purchase order, re-allocates materials, and frees removed ones", async () => {
     if (!app) return;
     const { project, vendor, material, supervisorUser } = await seedProcurement();

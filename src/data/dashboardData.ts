@@ -59,6 +59,8 @@ export type MaterialRow = {
   purchasedDate?: string;
   issuedAmount?: number;
   givenAmount?: number;
+  paymentHistory?: Array<{ date: string | Date; amount: number }>;
+  amountHistory?: Array<{ date: string | Date; issuedAmount: number; givenAmount: number; remainingAmount: number }>;
   isExistingMaterial?: boolean;
   orderedDate?: string;
   paymentType?: string;

@@ -1099,6 +1099,16 @@ export async function updatePurchaseOrder(req: Request, res: Response, next: Nex
   } catch (e) { next(e); }
 }
 
+export async function updatePurchaseOrderAmounts(req: Request, res: Response, next: NextFunction) {
+  try {
+    const purchaseOrder = await purchaseOrderService.updatePurchaseOrderAmounts(req.params.id, req.body);
+    invalidateCachePrefix("/api/purchase-orders");
+    invalidateCachePrefix("/api/materials");
+    invalidateCachePrefix("/api/dashboard/batch");
+    res.json({ purchaseOrder });
+  } catch (e) { next(e); }
+}
+
 export async function deletePurchaseOrder(req: Request, res: Response, next: NextFunction) {
   try {
     const deletion = await purchaseOrderService.deletePurchaseOrder(req.params.id, req.user?.sub);

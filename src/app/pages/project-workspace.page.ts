@@ -994,8 +994,8 @@ const siteMaterialDetailFields: FieldSchema[] = [
                       </td>
                       <td
                         *ngFor="let column of tableState.columns; let first = first; trackBy: trackColumn"
-                        [class.readonly-cell]="isReadonlyColumn(column.key)"
-                        [class.select-cell]="isRowEditing(row) && !isReadonlyColumn(column.key) && selectOptions(activeSection(), column.key).length > 0"
+                        [class.readonly-cell]="isReadonlyCell(row, column.key)"
+                        [class.select-cell]="isRowEditing(row) && !isReadonlyCell(row, column.key) && selectOptions(activeSection(), column.key).length > 0"
                         [class.labour-types-cell-host]="activeSection() === 'attendance' && column.key === 'labourTypes'"
                       >
                         <ng-container *ngIf="activeSection() === 'materials' && column.key === 'notes' && !isRowEditing(row); else nonMaterialNoteCell">
@@ -1028,6 +1028,30 @@ const siteMaterialDetailFields: FieldSchema[] = [
                           </div>
                         </ng-container>
                         <ng-template #nonMaterialNoteCell>
+                        <ng-container *ngIf="activeSection() === 'materials' && column.key === 'remainingAmount' && !isRowEditing(row); else nonMaterialRemainingCell">
+                          <div class="material-note-history material-amount-history" [class.open]="isMaterialAmountHistoryOpen(row)">
+                            <button type="button" class="material-note-trigger material-amount-trigger" [attr.aria-expanded]="isMaterialAmountHistoryOpen(row)" (pointerdown)="$event.stopPropagation()" (click)="toggleMaterialAmountHistory(row, $event)">
+                              <span class="material-amount-current">
+                                <strong>{{ formatTableMoney(row['remainingAmount']) }}</strong>
+                                <span>Current balance</span>
+                              </span>
+                              <small>{{ materialAmountHistory(row).length ? 'View history' : 'No history' }}</small>
+                              <svg viewBox="0 0 20 20" aria-hidden="true" class="svg-icon"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+                            </button>
+                            <div class="material-note-panel" *ngIf="isMaterialAmountHistoryOpen(row)" (pointerdown)="$event.stopPropagation()">
+                              <header><strong>Remaining amount history</strong><span>{{ materialAmountHistory(row).length }} entries</span></header>
+                              <div class="material-note-list" *ngIf="materialAmountHistory(row).length; else noAmountHistory">
+                                <article *ngFor="let entry of materialAmountHistory(row); let first = first">
+                                  <span class="material-note-date">{{ formatMaterialNoteDate(entry.date) }}</span>
+                                  <p>{{ formatMoney(entry.remainingAmount) }}</p>
+                                  <small *ngIf="first">Latest</small>
+                                </article>
+                              </div>
+                              <ng-template #noAmountHistory><p class="material-note-empty">No amount changes have been recorded.</p></ng-template>
+                            </div>
+                          </div>
+                        </ng-container>
+                        <ng-template #nonMaterialRemainingCell>
                         <ng-container *ngIf="activeSection() === 'attendance' && column.key === 'labourTypes'; else standardProjectCell">
                           <div class="labour-types-cell">
                             <span class="labour-group-badge" *ngIf="isLabourGroupRow(row)">{{ labourGroupCount(row) }} entries</span>
@@ -1064,7 +1088,7 @@ const siteMaterialDetailFields: FieldSchema[] = [
                         </ng-container>
                         <ng-template #standardProjectCell>
                           <div
-                            *ngIf="isRowEditing(row) && !isReadonlyColumn(column.key) && isControlledEditSelect(activeSection(), column.key); else editableProjectCell"
+                            *ngIf="isRowEditing(row) && !isReadonlyCell(row, column.key) && isControlledEditSelect(activeSection(), column.key); else editableProjectCell"
                             class="erp-select-menu"
                             [class.open]="isSelectMenuOpen(row, column.key)"
                           >
@@ -1236,15 +1260,19 @@ const siteMaterialDetailFields: FieldSchema[] = [
                             <ng-template #normalEditableCell>
                               <span
                                 class="editable-cell"
-                                [class.cell-readonly]="!isRowEditing(row) || isReadonlyColumn(column.key)"
-                                [attr.contenteditable]="isRowEditing(row) && !isReadonlyColumn(column.key) ? 'true' : null"
+                                [class.cell-readonly]="!isRowEditing(row) || isReadonlyCell(row, column.key)"
+                                [class.money-editable-cell]="activeSection() === 'materials' && isMaterialAmountField(column.key)"
+                                [attr.contenteditable]="isRowEditing(row) && !isReadonlyCell(row, column.key) ? 'true' : null"
+                                [attr.inputmode]="activeSection() === 'materials' && isMaterialAmountField(column.key) ? 'decimal' : null"
                                 spellcheck="false"
-                                (blur)="isRowEditing(row) && !isReadonlyColumn(column.key) && updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
+                                (keydown.enter)="isRowEditing(row) && !isReadonlyCell(row, column.key) && commitEditableCellOnEnter($event)"
+                                (blur)="isRowEditing(row) && !isReadonlyCell(row, column.key) && updateRowCell(activeSection(), row, column.key, $any($event.target).textContent || '')"
                               >
                                 {{ displayCell(row, column.key) }}
                               </span>
                             </ng-template>
                           </ng-template>
+                        </ng-template>
                         </ng-template>
                         </ng-template>
                       </td>
@@ -1877,6 +1905,7 @@ export class ProjectWorkspacePage {
   readonly allMaterialNames = signal<string[]>([]);
   readonly loadingAllMaterialNames = signal(false);
   readonly openMaterialNoteHistoryKey = signal("");
+  readonly openMaterialAmountHistoryKey = signal("");
   readonly openPoHistoryKey = signal("");
   readonly openBillHistoryKey = signal("");
   /** Full list of subcontractor names for the record-form dropdown.
@@ -2388,7 +2417,6 @@ export class ProjectWorkspacePage {
   }
 
   isRowEditing(row: TableRow): boolean {
-    if (row["__poSummary"] === "1") return false;
     const key = this.rowKey(row);
     return this.editingRowKey() === key || this.editingRowKeys().includes(key);
   }
@@ -4894,8 +4922,21 @@ export class ProjectWorkspacePage {
     this.updateRowCell(section, target, key, value);
   }
 
+  isMaterialAmountField(key: string): boolean {
+    return key === "issuedAmount" || key === "givenAmount" || key === "remainingAmount";
+  }
+
+  formatTableMoney(value: unknown): string {
+    return formatMoney(this.moneyNumber(value));
+  }
+
+  commitEditableCellOnEnter(event: Event) {
+    event.preventDefault();
+    (event.currentTarget as HTMLElement | null)?.blur();
+  }
+
   updateRowCell(section: ModuleKey, row: TableRow, key: string, value: string) {
-    if (this.isReadonlyColumn(key)) return;
+    if (this.isReadonlyCell(row, key)) return;
     const rowId = String(row["__rowId"] || "");
     if (!rowId) return;
     const cleanValue = value.trim();
@@ -4973,7 +5014,30 @@ export class ProjectWorkspacePage {
   }
 
   private persistProjectRowEdit(section: ModuleKey, row: TableRow, key: string, value: string) {
-    if (row["__poSummary"] === "1") return;
+    if (row["__poSummary"] === "1") {
+      if (section !== "materials" || !["issuedAmount", "givenAmount", "remainingAmount"].includes(key)) return;
+      const orderId = String(row["__purchaseOrderId"] || row["poNumber"] || "").trim();
+      if (!orderId) return;
+      const amount = Math.max(0, this.moneyNumber(value));
+      this.api.updatePurchaseOrderAmounts(orderId, { [key]: amount }).subscribe({
+        next: async ({ purchaseOrder }) => {
+          this.projectPurchaseOrders.update((orders) => orders.map((order) =>
+            order._id === purchaseOrder._id || order.poNumber === purchaseOrder.poNumber ? purchaseOrder : order,
+          ));
+          this.refreshSectionFromBackend("materials");
+          await this.presentToast(`${this.amountFieldLabel(key)} saved to the purchase order.`);
+        },
+        error: async (error: any) => {
+          await this.loadProjectPurchaseOrders(this.projectId());
+          this.refreshSectionFromBackend("materials");
+          await this.presentToast(
+            error?.error?.message || error?.message || `Could not save ${this.amountFieldLabel(key).toLowerCase()}. Please retry.`,
+            "danger",
+          );
+        },
+      });
+      return;
+    }
     const id = String(row["_id"] || "").trim();
     if (!id) return;
     const numeric = (input: string) => Math.max(0, this.moneyNumber(input));
@@ -4983,7 +5047,7 @@ export class ProjectWorkspacePage {
       payload = { customFields: { [key]: value } };
     } else if (section === "materials") {
       const field = ({ materialName: "name", reference: "receiptImageName" } as Record<string, string>)[key] || key;
-      const numericFields = new Set(["issuedAmount", "givenAmount", "requestedQuantity", "approvedQuantity", "purchasedQuantity", "consumedQuantity"]);
+      const numericFields = new Set(["issuedAmount", "givenAmount", "remainingAmount", "requestedQuantity", "approvedQuantity", "purchasedQuantity", "consumedQuantity"]);
       payload = { [field]: numericFields.has(field) ? numeric(value) : value };
     } else if (section === "expenses") {
       const field = ({ expenseDate: "date", approvalStatus: "status", reference: "receiptImageName", siteMaterial: "isSiteMaterial" } as Record<string, string>)[key] || key;
@@ -5003,12 +5067,30 @@ export class ProjectWorkspacePage {
       : section === "payments" ? this.api.patchPayment(id, payload)
       : null;
     request?.subscribe({
-      next: () => {
+      next: async () => {
         this.refreshSectionFromBackend(section);
         if (section === "expenses" || section === "generalExpenses") this.loadProjectExpenseRollup(this.projectId());
+        await this.presentToast(`${this.fieldLabel(section, key)} saved.`);
       },
-      error: () => this.refreshSectionFromBackend(section),
+      error: async (error: any) => {
+        this.refreshSectionFromBackend(section);
+        await this.presentToast(
+          error?.error?.message || error?.message || `Could not save ${this.fieldLabel(section, key).toLowerCase()}. Please retry.`,
+          "danger",
+        );
+      },
     });
+  }
+
+  private amountFieldLabel(key: string): string {
+    if (key === "issuedAmount") return "Issued amount";
+    if (key === "givenAmount") return "Given amount";
+    return "Remaining amount";
+  }
+
+  private fieldLabel(section: ModuleKey, key: string): string {
+    return sectionConfigs.find((config) => config.key === section)?.columns.find((column) => column.key === key)?.label
+      || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (character) => character.toUpperCase());
   }
 
   private updateWorkerCellRow(row: TableRow, key: string, value: string) {
@@ -5916,6 +5998,7 @@ export class ProjectWorkspacePage {
       status: row.status,
       notes: row.notes,
       __noteHistoryJson: JSON.stringify((row as any).noteHistory || []),
+      __amountHistoryJson: JSON.stringify((row as any).amountHistory || []),
       __poHistoryJson: JSON.stringify(this.materialPoHistorySources(row, inventory)),
       __billHistoryJson: JSON.stringify(this.materialBillHistorySources(row)),
       };
@@ -5930,13 +6013,14 @@ export class ProjectWorkspacePage {
         );
         const firstMaterial = linkedMaterials[0];
         const givenAmount = Number(order.givenAmount ?? linkedMaterials.reduce((sum, material) => sum + Number(material.givenAmount || 0), 0)) || 0;
-        const grandTotal = Number(order.grandTotal) || linkedMaterials.reduce((sum, material) => sum + Number(material.issuedAmount || 0), 0);
+        const issuedAmount = Number(order.issuedAmount ?? order.grandTotal) || linkedMaterials.reduce((sum, material) => sum + Number(material.issuedAmount || 0), 0);
         const billReferences = Array.isArray(order.billReferences) ? order.billReferences : [];
         const firstBill = billReferences[0];
         return {
           __rowId: `material-po:${order._id || order.poNumber}`,
           __projectId: order.projectId || projectId,
           __poSummary: "1",
+          __purchaseOrderId: order._id,
           _id: firstMaterial?._id,
           materialId: firstMaterial?.id || "",
           projectId: order.projectId || projectId,
@@ -5945,9 +6029,9 @@ export class ProjectWorkspacePage {
           unit: "",
           quantity: formatNumber((order.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)),
           isExistingMaterial: "",
-          issuedAmount: grandTotal,
+          issuedAmount,
           givenAmount,
-          remainingAmount: Math.max(0, grandTotal - givenAmount),
+          remainingAmount: Number(order.remainingAmount ?? Math.max(0, issuedAmount - givenAmount)),
           requestDate: order.date,
           receivedDate: "",
           vendor: order.vendorName,
@@ -5959,6 +6043,7 @@ export class ProjectWorkspacePage {
           status: "Approved",
           notes: order.notes || "",
           __noteHistoryJson: JSON.stringify([]),
+          __amountHistoryJson: JSON.stringify(order.amountHistory || []),
           __poHistoryJson: JSON.stringify([{ poNumber: order.poNumber, date: order.date, quantity: 0, unit: "" }]),
           __billHistoryJson: JSON.stringify(billReferences.map((bill) => ({
             url: bill.url,
@@ -6241,7 +6326,13 @@ export class ProjectWorkspacePage {
   }
 
   isReadonlyColumn(key: string): boolean {
-    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus" || key === "remainingStock" || key === "remainingAmount" || key === "totalPo" || key === "totalPaid";
+    return key === "clientId" || key === "runningBalance" || key === "weeklyPayable" || key === "weeklyPay" || key === "staffCount" || key === "balance" || key === "subtotal" || key === "totalGst" || key === "grandTotal" || key === "materialId" || key === "receivedStatus" || key === "remainingStock" || key === "totalPo" || key === "totalPaid";
+  }
+
+  isReadonlyCell(row: TableRow, key: string): boolean {
+    if (this.isReadonlyColumn(key)) return true;
+    if (row["__poSummary"] === "1") return !["issuedAmount", "givenAmount", "remainingAmount"].includes(key);
+    return false;
   }
 
   /**
@@ -6600,6 +6691,7 @@ export class ProjectWorkspacePage {
 
   private withLabourPayable(row: TableRow): TableRow {
     const attendance = String(row["attendance"] || "Present");
+    const hasSeparateLabourTypes = Boolean(String(row["labourTypes"] || "").trim());
     const labourTypes = this.cleanLabourTypeText(String(row["labourTypes"] || row["notes"] || "").trim());
     const enteredStaffCount = this.moneyNumber(row["staffCount"]);
     const staffCount = this.staffCountFromLabourTypes(labourTypes) || enteredStaffCount || this.moneyNumber(row["presentUnits"]) || 1;
@@ -6610,7 +6702,10 @@ export class ProjectWorkspacePage {
       attendance,
       shift: this.normalizeShift(row["shift"]),
       staffCount,
-      notes: labourTypes || row["notes"] || "",
+      // New mobile muster records carry labourTypes and the supervisor's
+      // free-text note separately. Only legacy records used Notes as the
+      // labour-type storage field, so do not echo that breakdown as a note.
+      notes: hasSeparateLabourTypes ? String(row["notes"] || "") : "",
     };
   }
 
@@ -6733,6 +6828,34 @@ export class ProjectWorkspacePage {
 
   isMaterialNoteHistoryOpen(row: TableRow): boolean {
     return this.openMaterialNoteHistoryKey() === this.rowKey(row);
+  }
+
+  materialAmountHistory(row: TableRow): Array<{ date: string; remainingAmount: number }> {
+    try {
+      const history = JSON.parse(String(row["__amountHistoryJson"] || "[]"));
+      if (Array.isArray(history)) {
+        return history
+          .map((entry) => ({
+            date: String(entry?.date || ""),
+            remainingAmount: Math.max(0, Number(entry?.remainingAmount) || 0),
+          }))
+          .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+      }
+    } catch {
+      // Legacy rows have no amount audit trail.
+    }
+    return [];
+  }
+
+  toggleMaterialAmountHistory(row: TableRow, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const key = this.rowKey(row);
+    this.openMaterialAmountHistoryKey.update((current) => current === key ? "" : key);
+  }
+
+  isMaterialAmountHistoryOpen(row: TableRow): boolean {
+    return this.openMaterialAmountHistoryKey() === this.rowKey(row);
   }
 
   formatMaterialNoteDate(value: string): string {

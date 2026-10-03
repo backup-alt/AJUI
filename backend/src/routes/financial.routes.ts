@@ -37,6 +37,7 @@ import {
   updateSubcontractorLaborSchema,
   createPurchaseOrderSchema,
   updatePurchaseOrderSchema,
+  updatePurchaseOrderAmountsSchema,
   listPurchaseOrdersSchema,
   createGstRateSchema,
   listApprovalsSchema,
@@ -293,6 +294,12 @@ router.put(
   validate(updatePurchaseOrderSchema),
   requireRole("admin"),
   ctrl.updatePurchaseOrder
+);
+router.patch(
+  "/purchase-orders/:id/amounts",
+  validate(updatePurchaseOrderAmountsSchema),
+  requireRole("admin"),
+  ctrl.updatePurchaseOrderAmounts
 );
 router.delete(
   "/purchase-orders/:id",

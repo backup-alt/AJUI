@@ -165,6 +165,8 @@ export function mapMaterial(m: any): any {
     billHistory: Array.isArray(m.billHistory) ? m.billHistory : [],
     issuedAmount: m.issuedAmount,
     givenAmount: m.givenAmount,
+    paymentHistory: Array.isArray(m.paymentHistory) ? m.paymentHistory : [],
+    amountHistory: Array.isArray(m.amountHistory) ? m.amountHistory : [],
     isExistingMaterial: Boolean(m.isExistingMaterial),
     orderedDate: m.orderedDate,
     requestDate: m.requestDate,

@@ -142,7 +142,17 @@ export interface PurchaseOrderItem {
 }
 
 export interface PurchaseOrder {
+  clientId?: string;
+  issuedAmount?: number;
   givenAmount?: number;
+  remainingAmount?: number;
+  paymentHistory?: Array<{ date: string | Date; amount: number }>;
+  amountHistory?: Array<{
+    date: string | Date;
+    issuedAmount: number;
+    givenAmount: number;
+    remainingAmount: number;
+  }>;
   billReferences?: Array<{url: string; label: string}>;
   _id: string;
   poNumber: string;
@@ -899,6 +909,24 @@ export class ApiService {
         this.cache.invalidate("/purchase-orders");
         this.cache.invalidate("/materials");
         this.cache.invalidate("/inventory");
+      }),
+      catchError(this.handleError),
+    );
+  }
+
+  updatePurchaseOrderAmounts(id: string, payload: {
+    issuedAmount?: number;
+    givenAmount?: number;
+    remainingAmount?: number;
+  }): Observable<{ purchaseOrder: PurchaseOrder }> {
+    return this.http.patch<{ purchaseOrder: PurchaseOrder }>(
+      `${this.baseUrl}/purchase-orders/${encodeURIComponent(id)}/amounts`,
+      payload,
+      { headers: this.authHeaders() },
+    ).pipe(
+      tap(() => {
+        this.cache.invalidate("/purchase-orders");
+        this.cache.invalidate("/materials");
       }),
       catchError(this.handleError),
     );

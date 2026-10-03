@@ -293,6 +293,10 @@ type PoDraftLine = {
           </button>
           @if (selectedOrder()) {
             <div class="editor-actions">
+              <button type="button" class="btn-secondary" (click)="goToProject(selectedOrder()!)">
+                <ion-icon name="folder-open-outline"></ion-icon>
+                Go to Project
+              </button>
               <button type="button" class="btn-secondary" [disabled]="exporting()" (click)="downloadPdf()">
                 {{ exporting() === 'pdf' ? 'Preparing PDF…' : 'Download PDF' }}
               </button>
@@ -334,6 +338,29 @@ type PoDraftLine = {
                 <div class="form-field"><label>Vendor</label><div class="po-readonly">{{ order.vendorName }}</div></div>
                 <div class="form-field po-notes-field"><label>Notes</label><div class="po-readonly">{{ order.notes || '—' }}</div></div>
               </div>
+              <div class="po-amount-summary" aria-label="Purchase order payment summary">
+                <div class="po-issued-amount"><span>Issued Amount</span><strong>{{ formatMoney(orderIssuedAmount(order)) }}</strong></div>
+                @if (isAdmin()) {
+                  <label class="po-amount-editor">
+                    <span>Given Amount</span>
+                    <span class="po-money-input"><b aria-hidden="true">₹</b><input type="number" min="0" step="0.01" inputmode="decimal" [max]="orderIssuedAmount(order)" [value]="amountGivenDraft()" [disabled]="amountSaving()" aria-label="Given amount" (input)="changePurchaseOrderAmount('givenAmount', $event, order)" (keydown.enter)="savePurchaseOrderAmounts($event)" /></span>
+                  </label>
+                  <label class="po-amount-editor">
+                    <span>Remaining Amount</span>
+                    <span class="po-money-input"><b aria-hidden="true">₹</b><input type="number" min="0" step="0.01" inputmode="decimal" [max]="orderIssuedAmount(order)" [value]="amountRemainingDraft()" [disabled]="amountSaving()" aria-label="Remaining amount" (input)="changePurchaseOrderAmount('remainingAmount', $event, order)" (keydown.enter)="savePurchaseOrderAmounts($event)" /></span>
+                  </label>
+                } @else {
+                  <div><span>Given Amount</span><strong>{{ formatMoney(order.givenAmount || 0) }}</strong></div>
+                  <div><span>Remaining Amount</span><strong>{{ formatMoney(orderRemainingAmount(order)) }}</strong></div>
+                }
+              </div>
+              @if (isAdmin()) {
+                <div class="po-amount-save-row">
+                  <p>Given and remaining amounts stay linked. Changing either one recalculates the other.</p>
+                  <span class="po-amount-save-status" role="status" aria-live="polite">{{ amountMessage() }}</span>
+                  <button type="button" class="btn-secondary" [disabled]="!amountDirty() || amountSaving()" (click)="savePurchaseOrderAmounts()">{{ amountSaving() ? 'Saving…' : 'Save payment amounts' }}</button>
+                </div>
+              }
             </div>
 
             <div class="items-section">
@@ -366,6 +393,22 @@ type PoDraftLine = {
                         <td class="col-gstamt amount-cell">{{ formatMoney(item.gstAmount) }}</td>
                         <td class="col-total amount-cell">{{ formatMoney(itemTotal(item)) }}</td>
                       </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="payment-history-section">
+              <div class="section-label">Payment History</div>
+              <div class="po-table-wrap">
+                <table class="payment-history-table">
+                  <thead><tr><th>Given Amount Date</th><th>Given Amount</th></tr></thead>
+                  <tbody>
+                    @for (payment of order.paymentHistory || []; track $index) {
+                      <tr><td>{{ payment.date | date:'dd MMM yyyy' }}</td><td>{{ formatMoney(payment.amount) }}</td></tr>
+                    } @empty {
+                      <tr><td colspan="2" class="payment-history-empty">No payments have been recorded.</td></tr>
                     }
                   </tbody>
                 </table>
@@ -466,6 +509,20 @@ type PoDraftLine = {
     .client-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     .po-fields { grid-template-columns: 2fr 2fr 1fr; }
     .po-notes-field { grid-column: 1 / -1; }
+    .po-amount-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .po-amount-summary > div { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid #d8e1ee; border-radius: 10px; background: #f8fafc; }
+    .po-amount-summary span { color: #64748b; font-size: 11px; font-weight: 700; }
+    .po-amount-summary strong { color: #0f172a; font-size: 16px; font-variant-numeric: tabular-nums; }
+    .po-amount-editor { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #b9c9df; border-radius: 10px; background: #ffffff; }
+    .po-money-input { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px; }
+    .po-money-input b { color: #102a56; font-size: 15px; }
+    .po-money-input input { width: 100%; min-width: 0; padding: 5px 7px; border: 1px solid #9eb3d5; border-radius: 6px; background: #ffffff; color: #0f172a; font: inherit; font-size: 15px; font-weight: 750; font-variant-numeric: tabular-nums; box-sizing: border-box; }
+    .po-money-input input:focus { outline: none; border-color: #2c5cff; box-shadow: 0 0 0 3px rgba(44, 92, 255, 0.14); }
+    .po-money-input input:disabled { background: #f1f5f9; color: #64748b; }
+    .po-amount-save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; margin-top: 10px; }
+    .po-amount-save-row p { margin: 0; color: #526070; font-size: 11px; line-height: 1.45; }
+    .po-amount-save-status { min-width: 72px; color: #166534; font-size: 11px; font-weight: 700; text-align: right; }
+    .po-amount-save-row button:disabled { cursor: not-allowed; opacity: 0.55; }
     .form-field { display: flex; flex-direction: column; gap: 4px; }
     .form-field label { font-size: 11px; font-weight: 600; color: #64748b; }
     .form-field input, .form-field select, .form-field textarea { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #1e293b; background: #fff; }
@@ -546,6 +603,12 @@ type PoDraftLine = {
     .po-select-create { justify-content: flex-start !important; color: #2c5cff !important; font-weight: 700; border-top: 1px solid #e2e8f0 !important; background: #f8fafc !important; position: sticky; bottom: 0; z-index: 1; }
     .po-select-create:hover { background: #eef2ff !important; }
     .items-section { margin-bottom: 24px; overflow: visible; }
+    .payment-history-section { width: min(520px, 100%); margin: 0 0 24px; }
+    .payment-history-table { width: 100%; border-collapse: collapse; border: 1px solid #cfd8e6; font-size: 12px; }
+    .payment-history-table th { padding: 9px 12px; background: #eef4ff; color: #002263; text-align: left; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; }
+    .payment-history-table td { padding: 9px 12px; border-top: 1px solid #e8edf4; color: #334155; }
+    .payment-history-table td:last-child { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .payment-history-table .payment-history-empty { text-align: center; color: #64748b; font-weight: 500; }
     .items-section .po-table-wrap { position: relative; }
     .items-table tbody tr { position: relative; }
     .items-table tbody td { position: relative; }
@@ -622,11 +685,16 @@ type PoDraftLine = {
     @media (max-width: 768px) {
       .quotation-document { padding: 20px; }
       .po-fields { grid-template-columns: 1fr; }
+      .po-amount-summary { grid-template-columns: 1fr; }
+      .po-amount-save-row { grid-template-columns: 1fr; align-items: stretch; }
+      .po-amount-save-status { min-width: 0; text-align: left; }
       .doc-header { flex-direction: column; gap: 16px; }
       .quotation-title, .quotation-meta { text-align: left; }
       .meta-row { justify-content: flex-start; }
       .po-totals { width: 100%; }
       .editor-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .editor-actions { width: 100%; flex-wrap: wrap; }
+      .editor-actions > button { flex: 1 1 150px; justify-content: center; }
       .po-pagination { align-items: flex-start; flex-direction: column; }
       .po-pagination-actions { width: 100%; justify-content: space-between; }
     }
@@ -677,6 +745,12 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
     return `Showing ${first}-${last} of ${total}`;
   });
   readonly selectedOrder = signal<PurchaseOrder | null>(null);
+  readonly amountGivenDraft = signal(0);
+  readonly amountRemainingDraft = signal(0);
+  readonly amountEditedField = signal<"givenAmount" | "remainingAmount">("givenAmount");
+  readonly amountDirty = signal(false);
+  readonly amountSaving = signal(false);
+  readonly amountMessage = signal("");
   readonly poActionRow = signal<PurchaseOrder | null>(null);
   readonly poActionPosition = signal({ x: 0, y: 0 });
   readonly editingId = signal("");
@@ -771,6 +845,74 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   closeDetailView() {
     this.selectedOrder.set(null);
     this.closeDetail.emit();
+  }
+
+  goToProject(order: PurchaseOrder) {
+    const clientId = String(order.clientId || "").trim();
+    if (clientId) {
+      void this.router.navigate(["/clients", clientId, "projects", order.projectId, "materials"]);
+      return;
+    }
+    void this.router.navigate(["/projects"], { queryParams: { projectId: order.projectId } });
+  }
+
+  orderIssuedAmount(order: PurchaseOrder): number {
+    return Number(order.issuedAmount ?? order.grandTotal) || 0;
+  }
+
+  orderRemainingAmount(order: PurchaseOrder): number {
+    return Math.max(0, Number(order.remainingAmount ?? (this.orderIssuedAmount(order) - Number(order.givenAmount || 0))) || 0);
+  }
+
+  changePurchaseOrderAmount(field: "givenAmount" | "remainingAmount", event: Event, order: PurchaseOrder) {
+    const issued = this.orderIssuedAmount(order);
+    const input = event.target as HTMLInputElement;
+    const entered = Math.min(issued, Math.max(0, Number(input.value) || 0));
+    if (field === "givenAmount") {
+      this.amountGivenDraft.set(entered);
+      this.amountRemainingDraft.set(Math.max(0, issued - entered));
+    } else {
+      this.amountRemainingDraft.set(entered);
+      this.amountGivenDraft.set(Math.max(0, issued - entered));
+    }
+    this.amountEditedField.set(field);
+    this.amountDirty.set(true);
+    this.amountMessage.set("Unsaved changes");
+  }
+
+  async savePurchaseOrderAmounts(event?: Event) {
+    event?.preventDefault();
+    const order = this.selectedOrder();
+    if (!order || !this.isAdmin() || !this.amountDirty() || this.amountSaving()) return;
+    const field = this.amountEditedField();
+    const value = field === "givenAmount" ? this.amountGivenDraft() : this.amountRemainingDraft();
+    this.amountSaving.set(true);
+    this.amountMessage.set("Saving to database…");
+    this.error.set("");
+    try {
+      const response = await firstValueFrom(this.api.updatePurchaseOrderAmounts(order._id || order.poNumber, { [field]: value }));
+      this.selectedOrder.set(response.purchaseOrder);
+      this.orders.update((orders) => orders.map((item) =>
+        item._id === response.purchaseOrder._id || item.poNumber === response.purchaseOrder.poNumber
+          ? response.purchaseOrder
+          : item,
+      ));
+      this.syncAmountDrafts(response.purchaseOrder);
+      await this.refreshSharedMaterials(response.purchaseOrder.projectId);
+      this.amountMessage.set("Saved");
+    } catch (error: any) {
+      this.amountMessage.set("Not saved");
+      this.error.set(error?.error?.message || error?.message || "Could not save payment amounts. Please retry.");
+    } finally {
+      this.amountSaving.set(false);
+    }
+  }
+
+  private syncAmountDrafts(order: PurchaseOrder) {
+    this.amountGivenDraft.set(Math.max(0, Number(order.givenAmount) || 0));
+    this.amountRemainingDraft.set(this.orderRemainingAmount(order));
+    this.amountDirty.set(false);
+    this.amountMessage.set("");
   }
 
   isAdmin() { return this.api.user()?.role === "admin"; }
@@ -988,6 +1130,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       await this.loadOrders();
       await this.refreshSharedMaterials(response.purchaseOrder.projectId);
       this.selectedOrder.set(response.purchaseOrder);
+      this.syncAmountDrafts(response.purchaseOrder);
       this.saved.emit(response.purchaseOrder);
     } catch (error: any) { this.error.set(error?.error?.error || error?.error?.message || error?.message || "Could not save purchase order."); }
     finally { this.saving.set(false); }
@@ -1023,6 +1166,7 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
       catch { this.error.set("Purchase order could not be opened for editing."); return; }
     }
     this.selectedOrder.set(order);
+    this.syncAmountDrafts(order);
     this.editingId.set(order._id);
     this.draftProjectId.set(order.projectId);
     this.vendorId.set(order.vendorId);
@@ -1051,8 +1195,12 @@ export class PurchaseOrdersPanelComponent implements OnInit, OnChanges {
   private async openOrder(value: string) {
     if (!value) return;
     const local = this.orders().find((order) => order.poNumber === value || order._id === value);
-    if (local) { this.selectedOrder.set(local); return; }
-    try { const response = await firstValueFrom(this.api.getPurchaseOrder(value)); this.selectedOrder.set(response.purchaseOrder); }
+    if (local) { this.selectedOrder.set(local); this.syncAmountDrafts(local); return; }
+    try {
+      const response = await firstValueFrom(this.api.getPurchaseOrder(value));
+      this.selectedOrder.set(response.purchaseOrder);
+      this.syncAmountDrafts(response.purchaseOrder);
+    }
     catch { this.error.set("Purchase order could not be opened."); }
   }
 
