@@ -390,7 +390,8 @@ export class ExpenseDetailPage implements OnInit {
     );
   });
 
-  async ngOnInit(): Promise<void> {
+  constructor() {
+    // Register icons immediately to prevent broken icon placeholders
     addIcons({
       locationOutline,
       businessOutline,
@@ -405,6 +406,9 @@ export class ExpenseDetailPage implements OnInit {
       cameraOutline,
       imagesOutline,
     });
+  }
+
+  async ngOnInit(): Promise<void> {
     await this.load();
   }
 

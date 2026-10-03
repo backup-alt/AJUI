@@ -27,12 +27,46 @@ export class BillAttachmentService {
   async openPdf(url: string): Promise<void> {
     if (!url || url === "#") return;
 
-    if (Capacitor.isNativePlatform() && /^https?:\/\//i.test(url)) {
-      await FileViewer.openDocumentFromUrl({ url });
-      return;
+    // Handle native platform with both HTTP URLs and base64 data URIs
+    if (Capacitor.isNativePlatform()) {
+      // HTTP/HTTPS URLs - use FileViewer for native preview
+      if (/^https?:\/\//i.test(url)) {
+        await FileViewer.openDocumentFromUrl({ url });
+        return;
+      }
+
+      // Base64 data URIs - convert to blob and use FileViewer
+      if (/^data:application\/pdf;base64,/.test(url)) {
+        const base64Data = url.split(',')[1];
+        const blob = this.base64ToBlob(base64Data, 'application/pdf');
+        const blobUrl = URL.createObjectURL(blob);
+
+        try {
+          // Try opening with FileViewer using blob URL
+          await FileViewer.openDocumentFromUrl({ url: blobUrl });
+        } catch (error) {
+          // Fallback: open in new window/tab
+          window.open(url, "_blank", "noopener,noreferrer");
+        } finally {
+          // Clean up blob URL after a delay
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+        }
+        return;
+      }
     }
 
+    // Web fallback - open in new tab
     window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  private base64ToBlob(base64: string, mimeType: string): Blob {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
   }
 
   isPdf(fileName?: string | null, url?: string | null, mimeType?: string | null): boolean {

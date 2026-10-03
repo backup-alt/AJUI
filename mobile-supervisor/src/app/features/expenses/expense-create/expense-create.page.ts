@@ -467,7 +467,8 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
 
   private actionSheetCtrl = inject(ActionSheetController);
 
-  async ngOnInit(): Promise<void> {
+  constructor() {
+    // Register icons immediately to prevent broken icon placeholders
     addIcons({
       cartOutline,
       cashOutline,
@@ -482,6 +483,9 @@ export class ExpenseCreatePage implements OnInit, OnDestroy {
       imagesOutline,
       documentOutline,
     });
+  }
+
+  async ngOnInit(): Promise<void> {
     await this.supervisor.init();
     this.selectedSiteId.set(this.supervisor.selectedSiteId());
     this.selectedSiteName.set(this.supervisor.selectedSiteName());
