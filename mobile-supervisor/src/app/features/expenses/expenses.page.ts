@@ -501,7 +501,7 @@ export class ExpensesPage implements OnInit {
     if (!expense.billUrl) return;
     if (this.isPdfBill(expense)) {
       try {
-        await this.billAttachments.openPdf(expense.billUrl);
+        await this.billAttachments.openPdf(expense.billUrl, expense.receiptImageName || 'receipt.pdf');
       } catch (error) {
         console.error('[Expenses] Could not open PDF bill', error);
       }

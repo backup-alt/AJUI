@@ -25,13 +25,30 @@ export class BillAttachmentService {
     return this.getPhoto(CameraSource.Photos);
   }
 
-  async openPdf(url: string): Promise<void> {
+  async openPdf(url: string, fileName = "bill.pdf"): Promise<void> {
     if (!url || url === "#") return;
 
-    // Handle native platform
     if (Capacitor.isNativePlatform()) {
-      // HTTP/HTTPS URLs - use FileViewer directly
       if (/^https?:\/\//i.test(url)) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            const blob = await response.blob();
+            const base64Data = await this.blobToBase64(blob);
+            const localName = `bill-preview-${Date.now()}-${this.safeFileName(fileName)}.pdf`;
+            const result = await Filesystem.writeFile({
+              path: localName,
+              data: base64Data,
+              directory: Directory.Cache,
+            });
+            await FileViewer.openDocumentFromLocalPath({ path: result.uri });
+            this.scheduleCleanup(localName);
+            return;
+          }
+        } catch (error) {
+          console.warn("Local PDF preview failed; trying the remote document viewer", error);
+        }
+
         await FileViewer.openDocumentFromUrl({ url });
         return;
       }
@@ -40,10 +57,10 @@ export class BillAttachmentService {
       if (/^data:application\/pdf;base64,/.test(url)) {
         try {
           const base64Data = url.split(",")[1];
-          const fileName = `temp-pdf-${Date.now()}.pdf`;
+          const tempFileName = `temp-pdf-${Date.now()}.pdf`;
 
           const result = await Filesystem.writeFile({
-            path: fileName,
+            path: tempFileName,
             data: base64Data,
             directory: Directory.Cache,
           });
@@ -54,7 +71,7 @@ export class BillAttachmentService {
           setTimeout(async () => {
             try {
               await Filesystem.deleteFile({
-                path: fileName,
+                path: tempFileName,
                 directory: Directory.Cache,
               });
             } catch {
@@ -71,6 +88,29 @@ export class BillAttachmentService {
 
     // Web fallback - open in new tab
     window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  private safeFileName(fileName: string): string {
+    return fileName.replace(/[^a-z0-9_-]/gi, "_").replace(/_+/g, "_").slice(0, 48) || "bill";
+  }
+
+  private scheduleCleanup(fileName: string): void {
+    setTimeout(async () => {
+      try {
+        await Filesystem.deleteFile({ path: fileName, directory: Directory.Cache });
+      } catch {
+        // The document viewer may still be using the file.
+      }
+    }, 10 * 60 * 1000);
   }
 
   isPdf(fileName?: string | null, url?: string | null, mimeType?: string | null): boolean {

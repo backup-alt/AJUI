@@ -384,11 +384,11 @@ import { Vendor } from '../../../shared/models';
     .bill-upload-copy strong span, .bill-error { color: #dc2626; }
     .bill-upload-copy > span { color: #64748b; font-size: 12px; line-height: 1.4; }
     .bill-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-    .bill-picker { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #002263; border-radius: 8px; background: #f0f4ff; color: #002263; font: inherit; font-size: 13px; font-weight: 700; }
+    .bill-picker { display: flex; width: 100%; min-height: 78px; padding: 8px 4px; box-sizing: border-box; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 1px dashed #002263; border-radius: 8px; background: #f0f4ff; color: #002263; font: inherit; font-size: 13px; font-weight: 700; line-height: 1.15; text-align: center; }
     .bill-picker-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
     .bill-picker-primary { border-style: solid; background: #002263; color: #fff; }
     .bill-picker-secondary { border-color: #94a3b8; background: #f8fafc; color: #334155; }
-    .bill-picker ion-icon { font-size: 20px; }
+    .bill-picker ion-icon { flex: 0 0 auto; font-size: 23px; }
     .bill-file-name { display: flex; align-items: center; gap: 7px; margin: 10px 0 0; color: #15803d; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
     .bill-file-name ion-icon { flex: 0 0 auto; font-size: 18px; }
     .bill-error { margin: 9px 0 0; font-size: 12px; font-weight: 600; }

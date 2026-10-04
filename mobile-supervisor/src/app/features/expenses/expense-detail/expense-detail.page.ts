@@ -424,7 +424,7 @@ export class ExpenseDetailPage implements OnInit {
     const url = this.receiptDataUrl();
     try {
       if (this.isPdfReceipt()) {
-        await this.billAttachments.openPdf(url);
+        await this.billAttachments.openPdf(url, this.expense()?.receiptImageName || 'receipt.pdf');
       } else {
         window.open(url, '_blank', 'noopener,noreferrer');
       }

@@ -31,6 +31,7 @@ import {
 } from 'ionicons/icons';
 import { SupervisorService } from '../../core/services/supervisor.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { BillAttachmentService } from '../../core/services/bill-attachment.service';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import {
   PageHeaderComponent,
@@ -779,10 +780,12 @@ export class RequestsPage implements OnInit {
     this.resetZoom();
   }
 
-  openBill(item: RequestItem): void {
+  private billAttachments = inject(BillAttachmentService);
+
+  async openBill(item: RequestItem): Promise<void> {
     if (!item.billUrl) return;
     if (this.isPdfBill(item)) {
-      window.open(item.billUrl, '_blank', 'noopener,noreferrer');
+      await this.billAttachments.openPdf(item.billUrl, item.billFileName || 'bill.pdf');
       return;
     }
     this.openBillImage(item.billUrl);
@@ -796,20 +799,20 @@ export class RequestsPage implements OnInit {
     return files.filter((bill) => Boolean(bill.billUrl));
   }
 
-  openBillFile(bill: { billUrl: string; fileName?: string }): void {
+  async openBillFile(bill: { billUrl: string; fileName?: string }): Promise<void> {
     if (this.isPdfBillFile(bill)) {
-      window.open(bill.billUrl, '_blank', 'noopener,noreferrer');
+      await this.billAttachments.openPdf(bill.billUrl, bill.fileName || 'bill.pdf');
       return;
     }
     this.openBillImage(bill.billUrl);
   }
 
-  isPdfBillFile(bill: { fileName?: string }): boolean {
-    return String(bill.fileName || '').toLowerCase().endsWith('.pdf');
+  isPdfBillFile(bill: { billUrl: string; fileName?: string }): boolean {
+    return this.billAttachments.isPdf(bill.fileName, bill.billUrl);
   }
 
   isPdfBill(item: RequestItem): boolean {
-    return String(item.billFileName || '').toLowerCase().endsWith('.pdf');
+    return this.billAttachments.isPdf(item.billFileName, item.billUrl);
   }
 
   closeBillViewer(event: Event): void {
