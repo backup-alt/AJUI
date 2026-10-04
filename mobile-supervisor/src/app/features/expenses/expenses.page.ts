@@ -5,6 +5,7 @@ import {
   IonSegment, IonSegmentButton, IonLabel, IonFab, IonFabButton,
   IonIcon, IonSkeletonText, IonRefresher, IonRefresherContent,
   IonInfiniteScroll, IonInfiniteScrollContent,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -342,6 +343,7 @@ export class ExpensesPage implements OnInit {
   private supervisor = inject(SupervisorService);
   private router = inject(Router);
   private billAttachments = inject(BillAttachmentService);
+  private toastController = inject(ToastController);
 
   expenses = signal<Expense[]>([]);
   filteredExpenses = signal<Expense[]>([]);
@@ -504,6 +506,13 @@ export class ExpensesPage implements OnInit {
         await this.billAttachments.openPdf(expense.billUrl, expense.receiptImageName || 'receipt.pdf');
       } catch (error) {
         console.error('[Expenses] Could not open PDF bill', error);
+        const toast = await this.toastController.create({
+          message: 'Could not open this PDF. Install a PDF viewer and try again.',
+          duration: 3000,
+          color: 'danger',
+          position: 'top',
+        });
+        await toast.present();
       }
       return;
     }

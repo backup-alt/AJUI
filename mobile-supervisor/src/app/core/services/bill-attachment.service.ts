@@ -8,6 +8,7 @@ import {
 import { Capacitor } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { FileViewer } from "@capacitor/file-viewer";
+import { PdfChooser } from "../plugins/pdf-chooser.plugin";
 
 export interface BillAttachment {
   data: string;
@@ -30,23 +31,37 @@ export class BillAttachmentService {
 
     if (Capacitor.isNativePlatform()) {
       if (/^https?:\/\//i.test(url)) {
+        const localName = `bill-preview-${Date.now()}-${this.safeFileName(fileName)}.pdf`;
         try {
+          if (Capacitor.getPlatform() === "android") {
+            const download = await Filesystem.downloadFile({
+              url,
+              path: localName,
+              directory: Directory.Cache,
+            });
+            const localUri = download.path
+              || (await Filesystem.getUri({ path: localName, directory: Directory.Cache })).uri;
+            await this.openNativePdf(localUri);
+            this.scheduleCleanup(localName);
+            return;
+          }
+
           const response = await fetch(url);
           if (response.ok) {
             const blob = await response.blob();
             const base64Data = await this.blobToBase64(blob);
-            const localName = `bill-preview-${Date.now()}-${this.safeFileName(fileName)}.pdf`;
             const result = await Filesystem.writeFile({
               path: localName,
               data: base64Data,
               directory: Directory.Cache,
             });
-            await FileViewer.openDocumentFromLocalPath({ path: result.uri });
+            await this.openNativePdf(result.uri);
             this.scheduleCleanup(localName);
             return;
           }
         } catch (error) {
-          console.warn("Local PDF preview failed; trying the remote document viewer", error);
+          console.warn("Local PDF preview failed", error);
+          if (Capacitor.getPlatform() === "android") throw error;
         }
 
         await FileViewer.openDocumentFromUrl({ url });
@@ -65,19 +80,9 @@ export class BillAttachmentService {
             directory: Directory.Cache,
           });
 
-          await FileViewer.openDocumentFromLocalPath({ path: result.uri });
+          await this.openNativePdf(result.uri);
 
-          // Clean up temp file after 5 seconds
-          setTimeout(async () => {
-            try {
-              await Filesystem.deleteFile({
-                path: tempFileName,
-                directory: Directory.Cache,
-              });
-            } catch {
-              // Ignore cleanup error
-            }
-          }, 5000);
+          this.scheduleCleanup(tempFileName);
 
           return;
         } catch (error) {
@@ -97,6 +102,14 @@ export class BillAttachmentService {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
+  }
+
+  private async openNativePdf(path: string): Promise<void> {
+    if (Capacitor.getPlatform() === "android") {
+      await PdfChooser.open({ path });
+      return;
+    }
+    await FileViewer.openDocumentFromLocalPath({ path });
   }
 
   private safeFileName(fileName: string): string {

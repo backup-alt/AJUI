@@ -399,27 +399,33 @@ type PoDraftLine = {
               </div>
             </div>
 
-            <div class="payment-history-section">
-              <div class="section-label">Payment History</div>
-              <div class="po-table-wrap">
-                <table class="payment-history-table">
-                  <thead><tr><th>Given Amount Date</th><th>Given Amount</th></tr></thead>
-                  <tbody>
-                    @for (payment of order.paymentHistory || []; track $index) {
-                      <tr><td>{{ payment.date | date:'dd MMM yyyy' }}</td><td>{{ formatMoney(payment.amount) }}</td></tr>
-                    } @empty {
-                      <tr><td colspan="2" class="payment-history-empty">No payments have been recorded.</td></tr>
-                    }
-                  </tbody>
-                </table>
+            <div class="po-bottom-section">
+              <div class="payment-history-section">
+                <div class="section-label">Payment History</div>
+                <div class="po-table-wrap">
+                  <table class="payment-history-table">
+                    <colgroup>
+                      <col class="payment-history-col-date" />
+                      <col class="payment-history-col-amount" />
+                    </colgroup>
+                    <thead><tr><th>Date</th><th>Given Amount</th></tr></thead>
+                    <tbody>
+                      @for (payment of order.paymentHistory || []; track $index) {
+                        <tr><td>{{ payment.date | date:'dd MMM yyyy' }}</td><td>{{ formatMoney(payment.amount) }}</td></tr>
+                      } @empty {
+                        <tr><td colspan="2" class="payment-history-empty">No payments have been recorded.</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
 
-            <div class="po-totals">
-              <div class="total-row"><span>Subtotal</span><span class="total-value">{{ formatMoney(order.subtotal) }}</span></div>
-              <div class="total-row"><span>Total GST</span><span class="total-value">{{ formatMoney(order.totalGst) }}</span></div>
-              <div class="total-row"><span>Round Off</span><span class="total-value">{{ formatMoney(order.roundOff) }}</span></div>
-              <div class="total-row grand"><span>Grand Total</span><span class="total-value">{{ formatMoney(order.grandTotal) }}</span></div>
+              <div class="po-totals">
+                <div class="total-row"><span>Subtotal</span><span class="total-value">{{ formatMoney(order.subtotal) }}</span></div>
+                <div class="total-row"><span>Total GST</span><span class="total-value">{{ formatMoney(order.totalGst) }}</span></div>
+                <div class="total-row"><span>Round Off</span><span class="total-value">{{ formatMoney(order.roundOff) }}</span></div>
+                <div class="total-row grand"><span>Grand Total</span><span class="total-value">{{ formatMoney(order.grandTotal) }}</span></div>
+              </div>
             </div>
           </div>
         } @else {
@@ -603,12 +609,36 @@ type PoDraftLine = {
     .po-select-create { justify-content: flex-start !important; color: #2c5cff !important; font-weight: 700; border-top: 1px solid #e2e8f0 !important; background: #f8fafc !important; position: sticky; bottom: 0; z-index: 1; }
     .po-select-create:hover { background: #eef2ff !important; }
     .items-section { margin-bottom: 24px; overflow: visible; }
-    .payment-history-section { width: min(520px, 100%); margin: 0 auto 24px; }
-    .payment-history-table { width: 100%; border-collapse: collapse; border: 1px solid #cfd8e6; font-size: 12px; }
-    .payment-history-table th { padding: 9px 12px; background: #eef4ff; color: #002263; text-align: left; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; }
-    .payment-history-table td { padding: 9px 12px; border-top: 1px solid #e8edf4; color: #334155; }
-    .payment-history-table td:last-child { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .payment-history-table .payment-history-empty { text-align: center; color: #64748b; font-weight: 500; }
+    .po-bottom-section {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+    .payment-history-section {
+      width: fit-content;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .payment-history-table {
+      width: 320px;
+      min-width: 0;
+      max-width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #cfd8e6;
+      font-size: 12px;
+      table-layout: fixed;
+    }
+    .payment-history-table .payment-history-col-date,
+    .payment-history-table col:first-child { width: 120px; }
+    .payment-history-table .payment-history-col-amount,
+    .payment-history-table col:last-child { width: 200px; }
+    .payment-history-table th { padding: 9px 12px; background: #eef4ff; color: #002263; text-align: center; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; font-weight: 900; white-space: nowrap; }
+    .payment-history-table td { padding: 9px 12px; border-top: 1px solid #e8edf4; color: #334155; text-align: center; white-space: nowrap; }
+    .payment-history-table td:last-child { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .payment-history-table .payment-history-empty { text-align: center; color: #64748b; font-weight: 500; white-space: normal; }
     .items-section .po-table-wrap { position: relative; }
     .items-table tbody tr { position: relative; }
     .items-table tbody td { position: relative; }
@@ -674,6 +704,14 @@ type PoDraftLine = {
     .remove-line:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .po-totals { margin-left: auto; width: 320px; max-width: 100%; border-top: 2px solid #002263; padding-top: 12px; }
+    .po-bottom-section .po-totals {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin-left: 0;
+      justify-self: stretch;
+      box-sizing: border-box;
+    }
     .total-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13px; color: #475569; }
     .total-row .total-value { font-weight: 600; color: #1e293b; }
     .total-row input { width: 90px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; text-align: right; }
@@ -691,7 +729,9 @@ type PoDraftLine = {
       .doc-header { flex-direction: column; gap: 16px; }
       .quotation-title, .quotation-meta { text-align: left; }
       .meta-row { justify-content: flex-start; }
-      .po-totals { width: 100%; }
+      .po-bottom-section { grid-template-columns: 1fr; }
+      .po-bottom-section .po-totals { width: 100%; margin-left: 0; justify-self: stretch; }
+      .po-totals { width: 100%; margin-left: 0; }
       .editor-header { flex-direction: column; align-items: flex-start; gap: 12px; }
       .editor-actions { width: 100%; flex-wrap: wrap; }
       .editor-actions > button { flex: 1 1 150px; justify-content: center; }

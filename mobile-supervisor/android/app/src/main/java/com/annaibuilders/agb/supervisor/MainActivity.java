@@ -12,6 +12,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(PdfChooserPlugin.class);
         super.onCreate(savedInstanceState);
         Window window = getWindow();
         window.setStatusBarColor(Color.parseColor("#FFFFFF"));
