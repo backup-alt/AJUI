@@ -1,0 +1,779 @@
+# DARK_MATTER_TRACE_V7
+name: Dark Matter Cloud Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Task instructions from Dark Matter mobile'
+        required: true
+        type: string
+      model:
+        description: 'OpenCode model ID (e.g. opencode/big-pickle)'
+        required: false
+        default: 'opencode/big-pickle'
+        type: string
+      agent:
+        description: 'Agent profile (build or plan)'
+        required: false
+        default: 'build'
+        type: string
+      thread_id:
+        description: 'Dark Matter thread ID'
+        required: false
+        default: ''
+        type: string
+      target_branch:
+        description: 'Branch selected by user to inspect or push commits'
+        required: false
+        default: ''
+        type: string
+      branch_strategy:
+        description: 'direct or new_pr_branch'
+        required: false
+        default: 'direct'
+        type: string
+      keep_alive_minutes:
+        description: 'Runner timeout/keep-alive window in minutes (360 for public, 40 for private)'
+        required: false
+        default: '360'
+        type: string
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: write
+  id-token: write
+
+jobs:
+  opencode-mobile:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(inputs.keep_alive_minutes || '360') }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch || github.ref_name }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Cache OpenCode CLI
+        id: cache-opencode
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.opencode-cli
+            ~/.local/share/opencode
+            ~/.cache/opencode
+          key: ${{ runner.os }}-opencode-cli-v2
+          restore-keys: |
+            ${{ runner.os }}-opencode-cli-
+
+      - name: Prepare OpenCode CLI
+        run: |
+          mkdir -p "$HOME/.opencode-cli/node_modules/.bin"
+          if [ ! -x "$HOME/.opencode-cli/node_modules/.bin/opencode" ]; then
+            npm install --prefix "$HOME/.opencode-cli" --no-save --silent opencode-ai@latest
+          fi
+          cat << 'WEBSEARCH_EOF' > "$HOME/.opencode-cli/node_modules/.bin/dm-websearch"
+          #!/usr/bin/env node
+          const https = require('https');
+          const q = process.argv.slice(2).join(' ').trim();
+          if (!q) {
+            console.log('Usage: dm-websearch "<search query or https://url>"');
+            process.exit(0);
+          }
+          function get(url, headers = {}) {
+            return new Promise((resolve) => {
+              const req = https.get(url, {
+                headers: Object.assign({
+                  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
+                  'Accept': 'text/html,application/json;q=0.9,*/*;q=0.8'
+                }, headers),
+                timeout: 8000
+              }, (res) => {
+                if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                  const next = res.headers.location.startsWith('http')
+                    ? res.headers.location
+                    : new URL(res.headers.location, url).toString();
+                  resolve(get(next, headers));
+                  return;
+                }
+                let data = '';
+                res.on('data', (c) => { if (data.length < 220000) data += c; });
+                res.on('end', () => resolve(data));
+              });
+              req.on('error', () => resolve(''));
+              req.on('timeout', () => { req.destroy(); resolve(''); });
+            });
+          }
+          function stripHtml(html) {
+            return String(html || '')
+              .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+              .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&nbsp;/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+          }
+          (async () => {
+            if (/^https?:\/\//i.test(q)) {
+              const raw = await get(q);
+              console.log('URL: ' + q + '\n\n' + stripHtml(raw).slice(0, 7000));
+              return;
+            }
+            const ddgUrl = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q);
+            const html = await get(ddgUrl);
+            const results = [];
+            const re = /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>|<div[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>)/gi;
+            let m;
+            while ((m = re.exec(html)) && results.length < 6) {
+              let link = m[1] || '';
+              const uddg = link.match(/[?&]uddg=([^&]+)/);
+              if (uddg) link = decodeURIComponent(uddg[1]);
+              const title = stripHtml(m[2]);
+              const snippet = stripHtml(m[3] || m[4] || '');
+              if (title && link) results.push({ title, url: link, snippet });
+            }
+            if (results.length === 0) {
+              const wikiUrl = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(q) + '&utf8=&format=json&srlimit=5';
+              const wikiRaw = await get(wikiUrl);
+              try {
+                const j = JSON.parse(wikiRaw);
+                for (const item of (j.query && j.query.search) || []) {
+                  results.push({
+                    title: item.title,
+                    url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(item.title.replace(/ /g, '_')),
+                    snippet: stripHtml(item.snippet || '')
+                  });
+                }
+              } catch {}
+            }
+            if (results.length === 0) {
+              console.log('No direct web matches found for: ' + q);
+            } else {
+              results.forEach((r, i) => {
+                console.log((i + 1) + '. ' + r.title + '\n   URL: ' + r.url + '\n   ' + r.snippet + '\n');
+              });
+            }
+          })();
+          WEBSEARCH_EOF
+          chmod +x "$HOME/.opencode-cli/node_modules/.bin/dm-websearch"
+          echo "$HOME/.opencode-cli/node_modules/.bin" >> "$GITHUB_PATH"
+          ACTOR_NAME="${GITHUB_ACTOR:-${GITHUB_REPOSITORY_OWNER:-developer}}"
+          ACTOR_ID="${GITHUB_ACTOR_ID:-}"
+          if [ -n "$ACTOR_ID" ]; then
+            ACTOR_EMAIL="${ACTOR_ID}+${ACTOR_NAME}@users.noreply.github.com"
+          else
+            ACTOR_EMAIL="${ACTOR_NAME}@users.noreply.github.com"
+          fi
+          git config user.name "$ACTOR_NAME"
+          git config user.email "$ACTOR_EMAIL"
+
+      - name: Run OpenCode CLI
+        shell: bash
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DM_GITHUB_REPOSITORY: ${{ github.repository }}
+          DM_GITHUB_RUN_ID: ${{ github.run_id }}
+          DM_GITHUB_SHA: ${{ github.sha }}
+          NO_COLOR: "1"
+          OPENCODE_CONFIG: "/tmp/dark-matter-opencode.json"
+          TASK_PROMPT: ${{ inputs.prompt }}
+          TASK_MODEL: ${{ inputs.model || 'opencode/big-pickle' }}
+          TASK_AGENT: ${{ inputs.agent || 'build' }}
+          TASK_THREAD_ID: ${{ inputs.thread_id }}
+          TARGET_BRANCH: ${{ inputs.target_branch || github.ref_name }}
+          BRANCH_STRATEGY: ${{ inputs.branch_strategy || 'direct' }}
+          DEFAULT_BRANCH: ${{ github.ref_name }}
+        run: |
+          MODEL="${TASK_MODEL:-opencode/big-pickle}"
+          AGENT_MODE="${TASK_AGENT:-build}"
+          RAW_JSON_FILE="/tmp/opencode_events.jsonl"
+          OUT_FILE="/tmp/opencode_reply.txt"
+          ERR_FILE="/tmp/opencode_err.txt"
+          TRACE_B64_FILE="/tmp/opencode_trace.b64"
+          INITIAL_HEAD_SHA=$(git rev-parse HEAD 2>/dev/null || true)
+
+          if [ "$AGENT_MODE" = "plan" ]; then
+            printf '{"permission":{"*":"deny","read":"allow","glob":"allow","grep":"allow","list":"allow","webfetch":"allow","websearch":"allow","fetch":"allow","search":"allow","bash":"allow"}}' > /tmp/dark-matter-opencode.json
+            export OPENCODE_PERMISSION='{"*":"deny","read":"allow","glob":"allow","grep":"allow","list":"allow","webfetch":"allow","websearch":"allow","fetch":"allow","search":"allow","bash":"allow"}'
+            INSTRUCTIONS="$TASK_PROMPT"
+          else
+            printf '{"permission":"allow"}' > /tmp/dark-matter-opencode.json
+            export OPENCODE_PERMISSION='{"*":"allow"}'
+            INSTRUCTIONS="$TASK_PROMPT"
+          fi
+
+          HELP_TEXT=$(opencode run --help 2>&1 || true)
+          OPENCODE_FLAGS=()
+          if printf '%s' "$HELP_TEXT" | grep -q -- '--format'; then
+            OPENCODE_FLAGS+=(--format json)
+          fi
+          if printf '%s' "$HELP_TEXT" | grep -q -- '--thinking'; then
+            OPENCODE_FLAGS+=(--thinking)
+          fi
+          if printf '%s' "$HELP_TEXT" | grep -q -- '--agent'; then
+            OPENCODE_FLAGS+=(--agent "$AGENT_MODE")
+          fi
+
+          cat << 'NODE_EOF' > /tmp/dm_live.js
+          const fs = require('fs');
+          const https = require('https');
+          const readline = require('readline');
+
+          const rawFile = '/tmp/opencode_events.jsonl';
+          const outFile = '/tmp/opencode_reply.txt';
+          const traceFile = '/tmp/opencode_trace.b64';
+          const modelName = process.env.TASK_MODEL || 'opencode/big-pickle';
+          const agentMode = process.env.TASK_AGENT || 'build';
+          const ghToken = process.env.GH_TOKEN || '';
+          const ghRepo = process.env.DM_GITHUB_REPOSITORY || '';
+          const ghRunId = String(process.env.DM_GITHUB_RUN_ID || '');
+          const ghSha = process.env.DM_GITHUB_SHA || '';
+
+          try { fs.writeFileSync(rawFile, ''); } catch {}
+
+          const thinkChunks = [];
+          let roundTextBuffer = [];
+          const allTextChunks = [];
+          const nonJsonLines = [];
+          const reads = new Set();
+          const writes = new Set();
+          const shell = new Set();
+          const searches = new Set();
+          const subagents = new Set();
+          const skills = new Set();
+          const steps = [];
+          let parsedAnyJson = false;
+          let turnCount = 0;
+          let totalOutputTokens = 0;
+          let totalReasoningTokens = 0;
+          let lastFinishReason = '';
+          let liveStep = 'Invoking ' + modelName + ' (' + agentMode + ' mode)';
+
+          function addStep(label) {
+            const clean = String(label || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+            if (!clean) return;
+            liveStep = clean;
+            if (steps.length < 36 && steps[steps.length - 1] !== clean) {
+              steps.push(clean);
+            }
+          }
+
+          function appendThinking(rawChunk, isDelta) {
+            const text = String(rawChunk || '');
+            if (!text.trim()) return;
+            if (isDelta && thinkChunks.length > 0) {
+              thinkChunks[thinkChunks.length - 1] += text;
+            } else {
+              const trimmed = text.trim();
+              const prev = thinkChunks.length > 0 ? thinkChunks[thinkChunks.length - 1].trim() : '';
+              if (prev && trimmed.startsWith(prev) && trimmed.length >= prev.length) {
+                thinkChunks[thinkChunks.length - 1] = trimmed;
+              } else if (prev !== trimmed) {
+                thinkChunks.push(trimmed);
+              }
+            }
+            const latestPreview = thinkChunks[thinkChunks.length - 1].trim().split(/\r?\n/).pop() || '';
+            if (latestPreview) {
+              liveStep = 'Thinking: ' + latestPreview.slice(0, 72);
+            }
+          }
+
+          function promoteRoundTextAsNarration() {
+            if (roundTextBuffer.length === 0) return;
+            const joined = roundTextBuffer.join(' ').replace(/\s+/g, ' ').trim();
+            roundTextBuffer = [];
+            if (joined) {
+              appendThinking(joined, false);
+              addStep('Planned: ' + joined.slice(0, 88));
+            }
+          }
+
+          function shortPath(p) {
+            const parts = String(p || '').split('/').filter(Boolean);
+            return parts.length <= 2 ? String(p || '') : parts.slice(-2).join('/');
+          }
+
+          function addSkillIfSkillPath(p) {
+            if (!p) return;
+            const norm = String(p);
+            const m = norm.match(/(?:^|\/)([^\/]+)\/SKILL\.md$/i);
+            if (m && m[1]) {
+              skills.add(m[1]);
+              addStep('Loaded skill: ' + m[1]);
+            } else if (/\.opencode\/skills\/([^\/]+)/i.test(norm)) {
+              const sk = norm.match(/\.opencode\/skills\/([^\/]+)/i)[1];
+              skills.add(sk);
+              addStep('Loaded skill: ' + sk);
+            }
+          }
+
+          function recordTool(nameRaw, inputObj, stateObj) {
+            promoteRoundTextAsNarration();
+            const name = String(nameRaw || '').toLowerCase();
+            const inp = inputObj && typeof inputObj === 'object' ? inputObj : {};
+            const st = stateObj && typeof stateObj === 'object' ? stateObj : {};
+            const title = typeof st.title === 'string' ? st.title.trim() : '';
+            const path = inp.filePath || inp.file_path || inp.path || inp.file || inp.target || inp.filename || inp.dir || inp.directory || '';
+
+            if (name.includes('webfetch') || name.includes('websearch') || name.includes('web_search') || name.includes('search_web') || name === 'fetch') {
+              const target = inp.url || inp.query || inp.q || inp.prompt || path || title || '';
+              if (target) {
+                const cleanTarget = String(target).slice(0, 100);
+                searches.add('web: ' + cleanTarget);
+                addStep('Searched web: ' + cleanTarget.slice(0, 72));
+              }
+            } else if (name === 'read' || name.includes('read_file') || name.includes('read_repo') || name === 'view_file' || name === 'cat') {
+              const target = path || title;
+              if (target) {
+                reads.add(String(target));
+                addStep('Read ' + shortPath(target));
+                addSkillIfSkillPath(target);
+              }
+            } else if (name.includes('write') && !name.includes('todo')) {
+              const target = path || title;
+              if (target) {
+                writes.add(String(target));
+                addStep('Edited ' + shortPath(target));
+              }
+            } else if (name.includes('edit') || name.includes('patch') || name.includes('replace')) {
+              const target = path || title;
+              if (target) {
+                writes.add(String(target));
+                addStep('Edited ' + shortPath(target));
+              }
+            } else if (name.includes('delete') || name.includes('remove') || name.includes('unlink')) {
+              const target = path || title;
+              if (target) {
+                writes.add(String(target));
+                addStep('Deleted ' + shortPath(target));
+              }
+            } else if (name.includes('bash') || name.includes('shell') || name.includes('exec') || name.includes('command')) {
+              const cmd = inp.command || inp.cmd || inp.script || title || '';
+              if (cmd) {
+                const line = String(cmd).split('\n')[0].slice(0, 120);
+                shell.add(line);
+                const dmMatch = line.match(/dm-websearch\s+["']?([^"'\n]+)["']?/i);
+                if (dmMatch && dmMatch[1]) {
+                  const wq = dmMatch[1].trim().slice(0, 90);
+                  searches.add('web: ' + wq);
+                  addStep('Searched web: ' + wq.slice(0, 72));
+                } else {
+                  addStep('Executed shell: ' + (title || line).slice(0, 72));
+                }
+              }
+            } else if (name.includes('grep') || name.includes('glob') || name.includes('find') || name.includes('list') || name === 'codesearch' || name === 'ls') {
+              const q = inp.pattern || inp.query || inp.glob || inp.path || inp.filePath || inp.file_path || title || '';
+              if (q) {
+                searches.add(name + ': ' + String(q).slice(0, 80));
+                addStep('Searched ' + name + ': ' + String(q).slice(0, 64));
+              }
+            } else if (name.includes('task') || name.includes('subagent') || name === 'agent') {
+              const stType = inp.subagent_type || inp.agent || 'subagent';
+              const desc = inp.description ? (': ' + String(inp.description).slice(0, 60)) : '';
+              subagents.add(String(stType) + desc);
+              addStep('Launched sub-agent: ' + String(stType) + desc);
+            } else if (name.includes('skill')) {
+              const sname = inp.name || inp.skill || inp.path || title || 'skill';
+              skills.add(String(sname));
+              addStep('Loaded skill: ' + String(sname));
+            } else if (name.includes('todo')) {
+              const count = Array.isArray(inp.todos) ? inp.todos.length : 0;
+              addStep(title || (count > 0 ? 'Updated task checklist (' + count + ' items)' : 'Updated task checklist'));
+            } else if (name.includes('question')) {
+              addStep('Prepared clarifying question');
+            } else if (title || name) {
+              addStep(title || ('Ran tool: ' + name));
+            }
+          }
+
+          function collectParts(evt) {
+            const out = [];
+            if (evt.part && typeof evt.part === 'object') out.push(evt.part);
+            if (evt.properties && evt.properties.part && typeof evt.properties.part === 'object') out.push(evt.properties.part);
+            if (Array.isArray(evt.parts)) evt.parts.forEach((x) => { if (x && typeof x === 'object') out.push(x); });
+            if (evt.message && Array.isArray(evt.message.parts)) evt.message.parts.forEach((x) => { if (x && typeof x === 'object') out.push(x); });
+            if (evt.item && typeof evt.item === 'object') out.push(evt.item);
+            if (out.length === 0) out.push(evt);
+            return out;
+          }
+
+          function buildTraceObject() {
+            return {
+              thinking: thinkChunks.join('\n\n').slice(0, 3200),
+              reads: Array.from(reads).slice(0, 24),
+              writes: Array.from(writes).slice(0, 24),
+              shell: Array.from(shell).slice(0, 20),
+              searches: Array.from(searches).slice(0, 20),
+              subagents: Array.from(subagents).slice(0, 12),
+              skills: Array.from(skills).slice(0, 12),
+              steps: steps.slice(0, 36),
+              liveStep: liveStep,
+            };
+          }
+
+          let checkRunId = null;
+          let checkDisabled = !ghToken || !ghRepo || !ghSha || !ghRunId;
+          let lastPatchMs = 0;
+          let patchTimer = null;
+          let inflightPromise = Promise.resolve();
+
+          function ghRequest(method, apiPath, bodyObj) {
+            if (checkDisabled) return Promise.resolve(null);
+            return new Promise((resolve) => {
+              const data = bodyObj ? JSON.stringify(bodyObj) : '';
+              const req = https.request({
+                hostname: 'api.github.com',
+                path: apiPath,
+                method: method,
+                timeout: 5000,
+                headers: {
+                  'Authorization': 'Bearer ' + ghToken,
+                  'Accept': 'application/vnd.github+json',
+                  'User-Agent': 'DarkMatter-CloudRunner/1.0',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
+                  'Content-Length': Buffer.byteLength(data)
+                }
+              }, (res) => {
+                let raw = '';
+                res.on('data', (c) => { if (raw.length < 32768) raw += c; });
+                res.on('end', () => {
+                  if (res.statusCode === 403 || res.statusCode === 404) {
+                    checkDisabled = true;
+                    resolve(null);
+                    return;
+                  }
+                  try { resolve(res.statusCode >= 200 && res.statusCode < 300 ? JSON.parse(raw || '{}') : null); }
+                  catch { resolve(null); }
+                });
+              });
+              req.on('error', () => resolve(null));
+              req.on('timeout', () => { req.destroy(); resolve(null); });
+              if (data) req.write(data);
+              req.end();
+            });
+          }
+
+          async function pushCheckRunUpdate(isFinal) {
+            if (checkDisabled) return;
+            const payloadObj = buildTraceObject();
+            const b64 = Buffer.from(JSON.stringify(payloadObj), 'utf8').toString('base64');
+            const outputBody = {
+              title: 'Dark Matter Trace',
+              summary: liveStep.slice(0, 140),
+              text: '<<<DARK_MATTER_LIVE_TRACE>>>' + b64 + '<<<DARK_MATTER_LIVE_TRACE_END>>>'
+            };
+            if (!checkRunId) {
+              const created = await ghRequest('POST', '/repos/' + ghRepo + '/check-runs', {
+                name: 'dark-matter-trace',
+                head_sha: ghSha,
+                external_id: ghRunId,
+                status: isFinal ? 'completed' : 'in_progress',
+                conclusion: isFinal ? 'neutral' : undefined,
+                output: outputBody
+              });
+              if (created && created.id) checkRunId = created.id;
+            } else {
+              const patchBody = isFinal
+                ? { status: 'completed', conclusion: 'neutral', output: outputBody }
+                : { output: outputBody };
+              await ghRequest('PATCH', '/repos/' + ghRepo + '/check-runs/' + checkRunId, patchBody);
+            }
+          }
+
+          function scheduleLiveUpdate() {
+            if (checkDisabled || patchTimer) return;
+            const now = Date.now();
+            const waitMs = Math.max(0, 1800 - (now - lastPatchMs));
+            patchTimer = setTimeout(() => {
+              patchTimer = null;
+              lastPatchMs = Date.now();
+              inflightPromise = inflightPromise.then(() => pushCheckRunUpdate(false));
+            }, waitMs);
+          }
+
+          if (!checkDisabled) {
+            inflightPromise = inflightPromise.then(() => pushCheckRunUpdate(false));
+          }
+
+          const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+          rl.on('line', (line) => {
+            try { fs.appendFileSync(rawFile, line + '\n'); } catch {}
+            const t = line.trim();
+            if (!t) return;
+            if (!t.startsWith('{')) {
+              nonJsonLines.push(line);
+              return;
+            }
+            let evt;
+            try { evt = JSON.parse(t); } catch { nonJsonLines.push(line); return; }
+            parsedAnyJson = true;
+            const delta = (evt.properties && typeof evt.properties.delta === 'string') ? evt.properties.delta : (typeof evt.delta === 'string' ? evt.delta : '');
+            for (const p of collectParts(evt)) {
+              const typ = String(p.type || evt.type || '').toLowerCase();
+              if (typeof p.reasoning_content === 'string') appendThinking(p.reasoning_content, false);
+              if (typeof p.reasoning === 'string') appendThinking(p.reasoning, false);
+              if (typeof p.thinking === 'string') appendThinking(p.thinking, false);
+              if (typeof evt.reasoning_content === 'string') appendThinking(evt.reasoning_content, false);
+              if (typeof evt.reasoning === 'string') appendThinking(evt.reasoning, false);
+
+              if (typ.includes('reason') || typ.includes('think')) {
+                const r = delta || p.text || p.thinking || p.reasoning || evt.text || evt.thinking || '';
+                if (typeof r === 'string' && r.trim()) {
+                  appendThinking(r, Boolean(delta));
+                }
+              } else if (typ === 'step_start' || typ === 'step-start') {
+                turnCount++;
+                promoteRoundTextAsNarration();
+                if (turnCount === 1 && steps.length === 0) {
+                  addStep('Model ' + modelName + ' analyzing request');
+                } else if (turnCount > 1) {
+                  liveStep = 'Processing step ' + turnCount + '…';
+                }
+              } else if (typ === 'step_finish' || typ === 'step-finish') {
+                const tokens = p.tokens || evt.tokens || {};
+                const outTok = Number(tokens.output || 0);
+                const reasonTok = Number(tokens.reasoning || 0);
+                if (outTok > 0) totalOutputTokens += outTok;
+                if (reasonTok > 0) totalReasoningTokens += reasonTok;
+                const reason = String(p.reason || evt.reason || '').trim();
+                if (reason) lastFinishReason = reason;
+              } else if (typ === 'error') {
+                const errObj = p.error || evt.error || p;
+                const msg = typeof errObj === 'string' ? errObj : (errObj.message || JSON.stringify(errObj));
+                if (msg) addStep('Error: ' + String(msg).slice(0, 90));
+              } else if (typ.includes('tool') || p.tool || evt.tool) {
+                const toolName = p.tool || p.name || p.toolName || evt.tool || evt.name || '';
+                const st = p.state && typeof p.state === 'object' ? p.state : evt.state || {};
+                const inp = st.input || p.input || p.args || p.arguments || evt.input || {};
+                recordTool(toolName, inp, st);
+              } else if (typ === 'text' || typ === 'assistant' || (p.type === 'text' && typeof p.text === 'string')) {
+                const txt = delta || p.text || evt.text || evt.content || '';
+                if (typeof txt === 'string' && txt.trim()) {
+                  roundTextBuffer.push(txt);
+                  allTextChunks.push(txt);
+                }
+              }
+            }
+            scheduleLiveUpdate();
+          });
+
+          rl.on('close', async () => {
+            if (patchTimer) {
+              clearTimeout(patchTimer);
+              patchTimer = null;
+            }
+            let finalText = parsedAnyJson
+              ? (roundTextBuffer.length > 0 ? roundTextBuffer : allTextChunks).join('\n').trim()
+              : nonJsonLines.join('\n').trim();
+            finalText = finalText.replace(/<(?:think|thinking|thought)>([\s\S]*?)<\/(?:think|thinking|thought)>/gi, (_, inner) => {
+              if (inner && inner.trim()) {
+                appendThinking(inner.trim(), false);
+              }
+              return '';
+            }).trim();
+
+            if (thinkChunks.length === 0 && reads.size === 0 && writes.size === 0 && shell.size === 0 && searches.size === 0) {
+              addStep('Ran ' + modelName + ' (' + agentMode + ' mode) — direct reply, no repo tools needed');
+            }
+            if (totalOutputTokens > 0 || totalReasoningTokens > 0) {
+              const tokParts = [];
+              if (totalReasoningTokens > 0) tokParts.push(totalReasoningTokens + ' reasoning');
+              if (totalOutputTokens > 0) tokParts.push(totalOutputTokens + ' output');
+              const finSuffix = lastFinishReason ? (lastFinishReason + ' · ') : '';
+              addStep('Model finished (' + finSuffix + tokParts.join(', ') + ' tokens)');
+            } else if (lastFinishReason) {
+              addStep('Model finished (' + lastFinishReason + ')');
+            }
+
+            fs.writeFileSync(outFile, finalText);
+            const finalTrace = buildTraceObject();
+            fs.writeFileSync(traceFile, Buffer.from(JSON.stringify(finalTrace), 'utf8').toString('base64'));
+            await inflightPromise;
+            await pushCheckRunUpdate(true);
+          });
+          NODE_EOF
+
+          run_opencode() {
+            opencode run "${OPENCODE_FLAGS[@]}" -m "$MODEL" "$INSTRUCTIONS"
+          }
+
+          set +e
+          run_opencode 2>"$ERR_FILE" | node /tmp/dm_live.js
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [ $STATUS -ne 0 ] || [ ! -s "$RAW_JSON_FILE" ]; then
+            if grep -qiE "Free usage limit|rate limit|401|unauthorized|quota" "$ERR_FILE" "$RAW_JSON_FILE" 2>/dev/null || [ -z "$OPENCODE_API_KEY" ]; then
+              echo "Retrying OpenCode CLI with public free tier..."
+              set +e
+              env -u OPENCODE_API_KEY opencode run "${OPENCODE_FLAGS[@]}" -m "$MODEL" "$INSTRUCTIONS" 2>"$ERR_FILE" | node /tmp/dm_live.js
+              STATUS=${PIPESTATUS[0]}
+              set -e
+            fi
+          fi
+
+          if [ ! -s "$OUT_FILE" ] && [ -s "$RAW_JSON_FILE" ]; then
+            cp "$RAW_JSON_FILE" "$OUT_FILE"
+          fi
+
+          PR_URL=""
+          PR_ERROR=""
+          COMMIT_URL=""
+          BRANCH_NAME=""
+          CHANGED_FILES=""
+          FILE_STATS_B64=""
+          if [ "$AGENT_MODE" != "plan" ]; then
+            if [ -n "$(git status --porcelain)" ]; then
+              git add -A
+              git commit -m "feat: ${TASK_THREAD_ID:-update}" || true
+            fi
+            COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || true)
+            if [ -n "$INITIAL_HEAD_SHA" ] && [ -n "$COMMIT_SHA" ] && [ "$INITIAL_HEAD_SHA" != "$COMMIT_SHA" ]; then
+              CHANGED_FILES=$(git diff --name-only "$INITIAL_HEAD_SHA" "$COMMIT_SHA" | tr '\n' ',' | sed 's/,$//')
+              FILE_STATS_B64=$(INITIAL_SHA="$INITIAL_HEAD_SHA" HEAD_SHA="$COMMIT_SHA" node -e '
+                const { execFileSync } = require("child_process");
+                const base = process.env.INITIAL_SHA;
+                const head = process.env.HEAD_SHA;
+                const statusOut = execFileSync("git", ["diff", "--name-status", base, head]).toString();
+                const numOut = execFileSync("git", ["diff", "--numstat", base, head]).toString();
+                const statusMap = {};
+                for (const l of statusOut.trim().split(/\r?\n/)) {
+                  if (!l) continue;
+                  const parts = l.split(/\t/);
+                  if (parts.length >= 2) statusMap[parts[parts.length - 1]] = parts[0].slice(0, 1);
+                }
+                const stats = [];
+                let patchBudget = 11000;
+                for (const l of numOut.trim().split(/\r?\n/)) {
+                  if (!l) continue;
+                  const parts = l.split(/\t/);
+                  if (parts.length < 3) continue;
+                  const path = parts.slice(2).join("\t");
+                  let patch = "";
+                  if (patchBudget > 300) {
+                    try {
+                      const rawDiff = execFileSync("git", ["diff", "-U2", "--no-color", base, head, "--", path], { maxBuffer: 512 * 1024 }).toString();
+                      const diffLines = rawDiff.split(/\r?\n/);
+                      const hunkStart = diffLines.findIndex(dl => dl.startsWith("@@"));
+                      const relevant = (hunkStart >= 0 ? diffLines.slice(hunkStart) : diffLines).slice(0, 38);
+                      let joined = relevant.join("\n").slice(0, Math.min(1150, patchBudget));
+                      if (diffLines.length - (hunkStart >= 0 ? hunkStart : 0) > 38) joined += "\n... (diff truncated)";
+                      patch = joined;
+                      patchBudget -= patch.length;
+                    } catch {}
+                  }
+                  stats.push({
+                    path,
+                    status: statusMap[path] || "M",
+                    additions: parseInt(parts[0], 10) || 0,
+                    deletions: parseInt(parts[1], 10) || 0,
+                    patch
+                  });
+                  if (stats.length >= 40) break;
+                }
+                process.stdout.write(Buffer.from(JSON.stringify(stats), "utf8").toString("base64"));
+              ' 2>/dev/null || true)
+
+              DEST_BRANCH="${TARGET_BRANCH:-${DEFAULT_BRANCH:-main}}"
+              if [ "$BRANCH_STRATEGY" = "new_pr_branch" ]; then
+                BRANCH_NAME="dark-matter/cloud-${GITHUB_RUN_ID}"
+                git checkout -B "$BRANCH_NAME"
+                if git push -u origin "$BRANCH_NAME" 2>/tmp/git_push_err.txt; then
+                  COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${COMMIT_SHA}"
+                  PR_OUT=$(gh pr create --base "$DEST_BRANCH" --head "$BRANCH_NAME" --title "Update: ${TASK_THREAD_ID:-Cloud Agent Update}" --body "Automated OpenCode cloud run #${GITHUB_RUN_ID} using model \`$MODEL\`. Changed files: ${CHANGED_FILES}" 2>&1 || true)
+                  PR_URL=$(printf '%s\n' "$PR_OUT" | grep -E '^https://' | tail -n 1 || true)
+                  if [ -z "$PR_URL" ]; then
+                    PR_ERROR=$(printf '%s' "$PR_OUT" | tr '\n' ' ' | head -c 220)
+                  fi
+                else
+                  PR_ERROR=$(cat /tmp/git_push_err.txt | tr '\n' ' ' | head -c 220)
+                  BRANCH_NAME=""
+                fi
+              else
+                if git push origin HEAD:"refs/heads/$DEST_BRANCH" 2>/tmp/git_push_err.txt; then
+                  BRANCH_NAME="$DEST_BRANCH"
+                  COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${COMMIT_SHA}"
+                else
+                  # Fallback only if target branch is protected from direct push
+                  BRANCH_NAME="dark-matter/cloud-${GITHUB_RUN_ID}"
+                  git checkout -B "$BRANCH_NAME"
+                  if git push -u origin "$BRANCH_NAME" 2>>/tmp/git_push_err.txt; then
+                    COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${COMMIT_SHA}"
+                    PR_OUT=$(gh pr create --base "$DEST_BRANCH" --head "$BRANCH_NAME" --title "Update: ${TASK_THREAD_ID:-Cloud Agent Update}" --body "Branch protection on \`$DEST_BRANCH\` required a PR. Run #${GITHUB_RUN_ID} using \`$MODEL\`." 2>&1 || true)
+                    PR_URL=$(printf '%s\n' "$PR_OUT" | grep -E '^https://' | tail -n 1 || true)
+                    PR_ERROR="Direct push to '$DEST_BRANCH' was blocked by branch protection; opened PR instead."
+                  else
+                    PR_ERROR=$(cat /tmp/git_push_err.txt | tr '\n' ' ' | head -c 220)
+                    BRANCH_NAME=""
+                  fi
+                fi
+              fi
+            fi
+          fi
+
+          printf '\n%s\n' '<<<DARK_MATTER_REPLY_START>>>'
+          if [ -s "$OUT_FILE" ]; then
+            cat "$OUT_FILE"
+          elif [ -s "$ERR_FILE" ]; then
+            echo "OpenCode CLI failed (exit $STATUS):"
+            cat "$ERR_FILE"
+          else
+            echo "OpenCode CLI finished (exit $STATUS) with empty output."
+          fi
+          printf '\n%s\n' '<<<DARK_MATTER_REPLY_END>>>'
+          if [ -n "$BRANCH_NAME" ]; then
+            printf '<<<DARK_MATTER_BRANCH>>>%s<<<DARK_MATTER_BRANCH_END>>>\n' "$BRANCH_NAME"
+          fi
+          if [ -n "$CHANGED_FILES" ]; then
+            printf '<<<DARK_MATTER_FILES>>>%s<<<DARK_MATTER_FILES_END>>>\n' "$CHANGED_FILES"
+          fi
+          if [ -n "$FILE_STATS_B64" ]; then
+            printf '<<<DARK_MATTER_FILE_STATS>>>%s<<<DARK_MATTER_FILE_STATS_END>>>\n' "$FILE_STATS_B64"
+          fi
+          if [ -s "$TRACE_B64_FILE" ]; then
+            printf '<<<DARK_MATTER_TRACE>>>%s<<<DARK_MATTER_TRACE_END>>>\n' "$(cat "$TRACE_B64_FILE")"
+          fi
+          if [ -n "$COMMIT_URL" ]; then
+            printf '<<<DARK_MATTER_COMMIT_URL>>>%s<<<DARK_MATTER_COMMIT_URL_END>>>\n' "$COMMIT_URL"
+          fi
+          if [ -n "$PR_URL" ]; then
+            printf '<<<DARK_MATTER_PR_URL>>>%s<<<DARK_MATTER_PR_URL_END>>>\n' "$PR_URL"
+          fi
+          if [ -n "$PR_ERROR" ]; then
+            printf '<<<DARK_MATTER_PR_ERROR>>>%s<<<DARK_MATTER_PR_ERROR_END>>>\n' "$PR_ERROR"
+          fi
+
+          if [ $STATUS -ne 0 ] && [ ! -s "$OUT_FILE" ]; then
+            exit $STATUS
+          fi
+
+  opencode-comment:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      (contains(github.event.comment.body, '/oc') ||
+       contains(github.event.comment.body, '/opencode'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Run OpenCode PR Agent
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: opencode/big-pickle
+          use_github_token: true
