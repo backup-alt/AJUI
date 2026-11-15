@@ -1,4 +1,4 @@
-# DARK_MATTER_TRACE_V7
+# DARK_MATTER_TRACE_V10
 name: Dark Matter Cloud Agent
 
 on:
@@ -37,6 +37,11 @@ on:
         description: 'Runner timeout/keep-alive window in minutes (360 for public, 40 for private)'
         required: false
         default: '360'
+        type: string
+      thinking:
+        description: 'Enable extended reasoning trace for complex queries (true/false)'
+        required: false
+        default: 'true'
         type: string
   issue_comment:
     types: [created]
@@ -191,6 +196,7 @@ jobs:
           TARGET_BRANCH: ${{ inputs.target_branch || github.ref_name }}
           BRANCH_STRATEGY: ${{ inputs.branch_strategy || 'direct' }}
           DEFAULT_BRANCH: ${{ github.ref_name }}
+          TASK_THINKING: ${{ inputs.thinking || 'true' }}
         run: |
           MODEL="${TASK_MODEL:-opencode/big-pickle}"
           AGENT_MODE="${TASK_AGENT:-build}"
@@ -199,6 +205,8 @@ jobs:
           ERR_FILE="/tmp/opencode_err.txt"
           TRACE_B64_FILE="/tmp/opencode_trace.b64"
           INITIAL_HEAD_SHA=$(git rev-parse HEAD 2>/dev/null || true)
+          DM_START_MARKER="/tmp/dm_run_started_marker"
+          touch "$DM_START_MARKER" 2>/dev/null || true
 
           if [ "$AGENT_MODE" = "plan" ]; then
             printf '{"permission":{"*":"deny","read":"allow","glob":"allow","grep":"allow","list":"allow","webfetch":"allow","websearch":"allow","fetch":"allow","search":"allow","bash":"allow"}}' > /tmp/dark-matter-opencode.json
@@ -210,12 +218,19 @@ jobs:
             INSTRUCTIONS="$TASK_PROMPT"
           fi
 
-          HELP_TEXT=$(opencode run --help 2>&1 || true)
+          FLAGS_CACHE_FILE="$HOME/.opencode-cli/.run_flags_v1"
+          if [ -f "$FLAGS_CACHE_FILE" ]; then
+            HELP_TEXT=$(cat "$FLAGS_CACHE_FILE" 2>/dev/null || true)
+          else
+            HELP_TEXT=$(opencode run --help 2>&1 || true)
+            mkdir -p "$HOME/.opencode-cli" 2>/dev/null || true
+            printf '%s' "$HELP_TEXT" > "$FLAGS_CACHE_FILE" 2>/dev/null || true
+          fi
           OPENCODE_FLAGS=()
           if printf '%s' "$HELP_TEXT" | grep -q -- '--format'; then
             OPENCODE_FLAGS+=(--format json)
           fi
-          if printf '%s' "$HELP_TEXT" | grep -q -- '--thinking'; then
+          if [ "$TASK_THINKING" != "false" ] && printf '%s' "$HELP_TEXT" | grep -q -- '--thinking'; then
             OPENCODE_FLAGS+=(--thinking)
           fi
           if printf '%s' "$HELP_TEXT" | grep -q -- '--agent'; then
@@ -226,6 +241,7 @@ jobs:
           const fs = require('fs');
           const https = require('https');
           const readline = require('readline');
+          const { execFileSync } = require('child_process');
 
           const rawFile = '/tmp/opencode_events.jsonl';
           const outFile = '/tmp/opencode_reply.txt';
@@ -236,6 +252,7 @@ jobs:
           const ghRepo = process.env.DM_GITHUB_REPOSITORY || '';
           const ghRunId = String(process.env.DM_GITHUB_RUN_ID || '');
           const ghSha = process.env.DM_GITHUB_SHA || '';
+          const workspaceRoot = (process.env.GITHUB_WORKSPACE || process.cwd() || '').replace(/\/+$/, '');
 
           try { fs.writeFileSync(rawFile, ''); } catch {}
 
@@ -250,12 +267,39 @@ jobs:
           const subagents = new Set();
           const skills = new Set();
           const steps = [];
+          const events = [];
+          const eventIndexByCallId = new Map();
+          const rawPathsForPreview = new Set();
+          const imagePreviews = {};
           let parsedAnyJson = false;
           let turnCount = 0;
           let totalOutputTokens = 0;
           let totalReasoningTokens = 0;
           let lastFinishReason = '';
           let liveStep = 'Invoking ' + modelName + ' (' + agentMode + ' mode)';
+          let activePhase = 'workflow';
+          let activeTask = 'Starting ' + modelName;
+          let activeThoughtIdx = -1;
+          let activeThoughtStartMs = 0;
+
+          function normalizePath(p) {
+            let s = String(p || '').trim();
+            if (!s) return '';
+            if (workspaceRoot && s.startsWith(workspaceRoot + '/')) {
+              s = s.slice(workspaceRoot.length + 1);
+            } else if (workspaceRoot && s === workspaceRoot) {
+              s = '.';
+            }
+            s = s.replace(/^\/?home\/runner\/work\/[^\/]+\/[^\/]+\//, '');
+            if (s.startsWith('./')) s = s.slice(2);
+            return s;
+          }
+
+          function shortPath(p) {
+            const norm = normalizePath(p);
+            const parts = norm.split('/').filter(Boolean);
+            return parts.length <= 2 ? norm : parts.slice(-2).join('/');
+          }
 
           function addStep(label) {
             const clean = String(label || '').replace(/\s+/g, ' ').trim().slice(0, 120);
@@ -266,39 +310,79 @@ jobs:
             }
           }
 
+          function pushEvent(evt) {
+            if (!evt || !evt.kind) return;
+            if (events.length < 48) {
+              events.push(evt);
+              return events.length - 1;
+            }
+            return -1;
+          }
+
+          function closeActiveThought(nowMs) {
+            if (activeThoughtIdx >= 0 && events[activeThoughtIdx]) {
+              const elapsed = Math.max(100, (nowMs || Date.now()) - activeThoughtStartMs);
+              events[activeThoughtIdx].durationMs = elapsed;
+              events[activeThoughtIdx].status = 'completed';
+              activeThoughtIdx = -1;
+              activeThoughtStartMs = 0;
+            }
+          }
+
           function appendThinking(rawChunk, isDelta) {
             const text = String(rawChunk || '');
             if (!text.trim()) return;
-            if (isDelta && thinkChunks.length > 0) {
+            const nowMs = Date.now();
+            if (isDelta && thinkChunks.length > 0 && activeThoughtIdx >= 0 && events[activeThoughtIdx]) {
               thinkChunks[thinkChunks.length - 1] += text;
+              events[activeThoughtIdx].detail = thinkChunks[thinkChunks.length - 1].trim().slice(0, 1200);
+              events[activeThoughtIdx].durationMs = Math.max(100, nowMs - activeThoughtStartMs);
             } else {
               const trimmed = text.trim();
               const prev = thinkChunks.length > 0 ? thinkChunks[thinkChunks.length - 1].trim() : '';
-              if (prev && trimmed.startsWith(prev) && trimmed.length >= prev.length) {
+              if (prev && trimmed.startsWith(prev) && trimmed.length >= prev.length && activeThoughtIdx >= 0 && events[activeThoughtIdx]) {
                 thinkChunks[thinkChunks.length - 1] = trimmed;
+                events[activeThoughtIdx].detail = trimmed.slice(0, 1200);
+                events[activeThoughtIdx].durationMs = Math.max(100, nowMs - activeThoughtStartMs);
               } else if (prev !== trimmed) {
+                closeActiveThought(nowMs);
                 thinkChunks.push(trimmed);
+                activeThoughtStartMs = nowMs;
+                activeThoughtIdx = pushEvent({
+                  kind: 'thought',
+                  tool: '',
+                  title: 'Thought',
+                  detail: trimmed.slice(0, 1200),
+                  output: '',
+                  durationMs: 0,
+                  status: 'running',
+                });
               }
             }
+            activePhase = 'thinking';
+            activeTask = 'Thinking';
             const latestPreview = thinkChunks[thinkChunks.length - 1].trim().split(/\r?\n/).pop() || '';
             if (latestPreview) {
               liveStep = 'Thinking: ' + latestPreview.slice(0, 72);
             }
           }
 
-          function promoteRoundTextAsNarration() {
+          function flushRoundTextAsNarration() {
             if (roundTextBuffer.length === 0) return;
-            const joined = roundTextBuffer.join(' ').replace(/\s+/g, ' ').trim();
+            const joined = roundTextBuffer.join('').trim();
             roundTextBuffer = [];
             if (joined) {
-              appendThinking(joined, false);
-              addStep('Planned: ' + joined.slice(0, 88));
+              closeActiveThought(Date.now());
+              pushEvent({
+                kind: 'text',
+                tool: '',
+                title: '',
+                detail: joined.slice(0, 1000),
+                output: '',
+                durationMs: 0,
+                status: 'completed',
+              });
             }
-          }
-
-          function shortPath(p) {
-            const parts = String(p || '').split('/').filter(Boolean);
-            return parts.length <= 2 ? String(p || '') : parts.slice(-2).join('/');
           }
 
           function addSkillIfSkillPath(p) {
@@ -315,82 +399,252 @@ jobs:
             }
           }
 
-          function recordTool(nameRaw, inputObj, stateObj) {
-            promoteRoundTextAsNarration();
+          function extractOutputSnippet(st) {
+            if (!st || typeof st !== 'object') return '';
+            const rawOut = st.output || st.result || (st.metadata && st.metadata.output) || '';
+            if (typeof rawOut !== 'string') return '';
+            return rawOut.replace(/\r\n/g, '\n').trim().slice(0, 220);
+          }
+
+          function computeToolDuration(st) {
+            if (!st || typeof st !== 'object' || !st.time) return 0;
+            const start = Number(st.time.start || 0);
+            const end = Number(st.time.end || 0);
+            return start > 0 && end > start ? Math.max(1, end - start) : 0;
+          }
+
+          function recordTool(nameRaw, inputObj, stateObj, callId) {
+            const nowMs = Date.now();
+            closeActiveThought(nowMs);
+            flushRoundTextAsNarration();
+
             const name = String(nameRaw || '').toLowerCase();
             const inp = inputObj && typeof inputObj === 'object' ? inputObj : {};
             const st = stateObj && typeof stateObj === 'object' ? stateObj : {};
-            const title = typeof st.title === 'string' ? st.title.trim() : '';
-            const path = inp.filePath || inp.file_path || inp.path || inp.file || inp.target || inp.filename || inp.dir || inp.directory || '';
+            const title = typeof st.title === 'string' ? normalizePath(st.title.trim()) : '';
+            const statusStr = typeof st.status === 'string' ? st.status.toLowerCase() : 'completed';
+            const rawPath = inp.filePath || inp.file_path || inp.path || inp.file || inp.target || inp.filename || inp.dir || inp.directory || '';
+            const normPath = normalizePath(rawPath);
+            const outputSnippet = extractOutputSnippet(st);
+            const durationMs = computeToolDuration(st);
+            if (rawPath && /\.(png|jpe?g|webp|gif|bmp)$/i.test(String(rawPath))) {
+              rawPathsForPreview.add(String(rawPath));
+            }
 
-            if (name.includes('webfetch') || name.includes('websearch') || name.includes('web_search') || name.includes('search_web') || name === 'fetch') {
-              const target = inp.url || inp.query || inp.q || inp.prompt || path || title || '';
-              if (target) {
-                const cleanTarget = String(target).slice(0, 100);
+            let eventObj = {
+              kind: 'tool',
+              tool: name || 'tool',
+              title: title || name,
+              detail: normPath || title,
+              output: outputSnippet,
+              durationMs: durationMs,
+              status: statusStr,
+            };
+
+            if (name.includes('websearch') || name.includes('web_search') || name.includes('search_web')) {
+              const target = String(inp.query || inp.q || inp.prompt || title || '');
+              const cleanTarget = target.slice(0, 140);
+              if (cleanTarget) {
                 searches.add('web: ' + cleanTarget);
                 addStep('Searched web: ' + cleanTarget.slice(0, 72));
               }
+              activePhase = 'tool';
+              activeTask = 'Searching web';
+              eventObj = { ...eventObj, tool: 'websearch', title: '1 search', detail: cleanTarget };
+            } else if (name.includes('webfetch') || name === 'fetch') {
+              const target = String(inp.url || inp.query || normPath || title || '');
+              const cleanTarget = target.slice(0, 140);
+              if (cleanTarget) {
+                searches.add('web: ' + cleanTarget);
+                addStep('Fetched: ' + cleanTarget.slice(0, 72));
+              }
+              activePhase = 'tool';
+              activeTask = 'Fetching page';
+              eventObj = { ...eventObj, tool: 'webfetch', title: '1 fetch', detail: cleanTarget };
             } else if (name === 'read' || name.includes('read_file') || name.includes('read_repo') || name === 'view_file' || name === 'cat') {
-              const target = path || title;
+              const target = normPath || title;
               if (target) {
-                reads.add(String(target));
+                reads.add(target);
                 addStep('Read ' + shortPath(target));
                 addSkillIfSkillPath(target);
               }
+              activePhase = 'tool';
+              activeTask = target ? ('Reading ' + shortPath(target)) : 'Reading file';
+              eventObj = { ...eventObj, tool: 'read', title: shortPath(target), detail: target };
             } else if (name.includes('write') && !name.includes('todo')) {
-              const target = path || title;
+              const target = normPath || title;
               if (target) {
-                writes.add(String(target));
+                writes.add(target);
                 addStep('Edited ' + shortPath(target));
               }
+              activePhase = 'tool';
+              activeTask = target ? ('Writing ' + shortPath(target)) : 'Writing file';
+              eventObj = { ...eventObj, tool: 'write', title: shortPath(target), detail: target };
             } else if (name.includes('edit') || name.includes('patch') || name.includes('replace')) {
-              const target = path || title;
+              const target = normPath || title;
               if (target) {
-                writes.add(String(target));
+                writes.add(target);
                 addStep('Edited ' + shortPath(target));
               }
+              activePhase = 'tool';
+              activeTask = target ? ('Editing ' + shortPath(target)) : 'Editing file';
+              eventObj = { ...eventObj, tool: 'edit', title: shortPath(target), detail: target };
             } else if (name.includes('delete') || name.includes('remove') || name.includes('unlink')) {
-              const target = path || title;
+              const target = normPath || title;
               if (target) {
-                writes.add(String(target));
+                writes.add(target);
                 addStep('Deleted ' + shortPath(target));
               }
+              activePhase = 'tool';
+              activeTask = target ? ('Deleting ' + shortPath(target)) : 'Deleting file';
+              eventObj = { ...eventObj, tool: 'delete', title: shortPath(target), detail: target };
             } else if (name.includes('bash') || name.includes('shell') || name.includes('exec') || name.includes('command')) {
               const cmd = inp.command || inp.cmd || inp.script || title || '';
-              if (cmd) {
-                const line = String(cmd).split('\n')[0].slice(0, 120);
-                shell.add(line);
+              const line = String(cmd).trim();
+              if (line) {
+                shell.add(line.split('\n')[0].slice(0, 140));
                 const dmMatch = line.match(/dm-websearch\s+["']?([^"'\n]+)["']?/i);
                 if (dmMatch && dmMatch[1]) {
                   const wq = dmMatch[1].trim().slice(0, 90);
                   searches.add('web: ' + wq);
                   addStep('Searched web: ' + wq.slice(0, 72));
+                  activePhase = 'tool';
+                  activeTask = 'Searching web';
+                  eventObj = { ...eventObj, tool: 'websearch', title: '1 search', detail: wq };
                 } else {
-                  addStep('Executed shell: ' + (title || line).slice(0, 72));
+                  addStep('Executed shell: ' + (title || line.split('\n')[0]).slice(0, 72));
+                  activePhase = 'tool';
+                  activeTask = 'Running shell';
+                  eventObj = { ...eventObj, tool: 'bash', title: title || line.split('\n')[0].slice(0, 64), detail: line.slice(0, 260) };
                 }
+              } else {
+                activePhase = 'tool';
+                activeTask = 'Running shell';
               }
             } else if (name.includes('grep') || name.includes('glob') || name.includes('find') || name.includes('list') || name === 'codesearch' || name === 'ls') {
-              const q = inp.pattern || inp.query || inp.glob || inp.path || inp.filePath || inp.file_path || title || '';
+              const q = normalizePath(inp.pattern || inp.query || inp.glob || inp.path || inp.filePath || inp.file_path || title || '');
               if (q) {
                 searches.add(name + ': ' + String(q).slice(0, 80));
                 addStep('Searched ' + name + ': ' + String(q).slice(0, 64));
               }
+              activePhase = 'tool';
+              activeTask = (name === 'glob' || name === 'list' || name === 'ls') ? 'Listing files' : 'Searching code';
+              eventObj = { ...eventObj, tool: name, title: title || name, detail: String(q).slice(0, 140) };
             } else if (name.includes('task') || name.includes('subagent') || name === 'agent') {
               const stType = inp.subagent_type || inp.agent || 'subagent';
-              const desc = inp.description ? (': ' + String(inp.description).slice(0, 60)) : '';
-              subagents.add(String(stType) + desc);
-              addStep('Launched sub-agent: ' + String(stType) + desc);
+              const desc = inp.description ? String(inp.description).slice(0, 100) : '';
+              subagents.add(String(stType) + (desc ? ': ' + desc : ''));
+              addStep('Launched sub-agent: ' + String(stType) + (desc ? ': ' + desc : ''));
+              activePhase = 'tool';
+              activeTask = 'Running sub-agent';
+              eventObj = { ...eventObj, tool: 'task', title: String(stType), detail: desc || title };
             } else if (name.includes('skill')) {
-              const sname = inp.name || inp.skill || inp.path || title || 'skill';
+              const sname = inp.name || inp.skill || normPath || title || 'skill';
               skills.add(String(sname));
               addStep('Loaded skill: ' + String(sname));
+              activePhase = 'tool';
+              activeTask = 'Loading skill';
+              eventObj = { ...eventObj, tool: 'skill', title: String(sname), detail: String(sname) };
             } else if (name.includes('todo')) {
               const count = Array.isArray(inp.todos) ? inp.todos.length : 0;
-              addStep(title || (count > 0 ? 'Updated task checklist (' + count + ' items)' : 'Updated task checklist'));
+              const lbl = title || (count > 0 ? 'Updated task checklist (' + count + ' items)' : 'Updated task checklist');
+              addStep(lbl);
+              activePhase = 'tool';
+              activeTask = 'Updating tasks';
+              eventObj = { ...eventObj, tool: 'todo', title: 'Tasks', detail: lbl };
             } else if (name.includes('question')) {
               addStep('Prepared clarifying question');
+              activePhase = 'tool';
+              activeTask = 'Preparing question';
+              eventObj = { ...eventObj, tool: 'question', title: 'AskQuestion', detail: title || 'Clarifying question' };
             } else if (title || name) {
               addStep(title || ('Ran tool: ' + name));
+              activePhase = 'tool';
+              activeTask = 'Running ' + (name || 'tool');
+            }
+
+            if (callId && eventIndexByCallId.has(callId)) {
+              const idx = eventIndexByCallId.get(callId);
+              if (idx >= 0 && events[idx]) {
+                events[idx] = {
+                  ...events[idx],
+                  ...eventObj,
+                  output: eventObj.output || events[idx].output,
+                  durationMs: eventObj.durationMs || events[idx].durationMs,
+                };
+                return;
+              }
+            }
+            const insertedIdx = pushEvent(eventObj);
+            if (callId && insertedIdx >= 0) {
+              eventIndexByCallId.set(callId, insertedIdx);
+            }
+          }
+
+          function captureEphemeralImagePreviews(forceScan) {
+            const candidates = [];
+            for (const p of rawPathsForPreview) {
+              candidates.push(p);
+            }
+            for (const p of reads) candidates.push(p);
+            for (const p of writes) candidates.push(p);
+            const imgPaths = Array.from(new Set(candidates)).filter((p) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(String(p)));
+            if (imgPaths.length === 0) return;
+
+            // Prioritize /tmp/ and newest images so live/uncommitted previews appear immediately
+            const prioritized = imgPaths.sort((a, b) => {
+              const aTmp = String(a).startsWith('/tmp/') ? 0 : 1;
+              const bTmp = String(b).startsWith('/tmp/') ? 0 : 1;
+              return aTmp - bTmp;
+            });
+
+            let budgetBytes = 9200;
+            for (const k of Object.keys(imagePreviews)) {
+              budgetBytes -= String(imagePreviews[k] || '').length;
+            }
+            for (const rawCandidate of prioritized) {
+              if (budgetBytes < 400) break;
+              const key = normalizePath(rawCandidate);
+              if (!forceScan && imagePreviews[key]) continue;
+              const resolvedFile = fs.existsSync(rawCandidate)
+                ? rawCandidate
+                : (fs.existsSync('/' + key) ? '/' + key : (workspaceRoot && fs.existsSync(workspaceRoot + '/' + key) ? workspaceRoot + '/' + key : null));
+              if (!resolvedFile) continue;
+
+              let dataUri = '';
+              try {
+                const pyScript = [
+                  'import sys, io, base64',
+                  'from PIL import Image',
+                  'im = Image.open(sys.argv[1]).convert("RGB")',
+                  'im.thumbnail((320, 320))',
+                  'buf = io.BytesIO()',
+                  'im.save(buf, format="JPEG", quality=56, optimize=True)',
+                  'print("data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii"))'
+                ].join('\n');
+                const out = execFileSync('python3', ['-c', pyScript, resolvedFile], { timeout: 2000 }).toString().trim();
+                if (out.startsWith('data:image/')) dataUri = out;
+              } catch {
+                try {
+                  const imBuf = execFileSync('convert', [resolvedFile, '-auto-orient', '-thumbnail', '320x320', '-strip', '-quality', '56', 'jpeg:-'], { timeout: 2000, maxBuffer: 64 * 1024 });
+                  if (imBuf && imBuf.length > 0 && imBuf.length <= 6500) {
+                    dataUri = 'data:image/jpeg;base64,' + imBuf.toString('base64');
+                  }
+                } catch {
+                  try {
+                    const rawBytes = fs.readFileSync(resolvedFile);
+                    if (rawBytes.length > 0 && rawBytes.length <= 5000) {
+                      const ext = resolvedFile.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+                      dataUri = 'data:image/' + ext + ';base64,' + rawBytes.toString('base64');
+                    }
+                  } catch {}
+                }
+              }
+              if (dataUri && dataUri.length <= budgetBytes) {
+                const prevLen = imagePreviews[key] ? imagePreviews[key].length : 0;
+                imagePreviews[key] = dataUri;
+                budgetBytes -= (dataUri.length - prevLen);
+              }
             }
           }
 
@@ -405,7 +659,7 @@ jobs:
             return out;
           }
 
-          function buildTraceObject() {
+          function buildTraceObject(isFinal) {
             return {
               thinking: thinkChunks.join('\n\n').slice(0, 3200),
               reads: Array.from(reads).slice(0, 24),
@@ -415,6 +669,10 @@ jobs:
               subagents: Array.from(subagents).slice(0, 12),
               skills: Array.from(skills).slice(0, 12),
               steps: steps.slice(0, 36),
+              events: events.slice(0, 48),
+              imagePreviews: imagePreviews,
+              activePhase: isFinal ? '' : activePhase,
+              activeTask: isFinal ? '' : activeTask,
               liveStep: liveStep,
             };
           }
@@ -433,7 +691,7 @@ jobs:
                 hostname: 'api.github.com',
                 path: apiPath,
                 method: method,
-                timeout: 5000,
+                timeout: 2500,
                 headers: {
                   'Authorization': 'Bearer ' + ghToken,
                   'Accept': 'application/vnd.github+json',
@@ -464,11 +722,11 @@ jobs:
 
           async function pushCheckRunUpdate(isFinal) {
             if (checkDisabled) return;
-            const payloadObj = buildTraceObject();
+            const payloadObj = buildTraceObject(isFinal);
             const b64 = Buffer.from(JSON.stringify(payloadObj), 'utf8').toString('base64');
             const outputBody = {
               title: 'Dark Matter Trace',
-              summary: liveStep.slice(0, 140),
+              summary: (activeTask || liveStep).slice(0, 140),
               text: '<<<DARK_MATTER_LIVE_TRACE>>>' + b64 + '<<<DARK_MATTER_LIVE_TRACE_END>>>'
             };
             if (!checkRunId) {
@@ -489,13 +747,18 @@ jobs:
             }
           }
 
+          let lastPreviewScanMs = 0;
           function scheduleLiveUpdate() {
             if (checkDisabled || patchTimer) return;
             const now = Date.now();
-            const waitMs = Math.max(0, 1800 - (now - lastPatchMs));
+            const waitMs = Math.max(0, 1600 - (now - lastPatchMs));
             patchTimer = setTimeout(() => {
               patchTimer = null;
               lastPatchMs = Date.now();
+              if (lastPatchMs - lastPreviewScanMs >= 2500) {
+                lastPreviewScanMs = lastPatchMs;
+                try { captureEphemeralImagePreviews(false); } catch {}
+              }
               inflightPromise = inflightPromise.then(() => pushCheckRunUpdate(false));
             }, waitMs);
           }
@@ -532,13 +795,15 @@ jobs:
                 }
               } else if (typ === 'step_start' || typ === 'step-start') {
                 turnCount++;
-                promoteRoundTextAsNarration();
+                closeActiveThought(Date.now());
+                flushRoundTextAsNarration();
                 if (turnCount === 1 && steps.length === 0) {
+                  activePhase = 'model';
+                  activeTask = 'Running ' + modelName;
                   addStep('Model ' + modelName + ' analyzing request');
-                } else if (turnCount > 1) {
-                  liveStep = 'Processing step ' + turnCount + '…';
                 }
               } else if (typ === 'step_finish' || typ === 'step-finish') {
+                closeActiveThought(Date.now());
                 const tokens = p.tokens || evt.tokens || {};
                 const outTok = Number(tokens.output || 0);
                 const reasonTok = Number(tokens.reasoning || 0);
@@ -547,19 +812,29 @@ jobs:
                 const reason = String(p.reason || evt.reason || '').trim();
                 if (reason) lastFinishReason = reason;
               } else if (typ === 'error') {
+                closeActiveThought(Date.now());
                 const errObj = p.error || evt.error || p;
                 const msg = typeof errObj === 'string' ? errObj : (errObj.message || JSON.stringify(errObj));
-                if (msg) addStep('Error: ' + String(msg).slice(0, 90));
+                if (msg) {
+                  activePhase = 'error';
+                  activeTask = 'Error encountered';
+                  addStep('Error: ' + String(msg).slice(0, 90));
+                  pushEvent({ kind: 'error', tool: '', title: 'Error', detail: String(msg).slice(0, 260), output: '', durationMs: 0, status: 'error' });
+                }
               } else if (typ.includes('tool') || p.tool || evt.tool) {
                 const toolName = p.tool || p.name || p.toolName || evt.tool || evt.name || '';
                 const st = p.state && typeof p.state === 'object' ? p.state : evt.state || {};
                 const inp = st.input || p.input || p.args || p.arguments || evt.input || {};
-                recordTool(toolName, inp, st);
+                const callId = p.callID || p.callId || p.id || evt.callID || evt.id || '';
+                recordTool(toolName, inp, st, callId);
               } else if (typ === 'text' || typ === 'assistant' || (p.type === 'text' && typeof p.text === 'string')) {
                 const txt = delta || p.text || evt.text || evt.content || '';
                 if (typeof txt === 'string' && txt.trim()) {
+                  closeActiveThought(Date.now());
                   roundTextBuffer.push(txt);
                   allTextChunks.push(txt);
+                  activePhase = 'text';
+                  activeTask = 'Generating response';
                 }
               }
             }
@@ -571,12 +846,14 @@ jobs:
               clearTimeout(patchTimer);
               patchTimer = null;
             }
+            closeActiveThought(Date.now());
             let finalText = parsedAnyJson
               ? (roundTextBuffer.length > 0 ? roundTextBuffer : allTextChunks).join('\n').trim()
               : nonJsonLines.join('\n').trim();
             finalText = finalText.replace(/<(?:think|thinking|thought)>([\s\S]*?)<\/(?:think|thinking|thought)>/gi, (_, inner) => {
               if (inner && inner.trim()) {
                 appendThinking(inner.trim(), false);
+                closeActiveThought(Date.now());
               }
               return '';
             }).trim();
@@ -594,13 +871,22 @@ jobs:
               addStep('Model finished (' + lastFinishReason + ')');
             }
 
+            captureEphemeralImagePreviews(true);
+
             fs.writeFileSync(outFile, finalText);
-            const finalTrace = buildTraceObject();
+            const finalTrace = buildTraceObject(true);
             fs.writeFileSync(traceFile, Buffer.from(JSON.stringify(finalTrace), 'utf8').toString('base64'));
-            await inflightPromise;
-            await pushCheckRunUpdate(true);
+            const flushDone = inflightPromise.then(() => pushCheckRunUpdate(true)).catch(() => {});
+            await Promise.race([flushDone, new Promise((r) => setTimeout(r, 1600))]);
           });
           NODE_EOF
+
+          HAD_OPENCODE_KEY=0
+          if [ -n "${OPENCODE_API_KEY:-}" ]; then
+            HAD_OPENCODE_KEY=1
+          else
+            unset OPENCODE_API_KEY
+          fi
 
           run_opencode() {
             opencode run "${OPENCODE_FLAGS[@]}" -m "$MODEL" "$INSTRUCTIONS"
@@ -611,8 +897,8 @@ jobs:
           STATUS=${PIPESTATUS[0]}
           set -e
 
-          if [ $STATUS -ne 0 ] || [ ! -s "$RAW_JSON_FILE" ]; then
-            if grep -qiE "Free usage limit|rate limit|401|unauthorized|quota" "$ERR_FILE" "$RAW_JSON_FILE" 2>/dev/null || [ -z "$OPENCODE_API_KEY" ]; then
+          if [ "$HAD_OPENCODE_KEY" -eq 1 ] && { [ $STATUS -ne 0 ] || [ ! -s "$RAW_JSON_FILE" ]; }; then
+            if grep -qiE "Free usage limit|rate limit|401|unauthorized|quota" "$ERR_FILE" "$RAW_JSON_FILE" 2>/dev/null; then
               echo "Retrying OpenCode CLI with public free tier..."
               set +e
               env -u OPENCODE_API_KEY opencode run "${OPENCODE_FLAGS[@]}" -m "$MODEL" "$INSTRUCTIONS" 2>"$ERR_FILE" | node /tmp/dm_live.js
@@ -632,17 +918,47 @@ jobs:
           CHANGED_FILES=""
           FILE_STATS_B64=""
           if [ "$AGENT_MODE" != "plan" ]; then
+            WORK_DIR="$PWD" START_MARKER="$DM_START_MARKER" node -e '
+              const fs = require("fs");
+              const path = require("path");
+              const workDir = process.env.WORK_DIR;
+              const startMarker = process.env.START_MARKER;
+              let startMs = 0;
+              try { startMs = fs.statSync(startMarker).mtimeMs; } catch {}
+              const docRe = /\.(pdf|xlsx|xls|docx|doc|pptx|ppt|csv|zip|epub|odt|ods|odp|rtf)$/i;
+              function promoteTmpDocs(dir, depth) {
+                if (depth > 2) return;
+                let entries = [];
+                try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+                for (const e of entries) {
+                  if (e.name.startsWith(".") || e.name === "dm_artifacts") continue;
+                  const full = path.join(dir, e.name);
+                  if (e.isDirectory()) promoteTmpDocs(full, depth + 1);
+                  else if (e.isFile() && docRe.test(e.name)) {
+                    try {
+                      const st = fs.statSync(full);
+                      if (st.size > 0 && st.size <= 20 * 1024 * 1024 && (startMs === 0 || st.mtimeMs >= startMs - 1000)) {
+                        const dest = path.join(workDir, e.name);
+                        if (!fs.existsSync(dest)) fs.copyFileSync(full, dest);
+                      }
+                    } catch {}
+                  }
+                }
+              }
+              promoteTmpDocs("/tmp", 0);
+            ' 2>/dev/null || true
             if [ -n "$(git status --porcelain)" ]; then
               git add -A
               git commit -m "feat: ${TASK_THREAD_ID:-update}" || true
             fi
             COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || true)
             if [ -n "$INITIAL_HEAD_SHA" ] && [ -n "$COMMIT_SHA" ] && [ "$INITIAL_HEAD_SHA" != "$COMMIT_SHA" ]; then
-              CHANGED_FILES=$(git diff --name-only "$INITIAL_HEAD_SHA" "$COMMIT_SHA" | tr '\n' ',' | sed 's/,$//')
+              CHANGED_FILES=$(git diff --name-only "$INITIAL_HEAD_SHA" "$COMMIT_SHA" | grep -v -E '(^|/)(page[_-]?[0-9]+|pg[_-]?[0-9]+|slide[_-]?[0-9]+|preview[_-]?[0-9]+|render[_-]?[0-9]+)\.(png|jpe?g|webp)$' | grep -v -E '(^|/)(make|generate|create|render|verify|check)_.*\.(py|sh)$' | tr '\n' ',' | sed 's/,$//')
               FILE_STATS_B64=$(INITIAL_SHA="$INITIAL_HEAD_SHA" HEAD_SHA="$COMMIT_SHA" node -e '
                 const { execFileSync } = require("child_process");
                 const base = process.env.INITIAL_SHA;
                 const head = process.env.HEAD_SHA;
+                const scratchRe = /(^|\/)(page[_-]?\d+|pg[_-]?\d+|slide[_-]?\d+|preview[_-]?\d+|render[_-]?\d+|thumb[_-]?\d+)\.(png|jpe?g|webp)$|(^|\/)(make|generate|create|render|verify|check)_.*\.(py|sh)$/i;
                 const statusOut = execFileSync("git", ["diff", "--name-status", base, head]).toString();
                 const numOut = execFileSync("git", ["diff", "--numstat", base, head]).toString();
                 const statusMap = {};
@@ -658,6 +974,7 @@ jobs:
                   const parts = l.split(/\t/);
                   if (parts.length < 3) continue;
                   const path = parts.slice(2).join("\t");
+                  if (scratchRe.test(path)) continue;
                   let patch = "";
                   if (patchBudget > 300) {
                     try {
@@ -720,6 +1037,102 @@ jobs:
             fi
           fi
 
+          ARTIFACTS_B64=""
+          ARTIFACTS_B64=$(OUT_DIR="/tmp/dm_artifacts" WORK_DIR="$PWD" START_MARKER="$DM_START_MARKER" node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const { execFileSync } = require("child_process");
+            const outDir = process.env.OUT_DIR;
+            const workDir = process.env.WORK_DIR;
+            const startMarker = process.env.START_MARKER;
+            let startMs = 0;
+            try { startMs = fs.statSync(startMarker).mtimeMs; } catch {}
+
+            fs.rmSync(outDir, { recursive: true, force: true });
+            fs.mkdirSync(outDir, { recursive: true });
+
+            const deliverableDocRe = /\.(pdf|xlsx|xls|docx|doc|pptx|ppt|csv|zip|epub|odt|ods|odp|rtf)$/i;
+            const binaryPriorityRe = /\.(pdf|xlsx|xls|docx|doc|pptx|ppt|csv|zip|epub|odt|ods|odp|rtf|png|jpe?g|webp|gif|svg)$/i;
+            const scratchImgRe = /^(page[_-]?\d+|pg[_-]?\d+|slide[_-]?\d+|screen[_-]?\d+|preview[_-]?\d+|render[_-]?\d+|thumb[_-]?\d+|test[_-].*|verify[_-].*|check[_-].*|tmp[_-].*|debug[_-].*)\.(png|jpe?g|webp)$/i;
+            const ignoredTmp = new Set(["dm_live.js", "opencode_events.jsonl", "opencode_reply.txt", "opencode_err.txt", "opencode_trace.b64", "dark-matter-opencode.json", "git_push_err.txt", "dm_run_started_marker", "dm_artifacts"]);
+
+            const found = [];
+            function scanTmp(dir, depth) {
+              if (depth > 3) return;
+              let entries = [];
+              try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+              for (const e of entries) {
+                if (e.name.startsWith(".") || ignoredTmp.has(e.name)) continue;
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) {
+                  scanTmp(full, depth + 1);
+                } else if (e.isFile() && deliverableDocRe.test(e.name)) {
+                  try {
+                    const st = fs.statSync(full);
+                    if (st.size > 0 && st.size <= 20 * 1024 * 1024 && (startMs === 0 || st.mtimeMs >= startMs - 1000)) {
+                      const promoted = path.join(workDir, e.name);
+                      const relPath = fs.existsSync(promoted) ? e.name : full;
+                      found.push({ abs: full, rel: relPath, priority: 0 });
+                    }
+                  } catch {}
+                }
+              }
+            }
+            scanTmp("/tmp", 0);
+
+            try {
+              const statusOut = execFileSync("git", ["status", "--porcelain"], { cwd: workDir }).toString();
+              for (const line of statusOut.split(/\r?\n/)) {
+                if (line.length < 4) continue;
+                let rel = line.slice(3).trim();
+                if (rel.includes(" -> ")) rel = rel.split(" -> ").pop().trim();
+                rel = rel.replace(/^"|"$/g, "");
+                const baseName = path.basename(rel);
+                if (scratchImgRe.test(baseName)) continue;
+                const abs = path.join(workDir, rel);
+                if (fs.existsSync(abs) && fs.statSync(abs).isFile() && binaryPriorityRe.test(rel)) {
+                  found.push({ abs, rel, priority: deliverableDocRe.test(rel) ? 0 : 1 });
+                }
+              }
+            } catch {}
+
+            // Also include recently modified workspace binary deliverables
+            try {
+              const recent = execFileSync("find", [workDir, "-maxdepth", "4", "-not", "-path", "*/.git/*", "-not", "-path", "*/node_modules/*", "-type", "f", "-newer", startMarker], { timeout: 2500 }).toString();
+              for (const full of recent.split(/\r?\n/)) {
+                if (!full || !binaryPriorityRe.test(full)) continue;
+                const baseName = path.basename(full);
+                if (scratchImgRe.test(baseName)) continue;
+                const rel = path.relative(workDir, full).replace(/\\/g, "/");
+                if (rel && !rel.startsWith("..")) {
+                  found.push({ abs: full, rel, priority: deliverableDocRe.test(rel) ? 0 : 1 });
+                }
+              }
+            } catch {}
+
+            found.sort((a, b) => a.priority - b.priority);
+            const seen = new Set();
+            const exported = [];
+            let totalBytes = 0;
+            for (const item of found) {
+              if (exported.length >= 20 || seen.has(item.rel)) continue;
+              try {
+                const st = fs.statSync(item.abs);
+                if (totalBytes + st.size > 24 * 1024 * 1024) continue;
+                const cleanSub = item.rel.replace(/^\/+/, "");
+                const dest = path.join(outDir, cleanSub);
+                fs.mkdirSync(path.dirname(dest), { recursive: true });
+                fs.copyFileSync(item.abs, dest);
+                seen.add(item.rel);
+                exported.push(item.rel);
+                totalBytes += st.size;
+              } catch {}
+            }
+            if (exported.length > 0) {
+              process.stdout.write(Buffer.from(JSON.stringify(exported), "utf8").toString("base64"));
+            }
+          ' 2>/dev/null || true)
+
           printf '\n%s\n' '<<<DARK_MATTER_REPLY_START>>>'
           if [ -s "$OUT_FILE" ]; then
             cat "$OUT_FILE"
@@ -739,6 +1152,9 @@ jobs:
           if [ -n "$FILE_STATS_B64" ]; then
             printf '<<<DARK_MATTER_FILE_STATS>>>%s<<<DARK_MATTER_FILE_STATS_END>>>\n' "$FILE_STATS_B64"
           fi
+          if [ -n "$ARTIFACTS_B64" ]; then
+            printf '<<<DARK_MATTER_ARTIFACTS>>>%s<<<DARK_MATTER_ARTIFACTS_END>>>\n' "$ARTIFACTS_B64"
+          fi
           if [ -s "$TRACE_B64_FILE" ]; then
             printf '<<<DARK_MATTER_TRACE>>>%s<<<DARK_MATTER_TRACE_END>>>\n' "$(cat "$TRACE_B64_FILE")"
           fi
@@ -755,6 +1171,15 @@ jobs:
           if [ $STATUS -ne 0 ] && [ ! -s "$OUT_FILE" ]; then
             exit $STATUS
           fi
+
+      - name: Upload deliverables
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dark-matter-files-${{ github.run_id }}
+          path: /tmp/dm_artifacts
+          if-no-files-found: ignore
+          retention-days: 14
 
   opencode-comment:
     if: >-
